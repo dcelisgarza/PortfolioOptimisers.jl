@@ -492,7 +492,7 @@ Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `N > 0`.
+  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples
@@ -529,6 +529,7 @@ Frontier
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
         @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        assert_resource_cap(N, RESOURCE_LIMITS[].max_frontier, :N, :max_frontier)
         @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
         @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))
         return new{typeof(N), typeof(factor), typeof(bound)}(N, factor, bound)

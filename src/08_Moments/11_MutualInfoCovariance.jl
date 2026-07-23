@@ -75,6 +75,7 @@ MutualInfoCovariance
                                   normalise::Bool)
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError(bins, "bins must be positive"))
+            assert_resource_cap(bins, RESOURCE_LIMITS[].max_bins, :bins, :max_bins)
         end
         return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
     end

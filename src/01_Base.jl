@@ -757,7 +757,7 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                       :dims => "`dims in (1, 2)`.",#
                       :alpha => "`0 < alpha < 1`.",#
                       :beta => "`0 < beta < 1`.",#
-                      :bins => "If `bins` is an integer, `bins > 0`.",#
+                      :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
                       :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                       :settings => "If not `nothing`, `!isempty(settings)`.",#
                       :S => "`!isempty(S)`.",#
@@ -1405,16 +1405,20 @@ function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_len
     return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
 end
 """
-Global resource caps for the sampling-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion.
+Global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion.
 
-The number of Monte-Carlo draws and the number of resampled asset subsets are untrusted configuration integers (config files, tuning grids, UI): each directly multiplies an allocation, and in the subset case a whole optimisation. Their own constructors only bound them from *below* (`n_sim > 0`, `n_subsets >= 2`), so an absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by the OOM killer rather than told what went wrong. These caps fail closed with a typed `DomainError` at the point the value is resolved.
+Draw counts, subset counts, frontier-sweep lengths and histogram bin counts are untrusted configuration integers (config files, tuning grids, UI): each directly multiplies an allocation, and in the subset and frontier cases a whole optimisation. Their own constructors only bound them from *below* (`n_sim > 0`, `n_subsets >= 2`, `N > 0`, `bins > 0`), so an absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by the OOM killer rather than told what went wrong. These caps fail closed with a typed `DomainError` at the point the value is resolved.
+
+There is **one cap per sink**, each named to mirror the field it guards. Reuse across sinks is deliberately avoided: a *linear* cap cannot bound a *quadratic* sink, which is why the `bins × bins` histogram gets its own [`max_bins`](@ref ResourceLimits) rather than sharing the linear draw cap.
 
 # Fields
 
-  - `max_samples`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`.
-  - `max_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
+  - `max_n_sim`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`. *Memory*-bound.
+  - `max_n_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
+  - `max_frontier`: maximum efficient-frontier sweep points (`N`) accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`.
+  - `max_bins`: maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref) (default `10_000`). The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is ≈ 800 MB per histogram — below OOM yet far above the ~50-bin range legitimate binning produces.
 
-The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). Both fields must be positive (enforced by the constructor).
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the four caps are same-typed and two share the value `100_000`, so positional construction is error-prone.
 
 # Related
 
@@ -1425,18 +1429,25 @@ The values are conservative static defaults, deliberately far above legitimate u
   - [`EquationLimits`](@ref)
 """
 struct ResourceLimits
-    max_samples::Int
-    max_subsets::Int
-    function ResourceLimits(max_samples::Integer, max_subsets::Integer)
-        @argcheck(max_samples > 0 && max_subsets > 0,
-                  ArgumentError("max_samples and max_subsets must be positive."))
-        return new(Int(max_samples), Int(max_subsets))
+    max_n_sim::Int
+    max_n_subsets::Int
+    max_frontier::Int
+    max_bins::Int
+    function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,
+                            max_frontier::Integer, max_bins::Integer)
+        @argcheck(max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0,
+                  ArgumentError("max_n_sim, max_n_subsets, max_frontier and max_bins must be positive."))
+        return new(Int(max_n_sim), Int(max_n_subsets), Int(max_frontier), Int(max_bins))
     end
 end
+function ResourceLimits(; max_n_sim::Integer = 1_000_000, max_n_subsets::Integer = 100_000,
+                        max_frontier::Integer = 100_000, max_bins::Integer = 10_000)
+    return ResourceLimits(max_n_sim, max_n_subsets, max_frontier, max_bins)
+end
 """
-    RESOURCE_LIMITS = ScopedConfig(ResourceLimits(1_000_000, 100_000))
+    RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 
-Default global resource caps for the sampling-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_samples"` / `"max_subsets"` preferences (see [`apply_preferences!`](@ref)).
+Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` preferences (see [`apply_preferences!`](@ref)).
 
 # Related
 
@@ -1445,16 +1456,19 @@ Default global resource caps for the sampling-based estimators, guarding the con
   - [`with_resource_limits`](@ref)
   - [`assert_resource_cap`](@ref)
 """
-const RESOURCE_LIMITS = ScopedConfig(ResourceLimits(1_000_000, 100_000))
+const RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 """
-    set_resource_limits!(; max_samples::Integer, max_subsets::Integer)
+    set_resource_limits!(; max_n_sim::Integer, max_n_subsets::Integer,
+                         max_frontier::Integer, max_bins::Integer)
 
 Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
 
-  - `max_samples`: maximum `n_sim` accepted by the uncertainty-set estimators.
-  - `max_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
+  - `max_n_sim`: maximum `n_sim` accepted by the uncertainty-set estimators.
+  - `max_n_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
+  - `max_frontier`: maximum `N` accepted by the [`Frontier`](@ref) sweep.
+  - `max_bins`: maximum `bins` accepted by the mutual-information estimators.
 
-Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. Both must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
+Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. All must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
 
 Returns the new default [`ResourceLimits`](@ref).
 
@@ -1465,26 +1479,34 @@ Returns the new default [`ResourceLimits`](@ref).
   - [`set_equation_limits!`](@ref)
 """
 function set_resource_limits!(;
-                              max_samples::Integer = (@atomic RESOURCE_LIMITS.default).max_samples,
-                              max_subsets::Integer = (@atomic RESOURCE_LIMITS.default).max_subsets)
-    return set_default!(RESOURCE_LIMITS, ResourceLimits(max_samples, max_subsets))
+                              max_n_sim::Integer = (@atomic RESOURCE_LIMITS.default).max_n_sim,
+                              max_n_subsets::Integer = (@atomic RESOURCE_LIMITS.default).max_n_subsets,
+                              max_frontier::Integer = (@atomic RESOURCE_LIMITS.default).max_frontier,
+                              max_bins::Integer = (@atomic RESOURCE_LIMITS.default).max_bins)
+    return set_default!(RESOURCE_LIMITS,
+                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
 end
 """
-    with_resource_limits(f; max_samples::Integer = RESOURCE_LIMITS[].max_samples,
-                         max_subsets::Integer = RESOURCE_LIMITS[].max_subsets)
+    with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
+                         max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
+                         max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
+                         max_bins::Integer = RESOURCE_LIMITS[].max_bins)
 
-Run `f()` with the sampling resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+Run `f()` with the resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
 
-Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former case and the `optimise` call in the latter.
+Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim`, `N` and `bins` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former cases and the `optimise` call in the latter.
 
 # Related
 
   - [`set_resource_limits!`](@ref)
   - [`RESOURCE_LIMITS`](@ref)
 """
-function with_resource_limits(f; max_samples::Integer = RESOURCE_LIMITS[].max_samples,
-                              max_subsets::Integer = RESOURCE_LIMITS[].max_subsets)
-    return with_config(f, RESOURCE_LIMITS, ResourceLimits(max_samples, max_subsets))
+function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
+                              max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
+                              max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
+                              max_bins::Integer = RESOURCE_LIMITS[].max_bins)
+    return with_config(f, RESOURCE_LIMITS,
+                       ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
 end
 """
     did_you_mean(name::AbstractString, candidates) -> String
@@ -1633,7 +1655,7 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
 
   - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
-  - `"max_samples"` / `"max_subsets"`: positive integers for [`RESOURCE_LIMITS`](@ref).
+  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
@@ -1644,9 +1666,9 @@ Preferences.jl offers no way to enumerate the keys a project has set, so a missp
 
   - [`apply_preferences!`](@ref)
 """
-const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_samples",
-                         "max_subsets", "suggestion_min_score", "suggestion_distance",
-                         "compact_show")
+const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
+                         "max_n_subsets", "max_frontier", "max_bins",
+                         "suggestion_min_score", "suggestion_distance", "compact_show")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1660,8 +1682,10 @@ To persist a configuration, put the keys in the active project's `LocalPreferenc
 [PortfolioOptimisers]
 equation_max_length = 512
 equation_max_depth = 64
-max_samples = 50_000
-max_subsets = 1_000
+max_n_sim = 50_000
+max_n_subsets = 1_000
+max_frontier = 1_000
+max_bins = 500
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
@@ -1688,16 +1712,21 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         set_equation_limits!(; max_length = something(ml, lim.max_length),
                              max_depth = something(md, lim.max_depth))
     end
-    xs = get(prefs, "max_samples", nothing)
-    xb = get(prefs, "max_subsets", nothing)
-    if !(isnothing(xs) && isnothing(xb))
-        for (key, val) in ("max_samples" => xs, "max_subsets" => xb)
+    xs = get(prefs, "max_n_sim", nothing)
+    xb = get(prefs, "max_n_subsets", nothing)
+    xf = get(prefs, "max_frontier", nothing)
+    xn = get(prefs, "max_bins", nothing)
+    if !(isnothing(xs) && isnothing(xb) && isnothing(xf) && isnothing(xn))
+        for (key, val) in ("max_n_sim" => xs, "max_n_subsets" => xb, "max_frontier" => xf,
+                           "max_bins" => xn)
             @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
                       ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
         end
         rlim = @atomic RESOURCE_LIMITS.default
-        set_resource_limits!(; max_samples = something(xs, rlim.max_samples),
-                             max_subsets = something(xb, rlim.max_subsets))
+        set_resource_limits!(; max_n_sim = something(xs, rlim.max_n_sim),
+                             max_n_subsets = something(xb, rlim.max_n_subsets),
+                             max_frontier = something(xf, rlim.max_frontier),
+                             max_bins = something(xn, rlim.max_bins))
     end
     ms = get(prefs, "suggestion_min_score", nothing)
     if !isnothing(ms)
@@ -2712,7 +2741,7 @@ end
 
 Assert that an untrusted sizing integer `val` does not exceed the active [`RESOURCE_LIMITS`](@ref) ceiling `cap`, failing closed with a `DomainError` otherwise.
 
-`sym` names the offending field in the message (e.g. `:n_sim`) and `knob` names the [`ResourceLimits`](@ref) field to raise (e.g. `:max_samples`), so the error tells the caller both what was rejected and how to allow it deliberately.
+`sym` names the offending field in the message (e.g. `:n_sim`) and `knob` names the [`ResourceLimits`](@ref) field to raise (e.g. `:max_n_sim`), so the error tells the caller both what was rejected and how to allow it deliberately.
 
 # Arguments
 

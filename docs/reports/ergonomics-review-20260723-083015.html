@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ergonomics review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .friction { border-left: 4px solid #dc2626; }
+      .signal   { border-left: 4px solid #059669; }
+      pre { white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <!-- ────────────────────────────── HEADER ────────────────────────────── -->
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-23 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          This pass walked the caller-facing surface — <code>optimise</code>, <code>prior</code>, <code>fit</code>/<code>predict</code>,
+          the <code>JuMPOptimiser</code>/<code>MeanRisk</code>/<code>EntropyPoolingPrior</code> constructors, the alias table, and the
+          docstring-generation dicts — looking for friction a caller hits before reading the source. It found a documented call that
+          throws <code>UndefVarError</code>, an exception whose name states the inverse of its cause, two silent corruptions in the
+          generated-doc dicts, and several places where a naming convention breaks or an alias is missing. Prior-review items
+          (Windowed macro, Model-State accessors, custom-objective channel, ucs-triple naming, <code>var_views</code> docstring) are
+          excluded.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">3 Strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">5 Worth exploring</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#dc2626"></span> friction</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#059669"></span> high signal</span>
+        </div>
+      </header>
+
+      <!-- ────────────────────────────── CANDIDATES ────────────────────────────── -->
+      <section id="candidates" class="space-y-10">
+
+        <!-- ── CARD 1 ── -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · The documented happy path throws <code>UndefVarError</code>: <code>predict</code> is never exported</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/03_Pipeline.jl:833, :859</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — caller follows the docstring</div>
+<pre>julia&gt; using PortfolioOptimisers
+julia&gt; res = fit(pipe, prices)          # exported — resolves
+julia&gt; predict(res, future_prices)      # docstring says predict(res::PipelineResult, ...)
+ERROR: UndefVarError: `predict` not defined</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — the pair the docs promise is reachable</div>
+<pre>julia&gt; res = fit(pipe, prices)
+julia&gt; predict(res, future_prices)      # resolves like its sibling fit</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>export Pipeline, PipelineResult, fit</code> exports <code>fit</code> but not <code>predict</code>, while the <code>fit_predict</code> docstring at line 833 tells the caller to call <code>predict(res::PipelineResult, data)</code>. After <code>using PortfolioOptimisers</code> the documented call fails with <code>UndefVarError</code> unless the caller qualifies <code>StatsAPI.predict</code> — a fact discoverable only by reading source.</p>
+            <p><span class="font-semibold">Direction.</span> The out-of-sample half of the workflow becomes callable by the name the docs already use, so <code>fit</code> and <code>predict</code> read as one pair.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: documented name resolves</li>
+            <li>convention holds: fit/predict pair</li>
+            <li>removes UndefVarError trap</li>
+            <li>blast radius: one export line</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 2 ── -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · <code>IsNothingError</code> is thrown when a value is <em>not</em> nothing</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/10_JuMPOptimiser.jl:614-615 · src/01_Base.jl:1860</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — the exception name states the inverse of the cause</div>
+<pre># type doc, 01_Base.jl:1860
+"Exception type thrown when an argument or value is unexpectedly `nothing`."
+
+# 10_JuMPOptimiser.jl:614 — thrown because sbgt is NOT nothing
+@argcheck(isnothing(sbgt),
+          IsNothingError("sbgt must be nothing when bgt is a
+                          BudgetCostEstimator, got sbgt = $sbgt"))</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — the exception type matches the caller's mistake</div>
+<pre># a "must-be-absent" check reads as a conflict, not a nothing-ness error
+ConflictingArgumentError("sbgt must be nothing when bgt is a
+                          BudgetCostEstimator, got sbgt = $sbgt")</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>IsNothingError</code> is documented and named for the case "value is unexpectedly <code>nothing</code>", but this site raises it for the opposite — <code>sbgt</code> must be nothing and isn't. A caller reading the exception type learns the reverse of what actually went wrong; the low-signal type fights the correct message string.</p>
+            <p><span class="font-semibold">Direction.</span> A "must-be-absent" constraint reports through a type whose name matches it, so the exception type carries the same signal as the message.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: type matches cause</li>
+            <li>convention: name ≠ inverse of meaning</li>
+            <li>message text already high-signal</li>
+            <li>blast radius: one throw site</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 3 ── -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · Two silent corruptions in <code>arg_dict</code> drop and misname generated docs</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:181, :206 (duplicate key) · :22-29 vs :174-179 (stale example)</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — duplicate key inside one Dict</div>
+<pre>const arg_dict = Dict(
+  ...
+  :181  :pler =&gt; "`pl`: Phylogeny estimator or result.",
+  ...
+  :206  :pler =&gt; "`pl`: Network estimator, phylogeny
+                  result, clustering estimator, or
+                  clustering result.",
+  ...)
+# second wins → line-181 description is dead</pre>
+            </div>
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — example disagrees with the real const</div>
+<pre># docstring example, :22-29
+:cler =&gt; "`cle`: ..."
+:ple  =&gt; "`pl`:  ..."
+# authoritative const, :174-179
+:cler =&gt; "`clr`: ..."
+:ple  =&gt; "`ple`: ..."
+# field_dict derives from the const (:729)
+# → rendered names ≠ example names</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>arg_dict</code> defines <code>:pler</code> twice within the same <code>Dict(...)</code>; Julia keeps the last, so the intended "Phylogeny estimator or result" description silently never renders. Separately, the docstring example at <code>:22-29</code> shows display names (<code>cle</code>, <code>pl</code>) that disagree with the authoritative const at <code>:174-179</code> (<code>clr</code>, <code>ple</code>) from which every rendered docstring is actually derived. Both are invisible until a caller compares the docs to the code.</p>
+            <p><span class="font-semibold">Direction.</span> One description per parameter, and an example that is the same source of truth callers read in the rendered docs.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: docs match rendered names</li>
+            <li>no silently-dropped description</li>
+            <li>convention: one key, one meaning</li>
+            <li>blast radius: two dict entries</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Note.</span> <code>field_dict</code> and <code>ret_dict</code> are all derived from these consts (<code>:729</code>), so a single mistyped key propagates to every docstring that references it — the reach is the whole generated-doc surface, not one page.
+          </div>
+        </article>
+
+        <!-- ── CARD 4 ── -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · <code>sub-group</code> vs <code>sub-grouped</code> — a whole kwarg family split on one silent suffix</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:478-499 · src/20_Optimisation/10_JuMPOptimiser.jl:347-368</div>
+
+          <div class="grid md:grid-cols-2 gap-4 text-xs font-mono">
+            <div class="diff-old rounded p-3 space-y-1">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the "-ed" is the whole distinction</div>
+              <div class="grid grid-cols-2 gap-1">
+                <span class="rounded px-2 py-1 bg-red-100">slt · Sub-group long thr.</span>
+                <span class="rounded px-2 py-1 bg-red-100">sglt · Sub-grouped long thr.</span>
+                <span class="rounded px-2 py-1 bg-red-100">sst · Sub-group short thr.</span>
+                <span class="rounded px-2 py-1 bg-red-100">sgst · Sub-grouped short thr.</span>
+                <span class="rounded px-2 py-1 bg-red-100">smtx · Sub-group matrix</span>
+                <span class="rounded px-2 py-1 bg-red-100">sgmtx · Sub-grouped matrix</span>
+                <span class="rounded px-2 py-1 bg-red-100">scard · Sub-group card.</span>
+                <span class="rounded px-2 py-1 bg-red-100">sgcarde · Sub-grouped card. est.</span>
+              </div>
+            </div>
+            <div class="diff-new rounded p-3 space-y-1">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — the two meanings named apart</div>
+              <p class="text-slate-600 leading-relaxed normal-case">A caller cannot tell from <code>slt</code> vs <code>sglt</code> which one they want; the docs disambiguate only by the word "grouped". Naming the two axes distinctly — or documenting the concrete difference in one sentence per pair — lets the caller pick without reading source.</p>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Eight <code>JuMPOptimiser</code> kwargs come in <code>s*</code>/<code>sg*</code> pairs whose only documented difference is "group" vs "grouped". The convention that the caller has learned — <code>s</code> = sub-group — quietly gains a second, near-identical member with no signal separating them. Adjacent to this, <code>card</code>/<code>scard</code> are bare integers while <code>gcarde</code>/<code>sgcarde</code> are estimators, so the <code>e</code>-for-estimator suffix convention also breaks within the same family.</p>
+            <p><span class="font-semibold">Direction.</span> The two group axes carry names (or one-line docs) that state their concrete difference, and the cardinality quartet suffixes consistently for its type.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: name states the axis</li>
+            <li>convention: -e suffix holds</li>
+            <li>fewer source-reads to pick</li>
+            <li>blast radius: kwarg family, aliasable</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 5 ── -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · Every exotic risk measure has an alias; no Prior or Uncertainty-Set estimator does</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">aliases</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl (1052 lines) — grep <code>Prior</code> → 0 aliases</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — coverage skewed to the tail</div>
+<pre>FLM, SLM, SD, UcVariance, HRP, HERC,
+SCHRP, NCO, STO, SSR, MR, RB, RRB, ...
+# ~60 risk-measure / optimiser acronyms
+
+# but a caller types in full, every time:
+EmpiricalPrior(...)
+BlackLittermanPrior(...)
+EntropyPoolingPrior(...)
+HighOrderPriorEstimator(...)
+BoxUncertaintySetAlgorithm(...)</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — aliases where callers actually type most</div>
+<pre>const BLP  = BlackLittermanPrior
+const EPP  = EntropyPoolingPrior
+const HOPE = HighOrderPriorEstimator
+const Box  = BoxUncertaintySetAlgorithm
+# literature acronyms are the natural names
+prior(EPP(; mu_views = ...), rd)</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The alias table exhaustively covers risk measures and covariance estimators — the deep tail a caller reaches occasionally — yet the longest, most-typed constructor names in the library (the Prior estimators and Uncertainty-Set estimators, instantiated on line 1 of nearly every workflow) have no short form. The alias convention holds for the rare cases and breaks for the common ones.</p>
+            <p><span class="font-semibold">Direction.</span> The literature acronyms (BL, EP, …) that callers already say aloud become discoverable short forms via autocomplete, matching the coverage the risk-measure family already enjoys.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>alias: covers the high-frequency path</li>
+            <li>discoverability: autocomplete finds BL/EP</li>
+            <li>convention: alias table complete</li>
+            <li>additive: zero blast radius</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Guard.</span> The file's own note reserves aliases for names "unambiguous in CONTEXT.md". <code>BL</code> for Black-Litterman spans four estimators — pick the acronym that names one type, or skip the ambiguous ones as the file already does for <code>MAD</code>.
+          </div>
+        </article>
+
+        <!-- ── CARD 6 ── -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · Two opposite naming philosophies live side by side</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/13_Prior/10_EntropyPoolingPrior.jl:449-462 · src/20_Optimisation/10_JuMPOptimiser.jl:339-363</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="rounded p-3 bg-slate-100">
+              <div class="text-xs uppercase tracking-wider mb-2 text-slate-600">Spelled-out — EntropyPoolingPrior</div>
+<pre>mu_views, var_views, cvar_views,
+sigma_views, sk_views, kt_views,
+cov_views, rho_views, var_alpha</pre>
+            </div>
+            <div class="rounded p-3 bg-slate-100">
+              <div class="text-xs uppercase tracking-wider mb-2 text-slate-600">Abbreviated — JuMPOptimiser</div>
+<pre>lcse, cte, bgt, sbgt, gbgt, xbgt,
+ple, ccnt, cobj, wb, l2c, lpc</pre>
+            </div>
+          </div>
+
+          <div class="diff-old rounded p-3 font-mono text-sm">
+            <div class="text-xs uppercase tracking-wider mb-2 text-red-700">And the two styles collide <em>inside</em> the readable estimator</div>
+<pre># EntropyPoolingPrior.jl:460-462 — cryptic kwargs among the mu_views siblings
+ds_opt::Option{&lt;:CVaREntropyPooling}  = nothing  # "single view"   → s
+dm_opt::Option{&lt;:OptimEntropyPooling} = nothing  # "multiple views" → m
+opt::NonCVaREP = OptimEntropyPooling()            # also named "opt" — but here it is
+                                                  # the EP solver algorithm, not the
+                                                  # JuMPOptimiser that MeanRisk's `opt` is</pre>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller who learns <code>EntropyPoolingPrior</code>'s fully-spelled <code>*_views</code> convention cannot transfer it to <code>JuMPOptimiser</code>'s terse codes, and vice versa. Worse, the readable estimator itself hides <code>ds_opt</code>/<code>dm_opt</code> (single/multiple-view encoded as <code>s</code>/<code>m</code>) among its spelled-out siblings, and reuses the kwarg name <code>opt</code> for a different concept than the <code>opt::JuMPOptimiser</code> of <code>MeanRisk</code>/<code>RiskBudgeting</code>.</p>
+            <p><span class="font-semibold">Direction.</span> One naming philosophy per surface — and where a name like <code>opt</code> is reused, it names the same kind of thing everywhere it appears.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: one style per surface</li>
+            <li>signal: opt means one thing</li>
+            <li>ds/dm_opt readable from the name</li>
+            <li>blast radius: kwarg renames, aliasable</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 7 ── -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">7 · <code>redundancy_keep is not implemented</code> — an internal function name, no fix</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/22_Preselection.jl:544 · contrast src/03_Preprocessing.jl:1259</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — names an internal method, offers no next step</div>
+<pre>throw(ArgumentError("redundancy_keep is not implemented for $(typeof(alg))"))</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — the pattern a sibling error already uses (03_Preprocessing.jl:1259)</div>
+<pre>"... does not implement fit_preprocessing. Extension authors: a
+ preprocessing estimator must implement both halves ..."
+# redundancy_keep should guide the same way: name the caller's mistake
+# (an algorithm with no keep-rule) and the way out.</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The message describes implementation state ("<code>redundancy_keep</code> is not implemented") — an internal function the caller never named — with no guidance. The neighbouring interface-not-implemented error in <code>03_Preprocessing.jl</code> already models the high-signal form (names the missing method <em>and</em> tells extension authors what to do); this outlier was not given the same treatment.</p>
+            <p><span class="font-semibold">Direction.</span> The error names what the caller did (supplied a redundancy algorithm without a keep-rule) and what to do next, matching the guidance its sibling already gives.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: names the caller's mistake</li>
+            <li>convention: matches sibling error</li>
+            <li>states the way out</li>
+            <li>blast radius: one message</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 8 ── -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">8 · Errors written in the same abbreviations the caller couldn't decode</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl:527 · src/03_Preprocessing.jl:384, :403</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — codes in the message, internal names in the auto-text</div>
+<pre># BudgetConstraints.jl:527 — reasoned, but all in codes
+"gbgt is over-determined: bgt ($bgt) and sbgt ($sbgt) already pin the
+ gross exposure ... Give at most two of bgt, sbgt and gbgt ..."
+
+# Preprocessing.jl:384/:403 — @argcheck auto-text leaks internal vars
+@argcheck(size(X) == size(B),  DimensionMismatch)   # caller sees X, B
+@argcheck(size(iv) == size(X), DimensionMismatch)   # caller sees iv, X</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — expand once, name the caller's kwarg</div>
+<pre>"gross budget (gbgt) is over-determined: net budget (bgt=$bgt) and short
+ budget (sbgt=$sbgt) already pin gross exposure. Pass at most two of them."
+
+DimensionMismatch("benchmark returns B must match asset returns X in size")</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The budget error is well-reasoned but written entirely in the <code>bgt</code>/<code>sbgt</code>/<code>gbgt</code> codes the caller already struggled to decode when setting them — it never expands them once. Separately, several bare <code>@argcheck(..., DimensionMismatch)</code> sites let ArgCheck auto-generate the text from the expression, so the caller sees internal names (<code>X</code>, <code>B</code>, <code>iv</code>, <code>ivpa</code>) instead of the kwargs they passed.</p>
+            <p><span class="font-semibold">Direction.</span> Error text expands each code the first time it appears and names the caller's kwarg rather than the internal variable.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: codes expanded once</li>
+            <li>names kwarg, not internal var</li>
+            <li>message decodes itself</li>
+            <li>blast radius: message text only</li>
+          </ul>
+        </article>
+
+        <!-- ── CARD 9 ── -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">9 · The minimal <code>optimise</code> call is a three-level ceremony</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/11_MeanRisk.jl:71, :99 · 14_RiskBudgeting.jl:379 · 10_JuMPOptimiser.jl:337</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — three required wrappers before any knob</div>
+<pre>MeanRisk(;
+  opt = JuMPOptimiser(;
+    slv = Solver(;
+      solver = Clarabel.Optimizer)))
+# opt required, slv required — every caller pays this
+# before touching a single risk/objective knob</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — one solver arg reaches the happy path</div>
+<pre>MeanRisk(; slv = Clarabel.Optimizer)
+# opt defaults to JuMPOptimiser; a bare solver module
+# is promoted to Solver(JuMPOptimiser(...)) internally</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The two most-used optimisers make <code>opt::JuMPOptimiser</code> a required kwarg, and <code>JuMPOptimiser</code> in turn makes <code>slv</code> required, so the shortest working call is the nested three-level form the docstring itself shows. A caller pays the full ceremony before reaching any risk or objective choice.</p>
+            <p><span class="font-semibold">Direction.</span> A caller who only has a solver reaches a working optimisation with one argument; the wrapping still exists but is not mandatory boilerplate.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>default: opt covers the common case</li>
+            <li>happy path first</li>
+            <li>solver promotion cuts nesting</li>
+            <li>tension: no universal solver default</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Why speculative.</span> There is no solver that covers ≥90% of callers, so <code>slv</code> cannot itself get a default — this is about collapsing the <em>nesting</em>, not defaulting the solver. Weigh against the library's explicit-configuration convention before pursuing.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ────────────────────────────── TOP RECOMMENDATION ────────────────────────────── -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — export <code>predict</code> so the documented workflow resolves</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          Start with <a href="#c1" class="text-emerald-700 underline">Card 1</a>. It is the highest friction-to-fix ratio on the list: a caller
+          who follows the <code>fit_predict</code> docstring verbatim hits <code>UndefVarError: predict not defined</code>, and the fix is one
+          token on one <code>export</code> line. Every other card improves a name, a default, or a message; this one turns a documented,
+          currently-broken happy path back on. Pair it with <a href="#c2" class="text-emerald-700 underline">Card 2</a> (the inverted
+          <code>IsNothingError</code>) and <a href="#c3" class="text-emerald-700 underline">Card 3</a> (the silent doc-dict corruptions) —
+          all three are Strong, low-blast-radius, and independent of the naming/alias discussions.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-07-23 · <code>/improve-ergonomics</code> · findings cited to file:line on branch <code>dev</code>, load-bearing claims verified against source.
+      </footer>
+    </main>
+  </body>
+</html>

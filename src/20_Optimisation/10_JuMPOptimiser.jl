@@ -1188,9 +1188,9 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                          fees = attrs.fees, sets = opt.sets, tr = opt.tr, ple = attrs.plr,
                          ret = attrs.ret, sca = opt.sca, ccnt = opt.ccnt, cobj = opt.cobj,
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
-                         l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc, l1 = opt.l1,
-                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, brt = opt.brt,
-                         cle_pr = opt.cle_pr, strict = opt.strict)
+                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
     processed_jump_optimiser(

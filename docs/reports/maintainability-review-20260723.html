@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Maintainability review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .copy    { border: 1px solid #cbd5e1; background: #f8fafc; }
+      .drifted { border: 1px solid #d97706; background: #fffbeb; }
+      .spoc    { background: linear-gradient(135deg, #064e3b, #065f46); color: #fff; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- ================= HEADER ================= -->
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Maintainability review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-23 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          This pass hunted for one code shape re-encoded across many sites, copies that have already
+          <em>drifted</em>, and single conceptual changes that force edits at N places. The codebase is
+          mature and heavily reviewed, so the residue is specific: two shapes have <strong>already
+          diverged into latent bugs</strong>, and a handful of transform families are each written out
+          three to seven times. Nine candidates below, ordered by leverage; the top two are correctness
+          bugs a consolidation both fixes and prevents.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">4 Strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Worth exploring</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded copy"></span> a copy</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded drifted"></span> a drifted copy</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded spoc"></span> single point of change</span>
+        </div>
+      </header>
+
+      <!-- ================= CANDIDATES ================= -->
+      <section id="candidates" class="space-y-10">
+
+        <!-- ===== CARD 1 ===== -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · Weighted <code>drawdown_at_risk</code> dropped the <code>sw</code> scaling its five siblings apply</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            06_XatRisk.jl · 07_ConditionalXatRisk.jl · 09_RelativisticXatRisk.jl — 6 weighted-quantile sites, 1 diverged
+          </div>
+
+          <!-- drift timeline -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500">The weighted α-quantile threshold: <code>searchsortedfirst(cum_w, level)</code></div>
+            <div class="grid sm:grid-cols-3 gap-2 font-mono text-xs">
+              <div class="copy rounded p-2">06_XatRisk.jl:340 &nbsp;VaR &nbsp;<span class="text-slate-500">sw·α</span></div>
+              <div class="copy rounded p-2">06_XatRisk.jl:476/483 &nbsp;VaRRange &nbsp;<span class="text-slate-500">sw·α</span></div>
+              <div class="copy rounded p-2">07_ConditionalXatRisk.jl:275 &nbsp;CVaR &nbsp;<span class="text-slate-500">sw·α</span></div>
+              <div class="copy rounded p-2">07_ConditionalXatRisk.jl:913 &nbsp;CDaR &nbsp;<span class="text-slate-500">sw·α</span></div>
+              <div class="copy rounded p-2">09_RelativisticXatRisk.jl:54 &nbsp;RRM &nbsp;<span class="text-slate-500">α·sw</span></div>
+              <div class="drifted rounded p-2 font-semibold">06_XatRisk.jl:710 &nbsp;DaR &nbsp;⚠ bare <code>alpha</code>, no <code>sw</code></div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              <code>get_observation_weights(w::VecNum,…)</code> returns <code>w</code> unchanged (<code>01_Base.jl:2576</code>), so
+              <code>sw = sum(w) ≠ 1</code> for un-normalised weights. The diverged copy backs both <code>DrawdownatRisk</code> and
+              <code>RelativeDrawdownatRisk</code> — weighted DaR/RLDaR silently use a different quantile convention than every other weighted measure.
+              Its own <em>un</em>weighted method (<code>:702</code>) matches the family; only the weighted branch drifted.
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Six copies of the weighted-quantile threshold; five scale the search target by <code>sw</code> and one does not, so weighted drawdown-at-risk returns a wrong quantile for un-normalised weights — a live correctness bug, not a tidy-up.</p>
+            <p><span class="font-semibold">Direction.</span> A single <code>weighted_quantile(v, level, w)</code> helper the six sites delegate to; the extraction forces the DaR threshold convention to become identical to its siblings, fixing the drift by construction.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>6 sites → 1 helper</li>
+            <li>fixes a live wrong-answer bug</li>
+            <li>drift becomes impossible</li>
+            <li>one test surface for the quantile</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 2 ===== -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · DR-CDaR registers its risk expression under the DR-CVaR key</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            20_RiskMeasureConstraints/07_ConditionalXatRiskConstraints.jl — 1 leaked key, 12 sibling symbols disagree with it
+          </div>
+
+          <!-- key-collision diagram -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="grid sm:grid-cols-2 gap-4 font-mono text-xs">
+              <div class="copy rounded p-3 space-y-1">
+                <div class="text-[0.65rem] uppercase tracking-wider text-slate-500">DR-CVaR (:200, legitimate)</div>
+                <div>key = <span class="text-emerald-700">:drcvar_risk_</span></div>
+                <div>lb_<span class="text-emerald-700">drcvar</span>_ · tau_<span class="text-emerald-700">drcvar</span>_ · s_<span class="text-emerald-700">drcvar</span>_ …</div>
+              </div>
+              <div class="drifted rounded p-3 space-y-1">
+                <div class="text-[0.65rem] uppercase tracking-wider text-amber-700">DR-CDaR (:583, cloned)</div>
+                <div>key = <span class="text-red-700 font-semibold">:drcvar_risk_</span> &nbsp;⚠</div>
+                <div>lb_<span class="text-amber-700">drcdar</span>_ · tau_<span class="text-amber-700">drcdar</span>_ · s_<span class="text-amber-700">drcdar</span>_ …</div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              The registry key (<code>:583</code>) and the twelve internal variable stems (<code>:598–:612</code>) disagree. Every other family kept its
+              key distinct (<code>evar/edar</code>, <code>rlvar/rldar</code>, <code>pvar/pdar</code>, <code>cvar/cdar</code>). A model carrying both a
+              DR-CVaR and a DR-CDaR term at the same index collides on <code>drcvar_risk_i</code>. This is copy-paste residue — direct proof the
+              VaR/DaR twins (card 3) are maintained by cloning.
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A cloned-body key was never renamed, so the DR-CDaR registration is one stem away from a silent model-registry collision — and the disagreement is invisible until both measures coexist at one index.</p>
+            <p><span class="font-semibold">Direction.</span> Derive the prefix once from the measure type (a <code>risk_key(r, i)</code> seam) rather than hand-typing the stem in each cloned body; the twin bodies then cannot disagree with themselves.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fixes a silent key collision</li>
+            <li>stem drift becomes impossible</li>
+            <li>blast radius: one seam</li>
+            <li>evidence the twins are cloned</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 3 ===== -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · VaR-form and DaR-form <code>set_risk_constraints!</code> are the same formulation on a different loss vector</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            20_RiskMeasureConstraints/{06,07,08,09,19}_*Constraints.jl — 5 family twins, ~200 lines duplicated in the DR pair alone
+          </div>
+
+          <!-- mirror grid -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+            <div class="grid grid-cols-[auto_1fr_1fr] gap-2 text-xs items-center">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500"></div>
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500 font-mono">VaR form · loss = net_X</div>
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500 font-mono">DaR form · loss = −view(dd,…)</div>
+
+              <div class="font-mono text-slate-600 pr-2">CVaR / CDaR</div>
+              <div class="copy rounded p-2 font-mono">07:51–80</div>
+              <div class="copy rounded p-2 font-mono">07:522–551</div>
+
+              <div class="font-mono text-slate-600 pr-2">EVaR / EDaR</div>
+              <div class="copy rounded p-2 font-mono">08:59–98</div>
+              <div class="copy rounded p-2 font-mono">08:234–269</div>
+
+              <div class="font-mono text-slate-600 pr-2">VaR / DaR</div>
+              <div class="copy rounded p-2 font-mono">06:67–105</div>
+              <div class="copy rounded p-2 font-mono">06:428–…</div>
+
+              <div class="font-mono text-slate-600 pr-2">DR-CVaR / DR-CDaR</div>
+              <div class="copy rounded p-2 font-mono">07:195–…</div>
+              <div class="drifted rounded p-2 font-mono">07:579–… ⚠ key drift (card 2)</div>
+
+              <div class="font-mono text-slate-600 pr-2">RVaR·PNVaR / …DaR</div>
+              <div class="copy rounded p-2 font-mono">09 / 19 VaR</div>
+              <div class="copy rounded p-2 font-mono">09 / 19 DaR</div>
+            </div>
+            <div class="mt-3 flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">emit_xatrisk!(model, loss_vec, T, prefix)</div>
+              <span class="text-slate-500 text-sm">← each twin becomes loss-vector + prefix</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Every quantile family writes its JuMP encoding twice — once on returns (<code>net_X</code>), once on drawdowns — and the two differ only in the loss vector, the <code>T</code> definition, and the name prefix; the DR pair is ~200 near-identical lines, and one twin has already drifted (card 2).</p>
+            <p><span class="font-semibold">Direction.</span> One <code>emit_xatrisk!(model, loss_vec, T, prefix)</code> per family carrying the shared skeleton; the ten methods become thin adapters that build the loss vector and call it.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>~200 DR lines → one skeleton</li>
+            <li>10 twins → loss-vector adapters</li>
+            <li>cuts off the card-2 drift class</li>
+            <li>new family: write it once</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 4 ===== -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · The fee decomposition is re-encoded ~34 times across a total×per-asset × price×no-price lattice</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            16_Fees.jl — 4 identical 5-term aggregators + ~30 primitive methods
+          </div>
+
+          <!-- two-layer grid -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
+            <div>
+              <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">(a) The 5-term aggregator body — byte-identical ×4</div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+                <div class="copy rounded p-2">calc_fees(w,p,fees) :650</div>
+                <div class="copy rounded p-2">calc_fees(w,fees) :841</div>
+                <div class="copy rounded p-2">calc_asset_fees(w,p,fees) :992</div>
+                <div class="copy rounded p-2">calc_asset_fees(w,fees) :1198</div>
+              </div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">(b) Primitive helpers — <code>Nothing/Number/VecNum</code> triples, doubled by a price / no-price axis</div>
+              <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 font-mono text-[0.7rem]">
+                <div class="copy rounded p-2">prop ·price 555/558/562</div>
+                <div class="copy rounded p-2">prop ·noprice 697/700/704</div>
+                <div class="copy rounded p-2">turn ·price 605/608/611</div>
+                <div class="copy rounded p-2">turn ·noprice 745/748/751</div>
+                <div class="copy rounded p-2">fixed 795/798/803</div>
+                <div class="copy rounded p-2">asset-prop ·price 892/…</div>
+                <div class="copy rounded p-2">asset-prop ·noprice 1041/…</div>
+                <div class="copy rounded p-2">asset-turn ·price 947/…</div>
+                <div class="copy rounded p-2">asset-turn ·noprice 1094/…</div>
+                <div class="copy rounded p-2">asset-fixed 1146/…</div>
+              </div>
+              <div class="text-[0.7rem] text-slate-500 mt-1 font-mono">the line <code>idx = op(w, zero(promote_type(…)))</code> recurs ~16× verbatim</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">fee_primitive(kind, w, p=ones, op)</div>
+              <span class="text-slate-500 text-sm">← price axis defaults away; one table-driven aggregator</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Adding a fee dimension or changing the long/short sign convention forces edits at all four aggregators and both price variants of every primitive — a ~34-site change amplification. Not yet drifted, but the no-price copies are only correct because they equal the price copy at <code>p = 1</code>.</p>
+            <p><span class="font-semibold">Direction.</span> One price-parameterised primitive (default <code>p = ones</code>) collapses the price axis (~30 → ~15); a table-driven aggregator collapses the four copies to one.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>4 aggregators → 1</li>
+            <li>price axis: ~30 → ~15</li>
+            <li>sign convention: one edit</li>
+            <li>blast radius: one fix</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 5 ===== -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · Each distance transform is written three times, every copy split <code>Nothing</code>/<code>Integer</code></h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            09_Distance/02_Distance.jl — ~48 <code>distance</code>/<code>cor_and_dist</code> methods; 22 Nothing/Integer pairs; cov2cor preamble ×8
+          </div>
+
+          <!-- three-layer × power grid -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500">SimpleDistance transform <code>sqrt(clamp((1−ρ<sup>p</sup>)·scale))</code> — one formula, six sites</div>
+            <div class="grid grid-cols-3 gap-2 font-mono text-xs">
+              <div class="copy rounded p-2 text-center">distance(ce,X)<br><span class="text-slate-500">Nothing :125</span></div>
+              <div class="copy rounded p-2 text-center">distance(rho)<br><span class="text-slate-500">Nothing :320</span></div>
+              <div class="copy rounded p-2 text-center">cor_and_dist(ce,X)<br><span class="text-slate-500">Nothing :438</span></div>
+              <div class="copy rounded p-2 text-center">distance(ce,X)<br><span class="text-slate-500">Integer :131</span></div>
+              <div class="copy rounded p-2 text-center">distance(rho)<br><span class="text-slate-500">Integer :332</span></div>
+              <div class="copy rounded p-2 text-center">cor_and_dist(ce,X)<br><span class="text-slate-500">Integer :446</span></div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              The <code>Nothing</code> method is exactly the <code>Integer</code> method with <code>power = 1</code>; ×5 algorithms × 3 call forms ≈ 48 methods.
+              Two further defects ride along: the <code>cov2cor</code> preamble is re-encoded across all 8 <code>rho</code>-form methods, and
+              <code>assert_matrix_issquare</code> guards only <span class="font-semibold">2 of those 8</span> (CorrelationDistance :378/:389) — an uneven guarantee.
+            </div>
+            <div class="drifted rounded p-3 text-xs leading-relaxed">
+              <span class="font-semibold">⚠ Latent bug (already drifted):</span> the Integer <code>cor_and_dist</code> methods return <code>rho .^ power</code> as the
+              <em>correlation</em> half (:444, :460, :472, :499, :514), while the <code>Nothing</code> variants return the true correlation. A caller asking for
+              <code>cor_and_dist</code> with <code>power = 2</code> gets ρ² labelled as the correlation matrix.
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">dist_transform(alg, rho, power)</div>
+              <span class="text-slate-500 text-sm">← 3 call forms delegate; power=Nothing handled once</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Every per-algorithm distance formula lives in six places (three call forms × two power branches); changing a clamp bound or the odd/even scale convention is a six-site edit per algorithm, and the correlation-output copies have already diverged into a wrong result.</p>
+            <p><span class="font-semibold">Direction.</span> One <code>dist_transform(alg, rho, power)</code> per algorithm that folds <code>power = nothing</code> into <code>power = 1</code>; the three call forms reduce to <em>compute ρ, then transform</em>, and the guard lands once.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>~48 methods → ~5 transforms</li>
+            <li>fixes the ρ<sup>p</sup> correlation leak</li>
+            <li>square-guard applied uniformly</li>
+            <li>cov2cor preamble: 8 → 1</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 6 ===== -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · <code>cov</code> is hand-written as <code>cor2cov!(cor(…), std)</code> in every correlation-style estimator</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">change-amplification</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            08_Moments/{05,06,08,09,11,24,35}_*.jl — 7 identical <code>cov</code> bodies, no shared fallback
+          </div>
+
+          <!-- change-amplification fan -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  X["cor → cov contract change<br/>(weights · eps clamp · errors)"]
+  X --> A["Kendall 09:166"]
+  X --> B["Spearman 09:327"]
+  X --> C["LTD 08:236"]
+  X --> D["MutualInfo 11:150"]
+  X --> E["Gerber 05:581"]
+  X --> F["SmythBroby 06:951"]
+  X --> G["GerberIQ 35:1839"]
+  classDef hit stroke:#dc2626,stroke-width:2px;
+  class A,B,C,D,E,F,G hit
+            </pre>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Each estimator repeats the same <code>cov</code> body — <code>dims</code> preamble, <code>sd = std(ve, X)</code>, one varying <code>cor</code> call, <code>cor2cov!</code> tail — because <code>26_AbstractCovarianceVariance.jl</code> derives <code>var</code>/<code>std</code> from <code>cov</code> but offers no generic <code>cov</code> fallback. Any change to the cor→cov contract is a seven-site edit.</p>
+            <p><span class="font-semibold">Direction.</span> One supertype method <code>cov(ce, X; …) = cor2cov!(cor(ce, X; …), std(ce.ve, X; …))</code>; each estimator then implements only <code>cor</code>. The <code>max.(sd, eps)</code> clamp lives in the shared <code>sd</code> step.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>7 cov bodies → 0</li>
+            <li>estimators implement only cor</li>
+            <li>single point of change</li>
+            <li>drift becomes impossible</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 7 ===== -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">7 · Tracking norms written once as a hard error-constraint and again as a risk measure — Lp scale duplicated</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            09_JuMPConstraints/11_TrackingErrorConstraints.jl ↔ 20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl — 4 norms + 2 IV/DV pairs, ×2 files
+          </div>
+
+          <!-- mirror diff -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="grid grid-cols-[auto_1fr_1fr_auto] gap-2 text-xs items-center font-mono">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500"></div>
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500">error-constraint (11)</div>
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500">risk-measure (18)</div>
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-500">cone/scale</div>
+
+              <div class="text-slate-600">L1</div><div class="copy rounded p-2">63–89</div><div class="copy rounded p-2">52–74</div><div class="text-slate-500">NormOne · T</div>
+              <div class="text-slate-600">L2</div><div class="copy rounded p-2">90–116</div><div class="copy rounded p-2">146–169</div><div class="text-slate-500">SOC · √(T−ddof)</div>
+              <div class="text-slate-600">Lp</div><div class="drifted rounded p-2">117–159 :131</div><div class="drifted rounded p-2">196–236 :214</div><div class="text-amber-700">Power · p==3?cbrt</div>
+              <div class="text-slate-600">L∞</div><div class="copy rounded p-2">160–189</div><div class="copy rounded p-2">263–286</div><div class="text-slate-500">NormInf · T−ddof</div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              The Lp scale constant <code>p == 3 ? cbrt(scale) : scale^p_inv</code> is physically duplicated at <code>11:131</code> and <code>18:214</code> — two copies of one
+              numeric contract, used two ways (a bound <code>t ≤ f·k</code> vs a divisor <code>t/scale</code>). Add a <code>p == 5</code> special-case to one and the other silently diverges.
+              The IV/DV risk-tracking pair is duplicated too (<code>11:190–242</code> ↔ <code>18:401–478</code>).
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">build_tracking_norm!(model, i, net_X, benchmark, alg) → (t, scale)</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The two tracking families share the whole preamble, cone, and normalisation and differ only in the outer bound; the Lp scale is a live drift hazard held in two files.</p>
+            <p><span class="font-semibold">Direction.</span> One <code>build_tracking_norm!</code> per norm returning <code>(t, scale)</code>; the error-constraint applies a clamp, the risk measure registers an expression — everything else single-sourced.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>Lp scale: 2 copies → 1</li>
+            <li>new norm: one file, not two</li>
+            <li>drift hazard removed</li>
+            <li>IV/DV pair collapses too</li>
+          </ul>
+        </article>
+
+        <!-- ===== CARD 8 ===== -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">8 · The <code>dims ∈ (1,2)</code> validate-and-transpose preamble — copied ~46× and its message already drifted three ways</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            08_Moments/ (33 sites) · 13_Prior/ — 46 argcheck sites, 3 message wordings, 2 mechanisms
+          </div>
+
+          <!-- drift, three wordings -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="grid sm:grid-cols-3 gap-2 text-xs">
+              <div class="copy rounded p-3">
+                <div class="font-mono">"dims must be 1 or 2"</div>
+                <div class="text-slate-500 mt-1">36 sites — the majority</div>
+              </div>
+              <div class="drifted rounded p-3">
+                <div class="font-mono">"dims must be either 1 or 2"</div>
+                <div class="text-amber-700 mt-1">5 sites — 01_Base_Moments.jl</div>
+              </div>
+              <div class="drifted rounded p-3">
+                <div class="font-mono">"dims must be in (1, 2)"</div>
+                <div class="text-amber-700 mt-1">5 sites — 36_Regime…, 13_Prior/{10,11,12}</div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              Even the <em>mechanism</em> diverged: <code>01_Base_Moments.jl</code> uses a hand-rolled <code>if !(dims in (1,2)) throw(…)</code> instead of <code>@argcheck</code>.
+              The <code>X = transpose(X)</code> guard rides along in 25 of the <code>08_Moments</code> sites.
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">normalise_dims(X, dims)  # or @check_dims</div>
+              <span class="text-slate-500 text-sm">← one message, one transpose, one mechanism</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The same two-line preamble opens nearly every moment/prior method; the copies were never kept in sync, so the error message has already drifted into three wordings and two throw mechanisms — the drift is not hypothetical, it is here.</p>
+            <p><span class="font-semibold">Direction.</span> A single <code>normalise_dims(X, dims)</code> helper (or a <code>@check_dims</code> macro) returning the possibly-transposed matrix; the message and transpose become single-sourced.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>~46 sites → 1 helper</li>
+            <li>3 wordings → 1</li>
+            <li>2 mechanisms → 1</li>
+            <li>underpins cards 5, 6</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Prior review.</span> Flagged as "dims preamble ×43" in the 2026-07-07 maintainability pass and still open; the new signal is that the message has since drifted — consolidation is now also a correctness cleanup.
+          </div>
+        </article>
+
+        <!-- ===== CARD 9 ===== -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">9 · <code>set_long_short_budget_constraints!</code> — an 8-method dispatch matrix over the same budget equation</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">change-amplification</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            09_JuMPConstraints/03_BudgetConstraints.jl:582–709 — 8 methods, lb/ub guard block repeated ~6×
+          </div>
+
+          <!-- matrix grid -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500"><code>bgt ∈ {Number, BudgetRange}</code> × <code>sbgt ∈ {Nothing, Number, BudgetRange}</code></div>
+            <div class="grid grid-cols-4 gap-2 font-mono text-xs">
+              <div class="copy rounded p-2">:582</div><div class="copy rounded p-2">:589</div><div class="copy rounded p-2">:596</div><div class="copy rounded p-2">:607</div>
+              <div class="copy rounded p-2">:621</div><div class="copy rounded p-2">:635</div><div class="copy rounded p-2">:652</div><div class="drifted rounded p-2">:674 ⚠ diverged shape</div>
+            </div>
+            <div class="text-xs text-slate-600 leading-relaxed">
+              Every body repeats the <code>lw/sw/k/sc</code> preamble and the emission <code>sc·(sum(lw) − k·bound) op 0</code>. The long-side coupling is already encoded
+              inconsistently — some fold <code>sbgt</code> in as <code>k·(lb + sbgt)</code> (:643) while the <code>BudgetRange×BudgetRange</code> case (:674) uses a different flag-based branch
+              structure than its siblings. Distinct from the MIP unification of ADR 0021/0033.
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">emit_budget!(model, wsum, bound, op) + range_bounds(bgt)</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Eight methods enumerate the bound-type combinations; a new budget type means adding another row, and the copies have already diverged in how they couple the short side.</p>
+            <p><span class="font-semibold">Direction.</span> An <code>emit_budget!(model, wsum, bound, op)</code> plus a <code>range_bounds(bgt)</code> iterator that yields <code>(bound, op)</code> pairs; the matrix collapses to one emission path.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>8 methods → 1 path</li>
+            <li>lb/ub guard: 6 → 1</li>
+            <li>coupling drift resolved</li>
+            <li>new budget type: no new row</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0021 / 0033.</span> This is the LP long/short <code>bgt×sbgt</code> pairing, not the MIP-space unification those ADRs settled — the recommendation does not reopen them.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ================= TOP RECOMMENDATION ================= -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — extract <code>weighted_quantile</code> and fix the drift it exposes</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          Start with <a href="#c1" class="text-emerald-700 underline">card 1</a>. It is the highest-leverage item because it is both a
+          live correctness bug and a clean consolidation: five of six weighted-quantile sites scale the search target by <code>sw</code> and
+          <code>drawdown_at_risk</code> does not, so weighted DaR/RLDaR silently return a wrong quantile for un-normalised weights. A single
+          <code>weighted_quantile(v, level, w)</code> helper collapses the six sites to one-liners <em>and</em> forces the diverged copy back onto
+          the family convention — the fix and the consolidation are the same edit. Pair it with <a href="#c2" class="text-emerald-700 underline">card 2</a>
+          (the DR-CDaR key collision), the second latent bug, since both are copy-paste residue of the twin structure that
+          <a href="#c3" class="text-emerald-700 underline">card 3</a> would eliminate at the source. After the bugs, <a href="#c4" class="text-emerald-700 underline">card 4</a>
+          (Fees, ~34 sites) and <a href="#c5" class="text-emerald-700 underline">card 5</a> (Distance, ~48 methods) buy back the most blast radius.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-07-23 · <code>/improve-maintainability</code> · findings located by four parallel explorers, every headline claim verified against source before inclusion.
+      </footer>
+
+    </main>
+  </body>
+</html>

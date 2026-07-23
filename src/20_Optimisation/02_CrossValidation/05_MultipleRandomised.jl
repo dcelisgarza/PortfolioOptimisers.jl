@@ -450,7 +450,7 @@ Get the number of asset subsets for multiple-randomised cross-validation.
 
 Resolves the number of subsets from either an integer (direct count) or a callable that computes it from the returns data.
 
-This is the single point at which the (possibly [`TimeDependent`](@ref) or callable) subset count becomes a concrete integer, so it is where the [`RESOURCE_LIMITS`](@ref) `max_subsets` ceiling is enforced — a constructor check could not see the value a schedule or callable ultimately produces. Every subset runs a full inner optimisation, so an absurd count is a compute-exhaustion sink rather than a merely large allocation.
+This is the single point at which the (possibly [`TimeDependent`](@ref) or callable) subset count becomes a concrete integer, so it is where the [`RESOURCE_LIMITS`](@ref) `max_n_subsets` ceiling is enforced — a constructor check could not see the value a schedule or callable ultimately produces. Every subset runs a full inner optimisation, so an absurd count is a compute-exhaustion sink rather than a merely large allocation.
 
 # Arguments
 
@@ -468,14 +468,15 @@ This is the single point at which the (possibly [`TimeDependent`](@ref) or calla
   - [`assert_resource_cap`](@ref)
 """
 function get_n_subsets(n_subsets::Integer, args...)
-    assert_resource_cap(n_subsets, RESOURCE_LIMITS[].max_subsets, :n_subsets, :max_subsets)
+    assert_resource_cap(n_subsets, RESOURCE_LIMITS[].max_n_subsets, :n_subsets,
+                        :max_n_subsets)
     return n_subsets
 end
 function get_n_subsets(n_subsets::NumberSubsetsEC,
                        rd::Union{<:Pr_RR, <:AbstractPricesResult})
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
-    assert_resource_cap(res, RESOURCE_LIMITS[].max_subsets, :n_subsets, :max_subsets)
+    assert_resource_cap(res, RESOURCE_LIMITS[].max_n_subsets, :n_subsets, :max_n_subsets)
     return res
 end
 """

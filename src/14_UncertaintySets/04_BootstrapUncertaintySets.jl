@@ -282,7 +282,7 @@ ARCHUncertaintySet
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
                                 kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
-        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_samples, :n_sim, :max_samples)
+        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))
         assert_unit_interval(q, :q)

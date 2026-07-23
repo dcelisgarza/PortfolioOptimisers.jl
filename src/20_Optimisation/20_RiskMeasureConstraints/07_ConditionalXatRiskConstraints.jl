@@ -580,7 +580,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:drcvar_risk_, i)
+    key = Symbol(:drdvar_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     X = pr.X

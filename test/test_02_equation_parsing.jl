@@ -228,15 +228,23 @@ end
     end
     @test pe.STRING_DISTANCE[].min_score == 0.7  # scoped override restored
 end
-@testset "Sampling resource caps fail closed" begin
+@testset "Resource caps fail closed" begin
     using PortfolioOptimisers, Test
     pe = PortfolioOptimisers
-    @test pe.RESOURCE_LIMITS[] == pe.ResourceLimits(1_000_000, 100_000)
-    # Both fields must be positive, like EquationLimits.
-    @test_throws ArgumentError pe.ResourceLimits(0, 10)
-    @test_throws ArgumentError pe.ResourceLimits(10, -1)
-    @test_throws ArgumentError pe.set_resource_limits!(max_samples = 0)
-    @test_throws ArgumentError pe.set_resource_limits!(max_subsets = -1)
+    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the four
+    # fields are same-typed and two share the value 100_000.
+    @test pe.RESOURCE_LIMITS[] == pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000)
+    @test pe.ResourceLimits() == pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000)
+    @test pe.ResourceLimits(; max_bins = 500).max_bins == 500
+    # Every field must be positive, like EquationLimits.
+    @test_throws ArgumentError pe.ResourceLimits(; max_n_sim = 0)
+    @test_throws ArgumentError pe.ResourceLimits(; max_n_subsets = -1)
+    @test_throws ArgumentError pe.ResourceLimits(; max_frontier = 0)
+    @test_throws ArgumentError pe.ResourceLimits(; max_bins = -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_n_sim = 0)
+    @test_throws ArgumentError pe.set_resource_limits!(max_n_subsets = -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_frontier = 0)
+    @test_throws ArgumentError pe.set_resource_limits!(max_bins = -1)
     # n_sim sizes an N^2 * n_sim array in both uncertainty-set estimators; the ceiling
     # converts an OOM kill into a typed DomainError naming the knob that raises it.
     @test_throws DomainError NormalUncertaintySet(; n_sim = 10_000_000_000)
@@ -248,7 +256,7 @@ end
         e
     end
     @test err isa DomainError
-    @test occursin("max_samples", err.msg)
+    @test occursin("max_n_sim", err.msg)
     @test occursin("set_resource_limits!", err.msg)
     # The shipped default is far below the cap and still constructs.
     @test NormalUncertaintySet(; n_sim = 3_000).n_sim == 3_000
@@ -259,18 +267,54 @@ end
     @test_throws DomainError pe.get_n_subsets(x -> 10_000_000, rd)
     @test pe.get_n_subsets(50) == 50
     @test pe.get_n_subsets(x -> 7, rd) == 7
+    # Frontier.N drives one full inner solve per point: a compute sink capped like n_subsets.
+    @test_throws DomainError Frontier(; N = 10_000_000)
+    ferr = try
+        Frontier(; N = 10_000_000)
+        nothing
+    catch e
+        e
+    end
+    @test ferr isa DomainError
+    @test occursin("max_frontier", ferr.msg)
+    @test Frontier(; N = 20).N == 20
+    # bins drives a bins x bins joint histogram: a quadratic memory sink with its own cap,
+    # shared by MutualInfoCovariance and VariationInfoDistance. Auto-selecting bin
+    # algorithms are data-bounded and uncapped.
+    @test_throws DomainError MutualInfoCovariance(; bins = 10_000_000)
+    @test_throws DomainError pe.VariationInfoDistance(; bins = 10_000_000)
+    berr = try
+        MutualInfoCovariance(; bins = 10_000_000)
+        nothing
+    catch e
+        e
+    end
+    @test berr isa DomainError
+    @test occursin("max_bins", berr.msg)
+    @test MutualInfoCovariance(; bins = 20).bins == 20
+    @test MutualInfoCovariance().bins isa pe.AbstractBins  # HacineGharbiRavier(), uncapped
     # A raised ceiling is honoured, and scoped overrides restore on exit.
-    pe.with_resource_limits(; max_samples = 20_000_000_000) do
+    pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
     end
-    @test pe.RESOURCE_LIMITS[].max_samples == 1_000_000
+    pe.with_resource_limits(; max_frontier = 20_000_000) do
+        @test Frontier(; N = 10_000_000).N == 10_000_000
+    end
+    pe.with_resource_limits(; max_bins = 20_000_000) do
+        @test MutualInfoCovariance(; bins = 10_000_000).bins == 10_000_000
+    end
+    @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.
-    pe.apply_preferences!(Dict{String, Any}("max_subsets" => 1_234))
-    @test pe.RESOURCE_LIMITS[].max_subsets == 1_234
-    @test pe.RESOURCE_LIMITS[].max_samples == 1_000_000  # unset key keeps its default
-    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_samples" => -5))
-    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_subsets" =>
+    pe.apply_preferences!(Dict{String, Any}("max_n_subsets" => 1_234, "max_bins" => 321))
+    @test pe.RESOURCE_LIMITS[].max_n_subsets == 1_234
+    @test pe.RESOURCE_LIMITS[].max_bins == 321
+    @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000  # unset key keeps its default
+    @test pe.RESOURCE_LIMITS[].max_frontier == 100_000  # unset key keeps its default
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_n_sim" => -5))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_n_subsets" =>
                                                                            true))
-    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_samples" => "1000"))
-    pe.set_resource_limits!(max_samples = 1_000_000, max_subsets = 100_000)  # restore
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_frontier" => "1000"))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_bins" => 1.5))
+    pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
+                            max_frontier = 100_000, max_bins = 10_000)  # restore
 end

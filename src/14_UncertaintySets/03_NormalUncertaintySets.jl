@@ -117,7 +117,7 @@ NormalUncertaintySet
                                   pdm::Option{<:AbstractPosdefEstimator},
                                   kwargs::NamedTuple)
         @argcheck(zero(n_sim) < n_sim, DomainError(n_sim, "n_sim must be > 0"))
-        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_samples, :n_sim, :max_samples)
+        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         assert_unit_interval(q, :q)
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
                    typeof(seed), typeof(ens), typeof(pdm), typeof(kwargs)}(pe, alg, n_sim,

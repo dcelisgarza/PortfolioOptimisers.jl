@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose", flowchart: { curve: "basis" } });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 6 5; }
+      body { -webkit-font-smoothing: antialiased; }
+      .card-num { font-variant-numeric: tabular-nums; }
+      .mass-iface { background: repeating-linear-gradient(45deg,#fbbf24,#fbbf24 6px,#f59e0b 6px,#f59e0b 12px); }
+      .deep-impl { background: linear-gradient(160deg,#0f172a,#1e293b); }
+      details > summary { list-style: none; cursor: pointer; }
+      details > summary::-webkit-details-marker { display: none; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <!-- ===================== HEADER ===================== -->
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="font-serif text-4xl tracking-tight">Architecture review</h1>
+          <span class="text-sm text-slate-500 card-num">PortfolioOptimisers.jl · dev · 2026-07-23</span>
+        </div>
+        <p class="text-slate-600 max-w-3xl">
+          Eight <strong>deepening opportunities</strong> — refactors that turn shallow modules into deep ones, move a seam to where it can be tested, or concentrate a scattered concept into one place. Ranked for leverage and testability. Findings already settled by ADRs 0022/0033/0034/0036/0037/0038 are excluded.
+        </p>
+        <!-- legend -->
+        <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-600 border-y border-slate-200 py-3">
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-400 bg-white"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="seam" stroke="#64748b" stroke-width="2"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leak</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep-impl"></span> deep module</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 mass-iface"></span> interface surface</span>
+        </div>
+        <!-- badge key -->
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">Strong</span>
+          <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">Worth exploring</span>
+          <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-medium">Speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600">dependency category tag</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-14">
+
+        <!-- ===================== CANDIDATE 1 ===================== -->
+        <article id="c1" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">01</span>
+            <h2 class="font-serif text-2xl">A pure risk-formulation seam</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">highest testability win</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            src/19_RiskMeasures/07_ConditionalXatRisk.jl · src/20_Optimisation/20_RiskMeasureConstraints/07_ConditionalXatRiskConstraints.jl · &nbsp;22 <code>set_risk_constraints!</code> methods across the 21-file mirror
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <!-- BEFORE -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — emitter reaches past its interface</div>
+              <div class="relative" style="height:280px">
+                <div class="absolute left-3 top-2 w-40 border border-slate-300 rounded bg-white px-2 py-1.5 text-xs">
+                  <div class="font-mono">set_risk_constraints!</div>
+                  <div class="text-slate-400 text-[10px] mt-0.5">(model, i, r::CVaR, opt, pr…)</div>
+                </div>
+                <!-- reaches into model internals -->
+                <div class="absolute right-3 top-2 w-40 deep-impl text-slate-200 rounded px-2 py-1.5 text-[11px] space-y-1">
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400">JuMP model (half-built)</div>
+                  <div>weight var <span class="font-mono">w</span></div>
+                  <div><span class="font-mono">get_constraint_scale</span></div>
+                  <div><span class="font-mono">set_net_portfolio_returns!</span></div>
+                  <div class="text-amber-300">↳ the cone math</div>
+                </div>
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" style="top:0">
+                  <line x1="175" y1="30" x2="290" y2="30" stroke="#dc2626" stroke-width="2" marker-end="url(#ar1)"/>
+                  <line x1="175" y1="42" x2="290" y2="60" stroke="#dc2626" stroke-width="2" marker-end="url(#ar1)"/>
+                  <defs><marker id="ar1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#dc2626"/></marker></defs>
+                </svg>
+                <div class="absolute left-3 bottom-2 right-3 text-[11px] text-slate-500 border-t border-dashed border-slate-300 pt-2">
+                  To exercise the CVaR cone you must stand up a partial model + prior + optimiser. The interesting math has no interface of its own.
+                </div>
+              </div>
+            </div>
+            <!-- AFTER -->
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — the cone is a deep module</div>
+              <div class="relative" style="height:280px">
+                <div class="absolute left-1/2 -translate-x-1/2 top-2 w-56 deep-impl text-slate-100 rounded px-3 py-2 text-xs">
+                  <div class="font-mono text-emerald-300">cvar_cone(returns_expr, α)</div>
+                  <div class="text-slate-400 text-[10px] mt-1">→ (var, z, risk_expr)</div>
+                  <div class="text-[10px] text-slate-400 mt-1">pure: no model, no prior, no w</div>
+                </div>
+                <div class="absolute left-2 bottom-16 w-32 border border-emerald-300 rounded bg-white px-2 py-1 text-[11px]">
+                  CVaR emitter<br><span class="text-slate-400 text-[10px]">feeds net returns</span>
+                </div>
+                <div class="absolute right-2 bottom-16 w-32 border border-emerald-300 rounded bg-white px-2 py-1 text-[11px]">
+                  CDaR emitter<br><span class="text-slate-400 text-[10px]">feeds drawdowns</span>
+                </div>
+                <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                  <line x1="120" y1="150" x2="150" y2="70" stroke="#059669" stroke-width="2" marker-end="url(#ar2)"/>
+                  <line x1="290" y1="150" x2="260" y2="70" stroke="#059669" stroke-width="2" marker-end="url(#ar2)"/>
+                  <defs><marker id="ar2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#059669"/></marker></defs>
+                </svg>
+                <div class="absolute left-2 bottom-2 right-2 text-[11px] text-emerald-700 border-t border-emerald-200 pt-2">
+                  Two adapters justify the seam: returns feed CVaR, drawdowns feed CDaR — one cone, tested directly on a returns vector.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The cone formulations — the mathematically interesting half of every risk measure — are reachable only through a half-assembled JuMP model, and the returns/drawdown twins (CVaR↔CDaR, EVaR↔EDaR, RVaR↔RLDaR, PNVaR↔PNDaR) are hand-mirrored despite the analytic functors already sharing one kernel.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Extract each cone as a pure builder over a returns/drawdown expression (<code class="font-mono text-xs">cvar_cone(expr, α)</code>); the emitter's job shrinks to choosing which series to feed it.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface is the test surface: cone tested on a vector</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> leverage: one cone, N feeders</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> twins collapse: CVaR/CDaR share one builder</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: a stabilisation change lands once, not ×4</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CANDIDATE 2 ===================== -->
+        <article id="c2" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">02</span>
+            <h2 class="font-serif text-2xl">Make the Model Assembly ordering contract declarable</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-medium">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">highest severity</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            src/20_Optimisation/10_JuMPOptimiser.jl (<code>assemble_jump_model!</code>) · 08_Base_JuMPOptimisation.jl (<code>SHARED_STATE</code>) · 09_JuMPConstraints/01_MIPIndicators.jl (<code>mip_key</code>)
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+            <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — ordering is load-bearing but invisible in every signature</div>
+            <pre class="mermaid">
+flowchart LR
+  A[set_weight_constraints!] --> S(( Model State<br/>~40 presence flags ))
+  B[risk builder] -->|sets :sr_risk| S
+  M[set_mip_constraints!] -->|reads :sw| S
+  O[objective builder] -.reads :sr_risk.-> S
+  P[SDP phylogeny] -.reads :variance_flag.-> S
+  MK[mip_key :ib/:ilb/:isb] -. bypasses seam-lock .-> S
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class O,P,MK leak
+  classDef hub fill:#0f172a,color:#e2e8f0,stroke:#334155;
+  class S hub
+            </pre>
+            <p class="text-[11px] text-slate-500 mt-2">ADR 0037 governs how a key is <em>spelled</em> (and fails closed) — but not <em>when</em> it must be written. Correctness rides on the call order of ~18 builders, communicated only through presence flags. The <code class="font-mono">mip_key</code> scheme is a third keying vocabulary that slips past the seam-lock entirely (~41 sites).</p>
+          </div>
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 mb-5">
+            <div class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — each builder declares reads/writes; order is derived and checkable</div>
+            <pre class="mermaid">
+flowchart LR
+  subgraph decl[declared producer → consumer graph]
+    A2[weights<br/>writes: w] --> R2[risk<br/>reads: w · writes: sr_risk]
+    R2 --> O2[objective<br/>reads: sr_risk]
+    A2 --> M2[mip<br/>reads: sw · writes: ib]
+  end
+  decl --> V{{topological check<br/>at assembly}}
+  classDef ok fill:#ecfdf5,stroke:#059669;
+  class A2,R2,O2,M2 ok
+            </pre>
+            <p class="text-[11px] text-emerald-700 mt-2">One seam absorbs both keying schemes; the ordering invariant becomes a property the interface states, not a comment on <code class="font-mono">SHARED_STATE</code>.</p>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">Builder correctness depends on ordering and hidden presence flags that appear in no signature; the MIP layer uses a parallel keying scheme outside the fail-closed lock.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Have each builder declare the Model State it reads and writes; derive the assembly order (or assert it) from those declarations, and pull <code class="font-mono text-xs">mip_key</code> under the same interface.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> ordering invariant becomes checkable</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> one Model-State vocabulary, not two</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> seam-lock actually covers the MIP layer</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: a reorder fails fast, not silently</li>
+          </ul>
+          <div class="mt-4 rounded bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+            Extends ADR 0037 rather than contradicting it — 0037's own "still out of scope" names <code class="font-mono">:noc_rk</code>, <code class="font-mono">:psi</code>, <code class="font-mono">:w_obj</code> as unclassified. This is the temporal contract it deferred.
+          </div>
+        </article>
+
+        <!-- ===================== CANDIDATE 3 ===================== -->
+        <article id="c3" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">03</span>
+            <h2 class="font-serif text-2xl">One optional-builder combinator, not 35 silent no-ops</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 text-xs">footgun</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            22 <code>set_X!(args...) = nothing</code> catch-alls in src/20_Optimisation/09_JuMPConstraints/ · plus the <code>args...</code> no-ops in src/01_Base.jl assertion combinators
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — every builder ships its own untyped no-op</div>
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2 text-[11px] font-mono"><span class="text-rose-500">✕</span> set_turnover!(args...) = nothing</div>
+                <div class="flex items-center gap-2 text-[11px] font-mono"><span class="text-rose-500">✕</span> set_tracking!(args...) = nothing</div>
+                <div class="flex items-center gap-2 text-[11px] font-mono"><span class="text-rose-500">✕</span> set_fees!(args...) = nothing</div>
+                <div class="flex items-center gap-2 text-[11px] font-mono"><span class="text-rose-500">✕</span> set_lp_reg!(args...) = nothing</div>
+                <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">… 18 more</div>
+                <div class="mt-3 text-[11px] text-rose-600 border-t border-dashed border-rose-200 pt-2">A signature drift resolves to the no-op — the constraint is <strong>silently dropped</strong>, no error (exactly how the <code class="font-mono">scard</code> loss in #04 stays quiet).</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one combinator dispatches on a typed presence wrapper</div>
+              <div class="relative" style="height:150px">
+                <div class="absolute left-1/2 -translate-x-1/2 top-3 w-52 deep-impl text-slate-100 rounded px-3 py-2 text-[11px] font-mono">
+                  optional(builder, input)
+                  <div class="text-slate-400 mt-1">Disabled → skip · Enabled → run · mismatch → raise</div>
+                </div>
+                <div class="absolute bottom-3 left-2 right-2 text-[11px] text-emerald-700 text-center">
+                  Enabled/Disabled is a type. A mis-shaped call can no longer match a no-op.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">"Be a no-op when disabled" is re-encoded as an untyped variadic method per builder; a drifted call site silently drops a constraint instead of raising — the shape ADR 0036 already fixed only for custom hooks.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">A single optional-builder combinator that dispatches on an enabled/disabled presence type; the disabled branch is the <em>only</em> path that skips.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> delete ~22 shallow no-op wrappers</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> mis-shaped calls raise, not vanish</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: the skip rule lives in one module</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> finishes what ADR 0036 started for hooks</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CANDIDATE 4 ===================== -->
+        <article id="c4" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">04</span>
+            <h2 class="font-serif text-2xl">Deepen JuMPOptimiser — kill the hand-remapped twin</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-xs font-medium">live bug confirmed</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            src/20_Optimisation/10_JuMPOptimiser.jl — <code>JuMPOptimiser</code> (44 fields) · <code>jump_optimiser_from_attributes</code> · <code>ProcessedJuMPOptimiserAttributes</code>
+          </p>
+
+          <!-- mass diagram -->
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — interface as wide as the struct, remapped by hand</div>
+              <div class="flex items-end justify-center gap-6" style="height:220px">
+                <div class="flex flex-col items-center">
+                  <div class="mass-iface w-16 rounded-t" style="height:150px"></div>
+                  <div class="deep-impl w-16 rounded-b" style="height:40px"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-2">44-field ctor</div>
+                </div>
+                <svg width="60" height="180"><line x1="0" y1="80" x2="52" y2="80" stroke="#dc2626" stroke-width="2" marker-end="url(#ar4)"/><defs><marker id="ar4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#dc2626"/></marker></defs></svg>
+                <div class="flex flex-col items-center">
+                  <div class="mass-iface w-16 rounded-t" style="height:120px"></div>
+                  <div class="deep-impl w-16 rounded-b" style="height:30px"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-2">40-arg remap</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">The remap spells 40 fields by hand and <strong>drops <code class="font-mono">scard</code></strong> — <code class="font-mono">factory</code> and <code class="font-mono">port_opt_view</code> both carry it, this path defaults it to <code class="font-mono">nothing</code>. Constrained-NOC assembles from this twin → sub-group cardinality silently vanishes.</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — the remap can't drop a field</div>
+              <div class="flex items-end justify-center gap-2" style="height:220px">
+                <div class="flex flex-col items-center">
+                  <div class="mass-iface w-14 rounded-t" style="height:36px"></div>
+                  <div class="deep-impl w-14 rounded-b" style="height:150px"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-emerald-600 mt-2">generated<br/>remap</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-emerald-700 mt-2 border-t border-emerald-200 pt-2">Derive the remap by reflection over field names (the pattern <code class="font-mono">no_bounds_optimiser</code> already uses) so adding a knob touches one place, and a field can't be silently omitted.</p>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">A 44-field struct with a hand-written 40-argument remap onto its processed twin: adding a knob touches ~8 sites, and the remap has already dropped <code class="font-mono">scard</code>, silently disabling sub-group cardinality in constrained-NOC.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Generate the remap from field names (as <code class="font-mono">no_bounds_optimiser</code> does); longer term, make the processed attributes a view over the optimiser rather than a second wide struct.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> fixes the live <code class="font-mono">scard</code> drop</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> one edit per new knob, not eight</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface shrinks; implementation absorbs the mapping</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: field list has one home</li>
+          </ul>
+          <div class="mt-4 rounded bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+            The <code class="font-mono">scard</code> drop is a correctness bug worth patching immediately, independent of the deepening. ADR 0008 already noted the two processed representations "coexist, left as-is" — this is the concrete cost.
+          </div>
+        </article>
+
+        <!-- ===================== CANDIDATE 5 ===================== -->
+        <article id="c5" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">05</span>
+            <h2 class="font-serif text-2xl">Break up the foundational grab-bags</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            src/01_Base.jl (3605L, ~11 clusters) · src/02_Tools.jl (2299L, macro-DSL + measures + loose helpers)
+          </p>
+
+          <!-- call-graph collapse -->
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — one file, no interface, eleven concepts</div>
+              <div class="border-2 border-slate-300 rounded p-2 grid grid-cols-2 gap-1.5 text-[10px]" style="min-height:220px">
+                <div class="bg-slate-100 rounded px-1.5 py-1">docstring registry</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">abstract roots</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">pretty_show</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">ScopedConfig ×4</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">error builders</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">Preferences loader</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">Error hierarchy</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">48 type aliases</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">27 assert_* fns</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1">VecScalar</div>
+                <div class="bg-slate-100 rounded px-1.5 py-1 col-span-2">NormError primitive (ADR 0020)</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — named deep modules with clean seams</div>
+              <div class="space-y-2 text-[11px]" style="min-height:220px">
+                <div class="deep-impl text-slate-100 rounded px-2 py-1.5 font-mono">DocRegistry</div>
+                <div class="deep-impl text-slate-100 rounded px-2 py-1.5 font-mono">ScopedConfig</div>
+                <div class="deep-impl text-slate-100 rounded px-2 py-1.5 font-mono">Assertions (+ assert_dims → #06)</div>
+                <div class="deep-impl text-slate-100 rounded px-2 py-1.5 font-mono">NormError</div>
+                <div class="deep-impl text-slate-100 rounded px-2 py-1.5 font-mono">Tools → PropMacros · VectorToScalarMeasure</div>
+                <div class="border border-emerald-300 bg-white rounded px-2 py-1 text-slate-500">Base keeps: roots · aliases · errors</div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">Two files are physical buckets, not modules — the docstring registry, ScopedConfig, the assertion module, NormError, the property-propagation macro DSL and the reducer hierarchy each have a clean seam but share only a filename.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Lift each self-contained cluster into its own file/module; leave the genuinely diffuse residue (abstract roots, alias zoo, error types) in Base.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: a concept has one file</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> deletion test passes: each extraction concentrates a name</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> AI-navigability: find ScopedConfig by name, not by line</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> no behaviour change — pure relocation</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CANDIDATE 6 ===================== -->
+        <article id="c6" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">06</span>
+            <h2 class="font-serif text-2xl">One <code class="font-mono text-xl">assert_dims</code>, not 48 copies</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">quick win</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            <code>@argcheck(dims in (1,2), …)</code> — 48 sites across 26 files · message already drifted into two spellings
+          </p>
+
+          <!-- cross-section -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mb-5">
+            <div class="grid md:grid-cols-2 gap-6 items-center">
+              <div>
+                <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — 48 hand-written preconditions</div>
+                <div class="space-y-0.5">
+                  <div class="h-3 bg-amber-200 rounded-sm"></div>
+                  <div class="h-3 bg-amber-200 rounded-sm"></div>
+                  <div class="h-3 bg-amber-300 rounded-sm"></div><!-- drifted -->
+                  <div class="h-3 bg-amber-200 rounded-sm"></div>
+                  <div class="h-3 bg-amber-200 rounded-sm"></div>
+                  <div class="h-3 bg-amber-300 rounded-sm"></div><!-- drifted -->
+                  <div class="text-[10px] text-slate-400 mt-1">…48 bands · 2 already say "must be in (1, 2)"</div>
+                </div>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one band, one message</div>
+                <div class="deep-impl text-slate-100 rounded px-3 py-4 font-mono text-xs text-center">assert_dims(dims)</div>
+                <div class="text-[10px] text-emerald-700 mt-2 text-center">joins the 27-function assertion module one file away</div>
+              </div>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The library's single most-repeated precondition is the one idiom that was never given a helper — despite a 27-function assertion module in the same base file. It has already drifted into two error spellings.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Add <code class="font-mono text-xs">assert_dims</code> to the assertion module and replace the 48 call sites.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> one change reaches 48 sites</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> message can't drift again</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> lowest-risk deepening in this report</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> natural companion to #05</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CANDIDATE 7 ===================== -->
+        <article id="c7" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">07</span>
+            <h2 class="font-serif text-2xl">Collapse the Distance dispatch matrix</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-medium">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 text-xs">drifted validation</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            src/09_Distance/02_Distance.jl (630L) — <code>distance</code> ~24 methods · <code>cor_and_dist</code> duplicates the whole matrix
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — shallow: interface ≈ implementation</div>
+              <div class="flex items-end justify-center gap-4" style="height:200px">
+                <div class="flex flex-col items-center">
+                  <div class="mass-iface w-20 rounded-t" style="height:130px"></div>
+                  <div class="deep-impl w-20 rounded-b" style="height:45px"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-2">6 algos × 2 power × 2 input</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">One-line bodies, 24 methods. cov2cor preamble repeated ×8. <code class="font-mono">assert_matrix_issquare</code> guards only 2 of 8 rho-methods — a non-square <code class="font-mono">rho</code> to <code class="font-mono">SimpleDistance</code> proceeds silently.</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — deep: small interface, shared math</div>
+              <div class="flex items-end justify-center gap-4" style="height:200px">
+                <div class="flex flex-col items-center">
+                  <div class="mass-iface w-20 rounded-t" style="height:40px"></div>
+                  <div class="deep-impl w-20 rounded-b" style="height:135px"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-emerald-600 mt-2">algo picks a transform</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-emerald-700 mt-2 border-t border-emerald-200 pt-2">Power/scale and cov2cor become shared helpers; validation runs once for all algos. Adding an algorithm is one method, not six.</p>
+            </div>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The <code class="font-mono text-xs">distance</code> seam is a hand-enumerated product (algorithm × power × input), <code class="font-mono text-xs">cor_and_dist</code> re-enumerates it, and the square-matrix check is applied unevenly — a shallow module with a silent-input footgun.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Factor the power/scale step and the cov2cor preamble into shared helpers, validate once, and let each algorithm supply only its transform.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface shrinks; math concentrates</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> validation applied uniformly</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> new algorithm = one method</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> cov2cor lives once, not ×8</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CANDIDATE 8 ===================== -->
+        <article id="c8" class="scroll-mt-6">
+          <div class="flex items-center gap-3 mb-1">
+            <span class="font-serif text-2xl text-slate-300 card-num">08</span>
+            <h2 class="font-serif text-2xl">A family-stamping <code class="font-mono text-xl">@risk_measure</code></h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs font-medium">Speculative</span>
+            <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
+            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-xs">known / catalogued</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500 mb-4">
+            48 concrete RiskMeasure structs · 51 scattered <code>risk_input_kind</code> lines · 40 <code>assert_unit_interval</code> sites · the DR/Range/Drawdown cross-product
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+            <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — one measure is stamped by hand in five aligned places</div>
+            <pre class="mermaid">
+flowchart TB
+  D[add / rename a measure] --> S1[struct + inner ctor]
+  D --> S2[kwargs ctor]
+  D --> S3[~40-line docstring]
+  D --> S4[risk_input_kind line]
+  D --> S5[supports_precomputed_returns]
+  D --> S6[mirror emitter file - see #01]
+  classDef amp fill:#fff7ed,stroke:#f59e0b;
+  class S1,S2,S3,S4,S5,S6 amp
+            </pre>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mb-5">
+            <div class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — one declaration stamps the family</div>
+            <pre class="mermaid">
+flowchart LR
+  M["@risk_measure(name, kind, family…)"] --> G((generated))
+  G --> a[struct + ctors]
+  G --> b[docstring]
+  G --> c[risk_input_kind]
+  G --> d[precomputed contract]
+  classDef ok fill:#ecfdf5,stroke:#059669;
+  class M,a,b,c,d ok
+            </pre>
+            <p class="text-[11px] text-slate-500 mt-2">To pay off, it must stamp <em>families</em> — the Range/Drawdown/Relative/DR axis (a data-carrying <code class="font-mono">kind</code> parameter, as <code class="font-mono">LowOrderMoment{…,alg}</code> already does), not single measures.</p>
+          </div>
+
+          <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The 48 measures are a hand-maintained cross-product; <code class="font-mono text-xs">risk_input_kind</code> is an implicit reflection contract you must remember to extend, and the DR twins even carry validated fields (<code class="font-mono">l</code>, <code class="font-mono">r</code>) that the analytic functor silently ignores — a reporting/optimisation mismatch.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">A macro that emits the struct, constructors, docstring skeleton, and the input-kind/precomputed contract from one declaration keyed on the family axis.</dd></div>
+          </dl>
+          <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> contract can't drift out of sync</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> the Range/DR axis becomes data, not N structs</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> best done after #01 gives the emitter a seam</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> surfaces the inert <code class="font-mono">l</code>/<code class="font-mono">r</code> mismatch</li>
+          </ul>
+          <div class="mt-4 rounded bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+            Already tracked (ADR 0018 "M5"; memory notes it as future work). Listed for completeness and re-scoped: it should stamp families, and it depends on #01 for the emitter half.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ===================== TOP RECOMMENDATION ===================== -->
+      <section id="top-recommendation">
+        <div class="rounded-xl deep-impl text-slate-100 p-7 shadow-lg">
+          <div class="text-xs uppercase tracking-widest text-emerald-400 mb-2">Top recommendation</div>
+          <h2 class="font-serif text-2xl mb-3">Start with <a href="#c1" class="underline decoration-emerald-400 underline-offset-4">#01 — a pure risk-formulation seam</a></h2>
+          <p class="text-slate-300 text-sm max-w-3xl mb-4">
+            It is the root that makes the whole risk-measure mirror expensive. Extracting the cones as pure builders delivers the report's single biggest testability win — the mathematically interesting formulations become testable on a returns vector instead of through a half-assembled JuMP model — collapses the returns/drawdown twins the analytic side already unified, and clears the way for #08. Two adapters (returns, drawdowns) justify the seam, so it is a real one, not a hypothetical.
+          </p>
+          <div class="flex flex-wrap gap-3 text-xs">
+            <span class="px-3 py-1 rounded-full bg-white/10">Then #04 — patch the live <span class="font-mono">scard</span> drop now, deepen the remap after</span>
+            <span class="px-3 py-1 rounded-full bg-white/10">#06 &amp; #05 — low-risk locality wins, any time</span>
+            <span class="px-3 py-1 rounded-full bg-white/10">#02 — the ambitious one; schedule deliberately</span>
+          </div>
+        </div>
+        <p class="text-center text-xs text-slate-400 mt-6">Generated by <span class="font-mono">/improve-codebase-architecture</span> · vocabulary: <span class="font-mono">/codebase-design</span> + CONTEXT.md</p>
+      </section>
+    </main>
+  </body>
+</html>
