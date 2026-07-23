@@ -1,10 +1,10 @@
-# TimeDependentCallable subtypes must be defined at top level. `TDCap` is a plain functor;
+# TimeDependentCallable subtypes must be defined at top level. `_test_TDCap` is a plain functor;
 # `TDPrevWCap` declares its previous-weights requirement directly.
 struct _test_TDCap <: PortfolioOptimisers.TimeDependentCallable
     hi::Float64
     lo::Float64
 end
-function (c::TDCap)(ctx::TimeDependentContext)
+function (c::_test_TDCap)(ctx::TimeDependentContext)
     return WeightBounds(; lb = 0.0,
                         ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
 end
@@ -52,7 +52,7 @@ end
         @test_throws PortfolioOptimisers.IsEmptyError TimeDependent(Union{}[])
         # Callables are stored as-is.
         @test TimeDependent(ctx -> Threshold(; val = 0.01)) isa TimeDependent
-        @test TimeDependent(TDCap(0.35, 0.2)) isa TimeDependent
+        @test TimeDependent(_test_TDCap(0.35, 0.2)) isa TimeDependent
         @test TimeDependent(PreviousWeightsFunction(ctx -> WeightBounds())) isa
               TimeDependent
         # bind defaults to :outermost and only accepts :outermost or :nearest.
@@ -243,7 +243,7 @@ end
         @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(optwb, 5))
         # Callable structs: functor over ctx with direct needs_previous_weights
         # declaration; equivalent to the bare-function form.
-        optcap = JuMPOptimiser(; slv = slv, wb = TimeDependent(TDCap(0.35, 0.2)))
+        optcap = JuMPOptimiser(; slv = slv, wb = TimeDependent(_test_TDCap(0.35, 0.2)))
         @test !PortfolioOptimisers.needs_previous_weights(optcap)
         optfn = JuMPOptimiser(; slv = slv,
                               wb = TimeDependent(ctx -> WeightBounds(; lb = 0.0,

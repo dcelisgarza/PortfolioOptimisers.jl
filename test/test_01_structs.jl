@@ -61,6 +61,8 @@
         nb1 = string.(1:4)
         nb2 = ["1"]
         ts = Date(2020, 1, 1) .+ Day.(0:2)
+        @test PortfolioOptimisers.assert_all_finite(X)
+        @test_throws IsNonFiniteError PortfolioOptimisers.assert_all_finite([1 NaN; 3 4])
         @test_throws IsNothingError ReturnsResult(; nx = nothing, X = X)
         @test_throws IsNothingError ReturnsResult(; nx = nx)
         @test_throws IsEmptyError ReturnsResult(; nx = String[], X = X)

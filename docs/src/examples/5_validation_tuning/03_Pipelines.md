@@ -297,8 +297,7 @@ pipe_struct = Pipeline(;
                                 EqualWeighted()))
 p_struct = ["prior" => [EmpiricalPrior(),
                         EmpiricalPrior(;
-                                       ce = PortfolioOptimisersCovariance(;
-                                                                          ce = GerberCovariance()))]]
+                                       ce = PortfolioOptimisersCovariance(; ce = GerberCovariance()))]]
 tuned_struct = search_cross_validation(pipe_struct,
                                        GridSearchCrossValidation(p_struct;
                                                                  cv = IndexWalkForward(500,

@@ -115,7 +115,7 @@ julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           assert_dims(dims)
+           PortfolioOptimisers.assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -127,7 +127,7 @@ julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimiser
 
 julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           assert_dims(dims)
+           PortfolioOptimisers.assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -240,7 +240,7 @@ julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           assert_dims(dims)
+           PortfolioOptimisers.assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -252,7 +252,7 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           assert_dims(dims)
+           PortfolioOptimisers.assert_dims(dims)
            if dims == 2
                X = X'
            end
