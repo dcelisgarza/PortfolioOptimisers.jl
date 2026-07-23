@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all dimension reduction regression algorithm targets in `PortfolioOptimisers.jl`.
+Abstract supertype for all dimension reduction regression algorithm targets.
 
 All concrete and/or abstract types implementing dimension reduction algorithms for regression (such as PCA or PPCA) should be subtypes of `DimensionReductionTarget`.
 

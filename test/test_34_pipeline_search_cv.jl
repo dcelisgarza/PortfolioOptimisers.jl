@@ -54,6 +54,13 @@
         # integer bounds are checked
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, 0)
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, 99)
+
+        # a bare (undotted) symbol that is not a step name fails closed rather than
+        # silently becoming a property access on the pipeline struct
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :impute_typo)
+        # genuinely dotted symbols still fall through to parse_lens (no fail-closed throw)
+        @test PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr")) isa
+              Accessors.PropertyLens
     end
 
     @testset "name-addressed == index-addressed" begin

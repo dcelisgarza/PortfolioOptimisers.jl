@@ -82,8 +82,16 @@ function pipeline_lens(pipe::Pipeline, key::AbstractString)
     return length(parts) == 1 ? step : parse_lens(parts[2]) ∘ step
 end
 function pipeline_lens(pipe::Pipeline, key::Symbol)
-    i = findfirst(==(string(key)), pipe.names)
+    ks = string(key)
+    i = findfirst(==(ks), pipe.names)
     if isnothing(i)
+        # A bare (undotted) symbol that misses the step-name table is a typo, not a
+        # lens path — fail closed rather than silently reinterpreting it as a property
+        # access on the pipeline struct. Genuinely dotted symbols still fall through to
+        # `parse_lens`, which is structurally capped.
+        @argcheck(occursin('.', ks),
+                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps" *
+                                did_you_mean(ks, pipe.names)))
         return parse_lens(key)
     end
     return Accessors.IndexLens((i,)) ∘ Accessors.PropertyLens(:steps)
@@ -344,13 +352,10 @@ function search_cross_validation(pipe::Pipeline,
 end
 function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation,
                                  data::Prices_RR)
-    if !isnothing(rscv.seed)
-        Random.seed!(rscv.rng, rscv.seed)
-    end
+    rng = resolve_rng(rscv.rng, rscv.seed)
     return search_cross_validation(pipe,
                                    GridSearchCrossValidation(make_p_grid(rscv.p,
-                                                                         rscv.n_iter,
-                                                                         rscv.rng);
+                                                                         rscv.n_iter, rng);
                                                              cv = rscv.cv, r = rscv.r,
                                                              scorer = rscv.scorer,
                                                              ex = rscv.ex,

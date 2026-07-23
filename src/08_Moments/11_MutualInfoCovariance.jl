@@ -75,6 +75,7 @@ MutualInfoCovariance
                                   normalise::Bool)
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError(bins, "bins must be positive"))
+            assert_resource_cap(bins, RESOURCE_LIMITS[].max_bins, :bins, :max_bins)
         end
         return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
     end
@@ -113,48 +114,11 @@ This method computes the pairwise mutual information correlation matrix for the 
   - [`cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
     return mutual_info(X, ce.bins, ce.normalise)
-end
-"""
-    Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
-
-Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
-
-This method computes the pairwise mutual information covariance matrix for the input data matrix `X`, using the binning strategy and normalisation specified in `ce`. The MI covariance matrix is obtained by rescaling the MI correlation matrix by the marginal standard deviations, as estimated by the variance estimator in `ce`.
-
-# Arguments
-
-  - `ce`: Mutual information-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
-
-# Returns
-
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of mutual information-based covariances.
-
-# Validation
-
-  - `dims` is either `1` or `2`.
-
-# Related
-
-  - [`MutualInfoCovariance`](@ref)
-  - [`mutual_info`](@ref)
-  - [`cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
-"""
-function Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
-    if dims == 2
-        X = transpose(X)
-    end
-    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    sigma = mutual_info(X, ce.bins, ce.normalise)
-    return StatsBase.cor2cov!(sigma, sd)
 end
 
 export MutualInfoCovariance

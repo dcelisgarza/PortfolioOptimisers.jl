@@ -171,12 +171,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for JuMP constraint estimators.
 
-Subtype `JuMPConstraintEstimator` to implement custom constraints or objectives for JuMP-based portfolio optimisers.
+The extension point for user-defined constraints and objectives. Rather than subtyping this directly, subtype one of the two purpose-built children and implement its one contract method:
+
+  - [`CustomJuMPConstraint`](@ref) ⇒ implement [`add_custom_constraint!`](@ref), supply via `JuMPOptimiser`'s `ccnt`.
+  - [`CustomJuMPObjective`](@ref) ⇒ implement [`add_custom_objective_term!`](@ref), supply via `JuMPOptimiser`'s `cobj`.
+
+(The objective child subtypes [`AbstractEstimator`](@ref) directly — it is grouped here as the sibling extension point, not by type hierarchy.)
 
 # Related
 
-  - [`CustomJuMPConstraint`](@ref)
-  - [`CustomJuMPObjective`](@ref)
+  - [`CustomJuMPConstraint`](@ref) / [`add_custom_constraint!`](@ref)
+  - [`CustomJuMPObjective`](@ref) / [`add_custom_objective_term!`](@ref)
 """
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
 """
@@ -184,27 +189,71 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for custom JuMP constraint implementations.
 
-Implement `add_custom_constraint!` to define custom JuMP model constraints.
+Subtype this and implement [`add_custom_constraint!`](@ref) — the single method the type exists to make you define — to add custom constraints to the JuMP model. Pass the resulting estimator (or a vector of them) as the `ccnt` field of [`JuMPOptimiser`](@ref).
 
 # Related
 
-  - [`JuMPConstraintEstimator`](@ref)
-  - [`CustomJuMPObjective`](@ref)
+  - [`add_custom_constraint!`](@ref) — the method to implement
+  - [`CustomJuMPObjective`](@ref) / [`add_custom_objective_term!`](@ref) — the objective-side analogue
+  - [`JuMPOptimiser`](@ref) — its `ccnt` field is where a custom constraint is supplied
 """
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
+"""
+    const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
+
+Alias for a vector of JuMP constraint estimators.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+"""
+const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
+"""
+    const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+
+Alias for a single JuMP constraint estimator or a vector of them.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`VecJuMPConstr`](@ref)
+"""
+const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
 """
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for custom JuMP objective implementations.
 
-Implement `add_custom_objective_term!` to add custom terms to the JuMP model objective.
+Subtype this and implement [`add_custom_objective_term!`](@ref) — the single method the type exists to make you define — to add custom penalty or reward terms to the JuMP model objective. Pass the resulting estimator (or a vector of them) as the `cobj` field of [`JuMPOptimiser`](@ref).
 
 # Related
 
-  - [`JuMPConstraintEstimator`](@ref)
-  - [`CustomJuMPConstraint`](@ref)
+  - [`add_custom_objective_term!`](@ref) — the method to implement
+  - [`CustomJuMPConstraint`](@ref) / [`add_custom_constraint!`](@ref) — the constraint-side analogue
+  - [`JuMPOptimiser`](@ref) — its `cobj` field is where a custom objective is supplied
 """
-abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
+abstract type CustomJuMPObjective <: AbstractEstimator end
+"""
+    const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
+
+Alias for a vector of JuMP objective estimators.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+"""
+const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
+"""
+    const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+
+Alias for a single JuMP objective estimator or a vector of them.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+  - [`VecJuMPObj`](@ref)
+"""
+const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -212,6 +261,9 @@ Return `false`: custom JuMP constraints never require previous portfolio weights
 """
 function needs_previous_weights(::CustomJuMPConstraint)
     return false
+end
+function needs_previous_weights(c::VecJuMPConstr)
+    return any(needs_previous_weights, c)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -221,23 +273,42 @@ Return `false`: custom JuMP objectives never require previous portfolio weights.
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
+function needs_previous_weights(c::VecJuMPObj)
+    return any(needs_previous_weights, c)
+end
 function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
+end
+function port_opt_view(cs::VecJuMPConstr, i::Any, args...; kwargs...)
+    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
 end
 function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
 end
+function port_opt_view(cs::VecJuMPObj, i::Any, args...; kwargs...)
+    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
+end
 """
-    add_custom_objective_term!(args...; kwargs...)
+    add_custom_objective_term!(model::JuMP.Model, obj, cobj::Nothing, optimiser, attrs)
+    add_custom_objective_term!(model::JuMP.Model, obj, cobj::CustomJuMPObjective, optimiser, attrs)
 
 Add a custom objective term to the JuMP model.
 
-No-op fallback. Override this method for subtypes of [`CustomJuMPObjective`](@ref) to add custom penalty or reward terms to the JuMP model objective.
+Implement this for a subtype of [`CustomJuMPObjective`](@ref) to price a preference the library does not already name. Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective expression: the accumulated penalty is folded in by [`add_penalty_to_objective!`](@ref) with the sign factor matching the objective's optimisation sense, so a contribution always worsens the objective and **a reward is a negative contribution**. This is what makes a term correct under every objective, [`MaximumRatio`](@ref) included, without the implementer consulting the sense (ADR 0036).
+
+`add_to_objective_penalty!` promotes an affine accumulator to a quadratic one as needed, so a quadratic term is safe on every configuration.
+
+Terms that are not homogeneous of degree one in `w` must still multiply any constant by [`get_k`](@ref): under a ratio objective the weights are solved in a rescaled space.
+
+There is no no-op fallback for a [`CustomJuMPObjective`](@ref) — a subtype with no method of its own raises, so a mis-shaped or stale signature fails loudly instead of silently contributing nothing. `nothing` (no custom term configured) is the only no-op.
 
 # Arguments
 
-  - `args...`: JuMP model and custom objective type (ignored in fallback).
-  - `kwargs...`: Additional keyword arguments.
+  - `model::JuMP.Model`: JuMP optimisation model, mid-assembly.
+  - `obj`: The [`ObjectiveFunction`](@ref) *being built*. During a [`Frontier`](@ref) sweep this differs from the objective the user declared — the endpoint sub-problems are built as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref).
+  - `cobj`: The custom objective estimator; the argument to dispatch on.
+  - `optimiser`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself); its `opt` field is the [`JuMPOptimiser`](@ref).
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Processed problem data — `attrs.pr` (prior), `attrs.ret` (returns estimator), `attrs.wb` (bounds), and the rest.
 
 # Returns
 
@@ -246,22 +317,56 @@ No-op fallback. Override this method for subtypes of [`CustomJuMPObjective`](@re
 # Related
 
   - [`CustomJuMPObjective`](@ref)
-  - [`add_custom_constraint!`](@ref)
+  - [`add_to_objective_penalty!`](@ref) — how to contribute a term
+  - [`add_custom_constraint!`](@ref) — the constraint-side analogue
 """
-function add_custom_objective_term!(args...; kwargs...)
+function add_custom_objective_term!(::JuMP.Model, ::Any, ::Nothing, ::Any, ::Any)
+    return nothing
+end
+function add_custom_objective_term!(::JuMP.Model, ::Any, cobj::CustomJuMPObjective, ::Any,
+                                    ::Any)
+    return throw(ArgumentError("""
+                               `$(nameof(typeof(cobj)))` subtypes `CustomJuMPObjective` but defines no `add_custom_objective_term!` method, so its term would contribute nothing.
+
+                               Define one with the signature:
+
+                                   PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, cobj::$(nameof(typeof(cobj))), optimiser, attrs)
+
+                               and contribute the term with `add_to_objective_penalty!(model, expr)`. A reward is a negative contribution; the optimisation sense is applied for you. See ADR 0036."""))
+end
+"""
+    add_custom_objective_term!(model::JuMP.Model, obj, cobjs::VecJuMPObj, optimiser, attrs)
+
+Apply each custom objective term in a vector, in order. Dispatches to the per-type [`add_custom_objective_term!`](@ref) for every element, so a `cobj` vector composes several custom terms into one objective — they accumulate additively in the shared objective penalty.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+  - [`VecJuMPObj`](@ref)
+"""
+function add_custom_objective_term!(model::JuMP.Model, obj, cobjs::VecJuMPObj, optimiser,
+                                    attrs)
+    for cobj in cobjs
+        add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
+    end
     return nothing
 end
 """
-    add_custom_constraint!(args...; kwargs...)
+    add_custom_constraint!(model::JuMP.Model, ccnt::Nothing, optimiser, attrs)
+    add_custom_constraint!(model::JuMP.Model, ccnt::CustomJuMPConstraint, optimiser, attrs)
 
 Add a custom constraint to the JuMP model.
 
-No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@ref) to add custom constraints to the JuMP model.
+Implement this for a subtype of [`CustomJuMPConstraint`](@ref) to mandate a preference the library does not already name. Two idioms keep a hand-written constraint correct (ADR 0008): scale it by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective.
+
+There is no no-op fallback for a [`CustomJuMPConstraint`](@ref) — a subtype with no method of its own raises, so a mis-shaped or stale signature fails loudly instead of silently adding no constraint. `nothing` (no custom constraint configured) is the only no-op.
 
 # Arguments
 
-  - `args...`: JuMP model and custom constraint type (ignored in fallback).
-  - `kwargs...`: Additional keyword arguments.
+  - `model::JuMP.Model`: JuMP optimisation model, mid-assembly.
+  - `ccnt`: The custom constraint estimator; the argument to dispatch on.
+  - `optimiser`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself).
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Processed problem data.
 
 # Returns
 
@@ -270,9 +375,35 @@ No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@r
 # Related
 
   - [`CustomJuMPConstraint`](@ref)
-  - [`add_custom_objective_term!`](@ref)
+  - [`add_custom_objective_term!`](@ref) — the objective-side analogue
 """
-function add_custom_constraint!(args...; kwargs...)
+function add_custom_constraint!(::JuMP.Model, ::Nothing, ::Any, ::Any)
+    return nothing
+end
+function add_custom_constraint!(::JuMP.Model, ccnt::CustomJuMPConstraint, ::Any, ::Any)
+    return throw(ArgumentError("""
+                               `$(nameof(typeof(ccnt)))` subtypes `CustomJuMPConstraint` but defines no `add_custom_constraint!` method, so it would add no constraint.
+
+                               Define one with the signature:
+
+                                   PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::$(nameof(typeof(ccnt))), optimiser, attrs)
+
+                               Scale the constraint by `get_constraint_scale(model)` and multiply any constant bound by `get_k(model)`. See ADR 0008."""))
+end
+"""
+    add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, optimiser, attrs)
+
+Apply each custom constraint in a vector, in order. Dispatches to the per-type [`add_custom_constraint!`](@ref) for every element, so a `ccnt` vector adds several custom constraints to the same model.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`VecJuMPConstr`](@ref)
+"""
+function add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, optimiser, attrs)
+    for ccnt in ccnts
+        add_custom_constraint!(model, ccnt, optimiser, attrs)
+    end
     return nothing
 end
 """
@@ -438,6 +569,144 @@ function get_k(model::JuMP.Model)
     @argcheck(haskey(model, :k),
               ArgumentError("model[:k] (homogenisation variable) has not been registered; call set_maximum_ratio_factor_variables! first"))
     return model[:k]
+end
+"""
+    set_unit_budget!(model::JuMP.Model)
+
+Record that the head normalised the model's budget scale to unit.
+
+A head declares this when its own constraints make the formulation scale-invariant, so
+downstream builders may substitute the literal `1` for the homogenisation variable `k`.
+[`RiskBudgeting`](@ref) is the only such head: its log-barrier normalisation pins the scale,
+and the weights are renormalised after the solve. Note that `k` remains a *free variable*
+under this declaration — it is the budget *scale* that is unit, not `k` that is constant.
+
+# Related
+
+  - [`is_unit_budget`](@ref)
+  - [`effective_k`](@ref)
+"""
+function set_unit_budget!(model::JuMP.Model)
+    model[:unit_budget] = true
+    return nothing
+end
+"""
+    is_unit_budget(model::JuMP.Model)
+
+Return whether the head normalised the budget scale to unit (see [`set_unit_budget!`](@ref)).
+
+# Related
+
+  - [`set_unit_budget!`](@ref)
+  - [`effective_k`](@ref)
+"""
+function is_unit_budget(model::JuMP.Model)
+    return haskey(model, :unit_budget)
+end
+"""
+    effective_k(model::JuMP.Model)
+
+Return the budget scale a builder should use: `1` under a unit budget, else `model[:k]`.
+
+Builders that multiply a bound by the budget want this rather than [`get_k`](@ref), so a
+scale-invariant head is honoured without each builder re-deriving that fact for itself.
+
+# Related
+
+  - [`is_unit_budget`](@ref)
+  - [`get_k`](@ref)
+"""
+function effective_k(model::JuMP.Model)
+    return ifelse(is_unit_budget(model), 1, get_k(model))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the head's *decomposition contract*: how `model[:w]` relates to the
+long/short parts `model[:lw]` and `model[:sw]`.
+
+Heads build that relationship in one of two incompatible ways, and a builder that pins the
+decomposition needs to know which, because the two need different constraints to become exact.
+The head declares its own with [`set_decomposition_contract!`](@ref); builders read it back
+with [`decomposition_contract`](@ref) and dispatch.
+
+# Related
+
+  - [`WeightsFromParts`](@ref)
+  - [`PartsBoundWeights`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+  - [`decomposition_contract`](@ref)
+"""
+abstract type AbstractDecompositionContract end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The head defines the weights *from* the parts: `w = lw - sw` is an identity, `lw` and `sw`
+being the primitive variables. Declared by [`set_rb_mip_w!`](@ref).
+
+Because the identity always holds, forcing the long-xor-short sign pattern is enough to pin the
+decomposition: with `sw = 0` the identity leaves `lw == w`, and `lw >= 0` makes that
+`max(w, 0)`. No slack remains to close.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`PartsBoundWeights`](@ref)
+"""
+struct WeightsFromParts <: AbstractDecompositionContract end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The head defines the parts as *bounds* on the weights: `lw >= w`, `sw >= -w`, `lw, sw >= 0`,
+`w` being the primitive variable. Declared by [`set_weight_constraints!`](@ref).
+
+The parts are only upper bounds on the true long/short exposures, so every budget built on
+them (`bgt`, `sbgt`, `gbgt`) bounds the realised exposure rather than pinning it. Forcing the
+sign pattern does not change that — the slack survives it — so pinning the decomposition under
+this contract needs two further constraints to close it.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`WeightsFromParts`](@ref)
+"""
+struct PartsBoundWeights <: AbstractDecompositionContract end
+"""
+    set_decomposition_contract!(model::JuMP.Model, dc::AbstractDecompositionContract)
+
+Record how the head related `model[:w]` to `model[:lw]`/`model[:sw]`.
+
+The first declaration wins: a head may run both builders (the mixed-integer
+[`RiskBudgeting`](@ref) head calls [`set_rb_mip_w!`](@ref), then hands the same `lw`/`sw` to
+[`set_weight_constraints!`](@ref), which re-states them as bounds). The identity is the
+stronger statement and still holds, so the bounds must not overwrite it.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`decomposition_contract`](@ref)
+"""
+function set_decomposition_contract!(model::JuMP.Model, dc::AbstractDecompositionContract)
+    if !haskey(model, :decomposition_contract)
+        model[:decomposition_contract] = dc
+    end
+    return nothing
+end
+"""
+    decomposition_contract(model::JuMP.Model)
+
+Return the head's decomposition contract, or `nothing` when no head declared one.
+
+`nothing` means the model has no short side — the weights are their own long part, `lw` is an
+alias for `w` and there is no `sw`, so there is no decomposition to pin.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+"""
+function decomposition_contract(model::JuMP.Model)
+    return haskey(model, :decomposition_contract) ? model[:decomposition_contract] : nothing
 end
 """
     get_ret(model::JuMP.Model)
@@ -624,23 +893,242 @@ function get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
     return model[Symbol(prefix, :dd)]
 end
 """
-    preg!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+    SHARED_STATE
 
-Register `val` in the model under the prefixed key `Symbol(prefix, name)` and return it.
+The Model State entries deliberately shared **bare** across a nested risk build.
 
-The single place the model-state namespacing convention lives: a nested risk build
-(e.g. risk tracking) passes a non-empty `prefix` so the shared infrastructure keys it
-creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the outer model's; the
-default empty prefix reproduces the bare key. Pairs with the prefixed read accessors.
-See ADR 0004.
+The complement of Per-Build Risk State: an entry belongs here iff it is *not* a function of
+the weights being optimised and *not* a build-scoped presence flag, so the inner and outer
+builds want the same object and prefixing it would break sharing rather than protect it
+(ADR 0005). [`shared_get`](@ref) and friends validate against this set, so the classification
+is enforced at run time rather than only by the seam-lock test (ADR 0037).
+
+Each grouping records *why* those entries are shared. Adding a name here is a claim that a
+nested build may safely see the enclosing build's copy — check that claim before adding.
+"""
+const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical in the inner
+                                  # and outer build (Cholesky/eigendecompositions, factor
+                                  # risk contribution lift).
+                                  :G, :GV, :Gkt, :vals_Akt, :vecs_Akt, :frc_W, :frc_M,
+                                  :frc_M_PSD,
+                                  # Model-wide singletons established once, before the risk
+                                  # spine runs.
+                                  :sc, :so, :k, :w, :ret, :risk, :fees, :unit_budget,
+                                  :decomposition_contract, :mip_indicators, :ss,
+                                  # Weight shaping: outer level only. A nested build shifts
+                                  # the weights through its own prefixed `:w`; it does not
+                                  # reshape the long/short parts.
+                                  :lw, :sw, :wp, :wn, :w1, :w_obj, :wip,
+                                  # Returns and objective plumbing, outer level only.
+                                  :ohf, :op, :cost_bgt_expr, :bucs_w, :t_eucs_gw, :sr_risk,
+                                  # Risk accumulation and frontier bookkeeping: collected by
+                                  # the terminal scalarise seam (ADR 0024), which runs once
+                                  # at the outer level. A nested build returns its
+                                  # expression to its caller instead of pushing here.
+                                  :risk_vec, :risk_frontier, :ret_frontier,
+                                  # Per-optimiser scratch on the outer model.
+                                  :noc_rk, :noc_rt, :psi,
+                                  # The one deliberate write-prefixed / read-bare entry
+                                  # (ADR 0005). The inner write is prefixed so a nested
+                                  # variance cannot leak its presence outward; the only
+                                  # readers are the outer-level phylogeny builders, which
+                                  # add a `p·tr(W)` penalty when no variance is present and
+                                  # so must see the OUTER flag. Reading this prefixed would
+                                  # silently re-add the penalty under tracking.
+                                  :variance_flag])
+"""
+    assert_shared_state(name::Symbol)
+
+Assert `name` is a sanctioned bare Model State entry.
+
+Guards the [`shared_get`](@ref) family so that reaching for a per-build entry without a
+prefix fails loudly at the call site, rather than silently aliasing the enclosing build's
+copy — the regression class that broke `IndependentVariableTracking`.
+"""
+function assert_shared_state(name::Symbol)
+    @argcheck(name in SHARED_STATE,
+              ArgumentError("model[:$name] is not a sanctioned bare Model State entry. If it is per-build risk state (a function of the weights, or a build-scoped presence flag) reach it with a prefix via state_get/state_build!; if it is genuinely shared across nested builds, add it to SHARED_STATE with the reason."))
+    return nothing
+end
+"""
+    shared_set!(model::JuMP.Model, name::Symbol, val)
+
+Register `val` as the sanctioned bare Model State entry `name` and return it.
+
+The unprefixed counterpart of [`state_set!`](@ref), for entries on [`SHARED_STATE`](@ref).
 
 # Related
 
-  - [`get_w`](@ref)
+  - [`shared_get`](@ref)
 """
-function preg!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
-    model[Symbol(prefix, name)] = val
+function shared_set!(model::JuMP.Model, name::Symbol, val)
+    assert_shared_state(name)
+    model[name] = val
     return val
+end
+"""
+    shared_has(model::JuMP.Model, name::Symbol)
+
+Return `true` if the sanctioned bare Model State entry `name` is registered.
+"""
+function shared_has(model::JuMP.Model, name::Symbol)
+    assert_shared_state(name)
+    return haskey(model, name)
+end
+"""
+    shared_get(model::JuMP.Model, name::Symbol)
+
+Return the sanctioned bare Model State entry `name`, asserting it has been registered.
+
+The unprefixed counterpart of [`state_get`](@ref). Prefer a named accessor
+([`get_w`](@ref), [`get_k`](@ref), [`get_ret`](@ref), …) where one exists.
+
+# Related
+
+  - [`shared_has`](@ref)
+  - [`SHARED_STATE`](@ref)
+"""
+function shared_get(model::JuMP.Model, name::Symbol)
+    assert_shared_state(name)
+    @argcheck(haskey(model, name),
+              ArgumentError("model[:$name] has not been registered; it is being read before the builder that produces it has run"))
+    return model[name]
+end
+"""
+    state_key(prefix::Symbol, name::Symbol)
+
+Resolve the Model State key for entry `name` under `prefix`.
+
+Internal to the Model State interface: the single place the prefix-namespacing convention
+is spelled. Keeping it here is what lets the seam-lock test assert that no emitter builds a
+key by hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
+[`state_set!`](@ref) and [`state_build!`](@ref). See ADR 0037.
+
+# Related
+
+  - [`state_build!`](@ref)
+"""
+function state_key(prefix::Symbol, name::Symbol)
+    return Symbol(prefix, name)
+end
+"""
+    state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+
+Register `val` in the model under the prefixed Model State key and return it.
+
+A nested risk build (e.g. risk tracking) passes a non-empty `prefix` so the shared
+infrastructure entries it creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the
+outer model's; the default empty prefix reproduces the bare key. See ADR 0005.
+
+# Related
+
+  - [`state_get`](@ref)
+  - [`state_build!`](@ref)
+"""
+function state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+    model[state_key(prefix, name)] = val
+    return val
+end
+"""
+    state_has(model::JuMP.Model, prefix::Symbol, name::Symbol)
+
+Return `true` if Model State entry `name` is registered under `prefix`.
+
+# Related
+
+  - [`state_get`](@ref)
+"""
+function state_has(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    return haskey(model, state_key(prefix, name))
+end
+"""
+    state_get(model::JuMP.Model, prefix::Symbol, name::Symbol)
+
+Return Model State entry `name` under `prefix`, asserting it has been registered.
+
+Prefer a named accessor ([`get_X`](@ref), [`get_net_X`](@ref), [`get_dd`](@ref), …) where
+one exists: those name the builder that produces the entry, so an out-of-order read reports
+which builder to call instead of a generic missing-entry error.
+
+# Related
+
+  - [`state_has`](@ref)
+  - [`state_build!`](@ref)
+"""
+function state_get(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    key = state_key(prefix, name)
+    @argcheck(haskey(model, key),
+              ArgumentError("model[$key] has not been registered; it is being read before the builder that produces it has run"))
+    return model[key]
+end
+"""
+    state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol)
+
+Return Model State entry `name` under `prefix`, building it with `f()` exactly once.
+
+The memoise-on-prefixed-key idiom shared by every risk and constraint emitter: if the entry
+is already registered — an earlier measure in the same build produced it, or an outer build
+already did — it is returned untouched; otherwise `f()` runs and its value is registered
+under the prefixed key. Companion entries created inside `f` register with
+[`state_set!`](@ref).
+
+Because the key is resolved here rather than at the call site, a Model State entry added in
+future participates in the prefix discipline with no further work. That is what closes the
+residual hole ADR 0004 §2 accepted; see ADR 0037.
+
+# Related
+
+  - [`state_set!`](@ref)
+  - [`state_get`](@ref)
+"""
+function state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol)
+    key = state_key(prefix, name)
+    if haskey(model, key)
+        return model[key]
+    end
+    val = f()
+    model[key] = val
+    return val
+end
+"""
+    mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol)
+
+Record that this build has `name` present, idempotently.
+
+A build-scoped presence flag: `name` carries no value beyond its own existence, and readers
+test it with [`state_has`](@ref) rather than reading it. Marking under `prefix` is what keeps
+a nested build's flags out of the enclosing build — the second half of Per-Build Risk State
+(ADR 0005), the half that is not weight-dependent.
+
+# Related
+
+  - [`state_has`](@ref)
+  - [`state_build!`](@ref)
+"""
+function mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    state_build!(() -> true, model, prefix, name)
+    return nothing
+end
+"""
+    nested_prefix(prefix::Symbol, tag::Symbol)
+    nested_prefix(prefix::Symbol, tag::Symbol, i)
+
+Compose the Model State namespace a nested build threads down its own spine.
+
+Distinct from a Model State *key*: this produces a `prefix`, not an entry name, so a nested
+build's entries cannot alias the enclosing build's. `tag` names the nesting kind (`:tr_iv_`,
+`:tr_dv_`, `:te_ir_`, `:te_dr_`, `:gain_`) and the optional `i` disambiguates the measure
+index, which is what makes tracking-nested-in-tracking collision-free. See ADR 0005.
+
+# Related
+
+  - [`state_build!`](@ref)
+"""
+function nested_prefix(prefix::Symbol, tag::Symbol)
+    return Symbol(prefix, tag)
+end
+function nested_prefix(prefix::Symbol, tag::Symbol, i)
+    return Symbol(prefix, tag, i, :_)
 end
 """
     set_initial_w!(args...)
@@ -781,7 +1269,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
-        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
+        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.")
         OptimisationFailure(; res = trials)
     end
     return retcode, process_model(model, retcode)
@@ -812,7 +1300,7 @@ function set_portfolio_returns!(model::JuMP.Model, X::MatNum; prefix::Symbol = S
         return model[Symbol(prefix, :X)]
     end
     w = get_w(model, prefix)
-    return preg!(model, prefix, :X, JuMP.@expression(model, X * w))
+    return state_set!(model, prefix, :X, JuMP.@expression(model, X * w))
 end
 """
     set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
@@ -844,9 +1332,9 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
     # `:fees` is shared and not recreated by a nested build, so it is read bare.
     if haskey(model, :fees)
         fees = model[:fees]
-        return preg!(model, prefix, :net_X, JuMP.@expression(model, X .- fees))
+        return state_set!(model, prefix, :net_X, JuMP.@expression(model, X .- fees))
     else
-        return preg!(model, prefix, :net_X, JuMP.@expression(model, X))
+        return state_set!(model, prefix, :net_X, JuMP.@expression(model, X))
     end
 end
 """
@@ -875,7 +1363,7 @@ function set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum;
     if haskey(model, Symbol(prefix, :Xap1))
         return model[Symbol(prefix, :Xap1)]
     end
-    return preg!(model, prefix, :Xap1, JuMP.@expression(model, X .+ one(eltype(X))))
+    return state_set!(model, prefix, :Xap1, JuMP.@expression(model, X .+ one(eltype(X))))
 end
 """
     set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -903,7 +1391,7 @@ function set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum;
     if haskey(model, Symbol(prefix, :nXap1))
         return model[Symbol(prefix, :nXap1)]
     end
-    return preg!(model, prefix, :nXap1, JuMP.@expression(model, -X .+ one(eltype(X))))
+    return state_set!(model, prefix, :nXap1, JuMP.@expression(model, -X .+ one(eltype(X))))
 end
 """
     set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -931,7 +1419,7 @@ function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum;
         return model[Symbol(prefix, :ddap1)]
     end
     _ddap1 = absolute_drawdown_arr(X) .+ one(eltype(X))
-    return preg!(model, prefix, :ddap1, JuMP.@expression(model, _ddap1))
+    return state_set!(model, prefix, :ddap1, JuMP.@expression(model, _ddap1))
 end
 """
     scalarise_risk_expression!(model, r, X, T, ...) -> nothing
@@ -961,3 +1449,12 @@ Generic function stub; concrete methods are defined in constraint and risk measu
 function set_risk_constraints! end
 
 export JuMPOptimisationSolution, JuMPOptimisationResult
+
+# The custom-term extension point (ADR 0036). Public API, but deliberately not exported:
+# `get_w`/`get_k` are too generic to put in a user's namespace, and the two builder methods
+# must be qualified anyway to be extended. Reach them as `PortfolioOptimisers.name`, or
+# import the ones you need. (`ProcessedJuMPOptimiserAttributes`, the `attrs` bundle a hook
+# receives, is already exported by `10_JuMPOptimiser.jl`.)
+public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,
+       add_custom_objective_term!, add_custom_constraint!, add_to_objective_penalty!, get_w,
+       get_k, get_constraint_scale

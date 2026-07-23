@@ -75,6 +75,30 @@ Alias for a union of uncertainty scaling algorithm and numeric types.
 """
 const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
+$(DocStringExtensions.TYPEDEF)
+
+Defines the abstract interface for algorithms that compute the radius `eps` of an ``\\ell_1`` uncertainty set on the characteristic vector.
+
+Subtypes implement specific methods for choosing the radius, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the resulting portfolio holds. The counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
+
+# Related
+
+  - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+  - [`L1UncertaintySetAlgorithm`](@ref)
+  - [`AbstractUncertaintyKAlgorithm`](@ref)
+"""
+abstract type AbstractUncertaintyEpsAlgorithm <: AbstractAlgorithm end
+"""
+    const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+
+Alias for a union of ``\\ell_1`` uncertainty radius algorithm and numeric types. A plain number is the radius itself; an algorithm defers its computation to the data.
+
+# Related
+
+  - [`AbstractUncertaintyEpsAlgorithm`](@ref)
+"""
+const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+"""
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
@@ -498,7 +522,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
+Computes the ellipsoidal uncertainty set scaling parameter `k` as `sqrt((1 - q) / q)`. This general formula ignores the distribution of the underlying data.
 
 # Related
 
@@ -788,9 +812,85 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
 end
+"""
+    box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}
+
+Element-wise lower/upper quantile bounds for a symmetric ``N \\times N`` statistic. `get_ij(i, j)` returns the vector of sampled values for entry ``(i, j)``; `q` is the (already halved)
+significance level; `kwargs` is splatted into `Statistics.quantile`. Shared by the box
+[`ucs`](@ref)/[`sigma_ucs`](@ref) constructions across estimator families — the accessor
+bridges the Wishart (`Vector`-of-matrices) and bootstrap (3-D array) sample containers.
+Positive-definite projection, if any, is applied by the caller.
+
+# Related
+
+  - [`ucs`](@ref)
+  - [`sigma_ucs`](@ref)
+  - [`vec_quantile_bounds`](@ref)
+"""
+function box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}
+    lb = Matrix{TE}(undef, N, N)
+    ub = Matrix{TE}(undef, N, N)
+    for j in 1:N
+        for i in j:N
+            s_ij = get_ij(i, j)
+            lb[j, i] = lb[i, j] = Statistics.quantile(s_ij, q; kwargs...)
+            ub[j, i] = ub[i, j] = Statistics.quantile(s_ij, one(q) - q; kwargs...)
+        end
+    end
+    return lb, ub
+end
+"""
+    vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
+
+Element-wise lower/upper quantile bounds for a vector-valued statistic. `mus` is an ``N \\times M`` matrix of `M` samples per component; `q` is the (already halved) significance
+level; `kwargs` is splatted into `Statistics.quantile`. Shared by the bootstrap box
+[`ucs`](@ref)/[`mu_ucs`](@ref) mean constructions.
+
+# Related
+
+  - [`ucs`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`box_quantile_bounds`](@ref)
+"""
+function vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
+    N = size(mus, 1)
+    lb = Vector{eltype(mus)}(undef, N)
+    ub = Vector{eltype(mus)}(undef, N)
+    for j in 1:N
+        mu_j = mus[j, :]
+        lb[j] = Statistics.quantile(mu_j, q; kwargs...)
+        ub[j] = Statistics.quantile(mu_j, one(q) - q; kwargs...)
+    end
+    return lb, ub
+end
+"""
+    ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
+                    class::AbstractEllipsoidalUncertaintySetResultClass)
+
+Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic
+covariance `cov`. Optionally restricts `cov` to its diagonal, fits the scaling `k` via
+[`k_ucs`](@ref) (which absorbs unused trailing arguments, so `samples` may be the deviation
+matrix, a `1:n_sim` range, or `nothing` depending on `method`), and tags the result with
+`class`. Shared by every ellipsoidal [`ucs`](@ref)/[`mu_ucs`](@ref)/[`sigma_ucs`](@ref)
+construction across estimator families.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`k_ucs`](@ref)
+  - [`ucs`](@ref)
+"""
+function ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
+                         class::AbstractEllipsoidalUncertaintySetResultClass)
+    if diagonal
+        cov = LinearAlgebra.Diagonal(cov)
+    end
+    k = k_ucs(method, q, samples, cov)
+    return EllipsoidalUncertaintySet(; sigma = cov, k = k, class = class)
+end
 
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
        EllipsoidalUncertaintySet, SigmaEllipsoidalUncertaintySet,
-       MuEllipsoidalUncertaintySet
+       MuEllipsoidalUncertaintySet, AbstractUncertaintyEpsAlgorithm

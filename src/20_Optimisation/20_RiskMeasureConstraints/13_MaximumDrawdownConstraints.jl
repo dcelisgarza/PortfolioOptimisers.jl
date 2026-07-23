@@ -42,16 +42,15 @@ where ``dd_t`` is the portfolio drawdown at time ``t``.
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    if haskey(model, Symbol(prefix, :mdd_risk))
-        return model[Symbol(prefix, :mdd_risk)]
+    return state_build!(model, prefix, :mdd_risk) do
+        sc = get_constraint_scale(model)
+        dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
+        T = length(dd) - 1
+        mdd_risk = JuMP.@variable(model)
+        state_set!(model, prefix, :cmdd_risk,
+                   JuMP.@constraint(model, sc * (mdd_risk .- view(dd, 2:(T + 1))) >= 0))
+        set_risk_bounds_and_expression!(model, opt, mdd_risk, r.settings, :mdd_risk;
+                                        prefix = prefix)
+        return mdd_risk
     end
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    mdd_risk = preg!(model, prefix, :mdd_risk, JuMP.@variable(model))
-    preg!(model, prefix, :cmdd_risk,
-          JuMP.@constraint(model, sc * (mdd_risk .- view(dd, 2:(T + 1))) >= 0))
-    set_risk_bounds_and_expression!(model, opt, mdd_risk, r.settings,
-                                    Symbol(prefix, :mdd_risk))
-    return mdd_risk
 end

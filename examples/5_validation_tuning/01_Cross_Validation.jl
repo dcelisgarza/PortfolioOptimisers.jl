@@ -99,7 +99,7 @@ We can visualise the out-of-sample performance and weight behaviour across folds
 # Portfolio cumulative returns across all KFold test periods.
 using StatsPlots, GraphRecipes
 # Per-asset weight distribution across folds.
-plot_ptf_cumulative_returns(kfold_pred)
+plot_portfolio_cumulative_returns(kfold_pred)
 # Portfolio turnover between consecutive folds.
 plot_weight_stability(kfold_pred)
 # Cross-validation scores (second moment / variance) per fold.
@@ -263,7 +263,7 @@ isequal(idx_walkforward_pred.mrd.ts, rd.ts[253:end])
 Cumulative returns across all walk-forward test windows, stacked together.
 =#
 
-plot_ptf_cumulative_returns(idx_walkforward_pred)
+plot_portfolio_cumulative_returns(idx_walkforward_pred)
 
 #=
 Portfolio composition evolution across walk-forward windows as a stacked bar.
@@ -309,7 +309,7 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
 With the turnover constraint the turnover per rebalancing period is now capped at 2%.
 =#
 
-plot_ptf_cumulative_returns(idx_tn_walkforward_pred)
+plot_portfolio_cumulative_returns(idx_tn_walkforward_pred)
 plot_turnover(idx_tn_walkforward_pred)
 plot_weight_stability(idx_tn_walkforward_pred)
 
@@ -368,7 +368,7 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
 Calendar-aligned walk-forward: cumulative returns and turnover across month-end rebalancing dates.
 =#
 
-plot_ptf_cumulative_returns(date_tn_walkforward_pred)
+plot_portfolio_cumulative_returns(date_tn_walkforward_pred)
 plot_turnover(date_tn_walkforward_pred)
 
 #=

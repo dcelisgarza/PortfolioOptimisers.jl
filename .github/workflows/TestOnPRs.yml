@@ -11,6 +11,10 @@ on:
       - "ext/**"
       - "examples/**"
       - "*.toml"
+      # The Capability Catalogue is checked by `test/test_26_docs.jl`. Without
+      # this path a PR that only edits the catalogue -- removing an entry, say --
+      # would skip the very test that guards it.
+      - "docs/capability_catalogue.jl"
     types: [opened, synchronize, reopened]
 
 concurrency:

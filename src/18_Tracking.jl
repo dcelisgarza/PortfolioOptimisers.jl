@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all tracking result types.
 
 All concrete and/or abstract types representing tracking error or tracking constraint results should be subtypes of `AbstractTracking`.
 
@@ -43,7 +43,7 @@ const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all tracking algorithm types.
 
 All concrete and/or abstract types representing tracking algorithms (such as weights or returns tracking) should be subtypes of `AbstractTrackingAlgorithm`.
 
@@ -107,7 +107,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all tracking formulation algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all tracking formulation algorithm types.
 
 All concrete and/or abstract types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should be subtypes of `TrackingFormulation`.
 
@@ -124,7 +124,7 @@ abstract type TrackingFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all variable-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all variable-based tracking formulation algorithms.
 
 All concrete and/or abstract types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should be subtypes of `VariableTracking`.
 

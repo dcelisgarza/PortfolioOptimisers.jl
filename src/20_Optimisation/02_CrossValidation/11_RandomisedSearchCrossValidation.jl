@@ -77,13 +77,10 @@ Performs randomised search cross-validation for portfolio optimisation estimator
 """
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  rscv::RandomisedSearchCrossValidation, rd::ReturnsResult)
-    if !isnothing(rscv.seed)
-        Random.seed!(rscv.rng, rscv.seed)
-    end
+    rng = resolve_rng(rscv.rng, rscv.seed)
     return search_cross_validation(opt,
                                    GridSearchCrossValidation(make_p_grid(rscv.p,
-                                                                         rscv.n_iter,
-                                                                         rscv.rng);
+                                                                         rscv.n_iter, rng);
                                                              cv = rscv.cv, r = rscv.r,
                                                              scorer = rscv.scorer,
                                                              ex = rscv.ex,

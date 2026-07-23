@@ -7,6 +7,12 @@ AbstractOptimisationEstimator
 BaseOptimisationEstimator
 OptimisationEstimator
 NonFiniteAllocationOptimisationEstimator
+pipe_route
+pipe_accepts
+pipe_config_field
+@pipe_delegates
+route_sigma_ucs
+@pipe_route_sigma_ucs
 OptimisationAlgorithm
 OptimisationResult
 NonFiniteAllocationOptimisationResult

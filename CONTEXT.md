@@ -19,6 +19,9 @@ A type used inside an Estimator to select or modify its computational behaviour.
 **Result**
 A plain data struct that holds the computed outputs of a function applied to an Estimator. Never callable. Passed downstream as inputs to further computation.
 
+**Choice Surface**
+The set of things a caller picks when specifying a problem: the concrete leaf Estimators and Algorithms. Results are not part of it — they are what comes back, never what is chosen, so a caller writes `MeanRisk` but never writes `MeanRiskResult`. The distinction is implied by the three definitions above but worth stating, because it decides membership questions that would otherwise be settled case by case: which types a user-facing inventory must cover, and which are outputs that merely need to be reachable from one.
+
 **Factory**
 A generic configuration mechanism for immutable structs — they may be Estimator, Result, or Algorithm structs. Because all structs are immutable and the library relies heavily on composition, `factory` is the standard way to propagate runtime-computed values (moments from a Prior Result, observation weights, previous portfolio weights, etc.) down through a composed struct tree. It takes a struct and runtime data and returns a new, fully-configured struct of the same type.
 
@@ -34,6 +37,12 @@ The Pipeline — data preparation included — is the unit that Cross-Validation
 
 **Pipeline Context**
 The accumulating blackboard threaded through a Pipeline's steps: a set of coarse typed slots — prices, returns, prior, phylogeny, uncertainty, constraints, weights — where each step reads the slots it needs and writes the slot its family produces. Heterogeneous slots (uncertainty, constraints) hold collections whose elements are routed to their optimiser targets by Result type. Internal machinery, not user-facing.
+
+**Routing Target**
+The destination a computed Pipeline Context slot is delivered to inside the optimisation step: `pe`, `cle`, `wb`, `lcse`, `ple`, `mu_ucs`, `sigma_ucs`. Targets are finer than slots and address a different audience — a *slot* is pipeline-author vocabulary naming a stage of the workflow, a *target* is optimiser-author vocabulary naming a destination, and nobody writing a Pipeline ever names one. The Pipeline owns the fan-out (splitting the uncertainty pair, grouping constraint results by Result type); the optimiser owns where a target lands, so a field rename stays local instead of breaking the Pipeline at run time. Five targets are named after the field they land in, making the routing rule derived rather than declared — a target lands in the like-named field of whichever optimiser has one. The two exceptions carry policy and name no field. A target an optimiser cannot receive is ignored when losing it cannot change the answer (`pe`, `cle`), an error otherwise. Internal machinery.
+
+**Data Slot**
+The two Pipeline Context slots — prices and returns — whose write *changes the asset universe*, as opposed to a *derived slot* (prior, phylogeny, uncertainty, constraints, weights) computed from the data. Writing a data slot makes every slot derived from it stale: a prior or constraint fitted on one universe does not match a later, different one, so a Pipeline rejects at construction any ordering that would strand such a result. The distinction is the whole content of the invalidation rule — only data slots invalidate, and they invalidate every later slot except the terminal *weights* slot, which is the workflow's output and which nothing derives from. Because nothing derives from weights, an optimisation step must be the last step of a Pipeline.
 
 **Preprocessing Estimator**
 The family of Estimators that transform price or returns data inside a Pipeline (prices-to-returns conversion, missing-data filtering, imputation, asset selection). Fitting one on training data produces a Result carrying any fitted state — imputation parameters, thresholds, and crucially the selected asset universe — which is then *applied* to unseen data so train and test are transformed consistently. Stateless steps carry no state and applying them is just running them.
@@ -86,6 +95,9 @@ The difference between Implied Volatility (market expectation) and realised vola
 
 ## 3. Statistics
 
+**Windowed Estimator**
+A moment estimator that restricts an inner moment estimator to a sub-window of the observations — the most recent *n*, or an explicit set of indices — and rebinds observation weights to that window before delegating. The inner estimator's semantics are untouched: windowing decides *which observations are seen*, never how the moment is computed from them, so any moment kind can be windowed and a windowed estimator is substitutable wherever its inner one is. The family spans the moment kinds (expected returns, covariance, variance, coskewness, cokurtosis), one type each, because each answers a different generic. Distinct from a Cross-Validation fold, which restricts observations to evaluate a strategy; a Windowed Estimator restricts them because older observations are held to be less informative about the present.
+
 ### 3.1 Expected Returns (Moments)
 
 **Expected Returns Estimator**
@@ -98,7 +110,7 @@ Computes a per-asset mean-return vector. Variants:
 - **MedianExpectedReturns**: (weighted) per-asset median.
 - **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: return the asset standard deviations / variances (used where a "return" slot should carry dispersion).
 - **CustomValueExpectedReturns**: user-supplied per-asset values.
-- **WindowedExpectedReturns**: restricts computation to a rolling or indexed observation window.
+- **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
 
 ### 3.2 Covariance & Variance (Moments)
 
@@ -116,12 +128,12 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 - **ImpliedVolatility** (covariance): scales covariance using implied volatility, optionally regressing realised on implied (`ImpliedVolatilityRegression`) or applying a premium factor (`ImpliedVolatilityPremium`).
 - **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply denoising / detoning / custom matrix processing plus posdef projection.
 - **PortfolioOptimisersCovariance**: composite estimator bundling covariance estimation with post-processing.
-- **Windowed** variants (`WindowedCovariance`, `WindowedVariance`): rolling/indexed observation window.
+- **Windowed** variants (`WindowedCovariance`, `WindowedVariance`): the Windowed Estimators for covariance and variance.
 
 ### 3.3 Higher-Order Moments
 
 **Coskewness** / **Cokurtosis**
-Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
+Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and the Windowed Estimators `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
 
 ### 3.4 Regression (factor modelling)
 
@@ -189,7 +201,20 @@ A robust optimisation construct that sits alongside a Prior in JuMP-based optimi
 
 - **Box** (`BoxUncertaintySet`): independent per-parameter bounds.
 - **Ellipsoidal** (`EllipsoidalUncertaintySet`, `Mu…`/`Sigma…` classes): joint confidence region; scaling parameter `k` from `NormalKUncertaintyAlgorithm`, `GeneralKUncertaintyAlgorithm`, or `ChiSqKUncertaintyAlgorithm`.
-- **Estimators**: `DeltaUncertaintySet` (delta bounds), `NormalUncertaintySet` (normality assumption), `ARCHUncertaintySet` (bootstrap for time series — `StationaryBootstrap`, `CircularBootstrap`, `MovingBootstrap`).
+- **ℓ1 / cross-polytope** (`L1UncertaintySet`): one error budget `eps` shared across all assets and both signs, optionally scaled per asset by `sd`; worst case `mu'w − eps·‖sd ⊙ w‖∞`. **Mean-only** — it bounds a *characteristic* vector and has no covariance analogue.
+- **Signed ℓ1** (`SignedL1UncertaintySet`): a budget per error sign (`ep`, `em`); worst case `mu'w − ep·[maxᵢ(−sdᵢwᵢ)]₊ − em·[maxᵢ(sdᵢwᵢ)]₊`. Not the joint set with `ep == em` — the joint set shares one budget across signs (`max(t₊,t₋)`), this one spends a budget per sign (`ep·t₊ + em·t₋`); they agree only when `w` is single-signed.
+- **Estimators**: `DeltaUncertaintySet` (delta bounds), `NormalUncertaintySet` (normality assumption), `ARCHUncertaintySet` (bootstrap for time series — `StationaryBootstrap`, `CircularBootstrap`, `MovingBootstrap`), `CharacteristicUncertaintySet` (the ℓ1 family; shape via `L1UncertaintySetAlgorithm`/`SignedL1UncertaintySetAlgorithm`, whose `scaled` flag selects equal-weight vs inverse-volatility behaviour).
+
+**ucs Triple** (`ucs` / `mu_ucs` / `sigma_ucs`)
+The three ways to ask an Uncertainty Set estimator for its sets: `ucs` returns the mean and covariance sets as a pair, `mu_ucs` returns the mean half, `sigma_ucs` the covariance half. Conceptually `ucs` *is* the mean half alongside the covariance half — but for sampling-based estimators the pair shares one random draw threaded through both halves, so `ucs`'s covariance half can differ numerically from a standalone `sigma_ucs` call that re-seeds (deliberate; not a drift). ℓ1 sets are mean-only: their `ucs`/`sigma_ucs` throw (ADR 0035).
+*Avoid*: assuming `ucs(ue) == (mu_ucs(ue), sigma_ucs(ue))` element-for-element under a fixed seed.
+
+**Characteristic Vector**
+The per-asset quantity an ℓ1 uncertainty set is built around. Usually the expected return, but the construction is indifferent: a prior built on `StandardDeviationExpectedReturns` ranks on volatility instead. The radius `eps` decides how many assets the resulting portfolio holds — small radius, one asset; moderate, a quintile; large, all of them equally — which is what makes the *quintile* and *1/N* heuristics exact solutions of a robust optimisation problem rather than folk wisdom (ADR 0032). There is deliberately no quintile optimiser: the portfolios are a `MeanRisk` recipe over this set.
+
+**Radius Calibration** (`ActiveAssetsUncertaintyAlgorithm`)
+The conversion from "how many assets should I hold?" to the opaque radius `eps` that produces it, by inverting the closed forms. A *calibration, not a constraint*: exact only for the bare budget-and-sign problem the closed forms assume, so any further constraint may move the realised count. `card` remains the tool for a hard cardinality bound.
+*Avoid*: reading `active` as a promise.
 
 ## 4. Optimisation
 
@@ -229,10 +254,19 @@ Wraps a single external backend (Clarabel, HiGHS, …): solver module, settings,
 The shared JuMP model configuration: one or more `Solver`s (fallback chains) plus JuMP-level settings. The execution environment consumed by all JuMP-based optimisers.
 
 **Model State**
-The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Accessed through a named interface rather than raw model keys.
+The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Reached only through its named interface, never by naming an entry directly; see Per-Build Risk State for which entries a nested build must keep to itself.
+
+**Per-Build Risk State**
+The part of Model State that belongs to *one* risk build rather than to the model as a whole, and so must not be shared with a build nested inside it. Two things qualify: anything that is a function of the weights being optimised — a nested build (risk tracking) shifts those weights, so the inner and outer answers genuinely differ — and any presence flag that gates a formulation choice for the build that set it. Everything else is a pure function of the Prior, identical in both builds, and is correctly shared: treating it as per-build would break sharing rather than protect it. The distinction decides correctness, not tidiness: getting it wrong makes a nested build silently read its parent's state.
 
 **Model Assembly**
 The fixed sequence in which a single-JuMP-model Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one — the steps between shaping the weight variables and setting the objective. Shared by MeanRisk, Risk Budgeting, Relaxed Risk Budgeting, Factor Risk Contribution, and constrained Near Optimal Centering; the per-optimiser parts (how weights are shaped, the objective, the solve) sit outside it. Distinct from Model State: Model State is the data the builders read and write, Model Assembly is the ordering of the builders themselves.
+
+**Objective Penalty**
+The accumulator through which every *soft* contribution reaches the objective — built-in regularisation, soft Turnover and Tracking, and user-supplied Custom Objective Terms alike. It exists because the objective's optimisation *sense* varies (some objectives are minimised, some maximised, and a ratio objective is either depending on the risk measure), so contributions are expressed once, sense-free, and the sense-correct factor is applied centrally when the accumulator is folded into the objective. A contribution always worsens the objective; a reward is a negative contribution. Distinct from a hard constraint, which bounds the feasible region rather than pricing a preference.
+
+**Custom Term** (the extension point)
+The user-facing escape hatch for expressing a preference the library does not already name: a Custom Objective Term prices one (through the Objective Penalty), a Custom Constraint mandates one. Both are supplied as inputs to the JuMPOptimiser and both are reached during Model Assembly, receiving the model under construction, the outer Optimisation Estimator, and the processed problem data. A term that names itself as one but supplies no builder is an error, not a no-op.
 
 ### 4.4 Constraints
 
@@ -251,6 +285,16 @@ User-facing utilities converting high-level specifications into the numeric form
 
 **JuMP Constraints**
 The layer adding numeric constraint data into a JuMP model. Includes budget constraints (`BudgetRange` = sum-of-weights interval, `BudgetCosts` = linear transaction costs, `BudgetMarketImpact` = power-law impact), `LpRegularisation`, plus Turnover, Tracking, and Fees constraints.
+
+**Net vs Gross Budget**
+`bgt` is the *net* exposure `1ᵀw`; `sbgt` the short side; `gbgt` the *gross* exposure (leverage) `‖w‖₁`. `bgt` and `sbgt` constrain net and gross only **together** — pinning both gives `1ᵀw = bgt` and `‖w‖₁ = bgt + 2·sbgt` — so `gbgt` exists for the combination they cannot reach: gross pinned with net free (the market-neutral portfolio). A number pins it, a `BudgetRange` bounds it (a leverage cap). It requires bounds admitting shorts, and is rejected when `bgt` and `sbgt` already determine the gross exposure.
+
+**Exact vs Bounded Budgets** (`xbgt`, `miprb`)
+The long/short variables `lw`/`sw` are *upper bounds* on the parts of `w`, not equal to them, so by default every budget built on them **bounds** the realised exposure rather than pinning it: `sbgt = 0.3` means *at most* 30% short. The objective normally pushes against the budget, making the bound tight, but it is not the same problem. Pinning the decomposition needs a per-asset *sign* bit and the big-M constraints keyed on it, so the budgets hold exactly — turning a linear program into a mixed-integer one, which is why it is opt-in. (The MIP complementarity used by threshold/fee constraints forces the long-xor-short *sign pattern* but does **not** close this slack; pinning emits that pair *and* the two constraints that close it.)
+
+Two callers want this, and they are one request routed through the **head contract** (`decomposition_contract`, in Model State): an explicit `xbgt` under a head whose `lw`/`sw` merely *bound* `w` (`PartsBoundWeights`), and risk budgeting's head, which makes `w = lw − sw` an *identity* (`WeightsFromParts`) and so asks for the pin by construction with no flag — the mechanism the old `miprb_flag` named. Both route to `set_exact_budget_constraints!`, which reads the contract back off the model and emits what it needs (the identity needs only the pin-pair; the bound needs two more constraints to close the slack).
+
+The sign bit need not be new. When the model already runs `short_mip_threshold_constraints` for a threshold / fee / cardinality feature, its `ilb`/`isb` already mean long and short and the exact-budget constraints reuse them — `i_mip = ilb + isb` stays the *held* bit that `card` counts. Only when *nothing else* consumes a held indicator does pinning declare its own: `sign_mip_constraints` adds a single sign bit `xb` per asset (`N` binaries, not the `2N` of a full long-short split), because the sign split is total — `w_i = 0` satisfies both `w_i ≥ 0` and `w_i ≤ 0` — so the inactive third state a held builder carries is dead weight. The long-only `mip_constraints` cannot serve it either: its `ib` means *held* and carries no sign, and a sign bit and a held bit are different bits. `xbgt` is ignored when the weight bounds admit no shorts, and is applied by `set_mip_constraints!` rather than `set_weight_constraints!`, since the budgets are built before the binaries that pin them exist.
 
 **Time-Dependent Input (Schedule)**
 An optimiser input whose value changes across the folds of a cross-validation scheme instead of being fixed for the whole horizon. Historically "time-dependent constraint" — constraint inputs were the first to vary — but the concept spans every **problem-definition** input.
@@ -337,7 +381,7 @@ The `XatRisk` naming uses "X" as shorthand for "Value" or "Drawdown" — the sam
 - **Value-at-Risk (VaR)**: `ValueatRisk` (formulations `MIPValueatRisk`, `DistributionValueatRisk`), `ValueatRiskRange`; drawdown forms `DrawdownatRisk`, `RelativeDrawdownatRisk`.
 - **Conditional (CVaR / Expected Shortfall)**: `ConditionalValueatRisk`, `…Range`, DR forms, drawdown `ConditionalDrawdownatRisk` (CDaR) and relatives.
 - **Entropic (EVaR)**: `EntropicValueatRisk`, `…Range`, `EntropicDrawdownatRisk` (EDaR), relatives.
-- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RDaR), relatives.
+- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RLDaR), relatives.
 - **Power Norm**: `PowerNormValueatRisk` (PNVaR), `…Range`, `PowerNormDrawdownatRisk`, relatives.
 
 **OWA (Ordered Weights Array)**
@@ -351,6 +395,7 @@ Weighted sum of *sorted* return realisations; weights generated by an Algorithm 
 
 - **BrownianDistanceVariance (BDVar)**: distance-covariance-based dispersion (`NormOneConeBrownianDistanceVariance`, `IneqBrownianDistanceVariance`).
 - **WorstRealisation**: worst single-period loss.
+- **NoRisk**: contributes *no* risk term at all. Exists so a risk-taking optimiser can express a problem that genuinely has none — an objective ignoring risk would otherwise still build the default `Variance`, dragging cone constraints into what is a linear program (the robust best-characteristic portfolios; the global maximum return portfolio). Only coherent under an objective that never consults risk, so `MeanRisk` rejects it with `MinimumRisk` and `MaximumRatio`, and the optimisers whose formulation *is* their risk measure reject it outright.
 - **Range**: spread between best and worst realisations.
 - **TurnoverRiskMeasure**: turnover expressed as a risk quantity.
 - **TrackingRiskMeasure**: benchmark deviation measured as a **norm** of the portfolio-vs-benchmark difference.

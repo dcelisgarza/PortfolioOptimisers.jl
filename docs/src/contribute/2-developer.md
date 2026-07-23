@@ -137,6 +137,18 @@ We try to keep a linear history in this repo, so it is important to keep your br
   - Exhaustive descriptions of the arguments, keyword arguments, type information, and data validation.
   - Exhaustive usage examples as REPL-style `jldoctest` blocks, they should maximize code coverage.
 
+### The Capability Catalogue
+
+The [capability catalogue](@ref capability-catalogue) is the user-facing inventory of everything the package can do, grouped by the job each thing does. It is generated: `docs/capability_catalogue.jl` curates only the **grouping**, and every description is the first sentence of the corresponding docstring, so a description cannot drift from the type it describes.
+
+**Adding a new estimator, algorithm, or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any concrete leaf subtype of `AbstractEstimator` or `AbstractAlgorithm` is missing, and the docs build refuses to render an incomplete page.
+
+- Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
+- Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
+- A function that is not a user-facing capability goes in `NOT_A_FEATURE` with a reason (`:alias`, `:base_overload`, `:trait`, `:internal`) instead. Removing an export means removing its entry there too; the check runs in both directions.
+
+Because descriptions come from docstrings, a type's **first sentence** has to stand alone in a bullet list. See the summary-sentence rules in `.github/instructions/julia-docstrings.instructions.md`.
+
 ## Building and viewing the documentation locally
 
 Following the latest suggestions, we recommend using `LiveServer` to build the documentation.

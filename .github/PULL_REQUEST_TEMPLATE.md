@@ -22,3 +22,4 @@ There is no related issue.
 - [ ] Tests are passing
 - [ ] Lint workflow is passing
 - [ ] Docs were updated and workflow is passing
+- [ ] Any new estimator, algorithm, or exported function is placed in the [Capability Catalogue](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/capability_catalogue.jl) (or listed in `NOT_A_FEATURE` with a reason) — `test/test_26_docs.jl` enforces this

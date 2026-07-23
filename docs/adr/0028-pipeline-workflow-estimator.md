@@ -29,10 +29,20 @@ fold and searched by the lens-based grid/randomised search machinery.
    carries a *default* `pe`, so intent is indistinguishable from default. Injection is
    type-checked at pipeline construction where possible. A shared prior is computed once per
    fold instead of once per consumer.
+   **Amended by [ADR 0038](0038-optimisers-own-pipeline-routing.md):** as implemented, "the
+   optimisation step's `pe`" meant only an optimiser holding a `JuMPOptimiser`/
+   `HierarchicalOptimiser` configuration, so the naive and meta-optimisers — which carry a
+   `pe` of their own, and have the most consumers — silently recomputed it. They now receive
+   it. The construction-time claim was also aspirational: routability is now checked, but
+   only for the `uncertainty` slot, whose targets are the only ones knowable before fitting.
 4. **Slot granularity is coarse, with type-driven routing.** The `uncertainty` and
    `constraints` slots hold heterogeneous collections whose elements route to their
    `JuMPOptimiser` fields by Result type. One-slot-per-optimiser-field was rejected as a
    maintenance mirror of `JuMPOptimiser` that turns the domain vocabulary into plumbing.
+   **Scoped by [ADR 0038](0038-optimisers-own-pipeline-routing.md):** this governs
+   `PIPELINE_SLOTS`, the pipeline-author vocabulary, which remains coarse and unchanged.
+   0038 adds a finer, per-field *Routing Target* vocabulary addressing optimiser authors,
+   and keeps it internal precisely so this decision is not circumvented.
 5. **CV splits on the pipeline's *input* rows as contiguous timestamp windows**, restricted to
    the sequential schemes (purged KFold, WalkForward); `CombinatorialCrossValidation` stays
    returns-level for now. Splitting on returns rows with a run-once "pre" segment was rejected

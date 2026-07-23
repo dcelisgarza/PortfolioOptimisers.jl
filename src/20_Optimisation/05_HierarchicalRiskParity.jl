@@ -179,6 +179,7 @@ Where:
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
+        assert_risk_measure_required(r, :HierarchicalRiskParity)
         assert_time_dependent_substitution(HierarchicalRiskParity, (; opt, r, sca, fb),
                                            hierarchical_risk_parity_td_defaults())
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
@@ -442,4 +443,6 @@ function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
     return _optimise(hrp, rd; dims = dims, kwargs...)
 end
 
+@pipe_delegates HierarchicalRiskParity opt
+@pipe_route_sigma_ucs HierarchicalRiskParity
 export HierarchicalRiskParity

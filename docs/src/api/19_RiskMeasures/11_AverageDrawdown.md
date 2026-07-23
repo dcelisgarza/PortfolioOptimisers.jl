@@ -3,4 +3,5 @@
 ```@docs
 AverageDrawdown
 RelativeAverageDrawdown
+average_drawdown
 ```

@@ -147,7 +147,7 @@ The target comes from the [`PipelineStep`](@ref) wrapper:
   - `:sigma` computes [`sigma_ucs`](@ref) and fills the covariance half.
   - `:both` computes [`ucs`](@ref), which derives *both* halves from one fit — sharing the prior and, for the sampling algorithms, the simulation draws — and is therefore cheaper than the two narrowed calls.
 
-A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and leaves the other untouched, so separate `:mu` and `:sigma` steps compose. Every populated half must reach the optimiser: [`inject_config`](@ref) and [`inject_sigma_ucs`](@ref) reject a set they cannot route rather than dropping it, so `:both` requires an optimiser with an [`ArithmeticReturn`](@ref) *and* an [`UncertaintySetVariance`](@ref) risk measure.
+A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and leaves the other untouched, so separate `:mu` and `:sigma` steps compose. Every populated half must reach the optimiser: each becomes its own [routing target](@ref PIPELINE_ROUTING_TARGETS) — `:mu_ucs` and `:sigma_ucs` — and neither is [optional](@ref PIPELINE_OPTIONAL_TARGETS), so a set that cannot be routed is rejected rather than dropped and `:both` requires an optimiser with an [`ArithmeticReturn`](@ref) *and* an [`UncertaintySetVariance`](@ref) risk measure.
 
 # Arguments
 

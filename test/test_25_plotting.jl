@@ -54,14 +54,14 @@
         @test_throws DomainError plot_rolling_drawdowns(w, X; rolling = -1)
     end
 
-    @testset "plot_ptf_cumulative_returns" begin
-        @test is_plot(plot_ptf_cumulative_returns(w, X))
-        @test is_plot(plot_ptf_cumulative_returns(w, X; ts = 1:T))
-        @test is_plot(plot_ptf_cumulative_returns(w, X; compound = true))
-        @test is_plot(plot_ptf_cumulative_returns(w_rd, rd))
-        @test is_plot(plot_ptf_cumulative_returns(w_rd, pr))
-        @test is_plot(plot_ptf_cumulative_returns(res, rd))
-        @test is_plot(plot_ptf_cumulative_returns(res))
+    @testset "plot_portfolio_cumulative_returns" begin
+        @test is_plot(plot_portfolio_cumulative_returns(w, X))
+        @test is_plot(plot_portfolio_cumulative_returns(w, X; ts = 1:T))
+        @test is_plot(plot_portfolio_cumulative_returns(w, X; compound = true))
+        @test is_plot(plot_portfolio_cumulative_returns(w_rd, rd))
+        @test is_plot(plot_portfolio_cumulative_returns(w_rd, pr))
+        @test is_plot(plot_portfolio_cumulative_returns(res, rd))
+        @test is_plot(plot_portfolio_cumulative_returns(res))
     end
 
     @testset "plot_asset_cumulative_returns" begin
@@ -237,7 +237,7 @@
         mr    = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         mpred = cross_val_predict(mr, rd, IndexWalkForward(80, 40))
 
-        @test is_plot(plot_ptf_cumulative_returns(mpred))
+        @test is_plot(plot_portfolio_cumulative_returns(mpred))
         @test is_plot(plot_drawdowns(mpred))
         @test is_plot(plot_histogram(mpred))
         @test is_plot(plot_rolling_measure(r_cvr, mpred))

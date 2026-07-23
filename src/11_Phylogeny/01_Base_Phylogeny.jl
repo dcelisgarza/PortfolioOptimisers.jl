@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all phylogeny estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all phylogeny estimator types.
 
 All concrete and/or abstract types implementing phylogeny-based estimation algorithms should be subtypes of `AbstractPhylogenyEstimator`.
 
@@ -14,7 +14,7 @@ abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all phylogeny algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all phylogeny algorithm types.
 
 All concrete and/or abstract types implementing specific phylogeny algorithms should be subtypes of `AbstractPhylogenyAlgorithm`.
 
@@ -27,7 +27,7 @@ abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all phylogeny result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all phylogeny result types.
 
 All concrete and/or abstract types representing the result of a phylogeny estimation should be subtypes of `AbstractPhylogenyResult`.
 

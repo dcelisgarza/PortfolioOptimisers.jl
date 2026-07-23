@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all phylogeny-based constraint estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all phylogeny-based constraint estimators.
 
 All concrete and/or abstract types representing phylogeny-based constraint estimators should be subtypes of `AbstractPhylogenyConstraintEstimator`.
 
@@ -16,7 +16,7 @@ abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimato
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all phylogeny-based constraint result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all phylogeny-based constraint result types.
 
 All concrete and/or abstract types representing the results of phylogeny-based constraint generation should be subtypes of `AbstractPhylogenyConstraintResult`.
 
@@ -97,7 +97,7 @@ const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for generating semi-definite phylogeny-based constraints in `PortfolioOptimisers.jl`.
+Estimator for generating semi-definite phylogeny-based constraints.
 
 `SemiDefinitePhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using a semi-definite matrix representation. The estimator wraps a phylogeny or clustering estimator and a non-negative penalty parameter `p`, which controls the strength of the constraint.
 
@@ -343,7 +343,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for generating integer phylogeny-based constraints in `PortfolioOptimisers.jl`.
+Estimator for generating integer phylogeny-based constraints.
 
 `IntegerPhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using integer or discrete representations. The estimator wraps a phylogeny or clustering estimator, a non-negative integer or vector of integers `B` specifying group sizes or allocations, and a big-M parameter `scale` used for formulating the MIP constraints.
 
@@ -567,7 +567,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all centrality-based constraint types in `PortfolioOptimisers.jl`.
+Abstract supertype for all centrality-based constraint types.
 
 All concrete types implementing centrality-based portfolio constraints should be subtypes of `AbstractCentralityConstraint`.
 

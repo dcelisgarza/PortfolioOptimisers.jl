@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all risk measure estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all risk measure estimators.
 
 Defines the interface for risk measure types, which quantify portfolio risk using various statistical or econometric methods. All concrete risk measure types should subtype `AbstractBaseRiskMeasure` to ensure consistency and composability within the optimisation framework.
 
@@ -378,7 +378,7 @@ abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all risk measure settings in `PortfolioOptimisers.jl`.
+Abstract supertype for all risk measure settings.
 
 Defines the interface for settings types that configure the behavior of risk measure estimators. All concrete risk measure settings types should subtype `AbstractRiskMeasureSettings` to ensure consistency and composability within the optimisation framework.
 
@@ -492,7 +492,7 @@ Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `N > 0`.
+  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples
@@ -529,6 +529,7 @@ Frontier
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
         @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        assert_resource_cap(N, RESOURCE_LIMITS[].max_frontier, :N, :max_frontier)
         @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
         @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))
         return new{typeof(N), typeof(factor), typeof(bound)}(N, factor, bound)
@@ -592,7 +593,7 @@ const Front_NumVec = Union{<:VecNum, <:Frontier}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Settings type for configuring risk measure estimators in `PortfolioOptimisers.jl`.
+Settings type for configuring risk measure estimators.
 Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures used in optimisation routines.
 
 # Fields
@@ -658,7 +659,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Settings type for configuring hierarchical risk measure estimators in `PortfolioOptimisers.jl`.
+Settings type for configuring hierarchical risk measure estimators.
 
 Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper bound.
 

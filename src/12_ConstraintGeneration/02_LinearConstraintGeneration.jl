@@ -169,7 +169,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all equation parsing result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all equation parsing result types.
 
 All concrete and/or abstract types representing parsing results should be subtypes of `AbstractParsingResult`.
 

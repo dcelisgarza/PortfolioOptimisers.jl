@@ -395,7 +395,7 @@ Internal dispatch called by [`optimise`](@ref). Computes covariance via the prio
 """
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
@@ -558,7 +558,7 @@ Internal dispatch called by [`optimise`](@ref). Assigns equal weights to all ass
 """
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     ew = reset_time_dependent_estimator(ew)
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
@@ -749,7 +749,7 @@ Internal dispatch called by [`optimise`](@ref). Draws weights from a Dirichlet d
 """
 function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     rw = reset_time_dependent_estimator(rw)
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
@@ -762,10 +762,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     else
         Distributions.Dirichlet(rw.alpha)
     end
-    if !isnothing(rw.seed)
-        Random.seed!(rw.rng, rw.seed)
-    end
-    w = rand(rw.rng, dist)
+    rng = resolve_rng(rw.rng, rw.seed)
+    w = rand(rng, dist)
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)

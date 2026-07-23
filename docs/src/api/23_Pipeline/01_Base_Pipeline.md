@@ -15,8 +15,13 @@ The preprocessing estimator and result hierarchies, the price-level [`PricesResu
 
 ```@docs
 PipelineContext
+PIPELINE_DATA_SLOTS
 PIPELINE_SLOTS
 PIPELINE_INVALIDATES
+PIPELINE_ROUTING_TARGETS
+PIPELINE_OPTIONAL_TARGETS
+unroutable_target
+assert_opt_last
 pipe_reads
 pipe_writes
 PipelineStep

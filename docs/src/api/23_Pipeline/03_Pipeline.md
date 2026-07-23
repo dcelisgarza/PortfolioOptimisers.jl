@@ -1,4 +1,4 @@
-# Pipeline
+# PortfolioOptimisers pipeline
 
 The `Pipeline` estimator reifies an end-to-end workflow — data preparation, prior estimation, phylogeny, uncertainty sets, constraint generation, and optimisation — as an ordered list of steps fitted as a single unit. Computed slots override the terminal optimiser's internal configuration; absent steps fall back to what the optimiser computes internally.
 
@@ -12,6 +12,7 @@ StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
                           test_idx = Colon(), cols = Colon())
 fit_predict(pipe::Pipeline, data::Prices_RR)
 port_opt_view(::Pipeline, args...; kwargs...)
+first_duplicate
 ```
 
 ## Holdout splitting
@@ -27,12 +28,15 @@ PortfolioOptimisers.holdout_window
 
 ## Injection
 
+The pipeline resolves its computed slots into [routing targets](@ref PIPELINE_ROUTING_TARGETS) and hands each one to the optimiser, which owns the decision of where it lands. See [`pipe_route`](@ref) for the optimiser-owned half of the seam.
+
 ```@docs
 inject_context
-inject_config
-inject_sigma_ucs
 constraint_results
+constraint_targets
 maybe_inject_step
+pipe_required_targets
+assert_routable
 ```
 
 ## Prediction

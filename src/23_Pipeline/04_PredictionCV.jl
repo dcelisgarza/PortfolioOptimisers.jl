@@ -331,6 +331,18 @@ end
 
 Run cross-validated prediction over an entire [`Pipeline`](@ref) workflow and return a [`MultiPeriodPredictionResult`](@ref).
 
+# Return type by cross-validation scheme
+
+`cross_val_predict` is the single entry point for every scheme, but the **result type depends on `cv`**: single-path schemes return one series, multi-path schemes return a per-path collection. The type flips with the scheme, so result-navigation code written against one shape (e.g. a `KFold` run) breaks when the scheme is swapped — branch on the scheme, not on the run.
+
+| `cv` scheme                                     | Return type                           | `.pred` holds                        |
+|:----------------------------------------------- |:------------------------------------- |:------------------------------------ |
+| [`KFold`](@ref) / walk-forward ([`CVER`](@ref)) | [`MultiPeriodPredictionResult`](@ref) | one series — one prediction per fold |
+| [`CombinatorialCrossValidation`](@ref)          | [`PopulationPredictionResult`](@ref)  | a per-path collection                |
+| [`MultipleRandomised`](@ref)                    | [`PopulationPredictionResult`](@ref)  | a per-path collection                |
+
+The combinatorial and asset-resampling schemes are dispatched by their own methods (see Related); the rest of this docstring describes the contiguous, single-path (`CVER`) method.
+
 The input is split at its own level — price-level data by the prices-aware `split` methods (contiguous windows, so stateful preprocessing stays inside the fold), returns-level data as usual — and for each fold the whole workflow is fitted on the training window and predicts on the test window, exactly as [`fit`](@ref)/[`predict`](@ref) do for a holdout. This method covers the contiguous, single-path schemes ([`KFold`](@ref) and the walk-forwards). Combinatorial and asset-resampling schemes have their own methods for a **returns-level** pipeline (see [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)`](@ref) and [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)); for a **price-starting** pipeline they are rejected at `split` by the rolling-window rule.
 
 This is the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline (ADR 0030): when the pipeline is time-dependent, fold `i` builds a [`TimeDependentContext`](@ref) — with `rd` the *raw, pre-preprocessing* input `data`, so pipeline-level callables see the fold's data before any step has transformed it — and swaps every schedule for its fold-`i` value via [`update_time_dependent_estimator`](@ref) **before** `fit` runs. A schedule step may resolve to an estimator (the fold optimises) or a precomputed result (the fold predicts only); injection never sees a schedule. When the pipeline [`needs_previous_weights`](@ref), [`run_folds`](@ref) runs sequentially and threads the previous fold's weights into the context's `w_prev` and, post-swap, into the optimisation steps via [`factory`](@ref).
@@ -353,6 +365,9 @@ This is the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipel
   - [`fit`](@ref)
   - [`TimeDependent`](@ref)
   - [`search_cross_validation`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref) / [`PopulationPredictionResult`](@ref) (the two return shapes)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation)`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised)`](@ref)
 """
 function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),

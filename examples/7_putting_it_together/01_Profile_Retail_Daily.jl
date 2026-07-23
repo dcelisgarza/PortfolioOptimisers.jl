@@ -6,7 +6,7 @@ run the whole pipeline end to end for a concrete investor, so you can see how th
 compose. This first profile is a **retail investor rebalancing daily** with a small account: the
 constraints are compute, trading cost, and capital, not sophistication.
 
-The reasoning, following the [strategy decision framework](../../user_guide/06_Choosing_a_Strategy.md):
+The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
   - **Compute is cheap but frequent** — rebalancing every day rules out heavy optimisations; a
     single convex solve is right.

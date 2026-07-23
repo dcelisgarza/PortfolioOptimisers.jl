@@ -324,9 +324,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
     T = length(dd) - 1
     alpha = r.alpha
     kappa = r.kappa
-    iat = inv(alpha * T)
     ik2 = inv(2 * kappa)
-    lnk = (iat^kappa - iat^(-kappa)) * ik2
     opk = one(kappa) + kappa
     omk = one(kappa) - kappa
     ik = inv(kappa)

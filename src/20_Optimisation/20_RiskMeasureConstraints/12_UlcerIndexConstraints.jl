@@ -43,18 +43,21 @@ where ``dd_t`` is the portfolio drawdown at time ``t``.
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    if haskey(model, Symbol(prefix, :uci))
-        return model[Symbol(prefix, :uci_risk)]
+    # The pre-migration guard tested `:uci` but returned `:uci_risk`; the two are always
+    # registered together in this block, so keying the memo on the returned entry is
+    # equivalent.
+    return state_build!(model, prefix, :uci_risk) do
+        sc = get_constraint_scale(model)
+        dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
+        T = length(dd) - 1
+        uci = state_set!(model, prefix, :uci, JuMP.@variable(model))
+        uci_risk = JuMP.@expression(model, uci / sqrt(T))
+        state_set!(model, prefix, :cuci_soc,
+                   JuMP.@constraint(model,
+                                    [sc * uci; sc * view(dd, 2:(T + 1))] in
+                                    JuMP.SecondOrderCone()))
+        set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings, :uci_risk;
+                                        prefix = prefix)
+        return uci_risk
     end
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    uci = preg!(model, prefix, :uci, JuMP.@variable(model))
-    uci_risk = preg!(model, prefix, :uci_risk, JuMP.@expression(model, uci / sqrt(T)))
-    preg!(model, prefix, :cuci_soc,
-          JuMP.@constraint(model,
-                           [sc * uci; sc * view(dd, 2:(T + 1))] in JuMP.SecondOrderCone()))
-    set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings,
-                                    Symbol(prefix, :uci_risk))
-    return uci_risk
 end

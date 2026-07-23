@@ -144,7 +144,7 @@ df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cos
 pretty_table(df; formatters = [fmt2])
 
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
-plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
+plot_portfolio_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
 ![Fig. 1](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_1.svg)

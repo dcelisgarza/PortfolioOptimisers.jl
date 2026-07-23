@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all regression estimator types.
 
 All concrete and/or abstract types implementing regression estimation algorithms should be subtypes of `AbstractRegressionEstimator`.
 
@@ -54,7 +54,7 @@ abstract type AbstractRegressionEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all regression result types.
 
 All concrete and/or abstract types representing the output of regression-based moment estimation should be subtypes of `AbstractRegressionResult`.
 
@@ -81,7 +81,7 @@ const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all regression algorithm types.
 
 All concrete and/or abstract types implementing specific regression algorithms should be subtypes of `AbstractRegressionAlgorithm`.
 
@@ -99,7 +99,7 @@ abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all stepwise regression algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all stepwise regression algorithm types.
 
 All concrete and/or abstract types implementing stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionAlgorithm`.
 
@@ -113,7 +113,7 @@ abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all stepwise regression criterion types in `PortfolioOptimisers.jl`.
+Abstract supertype for all stepwise regression criterion types.
 
 All concrete and/or abstract types representing criteria for stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionCriterion`. These criteria are used to evaluate model quality and guide variable selection during stepwise regression, such as AIC, BIC, or R².
 
@@ -126,7 +126,7 @@ abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regression target types in `PortfolioOptimisers.jl`.
+Abstract supertype for all regression target types.
 
 All concrete and/or abstract types representing regression targets (such as linear or generalised linear models) should be subtypes of `AbstractRegressionTarget`.
 
@@ -138,7 +138,7 @@ abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regression target type for standard linear models in `PortfolioOptimisers.jl`.
+Regression target type for standard linear models.
 
 `LinearModel` is used to specify a standard linear regression target (i.e., ordinary least squares) when constructing regression estimators. It encapsulates keyword arguments for configuring the underlying linear model fitting routine, enabling flexible extension and dispatch within the regression estimation framework.
 
@@ -237,7 +237,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regression target type for generalised linear models (GLMs) in `PortfolioOptimisers.jl`.
+Regression target type for generalised linear models (GLMs).
 
 `GeneralisedLinearModel` is used to specify a generalised linear regression target (e.g., logistic, Poisson, etc.) when constructing regression estimators. It encapsulates positional and keyword arguments for configuring the underlying GLM fitting routine, enabling flexible extension and dispatch within the regression estimation framework.
 
@@ -357,7 +357,7 @@ abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in `PortfolioOptimisers.jl`.
+Abstract supertype for all stepwise regression criteria where lower values indicate better model fit.
 
 All concrete and/or abstract types implementing minimisation-based stepwise regression criteria (such as AIC, AICC, or BIC) should be subtypes of `AbstractMinValStepwiseRegressionCriterion`. These criteria are used to guide variable selection in stepwise regression algorithms by minimising the criterion value.
 
@@ -373,7 +373,7 @@ abstract type AbstractMinValStepwiseRegressionCriterion <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in `PortfolioOptimisers.jl`.
+Abstract supertype for all stepwise regression criteria where higher values indicate better model fit.
 
 All concrete and/or abstract types implementing maximisation-based stepwise regression criteria (such as R² or Adjusted R²) should be subtypes of `AbstractMaxValStepwiseRegressionCriteria`. These criteria are used to guide variable selection in stepwise regression algorithms by maximising the criterion value.
 
@@ -388,7 +388,7 @@ abstract type AbstractMaxValStepwiseRegressionCriteria <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimisers.jl`.
+Akaike Information Criterion (AIC) for stepwise regression.
 
 `AIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. Lower values indicate better model fit, penalising model complexity to avoid overfitting.
 
@@ -417,7 +417,7 @@ struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Corrected Akaike Information Criterion (AICC) for stepwise regression in `PortfolioOptimisers.jl`.
+Corrected Akaike Information Criterion (AICC) for stepwise regression.
 
 `AICC` is a minimisation-based criterion similar to AIC, but includes a correction for small sample sizes. Lower values indicate better model fit, balancing fit and complexity.
 
@@ -447,7 +447,7 @@ struct AICC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimisers.jl`.
+Bayesian Information Criterion (BIC) for stepwise regression.
 
 `BIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. It penalises model complexity more strongly than AIC. Lower values indicate better model fit.
 
@@ -477,7 +477,7 @@ struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Coefficient of determination (R²) for stepwise regression in `PortfolioOptimisers.jl`.
+Coefficient of determination (R²) for stepwise regression.
 
 `RSquared` is a maximisation-based criterion used to evaluate model quality in stepwise regression algorithms. Higher values indicate better model fit, representing the proportion of variance explained by the model.
 
@@ -508,7 +508,7 @@ struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Adjusted coefficient of determination (Adjusted R²) for stepwise regression in `PortfolioOptimisers.jl`.
+Adjusted coefficient of determination (Adjusted R²) for stepwise regression.
 
 `AdjustedRSquared` is a maximisation-based criterion that adjusts R² for the number of predictors in the model, providing a more accurate measure of model quality when comparing models with different numbers of predictors.
 
@@ -601,7 +601,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for regression results in `PortfolioOptimisers.jl`.
+Container type for regression results.
 
 `Regression` stores the results of a regression-based moment estimation, including the main coefficient matrix, an optional auxiliary matrix, and the intercept vector. This type is used as the standard output for regression estimators, enabling consistent downstream processing and analysis.
 

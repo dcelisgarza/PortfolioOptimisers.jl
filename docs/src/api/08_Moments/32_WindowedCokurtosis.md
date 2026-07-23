@@ -2,5 +2,5 @@
 
 ```@docs
 WindowedCokurtosis
-cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, kwargs...)
+cokurtosis(kte::WindowedCokurtosis, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
 ```

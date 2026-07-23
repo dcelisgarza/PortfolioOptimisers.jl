@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies distance-based covariance estimators.
 
 `DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy.
 
@@ -292,7 +292,7 @@ julia> cor(ce, X)
   - [`cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -447,7 +447,7 @@ julia> cov(ce, X)
   - [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end

@@ -85,6 +85,7 @@ AverageDrawdown
   - [`UlcerIndex`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
+  - [`average_drawdown`](@ref)
 """
 @propagatable @concrete struct AverageDrawdown <: RiskMeasure
     """
@@ -104,9 +105,43 @@ function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          w::Option{<:ObsWeights} = nothing)::AverageDrawdown
     return AverageDrawdown(settings, w)
 end
+"""
+    average_drawdown(dd::VecNum, ::Nothing) -> Number
+    average_drawdown(dd::VecNum, w::VecNum) -> Number
+
+Aggregate a drawdown series into its mean drawdown.
+
+This is the shared aggregation kernel behind [`AverageDrawdown`](@ref) and [`RelativeAverageDrawdown`](@ref): the two measures differ only in the drawdown series they feed it ([`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) respectively), so the averaging lives here once.
+
+Dispatch on the second argument selects the weighting scheme, so callers resolve observation weights with [`get_observation_weights`](@ref) and let dispatch do the rest. Resolving before dispatching is what makes a [`DynamicAbstractWeights`](@ref) work here — the aggregator only ever sees a concrete weight vector or `nothing`.
+
+  - `::Nothing`: unweighted arithmetic mean.
+  - `w::VecNum`: weighted mean.
+
+# Arguments
+
+  - `dd::VecNum`: Drawdown series, all entries ≤ 0. Not modified.
+  - `w`: Resolved observation weights, or `nothing` for the unweighted mean.
+
+# Returns
+
+  - `Number`: Average drawdown, returned as a positive loss.
+
+# Related
+
+  - [`AverageDrawdown`](@ref)
+  - [`RelativeAverageDrawdown`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+"""
+function average_drawdown(dd::VecNum, ::Nothing)
+    return -Statistics.mean(dd)
+end
+function average_drawdown(dd::VecNum, w::VecNum)
+    return -Statistics.mean(dd, w)
+end
 function (r::AverageDrawdown)(x::VecNum)
-    dd = absolute_drawdown_vec(x)
-    return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
+    return average_drawdown(absolute_drawdown_vec(x), get_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -189,6 +224,7 @@ RelativeAverageDrawdown
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`AverageDrawdown`](@ref)
   - [`RelativeMaximumDrawdown`](@ref)
+  - [`average_drawdown`](@ref)
 """
 @propagatable @concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
     """
@@ -211,9 +247,7 @@ function RelativeAverageDrawdown(;
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)
-    dd = relative_drawdown_vec(x)
-    w = get_observation_weights(r.w, x)
-    return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, w))
+    return average_drawdown(relative_drawdown_vec(x), get_observation_weights(r.w, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

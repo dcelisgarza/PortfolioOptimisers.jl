@@ -1029,13 +1029,13 @@ end
 """
     ep_var_views!(var_views::Nothing, args...; kwargs...)
 
-No-op pass-through for variance view constraints when none are specified.
+No-op pass-through for value at risk (VaR) view constraints when none are specified.
 
-`ep_var_views!` is an internal API compatibility method that does nothing when variance view constraints (`var_views`) are not provided (`var_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_var_views!` without special-casing the absence of variance views.
+`ep_var_views!` is an internal API compatibility method that does nothing when value at risk (VaR) view constraints (`var_views`) are not provided (`var_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_var_views!` without special-casing the absence of value at risk (VaR) views.
 
 # Arguments
 
-  - `var_views::Nothing`: Indicates that no variance view constraints are specified.
+  - `var_views::Nothing`: Indicates that no value at risk (VaR) view constraints are specified.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -2325,7 +2325,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:StagedEP}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -2477,7 +2477,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:H0_EntropyPooling}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

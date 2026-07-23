@@ -1,113 +1,24 @@
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Coskewness estimator that restricts computation to a rolling or indexed observation window.
-
-`WindowedCoskewness` wraps another coskewness estimator and applies it to a subset of observations defined by a window and/or custom observation weights. This enables time-varying or recency-weighted coskewness estimation.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    WindowedCoskewness(;
-        ske::CoskewnessEstimator = Coskewness(),
-        w::Option{<:ObsWeights} = nothing,
-        window::Option{<:Int_VecInt} = nothing
-    ) -> WindowedCoskewness
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:oow])
-  - If `window` is provided, it must be nonempty, nonnegative, and finite.
-
-# Examples
-
-```jldoctest
-julia> WindowedCoskewness()
-WindowedCoskewness
-     ske ┼ Coskewness
-         │    me ┼ SimpleExpectedReturns
-         │       │   w ┴ nothing
-         │    mp ┼ MatrixProcessing
-         │       │     pdm ┼ Posdef
-         │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │       │      dn ┼ nothing
-         │       │      dt ┼ nothing
-         │       │     alg ┼ nothing
-         │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │   alg ┼ FullMoment()
-         │     w ┴ nothing
-       w ┼ nothing
-  window ┴ nothing
-```
-
-# Related
-
-  - [`CoskewnessEstimator`](@ref)
-  - [`Coskewness`](@ref)
-"""
-@propagatable @concrete struct WindowedCoskewness <: CoskewnessEstimator
+@windowed_estimator WindowedCoskewness <: CoskewnessEstimator begin
+    ske::CoskewnessEstimator = Coskewness()
+    noun = "Coskewness"
+    forward = [coskewness(::MatNum; mean) => (:cskew, :cskewV)]
+    doctest = """
+    julia> WindowedCoskewness()
+    WindowedCoskewness
+         ske ┼ Coskewness
+             │    me ┼ SimpleExpectedReturns
+             │       │   w ┴ nothing
+             │    mp ┼ MatrixProcessing
+             │       │     pdm ┼ Posdef
+             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       │      dn ┼ nothing
+             │       │      dt ┼ nothing
+             │       │     alg ┼ nothing
+             │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │   alg ┼ FullMoment()
+             │     w ┴ nothing
+           w ┼ nothing
+      window ┴ nothing
     """
-    $(field_dict[:ske])
-    """
-    @fprop @vprop ske
-    """
-    $(field_dict[:oow])
-    """
-    @wprop w
-    """
-    Window specification: an integer (last `window` observations) or a vector of indices.
-    """
-    window
-    function WindowedCoskewness(ske::CoskewnessEstimator, w::Option{<:ObsWeights},
-                                window::Option{<:Int_VecInt})
-        assert_nonempty_nonneg_finite_val(w, :w)
-        assert_nonempty_nonneg_finite_val(window, :window)
-        return new{typeof(ske), typeof(w), typeof(window)}(ske, w, window)
-    end
 end
-function WindowedCoskewness(; ske::CoskewnessEstimator = Coskewness(),
-                            w::Option{<:ObsWeights} = nothing,
-                            window::Option{<:Int_VecInt} = nothing)::WindowedCoskewness
-    return WindowedCoskewness(ske, w, window)
-end
-"""
-    coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
-
-Compute the coskewness tensor and processed matrix using a rolling or indexed observation window.
-
-This method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying coskewness estimator.
-
-# Arguments
-
-  - `ske`: Windowed coskewness estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - $(arg_dict[:dims])
-  - $(arg_dict[:oiv])
-  - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
-
-# Returns
-
-  - `cskew::Matrix{<:Number}`: Coskewness tensor (assets × assets²).
-  - `V::Matrix{<:Number}`: Processed coskewness matrix (assets × assets).
-
-# Related
-
-  - [`WindowedCoskewness`](@ref)
-  - [`Coskewness`](@ref)
-  - [`coskewness`](@ref)
-  - [`windowed_preamble`](@ref)
-"""
-function coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1,
-                    iv::Option{<:MatNum} = nothing, kwargs...)
-    inner, X, iv = windowed_preamble(ske.ske, ske.w, ske.window, X; iv = iv, dims = dims,
-                                     kwargs...)
-    return coskewness(inner, X; dims = dims, iv = iv, kwargs...)
-end
-
-export WindowedCoskewness

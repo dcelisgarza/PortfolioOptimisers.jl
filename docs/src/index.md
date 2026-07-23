@@ -228,7 +228,7 @@ We can also visualise the portfolio using various plotting functions. For exampl
 
 ```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
-plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
+plot_portfolio_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
 We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.

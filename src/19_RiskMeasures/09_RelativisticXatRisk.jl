@@ -387,7 +387,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Drawdown-at-Risk (RDaR) risk measure.
+Represents the Relativistic Drawdown-at-Risk (RLDaR) risk measure.
 
 `RelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
@@ -412,13 +412,13 @@ The Relativistic Drawdown-at-Risk is the RVaR of the drawdown series:
 
 ```math
 \\begin{align}
-\\mathrm{RDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
+  - ``\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
   - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
@@ -528,7 +528,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Relativistic Drawdown-at-Risk (Relative RDaR) risk measure for hierarchical optimisation.
+Represents the Relative Relativistic Drawdown-at-Risk (Relative RLDaR) risk measure for hierarchical optimisation.
 
 `RelativeRelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 

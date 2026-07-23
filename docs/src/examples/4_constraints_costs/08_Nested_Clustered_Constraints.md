@@ -91,8 +91,9 @@ wb_overall_assets = WeightBounds(; lb = fill(0.0, length(rd.nx)),
                                  ub = fill(0.20, length(rd.nx)))
 ````
 
-Use per-asset vectors so the direct `NestedClustered(wb = ...)` bound is applied
-to final aggregated asset weights (not just cluster allocations).
+The direct `NestedClustered(wb = ...)` bound always applies to the final aggregated asset
+weights. Per-asset vectors are used here to vary the cap by asset; a scalar bound is
+equivalent to the vector spelling of the same number repeated across every asset.
 
 ````@example 08_Nested_Clustered_Constraints
 res_nested_overall = optimise(NestedClustered(; pe = pr, cle = clr, wb = wb_overall_assets,
@@ -153,8 +154,8 @@ cluster-based decomposition.
 
 - Inner `wb` controls weights inside each cluster.
 - Outer `wb` controls allocation across synthetic cluster portfolios.
-- Direct `NestedClustered(wb = ...)` can constrain final asset weights when provided with a weight
-    bounds result or estimator.
+- Direct `NestedClustered(wb = ...)` constrains the final aggregated asset weights, whether
+    given as a scalar, a per-asset vector, or an estimator.
 
 ---
 

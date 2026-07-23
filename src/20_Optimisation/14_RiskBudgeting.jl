@@ -463,6 +463,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
+        assert_risk_measure_required(r, :RiskBudgeting)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
@@ -544,6 +545,9 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                           [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
                           crkb, sc * LinearAlgebra.dot(rb, log_w) >= 0
                       end)
+    # The log-barrier normalisation above pins the scale, so downstream builders may use 1
+    # in place of the free variable `k`.
+    set_unit_budget!(model)
     return rkb
 end
 """
@@ -611,7 +615,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          ::Any, wb::WeightBounds, rd::ReturnsResult)
     b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, rb.rba.flag,
                                                        rb.wi)
-    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1]; strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
+                                           strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
@@ -621,6 +626,8 @@ end
 Create long and short weight variables for MIP risk budgeting in the JuMP model.
 
 Registers long `lw`, short `sw` weight variables and the derived expressions `w = lw - sw` and `w_obj = lw + sw`.
+
+Because `w` is *derived* from the parts, this declares a [`WeightsFromParts`](@ref) decomposition contract for builders that pin the decomposition.
 
 # Arguments
 
@@ -634,6 +641,8 @@ Registers long `lw`, short `sw` weight variables and the derived expressions `w 
 # Related
 
   - [`set_risk_budgeting_constraints!`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+  - [`WeightsFromParts`](@ref)
   - [`RiskBudgeting`](@ref)
 """
 function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
@@ -646,6 +655,7 @@ function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
                           w, lw - sw
                           w_obj, lw + sw
                       end)
+    set_decomposition_contract!(model, WeightsFromParts())
     return nothing
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -656,7 +666,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                            <:Any}, pr::AbstractPriorResult,
                                          wb::WeightBounds, args...)
     set_rb_mip_w!(model, pr.X)
-    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w_obj]; strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w_obj);
+                                           strict = rb.opt.strict)
     w = get_w(model)
     sc = get_constraint_scale(model)
     k = get_k(model)
@@ -672,11 +683,8 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
-    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk(),
-                         isa(rb.rba,
-                             AssetRiskBudgeting{<:Any, <:Any, <:MixedIntegerRiskBudgeting}))
-    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
-                                      attrs.pr)
+    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
+    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
                                jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
@@ -712,5 +720,7 @@ function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
     return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates RiskBudgeting opt
+@pipe_route_sigma_ucs RiskBudgeting
 export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting, RiskBudgetingResult,
        LogRiskBudgeting, MixedIntegerRiskBudgeting

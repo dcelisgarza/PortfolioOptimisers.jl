@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all distance estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all distance estimator types.
 
 All concrete and/or abstract  types implementing distance-based estimation algorithms should be subtypes of `AbstractDistanceEstimator`.
 
@@ -16,7 +16,7 @@ abstract type AbstractDistanceEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all distance algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all distance algorithm types.
 
 All concrete and/or abstract types implementing specific distance-based algorithms (such as correlation distance, absolute distance, log distance, or information-theoretic distances) should be subtypes of `AbstractDistanceAlgorithm`.
 
@@ -187,7 +187,8 @@ VariationInfoDistance
     normalise
     function VariationInfoDistance(bins::Int_Bin, normalise::Bool)
         if isa(bins, Integer)
-            @argcheck(zero(bins) < bins, DomainError)
+            @argcheck(zero(bins) < bins, DomainError(bins, "bins must be positive"))
+            assert_resource_cap(bins, RESOURCE_LIMITS[].max_bins, :bins, :max_bins)
         end
         return new{typeof(bins), typeof(normalise)}(bins, normalise)
     end

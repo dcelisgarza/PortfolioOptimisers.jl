@@ -68,62 +68,48 @@ $<eq1>
 // )
 // #set image(width: 10em)
 // #jl(recompute: false,
-```julia
-# Import packages.
-using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
-# Load data.
-X = TimeArray(CSV.File(joinpath(@__DIR__, "../../examples/SP500.csv.gz"));
-              timestamp = :Date)
-# Compute returns.
-rd = prices_to_returns(X)
-# Split into training and test sets.
-rd_train, rd_test = train_test_split(rd; test_size = 0.2)
-# Mean Risk optimisation. Defaults to minimising risk.
-mr = MR(;
-  # Variance (default)
-  r = Variance(),
-  # Configured optimiser.
-  opt = JuMPOpt(;
-    # Using Clarabel as the solver. It's possible to provide fallbacks in the form of
-    # a vector, `PortfolioOptimisers.jl` will iterate until it finds one that works
-    # or they all fail.
-    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-      settings = Dict("verbose" => false)
-    ), # slv
-    # Weight bounds using an estimator (it builds the constraint based on the data).
-    # Lower bound for all assets is 0, upper bound for AAPL is 0.2, for the rest it's
-    # 1.
-    wb = WBE(; lb = 0, ub = "AAPL" => 0.2),
-    # This maps asset names to their indices in the data, as well as sets to which
-    # they belong. It is needed to build constraints from estimators and is used by
-    # other components such as some prior statistics.
-    sets = AssetSets(; dict = Dict("nx" => rd.nx)),
-    # L2 regularisation using a squared L2 norm with a scalar value of 0.0001. This
-    # is used to prevent weight concentration and thus reduce overfitting and improve
-    #generalisation.
-    l2 = L2Reg(; val = 0.01, alg = SquaredSOCRiskExpr()),
-    # Arithmetic returns with 100 evenly distributed points between the minimum and
-    # maximum returns in the training set. This way we can compute the efficient
-    # frontier, which is a subset of pareto fronts.
-    ret = ArithmeticReturn(; lb = Frontier(; N = 100))
-  ) # opt
-) # mr
-# Perform optimisation on the training set.
-res = optimise(mr, rd_train)
-# Predict on training data.
-pred_train = predict(res, rd_train)
-# Predict on test data.
-pred_test = predict(res, rd_test)
-# Scenario based standard deviation.
-r = SCM(; alg = SOCRiskExpr())
-# Plot the results.
-plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
-plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
-                    markercolor = :red, ylabel = "Mean Return",
-                    xlabel = "Standard Deviation")
-savefig(plt, joinpath(@__DIR__, "fig1.svg"))
-
-```<code1>
+#{
+  show figure: set block(breakable: true)
+  set figure(gap: 1.5em)
+  figure(
+    caption: [End-to-end example of a regularised Markowitz model.],
+    ```julia
+    using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "../../examples/SP500.csv.gz"));
+                  timestamp = :Date)
+    rd = prices_to_returns(X)
+    rd_train, rd_test = train_test_split(rd; test_size = 0.2)
+    # Mean Risk optimisation. Defaults to minimising risk.
+    mr = MR(;
+      r = Variance(),
+      # Use Clarabel as the solver.
+      opt = JuMPOpt(;
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+          settings = Dict("verbose" => false)
+        ), # slv
+        # 0 ≤ w ≤ 1 (default value except AAPL), w_"AAPL" ≤ 0.2
+        wb = WBE(; lb = 0, ub = "AAPL" => 0.2),
+        # Map asset name to the asset index in the returns matrix.
+        sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+        # L2 regularisation with a factor of 0.0001
+        l2 = L2Reg(; val = 0.0001),
+        # 100 between the lower and upper bounds of the efficient frontier.
+        ret = ArithmeticReturn(; lb = Frontier(; N = 100))
+      ) # opt
+    ) # mr
+    res = optimise(mr, rd_train)
+    pred_train = predict(res, rd_train)
+    pred_test = predict(res, rd_test)
+    # Scenario-based standard deviation.
+    r = SCM(; alg = SOCRiskExpr())
+    plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
+    plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
+                        markercolor = :red, ylabel = "Mean Return",
+                        xlabel = "Standard Deviation")
+    savefig(plt, joinpath(@__DIR__, "fig1.svg"))
+    ```,
+  )
+}<code1>
 // )
 #figure(
   image("fig1.svg", width: 65%),
@@ -148,7 +134,21 @@ The library is configured to allow for different workflows. There is no rigid st
 
 It is worth noting that the preprocessing and processing steps can be bundled into a single pipeline step, which can also be used standalone or in a cross-validation framework, which can be used to tune the hyperparameters of the entire preprocessing and processing stacks together.
 
-== Prior statistics
+== Phylogeny statistics
+
+These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and derive insights from it which can be used . Clustering and network analysis, though different tackle similar issues from different, complementary angles. The same analysis techniques can be used to exploit the structure each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include first and second order distances as defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl] API. The clustering and network analysis methods include:
+
+- Hierarchical agglomerative clustering.
+- Direct bubble hierarchy trees.
+- K-mean clustering.
+- Minimum spanning trees.
+- Planar maximally filtered graphs.
+
+== Constraint generation
+
+The library provides a large number of constraint generation methods. It makes it possible to use the type system to define dynamic constraints as well as letting the user write equations in natural language.
+
+== Moments and prior statistics
 
 #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] comes with a large number of moment estimation and prior statistics methods. It leverages #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]'s covariance estimator defintions and API to allow interoperability with the Julia ecosystem, for example by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They include a large number of methods, which can be combined in many ways. It's possible to compute the expected returns using a specific covariance method and vice-versa.
 
@@ -164,19 +164,9 @@ It is worth noting that the preprocessing and processing steps can be bundled in
 
 The prior statistics fall under three categories:
 
-- Frequentist: Empirical, factor models.
-- Bayesian: Black-Litterman.
+- Frequentist: Empirical and timeseries factor models for low and high moments.
+- Bayesian: Black-Litterman, vanilla, factor, Bayesian and Augmented.
 - Information-theoretic: Entropy pooling, opinion pooling.
-
-== Phylogeny statistics
-
-These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and derive insights from it which can be used . Clustering and network analysis, though different tackle similar issues from different, complementary angles. The same analysis techniques can be used to exploit the structure each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include first and second order distances as defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl] API. The clustering and network analysis methods include:
-
-- Hierarchical agglomerative clustering.
-- Direct bubble hierarchy trees.
-- K-mean clustering.
-- Minimum spanning trees.
-- Planar maximally filtered graphs.
 
 == Optimisers
 

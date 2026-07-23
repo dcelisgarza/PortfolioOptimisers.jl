@@ -28,6 +28,144 @@ function assert_split_position(ests)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that an optimisation step, if present, is the last step of a [`Pipeline`](@ref).
+
+A pipeline's optimiser writes the terminal `:opt` slot — the workflow's output. Nothing is derived from `:opt`, so a step running *after* an optimiser could only strand those weights: a later data or estimator step would leave `:opt` computed on a since-changed context, and no later step reads `:opt` to catch it. Pinning the optimiser last keeps `:opt` genuinely terminal, which is also what lets [`PIPELINE_INVALIDATES`](@ref) omit it from the invalidatable slots. A terminal optimiser is optional (a prior-only pipeline is legal); when absent the rule is vacuous.
+
+## Validation
+
+  - No step writes `:opt` unless it is the final step. A nested [`Pipeline`](@ref) reports the slot its own last step writes and is validated at its own construction, so a non-terminal optimiser hidden inside one is caught there.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+  - [`pipe_writes`](@ref)
+"""
+function assert_opt_last(ests)::Nothing
+    n = length(ests)
+    for (i, e) in enumerate(ests)
+        if i < n && pipe_writes(e) === :opt
+            throw(ArgumentError("an optimisation step writes the terminal :opt slot, so it must be the last step of a Pipeline, but one appears at step $i of $n; move it to the end, or drop the steps that follow it"))
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a step is *known at construction* to produce.
+
+Only the `uncertainty` slot qualifies. An uncertainty-set step must declare which parameters it bounds through its [`PipelineStep`](@ref) wrapper, and that declaration is a field of the step rather than a property of a computed result, so the targets it will write are known before anything runs.
+
+The other fail-closed targets are not: `:wb`, `:lcse` and `:ple` are chosen by the *result type* each constraint estimator produces, and every constraint estimator writes the same `constraints` slot, so which of the three a step will write cannot be read off its type. Those stay checked at injection time.
+
+# Arguments
+
+  - `est`: A step estimator.
+
+# Returns
+
+  - A tuple of routing targets, empty when nothing is statically known.
+
+# Related
+
+  - [`assert_routable`](@ref)
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+"""
+function pipe_required_targets(ps::PipelineStep)
+    if !(pipe_writes(ps) === :uncertainty)
+        return ()
+    end
+    return if ps.target === :mu
+        (:mu_ucs,)
+    elseif ps.target === :sigma
+        (:sigma_ucs,)
+    elseif ps.target === :both
+        (:mu_ucs, :sigma_ucs)
+    else
+        ()
+    end
+end
+pipe_required_targets(::Any) = ()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reject at construction a pipeline whose terminal optimiser cannot receive a target an earlier step will write.
+
+Without this, an unroutable uncertainty set is discovered by [`inject_context`](@ref) at injection time — which, under [`cross_val_predict`](@ref), is after the fold loop has already fitted every earlier step of the first fold. The check asks the optimiser directly via [`pipe_accepts`](@ref), so it stays honest as optimisers gain or lose fields.
+
+It is deliberately structural: it establishes that the optimiser *family* can receive the target at all, not that this particular configuration will accept the value. A [`JuMPOptimiser`](@ref) always accepts `:mu_ucs`, but one carrying a non-[`ArithmeticReturn`](@ref) estimator still fails at injection — that condition belongs to [`pipe_route`](@ref) and is not duplicated here.
+
+Skipped when the terminal step is a [`TimeDependent`](@ref) schedule or a precomputed result, since the optimiser is then not known until the fold loop resolves it.
+
+# Arguments
+
+  - `ests`: The step estimators, optimisation step last (see [`assert_opt_last`](@ref)).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`pipe_required_targets`](@ref)
+  - [`pipe_accepts`](@ref)
+  - [`Pipeline`](@ref)
+"""
+function assert_routable(ests)::Nothing
+    n = length(ests)
+    if !(n > 1)
+        return nothing
+    end
+    terminal = ests[n]
+    if !(pipe_writes(terminal) === :opt)
+        return nothing
+    end
+    opt = isa(terminal, PipelineStep) ? terminal.est : terminal
+    if !(isa(opt, OptimisationEstimator))
+        return nothing
+    end
+    for i in 1:(n - 1)
+        for target in pipe_required_targets(ests[i])
+            @argcheck(pipe_accepts(opt, Val(target)),
+                      ArgumentError("step $i of $n writes the :$target target, which the terminal $(Base.typename(typeof(opt)).wrapper) cannot receive; a computed uncertainty set that reaches no optimiser field would be silently dropped, so narrow the step's target, drop it, or use an optimiser that accepts it"))
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the first element that repeats an earlier one, for a name-uniqueness error
+that names the offending token without dumping the whole collection (ADR 0026 boundary
+discipline). Only ever called on the failing path.
+
+# Arguments
+
+  - `xs`: A collection of names.
+
+# Returns
+
+  - `seen::Set{String}`: A collection of names.
+
+# Related
+
+  - [`Pipeline`](@ref)
+"""
+function first_duplicate(xs)
+    seen = Set{eltype(xs)}()
+    for x in xs
+        if x in seen
+            return x
+        end
+        push!(seen, x)
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A reified end-to-end portfolio workflow: an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref).
@@ -54,6 +192,7 @@ Steps are given in execution order. Each element is either a step estimator or a
   - Every step must be steppable ([`pipe_writes`](@ref) must be defined for it).
   - Every slot a step reads must be written by an earlier step or fillable by the pipeline input (`prices` or `returns`).
   - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
+  - An optimisation step, if present, must be the last step (see [`assert_opt_last`](@ref)): it writes the terminal `:opt` slot, and no step may run after it.
   - Step names must be unique.
 
 # Examples
@@ -85,7 +224,7 @@ julia> pipe.names
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
         @argcheck(allunique(names),
-                  ArgumentError("pipeline step names must be unique, got $(collect(names))"))
+                  ArgumentError("pipeline step names must be unique; the name $(repr(first_duplicate(names))) is repeated among the $(length(names)) steps"))
         return new{typeof(names), typeof(steps)}(names, steps)
     end
 end
@@ -103,8 +242,10 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
         end
     end
     assert_split_position(ests)
+    assert_opt_last(ests)
+    assert_routable(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
-    avail = Set{Symbol}((:prices, :returns))
+    avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
     written = Dict{Symbol, Any}()
     for (e, slot) in zip(ests, slots)
         for r in pipe_reads(e)
@@ -226,9 +367,11 @@ end
     compute(w, ctx.opt.w; broadcast)
 end
 function Base.getindex(pr::PipelineResult, name::AbstractString)
-    i = findfirst(==(name), getfield(pr, :names))
+    names = getfield(pr, :names)
+    i = findfirst(==(name), names)
     @argcheck(!isnothing(i),
-              ArgumentError("no pipeline step named $(repr(name)); available steps: $(collect(getfield(pr, :names)))"))
+              ArgumentError("no pipeline step named $(repr(name)) among the $(length(names)) named steps" *
+                            did_you_mean(name, names)))
     return getfield(pr, :results)[i]
 end
 """
@@ -246,140 +389,66 @@ Iterate the elements of the `constraints` slot uniformly.
 
 # Related
 
-  - [`inject_config`](@ref)
+  - [`constraint_targets`](@ref)
 """
 constraint_results(::Nothing) = ()
 constraint_results(c::AbstractConstraintResult) = (c,)
 constraint_results(c::AbstractVector{<:AbstractConstraintResult}) = c
 """
-    inject_config(cfg::Union{<:JuMPOptimiser, <:HierarchicalOptimiser}, ctx::PipelineContext)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Override an optimiser configuration's internal estimators with the computed slots of the pipeline context.
+Fan the `constraints` slot out into [routing targets](@ref PIPELINE_ROUTING_TARGETS) by result type.
 
-Routing:
-
-  - `prior` slot → `pe` (both configurations; the result-in-place-of-estimator idiom, cf. `prior(::AbstractPriorResult)`).
-  - `phylogeny` slot → `cle` on [`HierarchicalOptimiser`](@ref) when it is a hierarchical clustering result; ignored by [`JuMPOptimiser`](@ref), whose phylogeny information enters as constraint results.
-  - `uncertainty` slot, mean half → `ret.ucs` on [`JuMPOptimiser`](@ref) (requires [`ArithmeticReturn`](@ref)); unroutable into a [`HierarchicalOptimiser`](@ref). The covariance half is routed separately into the risk measure by [`inject_sigma_ucs`](@ref).
-  - `constraints` slot elements, by result type: [`WeightBounds`](@ref) → `wb`; [`LinearConstraint`](@ref) → `lcse` and phylogeny constraint results → `ple` ([`JuMPOptimiser`](@ref) only).
-
-Unroutable elements throw an `ArgumentError` naming the offending type.
+[`WeightBounds`](@ref) become `:wb`, [`LinearConstraint`](@ref)s become `:lcse` and phylogeny constraint results become `:ple`. The latter two accumulate, and a group of one is unwrapped, matching the scalar-or-vector shape those fields accept everywhere else. A result of any other type is rejected here rather than at an optimiser, because no target exists for it at all.
 
 # Arguments
 
-  - `cfg`: The optimiser configuration.
-  - `ctx`: The pipeline context.
+  - `cs`: The `constraints` slot.
 
 # Returns
 
-  - `cfg′`: The updated configuration.
+  - A vector of `target => value` pairs, in `:wb`, `:lcse`, `:ple` order.
 
 # Related
 
   - [`inject_context`](@ref)
-  - [`inject_sigma_ucs`](@ref)
+  - [`constraint_results`](@ref)
 """
-function inject_config(cfg::JuMPOptimiser, ctx::PipelineContext)
-    if !isnothing(ctx.prior)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:pe}(), ctx.prior)
-    end
-    unc = ctx.uncertainty
-    if !isnothing(unc) && !isnothing(unc.mu)
-        @argcheck(isa(cfg.ret, ArithmeticReturn),
-                  ArgumentError("cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"))
-        ret = Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), unc.mu)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:ret}(), ret)
-    end
+function constraint_targets(cs)
+    wb = nothing
     lcs = LinearConstraint[]
     ples = AbstractPhylogenyConstraintResult[]
-    for c in constraint_results(ctx.constraints)
+    for c in constraint_results(cs)
         if isa(c, WeightBounds)
-            cfg = Accessors.set(cfg, Accessors.PropertyLens{:wb}(), c)
+            wb = c
         elseif isa(c, LinearConstraint)
             push!(lcs, c)
         elseif isa(c, AbstractPhylogenyConstraintResult)
             push!(ples, c)
         else
-            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into a JuMPOptimiser; supported: WeightBounds, LinearConstraint, and phylogeny constraint results"))
+            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into any optimiser; supported: WeightBounds, LinearConstraint, and phylogeny constraint results"))
         end
     end
-    if !isempty(lcs)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:lcse}(),
-                            length(lcs) == 1 ? lcs[1] : lcs)
+    out = Pair{Symbol, Any}[]
+    if !(isnothing(wb))
+        push!(out, :wb => wb)
     end
-    if !isempty(ples)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:ple}(),
-                            length(ples) == 1 ? ples[1] : identity.(ples))
+    if !(isempty(lcs))
+        push!(out, :lcse => length(lcs) == 1 ? lcs[1] : lcs)
     end
-    return cfg
-end
-function inject_config(cfg::HierarchicalOptimiser, ctx::PipelineContext)
-    if !isnothing(ctx.prior)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:pe}(), ctx.prior)
+    if !(isempty(ples))
+        push!(out, :ple => length(ples) == 1 ? ples[1] : identity.(ples))
     end
-    if !isnothing(ctx.phylogeny) && isa(ctx.phylogeny, AbstractClusteringResult)
-        cfg = Accessors.set(cfg, Accessors.PropertyLens{:cle}(), ctx.phylogeny)
-    end
-    unc = ctx.uncertainty
-    if !isnothing(unc) && !isnothing(unc.mu)
-        throw(ArgumentError("cannot route a mean uncertainty set into a HierarchicalOptimiser; uncertainty sets require a JuMP-based optimiser"))
-    end
-    for c in constraint_results(ctx.constraints)
-        if isa(c, WeightBounds)
-            cfg = Accessors.set(cfg, Accessors.PropertyLens{:wb}(), c)
-        else
-            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into a HierarchicalOptimiser; supported: WeightBounds"))
-        end
-    end
-    return cfg
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Route a covariance uncertainty set into the [`UncertaintySetVariance`](@ref) risk measure(s) of an optimisation estimator.
-
-The optimiser must expose a risk-measure field `r` containing at least one [`UncertaintySetVariance`](@ref) (possibly inside a vector); each one's `ucs` is replaced with `sig`. Anything else throws an `ArgumentError`.
-
-# Arguments
-
-  - `opt`: The optimisation estimator.
-  - `sig`: The covariance uncertainty set result.
-
-# Returns
-
-  - `opt′`: The updated estimator.
-
-# Related
-
-  - [`inject_context`](@ref)
-  - [`inject_config`](@ref)
-"""
-function inject_sigma_ucs(opt::OptimisationEstimator, sig::AbstractUncertaintySetResult)
-    @argcheck(hasproperty(opt, :r),
-              ArgumentError("cannot route a covariance uncertainty set into a $(Base.typename(typeof(opt)).wrapper): it has no risk-measure field"))
-    replace_usv(x) =
-        if isa(x, UncertaintySetVariance)
-            Accessors.set(x, Accessors.PropertyLens{:ucs}(), sig)
-        else
-            x
-        end
-    r = opt.r
-    newr = isa(r, AbstractVector) ? identity.([replace_usv(x) for x in r]) : replace_usv(r)
-    found = if isa(newr, AbstractVector)
-        any(x -> isa(x, UncertaintySetVariance), newr)
-    else
-        isa(newr, UncertaintySetVariance)
-    end
-    @argcheck(found,
-              ArgumentError("cannot route a covariance uncertainty set into a $(Base.typename(typeof(opt)).wrapper): no UncertaintySetVariance risk measure in its r field"))
-    return Accessors.set(opt, Accessors.PropertyLens{:r}(), newr)
+    return out
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Override an optimisation step's internal configuration with the computed slots of the pipeline context, immediately before the step runs.
 
-Estimators carrying an `opt` configuration field ([`JuMPOptimiser`](@ref) or [`HierarchicalOptimiser`](@ref)) are rebuilt via [`inject_config`](@ref), and a covariance uncertainty set is routed into their risk measures via [`inject_sigma_ucs`](@ref). Estimators without an injectable configuration (naive and meta-optimisers) ignore the `prior` and `phylogeny` slots — they compute internally — but populated `uncertainty` or `constraints` slots throw an `ArgumentError` rather than being silently dropped.
+This is the pipeline-owned half of the injection seam. It resolves everything that depends on the *slots* — which halves of the uncertainty pair are populated, which result types the `constraints` slot holds, how many of each — into a flat sequence of [routing targets](@ref PIPELINE_ROUTING_TARGETS), then hands each one to [`pipe_route`](@ref) without knowing where it lands. Which optimiser field receives a target is the optimiser's business, so a field rename is a local edit rather than a break here.
+
+Targets an optimiser has no home for are handled by [`unroutable_target`](@ref): `:pe` and `:cle` pass by, everything else throws rather than being silently dropped. This is why a naive or meta-optimiser accepts a computed prior it can use while still rejecting an uncertainty set it cannot.
 
 # Arguments
 
@@ -392,8 +461,9 @@ Estimators carrying an `opt` configuration field ([`JuMPOptimiser`](@ref) or [`H
 
 # Related
 
-  - [`inject_config`](@ref)
-  - [`inject_sigma_ucs`](@ref)
+  - [`pipe_route`](@ref)
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+  - [`constraint_targets`](@ref)
   - [`fit`](@ref)
 """
 function inject_context(opt::OptimisationEstimator, ctx::PipelineContext)
@@ -403,19 +473,26 @@ function inject_context(opt::OptimisationEstimator, ctx::PipelineContext)
        isnothing(ctx.constraints)
         return opt
     end
-    cfg = hasproperty(opt, :opt) ? opt.opt : nothing
-    if isa(cfg, Union{<:JuMPOptimiser, <:HierarchicalOptimiser})
-        opt = Accessors.set(opt, Accessors.PropertyLens{:opt}(), inject_config(cfg, ctx))
-        unc = ctx.uncertainty
-        if !isnothing(unc) && !isnothing(unc.sigma)
-            opt = inject_sigma_ucs(opt, unc.sigma)
-        end
-        return opt
+    if !isnothing(ctx.prior)
+        opt = pipe_route(opt, Val(:pe), ctx.prior)
     end
-    @argcheck(isnothing(ctx.uncertainty),
-              ArgumentError("cannot route uncertainty sets into a $(Base.typename(typeof(opt)).wrapper): it has no injectable optimiser configuration"))
-    @argcheck(isnothing(ctx.constraints),
-              ArgumentError("cannot route constraint results into a $(Base.typename(typeof(opt)).wrapper): it has no injectable optimiser configuration"))
+    #! A phylogeny result that is not a clustering structure has no :cle target; it reaches
+    #! the optimiser as constraint results instead, so there is nothing to route here.
+    if isa(ctx.phylogeny, AbstractClusteringResult)
+        opt = pipe_route(opt, Val(:cle), ctx.phylogeny)
+    end
+    unc = ctx.uncertainty
+    if !isnothing(unc)
+        if !isnothing(unc.mu)
+            opt = pipe_route(opt, Val(:mu_ucs), unc.mu)
+        end
+        if !isnothing(unc.sigma)
+            opt = pipe_route(opt, Val(:sigma_ucs), unc.sigma)
+        end
+    end
+    for (target, v) in constraint_targets(ctx.constraints)
+        opt = pipe_route(opt, Val(target), v)
+    end
     return opt
 end
 """
@@ -779,5 +856,5 @@ function optimise(::Pipeline, args...; kwargs...)
     return throw(ArgumentError("a Pipeline is a workflow, not an OptimisationEstimator: fit it with fit(pipeline, data). Wrapping a Pipeline inside a meta-optimiser is not supported."))
 end
 
-export Pipeline, PipelineResult, fit
+export Pipeline, PipelineResult
 public has_split, assert_no_holdout, assert_split_position, holdout_window

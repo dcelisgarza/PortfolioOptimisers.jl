@@ -2,9 +2,9 @@ using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
       Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI, Random
 
-exported_symbols = names(PortfolioOptimisers)
-all_symbols = names(PortfolioOptimisers; all = true)
-filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
+f = x -> !contains(string(x), r"#|^eval$|^include$")
+exported_symbols = filter!(f, names(PortfolioOptimisers))
+all_symbols = filter!(f, names(PortfolioOptimisers; all = true))
 private_symbols = setdiff(all_symbols, exported_symbols)
 public_symbols = exported_symbols[findall(x->!Base.isexported(PortfolioOptimisers, x),
                                           exported_symbols)]
@@ -16,6 +16,14 @@ end
 
 # Keep rendered docs and @example output fully expanded (no large-struct collapsing).
 PortfolioOptimisers.set_compact_show!(false)
+
+# `@example` output is captured into a plain `IOBuffer`, whose `displaysize` falls back to
+# `Base.displaysize()` — i.e. `ENV["LINES"]`/`ENV["COLUMNS"]`, defaulting to 24×80. PrettyTables
+# v3 fits tables to that size, so every `pretty_table` call in the guide and examples silently
+# loses rows and columns. Widening the environment here fixes all of them at once, with no
+# call-site options to keep in sync.
+ENV["LINES"] = 100_000
+ENV["COLUMNS"] = 100_000
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
@@ -146,9 +154,23 @@ user_guide = generate_files("../user_guide/", "user_guide/", diff_flag)
 include(joinpath(@__DIR__, "generate_type_hierarchy.jl"))
 generate_type_hierarchy()
 
-root_pages = [file
-              for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
-home = popat!(root_pages, findfirst(x->contains(x, "index"), root_pages))
+include(joinpath(@__DIR__, "generate_capability_catalogue.jl"))
+generate_capability_catalogue()
+
+# Root-level pages are named explicitly rather than picked positionally out of
+# `readdir`. The previous form took `root_pages[end]` as the references page,
+# which held only while `99_references.md` happened to sort last -- dropping any
+# new root page silently repointed the "References" nav entry at it.
+const HOME_PAGE = "index.md"
+const REFERENCES_PAGE = "99_references.md"
+const CATALOGUE_PAGE = "capability_catalogue.md"
+for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE)
+    if !(isfile(joinpath(@__DIR__, "src", page)))
+        error("docs/make.jl: expected root page `$page` is missing.")
+    else
+        true
+    end
+end
 api_pages = [item for item in walkdir(joinpath(@__DIR__, "src/api"))]
 contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
@@ -161,7 +183,8 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
          sitename = "PortfolioOptimisers.jl",
          format = DocumenterVitepress.MarkdownVitepress(;
                                                         repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
-         pages = ["Home" => home;
+         pages = ["Home" => HOME_PAGE;
+                  "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
                   "Examples" => examples;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
@@ -183,7 +206,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                             "Pipeline" =>
                                 joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])];
                   "Contribute" => contribute;
-                  "References" => root_pages[end]],
+                  "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

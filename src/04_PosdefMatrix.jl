@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all positive definite matrix estimator types.
 
 All concrete and/or abstract types that implement positive definite matrix projection or estimation should be subtypes of `AbstractPosdefEstimator`.
 
@@ -66,7 +66,7 @@ abstract type AbstractPosdefEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A concrete estimator type for projecting a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
+Projects a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
 
 `Posdef` encapsulates all parameters required for positive definite matrix projection in [`posdef!`](@ref) and [`posdef`](@ref) to perform the nearest positive definite projection according to the estimator.
 

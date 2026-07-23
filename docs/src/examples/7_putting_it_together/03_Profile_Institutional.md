@@ -12,7 +12,7 @@ Where the [retail profile](01_Profile_Retail_Daily.md) optimised for cost and th
 constraints*: concentration limits, sector caps, and a tracking-error budget against a benchmark.
 The size makes exact execution worthwhile.
 
-The reasoning, following the [strategy decision framework](../../user_guide/06_Choosing_a_Strategy.md):
+The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
 - **The mandate is the boss** — per-name caps, sector limits, and a benchmark tracking-error
     ceiling are hard requirements, exactly what the [`JuMPOptimiser`](@ref) constraint keywords

@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Retrieve or compute and cache the square-root matrix of the co-skewness matrix `V`.
 
 If `model` does not yet contain `GV`, attempts a Cholesky factorisation of `pr.V` and falls
-back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as `model[:GV]`.
+back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as the `:GV` Model State entry.
 
 # Arguments
 
@@ -21,7 +21,7 @@ back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as `m
   - [`set_risk_constraints!`](@ref)
 """
 function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
-    if !haskey(model, :GV)
+    if !shared_has(model, :GV)
         G = try
             LinearAlgebra.cholesky(pr.V).U
         catch err
@@ -33,7 +33,7 @@ function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
         end
         JuMP.@expression(model, GV, G)
     end
-    return model[:GV]
+    return shared_get(model, :GV)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

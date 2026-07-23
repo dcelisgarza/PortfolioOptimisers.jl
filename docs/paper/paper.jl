@@ -28,7 +28,7 @@ mr = MR(;
                       # This maps asset names to their indices in the data, as well as sets to which they belong. It is needed to build constraints from estimators and is used by other components such as some prior statistics.
                       sets = AssetSets(; dict = Dict("nx" => rd.nx)),
                       # L2 regularisation using a squared L2 norm with a scalar value of 0.0001. This is used to prevent weight concentration and thus reduce overfitting and improve generalisation.
-                      l2 = L2Reg(; val = 0.01, alg = SquaredSOCRiskExpr()),
+                      l2 = L2Reg(; val = 0.0001, alg = SOCRiskExpr()),
                       # Arithmetic returns with 100 evenly distributed points between the minimum and maximum returns in the training set. This way we can compute the efficient frontier, which is a subset of pareto fronts.
                       ret = ArithmeticReturn(; lb = Frontier(; N = 100))))
 # Perform optimisation on the training set.

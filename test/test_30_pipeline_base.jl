@@ -145,8 +145,36 @@
                        steps = (PricesToReturns(), EmpiricalPrior(), ClustersEstimator(),
                                 EqualWeighted())) isa Pipeline
 
-        @test PortfolioOptimisers.PIPELINE_INVALIDATES.returns ==
-              (:prior, :phylogeny, :uncertainty, :constraints)
+        # the invalidation table is derived from slot order + data slots; pin the whole
+        # thing so a future PIPELINE_SLOTS edit cannot silently change it
+        @test PortfolioOptimisers.PIPELINE_DATA_SLOTS == (:prices, :returns)
+        @test PortfolioOptimisers.PIPELINE_INVALIDATES ==
+              (prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
+               returns = (:prior, :phylogeny, :uncertainty, :constraints))
+        # only data slots are keys; every other slot (incl. terminal :opt) invalidates nothing
+        @test keys(PortfolioOptimisers.PIPELINE_INVALIDATES) ==
+              PortfolioOptimisers.PIPELINE_DATA_SLOTS
+        @test all(s -> get(PortfolioOptimisers.PIPELINE_INVALIDATES, s, ()) == (),
+                  (:prior, :phylogeny, :uncertainty, :constraints, :opt))
+    end
+
+    @testset "optimiser must be last" begin
+        # an optimisation step writes the terminal :opt slot; nothing may run after it
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PricesToReturns(), EqualWeighted(),
+                                                     EmpiricalPrior()))
+        # caught for a wrapped/optimiser-position step too
+        @test_throws ArgumentError Pipeline(; steps = (EqualWeighted(), EqualWeighted()))
+        # a non-terminal optimiser hidden in a nested pipeline is caught by its own construction
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (Pipeline(;
+                                                              steps = (PricesToReturns(),
+                                                                       EqualWeighted(),
+                                                                       EmpiricalPrior())),))
+        # optimiser last is fine; no optimiser at all is fine (prior-only pipeline)
+        @test Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted())) isa
+              Pipeline
+        @test Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())) isa Pipeline
     end
 
     @testset "PipelineStep" begin

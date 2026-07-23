@@ -22,8 +22,10 @@ AbstractUncertaintySetEstimator
 AbstractUncertaintySetAlgorithm
 AbstractUncertaintySetResult
 AbstractUncertaintyKAlgorithm
+AbstractUncertaintyEpsAlgorithm
 UcSE_UcS
 Num_UcSK
+Num_UcSEps
 AbstractEllipsoidalUncertaintySetResultClass
 ucs_selector
 k_ucs
@@ -32,4 +34,7 @@ port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaEllipsoidalUncertaintySet}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuEllipsoidalUncertaintySet}, i, args...)
+vec_quantile_bounds
+ellipsoidal_set
+box_quantile_bounds
 ```

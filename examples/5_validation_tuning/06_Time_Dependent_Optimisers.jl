@@ -186,7 +186,7 @@ pretty_table(DataFrame(:strategy => ["defensive", "aggressive", "regime switch"]
                             expected_risk(rk, pred_regime)]); formatters = [resfmt])
 #
 using StatsPlots, GraphRecipes
-plot_ptf_cumulative_returns(pred_regime)
+plot_portfolio_cumulative_returns(pred_regime)
 #=
 The composition plot makes the switching visible — capped, spread-out folds alternate with
 concentrated ones:

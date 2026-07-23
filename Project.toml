@@ -1,6 +1,6 @@
 name = "PortfolioOptimisers"
 uuid = "e0036ec9-05e5-505d-a6a9-07af41c94861"
-version = "0.26.0"
+version = "0.27.0"
 authors = ["Daniel Celis Garza <daniel.celis.garza@gmail.com>"]
 
 [deps]
@@ -66,7 +66,7 @@ GraphRecipes = "0.5"
 Graphs = "1.13"
 Impute = "0.6"
 InteractiveUtils = "1.12, 1.11"
-JuMP = "1.30"
+JuMP = "1.31, 1.30"
 LinearAlgebra = "1.12, 1.11"
 LogExpFunctions = "1, 0.3"
 MultivariateStats = "0.10"

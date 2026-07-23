@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cross-validation estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all cross-validation estimators.
 
 # Related
 
@@ -13,7 +13,7 @@ abstract type CrossValidationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cross-validation result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all cross-validation result types.
 
 # Related
 
@@ -375,7 +375,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all prediction result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all prediction result types.
 
 All concrete prediction result types from cross-validation should subtype `AbstractPredictionResult`.
 
@@ -999,4 +999,4 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,
-       PredictionReturnsResult, predict, fit_predict, sort_by_measure
+       PredictionReturnsResult, fit, predict, fit_predict, sort_by_measure

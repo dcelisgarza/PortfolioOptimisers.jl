@@ -234,9 +234,14 @@
                                                                                opt = jopt()),
                                                                       ctx_rb)
 
-        # optimisers without an injectable config reject computed constraints
+        # naive optimisers carry an asset-dimensioned `wb` of their own, so a computed
+        # weight bound reaches them directly rather than being rejected
+        ew2 = PortfolioOptimisers.inject_context(EqualWeighted(), ctx_wb)
+        @test ew2.wb === cons[1]
+        # they still reject a target they have no field for
+        ctx_lc = PortfolioOptimisers.PipelineContext(; returns = rd, constraints = cons[2])
         @test_throws ArgumentError PortfolioOptimisers.inject_context(EqualWeighted(),
-                                                                      ctx_wb)
+                                                                      ctx_lc)
     end
 
     @testset "nested pipelines and guards" begin

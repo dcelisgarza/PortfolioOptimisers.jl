@@ -61,22 +61,14 @@ res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
 [Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md).
 
 The **risk measure** is the `r` field (of `MeanRisk` and of the clustering optimisers below); the
-default is [`Variance`](@ref). Which family you pick encodes *what kind* of risk you penalise:
+default is [`Variance`](@ref). Which one you pick encodes *what kind* of risk you penalise —
+overall dispersion ([`Variance`](@ref)), the left tail ([`ConditionalValueatRisk`](@ref)),
+peak-to-trough paths ([`MaximumDrawdown`](@ref)), or the whole ordered loss curve
+([`OrderedWeightsArray`](@ref)). The full menu — every measure with its alias, its meaning, and
+which optimisers accept it — is the [risk measures](03_Risk_Measures.md) page; you can also mix
+several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
 
-  - **Moment-based** — [`Variance`](@ref), [`StandardDeviation`](@ref), and higher-moment
-    measures. Cheap and classic; the right default when returns are roughly symmetric and you care
-    about overall dispersion.
-  - **Quantile / tail** — [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref),
-    [`RelativisticValueatRisk`](@ref), … Reach for these when the *left tail* matters more than
-    overall spread ([Exotic Tail Risk Measures](../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.md)).
-  - **OWA (ordered-weight)** — [`OrderedWeightsArray`](@ref) measures weight the whole ordered loss
-    distribution, the most general family
-    ([OWA Risk Measures](../examples/3_optimisers/05_OWA_Risk_Measures.md)).
-
-You can mix several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
-**Drawdown** measures ([`MaximumDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), …) penalise
-peak-to-trough paths ([Drawdown Risk Measures](../examples/3_optimisers/07_Drawdown_Risk_Measures.md));
-the same drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
+The drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
 [`drawdowns`](@ref) on a realised book — when you want to measure rather than optimise it
 ([Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md)).
 
@@ -105,37 +97,14 @@ supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
 supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
 ```
 
-The table below is *generated* from that same predicate, so it can never drift from what the
-optimisers actually dispatch on. Meta-optimisers (`NestedClustered`, `Stacking`,
-`SubsetResampling`) are omitted because their acceptance is instance-specific: they *delegate*,
-accepting a measure only when every constituent optimiser does (the intersection of their
-children's categories).
-=#
+Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) are the exception: their
+acceptance is instance-specific because they *delegate*, accepting a measure only when every
+constituent optimiser does (the intersection of their children's categories).
 
-using InteractiveUtils
-## Leaf risk-measure types (concrete or parametric) under a supertype.
-function _leaf_risk_measures(T, acc = Type[])
-    subs = subtypes(T)
-    if isempty(subs)
-        push!(acc, T)
-    else
-        for S in subs
-            _leaf_risk_measures(S, acc)
-        end
-    end
-    return acc
-end
-rms = sort(unique(vcat(_leaf_risk_measures(RiskMeasure),
-                       _leaf_risk_measures(HierarchicalRiskMeasure))); by = nameof)
-tick(x) = x ? "✓" : ""
-pretty_table(DataFrame("Risk measure" => String.(nameof.(rms)),
-                       "JuMP (MeanRisk, RiskBudgeting, NOC, FRC)" =>
-                           [tick(supports_risk_measure(MeanRisk, M)) for M in rms],
-                       "Clustering (HRP, HERC, SCHRP)" =>
-                           [tick(supports_risk_measure(HierarchicalRiskParity, M))
-                            for M in rms]))
+The [risk measures](03_Risk_Measures.md) page tabulates every measure against these classes —
+the tables there are generated from the same predicate, so they cannot drift from what the
+optimisers actually dispatch on.
 
-#=
 ## 3. Clustering optimisers
 
 Clustering optimisers build the allocation from the asset correlation hierarchy instead of a

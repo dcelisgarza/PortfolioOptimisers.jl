@@ -282,6 +282,7 @@ ARCHUncertaintySet
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
                                 kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
+        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))
         assert_unit_interval(q, :q)
@@ -322,7 +323,7 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the expected return and covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns and covariances for uncertainty set estimation.
 
@@ -337,11 +338,9 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
         sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
@@ -364,7 +363,7 @@ Generates bootstrap samples of expected return vectors for returns data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the expected return using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns for uncertainty set estimation.
 
@@ -378,11 +377,9 @@ Generates bootstrap samples of expected return vectors for returns data using th
 function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
     end
     return mus
@@ -404,7 +401,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped covariances for uncertainty set estimation.
 
@@ -418,11 +415,9 @@ Generates bootstrap samples of covariance matrices for time series data using th
 function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
     return sigmas
@@ -497,21 +492,9 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgo
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(X)}(undef, N)
-    mu_u = Vector{eltype(X)}(undef, N)
-    sigma_l = Matrix{eltype(X)}(undef, N, N)
-    sigma_u = Matrix{eltype(X)}(undef, N, N)
-    for j in 1:N
-        mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
-        for i in j:N
-            sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
-                                                                ue.kwargs...)
-        end
-    end
+    mu_l, mu_u = vec_quantile_bounds(mus, q, ue.kwargs)
+    sigma_l, sigma_u = box_quantile_bounds(eltype(X), (i, j) -> sigmas[i, j, :], N, q,
+                                           ue.kwargs)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
@@ -570,16 +553,9 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetA
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
-    N = size(X, 2)
     mus = mu_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(X)}(undef, N)
-    mu_u = Vector{eltype(X)}(undef, N)
-    for j in 1:N
-        mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
-    end
+    mu_l, mu_u = vec_quantile_bounds(mus, q, ue.kwargs)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """
@@ -640,16 +616,8 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintyS
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    sigma_l = Matrix{eltype(X)}(undef, N, N)
-    sigma_u = Matrix{eltype(X)}(undef, N, N)
-    for j in 1:N
-        for i in j:N
-            sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
-                                                                ue.kwargs...)
-        end
-    end
+    sigma_l, sigma_u = box_quantile_bounds(eltype(X), (i, j) -> sigmas[i, j, :], N, q,
+                                           ue.kwargs)
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
@@ -741,16 +709,10 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     X_sigma = transpose(X_sigma)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
-    if ue.alg.diagonal
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet()),
-           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
+                           MuEllipsoidalUncertaintySet()),
+           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
@@ -817,12 +779,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     end
     X_mu = transpose(X_mu)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
-    if ue.alg.diagonal
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
+                           MuEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
@@ -889,12 +847,8 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     end
     X_sigma = transpose(X_sigma)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-    end
-    k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet

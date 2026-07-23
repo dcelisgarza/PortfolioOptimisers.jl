@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all shrunk expected returns estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all shrunk expected returns estimators.
 
 All concrete and/or abstract types implementing shrinkage-based expected returns estimation algorithms should be subtypes of `AbstractShrunkExpectedReturnsEstimator`.
 

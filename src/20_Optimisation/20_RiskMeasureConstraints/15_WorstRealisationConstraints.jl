@@ -38,17 +38,17 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; loss::Bool = true,
                                  prefix::Symbol = Symbol(""))
     key1, key2 = ifelse(loss, (:wr_risk, :cwr), (:wr_risk_gain, :cwr_gain))
-    if haskey(model, Symbol(prefix, key1))
-        return model[Symbol(prefix, key1)]
+    return state_build!(model, prefix, key1) do
+        sc = get_constraint_scale(model)
+        net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+        if !loss
+            net_X = -net_X
+        end
+        wr_risk = JuMP.@variable(model)
+        state_set!(model, prefix, key2,
+                   JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
+        return wr_risk
     end
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    wr_risk = preg!(model, prefix, key1, JuMP.@variable(model))
-    preg!(model, prefix, key2, JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
-    return wr_risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -79,10 +79,10 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
     key = ifelse(loss, :wr_risk, :wr_risk_gain)
-    if haskey(model, Symbol(prefix, key))
-        return model[Symbol(prefix, key)]
+    return state_build!(model, prefix, key) do
+        wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
+        set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, key;
+                                        prefix = prefix)
+        return wr_risk
     end
-    wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
-    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, Symbol(prefix, key))
-    return wr_risk
 end

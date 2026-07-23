@@ -11,7 +11,7 @@ Three internal call sites need the expected risk (or a moment) of a return serie
 
 - **`get_pr_value`** (entropy pooling) — the skewness / kurtosis of one asset's column,
   `view(pr.X, :, i)`;
-- **the seven portfolio-level plot functions** (`plot_ptf_cumulative_returns`,
+- **the seven portfolio-level plot functions** (`plot_portfolio_cumulative_returns`,
   `plot_drawdowns`, `plot_histogram`, `plot_rolling_measure`, `plot_benchmark`,
   `plot_performance_summary`, `plot_rolling_drawdowns`) applied to a `PredictionResult`,
   whose `rd.X` is the portfolio series.

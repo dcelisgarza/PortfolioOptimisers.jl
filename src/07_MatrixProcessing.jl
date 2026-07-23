@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all matrix processing estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all matrix processing estimator types.
 
 All concrete and/or abstract types that implement matrix processing routines---such as covariance matrix cleaning, denoising, or detoning---should be subtypes of `AbstractMatrixProcessingEstimator`.
 
@@ -71,7 +71,7 @@ abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all matrix processing algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all matrix processing algorithm types.
 
 All concrete and/or abstract types that implement a specific matrix processing algorithm should be subtypes of `AbstractMatrixProcessingAlgorithm`.
 
@@ -180,7 +180,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying matrix processing routines in `PortfolioOptimisers.jl`.
+Configures and applies matrix processing routines.
 
 `MatrixProcessing` encapsulates all steps required for processing covariance or correlation matrices, including positive definiteness enforcement, denoising, detoning, and optional custom matrix processing algorithms via [`matrix_processing!`](@ref) and [`matrix_processing`](@ref). This estimator allows users to build complex matrix processing pipelines tailored to their specific needs.
 

@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Ordered Weights Array (OWA) estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all Ordered Weights Array (OWA) estimator types.
 
 All concrete and/or abstract types implementing OWA estimation algorithms should be subtypes of `AbstractOrderedWeightsArrayEstimator`.
 
@@ -15,7 +15,7 @@ abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable OWA weight function estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for callable OWA weight function estimators.
 
 All concrete subtypes implementing callable OWA weight functions should subtype `AbstractOrderedWeightsArrayFunction`.
 
@@ -64,7 +64,7 @@ abstract type AbstractOrderedWeightsArrayFunction <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Ordered Weights Array (OWA) algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all Ordered Weights Array (OWA) algorithm types.
 
 All concrete and/or abstract types implementing specific OWA algorithms should be subtypes of `AbstractOrderedWeightsArrayAlgorithm`.
 

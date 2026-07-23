@@ -113,7 +113,11 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[BoxUncertaintySet](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[EllipsoidalUncertaintySet](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[EllipsoidalUncertaintySet](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1UncertaintySet](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[SignedL1UncertaintySet](@ref)
 
 ├──&nbsp;[BaseJuMPOptimisationResult](@ref)
 
@@ -311,6 +315,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[NegativeSkewness](@ref)
 
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[NoRisk](@ref)
+
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[OrderedWeightsArray](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[OrderedWeightsArrayRange](@ref)
@@ -383,9 +389,7 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[BudgetRange](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[CustomJuMPConstraint](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[CustomJuMPObjective](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[CustomJuMPConstraint](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[LinearConstraintEstimator](@ref)
 
@@ -645,6 +649,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[ARCHUncertaintySet](@ref)
 
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[CharacteristicUncertaintySet](@ref)
+
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[DeltaUncertaintySet](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[NormalUncertaintySet](@ref)
@@ -692,6 +698,8 @@ its docstring.
 ├──&nbsp;[CrossValidationSearchScorer](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[HighestMeanScore](@ref)
+
+├──&nbsp;[CustomJuMPObjective](@ref)
 
 ├──&nbsp;[DateAdjusterEstimator](@ref)
 
@@ -1057,6 +1065,10 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[WeightsTracking](@ref)
 
+├──&nbsp;[AbstractUncertaintyEpsAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ActiveAssetsUncertaintyAlgorithm](@ref)
+
 ├──&nbsp;[AbstractUncertaintyKAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[ChiSqKUncertaintyAlgorithm](@ref)
@@ -1069,7 +1081,11 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[BoxUncertaintySetAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[EllipsoidalUncertaintySetAlgorithm](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[EllipsoidalUncertaintySetAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1UncertaintySetAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[SignedL1UncertaintySetAlgorithm](@ref)
 
 ├──&nbsp;[BrownianDistanceVarianceFormulation](@ref)
 

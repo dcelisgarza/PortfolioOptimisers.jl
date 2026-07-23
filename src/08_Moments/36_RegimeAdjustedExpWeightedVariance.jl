@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regime adjustment methods in `PortfolioOptimisers.jl`.
+Abstract supertype for all regime adjustment methods.
 
 All concrete subtypes should subtype `RegimeAdjustedMethod` and implement the
 [`regime_multiplier`](@ref) interface.
@@ -824,7 +824,7 @@ result by the square of the regime multiplier derived from the smoothed regime s
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
+    assert_dims(dims)
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
     itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, y, :)),

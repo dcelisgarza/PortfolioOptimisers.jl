@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all walk-forward cross-validation estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all walk-forward cross-validation estimators.
 
 Walk-forward estimators split time series data into sequential training and testing windows, advancing the test window forward at each step. Subtypes implement index-based or date-based walk-forward schemes.
 

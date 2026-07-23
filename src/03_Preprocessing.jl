@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all returns result types.
 
 All concrete and/or types representing the result of returns calculations should be subtypes of `AbstractReturnsResult`.
 
@@ -14,7 +14,7 @@ abstract type AbstractReturnsResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all price-level data result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all price-level data result types.
 
 All concrete types representing price-level data should be subtypes of `AbstractPricesResult`. Defined alongside [`AbstractReturnsResult`](@ref) so cross-validation splitting, preprocessing, and prediction can dispatch on either data level.
 
@@ -54,6 +54,10 @@ Validate that asset or factor names and their corresponding returns matrix are p
 """
 function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
                                         names_sym::Symbol, mat_sym::Symbol)
+    if !isnothing(names)
+        @argcheck(allunique(names),
+                  ArgumentError("$names_sym names must be unique. Got\nallunique($names_sym) => $(allunique(names))"))
+    end
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
                   IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
@@ -69,7 +73,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A container for aligned, time-indexed price-level data in `PortfolioOptimisers.jl`.
+A container for aligned, time-indexed price-level data.
 
 `PricesResult` is the prices-level mirror of [`ReturnsResult`](@ref): it bundles asset prices with optional factor, benchmark, and implied volatility series, all as `TimeSeries.TimeArray`s. It is the input to price-level preprocessing estimators and prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline cross-validation via [`port_opt_view`](@ref).
 
@@ -258,7 +262,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
+Stores the results of asset and factor returns calculations.
 
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
 
@@ -363,50 +367,51 @@ ReturnsResult
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
-        if !isnothing(nx)
-            @argcheck(allunique(nx),
-                      ArgumentError("Asset names must be unique. Got\nallunique(nx) => $(allunique(nx))"))
-        end
-        if !isnothing(nf)
-            @argcheck(allunique(nf),
-                      ArgumentError("Factor names must be unique. Got\nallunique(nf) => $(allunique(nf))"))
-        end
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
-            @argcheck(length(nb) == 1, DimensionMismatch)
+            @argcheck(length(nb) == 1,
+                      DimensionMismatch("a single-column benchmark (B) admits exactly one benchmark name (nb), got length(nb) = $(length(nb))"))
         elseif isa(B, MatNum)
             check_names_and_returns_matrix(nb, B, :nb, :B)
         end
         if !isnothing(X) && !isnothing(F)
-            @argcheck(size(X, 1) == size(F, 1), DimensionMismatch)
+            @argcheck(size(X, 1) == size(F, 1),
+                      DimensionMismatch("asset returns (X) and factor returns (F) must share the same number of observations (rows), got size(X, 1) = $(size(X, 1)) and size(F, 1) = $(size(F, 1))"))
         end
         if !isnothing(X) && !isnothing(B)
             if isa(B, VecNum)
-                @argcheck(size(X, 1) == size(B, 1), DimensionMismatch)
+                @argcheck(size(X, 1) == size(B, 1),
+                          DimensionMismatch("benchmark returns (B) must match asset returns (X) in number of observations (rows), got size(X, 1) = $(size(X, 1)) and size(B, 1) = $(size(B, 1))"))
             else
-                @argcheck(size(X) == size(B), DimensionMismatch)
+                @argcheck(size(X) == size(B),
+                          DimensionMismatch("benchmark returns (B) must match asset returns (X) in size, got size(X) = $(size(X)) and size(B) = $(size(B))"))
             end
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
             @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
             if !isnothing(X)
-                @argcheck(length(ts) == size(X, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(X, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per asset-returns (X) observation (row), got length(ts) = $(length(ts)) and size(X, 1) = $(size(X, 1))"))
             end
             if !isnothing(F)
-                @argcheck(length(ts) == size(F, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(F, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per factor-returns (F) observation (row), got length(ts) = $(length(ts)) and size(F, 1) = $(size(F, 1))"))
             end
             if !isnothing(B)
-                @argcheck(length(ts) == size(B, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(B, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per benchmark-returns (B) observation (row), got length(ts) = $(length(ts)) and size(B, 1) = $(size(B, 1))"))
             end
         end
         if !isnothing(iv)
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-            @argcheck(size(iv) == size(X), DimensionMismatch)
+            @argcheck(size(iv) == size(X),
+                      DimensionMismatch("implied volatilities (iv) must match asset returns (X) in size, got size(iv) = $(size(iv)) and size(X) = $(size(X))"))
             if isa(ivpa, VecNum)
-                @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
+                @argcheck(length(ivpa) == size(iv, 2),
+                          DimensionMismatch("the implied-volatility risk-premium adjustment (ivpa), when a vector, must have one entry per asset (implied-volatility column), got length(ivpa) = $(length(ivpa)) and size(iv, 2) = $(size(iv, 2))"))
             end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
@@ -567,6 +572,19 @@ Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would han
 
   - [`port_opt_view`](@ref)
   - [`AbstractReturnsResult`](@ref)
+
+* * *
+
+    port_opt_view(rd::ReturnsResult, args...; kwargs...)
+
+Erroring tripwire for [`ReturnsResult`](@ref) calls whose *call shape* no supported arity matches.
+
+`ReturnsResult` does implement [`port_opt_view`](@ref), so the [`AbstractReturnsResult`](@ref) tripwire above would misreport a mistyped call as an unimplemented subtype. This method takes the call instead and names the call shape: the supported arities take one, two, or three positional index arguments and no keyword arguments — in particular `factors` is the third *positional* index, not a keyword.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`ReturnsResult`](@ref)
 """
 function port_opt_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
@@ -597,8 +615,13 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa)
 end
+function port_opt_view(rd::ReturnsResult, args...; kwargs...)
+    kws = keys(kwargs)
+    kwmsg = isempty(kws) ? "" : " and keyword argument(s) " * join(kws, ", ")
+    return throw(ArgumentError("port_opt_view(::ReturnsResult, ...) does not accept this call shape; got $(length(args)) positional index argument(s)$(kwmsg). Supported shapes: port_opt_view(rd, assets) to subselect assets; port_opt_view(rd, observations, assets) or port_opt_view(rd, observations, assets, factors) to subselect observations and assets together (note the reversed index order, and that `factors` is the third positional index, not a keyword)."))
+end
 function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
-    return throw(ArgumentError("port_opt_view is not implemented for $(typeof(rd)) with $(length(args)) index argument(s); implement it for the subtype. ReturnsResult supports port_opt_view(rd, assets) and port_opt_view(rd, observations, assets, factors = :)."))
+    return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype; without it a meta-optimiser or cross-validation fold would silently train on the unsubselected universe. See port_opt_view(rd::ReturnsResult, ...) for the reference implementation."))
 end
 """
     Prices_RR
@@ -827,7 +850,8 @@ end
         impute_method::Option{<:Impute.Imputor} = nothing
     ) -> ReturnsResult
 
-Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
+imputation, and optional implied volatility information.
 
 # Mathematical definition
 
@@ -1087,7 +1111,7 @@ Int64[]
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
-    @argcheck(dims in (1, 2), DomainError)
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -1103,7 +1127,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all preprocessing estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all preprocessing estimator types.
 
 Preprocessing estimators transform price or returns data (prices-to-returns conversion, missing-data filtering, imputation) under a fit/apply contract. Fitting one on training data with [`fit_preprocessing`](@ref) produces a result carrying any fitted state — imputation parameters, thresholds, and the selected asset universe — which [`apply_preprocessing`](@ref) then replays on unseen data so train and test windows are transformed consistently. Stateless preprocessing estimators carry no state, and applying them is equivalent to running them.
 
@@ -1152,7 +1176,7 @@ abstract type AbstractReturnsPreprocessingEstimator <: AbstractPreprocessingEsti
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all preprocessing result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all preprocessing result types.
 
 Preprocessing results are produced by [`fit_preprocessing`](@ref) on training data. They carry the fitted state needed to apply the same transformation to unseen data — imputation parameters, thresholds, and the selected asset universe. Stateless preprocessing estimators produce results that carry only their configuration.
 
@@ -1241,7 +1265,7 @@ Concrete preprocessing estimators must implement:
   - [`AbstractPreprocessingEstimator`](@ref)
 """
 function fit_preprocessing(est::AbstractPreprocessingEstimator, data)
-    return throw(ArgumentError("fit_preprocessing is not implemented for $(typeof(est)); implement fit_preprocessing(est, data) and apply_preprocessing(fitted, data)"))
+    return throw(ArgumentError("$(typeof(est)) subtypes AbstractPreprocessingEstimator but does not implement fit_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′."))
 end
 """
     apply_preprocessing(fitted, data) -> data′
@@ -1267,7 +1291,7 @@ Applying the fitted object produced by [`fit_preprocessing`](@ref) on the traini
 """
 function apply_preprocessing(fitted::Union{<:AbstractPreprocessingEstimator,
                                            <:AbstractPreprocessingResult}, data)
-    return throw(ArgumentError("apply_preprocessing is not implemented for $(typeof(fitted))"))
+    return throw(ArgumentError("$(typeof(fitted)) subtypes the preprocessing interface but does not implement apply_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′; a stateless estimator returns itself from fit_preprocessing and does the work here."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1461,7 +1485,7 @@ This is the single method a concrete [`AbstractAssetSelector`](@ref) must implem
   - [`fit_preprocessing`](@ref)
 """
 function select_assets(sel::AbstractAssetSelector, rd::AbstractReturnsResult)
-    return throw(ArgumentError("select_assets is not implemented for $(typeof(sel)); every AbstractAssetSelector must define select_assets(sel, rd) returning a keep-mask over the asset columns of rd"))
+    return throw(ArgumentError("$(typeof(sel)) subtypes AbstractAssetSelector but does not implement select_assets. Extension authors: every AbstractAssetSelector must define select_assets(sel, rd) returning a keep-mask over the asset columns of rd."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

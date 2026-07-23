@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all pipeline estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all pipeline estimator types.
 
 A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-returns conversion, returns preprocessing, prior estimation, phylogeny, uncertainty sets, constraint generation, and optimisation — as an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref). Pipelines widen the cross-validation and hyperparameter-tuning boundary to the entire workflow, data preparation included.
 
@@ -20,7 +20,7 @@ abstract type AbstractPipelineEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all pipeline result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all pipeline result types.
 
 Pipeline results carry the fitted per-step results of executing an [`AbstractPipelineEstimator`](@ref), the final [`PipelineContext`](@ref), and the terminal optimisation result when one exists.
 
@@ -83,24 +83,100 @@ The named slots of a [`PipelineContext`](@ref). Each pipeline step reads the slo
 const PIPELINE_SLOTS = (:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints,
                         :opt)
 """
-    const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
-                                  returns = (:prior, :phylogeny, :uncertainty, :constraints))
+    const PIPELINE_DATA_SLOTS = (:prices, :returns)
 
-The [`PipelineContext`](@ref) slots each written slot invalidates.
-
-Writing a data slot makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
-
-A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected. Slots absent from this table (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidate nothing.
+The [`PIPELINE_SLOTS`](@ref) whose write *changes the asset universe* — equivalently, the two slots a [`Pipeline`](@ref) input can fill directly. Writing one of these makes every slot *derived* from it stale, which is exactly what [`PIPELINE_INVALIDATES`](@ref) is derived from. Every other slot is computed from the data and reorders nothing, so writing it invalidates nothing.
 
 # Related
 
   - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+const PIPELINE_DATA_SLOTS = (:prices, :returns)
+"""
+    PIPELINE_INVALIDATES
+
+The [`PipelineContext`](@ref) slots each written slot invalidates, derived from [`PIPELINE_SLOTS`](@ref) order and [`PIPELINE_DATA_SLOTS`](@ref):
+
+```julia
+(prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
+ returns = (:prior, :phylogeny, :uncertainty, :constraints))
+```
+
+Writing a [data slot](@ref PIPELINE_DATA_SLOTS) makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
+
+The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_DATA_SLOTS`](@ref)
   - [`Pipeline`](@ref)
   - [`PipelineContext`](@ref)
 """
-const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty,
-                                        :constraints),
-                              returns = (:prior, :phylogeny, :uncertainty, :constraints))
+const PIPELINE_INVALIDATES = let slots = PIPELINE_SLOTS, terminal = last(PIPELINE_SLOTS)
+    idx(x) = findfirst(==(x), slots)
+    NamedTuple{PIPELINE_DATA_SLOTS}(map(PIPELINE_DATA_SLOTS) do s
+                                        return Tuple(x
+                                                     for x in slots
+                                                     if x != terminal && idx(x) > idx(s))
+                                    end)
+end
+"""
+    const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs)
+
+The destinations [`inject_context`](@ref) can deliver a computed slot to.
+
+Routing targets are finer than [`PIPELINE_SLOTS`](@ref) and address a different audience. A slot is *pipeline-author* vocabulary: it names a stage of the workflow, and a step's estimator family decides which slot it writes. A target is *optimiser-author* vocabulary: it names a destination, and an optimiser's fields decide which targets it accepts. Users writing pipelines never name a target.
+
+The fan-out from slots to targets is the [`Pipeline`](@ref)'s job, and it is where the slot-level heterogeneity is resolved:
+
+  - `prior` → `:pe`.
+  - `phylogeny` → `:cle`, when the result is a clustering structure.
+  - `uncertainty` → `:mu_ucs` and `:sigma_ucs`, one per populated half of the [`PipelineUncertaintySets`](@ref) pair.
+  - `constraints` → `:wb`, `:lcse` or `:ple`, per element, by result type; multiple `:lcse`/`:ple` elements are packed into a vector.
+
+Five of the seven are named after the field they land in, using this package's shared field vocabulary (see `field_dict`), so [`pipe_route`](@ref) needs no per-optimiser declaration — the target lands in the like-named field of whichever optimiser has one. `:mu_ucs` and `:sigma_ucs` are the exceptions: they carry validation policy and name no plain field.
+
+Note that `:cle` and `:ple` are one letter apart and come from the *same* `phylogeny` slot; they are not interchangeable. `:cle` is a clustering structure the optimiser uses to build a hierarchy, `:ple` is a phylogeny *constraint* result. That is why only one of them is optional below.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_OPTIONAL_TARGETS`](@ref)
+  - [`pipe_route`](@ref)
+  - [`inject_context`](@ref)
+"""
+const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs)
+"""
+    const PIPELINE_OPTIONAL_TARGETS = (:pe, :cle)
+
+The [routing targets](@ref PIPELINE_ROUTING_TARGETS) an optimiser may have no home for without it being an error.
+
+The asymmetry is the whole of the injection policy, and it turns on whether dropping the value changes the *answer*:
+
+  - `:pe` and `:cle` do not. An optimiser with no `pe` field either needs no prior ([`EqualWeighted`](@ref)) or computes an equivalent one internally, which is what ADR 0028 means by every stage being optional. A [`JuMPOptimiser`](@ref) has no `cle` field because phylogeny reaches it as constraint results — generated from returns, not from this slot — so the structure is genuinely surplus to it.
+  - Everything else does. A weight bound, linear constraint, phylogeny constraint or uncertainty set that reaches no optimiser field would silently change the solved portfolio, so it is an error — the same reason [`PipelineStep`](@ref)'s `target` rejects an uncertainty half it cannot place.
+
+Note the cost that *is* paid: no step reads the `prior` or `phylogeny` slots — [`inject_context`](@ref) is their only consumer — so a step writing a slot the terminal optimiser cannot receive is wasted computation, silently. That is a performance trap rather than a correctness one, which is why it is tolerated rather than rejected, but it is the reason to keep this list short.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+  - [`unroutable_target`](@ref)
+"""
+const PIPELINE_OPTIONAL_TARGETS = (:pe, :cle)
+function unroutable_target(x, ::Val{target}, _) where {target}
+    if target in PIPELINE_OPTIONAL_TARGETS
+        return x
+    end
+    return throw(ArgumentError("cannot route the :$target pipeline target into a $(Base.typename(typeof(x)).wrapper): it has no :$target field to receive it"))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

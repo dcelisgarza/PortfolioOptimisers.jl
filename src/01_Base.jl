@@ -1,109 +1,27 @@
 """
-    arg_dict = Dict(
-                 # Weight vectors.
-                 :pw => "`w`: Portfolio weights vector.",
-                 :ow => "`w`: Observation weights vector.",
-                 :oow => "`w`: Optional observation weights vector.",
-                 # Matrix processing.
-                 :pdm => "`pdm`: Positive definite matrix estimator.",
-                 :dn => "`dn`: Matrix denoising estimator.",
-                 :dt => "`dt`: Matrix detoning estimator.",
-                 :mp => "`mp`: Matrix processing estimator.",
-                 # Moments.
-                 :me => "`me`: Expected returns estimator.",
-                 :ce => "`ce`: Covariance estimator.",
-                 :ve => "`ve`: Variance estimator.",
-                 :ske => "`ske`: Coskewness estimator.",
-                 :kte => "`kte`: Cokurtosis estimator.",
-                 :de => "`de`: Distance matrix estimator.",
-                 # Priors.
-                 :pe => "`pe`: Prior estimator.",
-                 :pr => "`pr`: Prior result.",
-                 :per => "`pe`: Prior estimator or result.",
-                 # Phylogeny.
-                 :cle => "`cle`: Clusters estimator.",
-                 :clr => "`clr`: Clusters result.",
-                 :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.",
-                 :plr => "`pl`: Phylogeny result.",
-                 :pler => "`pl`: Phylogeny estimator or result.",
-                 :nte => "`pl`: Network estimator.",
-                 :ntr => "`pl`: Network result.",
-                 :nter => "`pl`: Network estimator or result.",
-                 :cte => "`cte`: Centrality estimator.",
-                 :cta => "`ct`: Centrality algorithm.",
-                 :ctr => "`ct`: Centrality result.",
-                 :cter => "`ct`: Centrality estimator or result.",
-                 # Turnover.
-                 :tne => "`tn`: Turnover estimator.",
-                 :tnr => "`tn`: Turnover result.",
-                 :tner => "`tn`: Turnover estimator or result.",
-                 :tnes => "`tn`: Turnover estimator(s).",
-                 :tnrs => "`tn`: Turnover result(s).",
-                 :tners => "`tn`: Turnover estimator(s) or result(s).",
-                 # Tracking.
-                 :tre => "`tr`: Tracking error estimator.",
-                 :trr => "`tr`: Tracking error result.",
-                 :trer => "`tr`: Tracking error estimator or result.",
-                 :tres => "`tr`: Tracking error estimator(s).",
-                 :trrs => "`tr`: Tracking error result(s).",
-                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                 # Weight bounds.
-                 :wbe => "`wb`: Weight bounds estimator.",
-                 :wbr => "`wb`: Weight bounds result.",
-                 :wber => "`wb`: Weight bounds estimator or result.",
-                 :wb => "`wb`: Weight bounds.",
-                 # Fees.
-                 :feese => "`fees`: Fees estimator.",
-                 :feesr => "`fees`: Fees result.",
-                 :feeser => "`fees`: Fees estimator or result.",
-                 :fees => "`fees`: Fees estimator or result.",
-                 # Optimiser config.
-                 :opt => "`opt`: `JuMP` optimiser configuration.",
-                 :kwargs => "`kwargs`: Additional keyword arguments.",
-                 # Index.
-                 :idx => "`idx`: Index vector.",
-                 # Risk measure.
-                 :r => "`r`: Risk measure or vector of risk measures.",
-                 # Returns estimator.
-                 :ret => "`ret`: Returns estimator for `JuMP` models.",
-                 # Turnover constraint.
-                 :tn => "`tn`: Turnover constraint estimator.",
-                 # Tracking constraint.
-                 :tr => "`tr`: Tracking error constraint estimator.",
-                 # Near optimal centering result fields.
-                 :w_opt => "`w_opt`: Optimal portfolio weights.",
-                 :w_max => "`w_max`: Maximum-risk portfolio weights.",
-                 :w_min => "`w_min`: Minimum-risk portfolio weights.",
-                 :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",
-                 :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",
-                 :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",
-                 :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",
-                 :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",
-                 :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",
-                 :rt_opt => "`rt_opt`: Optimal return target.",
-                 :rt_max => "`rt_max`: Maximum return target.",
-                 :rt_min => "`rt_min`: Minimum return target.",
-                 :rk_opt => "`rk_opt`: Optimal risk target.",
-                 :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",
-                 # Discrete allocation result fields.
-                 :l_model => "`l_model`: `JuMP` model for the long allocation.",
-                 :s_model => "`s_model`: `JuMP` model for the short allocation.",
-                 :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",
-                 :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",
-                 # Risk budgeting.
-                 :prb => "`prb`: Processed risk budgeting configuration.",
-                 :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",
-                 :wfalg => "`alg`: Weight finaliser error formulation algorithm.",
-                 :res_retcode => "`res`: Optional result or message from the solver.",
-                 :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",
-                 :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",
-                 :opt_hier => "`opt`: Base hierarchical optimiser configuration.",
-                 :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",
-                 :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",
-                 :schalg => "`alg`: Schur complement algorithm variant.")
+    arg_dict
 
-This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+Maps a parameter key to the docstring description of the corresponding argument or
+field, so that a single description is written once here and interpolated into every
+docstring that mentions that parameter (via `\$(arg_dict[key])` for `# Arguments`
+entries, or through the derived [`field_dict`](@ref) for `# Fields` entries).
+
+Each value has the form ``"`name`: description."``, where `name` is the display name
+the caller sees and everything after the first `:` is the prose; `field_dict`
+strips the ``"`name`: "`` prefix. A few illustrative entries:
+
+    :ce   => "`ce`: Covariance estimator."
+    :oow  => "`w`: Optional observation weights vector `observations × 1`, ..."
+    :per  => "`pr`: Prior estimator or result."
+    :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result."
+
+The `const` definition below is the single source of truth; consult it for the full
+table of keys and descriptions.
+
+# Related
+
+  - [`field_dict`](@ref)
+  - [`val_dict`](@ref)
 """
 const arg_dict = Dict(
                       # Weight vectors.
@@ -178,7 +96,6 @@ const arg_dict = Dict(
                       :cler => "`clr`: Clusters estimator or result.",#
                       :ple => "`ple`: Phylogeny estimator.",#
                       :plr => "`plr`: Phylogeny result.",#
-                      :pler => "`pl`: Phylogeny estimator or result.",#
                       :nte => "`nte`: Network estimator.",#
                       :ntr => "`pl`: Network result.",#
                       :nter => "`pl`: Network estimator or result.",#
@@ -286,7 +203,7 @@ const arg_dict = Dict(
                       :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
                       :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
                       :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
-                      :miprb_flag_arg => "`miprb_flag::Bool`: Whether to add MIP rebalancing constraints.",
+                      :xbgt_flag_arg => "`xbgt_flag::Bool`: Whether to pin the long/short decomposition, so the budgets built on `lw`/`sw` hold exactly (see [`set_exact_budget_constraints!`](@ref)).",
                       :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
                       :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
                       :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
@@ -368,6 +285,15 @@ const arg_dict = Dict(
                       :class_ucs => "`class`: Uncertainty set class.",#
                       :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
                       :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                      :eps_ucs => "`eps`: Radius of the ``\\\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
+                      :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                      :en_ucs => "`en`: Radius of the negative-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                      :sd_ucs => "`sd`: Per-asset scaling vector for the ``\\\\ell_1`` uncertainty set (the estimated standard deviations). `nothing` leaves the set unscaled, so every element of the characteristic vector is assumed to suffer the same estimation error.",#
+                      :method_l1_ucs => "`method`: Radius of the ``\\\\ell_1`` uncertainty set. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :mp_ucs => "`mp`: Radius of the positive-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :mm_ucs => "`mm`: Radius of the negative-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :scaled_ucs => "`scaled`: Whether to scale the uncertainty set by the estimated standard deviations. `false` assumes every characteristic suffers the same estimation error; `true` assumes assets with larger variance suffer larger estimation error, which yields inverse-volatility weights.",#
+                      :active_ucs => "`active`: Target number of active assets on the *unconstrained* problem, as a count (integer `>= 1`) or a fraction of the universe (float in `(0, 1)`). This is a radius calibration, not a cardinality constraint: it selects the radius that would activate this many assets subject only to the budget and sign constraints. Any further constraint may change the realised count. Use `card` for a hard cardinality constraint.",#
                       :n_sim => "`n_sim`: Number of simulation samples.",#
                       :block_size => "`block_size`: Block size for bootstrap sampling.",#
                       :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
@@ -458,8 +384,10 @@ const arg_dict = Dict(
                       :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                       :sca => "`sca`: Scalariser for combining multiple risk measures.",#
                       :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
-                      :bgt => "`bgt`: Portfolio budget constraint.",#
-                      :sbgt => "`sbgt`: Short-sale budget constraint.",#
+                      :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default budgets *bound* the realised exposure rather than pinning it (see `xbgt`). Together with `sbgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
+                      :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, a [`BudgetRange`](@ref) bounds it; by default it *bounds*, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. Together with `bgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
+                      :gbgt => "`gbgt`: Gross budget (leverage) constraint, `sum(lw) + sum(sw)`. A number pins the gross exposure; a [`BudgetRange`](@ref) bounds it, e.g. `BudgetRange(; lb = nothing, ub = 2.0)` caps leverage at 2x. Unlike `bgt` and `sbgt` — which pin the net and gross exposures only *together* — this constrains the gross exposure on its own, leaving the net free. Requires weight bounds that admit short positions, and is bounded rather than pinned unless `xbgt` is set.",#
+                      :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
                       :lt => "`lt`: Long-side minimum holding threshold.",#
                       :st => "`st`: Short-side minimum holding threshold.",#
                       :lcse => "`lcse`: Linear constraint set estimator(s).",#
@@ -486,9 +414,9 @@ const arg_dict = Dict(
                       :ss => "`ss`: Optional scalar shrinkage parameter.",#
                       :card => "`card`: Global cardinality constraint.",#
                       :scard => "`scard`: Sub-group cardinality constraint(s).",#
-                      :wn2 => "`wn2`: 2-norm weight constraint. Lower bound on the effective number of assets, `inv(norm(w, 2)^2) >= wn2`.",#
-                      :wnp => "`wnp`: P-norm weight constraint(s). Each [`LpRegularisation`](@ref) supplies a norm order `p` and a lower bound `val` on the p-norm effective number of assets, `inv(norm(w, p)^p) >= val`.",#
-                      :wninf => "`wninf`: Infinity-norm weight constraint. Lower bound on `inv(norm(w, Inf))`, equivalently an upper bound `inv(wninf)` on the largest weight.",#
+                      :l2c => "`l2c`: 2-norm ceiling on the weights — bounds `norm(w, 2) <= l2c * k` (`k` is the budget, `1` for a fully invested portfolio). Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`.",#
+                      :lpc => "`lpc`: p-norm ceiling(s) on the weights at an arbitrary norm order. Each [`LpRegularisation`](@ref) supplies a norm order `p` and a bound `val`, enforcing `norm(w, p) <= val * k`. Smaller `val` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `val = m^(-1/p)` requires at least `m` p-norm effective assets (`inv(norm(w, p)^p) >= m`). Norm-constraint family with `l2c` and `linfc`.",#
+                      :linfc => "`linfc`: ∞-norm ceiling on the weights — a cap on the largest absolute weight: `norm(w, Inf) <= linfc * k`. So `linfc = 0.2` caps the largest weight at 20% of a fully invested portfolio. Used as a diversification floor via the reciprocal: `linfc = 1 / m` spreads the portfolio across at least `m` assets. Norm-constraint family with `l2c` and `lpc`.",#
                       :l1 => "`l1`: L1 regularisation coefficient.",#
                       :l2 => "`l2`: L2 regularisation term(s).",#
                       :linf => "`linf`: L∞ regularisation coefficient.",#
@@ -496,7 +424,7 @@ const arg_dict = Dict(
                       :l2reg_val => "`val`: L2 regularisation penalty coefficient.",#
                       :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
                       :lpreg_p => "`p`: Norm order, `p > 1`.",#
-                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the lower bound on the p-norm effective number of assets when it is used as a weight norm constraint (the `wnp` field).",#
+                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
                       :brt => "`brt`: Whether to use bootstrap returns.",#
                       :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
                       :wf => "`wf`: Weight finaliser.",#
@@ -527,7 +455,7 @@ const arg_dict = Dict(
                       :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
                       :n_iter => "`n_iter`: Number of random iterations.",#
                       :cv => "`cv`: Cross-validation estimator.",#
-                      :scorer => "`scorer`: Scoring function.",#
+                      :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
                       :train_score => "`train_score`: Whether to also compute the training set score.",#
                       :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                       :train_scores => "`train_scores`: Training set scores.",#
@@ -746,7 +674,7 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                       :dims => "`dims in (1, 2)`.",#
                       :alpha => "`0 < alpha < 1`.",#
                       :beta => "`0 < beta < 1`.",#
-                      :bins => "If `bins` is an integer, `bins > 0`.",#
+                      :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
                       :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                       :settings => "If not `nothing`, `!isempty(settings)`.",#
                       :S => "`!isempty(S)`.",#
@@ -788,6 +716,8 @@ const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 
                       :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
                       :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
                       :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                      :cskew => "`cskew::MatNum`: Coskewness tensor `features x features²`.",#
+                      :cskewV => "`V::MatNum`: Processed coskewness matrix `features x features`.",#
                       :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
                       :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                       :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
@@ -840,7 +770,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all estimator types.
 
 All custom estimators should subtype `AbstractEstimator`.
 
@@ -855,7 +785,7 @@ abstract type AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all algorithm types.
 
 All algorithms should subtype `AbstractAlgorithm`.
 
@@ -870,7 +800,7 @@ abstract type AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all result types.
 
 All result objects should subtype `AbstractResult`.
 
@@ -978,7 +908,7 @@ abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
 
-Macro to define a custom pretty-printing `Base.show` method for types in `PortfolioOptimisers.jl`.
+Macro to define a custom pretty-printing `Base.show` method for types.
 
 This macro generates a `show` method that displays the type name and all fields in a readable, aligned format. For fields that are themselves custom types or collections, the macro recursively applies pretty-printing for nested structures. Handles compact and multiline IO contexts gracefully.
 
@@ -1240,7 +1170,7 @@ Global configuration for the fuzzy "did you mean?" suggestions appended to "vari
 # Fields
 
   - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
-  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
+  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion. Must be positive (enforced by the constructor). `StringDistances.findnearest` never suggests a candidate scoring exactly `0`, but any threshold at or below `0` admits every candidate with *some* nonzero similarity — so `0` and a negative value behave identically and both defeat the info-leak-safe boundary by naming a real asset for a near-miss probe.
 
 Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
 
@@ -1254,6 +1184,11 @@ Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the
 struct StringDistanceConfig
     dist::StringDistances.StringDistance
     min_score::Float64
+    function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
+        @argcheck(min_score > 0,
+                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes and defeating the info-leak-safe boundary (ADR 0026)."))
+        return new(dist, Float64(min_score))
+    end
 end
 """
     STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(), 0.7))
@@ -1275,7 +1210,7 @@ const STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levens
 Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](@ref). The store is atomic (see [`ScopedConfig`](@ref)); unspecified keywords keep their current default. For a temporary, task-scoped override use [`with_string_distance`](@ref).
 
   - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
-  - `min_score`: minimum normalised similarity in `[0, 1]` to emit a suggestion; set above `1` to disable suggestions.
+  - `min_score`: minimum normalised similarity in `(0, 1]` to emit a suggestion; set above `1` to disable suggestions. Must be positive: a non-positive threshold admits every candidate with any nonzero similarity.
 
 Returns the new default [`StringDistanceConfig`](@ref).
 
@@ -1385,6 +1320,110 @@ Useful to tighten the boundary around one batch of untrusted constraint strings,
 function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
                               max_depth::Integer = EQUATION_LIMITS[].max_depth)
     return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
+end
+"""
+Global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion.
+
+Draw counts, subset counts, frontier-sweep lengths and histogram bin counts are untrusted configuration integers (config files, tuning grids, UI): each directly multiplies an allocation, and in the subset and frontier cases a whole optimisation. Their own constructors only bound them from *below* (`n_sim > 0`, `n_subsets >= 2`, `N > 0`, `bins > 0`), so an absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by the OOM killer rather than told what went wrong. These caps fail closed with a typed `DomainError` at the point the value is resolved.
+
+There is **one cap per sink**, each named to mirror the field it guards. Reuse across sinks is deliberately avoided: a *linear* cap cannot bound a *quadratic* sink, which is why the `bins × bins` histogram gets its own [`max_bins`](@ref ResourceLimits) rather than sharing the linear draw cap.
+
+# Fields
+
+  - `max_n_sim`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`. *Memory*-bound.
+  - `max_n_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
+  - `max_frontier`: maximum efficient-frontier sweep points (`N`) accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`.
+  - `max_bins`: maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref) (default `10_000`). The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is ≈ 800 MB per histogram — below OOM yet far above the ~50-bin range legitimate binning produces.
+
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the four caps are same-typed and two share the value `100_000`, so positional construction is error-prone.
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`assert_resource_cap`](@ref)
+  - [`EquationLimits`](@ref)
+"""
+struct ResourceLimits
+    max_n_sim::Int
+    max_n_subsets::Int
+    max_frontier::Int
+    max_bins::Int
+    function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,
+                            max_frontier::Integer, max_bins::Integer)
+        @argcheck(max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0,
+                  ArgumentError("max_n_sim, max_n_subsets, max_frontier and max_bins must be positive."))
+        return new(Int(max_n_sim), Int(max_n_subsets), Int(max_frontier), Int(max_bins))
+    end
+end
+function ResourceLimits(; max_n_sim::Integer = 1_000_000, max_n_subsets::Integer = 100_000,
+                        max_frontier::Integer = 100_000, max_bins::Integer = 10_000)
+    return ResourceLimits(max_n_sim, max_n_subsets, max_frontier, max_bins)
+end
+"""
+    RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
+
+Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`ResourceLimits`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`assert_resource_cap`](@ref)
+"""
+const RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
+"""
+    set_resource_limits!(; max_n_sim::Integer, max_n_subsets::Integer,
+                         max_frontier::Integer, max_bins::Integer)
+
+Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
+
+  - `max_n_sim`: maximum `n_sim` accepted by the uncertainty-set estimators.
+  - `max_n_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
+  - `max_frontier`: maximum `N` accepted by the [`Frontier`](@ref) sweep.
+  - `max_bins`: maximum `bins` accepted by the mutual-information estimators.
+
+Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. All must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
+
+Returns the new default [`ResourceLimits`](@ref).
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`set_equation_limits!`](@ref)
+"""
+function set_resource_limits!(;
+                              max_n_sim::Integer = (@atomic RESOURCE_LIMITS.default).max_n_sim,
+                              max_n_subsets::Integer = (@atomic RESOURCE_LIMITS.default).max_n_subsets,
+                              max_frontier::Integer = (@atomic RESOURCE_LIMITS.default).max_frontier,
+                              max_bins::Integer = (@atomic RESOURCE_LIMITS.default).max_bins)
+    return set_default!(RESOURCE_LIMITS,
+                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
+end
+"""
+    with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
+                         max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
+                         max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
+                         max_bins::Integer = RESOURCE_LIMITS[].max_bins)
+
+Run `f()` with the resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim`, `N` and `bins` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former cases and the `optimise` call in the latter.
+
+# Related
+
+  - [`set_resource_limits!`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+"""
+function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
+                              max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
+                              max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
+                              max_bins::Integer = RESOURCE_LIMITS[].max_bins)
+    return with_config(f, RESOURCE_LIMITS,
+                       ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
 end
 """
     did_you_mean(name::AbstractString, candidates) -> String
@@ -1533,6 +1572,7 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
 
   - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
+  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
@@ -1543,12 +1583,13 @@ Preferences.jl offers no way to enumerate the keys a project has set, so a missp
 
   - [`apply_preferences!`](@ref)
 """
-const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth",
+const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
+                         "max_n_subsets", "max_frontier", "max_bins",
                          "suggestion_min_score", "suggestion_distance", "compact_show")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
 Fails closed: an invalid value throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a weaker cap than the one the project requested. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
@@ -1558,6 +1599,10 @@ To persist a configuration, put the keys in the active project's `LocalPreferenc
 [PortfolioOptimisers]
 equation_max_length = 512
 equation_max_depth = 64
+max_n_sim = 50_000
+max_n_subsets = 1_000
+max_frontier = 1_000
+max_bins = 500
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
@@ -1568,6 +1613,7 @@ compact_show = 4
   - [`PREFERENCE_KEYS`](@ref)
   - [`PREFERENCE_DISTANCES`](@ref)
   - [`set_equation_limits!`](@ref)
+  - [`set_resource_limits!`](@ref)
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
 """
@@ -1582,6 +1628,22 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         lim = @atomic EQUATION_LIMITS.default
         set_equation_limits!(; max_length = something(ml, lim.max_length),
                              max_depth = something(md, lim.max_depth))
+    end
+    xs = get(prefs, "max_n_sim", nothing)
+    xb = get(prefs, "max_n_subsets", nothing)
+    xf = get(prefs, "max_frontier", nothing)
+    xn = get(prefs, "max_bins", nothing)
+    if !(isnothing(xs) && isnothing(xb) && isnothing(xf) && isnothing(xn))
+        for (key, val) in ("max_n_sim" => xs, "max_n_subsets" => xb, "max_frontier" => xf,
+                           "max_bins" => xn)
+            @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                      ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+        end
+        rlim = @atomic RESOURCE_LIMITS.default
+        set_resource_limits!(; max_n_sim = something(xs, rlim.max_n_sim),
+                             max_n_subsets = something(xb, rlim.max_n_subsets),
+                             max_frontier = something(xf, rlim.max_frontier),
+                             max_bins = something(xn, rlim.max_bins))
     end
     ms = get(prefs, "suggestion_min_score", nothing)
     if !isnothing(ms)
@@ -1727,7 +1789,7 @@ has_pretty_show_method(::Clustering.KmeansResult)::Bool = true
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
+Abstract supertype for all custom exception types.
 
 All error types specific to `PortfolioOptimisers.jl` should be subtypes of `PortfolioOptimisersError`.
 
@@ -1736,6 +1798,7 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -1768,6 +1831,7 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
     """
@@ -1805,6 +1869,7 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsNothingError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
     """
@@ -1842,8 +1907,47 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when an argument or value is mutually exclusive with another and both were supplied — a "must-be-absent" constraint was violated (e.g. an argument that must be `nothing` because a conflicting one is set).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConflictingArgumentError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator"))
+ERROR: ConflictingArgumentError: sbgt must be nothing when bgt is a BudgetCostEstimator
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+@concrete struct ConflictingArgumentError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -2140,7 +2244,7 @@ const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all estimator value algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all estimator value algorithm types.
 
 Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
 
@@ -2566,6 +2670,92 @@ function assert_finite(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
+    assert_all_finite(val::ArrNum, sym::Sym_Str = :val)
+
+Assert that *every* element of `val` is finite, failing closed with an [`IsNonFiniteError`](@ref) otherwise.
+
+Unlike [`assert_finite`](@ref), which only requires *one* finite element, this demands the whole array be finite. It guards the comparison-based covariance estimators ([`GerberCovariance`](@ref), [`SmythBrobyCovariance`](@ref)): their `X .>= sd` / `X .<= -sd` comparisons silently evaluate a `NaN` entry as `false`, masking it as "no co-movement" and yielding a finite, plausible, *wrong* covariance rather than an error. Clean returns first with an asset selector (e.g. [`CompleteAssetSelector`](@ref)) or [`MissingDataFilter`](@ref) — non-finite entries in a returns matrix are a supported input to *those*, but not to a comparison-based estimator. The message reports the count of offending entries and the first offending index only — never the data values.
+
+# Arguments
+
+  - `val`: Array to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_finite`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+function assert_all_finite(val::ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(isfinite, val),
+              IsNonFiniteError("all(isfinite, $sym) must hold. Got $(count(!isfinite, val)) non-finite entries; first at $(findfirst(!isfinite, val))."))
+    return nothing
+end
+"""
+    assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str, knob::Sym_Str)
+
+Assert that an untrusted sizing integer `val` does not exceed the active [`RESOURCE_LIMITS`](@ref) ceiling `cap`, failing closed with a `DomainError` otherwise.
+
+`sym` names the offending field in the message (e.g. `:n_sim`) and `knob` names the [`ResourceLimits`](@ref) field to raise (e.g. `:max_n_sim`), so the error tells the caller both what was rejected and how to allow it deliberately.
+
+# Arguments
+
+  - `val`: The requested size.
+  - `cap`: The active ceiling.
+  - `sym`: Symbolic name of the offending field.
+  - `knob`: Symbolic name of the [`ResourceLimits`](@ref) field that raises the ceiling.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+"""
+function assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str,
+                             knob::Sym_Str)::Nothing
+    @argcheck(val <= cap,
+              DomainError(val,
+                          "$sym = $val exceeds RESOURCE_LIMITS[].$knob = $cap. Raise it with set_resource_limits!(; $knob) — or with_resource_limits for a single scope — for genuinely large machine-authored runs."))
+    return nothing
+end
+"""
+    resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
+
+Resolve which random number generator to draw from given an optional `seed`.
+
+A supplied `seed` yields a fresh, private generator — a `copy` of `rng` reseeded with `seed`
+via `Random.seed!` — so a seeded estimator is reproducible **without** reseeding, and thereby
+silently derandomising, the task-global RNG the caller may also own (the default `rng` is
+`Random.default_rng()`, a shared object). When `seed` is `nothing`, `rng` is returned unchanged
+and used as-is.
+
+Copying `rng` before seeding (rather than constructing a fixed generator type such as
+`Random.Xoshiro(seed)`) preserves both the caller's generator *object* — it is never mutated —
+and its *type*, so a caller-supplied portable generator (e.g. `StableRNGs.StableRNG`) keeps
+producing the same stream `Random.seed!(rng, seed)` did in place. The observable draws are thus
+identical to the old in-place seeding; only the side effect on the caller's stream disappears.
+
+# Arguments
+
+  - `rng`: Fallback random number generator, used verbatim when `seed` is `nothing`.
+  - `seed`: Optional seed. If set, a private `Random.seed!(copy(rng), seed)` is returned instead of touching `rng`.
+
+# Returns
+
+  - `Random.AbstractRNG`: the generator to draw from.
+"""
+function resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
+    return isnothing(seed) ? rng : Random.seed!(copy(rng), seed)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that all elements of `val` are non-negative (`>= 0`).
@@ -2868,9 +3058,36 @@ function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `dims` selects a valid matrix dimension (`dims in (1, 2)`).
+
+# Arguments
+
+  - `dims`: Dimension selector to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - Throws `DomainError` if `dims ∉ (1, 2)`.
+
+# Related
+
+  - [`assert_matrix_issquare`](@ref)
+"""
+function assert_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
+    @argcheck(dims in (1, 2),
+              DomainError(dims, "$sym must be 1 or 2. Got\n$sym => $(dims)"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
-Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
+Represents a composite result containing a vector and a scalar.
 
 Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
 
@@ -2950,7 +3167,7 @@ const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all norm-based error algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all norm-based error algorithms.
 
 All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
 
@@ -3399,5 +3616,5 @@ function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a, p) / factor
 end
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar, L2Norm,
-       SquaredL2Norm, L1Norm, LpNorm, LInfNorm
+export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
+       PropertyPathError, VecScalar, L2Norm, SquaredL2Norm, L1Norm, LpNorm, LInfNorm

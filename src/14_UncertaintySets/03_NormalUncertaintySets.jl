@@ -117,6 +117,7 @@ NormalUncertaintySet
                                   pdm::Option{<:AbstractPosdefEstimator},
                                   kwargs::NamedTuple)
         @argcheck(zero(n_sim) < n_sim, DomainError(n_sim, "n_sim must be > 0"))
+        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         assert_unit_interval(q, :q)
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
                    typeof(seed), typeof(ens), typeof(pdm), typeof(kwargs)}(pe, alg, n_sim,
@@ -258,6 +259,26 @@ function sigma_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::
     return sigma_sigma
 end
 """
+    mu_normal_box_set(sigma_mu::MatNum, q::Number)
+
+Box uncertainty set for expected returns under normality: zero lower bound and upper bound
+``2 \\Phi^{-1}(1 - q) \\sqrt{\\operatorname{diag}(\\mathbf{\\Sigma}_{\\mu})}``, where `q` is
+the already-halved significance level. Shared by the box [`ucs`](@ref)/[`mu_ucs`](@ref)
+constructions for [`NormalUncertaintySet`](@ref).
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`mu_asymptotic_cov`](@ref)
+"""
+function mu_normal_box_set(sigma_mu::MatNum, q::Number)
+    mu_u = Distributions.cquantile(Distributions.Normal(), q) *
+           sqrt.(LinearAlgebra.diag(sigma_mu)) *
+           2
+    mu_l = range(zero(eltype(sigma_mu)), zero(eltype(sigma_mu)); length = size(sigma_mu, 1))
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
+end
+"""
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
@@ -333,28 +354,13 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
-    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    sigma_l = Matrix{eltype(sigma)}(undef, N, N)
-    sigma_u = Matrix{eltype(sigma)}(undef, N, N)
-    for j in 1:N
-        for i in j:N
-            sigma_ij = getindex.(sigmas, i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
-                                                                ue.kwargs...)
-        end
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    sigma_l, sigma_u = box_quantile_bounds(eltype(sigma), (i, j) -> getindex.(sigmas, i, j),
+                                           N, q, ue.kwargs)
     posdef!(ue.pdm, sigma_l)
     posdef!(ue.pdm, sigma_u)
-    mu_u = Distributions.cquantile(Distributions.Normal(), q) *
-           sqrt.(LinearAlgebra.diag(sigma_mu)) *
-           2
-    mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = N)
-    return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
-           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
+    return mu_normal_box_set(sigma_mu, q), BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
@@ -414,11 +420,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, pr.sigma, T)
     q = ue.q * 0.5
-    mu_u = Distributions.cquantile(Distributions.Normal(), q) *
-           sqrt.(LinearAlgebra.diag(sigma_mu)) *
-           2
-    mu_l = range(zero(eltype(sigma_mu)), zero(eltype(sigma_mu)); length = size(pr.X, 2))
-    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
+    return mu_normal_box_set(sigma_mu, q)
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
@@ -483,20 +485,10 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
-    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    sigma_l = Matrix{eltype(sigma)}(undef, N, N)
-    sigma_u = Matrix{eltype(sigma)}(undef, N, N)
-    for j in 1:N
-        for i in j:N
-            sigma_ij = getindex.(sigmas, i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
-                                                                ue.kwargs...)
-        end
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    sigma_l, sigma_u = box_quantile_bounds(eltype(sigma), (i, j) -> getindex.(sigmas, i, j),
+                                           N, q, ue.kwargs)
     posdef!(ue.pdm, sigma_l)
     posdef!(ue.pdm, sigma_u)
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
@@ -588,27 +580,19 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
-    X_mu = transpose(rand(ue.rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
-    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    rng = resolve_rng(ue.rng, ue.seed)
+    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet()),
-           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
+                           MuEllipsoidalUncertaintySet()),
+           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,
@@ -694,16 +678,10 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
-    k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet()),
-           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu,
+                           MuEllipsoidalUncertaintySet()),
+           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
@@ -751,16 +729,10 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q)
-    k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet()),
-           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
+                           MuEllipsoidalUncertaintySet()),
+           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
@@ -808,16 +780,10 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     (; mu, sigma) = pr
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
-    X_mu = transpose(rand(ue.rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
-    if ue.alg.diagonal
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet())
+    rng = resolve_rng(ue.rng, ue.seed)
+    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
+                           MuEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
@@ -866,12 +832,8 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if ue.alg.diagonal
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu,
+                           MuEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
@@ -919,12 +881,8 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if ue.alg.diagonal
-        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
-    end
-    k_mu = k_ucs(ue.alg.method, ue.q)
-    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                     class = MuEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
+                           MuEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
@@ -974,22 +932,16 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
-    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    rng = resolve_rng(ue.rng, ue.seed)
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-    end
-    k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
@@ -1040,12 +992,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-    end
-    k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
@@ -1094,12 +1042,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    if ue.alg.diagonal
-        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
-    end
-    k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                     class = SigmaEllipsoidalUncertaintySet())
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
+                           SigmaEllipsoidalUncertaintySet())
 end
 
 export NormalUncertaintySet

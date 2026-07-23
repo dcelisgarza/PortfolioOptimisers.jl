@@ -537,7 +537,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, swi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb = weight_bounds_constraints(st.wb, st.sets; N = Ni, strict = st.strict,
+    wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode, reso.w, wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,

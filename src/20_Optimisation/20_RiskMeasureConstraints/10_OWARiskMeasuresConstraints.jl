@@ -20,15 +20,14 @@ Introduces a vector variable `owa` of length `T` and adds the equality constrain
   - [`set_risk_constraints!`](@ref)
 """
 function set_owa_constraints!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
-    if haskey(model, Symbol(prefix, :owa))
-        return model[Symbol(prefix, :owa)]
+    return state_build!(model, prefix, :owa) do
+        sc = get_constraint_scale(model)
+        net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+        T = size(X, 1)
+        owa = JuMP.@variable(model, [1:T])
+        state_set!(model, prefix, :owac, JuMP.@constraint(model, sc * (net_X - owa) == 0))
+        return owa
     end
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    T = size(X, 1)
-    owa = preg!(model, prefix, :owa, JuMP.@variable(model, [1:T]))
-    preg!(model, prefix, :owac, JuMP.@constraint(model, sc * (net_X - owa) == 0))
-    return owa
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

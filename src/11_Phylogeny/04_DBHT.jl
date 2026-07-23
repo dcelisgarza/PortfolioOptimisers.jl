@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in `PortfolioOptimisers.jl`.
+Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods.
 
 # Related
 
@@ -1810,7 +1810,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all inverse matrix sparsification algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all inverse matrix sparsification algorithms.
 
 # Related
 

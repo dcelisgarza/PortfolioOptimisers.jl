@@ -263,7 +263,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
@@ -273,7 +273,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
@@ -291,7 +291,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma)))
     p = alg.p
@@ -388,7 +388,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rd::ReturnsResult)
     b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, rrb.rba.flag,
                                                        rrb.wi)
-    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w1],
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, shared_get(model, :w1),
                                                    Matrix(LinearAlgebra.Symmetric(rr.L \
                                                                                   pr.sigma *
                                                                                   b1)))
@@ -417,8 +417,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     JuMP.@expression(model, k, 1)
     prb = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)
-    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb.opt.cobj, rrb,
-                                      attrs.pr)
+    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
                                jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
@@ -454,5 +453,6 @@ function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}
     return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates RelaxedRiskBudgeting opt
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,
        RegularisedPenalisedRelaxedRiskBudgeting, RelaxedRiskBudgeting

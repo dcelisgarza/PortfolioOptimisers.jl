@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber covariance estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber covariance estimators.
 
 All concrete and/or abstract types implementing Gerber covariance estimation algorithms should be subtypes of `BaseGerberCovariance`.
 
@@ -22,7 +22,7 @@ abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber covariance algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber covariance algorithm types.
 
 All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`.
 
@@ -129,7 +129,7 @@ struct Gerber2 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying Gerber covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies Gerber covariance estimators.
 
 `GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant.
 
@@ -523,7 +523,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -578,7 +578,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end

@@ -58,10 +58,10 @@ Where:
   - [`MaxScalariser`](@ref)
 """
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
-    if !haskey(model, :risk_vec)
+    if !shared_has(model, :risk_vec)
         return nothing
     end
-    risk_vec = model[:risk_vec]
+    risk_vec = shared_get(model, :risk_vec)
     if any(x -> isa(x, JuMP.QuadExpr), risk_vec)
         JuMP.@expression(model, risk, zero(JuMP.QuadExpr))
     else
@@ -73,10 +73,10 @@ function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
-    if !haskey(model, :risk_vec)
+    if !shared_has(model, :risk_vec)
         return nothing
     end
-    risk_vec = model[:risk_vec]
+    risk_vec = shared_get(model, :risk_vec)
     sc = get_constraint_scale(model)
     N = length(risk_vec)
     gamma = sca.gamma
@@ -94,10 +94,10 @@ function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
-    if !haskey(model, :risk_vec)
+    if !shared_has(model, :risk_vec)
         return nothing
     end
-    risk_vec = model[:risk_vec]
+    risk_vec = shared_get(model, :risk_vec)
     JuMP.@variable(model, risk)
     JuMP.@constraint(model, risk_ms, risk .- risk_vec .>= 0)
     return nothing
@@ -150,7 +150,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add an upper-bound constraint on a risk expression to `model`.
 
 The `Nothing` overload does nothing (no bound was requested). The `Front_NumVec` overload
-records the expression and its frontier bound vector in `model[:risk_frontier]` for later
+records the expression and its frontier bound vector in the `:risk_frontier` Model State entry for later
 use in Pareto frontier solves. The `Number` overload adds the constraint
 `sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
 warning: a non-`nothing` bound with an optimiser outside [`NonFRCJuMPOpt`](@ref) is
@@ -193,7 +193,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                flag::Bool = true)
     bound_key = Symbol(key, :_ub)
     bound_var_key = Symbol(key, :_ub_var)
-    if !haskey(model, :risk_frontier)
+    if !shared_has(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
                                               Tuple{<:JuMP.AbstractJuMPScalar,
@@ -201,7 +201,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                                                                                           ub,
                                                                                                           flag)])
     else
-        risk_frontier = model[:risk_frontier]
+        risk_frontier = shared_get(model, :risk_frontier)
         push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag))
     end
     return nothing
@@ -245,10 +245,10 @@ function set_risk_expression!(model::JuMP.Model, r_expr::JuMP.AbstractJuMPScalar
     if !rke
         return nothing
     end
-    if !haskey(model, :risk_vec)
+    if !shared_has(model, :risk_vec)
         JuMP.@expression(model, risk_vec, Union{JuMP.AffExpr, JuMP.QuadExpr}[])
     end
-    risk_vec = model[:risk_vec]
+    risk_vec = shared_get(model, :risk_vec)
     push!(risk_vec, scale * r_expr)
     return nothing
 end
@@ -266,8 +266,15 @@ with `settings.scale` and `settings.rke`.
   - $(arg_dict[:opt_rjumpe])
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
-  - $(arg_dict[:key_sym])
+  - `name`: Bare Model State entry name seeding the derived bound keys (`<name>_ub`,
+    `<name>_ub_var`). Per-instance Category-B scratch names are passed as-is; a
+    prefix-managed name is resolved against `prefix` here rather than at the call site, so
+    emitters never build a key by hand (ADR 0037).
   - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace for `name` (default: empty, i.e. the bare key).
 
 # Returns
 
@@ -277,12 +284,14 @@ with `settings.scale` and `settings.rke`.
 
   - [`set_risk_upper_bound!`](@ref)
   - [`set_risk_expression!`](@ref)
+  - [`state_key`](@ref)
 """
 function set_risk_bounds_and_expression!(model::JuMP.Model,
                                          opt::RiskJuMPOptimisationEstimator,
                                          r_expr::JuMP.AbstractJuMPScalar,
-                                         settings::RiskMeasureSettings, key,
-                                         flag::Bool = true)
+                                         settings::RiskMeasureSettings, name,
+                                         flag::Bool = true; prefix::Symbol = Symbol(""))
+    key = state_key(prefix, name)
     set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
@@ -333,16 +342,17 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` and ``V_t = 
 """
 function set_drawdown_constraints!(model::JuMP.Model, X::MatNum;
                                    prefix::Symbol = Symbol(""))
-    if haskey(model, Symbol(prefix, :dd))
-        return model[Symbol(prefix, :dd)]
+    return state_build!(model, prefix, :dd) do
+        sc = get_constraint_scale(model)
+        net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+        T = length(net_X)
+        dd = JuMP.@variable(model, [1:(T + 1)])
+        state_set!(model, prefix, :cdd_start, JuMP.@constraint(model, sc * dd[1] == 0))
+        state_set!(model, prefix, :cdd_geq_0,
+                   JuMP.@constraint(model, sc * view(dd, 2:(T + 1)) >= 0))
+        state_set!(model, prefix, :cdd,
+                   JuMP.@constraint(model,
+                                    sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0))
+        return dd
     end
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    T = length(net_X)
-    dd = preg!(model, prefix, :dd, JuMP.@variable(model, [1:(T + 1)]))
-    preg!(model, prefix, :cdd_start, JuMP.@constraint(model, sc * dd[1] == 0))
-    preg!(model, prefix, :cdd_geq_0, JuMP.@constraint(model, sc * view(dd, 2:(T + 1)) >= 0))
-    preg!(model, prefix, :cdd,
-          JuMP.@constraint(model, sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0))
-    return dd
 end

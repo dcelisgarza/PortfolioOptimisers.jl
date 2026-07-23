@@ -423,23 +423,26 @@ end
     # SOCRiskExpr penalises ‖w‖₂ instead, so it does not.
     @test !isapprox(w_soc, w_quad; rtol = 5e-4)
 end
-@testset "Weight norm constraints bound the effective number of assets" begin
-    # wn2/wnp/wninf are lower bounds on diversification, not upper bounds on the norm.
+@testset "Weight norm constraints double as a diversification floor" begin
+    # l2c/lpc/linfc are upper bounds on the respective norm. Via the reciprocal recipe they
+    # act as diversification floors: l2c = 1/sqrt(m) and lpc val = m^(-1/p) require at least
+    # m (p-norm) effective assets; linfc = 1/m caps the largest weight at a 1/m share.
     opt(; kwargs...) = JuMPOptimiser(; pe = pr, slv = slv, kwargs...)
     ena_p(w, p) = inv(sum(abs.(w) .^ p))
     w_none = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt())).w
     @test number_effective_assets(w_none) < 1.5    # concentrated without a constraint
     for v in (4, 8)
-        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; wn2 = v))).w
+        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; l2c = inv(sqrt(v))))).w
         @test number_effective_assets(w) >= v - 1e-4
     end
     for v in (4, 8)
         w = optimise(MeanRisk(; obj = MaximumReturn(),
-                              opt = opt(; wnp = LpRegularisation(; p = 3, val = v)))).w
+                              opt = opt(;
+                                        lpc = LpRegularisation(; p = 3, val = v^(-1 / 3))))).w
         @test ena_p(w, 3) >= v - 1e-3
     end
     for v in (4, 8)
-        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; wninf = v))).w
+        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; linfc = inv(v)))).w
         @test maximum(abs, w) <= inv(v) + 1e-4
     end
 end

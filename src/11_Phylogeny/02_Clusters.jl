@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all clustering estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all clustering estimator types.
 
 All concrete and/or abstract types implementing clustering-based estimation algorithms should be subtypes of `AbstractClustersEstimator`.
 
@@ -14,7 +14,7 @@ abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all clustering algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all clustering algorithm types.
 
 All concrete and/or abstract types implementing specific clustering algorithms should be subtypes of `AbstractClustersAlgorithm`.
 
@@ -42,7 +42,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all hierarchical clustering algorithm types.
 
 All concrete and/or abstract types implementing hierarchical clustering algorithms (such as hierarchical agglomerative clustering or DBHT) should be subtypes of `AbstractHierarchicalClusteringAlgorithm`.
 
@@ -56,7 +56,7 @@ abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorit
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all non-hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all non-hierarchical clustering algorithm types.
 
 All concrete and/or abstract types implementing non-hierarchical clustering algorithms (such as k-means) should be subtypes of `AbstractNonHierarchicalClusteringAlgorithm`.
 
@@ -69,7 +69,7 @@ abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgo
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all optimal number of clusters estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all optimal number of clusters estimator types.
 
 All concrete and/or abstract types implementing algorithms to estimate the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersEstimator`.
 
@@ -81,7 +81,7 @@ abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all optimal number of clusters algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all optimal number of clusters algorithm types.
 
 All concrete and/or abstract types implementing specific algorithms for determining the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersAlgorithm`.
 
@@ -106,7 +106,7 @@ const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all clustering result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all clustering result types.
 
 All concrete and/or abstract types representing the result of a clustering estimation should be subtypes of `AbstractClusteringResult`.
 
@@ -132,7 +132,7 @@ const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
+Result type for hierarchical clustering.
 
 `Clusters` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
 
@@ -331,7 +331,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for selecting the optimal number of clusters in `PortfolioOptimisers.jl`.
+Estimator type for selecting the optimal number of clusters.
 
 `OptimalNumberClusters` encapsulates the configuration for determining the optimal number of clusters, including the maximum allowed clusters and the algorithm used for selection.
 
@@ -400,7 +400,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
+Algorithm type for hierarchical clustering.
 
 `HClustAlgorithm` specifies the linkage method used for hierarchical clustering, such as `:ward`, `:single`, `:complete`, or `:average`.
 
@@ -444,7 +444,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for clustering in `PortfolioOptimisers.jl`.
+Estimator type for clustering.
 
 `ClustersEstimator` encapsulates all configuration required for clustering, including the covariance estimator, distance estimator, res algorithm, and optimal number of clusters estimator.
 

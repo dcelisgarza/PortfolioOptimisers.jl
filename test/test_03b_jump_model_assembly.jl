@@ -2,7 +2,7 @@
 #
 # These build a model through the per-optimiser head and `assemble_jump_model!`, then
 # assert on the *constructed* model — without ever solving it. The interface under test is
-# the assembler's keyword arguments (`r`, `wn2`/`l1`/… settings); the assertions check which
+# the assembler's keyword arguments (`r`, `l2c`/`l1`/… settings); the assertions check which
 # Model-State keys the middle registers, so they exercise the routing rather than numerics.
 @testset "JuMP model assembly (solver-free)" begin
     using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP
@@ -16,7 +16,7 @@
     # Run the head + assembler for `mr`, stop before solving, return the set of registered
     # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
     # be overridden to probe a single branch in isolation.
-    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj, miprb_flag = false,
+    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj,
                            sdp_asset_phylogeny = true)
         nt = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
@@ -33,7 +33,7 @@
                                                     sgst = nt.sgst, tn = nt.tn,
                                                     fees = nt.fees, plr = nt.plr,
                                                     ret = nt.ret)
-        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, miprb_flag, b1,
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
                                 sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end
@@ -68,16 +68,47 @@
     end
 
     @testset "optional constraints toggle on their settings" begin
-        @test "wn2" ∉ assemble_keys(base)
-        @test "wn2" in assemble_keys(MeanRisk(; r = Variance(),
-                                              opt = JuMPOptimiser(; slv = slv, wn2 = 5)))
+        @test "l2c" ∉ assemble_keys(base)
+        @test "l2c" in assemble_keys(MeanRisk(; r = Variance(),
+                                              opt = JuMPOptimiser(; slv = slv, l2c = 0.5)))
 
         @test "l1" ∉ assemble_keys(base)
         @test "l1" in assemble_keys(MeanRisk(; r = Variance(),
                                              opt = JuMPOptimiser(; slv = slv, l1 = 0.1)))
     end
 
-    @testset "lp penalty and wnp constraint register distinct keys" begin
+    @testset "integer phylogeny gates on the held indicator, not a fixed key" begin
+        # `set_iplg_constraints!` re-read `model[:ib]`, which only the long-only builder
+        # registers. Anything that routes the model to the long-short builder — a short
+        # threshold here, but fixed fees or `xbgt` do it too — registers `ilb`/`isb`/`i_mip`
+        # and no `:ib`, so the phylogeny constraint threw `KeyError(:ib)` at assembly time.
+        # The builder now registers its bundle in Model State (`set_mip_indicators!`) and the
+        # late emitter reads it back with `mip_indicators` + `held_bin` — no key involved.
+        mr = MeanRisk(; r = Variance(),
+                      opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                          wb = WeightBounds(; lb = -1, ub = 1),
+                                          ple = IntegerPhylogenyEstimator(;
+                                                                          pl = NetworkEstimator(),
+                                                                          B = 1),
+                                          st = Threshold(; val = 0.05)))
+        ks = assemble_keys(mr)
+        @test "card_plg_1" in ks       # the phylogeny constraint was emitted at all
+        @test "i_mip" in ks            # ... gated on the long-short builder's held indicator
+        @test "ib" ∉ ks                # ... which is not `:ib`; that key is never registered
+
+        # The long-only builder still routes through the same call and keeps `:ib`.
+        mrl = MeanRisk(; r = Variance(),
+                       opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                           wb = WeightBounds(; lb = -1, ub = 1),
+                                           ple = IntegerPhylogenyEstimator(;
+                                                                           pl = NetworkEstimator(),
+                                                                           B = 1)))
+        ksl = assemble_keys(mrl)
+        @test "card_plg_1" in ksl
+        @test "ib" in ksl
+    end
+
+    @testset "lp penalty and lpc constraint register distinct keys" begin
         # The p-norm weight constraint and the Lp regularisation penalty both build
         # PowerCone epigraphs. They must not register under the same Model-State names,
         # or whichever runs second silently clobbers the other's handle in the object
@@ -86,12 +117,12 @@
                                     opt = JuMPOptimiser(; slv = slv,
                                                         lp = LpRegularisation(; p = 3,
                                                                               val = 0.1),
-                                                        wnp = LpRegularisation(; p = 3,
-                                                                               val = 6))))
+                                                        lpc = LpRegularisation(; p = 3,
+                                                                               val = 0.5))))
         for k in ("clp_1", "cslp_1", "t_lp_1", "r_lp_1")       # Lp penalty
             @test k in ks
         end
-        for k in ("cwnp_1", "cswnp_1", "t_wnp_1", "r_wnp_1")   # p-norm constraint
+        for k in ("clpc_1", "cslpc_1", "t_lpc_1", "r_lpc_1")   # p-norm constraint
             @test k in ks
         end
     end

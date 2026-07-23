@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all coskewness estimators.
 
 All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 
@@ -389,7 +389,7 @@ julia> V
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -400,7 +400,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
 end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end

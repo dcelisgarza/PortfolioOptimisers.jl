@@ -1,36 +1,36 @@
-# TimeDependentCallable subtypes must be defined at top level. `TDCap` is a plain functor;
-# `TDPrevWCap` declares its previous-weights requirement directly.
-struct TDCap <: PortfolioOptimisers.TimeDependentCallable
+# TimeDependentCallable subtypes must be defined at top level. `_test_TDCap` is a plain functor;
+# `_test_TDPrevWCap` declares its previous-weights requirement directly.
+struct _test_TDCap <: PortfolioOptimisers.TimeDependentCallable
     hi::Float64
     lo::Float64
 end
-function (c::TDCap)(ctx::TimeDependentContext)
+function (c::_test_TDCap)(ctx::TimeDependentContext)
     return WeightBounds(; lb = 0.0,
                         ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
 end
-struct TDPrevWCap <: PortfolioOptimisers.TimeDependentCallable end
-function (c::TDPrevWCap)(ctx::TimeDependentContext)
+struct _test_TDPrevWCap <: PortfolioOptimisers.TimeDependentCallable end
+function (c::_test_TDPrevWCap)(ctx::TimeDependentContext)
     return Threshold(; val = isnothing(ctx.w_prev) ? 0.01 : 0.05)
 end
-function PortfolioOptimisers.needs_previous_weights(::TDPrevWCap)
+function PortfolioOptimisers.needs_previous_weights(::_test_TDPrevWCap)
     return true
 end
-# `TDOptCap` declares that its per-fold value is an optimiser, which is what makes a schedule
+# `_test_TDOptCap` declares that its per-fold value is an optimiser, which is what makes a schedule
 # holding it statically admissible in an optimiser-valued field.
-struct TDOptCap <: PortfolioOptimisers.TimeDependentOptimiserCallable end
-function (c::TDOptCap)(ctx::TimeDependentContext)
+struct _test_TDOptCap <: PortfolioOptimisers.TimeDependentOptimiserCallable end
+function (c::_test_TDOptCap)(ctx::TimeDependentContext)
     return isodd(ctx.i) ? EqualWeighted() : InverseVolatility()
 end
-# `TDLog` records the optimiser it picks per fold in a mutable field, keyed by the coordinates
+# `_test_TDLog` records the optimiser it picks per fold in a mutable field, keyed by the coordinates
 # recovery needs — `(path_id, i)`, so it works under multi-path schemes too. A callable
 # schedule selects nothing by index, so its per-fold decision is recoverable only if it logs
 # it; the `TimeDependentCallable` struct interface is where that logging lives (#148).
-struct TDLog{T, U} <: PortfolioOptimisers.TimeDependentOptimiserCallable
+struct _test_TDLog{T, U} <: PortfolioOptimisers.TimeDependentOptimiserCallable
     odd::T
     even::U
     log::Vector{Tuple{Union{Int, Nothing}, Int, Symbol}}
 end
-function (c::TDLog)(ctx::TimeDependentContext)
+function (c::_test_TDLog)(ctx::TimeDependentContext)
     pick = isodd(ctx.i) ? :odd : :even
     push!(c.log, (ctx.path_id, ctx.i, pick))
     return pick === :odd ? c.odd : c.even
@@ -52,7 +52,7 @@ end
         @test_throws PortfolioOptimisers.IsEmptyError TimeDependent(Union{}[])
         # Callables are stored as-is.
         @test TimeDependent(ctx -> Threshold(; val = 0.01)) isa TimeDependent
-        @test TimeDependent(TDCap(0.35, 0.2)) isa TimeDependent
+        @test TimeDependent(_test_TDCap(0.35, 0.2)) isa TimeDependent
         @test TimeDependent(PreviousWeightsFunction(ctx -> WeightBounds())) isa
               TimeDependent
         # bind defaults to :outermost and only accepts :outermost or :nearest.
@@ -158,7 +158,7 @@ end
         # and a precomputed result, and a declared optimiser callable.
         @test TimeDependent([ew, iv]) isa PortfolioOptimisers.TD_OptE_Opt
         @test TimeDependent([ew, res]) isa PortfolioOptimisers.TD_OptE_Opt
-        @test TimeDependent(TDOptCap()) isa PortfolioOptimisers.TD_OptE_Opt
+        @test TimeDependent(_test_TDOptCap()) isa PortfolioOptimisers.TD_OptE_Opt
         # Admitted, and checked only when the fold loop swaps the value in.
         @test TimeDependent(ctx -> ew) isa PortfolioOptimisers.TD_OptE_Opt
         @test TimeDependent(PreviousWeightsFunction(ctx -> ew)) isa
@@ -174,8 +174,8 @@ end
         # A declared optimiser callable resolves per fold like any other callable.
         ctx = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
                                    test_idx = [101:150, 151:200])
-        @test PortfolioOptimisers.time_dependent_value(TimeDependent(TDOptCap()), ctx) isa
-              InverseVolatility
+        @test PortfolioOptimisers.time_dependent_value(TimeDependent(_test_TDOptCap()),
+                                                       ctx) isa InverseVolatility
     end
     @testset "Host validation" begin
         td = TimeDependent([Threshold(; val = 0.01), Threshold(; val = 0.02)])
@@ -232,7 +232,7 @@ end
                                                                      ub = 1.0 / ctx.i)))
         @test PortfolioOptimisers.update_time_dependent_estimator(optwb, ctx2).wb.ub == 0.5
         # PreviousWeightsFunction declares the prev-weights requirement as data.
-        pwf = TimeDependent(PreviousWeightsFunction(TDPrevWCap()))
+        pwf = TimeDependent(PreviousWeightsFunction(_test_TDPrevWCap()))
         optp = JuMPOptimiser(; slv = slv, lt = pwf)
         @test PortfolioOptimisers.needs_previous_weights(optp)
         @test PortfolioOptimisers.update_time_dependent_estimator(optp, ctx1).lt.val == 0.01
@@ -243,7 +243,7 @@ end
         @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(optwb, 5))
         # Callable structs: functor over ctx with direct needs_previous_weights
         # declaration; equivalent to the bare-function form.
-        optcap = JuMPOptimiser(; slv = slv, wb = TimeDependent(TDCap(0.35, 0.2)))
+        optcap = JuMPOptimiser(; slv = slv, wb = TimeDependent(_test_TDCap(0.35, 0.2)))
         @test !PortfolioOptimisers.needs_previous_weights(optcap)
         optfn = JuMPOptimiser(; slv = slv,
                               wb = TimeDependent(ctx -> WeightBounds(; lb = 0.0,
@@ -256,7 +256,7 @@ end
             of = PortfolioOptimisers.update_time_dependent_estimator(optfn, ctx)
             @test oc.wb.ub ≈ of.wb.ub
         end
-        optpw = JuMPOptimiser(; slv = slv, lt = TimeDependent(TDPrevWCap()))
+        optpw = JuMPOptimiser(; slv = slv, lt = TimeDependent(_test_TDPrevWCap()))
         @test PortfolioOptimisers.needs_previous_weights(optpw)
         @test PortfolioOptimisers.update_time_dependent_estimator(optpw, ctx1).lt.val ==
               0.01
@@ -658,8 +658,8 @@ end
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn.pred)
         # The callable may also return vectors that differ in length per fold (the
         # vector-of-vectors shape, computed rather than listed).
-        struct LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
-        function (c::LC_Callable)(ctx::TimeDependentContext)
+        struct _test_TD_LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
+        function (c::_test_TD_LC_Callable)(ctx::TimeDependentContext)
             return if ctx.i == 1
                 [LinearConstraintEstimator(; val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]
             else
@@ -686,7 +686,7 @@ end
 
         mr_fn_vv2 = MeanRisk(;
                              opt = JuMPOptimiser(; slv = slv, sets = sets,
-                                                 lcse = TimeDependent(LC_Callable())))
+                                                 lcse = TimeDependent(_test_TD_LC_Callable())))
         pfn_vv = cross_val_predict(mr_fn_vv2, rd, cvw)
         @test length(pfn_vv.pred) == 2
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn_vv.pred)
@@ -1087,7 +1087,7 @@ end
             @test isapprox(p.pred[2].res.w, piv.pred[2].res.w)
             @test !isapprox(pew.pred[2].res.w, piv.pred[2].res.w)
             # A declared optimiser callable schedules the same way (odd folds EqualWeighted).
-            pc = cross_val_predict(TimeDependent(TDOptCap()), rd, cvw)
+            pc = cross_val_predict(TimeDependent(_test_TDOptCap()), rd, cvw)
             @test isapprox(pc.pred[1].res.w, pew.pred[1].res.w)
             @test isapprox(pc.pred[2].res.w, piv.pred[2].res.w)
         end
@@ -1864,8 +1864,8 @@ end
             # A callable recovers its per-fold decision from `(ctx.path_id, ctx.i)`: run
             # sequentially so the shared log is race-free, and every (path, fold) is recorded.
             log = Tuple{Union{Int, Nothing}, Int, Symbol}[]
-            cross_val_predict(TimeDependent(TDLog(ew, iv, log); default = ew), rd, mkmr();
-                              ex = seqex)
+            cross_val_predict(TimeDependent(_test_TDLog(ew, iv, log); default = ew), rd,
+                              mkmr(); ex = seqex)
             for p in 1:2
                 picks = sort([(e[2], e[3]) for e in log if e[1] == p])
                 @test picks == [(i, isodd(i) ? :odd : :even) for i in 1:n_pp]
@@ -1875,8 +1875,8 @@ end
             cvw = IndexWalkForward(100, 50)
             n = PortfolioOptimisers.n_splits(cvw, rd)
             log = Tuple{Union{Int, Nothing}, Int, Symbol}[]
-            mp = cross_val_predict(TimeDependent(TDLog(ew, iv, log); default = ew), rd, cvw;
-                                   ex = seqex)
+            mp = cross_val_predict(TimeDependent(_test_TDLog(ew, iv, log); default = ew),
+                                   rd, cvw; ex = seqex)
             @test Set(log) == Set([(nothing, i, isodd(i) ? :odd : :even) for i in 1:n])
             pe = cross_val_predict(ew, rd, cvw)
             pv = cross_val_predict(iv, rd, cvw)

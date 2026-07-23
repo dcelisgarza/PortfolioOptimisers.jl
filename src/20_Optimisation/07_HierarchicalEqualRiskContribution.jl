@@ -226,6 +226,8 @@ Where:
         if isa(ro, AbstractVector)
             @argcheck(!isempty(ro), IsEmptyError("ro cannot be empty"))
         end
+        assert_risk_measure_required(ri, :HierarchicalEqualRiskContribution)
+        assert_risk_measure_required(ro, :HierarchicalEqualRiskContribution)
         assert_time_dependent_substitution(HierarchicalEqualRiskContribution,
                                            (; opt, ri, ro, scai, scao, ex, fb),
                                            herc_td_defaults())
