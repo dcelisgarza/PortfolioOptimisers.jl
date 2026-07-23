@@ -1,21 +1,21 @@
-# TimeDependentCallable subtypes must be defined at top level. `TDPipeOpt` declares that
+# TimeDependentCallable subtypes must be defined at top level. `_test_TDPipeOpt` declares that
 # its per-fold value is an optimiser and records the raw fold data its context carries;
-# `TDPipePrevW` additionally declares its previous-weights requirement.
-struct TDPipeOpt <: PortfolioOptimisers.TimeDependentOptimiserCallable
+# `_test_TDPipePrevW` additionally declares its previous-weights requirement.
+struct _test_TDPipeOpt <: PortfolioOptimisers.TimeDependentOptimiserCallable
     seen::Vector{Any}
 end
-function (c::TDPipeOpt)(ctx::TimeDependentContext)
+function (c::_test_TDPipeOpt)(ctx::TimeDependentContext)
     c.seen[ctx.i] = ctx.rd
     return isodd(ctx.i) ? EqualWeighted() : InverseVolatility()
 end
-struct TDPipePrevW <: PortfolioOptimisers.TimeDependentOptimiserCallable
+struct _test_TDPipePrevW <: PortfolioOptimisers.TimeDependentOptimiserCallable
     seen::Vector{Any}
 end
-function (c::TDPipePrevW)(ctx::TimeDependentContext)
+function (c::_test_TDPipePrevW)(ctx::TimeDependentContext)
     c.seen[ctx.i] = ctx.w_prev
     return EqualWeighted()
 end
-function PortfolioOptimisers.needs_previous_weights(::TDPipePrevW)
+function PortfolioOptimisers.needs_previous_weights(::_test_TDPipePrevW)
     return true
 end
 @testset "Pipeline prediction and CV" begin
@@ -258,7 +258,7 @@ end
             @test !isapprox(p.pred[1].res.w, p.pred[2].res.w)
             # a declared functor schedules the same way, and its context carries the
             # fold's raw, pre-preprocessing input data
-            cap = TDPipeOpt(Vector{Any}(nothing, nf))
+            cap = _test_TDPipeOpt(Vector{Any}(nothing, nf))
             pc = cross_val_predict(Pipeline(; steps = (prep..., TimeDependent(cap))), pr,
                                    cvw)
             @test isapprox(pc.pred[1].res.w, m1.res.w)
@@ -315,7 +315,7 @@ end
         end
 
         @testset "previous weights thread through the fold loop" begin
-            cap = TDPipePrevW(Vector{Any}(nothing, nf))
+            cap = _test_TDPipePrevW(Vector{Any}(nothing, nf))
             pipe = Pipeline(; steps = (prep..., TimeDependent(cap)))
             @test PortfolioOptimisers.needs_previous_weights(pipe)
             p = @test_logs (:info,) match_mode = :any cross_val_predict(pipe, pr, cvw)
