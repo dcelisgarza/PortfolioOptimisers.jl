@@ -193,55 +193,5 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     end
     return lower_tail_dependence(X, ce.alpha, ce.ex)
 end
-"""
-    Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-
-Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
-
-This method computes the lower tail dependence (LTD) covariance matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD covariance focuses on the co-movement of asset returns in the lower tail, making it robust to extreme events and particularly relevant for risk-sensitive applications.
-
-# Arguments
-
-  - `ce`: Lower tail dependence covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
-
-# Returns
-
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of lower tail dependence covariances.
-
-# Validation
-
-  - `dims` is either `1` or `2`.
-
-# Examples
-
-```jldoctest
-julia> ce = LowerTailDependenceCovariance();
-
-julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
-
-julia> cov(ce, X)
-2×2 Matrix{Float64}:
- 0.0001  0.0001
- 0.0001  0.0001
-```
-
-# Related
-
-  - [`LowerTailDependenceCovariance`](@ref)
-  - [`lower_tail_dependence`](@ref)
-"""
-function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
-                        kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
-    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    sigma = lower_tail_dependence(X, ce.alpha, ce.ex)
-    return StatsBase.cor2cov!(sigma, sd)
-end
 
 export LowerTailDependenceCovariance

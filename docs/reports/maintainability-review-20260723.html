@@ -353,10 +353,11 @@
             <div class="flex flex-wrap gap-2">
               <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
               <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">change-amplification</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-700 text-white font-semibold">✓ fixed</span>
             </div>
           </div>
           <div class="font-mono text-sm text-slate-500">
-            08_Moments/{05,06,08,09,11,24,35}_*.jl — 7 identical <code>cov</code> bodies, no shared fallback
+            08_Moments/{08,09,11}_*.jl — 4 correlation-native <code>cov</code> bodies collapsed to one supertype fallback (Gerber family + ImpliedVolatility excluded)
           </div>
 
           <!-- change-amplification fan -->
@@ -381,11 +382,25 @@ flowchart LR
             <p><span class="font-semibold">Direction.</span> One supertype method <code>cov(ce, X; …) = cor2cov!(cor(ce, X; …), std(ce.ve, X; …))</code>; each estimator then implements only <code>cor</code>. The <code>max.(sd, eps)</code> clamp lives in the shared <code>sd</code> step.</p>
           </div>
           <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>7 cov bodies → 0</li>
+            <li>4 cov bodies → 0</li>
             <li>estimators implement only cor</li>
             <li>single point of change</li>
             <li>drift becomes impossible</li>
           </ul>
+          <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <span class="font-semibold">Resolved (2026-07-23).</span> A generic
+            <code>Statistics.cov(ce::AbstractCovarianceEstimator, X; …) = cor2cov!(cor(ce, X; …), std(ce.ve, X; …))</code>
+            fallback now lives in <code>01_Base_Moments.jl</code>, beside the existing <code>compat_cov</code>/<code>robust_cov</code>
+            layer and symmetric to the <code>var</code>/<code>std</code>-from-<code>cov</code> derivations. The hand-written <code>cov</code>
+            was deleted from <code>LowerTailDependenceCovariance</code>, <code>KendallCovariance</code>, <code>SpearmanCovariance</code>
+            and <code>MutualInfoCovariance</code> — each now implements only <code>cor</code>; results are byte-identical
+            (<code>cov == cor2cov!(cor, std)</code> verified, moments 530/530 + robust 7/7 green).
+            <span class="font-semibold">Scope correction:</span> only 4 of the listed 7 applied. The Gerber family
+            (<code>05/06/35</code>) thread a <em>clamped</em> <code>sd</code> into the correlation itself, so delegating would
+            silently switch their final scaling to unclamped <code>std</code> — left hand-written. <code>ImpliedVolatility</code>
+            (<code>24</code>, listed in the header but not the fan) scales by implied volatility, not <code>std(ce.ve)</code>, and
+            has no <code>ve</code> field — it never fit the shape.
+          </div>
         </article>
 
         <!-- ===== CARD 7 ===== -->

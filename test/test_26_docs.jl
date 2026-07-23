@@ -92,7 +92,7 @@ function -- cannot host.
             # Results are outputs nobody constructs, so they are not required here.
             required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
                                                  leaf_types(PO.AbstractAlgorithm)))))
-            filter!(n -> !contains(string(n), "TDPipe"), required)
+            filter!(n -> !contains(string(n), "_test_TD"), required)
             uncatalogued = sort(collect(setdiff(required, catalogued)))
             if !isempty(uncatalogued)
                 @warn """$(length(uncatalogued)) estimator(s)/algorithm(s) are missing from the

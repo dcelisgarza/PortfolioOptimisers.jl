@@ -115,9 +115,7 @@ julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           if !(dims in (1, 2))
-               throw(DomainError(dims, "dims must be either 1 or 2"))
-           end
+           assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -129,9 +127,7 @@ julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimiser
 
 julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           if !(dims in (1, 2))
-               throw(DomainError(dims, "dims must be either 1 or 2"))
-           end
+           assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -244,9 +240,7 @@ julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           if !(dims in (1, 2))
-               throw(DomainError(dims, "dims must be either 1 or 2"))
-           end
+           assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -258,9 +252,7 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           if !(dims in (1, 2))
-               throw(DomainError(dims, "dims must be either 1 or 2"))
-           end
+           assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -370,9 +362,7 @@ julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
-           if !(dims in (1, 2))
-               throw(DomainError(dims, "dims must be either 1 or 2"))
-           end
+           assert_dims(dims)
            if dims == 2
                X = X'
            end
@@ -547,6 +537,49 @@ SemiMoment()
   - [`FullMoment`](@ref)
 """
 struct SemiMoment <: AbstractMomentAlgorithm end
+"""
+    Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Generic covariance fallback assembling the covariance matrix from the estimator's correlation matrix and the marginal standard deviations of its variance estimator `ce.ve`.
+
+This fallback lets a correlation-style covariance estimator define only its [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/) method; the covariance is then recovered by rescaling the correlation matrix with the standard deviations obtained from `std(ce.ve, X)`. Estimators whose covariance is not a plain rescaling of their correlation (for example [`ImpliedVolatility`](@ref)) override this method.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\hat{\\rho}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\hat{\\rho}_{ij}``: Correlation between assets ``i`` and ``j``, from `cor(ce, X)`.
+  - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``, from `std(ce.ve, X)`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to `cor` and to the variance estimator.
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
+                        kwargs...)
+    return StatsBase.cor2cov!(Statistics.cor(ce, X; dims = dims, kwargs...),
+                              Statistics.std(ce.ve, X; dims = dims, kwargs...))
+end
 """
     compat_cov(
         ce::StatsBase.CovarianceEstimator,

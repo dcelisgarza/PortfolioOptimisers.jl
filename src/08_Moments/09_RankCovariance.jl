@@ -126,53 +126,6 @@ function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...
     return StatsBase.corkendall(X)
 end
 """
-    Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
-
-Compute the Kendall's tau rank covariance matrix using a [`KendallCovariance`](@ref) estimator.
-
-This method computes the covariance matrix for the input data matrix `X` by combining the Kendall's tau rank correlation matrix with the marginal standard deviations estimated by the variance estimator in `ce`. This approach is robust to outliers and non-Gaussian data.
-
-# Arguments
-
-  - `ce`: Kendall's tau-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
-
-# Returns
-
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank covariances.
-
-# Validation
-
-  - `dims` is either `1` or `2`.
-
-# Examples
-
-```jldoctest
-julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
-
-julia> cov(KendallCovariance(), X)
-2×2 Matrix{Float64}:
- 0.0001  0.0001
- 0.0001  0.0001
-```
-
-# Related
-
-  - [`KendallCovariance`](@ref)
-  - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
-"""
-function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
-    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    sigma = StatsBase.corkendall(X)
-    return StatsBase.cor2cov!(sigma, sd)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Robust covariance estimator based on Spearman's rho rank correlation.
@@ -285,52 +238,5 @@ function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs..
         X = transpose(X)
     end
     return StatsBase.corspearman(X)
-end
-"""
-    Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-
-Compute the Spearman's rho rank covariance matrix using a [`SpearmanCovariance`](@ref) estimator.
-
-This method computes the covariance matrix for the input data matrix `X` by combining the Spearman's rho rank correlation matrix with the marginal standard deviations estimated by the variance estimator in `ce`. This approach is robust to outliers and non-Gaussian data.
-
-# Arguments
-
-  - `ce`: Spearman's rho-based covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
-
-# Returns
-
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank covariances.
-
-# Validation
-
-  - `dims` is either `1` or `2`.
-
-# Examples
-
-```jldoctest
-julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
-
-julia> cov(SpearmanCovariance(), X)
-2×2 Matrix{Float64}:
- 0.0001  0.0001
- 0.0001  0.0001
-```
-
-# Related
-
-  - [`SpearmanCovariance`](@ref)
-  - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
-"""
-function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
-    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    sigma = StatsBase.corspearman(X)
-    return StatsBase.cor2cov!(sigma, sd)
 end
 export KendallCovariance, SpearmanCovariance
