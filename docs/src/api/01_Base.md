@@ -105,6 +105,7 @@ IsNothingError
 IsEmptyError
 IsNonFiniteError
 PropertyPathError
+ConflictingArgumentError
 ```
 
 ## Assertions

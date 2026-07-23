@@ -1,109 +1,27 @@
 """
-    arg_dict = Dict(
-                 # Weight vectors.
-                 :pw => "`w`: Portfolio weights vector.",
-                 :ow => "`w`: Observation weights vector.",
-                 :oow => "`w`: Optional observation weights vector.",
-                 # Matrix processing.
-                 :pdm => "`pdm`: Positive definite matrix estimator.",
-                 :dn => "`dn`: Matrix denoising estimator.",
-                 :dt => "`dt`: Matrix detoning estimator.",
-                 :mp => "`mp`: Matrix processing estimator.",
-                 # Moments.
-                 :me => "`me`: Expected returns estimator.",
-                 :ce => "`ce`: Covariance estimator.",
-                 :ve => "`ve`: Variance estimator.",
-                 :ske => "`ske`: Coskewness estimator.",
-                 :kte => "`kte`: Cokurtosis estimator.",
-                 :de => "`de`: Distance matrix estimator.",
-                 # Priors.
-                 :pe => "`pe`: Prior estimator.",
-                 :pr => "`pr`: Prior result.",
-                 :per => "`pe`: Prior estimator or result.",
-                 # Phylogeny.
-                 :cle => "`cle`: Clusters estimator.",
-                 :clr => "`clr`: Clusters result.",
-                 :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.",
-                 :plr => "`pl`: Phylogeny result.",
-                 :pler => "`pl`: Phylogeny estimator or result.",
-                 :nte => "`pl`: Network estimator.",
-                 :ntr => "`pl`: Network result.",
-                 :nter => "`pl`: Network estimator or result.",
-                 :cte => "`cte`: Centrality estimator.",
-                 :cta => "`ct`: Centrality algorithm.",
-                 :ctr => "`ct`: Centrality result.",
-                 :cter => "`ct`: Centrality estimator or result.",
-                 # Turnover.
-                 :tne => "`tn`: Turnover estimator.",
-                 :tnr => "`tn`: Turnover result.",
-                 :tner => "`tn`: Turnover estimator or result.",
-                 :tnes => "`tn`: Turnover estimator(s).",
-                 :tnrs => "`tn`: Turnover result(s).",
-                 :tners => "`tn`: Turnover estimator(s) or result(s).",
-                 # Tracking.
-                 :tre => "`tr`: Tracking error estimator.",
-                 :trr => "`tr`: Tracking error result.",
-                 :trer => "`tr`: Tracking error estimator or result.",
-                 :tres => "`tr`: Tracking error estimator(s).",
-                 :trrs => "`tr`: Tracking error result(s).",
-                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                 # Weight bounds.
-                 :wbe => "`wb`: Weight bounds estimator.",
-                 :wbr => "`wb`: Weight bounds result.",
-                 :wber => "`wb`: Weight bounds estimator or result.",
-                 :wb => "`wb`: Weight bounds.",
-                 # Fees.
-                 :feese => "`fees`: Fees estimator.",
-                 :feesr => "`fees`: Fees result.",
-                 :feeser => "`fees`: Fees estimator or result.",
-                 :fees => "`fees`: Fees estimator or result.",
-                 # Optimiser config.
-                 :opt => "`opt`: `JuMP` optimiser configuration.",
-                 :kwargs => "`kwargs`: Additional keyword arguments.",
-                 # Index.
-                 :idx => "`idx`: Index vector.",
-                 # Risk measure.
-                 :r => "`r`: Risk measure or vector of risk measures.",
-                 # Returns estimator.
-                 :ret => "`ret`: Returns estimator for `JuMP` models.",
-                 # Turnover constraint.
-                 :tn => "`tn`: Turnover constraint estimator.",
-                 # Tracking constraint.
-                 :tr => "`tr`: Tracking error constraint estimator.",
-                 # Near optimal centering result fields.
-                 :w_opt => "`w_opt`: Optimal portfolio weights.",
-                 :w_max => "`w_max`: Maximum-risk portfolio weights.",
-                 :w_min => "`w_min`: Minimum-risk portfolio weights.",
-                 :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",
-                 :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",
-                 :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",
-                 :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",
-                 :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",
-                 :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",
-                 :rt_opt => "`rt_opt`: Optimal return target.",
-                 :rt_max => "`rt_max`: Maximum return target.",
-                 :rt_min => "`rt_min`: Minimum return target.",
-                 :rk_opt => "`rk_opt`: Optimal risk target.",
-                 :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",
-                 # Discrete allocation result fields.
-                 :l_model => "`l_model`: `JuMP` model for the long allocation.",
-                 :s_model => "`s_model`: `JuMP` model for the short allocation.",
-                 :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",
-                 :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",
-                 # Risk budgeting.
-                 :prb => "`prb`: Processed risk budgeting configuration.",
-                 :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",
-                 :wfalg => "`alg`: Weight finaliser error formulation algorithm.",
-                 :res_retcode => "`res`: Optional result or message from the solver.",
-                 :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",
-                 :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",
-                 :opt_hier => "`opt`: Base hierarchical optimiser configuration.",
-                 :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",
-                 :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",
-                 :schalg => "`alg`: Schur complement algorithm variant.")
+    arg_dict
 
-This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+Maps a parameter key to the docstring description of the corresponding argument or
+field, so that a single description is written once here and interpolated into every
+docstring that mentions that parameter (via `\$(arg_dict[key])` for `# Arguments`
+entries, or through the derived [`field_dict`](@ref) for `# Fields` entries).
+
+Each value has the form ``"`name`: description."``, where `name` is the display name
+the caller sees and everything after the first `:` is the prose; `field_dict`
+strips the ``"`name`: "`` prefix. A few illustrative entries:
+
+    :ce   => "`ce`: Covariance estimator."
+    :oow  => "`w`: Optional observation weights vector `observations × 1`, ..."
+    :per  => "`pr`: Prior estimator or result."
+    :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result."
+
+The `const` definition below is the single source of truth; consult it for the full
+table of keys and descriptions.
+
+# Related
+
+  - [`field_dict`](@ref)
+  - [`val_dict`](@ref)
 """
 const arg_dict = Dict(
                       # Weight vectors.
@@ -178,7 +96,6 @@ const arg_dict = Dict(
                       :cler => "`clr`: Clusters estimator or result.",#
                       :ple => "`ple`: Phylogeny estimator.",#
                       :plr => "`plr`: Phylogeny result.",#
-                      :pler => "`pl`: Phylogeny estimator or result.",#
                       :nte => "`nte`: Network estimator.",#
                       :ntr => "`pl`: Network result.",#
                       :nter => "`pl`: Network estimator or result.",#
@@ -1881,6 +1798,7 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -1913,6 +1831,7 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
     """
@@ -1950,6 +1869,7 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsNothingError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
     """
@@ -1987,8 +1907,47 @@ Stacktrace:
   - [`PortfolioOptimisersError`](@ref)
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
+  - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when an argument or value is mutually exclusive with another and both were supplied — a "must-be-absent" constraint was violated (e.g. an argument that must be `nothing` because a conflicting one is set).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConflictingArgumentError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator"))
+ERROR: ConflictingArgumentError: sbgt must be nothing when bgt is a BudgetCostEstimator
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+@concrete struct ConflictingArgumentError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -3657,5 +3616,5 @@ function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a, p) / factor
 end
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar, L2Norm,
-       SquaredL2Norm, L1Norm, LpNorm, LInfNorm
+export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
+       PropertyPathError, VecScalar, L2Norm, SquaredL2Norm, L1Norm, LpNorm, LInfNorm

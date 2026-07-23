@@ -999,4 +999,4 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,
-       PredictionReturnsResult, predict, fit_predict, sort_by_measure
+       PredictionReturnsResult, fit, predict, fit_predict, sort_by_measure

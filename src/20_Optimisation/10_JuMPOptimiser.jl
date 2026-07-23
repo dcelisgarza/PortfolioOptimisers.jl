@@ -612,7 +612,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
             @argcheck(isfinite(bgt), IsNonFiniteError("bgt must be finite, got $bgt"))
         elseif isa(bgt, BudgetCostEstimator)
             @argcheck(isnothing(sbgt),
-                      IsNothingError("sbgt must be nothing when bgt is a BudgetCostEstimator, got sbgt = $sbgt"))
+                      ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator, got sbgt = $sbgt"))
         end
         if isa(sbgt, Number)
             assert_nonempty_nonneg_finite_val(sbgt, :sbgt)

@@ -541,7 +541,7 @@ Return the keep-mask a redundancy algorithm admits.
 """
 function redundancy_keep(alg::AbstractRedundancyAlgorithm, ::AbstractReturnsResult,
                          ::Option{<:VecNum}, ::Bool)
-    return throw(ArgumentError("redundancy_keep is not implemented for $(typeof(alg))"))
+    return throw(ArgumentError("$(typeof(alg)) subtypes AbstractRedundancyAlgorithm but does not implement redundancy_keep. Extension authors: a redundancy algorithm must implement redundancy_keep(alg, rd, scores, bib) -> BitVector returning the keep-mask, and requires_score(alg) -> Bool when it cannot pick a survivor without a score."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

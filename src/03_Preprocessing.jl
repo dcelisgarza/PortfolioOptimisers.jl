@@ -370,39 +370,48 @@ ReturnsResult
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
-            @argcheck(length(nb) == 1, DimensionMismatch)
+            @argcheck(length(nb) == 1,
+                      DimensionMismatch("a single-column benchmark (B) admits exactly one benchmark name (nb), got length(nb) = $(length(nb))"))
         elseif isa(B, MatNum)
             check_names_and_returns_matrix(nb, B, :nb, :B)
         end
         if !isnothing(X) && !isnothing(F)
-            @argcheck(size(X, 1) == size(F, 1), DimensionMismatch)
+            @argcheck(size(X, 1) == size(F, 1),
+                      DimensionMismatch("asset returns (X) and factor returns (F) must share the same number of observations (rows), got size(X, 1) = $(size(X, 1)) and size(F, 1) = $(size(F, 1))"))
         end
         if !isnothing(X) && !isnothing(B)
             if isa(B, VecNum)
-                @argcheck(size(X, 1) == size(B, 1), DimensionMismatch)
+                @argcheck(size(X, 1) == size(B, 1),
+                          DimensionMismatch("benchmark returns (B) must match asset returns (X) in number of observations (rows), got size(X, 1) = $(size(X, 1)) and size(B, 1) = $(size(B, 1))"))
             else
-                @argcheck(size(X) == size(B), DimensionMismatch)
+                @argcheck(size(X) == size(B),
+                          DimensionMismatch("benchmark returns (B) must match asset returns (X) in size, got size(X) = $(size(X)) and size(B) = $(size(B))"))
             end
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
             @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
             if !isnothing(X)
-                @argcheck(length(ts) == size(X, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(X, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per asset-returns (X) observation (row), got length(ts) = $(length(ts)) and size(X, 1) = $(size(X, 1))"))
             end
             if !isnothing(F)
-                @argcheck(length(ts) == size(F, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(F, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per factor-returns (F) observation (row), got length(ts) = $(length(ts)) and size(F, 1) = $(size(F, 1))"))
             end
             if !isnothing(B)
-                @argcheck(length(ts) == size(B, 1), DimensionMismatch)
+                @argcheck(length(ts) == size(B, 1),
+                          DimensionMismatch("timestamps (ts) must have one entry per benchmark-returns (B) observation (row), got length(ts) = $(length(ts)) and size(B, 1) = $(size(B, 1))"))
             end
         end
         if !isnothing(iv)
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-            @argcheck(size(iv) == size(X), DimensionMismatch)
+            @argcheck(size(iv) == size(X),
+                      DimensionMismatch("implied volatilities (iv) must match asset returns (X) in size, got size(iv) = $(size(iv)) and size(X) = $(size(X))"))
             if isa(ivpa, VecNum)
-                @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
+                @argcheck(length(ivpa) == size(iv, 2),
+                          DimensionMismatch("the implied-volatility risk-premium adjustment (ivpa), when a vector, must have one entry per asset (implied-volatility column), got length(ivpa) = $(length(ivpa)) and size(iv, 2) = $(size(iv, 2))"))
             end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),

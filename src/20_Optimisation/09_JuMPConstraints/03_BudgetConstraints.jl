@@ -524,10 +524,10 @@ function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
         return nothing
     end
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
-              ArgumentError("gbgt is over-determined: bgt ($bgt) and sbgt ($sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
+              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
-                  ArgumentError("gbgt requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and bgt already constrains it. Got wb = $wb."))
+                  ArgumentError("gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got wb = $wb."))
     end
     return nothing
 end

@@ -856,5 +856,5 @@ function optimise(::Pipeline, args...; kwargs...)
     return throw(ArgumentError("a Pipeline is a workflow, not an OptimisationEstimator: fit it with fit(pipeline, data). Wrapping a Pipeline inside a meta-optimiser is not supported."))
 end
 
-export Pipeline, PipelineResult, fit
+export Pipeline, PipelineResult
 public has_split, assert_no_holdout, assert_split_position, holdout_window
