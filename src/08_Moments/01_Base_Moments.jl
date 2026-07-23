@@ -362,7 +362,7 @@ julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
-           assert_dims(dims)
+           PortfolioOptimisers.assert_dims(dims)
            if dims == 2
                X = X'
            end

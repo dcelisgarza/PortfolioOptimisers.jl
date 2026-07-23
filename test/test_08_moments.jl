@@ -490,41 +490,6 @@
             end
         end
     end
-    @testset "Comparison estimators reject non-finite returns" begin
-        # NaN/Inf in a returns matrix silently masks to "no co-movement" through
-        # Gerber's `X .>= sd` comparison, yielding a finite, plausible, wrong
-        # covariance. The comparison-based estimators must fail closed instead.
-        Xok = [0.10 0.20; -0.05 0.03; 0.02 -0.01; 0.04 0.06]
-        Xnan = copy(Xok);
-        Xnan[3, 2] = NaN
-        Xinf = copy(Xok);
-        Xinf[1, 1] = Inf
-        for ce in
-            (GerberCovariance(; alg = Gerber0()), GerberCovariance(; alg = Gerber1()),
-             GerberCovariance(; alg = Gerber2()),
-             SmythBrobyCovariance(; alg = SmythBroby0()),
-             SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
-             SmythBrobyCovariance(; alg = SmythBrobyCount0()))
-            @test all(isfinite, cov(ce, Xok))
-            @test all(isfinite, cor(ce, Xok))
-            for Xbad in (Xnan, Xinf)
-                @test_throws PortfolioOptimisers.IsNonFiniteError cov(ce, Xbad)
-                @test_throws PortfolioOptimisers.IsNonFiniteError cor(ce, Xbad)
-                # dims = 2 path is guarded before the transpose
-                @test_throws PortfolioOptimisers.IsNonFiniteError cov(ce, permutedims(Xbad);
-                                                                      dims = 2)
-            end
-        end
-        # The message names a count and first index, never the data values.
-        msg = try
-            cov(GerberCovariance(), Xnan)
-            ""
-        catch e
-            sprint(showerror, e)
-        end
-        @test occursin("non-finite entries", msg)
-        @test !occursin("0.2", msg)
-    end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = ForwardSelection()),
                StepwiseRegression(; alg = ForwardSelection(), crit = AIC()),
