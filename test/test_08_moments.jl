@@ -863,3 +863,406 @@ end
     # No `iv` at all still reaches the inner estimator as `nothing`.
     @test cov(probe, rd.X) == [0 0; 0 0]
 end
+# ---------------------------------------------------------------------------
+# @windowed_estimator — the declaration that generates the family above (ADR 0039)
+# ---------------------------------------------------------------------------
+# A throwaway sixth family member, declared through the same macro the five shipped
+# estimators use. Asserting against it keeps the checks on what the *macro* emits rather
+# than on what any one shipped type happens to look like today.
+module WindowedEstimatorProbe
+using Statistics, StatsBase, PortfolioOptimisers
+using PortfolioOptimisers: MatNum, VecNum, Option, Int_VecInt, ObsWeights,
+                           AbstractVarianceEstimator, arg_dict, field_dict, ret_dict,
+                           val_dict, assert_nonempty_nonneg_finite_val, factory_child,
+                           windowed_preamble, _wprop, @concrete, @propagatable,
+                           @windowed_estimator
+import PortfolioOptimisers: factory, port_opt_view
+const DocStringExtensions = PortfolioOptimisers.DocStringExtensions
+@windowed_estimator ProbeWindowedVariance <: AbstractVarianceEstimator begin
+    ve::AbstractVarianceEstimator = SimpleVariance()
+    noun = "Variance"
+    # `std` deliberately omits `mean`, so an undeclared keyword has no way through.
+    forward = [Statistics.var(::MatNum; mean) => :vararr,
+               Statistics.std(::VecNum) => :stdnum]
+    doctest = """
+    julia> 1 + 1
+    2
+    """
+end
+end
+@testset "@windowed_estimator" begin
+    using Test, PortfolioOptimisers, Statistics, StatsBase, StableRNGs
+    msg_of(f) =
+        try
+            f()
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+
+    @testset "Declaration parsing" begin
+        # The inner estimator line yields the field name, its declared type, and the
+        # keyword-constructor default, all unevaluated.
+        @test PortfolioOptimisers.windowed_parse_field(:(ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())) ==
+              (:ce, :(StatsBase.CovarianceEstimator), :(PortfolioOptimisersCovariance()))
+        # It must be a `field::Type = default` line — nothing looser.
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_field(:(ve::AbstractVarianceEstimator))
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_field(:(ve = SimpleVariance()))
+        # The field name is also the generated methods' argument name, so it must be a
+        # bare symbol...
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_field(:(a.b::AbstractVarianceEstimator = SimpleVariance()))
+        # ...and a `field_dict` key, or the generated field docstring would be empty.
+        @test occursin("`vee` is not a `field_dict` key",
+                       msg_of(() -> PortfolioOptimisers.windowed_parse_field(:(vee::AbstractVarianceEstimator = SimpleVariance()))))
+
+        # A `forward` entry parses into the generic, its input type, whether it names
+        # `mean`, and the `ret_dict` keys documenting the return values.
+        @test PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum; mean) =>
+                                                               :sigma)) ==
+              (:(Statistics.cov), :MatNum, true, [:sigma])
+        @test PortfolioOptimisers.windowed_parse_forward(:(Statistics.std(::VecNum) =>
+                                                               :stdnum)) ==
+              (:(Statistics.std), :VecNum, false, [:stdnum])
+        # A tuple return documents each of its values.
+        @test PortfolioOptimisers.windowed_parse_forward(:(coskewness(::MatNum; mean) =>
+                                                               (:cskew, :cskewV))) ==
+              (:coskewness, :MatNum, true, [:cskew, :cskewV])
+        # Not a pair, or a left-hand side that is not a call.
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum)))
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov =>
+                                                                                    :sigma))
+        # Exactly one positional type, and it must be one the macro can generate for.
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum,
+                                                                                               ::VecNum) =>
+                                                                                    :sigma))
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::AbstractMatrix) =>
+                                                                                    :sigma))
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(X::MatNum) =>
+                                                                                    :sigma))
+        # `mean` is the only keyword an entry may name; anything else would have to ride
+        # in `kwargs...` and would leak into `windowed_preamble`.
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum;
+                                                                                               dims) =>
+                                                                                    :sigma))
+        # Return keys are quoted symbols, and must name `ret_dict` entries.
+        @test_throws ArgumentError PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum) =>
+                                                                                    sigma))
+        @test occursin("`sigmaa` is not a `ret_dict` key",
+                       msg_of(() -> PortfolioOptimisers.windowed_parse_forward(:(Statistics.cov(::MatNum) =>
+                                                                                     :sigmaa))))
+
+        # Every rejection carries the macro's name, so the error points at the declaration
+        # rather than at the helper that raised it.
+        @test occursin("@windowed_estimator: ",
+                       msg_of(() -> PortfolioOptimisers.windowed_estimator_error("boom")))
+        @test PortfolioOptimisers.windowed_estimator_check_key(:mu,
+                                                               PortfolioOptimisers.ret_dict,
+                                                               "ret_dict") === :mu
+    end
+
+    @testset "Mistyped-key suggestions" begin
+        # The looser Damerau-Levenshtein/0.5 configuration is load-bearing: under the
+        # library default a short key like `noun` never matches, so the suggestion would
+        # be dead code (ADR 0026 keeps the strict default for asset-name probes).
+        @test occursin("did you mean `noun`?",
+                       PortfolioOptimisers.windowed_estimator_suggest(:nuon,
+                                                                      PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
+        @test isempty(PortfolioOptimisers.did_you_mean("nuon",
+                                                       ["noun", "forward", "doctest"]))
+        # A key too far from any candidate suggests nothing rather than guessing.
+        @test isempty(PortfolioOptimisers.windowed_estimator_suggest(:zzzzzzz,
+                                                                     PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
+    end
+
+    @testset "Generated docstrings and method bodies" begin
+        dm = PortfolioOptimisers.windowed_method_doc(:(Statistics.cov), :ce,
+                                                     :WindowedCovariance, :MatNum, true,
+                                                     [:sigma], "Covariance",
+                                                     ["[`sibling`](@ref)"])
+        dv = PortfolioOptimisers.windowed_method_doc(:(Statistics.std), :ve,
+                                                     :WindowedVariance, :VecNum, false,
+                                                     [:stdnum], "Variance", String[])
+        # Docstrings are interpolation ASTs, not strings: the dictionary lookups stay live
+        # parts of the `DocStr`, exactly as a hand-written `$(arg_dict[:dims])` would.
+        @test Meta.isexpr(dm, :string)
+        @test filter(x -> !isa(x, String), dm.args) ==
+              Any[:(arg_dict[:dims]), :(arg_dict[:oiv]), :(ret_dict[:sigma])]
+        # The vector forwarder documents neither `dims` nor `iv` — it takes neither.
+        @test filter(x -> !isa(x, String), dv.args) == Any[:(ret_dict[:stdnum])]
+        # The summary names the generic, not the type's noun: `std` on a windowed variance
+        # estimator computes a standard deviation.
+        @test occursin("Compute `Statistics.std` over a rolling or indexed observation window",
+                       join(filter(x -> isa(x, String), dv.args)))
+        # Siblings cross-link, and a method never links to itself.
+        @test occursin("[`sibling`](@ref)", join(filter(x -> isa(x, String), dm.args)))
+        @test PortfolioOptimisers.windowed_method_ref(:(Statistics.cov), :ce,
+                                                      :WindowedCovariance, :MatNum) ==
+              "[`Statistics.cov(ce::WindowedCovariance, X::MatNum)`](@ref)"
+
+        td = PortfolioOptimisers.windowed_type_doc(:WindowedCovariance,
+                                                   :AbstractCovarianceEstimator, :ce,
+                                                   :(StatsBase.CovarianceEstimator),
+                                                   :(PortfolioOptimisersCovariance()),
+                                                   "Covariance", "julia> 1 + 1\n2\n",
+                                                   ["[`m`](@ref)"])
+        @test Meta.isexpr(td, :string)
+        # `TYPEDEF`/`FIELDS` must survive as abbreviations; a rendered string would freeze
+        # the field list at macro-expansion time.
+        @test filter(x -> !isa(x, String), td.args) ==
+              Any[:(DocStringExtensions.TYPEDEF), :(DocStringExtensions.FIELDS),
+                  :(val_dict[:oow])]
+
+        # The matrix forwarder threads `dims`/`iv` through `windowed_preamble` and names
+        # `mean` only when the entry declared it.
+        defm = PortfolioOptimisers.windowed_method_def(:(Statistics.cov), :ce,
+                                                       :WindowedCovariance, :MatNum, true)
+        defv = PortfolioOptimisers.windowed_method_def(:(Statistics.std), :ve,
+                                                       :WindowedVariance, :VecNum, false)
+        @test Meta.isexpr(defm, :function)
+        @test string(defm.args[1]) ==
+              "Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)"
+        @test occursin("windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims, kwargs...)",
+                       string(defm.args[2]))
+        # The vector forwarder takes the estimator and the data, and nothing else.
+        @test string(defv.args[1]) == "Statistics.std(ve::WindowedVariance, X::VecNum; )"
+        @test occursin("windowed_preamble(ve.ve, ve.w, ve.window, X)", string(defv.args[2]))
+    end
+
+    @testset "Expansion-time rejection" begin
+        windowed_decl(head, body) = Expr(:macrocall, Symbol("@windowed_estimator"),
+                                         LineNumberNode(@__LINE__), head, body)
+        good_head = :(ProbeBad <: AbstractVarianceEstimator)
+        good_body = quote
+            ve::AbstractVarianceEstimator = SimpleVariance()
+            noun = "Variance"
+            forward = [Statistics.var(::MatNum; mean) => :vararr]
+            doctest = "julia> 1 + 1\n2\n"
+        end
+        # Expanded in the probe module, where the names the macro emits resolve.
+        expand(head, body) = macroexpand(WindowedEstimatorProbe, windowed_decl(head, body))
+        bad_msg(head, body) = msg_of(() -> expand(head, body))
+
+        # A well-formed declaration expands to the whole family member: the struct and its
+        # constructors, the forwarders, and the export.
+        ex = expand(good_head, good_body)
+        @test Meta.isexpr(ex, :block)
+        @test count(a -> Meta.isexpr(a, :export), ex.args) == 1
+        @test ex.args[findfirst(a -> Meta.isexpr(a, :export), ex.args)].args == [:ProbeBad]
+        @test occursin("windowed_preamble", string(ex))
+        @test occursin("assert_nonempty_nonneg_finite_val", string(ex))
+
+        # Header and body shape. The name must be a bare symbol: it is the type being
+        # defined, so a dotted or parametric header is rejected along with a missing `<:`.
+        @test occursin("the header must read `Name <: Super`",
+                       bad_msg(:ProbeBad, good_body))
+        @test occursin("the header must read `Name <: Super`",
+                       bad_msg(:(A.B <: AbstractVarianceEstimator), good_body))
+        @test occursin("the header must read `Name <: Super`",
+                       bad_msg(:(ProbeBad{T} <: AbstractVarianceEstimator), good_body))
+        @test occursin("must be a `begin ... end` block", bad_msg(good_head, :(1 + 1)))
+
+        # Body lines are assignments, and exactly one of them declares the inner estimator.
+        @test occursin("must be an assignment",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   noun
+                               end))
+        @test occursin("exactly one `field::Type = default` line",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
+                               end))
+
+        # A mistyped key is rejected with a suggestion instead of silently producing a
+        # malformed docstring or a missing forwarder.
+        @test occursin("`nuon` is not a recognised key (did you mean `noun`?)",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   nuon = "Variance"
+                               end))
+
+        # Every key is required...
+        @test occursin("missing required `noun` declaration",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   forward = [Statistics.var(::MatNum) => :vararr]
+                                   doctest = "x"
+                               end))
+        @test occursin("missing required `field::Type = default` declaration",
+                       bad_msg(good_head,
+                               quote
+                                   noun = "Variance"
+                                   forward = [Statistics.var(::MatNum) => :vararr]
+                                   doctest = "x"
+                               end))
+        # ...`noun`/`doctest` must be literals the macro can splice into prose...
+        @test occursin("must be string literals",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   noun = string("Vari", "ance")
+                                   forward = [Statistics.var(::MatNum) => :vararr]
+                                   doctest = "x"
+                               end))
+        # ...and `forward` must be a non-empty vector, or the type would answer no generic.
+        @test occursin("`forward` must be a vector",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   noun = "Variance"
+                                   forward = Statistics.var(::MatNum) => :vararr
+                                   doctest = "x"
+                               end))
+        @test occursin("must declare at least one generic",
+                       bad_msg(good_head,
+                               quote
+                                   ve::AbstractVarianceEstimator = SimpleVariance()
+                                   noun = "Variance"
+                                   forward = []
+                                   doctest = "x"
+                               end))
+    end
+
+    @testset "Generated family member" begin
+        rng = StableRNG(987654321)
+        X = randn(rng, 60, 4)
+        ew = eweights(1:60, inv(60); scale = true)
+        pw = pweights(fill(inv(60), 60))
+        idx = [2, 7, 11, 40]
+        W = WindowedEstimatorProbe.ProbeWindowedVariance
+
+        # One declared field; the macro supplies `w` and `window`, and nothing else.
+        @test fieldnames(W) == (:ve, :w, :window)
+        @test W <: PortfolioOptimisers.AbstractVarianceEstimator
+        # The generated `export` makes the type reachable from the declaring module.
+        @test :ProbeWindowedVariance in names(WindowedEstimatorProbe)
+
+        # Keyword-constructor defaults come from the declaration's right-hand side; every
+        # field is parametrised (`@concrete`), so the type is concrete.
+        w0 = W()
+        @test w0.ve isa SimpleVariance
+        @test isnothing(w0.w)
+        @test isnothing(w0.window)
+        @test isconcretetype(typeof(w0))
+        @test isconcretetype(typeof(W(; w = ew, window = idx)))
+
+        # The positional constructor validates `w` and `window`, uniformly with the five
+        # shipped members.
+        @test_throws PortfolioOptimisers.IsEmptyError W(; window = Int[])
+        @test_throws DomainError W(; window = -5)
+        @test_throws PortfolioOptimisers.IsEmptyError W(; w = pweights(Float64[]))
+
+        # `@fprop`/`@wprop`: `factory` rebinds `w` and recurses into the inner estimator,
+        # while `window` rides through untouched.
+        w1 = factory(W(; window = 20), ew)
+        @test w1.w === ew
+        @test w1.ve.w === ew
+        @test w1.window == 20
+        # `@vprop`: a view recurses into the inner estimator and keeps the window.
+        w2 = PortfolioOptimisers.port_opt_view(W(; window = 20), [1, 2])
+        @test w2 isa W
+        @test w2.window == 20
+
+        # The forwarders window the data, then delegate to the inner estimator.
+        @test isapprox(var(W(; window = 20), X), var(SimpleVariance(), X[41:60, :]))
+        @test isapprox(var(W(; window = idx), X), var(SimpleVariance(), X[idx, :]))
+        @test isapprox(var(W(), X), var(SimpleVariance(), X))
+        @test isapprox(std(W(; window = 20), X[:, 1]), std(SimpleVariance(), X[41:60, 1]))
+        # `dims = 2` windows the transposed data identically.
+        @test isapprox(var(W(; window = 20), permutedims(X); dims = 2),
+                       var(SimpleVariance(), permutedims(X[41:60, :]); dims = 2))
+        # Observation weights are rebound to the window, not applied whole.
+        @test isapprox(var(W(; w = pw, window = 20), X),
+                       var(SimpleVariance(; me = SimpleExpectedReturns(; w = pw[41:60]),
+                                          w = pw[41:60]), X[41:60, :]))
+
+        # Declaring `mean` emits it as a named keyword, so it reaches the inner estimator
+        # instead of riding in `kwargs...` into `windowed_preamble`.
+        @test Base.kwarg_decl(only(methods(var, (W, PortfolioOptimisers.MatNum)))) ==
+              [:dims, :mean, :iv, Symbol("kwargs...")]
+        @test isapprox(var(W(; window = 20), X;
+                           mean = mean(SimpleExpectedReturns(), X[41:60, :])),
+                       var(W(; window = 20), X))
+        # Omitting it emits no keyword at all, so nothing can ride through unnoticed: the
+        # call no longer matches the generated forwarder and falls through to a StatsBase
+        # fallback that has nothing to compute with.
+        @test isempty(Base.kwarg_decl(only(methods(std, (W, PortfolioOptimisers.VecNum)))))
+        @test_throws Exception std(W(; window = 20), X[:, 1]; mean = 0.0)
+
+        # Docstrings are generated too, with the dictionary lookups kept live rather than
+        # hand-copied, so an `arg_dict`/`ret_dict` edit reaches them.
+        tdoc = string(@doc WindowedEstimatorProbe.ProbeWindowedVariance)
+        @test occursin("Variance estimator that restricts computation to a rolling or indexed observation window",
+                       tdoc)
+        @test occursin(PortfolioOptimisers.val_dict[:oow], tdoc)
+        @test occursin("julia> 1 + 1", tdoc)
+        mdoc = string(Base.Docs.doc(Base.Docs.Binding(Statistics, :var),
+                                    Tuple{W, PortfolioOptimisers.MatNum}))
+        @test occursin(PortfolioOptimisers.ret_dict[:vararr], mdoc)
+        @test occursin(PortfolioOptimisers.arg_dict[:dims], mdoc)
+        @test occursin("[`windowed_preamble`](@ref)", mdoc)
+        sdoc = string(Base.Docs.doc(Base.Docs.Binding(Statistics, :std),
+                                    Tuple{W, PortfolioOptimisers.VecNum}))
+        @test occursin(PortfolioOptimisers.ret_dict[:stdnum], sdoc)
+        @test !occursin("dims", sdoc)
+
+        # The five shipped members are generated from this same template, which is what
+        # keeps them in sync (ADR 0039).
+        for T in (WindowedExpectedReturns, WindowedCovariance, WindowedVariance,
+                  WindowedCoskewness, WindowedCokurtosis)
+            @test occursin("estimator that restricts computation to a rolling or indexed observation window",
+                           string(Base.Docs.doc(T)))
+        end
+    end
+
+    @testset "windowed_preamble" begin
+        rng = StableRNG(192837465)
+        X = randn(rng, 30, 4)
+        iv = abs.(randn(rng, 30, 4)) .+ 1
+        ew = eweights(1:30, inv(30); scale = true)
+        idx = [2, 5, 9]
+
+        # No window: the data and `iv` pass through whole, and the weights cover the whole
+        # sample. Only `window = nothing` resolves to a `Colon`, which is why `iv` is left
+        # alone here and subset everywhere else.
+        inner, Xw, ivw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), ew,
+                                                               nothing, X; iv = iv)
+        @test size(Xw) == size(X)
+        @test ivw === iv
+        @test inner.w == ew
+        # An `Int` window resolves to a range over the last observations, which is a
+        # `VecInt`, so `iv` and the weights are subset to it too.
+        inner, Xw, ivw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), ew, 10, X;
+                                                               iv = iv)
+        @test Xw == X[21:30, :]
+        @test ivw == iv[21:30, :]
+        @test inner.w == ew[21:30]
+        # An index vector selects exactly those observations.
+        inner, Xw, ivw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), ew, idx, X;
+                                                               iv = iv)
+        @test Xw == X[idx, :]
+        @test ivw == iv[idx, :]
+        @test inner.w == ew[idx]
+        # `dims = 2` windows columns instead of rows, for both `X` and `iv`.
+        inner, Xw, ivw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), ew, idx,
+                                                               permutedims(X);
+                                                               iv = permutedims(iv),
+                                                               dims = 2)
+        @test Xw == permutedims(X)[:, idx]
+        @test ivw == permutedims(iv)[:, idx]
+        # Without weights the inner estimator is left unweighted; without `iv` there is
+        # nothing to subset.
+        inner, Xw, ivw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), nothing,
+                                                               idx, X)
+        @test isnothing(inner.w)
+        @test isnothing(ivw)
+        # The vector method windows the series and rebinds the weights the same way.
+        inner, xw = PortfolioOptimisers.windowed_preamble(SimpleVariance(), ew, 10, X[:, 1])
+        @test xw == X[21:30, 1]
+        @test inner.w == ew[21:30]
+    end
+end
