@@ -1,5 +1,5 @@
 # TimeDependentCallable subtypes must be defined at top level. `_test_TDCap` is a plain functor;
-# `_test_TDCap` declares its previous-weights requirement directly.
+# `_test_TDPrevWCap` declares its previous-weights requirement directly.
 struct _test_TDCap <: PortfolioOptimisers.TimeDependentCallable
     hi::Float64
     lo::Float64
@@ -9,10 +9,10 @@ function (c::_test_TDCap)(ctx::TimeDependentContext)
                         ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
 end
 struct _test_TDPrevWCap <: PortfolioOptimisers.TimeDependentCallable end
-function (c::_test_TDCap)(ctx::TimeDependentContext)
+function (c::_test_TDPrevWCap)(ctx::TimeDependentContext)
     return Threshold(; val = isnothing(ctx.w_prev) ? 0.01 : 0.05)
 end
-function PortfolioOptimisers.needs_previous_weights(::_test_TDCap)
+function PortfolioOptimisers.needs_previous_weights(::_test_TDPrevWCap)
     return true
 end
 # `_test_TDOptCap` declares that its per-fold value is an optimiser, which is what makes a schedule
@@ -166,11 +166,11 @@ end
         # A schedule of constraint values is not an optimiser schedule.
         @test !(TimeDependent([Fees(; l = 0.001)]) isa PortfolioOptimisers.TD_OptE_Opt)
         # The optional form additionally admits `nothing` and the static value.
-        _test_TDO = PortfolioOptimisers.TDO_Option{<:PortfolioOptimisers.OptE_Opt}
-        @test nothing isa _test_TDO
-        @test ew isa _test_TDO
-        @test TimeDependent([ew, iv]) isa _test_TDO
-        @test !(TimeDependent([Fees(; l = 0.001)]) isa _test_TDO)
+        TDO = PortfolioOptimisers.TDO_Option{<:PortfolioOptimisers.OptE_Opt}
+        @test nothing isa TDO
+        @test ew isa TDO
+        @test TimeDependent([ew, iv]) isa TDO
+        @test !(TimeDependent([Fees(; l = 0.001)]) isa TDO)
         # A declared optimiser callable resolves per fold like any other callable.
         ctx = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
                                    test_idx = [101:150, 151:200])
@@ -232,7 +232,7 @@ end
                                                                      ub = 1.0 / ctx.i)))
         @test PortfolioOptimisers.update_time_dependent_estimator(optwb, ctx2).wb.ub == 0.5
         # PreviousWeightsFunction declares the prev-weights requirement as data.
-        pwf = TimeDependent(PreviousWeightsFunction(_test_TDCap()))
+        pwf = TimeDependent(PreviousWeightsFunction(_test_TDPrevWCap()))
         optp = JuMPOptimiser(; slv = slv, lt = pwf)
         @test PortfolioOptimisers.needs_previous_weights(optp)
         @test PortfolioOptimisers.update_time_dependent_estimator(optp, ctx1).lt.val == 0.01
@@ -256,7 +256,7 @@ end
             of = PortfolioOptimisers.update_time_dependent_estimator(optfn, ctx)
             @test oc.wb.ub ≈ of.wb.ub
         end
-        optpw = JuMPOptimiser(; slv = slv, lt = TimeDependent(_test_TDCap()))
+        optpw = JuMPOptimiser(; slv = slv, lt = TimeDependent(_test_TDPrevWCap()))
         @test PortfolioOptimisers.needs_previous_weights(optpw)
         @test PortfolioOptimisers.update_time_dependent_estimator(optpw, ctx1).lt.val ==
               0.01
@@ -658,8 +658,8 @@ end
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn.pred)
         # The callable may also return vectors that differ in length per fold (the
         # vector-of-vectors shape, computed rather than listed).
-        struct _test_TDLC_Callable <: PortfolioOptimisers.TimeDependentCallable end
-        function (c::_test_TDLC_Callable)(ctx::TimeDependentContext)
+        struct _test_LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
+        function (c::_test_LC_Callable)(ctx::TimeDependentContext)
             return if ctx.i == 1
                 [LinearConstraintEstimator(; val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]
             else
@@ -686,7 +686,7 @@ end
 
         mr_fn_vv2 = MeanRisk(;
                              opt = JuMPOptimiser(; slv = slv, sets = sets,
-                                                 lcse = TimeDependent(_test_TDLC_Callable())))
+                                                 lcse = TimeDependent(_test_LC_Callable())))
         pfn_vv = cross_val_predict(mr_fn_vv2, rd, cvw)
         @test length(pfn_vv.pred) == 2
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn_vv.pred)
@@ -877,7 +877,7 @@ end
                                               default = EqualWeighted()))
             @test PortfolioOptimisers.reset_time_dependent_estimator(mrd).fb ==
                   EqualWeighted()
-            # Required fields stay non-nothing (typed _test_TD, not _test_TD_Option).
+            # Required fields stay non-nothing (typed TD, not TD_Option).
             @test_throws TypeError MeanRisk(; opt = jopt, r = nothing)
             @test_throws TypeError MeanRisk(; opt = jopt, obj = nothing)
             # The constructor test-substitutes each entry, so a wrongly-typed or invalid
