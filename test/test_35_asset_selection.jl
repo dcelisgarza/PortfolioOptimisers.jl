@@ -1,7 +1,7 @@
 using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs
 
 # a selector that never implements select_assets, for the erroring-fallback test
-struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
+struct _test_UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
 
 @testset "Asset selection" begin
     PO = PortfolioOptimisers
@@ -151,7 +151,7 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         @test collect(apply_preprocessing(res, extra).nx) == ["A", "C"]
 
         # the erroring fallback names the missing method
-        @test_throws ArgumentError fit_preprocessing(UnimplementedSelector(), RDZ)
+        @test_throws ArgumentError fit_preprocessing(_test_UnimplementedSelector(), RDZ)
     end
 
     @testset "pipeline integration" begin
