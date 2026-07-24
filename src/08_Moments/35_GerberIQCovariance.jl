@@ -1367,43 +1367,43 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
         n14
     elseif dp1i <= xi && zro < xj < dp2j || dp1j <= xj && zro < xi < dp2i
         n15
-    elseif dp1i <= xi && -dn1j < xj < zro || dp1j <= xj && -dn1i < xi < zro
+    elseif dp1i <= xi && -dn2j < xj < zro || dp1j <= xj && -dn2i < xi < zro
         n18
-    elseif dp1i <= xi && -dn2j < xj <= -dn1j || dp1j <= xj && -dn2i < xi <= -dn1i
+    elseif dp1i <= xi && -dn1j < xj <= -dn2j || dp1j <= xj && -dn1i < xi <= -dn2i
         n19
-    elseif dp1i <= xi && xj <= -dn2j || dp1j <= xj && xi <= -dn2i
+    elseif dp1i <= xi && xj <= -dn1j || dp1j <= xj && xi <= -dn1i
         n13
     elseif dp2i <= xi < dp1i && dp2j <= xj < dp1j
         n4
     elseif dp2i <= xi < dp1i && zro < xj < dp2j || dp2j <= xj < dp1j && zro < xi < dp2i
         n7
-    elseif dp2i <= xi < dp1i && -dn1j < xj < zro || dp2j <= xj < dp1j && -dn1i < xi < zro
+    elseif dp2i <= xi < dp1i && -dn2j < xj < zro || dp2j <= xj < dp1j && -dn2i < xi < zro
         n9
-    elseif dp2i <= xi < dp1i && -dn2j < xj <= -dn1j ||
-           dp2j <= xj < dp1j && -dn2i < xi <= -dn1i
+    elseif dp2i <= xi < dp1i && -dn1j < xj <= -dn2j ||
+           dp2j <= xj < dp1j && -dn1i < xi <= -dn2i
         n6
-    elseif dp2i <= xi < dp1i && xj <= -dn2j || dp2j <= xj < dp1j && xi <= -dn2i
+    elseif dp2i <= xi < dp1i && xj <= -dn1j || dp2j <= xj < dp1j && xi <= -dn1i
         n20
     elseif zro < xi < dp2i && zro < xj < dp2j
         n1
-    elseif zro < xi < dp2i && -dn1j < xj < zro || zro < xj < dp2j && -dn1i < xi < zro
+    elseif zro < xi < dp2i && -dn2j < xj < zro || zro < xj < dp2j && -dn2i < xi < zro
         n3
-    elseif zro < xi < dp2i && -dn2j < xj <= -dn1j || zro < xj < dp2j && -dn2i < xi <= -dn1i
+    elseif zro < xi < dp2i && -dn1j < xj <= -dn2j || zro < xj < dp2j && -dn1i < xi <= -dn2i
         n10
-    elseif zro < xi < dp2i && xj <= -dn2j || zro < xj < dp2j && xi <= -dn2i
+    elseif zro < xi < dp2i && xj <= -dn1j || zro < xj < dp2j && xi <= -dn1i
         n21
-    elseif -dn1i < xi < zro && -dn1j < xj < zro
+    elseif -dn2i < xi < zro && -dn2j < xj < zro
         n2
-    elseif -dn1i < xi < zro && -dn2j < xj <= -dn1j ||
-           -dn1j < xj < zro && -dn2i < xi <= -dn1i
+    elseif -dn2i < xi < zro && -dn1j < xj <= -dn2j ||
+           -dn2j < xj < zro && -dn1i < xi <= -dn2i
         n8
-    elseif -dn1i < xi < zro && xj <= -dn2j || -dn1j < xj < zro && xi <= -dn2i
+    elseif -dn2i < xi < zro && xj <= -dn1j || -dn2j < xj < zro && xi <= -dn1i
         n16
-    elseif -dn2i < xi <= -dn1i && -dn2j < xj <= -dn1j
+    elseif -dn1i < xi <= -dn2i && -dn1j < xj <= -dn2j
         n5
-    elseif -dn2i < xi <= -dn1i && xj <= -dn2j || -dn2j < xj <= -dn1j && xi <= -dn2i
+    elseif -dn1i < xi <= -dn2i && xj <= -dn1j || -dn1j < xj <= -dn2j && xi <= -dn1i
         n17
-    elseif xi <= -dn2i && xj <= -dn2j
+    elseif xi <= -dn1i && xj <= -dn1j
         n12
     else
         zro

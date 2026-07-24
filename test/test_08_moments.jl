@@ -490,6 +490,54 @@
             end
         end
     end
+    @testset "GerberIQ region templates" begin
+        # gerber_iq_weight maps a co-movement (r_i, r_j) to its region's squeezing weight.
+        # Sentinel weights n_k = k/100 (and distinct thresholds) make every region identifiable,
+        # so these grids verify the templates against the paper's Figures 1(b)/2/3. The default
+        # FullGerberIQ has all thresholds equal (empty moderate band), which masks a negative-side
+        # dn1/dn2 mix-up; distinct dn1 != dn2 below is what exercises it.
+        giqw(ri, rj, kind) = PortfolioOptimisers.gerber_iq_weight(ri, rj, abs(ri), abs(rj),
+                                                                  1.0, 1.0, kind)
+        # BasicGerberIQ: both >= d -> 1; both < d -> n; mixed -> n^2 (magnitude-only, symmetric).
+        basic = BasicGerberIQ(; d = 3.0, n = 0.5)
+        for (ri, rj, e) in
+            ((3.5, 3.5, 1.0), (-3.5, -3.5, 1.0), (3.5, -3.5, 1.0), (1.5, 1.5, 0.5),
+             (-1.5, -1.5, 0.5), (2.5, 0.5, 0.5), (3.5, 1.5, 0.25), (1.5, 3.5, 0.25),
+             (-3.5, 1.5, 0.25), (0.5, -3.5, 0.25))
+            @test giqw(ri, rj, basic) ≈ e
+        end
+        # PartialGerberIQ: one representative point per region (Figure 1(b)); check symmetry too.
+        partial = PartialGerberIQ(; dcp = 2.0, dcn = 3.0, ddp = 3.0, ddn = 2.0,
+                                  Dict(Symbol("n$k") => k / 100 for k in 1:10)...)
+        for (pt, k) in
+            (((2.5, 2.5), 4), ((2.5, 1.0), 7), ((1.0, 1.0), 1), ((-3.5, -3.5), 5),
+             ((-3.5, -1.0), 8), ((-1.5, -1.5), 2), ((3.5, -2.5), 6), ((3.5, -1.0), 9),
+             ((1.0, -2.5), 10), ((1.0, -1.0), 3))
+            @test giqw(pt[1], pt[2], partial) ≈ k / 100
+            @test giqw(pt[2], pt[1], partial) ≈ k / 100
+        end
+        # FullGerberIQ: the full Figure 2 region grid (rows r_j high->low, cols r_i low->high).
+        full = FullGerberIQ(; dp1 = 3.0, dp2 = 2.0, dn1 = 3.0, dn2 = 2.0,
+                            Dict(Symbol("n$k") => k / 100 for k in 1:21)...)
+        rj_rows = (3.5, 2.5, 1.5, -1.5, -2.5, -3.5)
+        ri_cols = (-3.5, -2.5, -1.5, 1.5, 2.5, 3.5)
+        fig2 = [13 19 18 15 14 11
+                20 6 9 7 4 14
+                21 10 3 1 7 15
+                16 8 2 3 9 18
+                17 5 8 10 6 19
+                12 17 16 21 20 13]
+        for (r, rj) in enumerate(rj_rows), (c, ri) in enumerate(ri_cols)
+            @test round(Int, 100 * giqw(ri, rj, full)) == fig2[r, c]
+        end
+        # Every region reachable (guards the negative moderate-band dn1/dn2 bug) and symmetric.
+        grid = [round(Int, 100 * giqw(ri, rj, full))
+                for ri in range(-3.8, 3.8; length = 97),
+                    rj in range(-3.8, 3.8; length = 97)]
+        @test isempty(setdiff(1:21, unique(grid)))
+        @test all(giqw(a, b, full) ≈ giqw(b, a, full)
+                  for a in range(-4, 4; length = 31), b in range(-4, 4; length = 31))
+    end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = ForwardSelection()),
                StepwiseRegression(; alg = ForwardSelection(), crit = AIC()),

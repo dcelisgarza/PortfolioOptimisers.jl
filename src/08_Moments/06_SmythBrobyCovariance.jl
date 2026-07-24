@@ -905,7 +905,6 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 """
 function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
-    (X, :X)
     if dims == 2
         X = transpose(X)
     end
