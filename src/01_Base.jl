@@ -86,6 +86,10 @@ const arg_dict = Dict(
                       :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
                       :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
                       :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
+                      :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
+                      :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
+                      :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
+                      :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
                       # Priors.
                       :pe  => "`pe`: Prior estimator.",#
                       :pr  => "`pr`: Prior result.",#
@@ -172,6 +176,7 @@ const arg_dict = Dict(
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :X_Xv => "`X`: Data matrix or vector.",#
+                      :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",
                       :stdvec => "`sd`: Vector of standard deviations for each asset.",#
@@ -2131,6 +2136,20 @@ Alias for an abstract array of numeric types or JuMP scalar types.
   - [`MatNum`](@ref)
 """
 const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract 3-dimensional array of numeric types or JuMP scalar types.
+
+Rank-restricted counterpart of [`ArrNum`](@ref), for the data that is a stack of matrices rather than a single one — a window of time-varying features, whose observation axis leads. Dispatching on this alias keeps the 2-D and 3-D entry points apart without a runtime `ndims` branch.
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
+  - [`ArrNum`](@ref)
+"""
+const Arr3Num = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}, 3}
 """
     const VecNum_MatNum = Union{<:VecNum, <:MatNum}
 

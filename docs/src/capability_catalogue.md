@@ -219,6 +219,29 @@ The distance estimators are used together with various distance matrix algorithm
   - Predefined number of bins
 - Canonical distance algorithm for portfolio optimization. [`CanonicalDistance`](@ref)
 
+### Feature distances
+
+A feature matrix describes assets by their exposures, memberships, loadings or adjacencies rather than by their returns, and can be turned into a distance matrix directly — no correlation matrix in between.
+
+- ::: details Feature-based distance estimator for portfolio optimization. [`FeatureDistance`](@ref)
+  - Normalised angular distance metric. [`AngularDist`](@ref)
+  - ::: details Collapsing a window of time-varying features
+    - Feature collapse algorithm keeping the most recent observation. [`LastObservation`](@ref)
+    - ::: details Feature collapse algorithm aggregating the features, then measuring. [`AggregateFeatures`](@ref) and [`AggregateDistances`](@ref)
+      - Collapse algorithm aggregating by the mean. [`MeanCollapse`](@ref)
+      - Collapse algorithm aggregating by the median. [`MedianCollapse`](@ref)
+    - Feature collapse algorithm stacking the observations into one feature vector. [`StackObservations`](@ref)
+
+### Similarity matrices
+
+Every similarity matrix algorithm is a pure transformation of a distance matrix, applied by [`distance_to_similarity`](@ref). [`FeatureDistance`](@ref) picks one from its metric via [`default_similarity`](@ref); the Planar Maximally Filtered Graph used by [`DBHT`](@ref) and [`LoGo`](@ref) takes its own.
+
+- Similarity matrix algorithm using the linear complement of the distance. [`ComplementSimilarity`](@ref)
+- Similarity matrix algorithm inverting a normalised angular distance. [`AngularSimilarity`](@ref)
+- Similarity matrix algorithm using the maximum distance transformation. [`MaximumDistanceSimilarity`](@ref)
+- Similarity matrix algorithm using the exponential transformation. [`ExponentialSimilarity`](@ref)
+- Similarity matrix algorithm using a generalised exponential transformation. [`GeneralExponentialSimilarity`](@ref)
+
 ## Phylogeny
 
 `PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios.
@@ -257,11 +280,9 @@ Adjacency matrices encode asset relationships either with clustering or graph th
 - ::: details Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covariance, and distance estimators
   - Algorithm type for Kruskal's minimum spanning tree (MST). [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), and [`PrimTree`](@ref)
   - ::: details Triangulated Maximally Filtered Graph with various similarity matrix estimators
-    - Maximum distance similarity [`MaximumDistanceSimilarity`](@ref)
-    - Exponential similarity [`ExponentialSimilarity`](@ref)
-    - General exponential similarity [`GeneralExponentialSimilarity`](@ref)
-    - Linear complement similarity [`ComplementSimilarity`](@ref)
-    - Angular similarity [`AngularSimilarity`](@ref)
+
+    Any member of the similarity matrix family: [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref), [`ComplementSimilarity`](@ref) or [`AngularSimilarity`](@ref).
+
 - Estimator type for clustering. [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
 - Estimator type for network-based phylogeny analysis. [`NetworkClustersEstimator`](@ref)
 - Group assets by clustering them, and keep the best-scoring member of each cluster. [`ClusterGroups`](@ref)

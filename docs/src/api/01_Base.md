@@ -136,6 +136,7 @@ VecNum
 VecInt
 MatNum
 ArrNum
+Arr3Num
 VecNum_MatNum
 Num_VecNum
 Func_Num_VecNum

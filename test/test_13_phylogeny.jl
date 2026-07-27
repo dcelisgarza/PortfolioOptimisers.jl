@@ -46,6 +46,203 @@
               PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
         @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
     end
+    @testset "Feature distance tests" begin
+        DS = PortfolioOptimisers.Distances
+        rng = StableRNG(987654321)
+        # The elementwise method is `AngularDist`'s contract; `_pairwise!` is an internal
+        # hook overloaded to delegate to Distances' gemm `CosineDist` kernel. Nothing in
+        # Distances pins the two together, so this does.
+        function elementwise_pairwise(metric, Z; dims = 1)
+            n = dims == 1 ? size(Z, 1) : size(Z, 2)
+            obs(i) = dims == 1 ? view(Z, i, :) : view(Z, :, i)
+            D = zeros(Float64, n, n)
+            for i in 1:n, j in 1:n
+                D[i, j] = i == j ? 0.0 : metric(obs(i), obs(j))
+            end
+            return D
+        end
+        @testset "AngularDist gemm path matches the elementwise method" begin
+            for N in (2, 5, 50, 200), K in (1, 3, 30)
+                Z = randn(rng, N, K)
+                @test isapprox(DS.pairwise(AngularDist(), Z; dims = 1),
+                               elementwise_pairwise(AngularDist(), Z); atol = 1e-8)
+            end
+            # Zero rows are where the gemm kernel and the elementwise method could most
+            # easily disagree: the gemm divides by the norm and produces NaN.
+            Zz = randn(rng, 8, 4)
+            Zz[2, :] .= 0
+            Zz[5, :] .= 0
+            @test isapprox(DS.pairwise(AngularDist(), Zz; dims = 1),
+                           elementwise_pairwise(AngularDist(), Zz); atol = 1e-8)
+            @test isapprox(DS.pairwise(AngularDist(), permutedims(Zz); dims = 2),
+                           elementwise_pairwise(AngularDist(), permutedims(Zz); dims = 2);
+                           atol = 1e-8)
+            # The convention itself: 0 between two zero rows, 1 against a non-zero one.
+            Da = DS.pairwise(AngularDist(), Zz; dims = 1)
+            @test all(iszero, Da[[2, 5], [2, 5]])
+            @test all(isone, Da[[2, 5], [1, 3, 4, 6, 7, 8]])
+            # A true metric, unlike `CosineDist`.
+            @test AngularDist() isa DS.Metric
+            @test DS.result_type(AngularDist(), Int, Int) === Float64
+        end
+        @testset "2-D feature matrices" begin
+            Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
+            de = FeatureDistance()
+            @test de.metric === AngularDist()
+            @test de.alg === LastObservation()
+            # `sim` is defaulted from the metric, and `AngularDist` gets the exact inverse.
+            @test de.sim === AngularSimilarity()
+            @test FeatureDistance(; metric = DS.CosineDist()).sim === ComplementSimilarity()
+            D = distance(de, Z)
+            @test issymmetric(D)
+            @test all(iszero, diag(D))
+            @test isapprox(D, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            # `cor_and_dist`'s first slot is the similarity, derived from this very `D`.
+            S, D2 = cor_and_dist(de, Z)
+            @test D2 == D
+            @test isapprox(S, cos.(pi .* D))
+            # `AngularSimilarity` recovers the cosine similarity exactly, with no `Z`.
+            Zc = randn(rng, 40, 7)
+            Sc, _ = cor_and_dist(de, Zc)
+            @test isapprox(Sc, one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            # Every `SemiMetric` yields a similarity; nothing throws.
+            Se, De = cor_and_dist(FeatureDistance(; metric = DS.Euclidean()), Zc)
+            @test isapprox(Se, one(eltype(De)) .- De)
+            # `dims` retargets to `Z`, so a transposed matrix gives the same answer.
+            @test isapprox(distance(de, permutedims(Zc); dims = 2), distance(de, Zc))
+            # Producer #4's square adjacency is integer-valued and needs no promotion.
+            Zi = [1 0 1; 0 1 1; 1 1 0]
+            @test eltype(distance(de, Zi)) === Float64
+            # Asset views are `SubArray`s and need no `collect`.
+            @test isapprox(distance(de, view(Zi, 1:2, :)), distance(de, Zi[1:2, :]))
+        end
+        @testset "Degenerate 2-D inputs" begin
+            de = FeatureDistance()
+            # A single feature: every asset is on one ray, so the angular distance is 0.
+            # `CorrDist` is NaN against any constant row, hence unusable here (#162).
+            Z1 = reshape([1.0, 2.0, 3.0], 3, 1)
+            @test all(iszero, distance(de, Z1))
+            Dc = distance(FeatureDistance(; metric = DS.CorrDist()), Z1)
+            @test all(isnan, Dc[(1:3) .!= (1:3)'])
+            # Zero rows: valid input the metric cannot measure. The patch rewrites only the
+            # entries the metric left as NaN.
+            Zz = [1.0 0.0; 0.0 0.0; 0.0 0.0; 1.0 1.0]
+            for metric in (AngularDist(), DS.CosineDist(), DS.Jaccard(), DS.BrayCurtis())
+                D = distance(FeatureDistance(; metric = metric), Zz)
+                @test !any(isnan, D)
+                @test iszero(D[2, 3])
+                @test isone(D[2, 1])
+                @test isone(D[3, 4])
+            end
+            # `Euclidean` places a zero row at the origin — a real distance, not a NaN — so
+            # the patch must leave it alone.
+            De = distance(FeatureDistance(; metric = DS.Euclidean()), Zz)
+            @test isapprox(De[2, 1], 1.0)
+            @test isapprox(De[2, 4], sqrt(2))
+            @test iszero(De[2, 3])
+        end
+        @testset "Collapse algorithms" begin
+            Z3 = abs.(randn(rng, 6, 5, 4))
+            algs = (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                    StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+            Ds = [distance(FeatureDistance(; alg = alg), Z3) for alg in algs]
+            for D in Ds
+                @test size(D) == (5, 5)
+                @test issymmetric(D)
+                @test all(iszero, diag(D))
+                @test !any(isnan, D)
+            end
+            # The four rules genuinely differ; `StackObservations` is not a rename of one
+            # of the other three.
+            for i in 1:4, j in (i + 1):4
+                @test !isapprox(Ds[i], Ds[j])
+            end
+            # `LastObservation` discards the window.
+            @test Ds[1] == distance(FeatureDistance(), Z3[6, :, :])
+            # `dims = 2` swaps the two trailing axes, for every rule.
+            Z3p = permutedims(Z3, (1, 3, 2))
+            for (alg, D) in zip(algs, Ds)
+                @test isapprox(distance(FeatureDistance(; alg = alg), Z3p; dims = 2), D)
+            end
+            # At T == 1 there is nothing to collapse, so all four agree exactly.
+            Z1 = Z3[6:6, :, :]
+            D1 = [distance(FeatureDistance(; alg = alg), Z1) for alg in algs]
+            @test all(D -> D == D1[1], D1)
+            @test D1[1] == Ds[1]
+            # `AggregateDistances` applies the zero-feature convention per observation, so
+            # an asset that is zero at *some* observations differs from the stacked form.
+            Zs = zeros(2, 3, 2)
+            Zs[1, :, :] = [1.0 0.0; 0.0 0.0; 0.0 1.0]
+            Zs[2, :, :] = [1.0 1.0; 1.0 0.0; 1.0 0.0]
+            @test !isapprox(distance(FeatureDistance(; alg = StackObservations()), Zs),
+                            distance(FeatureDistance(; alg = AggregateDistances()), Zs))
+            # A median of distance matrices is not a metric, so it is rejected outright.
+            @test_throws ArgumentError AggregateDistances(; alg = MedianCollapse())
+            @test AggregateFeatures(; alg = MedianCollapse()).alg === MedianCollapse()
+            # The 2-D method never consults `alg`.
+            Z2 = Z3[6, :, :]
+            for alg in algs
+                @test distance(FeatureDistance(; alg = alg), Z2) == distance(FeatureDistance(),
+                                                                             Z2)
+            end
+        end
+        @testset "Observation weights" begin
+            Z3 = abs.(randn(rng, 6, 5, 4))
+            w = pweights([1.0, 1, 1, 1, 1, 5])
+            pairs = [(AggregateFeatures(), AggregateFeatures(; w = w)),
+                     (AggregateDistances(), AggregateDistances(; w = w)),
+                     (AggregateFeatures(; alg = MedianCollapse()),
+                      AggregateFeatures(; w = w, alg = MedianCollapse()))]
+            for (alg, walg) in pairs
+                unweighted = distance(FeatureDistance(; alg = alg), Z3)
+                weighted = distance(FeatureDistance(; alg = walg), Z3)
+                @test !isapprox(unweighted, weighted)
+                @test issymmetric(weighted)
+                @test all(iszero, diag(weighted))
+            end
+            # `@wprop` on the collapse algorithm plus `@fprop` on `FeatureDistance.alg`
+            # closes the chain, so `factory` installs threaded weights.
+            fd = factory(FeatureDistance(; alg = AggregateFeatures()), w)
+            @test fd.alg.w === w
+            @test fd.metric === AngularDist()
+            @test fd.sim === AngularSimilarity()
+            # The rules with no observation axis to weight ignore threaded weights.
+            @test factory(FeatureDistance(), w).alg === LastObservation()
+            # `FeatureDistance` must be `@propagatable`, or `ClustersEstimator`'s `@fprop de`
+            # has nothing to recurse into.
+            @test hasmethod(factory, Tuple{FeatureDistance, Vararg{Any}})
+        end
+        @testset "Feature matrix validation" begin
+            de = FeatureDistance()
+            Z = [1.0 2.0; 3.0 4.0]
+            @test_throws DomainError distance(de, Z; dims = 3)
+            @test_throws PortfolioOptimisers.IsEmptyError distance(de,
+                                                                   Matrix{Float64}(undef, 0,
+                                                                                   0))
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de, [1.0 NaN; 3.0 4.0])
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de, [1.0 Inf; 3.0 4.0])
+            # `Jaccard` is the Ruzicka form and returns values up to 2 on signed input,
+            # silently. The non-negativity check is mandatory for it, and for the two other
+            # non-negative-domain metrics, but must not fire for the default.
+            for metric in (DS.Jaccard(), DS.BrayCurtis(), DS.ChiSqDist())
+                @test_throws DomainError distance(FeatureDistance(; metric = metric),
+                                                  [1.0 -2.0; 3.0 4.0])
+            end
+            @test !any(isnan, distance(de, [1.0 -2.0; 3.0 4.0]))
+            # Structural degeneracy the metric can handle is admitted, not rejected.
+            @test size(distance(de, [1.0 1.0; 1.0 1.0; 0.0 0.0])) == (3, 3)
+            # The 3-D entry point validates the same way.
+            @test_throws DomainError distance(de, abs.(randn(rng, 2, 3, 2)); dims = 3)
+        end
+        @testset "FeatureDistance is a distance estimator" begin
+            # It is a peer of `Distance`/`DistanceDistance`, not one of their algorithms:
+            # every consumer types its `de` field as `AbstractDistanceEstimator`.
+            @test FeatureDistance() isa PortfolioOptimisers.AbstractDistanceEstimator
+            @test LastObservation() isa PortfolioOptimisers.AbstractFeatureCollapseAlgorithm
+            @test MeanCollapse() isa PortfolioOptimisers.AbstractCollapseAlgorithm
+            @test AngularDist() isa DS.SemiMetric
+        end
+    end
     @testset "Clustering tests" begin
         clr = clusterise(ClustersEstimator(; ce = PortfolioOptimisersCovariance(),
                                            de = Distance(; alg = CanonicalDistance()),
