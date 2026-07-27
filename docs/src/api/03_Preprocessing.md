@@ -12,7 +12,17 @@ prices_to_returns
 port_opt_view(::ReturnsResult, ::Any)
 returns_result_picker
 Prices_RR
+PortfolioOptimisers.apply_impute_method
 ```
+
+!!! note "`Impute` is optional; `Imputer` is not `Impute`"
+    The `impute_method` keyword of [`prices_to_returns`](@ref) takes an
+    [`Impute.jl`](https://github.com/invenia/Impute.jl) imputor, and `Impute` is a **weak**
+    dependency: add it to your project and `using Impute` to load `PortfolioOptimisersImputeExt`,
+    which supplies the method. Without it, passing an imputor raises an `ArgumentError` rather than
+    working silently. This is unrelated to [`Imputer`](@ref), PortfolioOptimisers' own imputation
+    estimator for pipelines, despite the similar name. See
+    `docs/adr/0042-impute-is-a-weak-dependency.md`.
 
 ## Price-level data
 

@@ -19,7 +19,6 @@ DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-Impute = "f7bf1975-0170-51b9-8c5f-a992d46b9575"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -42,9 +41,11 @@ TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [weakdeps]
 GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
+Impute = "f7bf1975-0170-51b9-8c5f-a992d46b9575"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [extensions]
+PortfolioOptimisersImputeExt = "Impute"
 PortfolioOptimisersPlotsExt = ["GraphRecipes", "StatsPlots"]
 
 [compat]
