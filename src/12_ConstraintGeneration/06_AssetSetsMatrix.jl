@@ -24,11 +24,11 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx",
-                        dict = Dict("nx" => ["A", "B", "C"],
-                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
+julia> sets = AssetSets(; key = \"nx\",
+                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
 
-julia> est = AssetSetsMatrixEstimator(; val = "nx_sector")
+julia> est = AssetSetsMatrixEstimator(; val = \"nx_sector\")
 AssetSetsMatrixEstimator
   val ┴ String: "nx_sector"
 
@@ -127,11 +127,11 @@ Construct a binary asset-group membership matrix from asset set groupings.
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx",
-                        dict = Dict("nx" => ["A", "B", "C"],
-                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
+julia> sets = AssetSets(; key = \"nx\",
+                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
 
-julia> asset_sets_matrix("nx_sector", sets)
+julia> asset_sets_matrix(\"nx_sector\", sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
  1  1  0
  0  0  1

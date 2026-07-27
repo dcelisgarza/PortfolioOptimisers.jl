@@ -1359,13 +1359,13 @@ rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
 ```julia
 @windowed_estimator WindowedVariance <: AbstractVarianceEstimator begin
     ve::AbstractVarianceEstimator = SimpleVariance()
-    noun    = "Variance"
+    noun = \"Variance\"
     forward = [Statistics.var(::MatNum; mean) => :vararr,
                Statistics.var(::VecNum; mean) => :varnum]
-    doctest = \"\"\"
+    doctest = \"""
     julia> WindowedVariance()
     ...
-    \"\"\"
+    \"""
 end
 ```
 

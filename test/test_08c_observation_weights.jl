@@ -65,7 +65,7 @@ const PO = PortfolioOptimisers
         @test length(PO.get_observation_weights(VectorOnlyObsWeights(), x)) == 60
         # ...but the shape it never implemented raises rather than silently unweighting.
         @test_throws PO.ObservationWeightsError PO.get_observation_weights(VectorOnlyObsWeights(),
-                                                                          X; dims = 1)
+                                                                           X; dims = 1)
     end
 
     @testset "ObservationWeightsError" begin
@@ -105,9 +105,10 @@ const PO = PortfolioOptimisers
         @test length(w) == 10
 
         vw = VectorOnlyObsWeights()
-        @test_throws PO.ObservationWeightsError PO.moment_window_and_weights(X, vw; dims = 1)
+        @test_throws PO.ObservationWeightsError PO.moment_window_and_weights(X, vw;
+                                                                             dims = 1)
         @test_throws PO.ObservationWeightsError PO.moment_window_and_weights(X, vw, idx;
-                                                                            dims = 1)
+                                                                             dims = 1)
 
         # `nothing` weights remain permissive through the same helper: the strictness must
         # not leak into the legitimately-unweighted path.
@@ -132,8 +133,9 @@ const PO = PortfolioOptimisers
         # MethodError while its sibling `cor` worked. It now resolves like `cor` does, and
         # agrees with passing the equivalent static weights directly.
         @test isapprox(cov(GeneralCovariance(; w = cw), X),
-                       cov(GeneralCovariance(; w = PO.get_observation_weights(cw, X;
-                                                                             dims = 1)), X))
+                       cov(GeneralCovariance(;
+                                             w = PO.get_observation_weights(cw, X;
+                                                                            dims = 1)), X))
 
         # An unresolvable type raises instead of returning an unweighted moment.
         @test_throws PO.ObservationWeightsError cor(GeneralCovariance(; w = vw), X)

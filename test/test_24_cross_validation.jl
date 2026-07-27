@@ -735,7 +735,7 @@
                                        range(; start = 0.0009, stop = 0.0012, length = 3)],
                                   [:(opti[2]) =>
                                        [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                        MeanRisk(; opt = opt, obj = MaximumRatio())]]]);
+                                        MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)

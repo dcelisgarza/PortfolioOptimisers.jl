@@ -165,8 +165,8 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 # Examples
 
 ```jldoctest
-julia> WeightBoundsEstimator(; lb = Dict("A" => 0.1, "B" => 0.2),
-                             ub = Dict("A" => 0.8, "B" => 0.9))
+julia> WeightBoundsEstimator(; lb = Dict(\"A\" => 0.1, \"B\" => 0.2),
+                             ub = Dict(\"A\" => 0.8, \"B\" => 0.9))
 WeightBoundsEstimator
    lb ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
    ub ┼ Dict{String, Float64}: Dict("B" => 0.9, "A" => 0.8)
@@ -275,9 +275,9 @@ Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> wb = WeightBoundsEstimator(; lb = Dict("A" => 0.1, "B" => 0.2), ub = 1.0);
+julia> wb = WeightBoundsEstimator(; lb = Dict(\"A\" => 0.1, \"B\" => 0.2), ub = 1.0);
 
 julia> weight_bounds_constraints(wb, sets)
 WeightBounds

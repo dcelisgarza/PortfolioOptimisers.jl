@@ -104,7 +104,8 @@
             # `AngularSimilarity` recovers the cosine similarity exactly, with no `Z`.
             Zc = randn(rng, 40, 7)
             Sc, _ = cor_and_dist(de, Zc)
-            @test isapprox(Sc, one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            @test isapprox(Sc,
+                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
             # Every `SemiMetric` yields a similarity; nothing throws.
             Se, De = cor_and_dist(FeatureDistance(; metric = DS.Euclidean()), Zc)
             @test isapprox(Se, one(eltype(De)) .- De)
@@ -182,8 +183,8 @@
             # The 2-D method never consults `alg`.
             Z2 = Z3[6, :, :]
             for alg in algs
-                @test distance(FeatureDistance(; alg = alg), Z2) == distance(FeatureDistance(),
-                                                                             Z2)
+                @test distance(FeatureDistance(; alg = alg), Z2) ==
+                      distance(FeatureDistance(), Z2)
             end
         end
         @testset "Observation weights" begin
@@ -219,8 +220,10 @@
             @test_throws PortfolioOptimisers.IsEmptyError distance(de,
                                                                    Matrix{Float64}(undef, 0,
                                                                                    0))
-            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de, [1.0 NaN; 3.0 4.0])
-            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de, [1.0 Inf; 3.0 4.0])
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de,
+                                                                       [1.0 NaN; 3.0 4.0])
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de,
+                                                                       [1.0 Inf; 3.0 4.0])
             # `Jaccard` is the Ruzicka form and returns values up to 2 on signed input,
             # silently. The non-negativity check is mandatory for it, and for the two other
             # non-negative-domain metrics, but must not fire for the default.

@@ -36,7 +36,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 # Examples
 
 ```jldoctest
-julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2), dval = 0.0)
+julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2), dval = 0.0)
 TurnoverEstimator
       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
     val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
@@ -108,7 +108,7 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
 # Examples
 
 ```jldoctest
-julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2),
                               dval = 0.0)
 TurnoverEstimator
       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
@@ -123,7 +123,7 @@ TurnoverEstimator
    dval ┼ Float64: 0.0
   fixed ┴ Bool: false
 
-julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2),
                               dval = 0.0, fixed = true)
 TurnoverEstimator
       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
@@ -179,9 +179,9 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2));
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2));
 
 julia> turnover_constraints(tn, sets)
 Turnover
@@ -489,11 +489,11 @@ Provides a uniform interface for processing multiple constraint estimators simul
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> tn1 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2));
+julia> tn1 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2));
 
-julia> tn2 = TurnoverEstimator(; w = [0.1, 0.4, 0.5], val = Dict("B" => 0.15, "C" => 0.3));
+julia> tn2 = TurnoverEstimator(; w = [0.1, 0.4, 0.5], val = Dict(\"B\" => 0.15, \"C\" => 0.3));
 
 julia> turnover_constraints([tn1, tn2], sets)
 2-element Vector{Turnover{Vector{Float64}, Vector{Float64}, Bool}}:
@@ -596,7 +596,7 @@ Create views of multiple turnover constraints or estimators for a subset of asse
 ```jldoctest
 julia> tn1 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0], fixed = true);
 
-julia> tn2 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
+julia> tn2 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2),
                                dval = 0.0, fixed = true);
 
 julia> PortfolioOptimisers.port_opt_view(concrete_typed_array([tn1, tn2]), 1:2)

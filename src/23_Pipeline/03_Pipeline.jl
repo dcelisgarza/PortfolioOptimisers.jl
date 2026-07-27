@@ -567,7 +567,7 @@ The context slot matching the input type is filled (`PricesResult` → `prices`,
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 4),
-                     [100.0 101.0; 102.0 103.0; 101.0 104.0; 103.0 102.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 101.0 104.0; 103.0 102.0], [\"A\", \"B\"]);
 
 julia> pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted()));
 

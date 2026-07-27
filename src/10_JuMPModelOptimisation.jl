@@ -195,7 +195,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> JuMPResult(; trials = Dict(:HiGHS => Dict(:optimize! => "error")), success = true)
+julia> JuMPResult(; trials = Dict(:HiGHS => Dict(:optimize! => \"error\")), success = true)
 JuMPResult
    trials ┼ Dict{Symbol, Dict{Symbol, String}}: Dict(:HiGHS => Dict(:optimize! => "error"))
   success ┴ Bool: true

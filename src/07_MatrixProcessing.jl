@@ -35,7 +35,7 @@ julia> function PortfolioOptimisers.matrix_processing!(est::MyMatrixProcessingEs
                                                        sigma::PortfolioOptimisers.MatNum,
                                                        X::PortfolioOptimisers.MatNum)
            # Implement your in-place matrix processing logic here.
-           println("Processing matrix in-place...")
+           println(\"Processing matrix in-place...\")
            return sigma
        end
 
@@ -43,7 +43,7 @@ julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEst
                                                       sigma::PortfolioOptimisers.MatNum,
                                                       X::PortfolioOptimisers.MatNum)
            sigma = copy(sigma)
-           println("Copy sigma...")
+           println(\"Copy sigma...\")
            matrix_processing!(est, sigma, X)
            return sigma
        end
@@ -104,7 +104,7 @@ julia> function PortfolioOptimisers.matrix_processing_algorithm!(alg::MyMatrixPr
                                                                  X::PortfolioOptimisers.MatNum;
                                                                  kwargs...)
            # Implement your in-place matrix processing algorithm logic here.
-           println("Applying custom matrix processing algorithm in-place...")
+           println(\"Applying custom matrix processing algorithm in-place...\")
            return sigma
        end
 
@@ -113,7 +113,7 @@ julia> function PortfolioOptimisers.matrix_processing_algorithm(alg::MyMatrixPro
                                                                 X::PortfolioOptimisers.MatNum;
                                                                 kwargs...)
            sigma = copy(sigma)
-           println("Copy sigma...")
+           println(\"Copy sigma...\")
            return PortfolioOptimisers.matrix_processing_algorithm!(alg, sigma, X; kwargs...)
        end
 

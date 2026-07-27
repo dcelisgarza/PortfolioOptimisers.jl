@@ -107,7 +107,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -204,7 +204,7 @@ The asset price series is the master clock: `i` selects rows of `X`, and the fac
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -303,7 +303,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+julia> ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
      X ┼ 2×2 Matrix{Float64}
@@ -454,7 +454,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
      X ┼ 2×2 Matrix{Float64}
@@ -534,7 +534,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = ["F1"],
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = [\"F1\"],
                           F = [1.0; 2.0; 3.0;;])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
@@ -716,7 +716,7 @@ The free-function form of [`TrainTestSplit`](@ref); the windows are [`port_opt_v
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A"], X = reshape(collect(0.1:0.1:1.0), 10, 1));
+julia> rd = ReturnsResult(; nx = [\"A\"], X = reshape(collect(0.1:0.1:1.0), 10, 1));
 
 julia> train, test = train_test_split(rd; test_size = 0.2);
 
@@ -771,7 +771,7 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.10 0.20; 0.30 0.40], nb = ["BM"],
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.10 0.20; 0.30 0.40], nb = [\"BM\"],
                           B = [0.01; 0.02])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
@@ -962,7 +962,7 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
-                     ["A", "B"])
+                     [\"A\", \"B\"])
 3×2 TimeSeries.TimeArray{Int64, 2, Dates.Date, Matrix{Int64}} 2020-01-01 to 2020-01-03
 ┌────────────┬─────┬─────┐
 │            │ A   │ B   │
@@ -1614,7 +1614,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -1715,7 +1715,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 NaN; 102.0 NaN; 104.0 105.0],
-                     ["A", "B"]);
+                     [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -1831,7 +1831,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 1.0; NaN 3.0; 104.0 5.0],
-                     ["A", "B"]);
+                     [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 

@@ -34,9 +34,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> BlackLittermanPrior(; sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"])),
+julia> BlackLittermanPrior(; sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                            views = LinearConstraintEstimator(;
-                                                             val = ["A == 0.03", "B + C == 0.04"]))
+                                                             val = [\"A == 0.03\", \"B + C == 0.04\"]))
 BlackLittermanPrior
           pe ┼ EmpiricalPrior
              │        ce ┼ PortfolioOptimisersCovariance

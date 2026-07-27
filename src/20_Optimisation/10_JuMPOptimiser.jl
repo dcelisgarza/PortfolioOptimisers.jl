@@ -46,7 +46,7 @@ construct via [`processed_jump_optimiser_attributes`](@ref) rather than directly
 
 ```jldoctest
 julia> pr = prior(EmpiricalPrior(),
-                  ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+                  ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
 
 julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
                                         lcsr = nothing, ctr = nothing, gcardr = nothing,
@@ -1324,7 +1324,7 @@ before calling this function. See `Model Assembly` in `CONTEXT.md` and
 julia> using PortfolioOptimisers
 
 julia> pr = prior(EmpiricalPrior(),
-                  ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+                  ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
 
 julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
                                         lcsr = nothing, ctr = nothing, gcardr = nothing,
