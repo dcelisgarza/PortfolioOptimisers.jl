@@ -1163,7 +1163,7 @@ function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any,
                                               <:AbstractSimilarityMatrixAlgorithm},
                         X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
-    S = dbht_similarity(nte.alg; S = S, D = D)
+    S = distance_to_similarity(nte.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
@@ -1297,7 +1297,7 @@ Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a
   - [`Clusters`](@ref)
   - [`_clusterise`](@ref)
   - [`PMFG_T2s`](@ref)
-  - [`dbht_similarity`](@ref)
+  - [`distance_to_similarity`](@ref)
 """
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractSimilarityMatrixAlgorithm,
@@ -1305,7 +1305,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                     dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
-    S = dbht_similarity(nte.nte.alg; S = S, D = D)
+    S = distance_to_similarity(nte.nte.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     for i in 0:(nte.nte.n)
         P .+= S^i - Rpm^i

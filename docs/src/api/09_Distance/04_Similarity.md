@@ -1,0 +1,12 @@
+# Similarity Matrices
+
+```@docs
+AbstractSimilarityMatrixAlgorithm
+MaximumDistanceSimilarity
+ExponentialSimilarity
+GeneralExponentialSimilarity
+ComplementSimilarity
+AngularSimilarity
+distance_to_similarity
+default_similarity
+```

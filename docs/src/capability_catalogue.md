@@ -260,6 +260,8 @@ Adjacency matrices encode asset relationships either with clustering or graph th
     - Maximum distance similarity [`MaximumDistanceSimilarity`](@ref)
     - Exponential similarity [`ExponentialSimilarity`](@ref)
     - General exponential similarity [`GeneralExponentialSimilarity`](@ref)
+    - Linear complement similarity [`ComplementSimilarity`](@ref)
+    - Angular similarity [`AngularSimilarity`](@ref)
 - Estimator type for clustering. [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
 - Estimator type for network-based phylogeny analysis. [`NetworkClustersEstimator`](@ref)
 - Group assets by clustering them, and keep the best-scoring member of each cluster. [`ClusterGroups`](@ref)

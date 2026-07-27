@@ -485,6 +485,9 @@ function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
     s = LinearAlgebra.diag(S)
     iscov = any(!isone, s)
     if iscov
+        # Copy before rescaling: `cov2cor!` mutates in place, and `clr.S` is the caller's
+        # stored result, not ours to rewrite.
+        S = copy(S)
         s .= sqrt.(s)
         StatsBase.cov2cor!(S, s)
     end

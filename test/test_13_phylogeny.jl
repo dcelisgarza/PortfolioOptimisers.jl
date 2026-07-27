@@ -1,10 +1,51 @@
 @testset "Phylogeny tests" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StableRNGs,
-          StatsBase, SparseArrays
+          StatsBase, SparseArrays, LinearAlgebra
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPrior(), rd)
     wt = pweights(fill(inv(size(pr.X, 1)), size(pr.X, 1)))
+    @testset "Similarity matrix tests" begin
+        _, D = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), pr.X)
+        Sc = PortfolioOptimisers.distance_to_similarity(ComplementSimilarity(); D = D)
+        Sa = PortfolioOptimisers.distance_to_similarity(AngularSimilarity(); D = D)
+        # Both are pure elementwise transforms of D.
+        @test isapprox(Sc, one(eltype(D)) .- D)
+        @test isapprox(Sa, cos.(pi .* D))
+        # Symmetry and the unit diagonal survive both, since `pairwise` zeroes the diagonal.
+        for S in (Sc, Sa)
+            @test issymmetric(S)
+            @test isapprox(diag(S), ones(size(S, 1)))
+        end
+        # `AngularSimilarity` is bounded; `ComplementSimilarity` is only bounded when D is.
+        @test all(-one(eltype(Sa)) .<= Sa .<= one(eltype(Sa)))
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(ComplementSimilarity();
+                                                                  D = [0.0 7.0; 7.0 0.0]),
+                       [1.0 -6.0; -6.0 1.0])
+        # `AngularSimilarity` inverts a normalised angular distance exactly.
+        rho = cor(pr.X)
+        Da = acos.(clamp.(rho, -1, 1)) ./ pi
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                  D = Da), rho)
+        # The zero-row convention: D = 1 against a non-zero row, D = 0 between two zero rows.
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                  D = [0.0 1.0 1.0
+                                                                       1.0 0.0 0.0
+                                                                       1.0 0.0 0.0]),
+                       [1.0 -1.0 -1.0; -1.0 1.0 1.0; -1.0 1.0 1.0])
+        # `default_similarity` falls back to the linear complement for every metric.
+        for metric in (PortfolioOptimisers.Distances.CosineDist(),
+                       PortfolioOptimisers.Distances.Jaccard(),
+                       PortfolioOptimisers.Distances.BrayCurtis(),
+                       PortfolioOptimisers.Distances.CorrDist(),
+                       PortfolioOptimisers.Distances.Euclidean())
+            @test PortfolioOptimisers.default_similarity(metric) === ComplementSimilarity()
+        end
+        # Both new members are on the exported API and in the family.
+        @test ComplementSimilarity() isa
+              PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+        @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+    end
     @testset "Clustering tests" begin
         clr = clusterise(ClustersEstimator(; ce = PortfolioOptimisersCovariance(),
                                            de = Distance(; alg = CanonicalDistance()),
@@ -57,9 +98,10 @@
                                                                        alg = SecondOrderDifference())),
                          pr.X)
         S, D = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), pr.X)
-        @test isapprox(PortfolioOptimisers.dbht_similarity(ExponentialSimilarity(); D = D),
-                       PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
-                                                           D = D))
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity();
+                                                                  D = D),
+                       PortfolioOptimisers.distance_to_similarity(GeneralExponentialSimilarity();
+                                                                  D = D))
         A1, tri1, separators1, cliques1, cliqueTree1 = PortfolioOptimisers.PMFG_T2s(S, 5)
         @test isapprox(A1,
                        sparse([2, 3, 4, 6, 7, 9, 10, 13, 14, 16, 1, 3, 4, 5, 6, 7, 10, 13,
@@ -259,29 +301,29 @@
         @test clr.k == 3
 
         @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                              alg = SecondOrderDifference(),
-                                                                                                                                                              max_k = nothing),
-                                                                                                                                        alg, clr.D)[2]
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = nothing),
+                                                               alg, clr.D)[2]
         @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                        alg = SecondOrderDifference(),
-                                                                                                                                                        max_k = 1),
-                                                                                                                                  alg, clr.D)[2]
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = 1),
+                                                               alg, clr.D)[2]
         @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                          alg = SecondOrderDifference(),
-                                                                                                                                                          max_k = 100),
-                                                                                                                                    alg, clr.D)[2]
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = 100),
+                                                               alg, clr.D)[2]
         @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                        alg = SilhouetteScore(),
-                                                                                                                                                        max_k = nothing),
-                                                                                                                                  alg, clr.D)[2]
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = nothing),
+                                                               alg, clr.D)[2]
         @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                  alg = SilhouetteScore(),
-                                                                                                                                                  max_k = 1),
-                                                                                                                            alg, clr.D)[2]
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = 1),
+                                                               alg, clr.D)[2]
         @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                                                                                    alg = SilhouetteScore(),
-                                                                                                                                                    max_k = 100),
-                                                                                                                              alg, clr.D)[2]
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = 100),
+                                                               alg, clr.D)[2]
         @test 4 ==
               PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
                                                                                 max_k = nothing),
@@ -461,12 +503,12 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        @test isapprox(PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(GeneralExponentialSimilarity();
                                                            D = rho),
-                       PortfolioOptimisers.dbht_similarity(ExponentialSimilarity(); D = rho))
+                       PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity(); D = rho))
 
         sim = MaximumDistanceSimilarity()
-        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.distance_to_similarity(sim; S = rho, D = dist)
         root = UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = PortfolioOptimisers.DBHTs(dist, S;
                                                                      branchorder = :default,
@@ -611,7 +653,7 @@
         @test isapprox(cliqueTree1, cliqueTree1_t)
 
         sim = ExponentialSimilarity()
-        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.distance_to_similarity(sim; S = rho, D = dist)
 
         root = EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = PortfolioOptimisers.DBHTs(dist, S;

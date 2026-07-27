@@ -37,189 +37,6 @@ struct EqualRoot <: DBHTRootMethod end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
-
-# Related
-
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`DBHT`](@ref)
-  - [`LoGo`](@ref)
-"""
-abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using the maximum distance transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using the exponential transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using a generalised exponential transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-  - ``c``: Scale factor.
-  - ``p``: Exponent.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    GeneralExponentialSimilarity(;
-        coef::Number = 1.0,
-        power::Number = 1.0
-    ) -> GeneralExponentialSimilarity
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:dbhtcoef])
-  - $(val_dict[:dbhtpower])
-
-# Examples
-
-```jldoctest
-julia> GeneralExponentialSimilarity()
-GeneralExponentialSimilarity
-   coef ┼ Int64: 1
-  power ┴ Int64: 1
-```
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-@concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
-    """
-    $(field_dict[:dbhtcoef])
-    """
-    coef
-    """
-    $(field_dict[:dbhtpower])
-    """
-    power
-    function GeneralExponentialSimilarity(coef::Number, power::Number)
-        @argcheck(zero(coef) < coef, DomainError)
-        @argcheck(zero(power) < power, DomainError)
-        return new{typeof(coef), typeof(power)}(coef, power)
-    end
-end
-function GeneralExponentialSimilarity(; coef::Number = 1,
-                                      power::Number = 1)::GeneralExponentialSimilarity
-    return GeneralExponentialSimilarity(coef, power)
-end
-"""
-    dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::MatNum, kwargs...)
-
-Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
-
-This function dispatches on the type of `se` to apply the appropriate similarity transformation to the distance matrix `D`. Used internally by DBHT and related clustering algorithms.
-
-# Arguments
-
-  - `se`: Similarity matrix algorithm.
-
-      + `se::MaximumDistanceSimilarity`: Uses the maximum distance transformation.
-      + `se::ExponentialSimilarity`: Uses the exponential transformation.
-      + `se::GeneralExponentialSimilarity`: Uses a generalised exponential transformation.
-
-  - `D`: Distance matrix.
-
-  - `kwargs...`: Additional keyword arguments (not used).
-
-# Returns
-
-  - `S::Matrix{<:Number}`: Similarity matrix of the same size as `D`.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-"""
-function dbht_similarity(::MaximumDistanceSimilarity; D::MatNum, kwargs...)
-    return ceil(maximum(D)^2) .- D .^ 2
-end
-function dbht_similarity(::ExponentialSimilarity; D::MatNum, kwargs...)
-    return exp.(-D)
-end
-function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
-    power = se.power
-    coef = se.coef
-    return exp.(-coef * D .^ power)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
 `DBHT` is a composable clustering algorithm type for constructing hierarchical clusterings using the Direct Bubble Hierarchical Tree (DBHT) method, as described in [DBHTs](@cite).
@@ -1769,7 +1586,7 @@ This method computes the similarity and distance matrices from the input data ma
 # Details
 
   - Computes the similarity and distance matrices using the estimator's configured correlation and distance estimators.
-  - Applies the selected similarity transformation via [`dbht_similarity`](@ref).
+  - Applies the selected similarity transformation via [`distance_to_similarity`](@ref).
   - Runs the full DBHT clustering pipeline via [`DBHTs`](@ref), including PMFG construction, clique and bubble hierarchy extraction, and dendrogram construction.
   - Determines the optimal number of clusters using the estimator's cluster selection method.
   - Returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
@@ -1783,13 +1600,13 @@ This method computes the similarity and distance matrices from the input data ma
   - [`DBHT`](@ref)
   - [`Clusters`](@ref)
   - [`DBHTs`](@ref)
-  - [`dbht_similarity`](@ref)
+  - [`distance_to_similarity`](@ref)
   - [`ClustersEstimator`](@ref)
 """
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                     branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
-    S = dbht_similarity(cle.alg.sim; S = S, D = D)
+    S = distance_to_similarity(cle.alg.sim; S = S, D = D)
     res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
@@ -1984,7 +1801,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - [`J_LoGo`](@ref)
   - [`LoGo_dist_assert`](@ref)
   - [`PMFG_T2s`](@ref)
-  - [`dbht_similarity`](@ref)
+  - [`distance_to_similarity`](@ref)
   - [`Posdef`](@ref)
 """
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
@@ -1999,7 +1816,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
         sigma
     end
     D = distance(je.de, S, X; dims = dims, kwargs...)
-    S = dbht_similarity(je.sim; S = S, D = D)
+    S = distance_to_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I
     posdef!(je.pdm, sigma)
@@ -2072,5 +1889,4 @@ function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::
     return logo!(je, sigma, X; dims = dims, kwargs...)
 end
 
-export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
-       UniqueRoot, EqualRoot, DBHT, LoGo, Clusters
+export UniqueRoot, EqualRoot, DBHT, LoGo, Clusters

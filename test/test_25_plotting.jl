@@ -111,6 +111,13 @@
         @test is_plot(plot_clusters(cle, pr.X))
         @test is_plot(plot_clusters(cle, pr, rd.nx))
         @test is_plot(plot_clusters(cle, rd))
+
+        # A non-unit diagonal sends plot_clusters down its cov2cor! branch, which must not
+        # rewrite the caller's stored similarity matrix.
+        cov_clr = Clusters(; res = clr.res, S = 4 * clr.S, D = clr.D, k = clr.k)
+        S0 = copy(cov_clr.S)
+        @test is_plot(plot_clusters(cov_clr))
+        @test cov_clr.S == S0
     end
 
     @testset "plot_drawdowns" begin
