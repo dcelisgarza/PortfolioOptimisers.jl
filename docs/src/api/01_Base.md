@@ -106,6 +106,7 @@ IsEmptyError
 IsNonFiniteError
 PropertyPathError
 ConflictingArgumentError
+ObservationWeightsError
 ```
 
 ## Assertions

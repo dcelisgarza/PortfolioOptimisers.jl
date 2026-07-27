@@ -857,14 +857,14 @@ julia> function MyWeights(; half_life::Integer = 5)
        end
 MyWeights
 
-julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.VecNum;
                                                             kwargs...)
            lambda = 2^(-inv(w.half_life))
            return eweights(1:length(X), lambda; scale = true)
        end
 
-julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.MatNum;
                                                             dims::Int = 1, kwargs...)
            lambda = 2^(-inv(w.half_life))
@@ -898,10 +898,37 @@ julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dim
  1.0
 ```
 
+Both methods must be dispatched on the concrete subtype, as above — never on `DynamicAbstractWeights` itself, which would capture every other subtype too.
+
+Implementing only one of the two arities is the mistake to avoid. Rather than silently computing an unweighted result, the unimplemented shape raises [`ObservationWeightsError`](@ref) and names the methods to write:
+
+```jldoctest
+julia> struct PartialWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+
+julia> function PortfolioOptimisers.get_observation_weights(w::PartialWeights,
+                                                            X::PortfolioOptimisers.VecNum;
+                                                            kwargs...)
+           return eweights(1:length(X), 0.5; scale = true)
+       end
+
+julia> PortfolioOptimisers.get_observation_weights(PartialWeights(), 1:3)
+3-element Weights{Float64, Float64, Vector{Float64}}:
+ 0.25
+ 0.5
+ 1.0
+
+julia> PortfolioOptimisers.get_observation_weights(PartialWeights(), ones(3, 10))
+ERROR: ObservationWeightsError: PartialWeights is a DynamicAbstractWeights with no `get_observation_weights` method for a 2-dimensional input of size (3, 10). Implement `get_observation_weights(w::PartialWeights, X::VecNum; kwargs...)` and/or `get_observation_weights(w::PartialWeights, X::MatNum; dims::Int = 1, kwargs...)`, or pass a `StatsBase.AbstractWeights` instead (or `nothing` to compute unweighted). See the `DynamicAbstractWeights` docstring for a worked example.
+Stacktrace:
+[...]
+```
+
 # Related
 
   - [`ObsWeights`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`ObservationWeightsError`](@ref)
+  - [`get_observation_weights`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 abstract type DynamicAbstractWeights <: AbstractEstimator end
@@ -1990,6 +2017,45 @@ Stacktrace:
     msg
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a [`DynamicAbstractWeights`](@ref) cannot resolve observation weights for the data it was handed, because no [`get_observation_weights`](@ref) method is implemented for that input's shape.
+
+[`get_observation_weights`](@ref) returns `nothing` to mean *no weights were requested*, never *weights were unavailable*. Every `isnothing` branch downstream reads it the first way and computes an unweighted result, so a `DynamicAbstractWeights` that resolved to `nothing` would silently produce a numerically plausible but unweighted answer with no diagnostic. It raises instead.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ObservationWeightsError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(ObservationWeightsError("MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)"))
+ERROR: ObservationWeightsError: MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+@concrete struct ObservationWeightsError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
@@ -2544,6 +2610,10 @@ const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 
 Get the observation weights for statistical estimation.
 
+`nothing` is returned only when `w === nothing`, and means *no weights were requested* — every `isnothing` branch downstream reads it that way and computes an unweighted result. It never means *weights were unavailable*: a [`DynamicAbstractWeights`](@ref) with no method for the given input shape throws [`ObservationWeightsError`](@ref) rather than resolving to `nothing`, because returning `nothing` there would silently yield an unweighted answer that looks plausible.
+
+This is why call sites need no strictness check of their own. A `DynamicAbstractWeights` is resolved *before* dispatch (see [`average_drawdown`](@ref) for the pattern), so the estimator downstream only ever sees a concrete weight vector or a deliberate `nothing`.
+
 # Arguments
 
   - $(arg_dict[:oow])
@@ -2552,14 +2622,30 @@ Get the observation weights for statistical estimation.
 
 # Returns
 
-  - `w::Option{<:VecNum}`: The observation weights, or `nothing` for when `w` is [`DynamicAbstractWeights`](@ref) or `nothing`.
+  - `w::Option{<:VecNum}`: The observation weights, or `nothing` when `w` is `nothing`.
+
+# Throws
+
+  - [`ObservationWeightsError`](@ref): if `w` is a [`DynamicAbstractWeights`](@ref) with no `get_observation_weights` method for the shape of the given input.
 
 # Related
 
   - [`ObsWeights`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`ObservationWeightsError`](@ref)
 """
-function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
+function get_observation_weights(::Nothing, args...; kwargs...)
     return nothing
+end
+function get_observation_weights(w::DynamicAbstractWeights, args...; kwargs...)
+    name = nameof(typeof(w))
+    X = isempty(args) ? nothing : first(args)
+    shape = if isa(X, AbstractArray)
+        "a $(ndims(X))-dimensional input of size $(size(X))"
+    else
+        "the given input"
+    end
+    return throw(ObservationWeightsError("$name is a DynamicAbstractWeights with no `get_observation_weights` method for $shape. Implement `get_observation_weights(w::$name, X::VecNum; kwargs...)` and/or `get_observation_weights(w::$name, X::MatNum; dims::Int = 1, kwargs...)`, or pass a `StatsBase.AbstractWeights` instead (or `nothing` to compute unweighted). See the `DynamicAbstractWeights` docstring for a worked example."))
 end
 function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
@@ -3617,4 +3703,5 @@ function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
-       PropertyPathError, VecScalar, L2Norm, SquaredL2Norm, L1Norm, LpNorm, LInfNorm
+       PropertyPathError, ObservationWeightsError, VecScalar, L2Norm, SquaredL2Norm, L1Norm,
+       LpNorm, LInfNorm

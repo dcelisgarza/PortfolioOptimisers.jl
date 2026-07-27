@@ -116,10 +116,11 @@ julia> cov(GeneralCovariance(), X)
 """
 function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    return if isnothing(ce.w)
+    w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+        robust_cov(ce.ce, X, w; dims = dims, mean = mean, kwargs...)
     end
 end
 """
