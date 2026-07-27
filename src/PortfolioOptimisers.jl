@@ -19,7 +19,6 @@ using DocStringExtensions: DocStringExtensions
 using FLoops: FLoops
 using GLM: GLM
 using Graphs: Graphs
-using Impute: Impute
 using InteractiveUtils: InteractiveUtils
 using JuMP: JuMP
 using LinearAlgebra: LinearAlgebra

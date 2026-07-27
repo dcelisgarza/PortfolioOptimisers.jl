@@ -47,4 +47,38 @@
 
         @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
     end
+
+    @testset "impute_method without Impute loaded" begin
+        # `Impute` is a weak dependency (ADR 0042) and is deliberately absent from the test
+        # environment, so this testset exercises the not-loaded half of the seam.
+        @test isnothing(Base.get_extension(PortfolioOptimisers,
+                                           :PortfolioOptimisersImputeExt))
+
+        rng = StableRNG(123456789)
+        dfx = DataFrame(rand(rng, 21, 4), :auto)
+        dfx[!, :date] = (today() - Day(20)):Day(1):today()
+        Px = TimeArray(dfx; timestamp = :date)
+
+        # The default path must not need `Impute`, whether the keyword is omitted or given
+        # explicitly as `nothing`.
+        rd = prices_to_returns(Px)
+        @test prices_to_returns(Px; impute_method = nothing).X == rd.X
+        @test PortfolioOptimisers.apply_impute_method(dfx, nothing) === dfx
+
+        # Anything else is an ArgumentError naming both the missing `using Impute` and the
+        # unrelated `Imputer` estimator the name collides with.
+        for bad in (Imputer(), :LOCF, "LOCF")
+            err = try
+                prices_to_returns(Px; impute_method = bad)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError)
+            @test occursin("using Impute", err.msg)
+            @test occursin("`Impute` is not loaded", err.msg)
+            @test occursin("Imputer", err.msg)
+        end
+        @test_throws ArgumentError PortfolioOptimisers.apply_impute_method(dfx, Imputer())
+    end
 end
