@@ -350,6 +350,44 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Sy
     return isnothing(rd) || x_src == :prior ? pr.X : rd.X
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Pick the feature matrix a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator reads, and diagnose its absence.
+
+The counterpart of [`returns_matrix_picker`](@ref), with the opposite default: `z_src = :data` prefers the user's own [`ReturnsResult`](@ref) over a derived one, because an explicit feature matrix outranks a produced one. (`x_src = :prior` prefers the prior, because a posterior returns matrix *is* the improvement being asked for. The differing defaults are the argument for naming the source rather than flagging it.)
+
+A missing feature matrix is **not** an error here: `Z` is only required when a [`FeatureDistance`](@ref) is actually in the estimator tree, which this layer cannot see. Resolution therefore returns `nothing` and defers the throw to [`assert_feature_matrix_supplied`](@ref), passing a second return value that names *why* nothing was found — `:neither` when no carrier holds one, and the selector itself when it picked the empty carrier while the other held one.
+
+# Arguments
+
+  - `pr`: Prior result or returns result object.
+  - `rd`: Optional returns result.
+  - `z_src`: Source selector, `:prior` or `:data`.
+
+# Validation
+
+  - `z_src in (:prior, :data)`.
+
+# Returns
+
+  - `Z::Option{<:MatNum_Arr3Num}`: Feature matrix from the selected carrier, or `nothing`.
+  - `z_diag::Symbol`: The diagnostic to forward as `z_src`; the selector itself, or `:neither`.
+
+# Related
+
+  - [`assert_source_selector`](@ref)
+  - [`returns_matrix_picker`](@ref)
+  - [`assert_feature_matrix_supplied`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function feature_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, z_src::Symbol)
+    assert_source_selector(z_src, :z_src)
+    Zp = pr.Z
+    Zd = isnothing(rd) ? nothing : rd.Z
+    Z = isnothing(rd) || z_src == :prior ? Zp : Zd
+    return Z, isnothing(Zp) && isnothing(Zd) ? :neither : z_src
+end
+"""
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
@@ -374,9 +412,10 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 """
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                    kwargs...)
+                    z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return clusterise(cle, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return clusterise(cle, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
@@ -404,9 +443,10 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          x_src::Symbol = :prior, kwargs...)
+                          x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_matrix(pl, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return phylogeny_matrix(pl, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -419,8 +459,9 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 
   - `plc`: Phylogeny constraint estimator.
   - `pr`: Prior result or returns result object.
-  - `rd`: Optional returns result (used when `x_src = :data`).
+  - `rd`: Optional returns result (used when `x_src = :data` or `z_src = :data`).
   - `x_src`: If `:prior`, use asset returns from `pr`; if `:data`, use `rd`. Default is `:prior`.
+  - `z_src`: Which carrier supplies the feature matrix a [`FeatureDistance`](@ref) reads: `:data` takes `rd.Z`, `:prior` takes `pr.Z`. Default is `:data`. Ignored when no [`FeatureDistance`](@ref) is in the estimator.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -435,9 +476,10 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 """
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing,
-                               x_src::Symbol = :prior, kwargs...)
+                               x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_constraints(plc, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return phylogeny_constraints(plc, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -464,9 +506,10 @@ Compute the centrality vector for a centrality estimator and prior result.
 """
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
+                           z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(cte, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_vector(cte, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -496,9 +539,10 @@ Compute the centrality vector for a network or clustering estimator and centrali
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
+                           z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(pl, ct, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_vector(pl, ct, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -530,9 +574,9 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                            x_src::Symbol = :prior, kwargs...)
+                            x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, x_src = x_src,
-                                               kwargs...).X, w)
+                                               z_src = z_src, kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
@@ -561,9 +605,10 @@ Compute the weighted average centrality for a centrality estimator.
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                            kwargs...)
+                            z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return average_centrality(cte, w, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return average_centrality(cte, w, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
@@ -602,9 +647,10 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 """
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                         kwargs...)
+                         z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return asset_phylogeny(pl, w, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return asset_phylogeny(pl, w, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -617,8 +663,9 @@ Compute centrality constraints from asset returns in a prior result using a cent
 
   - `ccs`: Centrality constraint estimator or vector thereof.
   - `pr`: Prior result or returns result object.
-  - `rd`: Optional returns result (used when `x_src = :data`).
+  - `rd`: Optional returns result (used when `x_src = :data` or `z_src = :data`).
   - `x_src`: If `:prior`, use asset returns from `pr`; if `:data`, use `rd`. Default is `:prior`.
+  - `z_src`: Which carrier supplies the feature matrix a [`FeatureDistance`](@ref) reads: `:data` takes `rd.Z`, `:prior` takes `pr.Z`. Default is `:data`. Ignored when no [`FeatureDistance`](@ref) is in the estimator.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -632,9 +679,10 @@ Compute centrality constraints from asset returns in a prior result using a cent
 """
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
-                                x_src::Symbol = :prior, kwargs...)
+                                x_src::Symbol = :prior, z_src::Symbol = :data, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_constraints(ccs, X; kwargs...)
+    Z, z_diag = feature_matrix_picker(pr, rd, z_src)
+    return centrality_constraints(ccs, X; Z = Z, z_src = z_diag, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

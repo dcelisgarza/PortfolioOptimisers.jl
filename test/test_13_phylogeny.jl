@@ -524,6 +524,25 @@
                                                                                      alg = SilhouetteScore(),
                                                                                      max_k = 100),
                                                                alg, clr.D)[2]
+        # A single cluster has no silhouette, so `W_list[1]` is never computed — it must
+        # still be *written*, or `argmax` reads uninitialised memory and returns `k = 1`
+        # whenever that garbage beats every real score. That made this whole block flaky,
+        # since the garbage is whatever the allocator last left there. Fresh allocations
+        # each iteration, so a reintroduction fails here rather than intermittently
+        # somewhere downstream.
+        onc_sil = OptimalNumberClusters(; alg = SilhouetteScore(), max_k = nothing)
+        rng_sil = StableRNG(1234)
+        for _ in 1:50
+            Dr = PortfolioOptimisers.cor_and_dist(Distance(; alg = CanonicalDistance()),
+                                                  PortfolioOptimisersCovariance(),
+                                                  randn(rng_sil, 200, 20))[2]
+            alg_sil = KMeansAlgorithm(; rng = StableRNG(42), seed = 42,
+                                      kwargs = (; init = :kmcen))
+            k = PortfolioOptimisers.optimal_number_clusters(onc_sil, alg_sil, Dr)[2]
+            # `max_k = nothing` gives `c1 = floor(sqrt(20)) = 4`, and the silhouette of a
+            # one-cluster partition is undefined, so `k = 1` is never a legitimate answer.
+            @test 2 <= k <= 4
+        end
         @test 4 ==
               PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
                                                                                 max_k = nothing),

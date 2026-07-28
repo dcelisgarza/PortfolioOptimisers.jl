@@ -389,6 +389,12 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
     - Compute the derived feature matrix and its squareness flag. [`feature_matrix`](@ref) and [`AbstractFeatureMatrixEstimator`](@ref)
     - Feature matrix producer that reads the regression loadings off the wrapped prior result. [`RegressionFeatures`](@ref)
+    - ::: details Feature matrix producer reusing a square phylogeny or adjacency matrix as a feature source. [`PhylogenyFeatures`](@ref) and [`phylogeny_features`](@ref)
+
+      Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer that sets `z_sq = true`, and via a precomputed [`PhylogenyResult`](@ref) the only route by which user-supplied exogenous square structure reaches a distance.
+
+      - Phylogeny feature algorithm giving each asset its `n`-hop neighbourhood indicator. [`BinaryNeighbourhood`](@ref)
+      - Phylogeny feature algorithm grading each asset's neighbourhood by hop count. [`GradedNeighbourhood`](@ref)
 - ::: details Container type for high order prior results. [`HighOrderPrior`](@ref)
   - High order prior estimator for asset returns. [`HighOrderPriorEstimator`](@ref)
   - Represents the High Order Factor Prior Estimator. [`HighOrderFactorPriorEstimator`](@ref)

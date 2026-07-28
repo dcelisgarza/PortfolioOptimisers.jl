@@ -547,15 +547,29 @@ Resolve the observation weights of a collapse algorithm against a window of time
 
 `Z` is matricised to `observations × (assets · features)` first, because [`get_observation_weights`](@ref)'s documented interface is `VecNum`/`MatNum` and a raw 3-D array matches neither — a user's correct `MatNum` method would otherwise never fire. There is no caller-side `nothing` guard: [`get_observation_weights`](@ref) raises [`ObservationWeightsError`](@ref) itself when a [`DynamicAbstractWeights`](@ref) cannot resolve, so `nothing` here means only that no weights were requested (ADR 0043).
 
+# Validation
+
+  - `length(w) == size(Z, 1)` once resolved.
+
+# Details
+
+  - **Cross-fold weighting requires a [`DynamicAbstractWeights`](@ref).** It resolves against the `Z` it is handed, so it is fold-local and correct automatically. A *static* `AbstractWeights` is fixed at construction and outlives the fold: a longer one used to be read positionally by [`AggregateDistances`](@ref), giving the *oldest* weights to the *newest* observations with no bounds error, and a shorter one gave a bare `BoundsError`. The length check makes both loud.
+
 # Related
 
   - [`AggregateFeatures`](@ref)
   - [`AggregateDistances`](@ref)
   - [`get_observation_weights`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
 """
 function collapse_weights(w::Option{<:ObsWeights}, Z::Arr3Num)
-    return get_observation_weights(w, reshape(Z, size(Z, 1), size(Z, 2) * size(Z, 3));
-                                   dims = 1)
+    w = get_observation_weights(w, reshape(Z, size(Z, 1), size(Z, 2) * size(Z, 3));
+                                dims = 1)
+    if !isnothing(w)
+        @argcheck(length(w) == size(Z, 1),
+                  DimensionMismatch("length(w) == size(Z, 1) must hold. Got\nlength(w) => $(length(w))\nsize(Z, 1) => $(size(Z, 1)).\nCross-fold weighting requires a DynamicAbstractWeights, which resolves against the feature window it is given."))
+    end
+    return w
 end
 """
     feature_distance(de::FeatureDistance, Z::Arr3Num, dims::Integer)
@@ -703,6 +717,70 @@ end
 function cor_and_dist(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
     D = distance(de, Z; dims = dims, kwargs...)
     return distance_to_similarity(de.sim; D = D), D
+end
+"""
+    assert_feature_matrix_supplied(Z::Option{<:ArrNum}, z_src::Symbol)
+
+Assert that a feature matrix reached [`FeatureDistance`](@ref)'s three-argument entry point, and name the reason when none did.
+
+Every way of failing to supply `Z` arrives here identically, as `Z === nothing`. `z_src` is the diagnostic that tells them apart — it is resolved by [`feature_matrix_picker`](@ref) and rides the wire beside `Z` purely so this message can be specific:
+
+  - `:none`: nothing supplied `Z` at all. The estimator was driven from a raw returns matrix, which carries no feature matrix — the two-argument `distance(de, Z; dims)` entry point, a [`ReturnsResult`](@ref) or a prior result is needed.
+  - `:neither`: a carrier was available but neither it nor the returns result holds a feature matrix. The feature matrix has not been supplied or produced.
+  - `:data` / `:prior`: `z_src` selected a carrier that holds no feature matrix, while the *other* one does. This is the typo/wrong-selector case, and the message says which value to use instead.
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_matrix_picker`](@ref)
+  - [`IsNothingError`](@ref)
+"""
+function assert_feature_matrix_supplied(Z::Option{<:ArrNum}, z_src::Symbol)::Nothing
+    if isnothing(Z)
+        throw(IsNothingError(if z_src == :none
+                                 "FeatureDistance requires a feature matrix `Z`, but this call supplied none. It was reached from a raw returns matrix, which carries no feature matrix: drive it from a ReturnsResult or a prior result that carries `Z`, or call `distance(de, Z; dims = dims)` directly."
+                             elseif z_src == :data
+                                 "FeatureDistance requires a feature matrix `Z`, but `z_src = :data` selected the returns result and it carries no `Z`. The prior result does carry one — set `z_src = :prior`."
+                             elseif z_src == :prior
+                                 "FeatureDistance requires a feature matrix `Z`, but `z_src = :prior` selected the prior result and it carries no `Z`. The returns result does carry one — set `z_src = :data`."
+                             else
+                                 "FeatureDistance requires a feature matrix `Z`, but neither the returns result nor the prior result carries one. Supply `Z` on the ReturnsResult, or use a FeaturePrior to derive it."
+                             end))
+    end
+    return nothing
+end
+"""
+    distance(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
+             z_src::Symbol = :none, kwargs...)
+    cor_and_dist(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
+                 z_src::Symbol = :none, kwargs...)
+
+Three-argument entry points, for the clustering and network estimators.
+
+Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, passing a covariance estimator (or, in [`logo!`](@ref)'s case, a similarity matrix) and a returns matrix. [`FeatureDistance`](@ref) uses neither: it measures a feature matrix, which travels beside them on the `Z` keyword argument, resolved from a carrier by [`feature_matrix_picker`](@ref). Both positionals are therefore ignored, and typed `::Any` rather than bounded — `logo!` puts a similarity matrix where the others put a covariance estimator.
+
+# Details
+
+  - **`dims` is ignored and the kernel is called with `dims = 1`.** The ambient `dims` describes the returns matrix `X`, and a carried `Z` is canonically assets-major regardless of it. `dims` stays meaningful only at the raw-matrix entry point `distance(de, Z; dims)`.
+  - A missing `Z` throws [`IsNothingError`](@ref) naming `z_src` (see [`assert_feature_matrix_supplied`](@ref)).
+
+# Related
+
+  - [`FeatureDistance`](@ref)
+  - [`feature_matrix_picker`](@ref)
+  - [`assert_feature_matrix_supplied`](@ref)
+  - [`clusterise`](@ref)
+  - [`phylogeny_matrix`](@ref)
+"""
+function distance(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
+                  z_src::Symbol = :none, kwargs...)
+    assert_feature_matrix_supplied(Z, z_src)
+    return distance(de, Z; dims = 1)
+end
+function cor_and_dist(de::FeatureDistance, ::Any, ::Any; Z::Option{<:ArrNum} = nothing,
+                      z_src::Symbol = :none, kwargs...)
+    assert_feature_matrix_supplied(Z, z_src)
+    return cor_and_dist(de, Z; dims = 1)
 end
 
 export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,

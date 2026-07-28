@@ -290,6 +290,7 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
         x_src::Symbol = :prior,
+        z_src::Symbol = :data,
         strict::Bool = false
     ) -> NestedClustered
 
@@ -304,6 +305,7 @@ Schedule entries for `opti`/`opto` must be estimators, like the static fields: a
 ## Validation
 
   - `x_src in (:prior, :data)`.
+  - `z_src in (:prior, :data)`.
   - `opto` must pass `assert_external_optimiser` and `assert_special_nco_requirements` (schedules delegate to their entries and `default`).
   - If `opti !== opto`: `opti` must pass `assert_internal_optimiser` and `assert_special_nco_requirements`.
   - If `cv` is provided: `opti` must also pass `assert_external_optimiser` and `assert_special_nco_requirements`.
@@ -387,6 +389,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     x_src
     """
+    $(field_dict[:z_src])
+    """
+    z_src
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -396,8 +402,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                              cv::Option{<:OptimisationCrossValidation},
                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, x_src::Symbol,
-                             strict::Bool)
+                             z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
+        assert_source_selector(z_src, :z_src)
         assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
@@ -418,15 +425,25 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(NestedClustered,
                                            (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
-                                            ex, fb, brt, x_src, strict),
+                                            ex, fb, brt, x_src, z_src, strict),
                                            nested_clustered_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(x_src), typeof(strict)}(pe, cle, wb,
-                                                                           fees, sets, opti,
-                                                                           opto, cv, wf, ex,
-                                                                           fb, brt, x_src,
-                                                                           strict)
+                   typeof(fb), typeof(brt), typeof(x_src), typeof(z_src), typeof(strict)}(pe,
+                                                                                          cle,
+                                                                                          wb,
+                                                                                          fees,
+                                                                                          sets,
+                                                                                          opti,
+                                                                                          opto,
+                                                                                          cv,
+                                                                                          wf,
+                                                                                          ex,
+                                                                                          fb,
+                                                                                          brt,
+                                                                                          x_src,
+                                                                                          z_src,
+                                                                                          strict)
     end
 end
 function NestedClustered(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
@@ -438,9 +455,10 @@ function NestedClustered(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                         x_src::Symbol = :prior, strict::Bool = false)
+                         x_src::Symbol = :prior, z_src::Symbol = :data,
+                         strict::Bool = false)
     return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, x_src,
-                           strict)
+                           z_src, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -564,7 +582,7 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
-                           fb = nco.fb, brt = nco.brt, x_src = nco.x_src,
+                           fb = nco.fb, brt = nco.brt, x_src = nco.x_src, z_src = nco.z_src,
                            strict = nco.strict)
 end
 """
@@ -689,7 +707,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     pr = prior(nco.pe, rd; dims = dims)
     X = pr.X
     clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     branchorder = branchorder, x_src = nco.x_src)
+                     branchorder = branchorder, x_src = nco.x_src, z_src = nco.z_src)
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(X), strict = nco.strict)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

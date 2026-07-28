@@ -57,7 +57,7 @@ where the position is required and neither exists — throws a structured
   solved: `pe`, `ret`, `sca`, `sets`, `cle`, `wf`, `r`, `obj`, `wi`, constraint fields, `fb`,
   the metas' `opti`/`opto`/`opt`, `scale`, `subset_size`, `n_subsets`, …), never *execution
   control* (how it is solved: `slv`, `ex`, `rng`, `seed`, `sc`, `so`, `brt`, `x_src`,
-  `strict`, `sq`, and `NestedClustered.cv`, which *is* the inner fold loop). The criterion is
+  `z_src`, `strict`, `sq`, and `NestedClustered.cv`, which *is* the inner fold loop). The criterion is
   applied per constructor and the widened signatures are the admissibility table — the single
   source of truth for which inputs may vary over folds, spelled with a small family of aliases:
   `TD_Option{X} = Union{Nothing, <:TimeDependent, X}` for optional fields,

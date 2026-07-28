@@ -121,6 +121,7 @@ HierarchicalEqualRiskContribution
        │          │   iter ┴ Int64: 100
        │      brt ┼ Bool: false
        │    x_src ┼ Symbol: :prior
+       │    z_src ┼ Symbol: :data
        │   strict ┴ Bool: false
     ri ┼ Variance
        │   settings ┼ RiskMeasureSettings
@@ -688,7 +689,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     pr = prior(hec.opt.pe, rd; dims = dims)
     X = pr.X
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     branchorder = branchorder, x_src = hec.opt.x_src)
+                     branchorder = branchorder, x_src = hec.opt.x_src,
+                     z_src = hec.opt.z_src)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees = herc_risk(hec, pr, cls)

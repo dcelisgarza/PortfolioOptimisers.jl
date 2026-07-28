@@ -128,6 +128,28 @@ function centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
     return plr
 end
 """
+    port_opt_view(plr::PhylogenyResult{<:MatNum}, i, args...)
+    port_opt_view(plr::PhylogenyResult{<:VecNum}, i, args...)
+
+Return a view of a [`PhylogenyResult`](@ref) restricted to assets at index `i`.
+
+A `PhylogenyResult` is *data*, not configuration: its matrix is indexed by the full asset universe, so a subproblem must slice both axes of a phylogeny matrix, and the single axis of a centrality vector. Without this method the universal [`port_opt_view`](@ref) fallback reaches [`nothing_scalar_array_view`](@ref), which has no method for a result type — a precomputed phylogeny fed to a subsetting consumer was a `MethodError` rather than a view.
+
+The sliced matrix stays symmetric with a zero diagonal, so it re-validates.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`PhylogenyFeatures`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(plr::PhylogenyResult{<:MatNum}, i, args...)::PhylogenyResult
+    return PhylogenyResult(; X = view(plr.X, i, i))
+end
+function port_opt_view(plr::PhylogenyResult{<:VecNum}, i, args...)::PhylogenyResult
+    return PhylogenyResult(; X = view(plr.X, i))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality algorithm types in `PortfolioOptimisers.jl` from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
@@ -832,6 +854,21 @@ Similar to [`NwE_Pl_ClE_Cl`](@ref) but restricts `PhylogenyResult` to those wrap
 """
 const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
                              <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
+"""
+    const NwE_PlM = Union{<:AbstractNetworkEstimator, <:PhylogenyResult{<:MatNum}}
+
+Alias for a network estimator or a matrix-phylogeny result.
+
+[`NwE_PlM_ClE_Cl`](@ref) without the clustering sources. It is the graph-source bound of [`PhylogenyFeatures`](@ref), which admits a *graph* and excludes a *partition*: the square matrix a clustering source produces is `P * transpose(P) - I`, whose rows are cluster-membership indicators, so reusing it as a feature matrix recodes the partition and nothing else. See [`PhylogenyFeatures`](@ref) for the worked counterexample.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`PhylogenyResult`](@ref)
+  - [`NwE_PlM_ClE_Cl`](@ref)
+  - [`PhylogenyFeatures`](@ref)
+"""
+const NwE_PlM = Union{<:AbstractNetworkEstimator, <:PhylogenyResult{<:MatNum}}
 """
     const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 

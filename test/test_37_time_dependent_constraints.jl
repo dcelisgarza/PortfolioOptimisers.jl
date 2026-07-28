@@ -700,7 +700,7 @@ end
         # prior estimator, returns model, scalariser and asset sets of a `JuMPOptimiser`,
         # and the prior, clustering estimator, sets and weight finaliser of a
         # `HierarchicalOptimiser`. Execution control (`slv`, `sc`, `so`, `brt`, `x_src`,
-        # `strict`) stays static.
+        # `z_src`, `strict`) stays static.
         cvw = IndexWalkForward(100, 50)
         pe_semi = EmpiricalPrior(;
                                  ce = PortfolioOptimisersCovariance(;
@@ -1614,7 +1614,7 @@ end
     @testset "Problem-definition fields of the meta-optimisers" begin
         # The metas' own non-optimiser problem definition — prior, sets, weight finaliser,
         # and NestedClustered's clustering estimator — takes schedules like any other
-        # host's; `cv`, `ex`, `brt`, `x_src` and `strict` stay static.
+        # host's; `cv`, `ex`, `brt`, `x_src`, `z_src` and `strict` stay static.
         ew, iv = EqualWeighted(), InverseVolatility()
         mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cvw = IndexWalkForward(100, 50)

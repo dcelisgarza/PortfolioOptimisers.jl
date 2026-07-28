@@ -161,14 +161,16 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         x_src::Symbol = :prior,
+        z_src::Symbol = :data,
         strict::Bool = false
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `strict`) stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `z_src`, `strict`) stays static.
 
 ## Validation
 
   - `x_src in (:prior, :data)`.
+  - `z_src in (:prior, :data)`.
   - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
 # Examples
@@ -237,6 +239,7 @@ HierarchicalOptimiser
          │   iter ┴ Int64: 100
      brt ┼ Bool: false
    x_src ┼ Symbol: :prior
+   z_src ┼ Symbol: :data
   strict ┴ Bool: false
 ```
 
@@ -285,6 +288,10 @@ HierarchicalOptimiser
     """
     x_src
     """
+    $(field_dict[:z_src])
+    """
+    z_src
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -292,25 +299,20 @@ HierarchicalOptimiser
                                    slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
                                    fees::TD_Option{<:FeesE_Fees},
                                    sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
-                                   brt::Bool, x_src::Symbol, strict::Bool)
+                                   brt::Bool, x_src::Symbol, z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
+        assert_source_selector(z_src, :z_src)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
                                            (; pe, cle, slv, wb, fees, sets, wf, brt, x_src,
-                                            strict), hierarchical_optimiser_td_defaults())
+                                            z_src, strict),
+                                           hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(strict)}(pe,
-                                                                                         cle,
-                                                                                         slv,
-                                                                                         wb,
-                                                                                         fees,
-                                                                                         sets,
-                                                                                         wf,
-                                                                                         brt,
-                                                                                         x_src,
-                                                                                         strict)
+                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(z_src),
+                   typeof(strict)}(pe, cle, slv, wb, fees, sets, wf, brt, x_src, z_src,
+                                   strict)
     end
 end
 function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
@@ -321,8 +323,10 @@ function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                                sets::TD_Option{<:AssetSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, x_src::Symbol = :prior,
+                               z_src::Symbol = :data,
                                strict::Bool = false)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict)
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, z_src,
+                                 strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

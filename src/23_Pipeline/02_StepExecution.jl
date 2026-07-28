@@ -86,7 +86,7 @@ function run_step(cle::AbstractClustersEstimator, ctx::PipelineContext)
 end
 function run_step(ne::AbstractNetworkEstimator, ctx::PipelineContext)
     require_slot(ctx, :returns, ne)
-    res = phylogeny_matrix(ne, ctx.returns.X)
+    res = phylogeny_matrix(ne, ctx.returns)
     return res, set_slot(ctx, :phylogeny, res)
 end
 function run_step(opt::OptimisationEstimator, ctx::PipelineContext)
@@ -261,7 +261,7 @@ function run_step(ce::RiskBudgetEstimator, ctx::PipelineContext)
 end
 function run_step(ce::AbstractPhylogenyConstraintEstimator, ctx::PipelineContext)
     require_slot(ctx, :returns, ce)
-    res = phylogeny_constraints(ce, ctx.returns.X)
+    res = phylogeny_constraints(ce, ctx.returns)
     return res, add_constraint_result(ctx, res)
 end
 function run_step(ce::AbstractConstraintEstimator, ::PipelineContext)

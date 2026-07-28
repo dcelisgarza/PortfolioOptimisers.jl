@@ -6,6 +6,11 @@ A feature prior attaches an `assets × features` matrix to the prior it wraps, w
 AbstractFeatureMatrixEstimator
 feature_matrix
 RegressionFeatures
+AbstractPhylogenyFeatureAlgorithm
+BinaryNeighbourhood
+GradedNeighbourhood
+phylogeny_features
+PhylogenyFeatures
 FeaturePrior
 PortfolioOptimisers.feature_estimator_view
 port_opt_view(pe::FeaturePrior, i, args...)
