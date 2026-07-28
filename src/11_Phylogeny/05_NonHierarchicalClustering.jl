@@ -183,6 +183,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     cluster_lvls = [get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
+    W_list[1] = typemin(eltype(D))
     for i in 2:c1
         sl = Clustering.silhouettes(cluster_lvls[i], D)
         W_list[i] = vec_to_real_measure(measure_alg, sl)
