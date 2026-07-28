@@ -306,10 +306,12 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
+  - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
 # Related
 
   - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`assert_prior_regression`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`FactorPrior`](@ref)
   - [`prior`](@ref)
@@ -329,6 +331,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     posterior_sk = nothing
     posterior_V = nothing
     pr = prior(pe.pe, X, F; dims = 1, kwargs...)
+    assert_prior_regression(pr, :pe)
     posterior_X = pr.X
     M = pr.rr.M
     f_kt = cokurtosis(pe.kte, F; kwargs...)

@@ -32,13 +32,13 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 # Examples
 
 ```jldoctest
-julia> ThresholdEstimator(; val = Dict("A" => 0.05, "B" => 0.1))
+julia> ThresholdEstimator(; val = Dict(\"A\" => 0.05, \"B\" => 0.1))
 ThresholdEstimator
    val ┼ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
    key ┼ nothing
   dval ┴ nothing
 
-julia> ThresholdEstimator(; val = "A" => 0.05)
+julia> ThresholdEstimator(; val = \"A\" => 0.05)
 ThresholdEstimator
    val ┼ Pair{String, Float64}: "A" => 0.05
    key ┼ nothing
@@ -294,9 +294,9 @@ Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> t = ThresholdEstimator(Dict("A" => 0.05, "B" => 0.1));
+julia> t = ThresholdEstimator(Dict(\"A\" => 0.05, \"B\" => 0.1));
 
 julia> threshold_constraints(t, sets)
 Threshold

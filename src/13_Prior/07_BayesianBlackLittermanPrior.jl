@@ -37,11 +37,11 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> BayesianBlackLittermanPrior(;
-                                   sets = AssetSets(; key = "nx",
-                                                    dict = Dict("nx" => ["A", "B", "C"])),
+                                   sets = AssetSets(; key = \"nx\",
+                                                    dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                                    views = LinearConstraintEstimator(;
-                                                                     val = ["A == 0.03",
-                                                                            "B + C == 0.04"]))
+                                                                     val = [\"A == 0.03\",
+                                                                            \"B + C == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
              │    pe ┼ EmpiricalPrior
@@ -238,6 +238,7 @@ Where:
 
   - `dims in (1, 2)`.
   - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
+  - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
 # Details
 
@@ -267,6 +268,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
               DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
+    assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
                                                   prior_result.f_mu, prior_result.f_sigma,
                                                   prior_result.rr

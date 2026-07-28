@@ -111,7 +111,7 @@ Positional and keyword arguments correspond to fields above.
 # Examples
 
 ```jldoctest
-julia> GridSearchCrossValidation(Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0]))
+julia> GridSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2], \"beta\" => [1.0, 2.0]))
 GridSearchCrossValidation
             p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
            cv ┼ KFold
@@ -267,8 +267,8 @@ Keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> RandomisedSearchCrossValidation(Dict("alpha" => [0.1, 0.2, 0.3],
-                                            "beta" => Normal(1.0, 0.5)))
+julia> RandomisedSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2, 0.3],
+                                            \"beta\" => Normal(1.0, 0.5)))
 RandomisedSearchCrossValidation
             p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Distributions.Normal{Float64}(μ=1.0, σ=0.5))
            cv ┼ KFold

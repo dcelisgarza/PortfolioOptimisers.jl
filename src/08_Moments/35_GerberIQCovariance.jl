@@ -299,7 +299,7 @@ julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
            function GaussianDecay(a::Union{Nothing, <:Number})
                if isa(a, Number)
                    PortfolioOptimisers.@argcheck(a >= 0,
-                                                 DomainError(a, "`a` must be non-negative"))
+                                                 DomainError(a, \"`a` must be non-negative\"))
                end
                return new{typeof(a)}(a)
            end

@@ -5,7 +5,9 @@ LowOrderPrior
 HighOrderPrior
 prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
-clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true, kwargs...)
+assert_prior_regression
+returns_matrix_picker
+clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior, kwargs...)
 AbstractPriorEstimator
 AbstractLowOrderPriorEstimator
 AbstractLowOrderPriorEstimator_A

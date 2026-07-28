@@ -128,9 +128,9 @@ Convert parsed Black-Litterman view equations into a `BlackLittermanViews` objec
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> lcs = parse_equation(["A + B == 0.05", "C == 0.02"]);
+julia> lcs = parse_equation([\"A + B == 0.05\", \"C == 0.02\"]);
 
 julia> PortfolioOptimisers.get_black_litterman_views(lcs, sets)
 BlackLittermanViews
@@ -218,15 +218,15 @@ Unified interface for constructing or passing through Black-Litterman investor v
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
-julia> black_litterman_views(["A + B == 0.05", "C == 0.02"], sets)
+julia> black_litterman_views([\"A + B == 0.05\", \"C == 0.02\"], sets)
 BlackLittermanViews
      P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
      Q ┼ Vector{Float64}: [0.05, 0.02]
   excl ┴ nothing
 
-julia> lce = LinearConstraintEstimator(; val = ["A == 0.03", "B + C == 0.04"]);
+julia> lce = LinearConstraintEstimator(; val = [\"A == 0.03\", \"B + C == 0.04\"]);
 
 julia> black_litterman_views(lce, sets)
 BlackLittermanViews

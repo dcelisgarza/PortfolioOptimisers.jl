@@ -107,7 +107,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -204,7 +204,7 @@ The asset price series is the master clock: `i` selects rows of `X`, and the fac
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -303,7 +303,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+julia> ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
      X ┼ 2×2 Matrix{Float64}
@@ -454,7 +454,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
      X ┼ 2×2 Matrix{Float64}
@@ -534,7 +534,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = ["F1"],
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = [\"F1\"],
                           F = [1.0; 2.0; 3.0;;])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
@@ -716,7 +716,7 @@ The free-function form of [`TrainTestSplit`](@ref); the windows are [`port_opt_v
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A"], X = reshape(collect(0.1:0.1:1.0), 10, 1));
+julia> rd = ReturnsResult(; nx = [\"A\"], X = reshape(collect(0.1:0.1:1.0), 10, 1));
 
 julia> train, test = train_test_split(rd; test_size = 0.2);
 
@@ -771,7 +771,7 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.10 0.20; 0.30 0.40], nb = ["BM"],
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.10 0.20; 0.30 0.40], nb = [\"BM\"],
                           B = [0.01; 0.02])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
@@ -835,6 +835,47 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
     end
 end
 """
+    apply_impute_method(X, impute_method) -> Any
+
+Apply the `impute_method` given to [`prices_to_returns`](@ref) to the price table `X`.
+
+`Impute` is a weak dependency, so this is the seam that keeps it optional. The identity method on
+`nothing` is the default path and lives here; the method accepting an `Impute.Imputor` is supplied
+by `PortfolioOptimisersImputeExt` and only exists once the caller has run `using Impute`. Anything
+else throws.
+
+# Arguments
+
+  - `X`: Price table (a `DataFrames.DataFrame` as built by [`prices_to_returns`](@ref)).
+  - `impute_method`: `nothing` (no imputation), or an `Impute.Imputor` when `Impute` is loaded.
+
+# Returns
+
+  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
+
+# Validation
+
+  - Throws an `ArgumentError` for any `impute_method` that is neither `nothing` nor an
+    `Impute.Imputor`, distinguishing "`Impute` is not loaded" from "wrong type". Note that
+    [`Imputer`](@ref) is a PortfolioOptimisers estimator unrelated to `Impute.jl` and is not
+    accepted here.
+
+# Related
+
+  - [`prices_to_returns`](@ref)
+  - [`Imputer`](@ref)
+  - [`Impute`](https://github.com/invenia/Impute.jl)
+"""
+apply_impute_method(X, ::Nothing) = X
+function apply_impute_method(::Any, impute_method)
+    reason = if isnothing(Base.get_extension(@__MODULE__, :PortfolioOptimisersImputeExt))
+        "`Impute` is not loaded, so no imputor can be recognised; run `using Impute` (adding it to your project if needed)"
+    else
+        "`Impute` is loaded, but a $(typeof(impute_method)) is not an `Impute.Imputor`"
+    end
+    return throw(ArgumentError("`impute_method` accepts only `nothing` or an `Impute.Imputor` such as `Impute.LOCF()` or `Impute.Interpolate()`: $(reason). Note that `Imputer` is a PortfolioOptimisers preprocessing estimator, entirely unrelated to `Impute.jl` despite the similar name — it fills gaps with per-asset statistics fitted on a training window and is used as a `Pipeline` step, not passed to `prices_to_returns`."))
+end
+"""
     prices_to_returns(
         X::TimeSeries.TimeArray,
         F::Option{<:TimeSeries.TimeArray} = nothing;
@@ -847,7 +888,7 @@ end
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
-        impute_method::Option{<:Impute.Imputor} = nothing
+        impute_method = nothing
     ) -> ReturnsResult
 
 Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
@@ -887,7 +928,7 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
-  - `impute_method`: Optional imputation method for missing data.
+  - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
 
 # Returns
 
@@ -921,7 +962,7 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
-                     ["A", "B"])
+                     [\"A\", \"B\"])
 3×2 TimeSeries.TimeArray{Int64, 2, Dates.Date, Matrix{Int64}} 2020-01-01 to 2020-01-03
 ┌────────────┬─────┬─────┐
 │            │ A   │ B   │
@@ -953,6 +994,7 @@ ReturnsResult
   - [`VecDate`](@ref)
   - [`Num_VecNum`](@ref)
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
+  - [`apply_impute_method`](@ref)
   - [`Impute`](https://github.com/invenia/Impute.jl)
 """
 function prices_to_returns(X::TimeSeries.TimeArray,
@@ -965,8 +1007,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Option{<:Function} = nothing,
-                           join_method::Symbol = :outer,
-                           impute_method::Option{<:Impute.Imputor} = nothing)
+                           join_method::Symbol = :outer, impute_method = nothing)
     @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
@@ -1002,9 +1043,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                               DataFrames.ByRow((x) -> ifelse((isa(x, Number) && isnan(x)),
                                                              missing, x));
                           renamecols = false)
-    if !isnothing(impute_method)
-        X = Impute.impute(X, impute_method)
-    end
+    X = apply_impute_method(X, impute_method)
     missing_mtx = ismissing.(Matrix(X[!, 2:end]))
     missings_cols = vec(count(missing_mtx; dims = 2))
     keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
@@ -1575,7 +1614,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 101.0; 102.0 103.0; 104.0 105.0], ["A", "B"]);
+                     [100.0 101.0; 102.0 103.0; 104.0 105.0], [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -1676,7 +1715,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 NaN; 102.0 NaN; 104.0 105.0],
-                     ["A", "B"]);
+                     [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -1792,7 +1831,7 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 1.0; NaN 3.0; 104.0 5.0],
-                     ["A", "B"]);
+                     [\"A\", \"B\"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -1885,3 +1924,4 @@ export PricesResult, ReturnsResult, prices_to_returns, returns_result_picker,
        fit_preprocessing, apply_preprocessing, PricesToReturns, MissingDataFilter,
        MissingDataFilterResult, Imputer, ImputerResult, AssetSelectorResult,
        train_test_split, TrainTestSplit, TrainTestSplitResult
+public apply_impute_method

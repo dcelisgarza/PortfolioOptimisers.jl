@@ -416,7 +416,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B", "C"], X = [0.1 0.0 -0.2; -0.1 0.0 0.3; 0.2 0.0 -0.1]);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"], X = [0.1 0.0 -0.2; -0.1 0.0 0.3; 0.2 0.0 -0.1]);
 
 julia> sel = ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = 1e-12));
 
@@ -469,7 +469,7 @@ The returns-level counterpart of [`MissingDataFilter`](@ref)'s column threshold,
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 NaN]);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 NaN]);
 
 julia> PortfolioOptimisers.fit_preprocessing(CompleteAssetSelector(), rd).nx
 1-element Vector{String}:
@@ -875,7 +875,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B", "C"],
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\", \"C\"],
                           X = [0.10 0.10 -0.05; -0.10 -0.10 0.07; 0.05 0.05 -0.02;
                                0.02 0.02 0.09]);
 

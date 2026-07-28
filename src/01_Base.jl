@@ -426,7 +426,7 @@ const arg_dict = Dict(
                       :lpreg_p => "`p`: Norm order, `p > 1`.",#
                       :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
                       :brt => "`brt`: Whether to use bootstrap returns.",#
-                      :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
+                      :x_src => "`x_src`: Which returns matrix the clustering, phylogeny and centrality estimators read: `:prior` takes the prior result's `X`, `:data` takes the raw returns result's `X`. Ignored when no returns result is available, in which case the prior result's `X` is used.",#
                       :wf => "`wf`: Weight finaliser.",#
                       :rkb => "`rkb`: Risk budget estimator or result.",#
                       :rba => "`rba`: Risk budget algorithm.",#
@@ -846,7 +846,7 @@ julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
            half_life::T
            function MyWeights(half_life::Integer)
                if half_life < one(half_life)
-                   throw(DomainError(half_life, "half_life must be an integer greater than zero"))
+                   throw(DomainError(half_life, \"half_life must be an integer greater than zero\"))
                end
                return new{typeof(half_life)}(half_life)
            end
@@ -857,14 +857,14 @@ julia> function MyWeights(; half_life::Integer = 5)
        end
 MyWeights
 
-julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.VecNum;
                                                             kwargs...)
            lambda = 2^(-inv(w.half_life))
            return eweights(1:length(X), lambda; scale = true)
        end
 
-julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.MatNum;
                                                             dims::Int = 1, kwargs...)
            lambda = 2^(-inv(w.half_life))
@@ -898,10 +898,37 @@ julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dim
  1.0
 ```
 
+Both methods must be dispatched on the concrete subtype, as above — never on `DynamicAbstractWeights` itself, which would capture every other subtype too.
+
+Implementing only one of the two arities is the mistake to avoid. Rather than silently computing an unweighted result, the unimplemented shape raises [`ObservationWeightsError`](@ref) and names the methods to write:
+
+```jldoctest
+julia> struct PartialWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+
+julia> function PortfolioOptimisers.get_observation_weights(w::PartialWeights,
+                                                            X::PortfolioOptimisers.VecNum;
+                                                            kwargs...)
+           return eweights(1:length(X), 0.5; scale = true)
+       end
+
+julia> PortfolioOptimisers.get_observation_weights(PartialWeights(), 1:3)
+3-element Weights{Float64, Float64, Vector{Float64}}:
+ 0.25
+ 0.5
+ 1.0
+
+julia> PortfolioOptimisers.get_observation_weights(PartialWeights(), ones(3, 10))
+ERROR: ObservationWeightsError: PartialWeights is a DynamicAbstractWeights with no `get_observation_weights` method for a 2-dimensional input of size (3, 10). Implement `get_observation_weights(w::PartialWeights, X::VecNum; kwargs...)` and/or `get_observation_weights(w::PartialWeights, X::MatNum; dims::Int = 1, kwargs...)`, or pass a `StatsBase.AbstractWeights` instead (or `nothing` to compute unweighted). See the `DynamicAbstractWeights` docstring for a worked example.
+Stacktrace:
+[...]
+```
+
 # Related
 
   - [`ObsWeights`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`ObservationWeightsError`](@ref)
+  - [`get_observation_weights`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 abstract type DynamicAbstractWeights <: AbstractEstimator end
@@ -1819,7 +1846,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsNothingError("Input data must not be nothing"))
+julia> throw(IsNothingError(\"Input data must not be nothing\"))
 ERROR: IsNothingError: Input data must not be nothing
 Stacktrace:
  [1] top-level scope
@@ -1857,7 +1884,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsEmptyError("Input array must not be empty"))
+julia> throw(IsEmptyError(\"Input array must not be empty\"))
 ERROR: IsEmptyError: Input array must not be empty
 Stacktrace:
  [1] top-level scope
@@ -1895,7 +1922,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsNonFiniteError("Input array contains non-finite values"))
+julia> throw(IsNonFiniteError(\"Input array contains non-finite values\"))
 ERROR: IsNonFiniteError: Input array contains non-finite values
 Stacktrace:
  [1] top-level scope
@@ -1933,7 +1960,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator"))
+julia> throw(ConflictingArgumentError(\"sbgt must be nothing when bgt is a BudgetCostEstimator\"))
 ERROR: ConflictingArgumentError: sbgt must be nothing when bgt is a BudgetCostEstimator
 Stacktrace:
  [1] top-level scope
@@ -1971,7 +1998,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(PropertyPathError("cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`"))
+julia> throw(PropertyPathError(\"cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`\"))
 ERROR: PropertyPathError: cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`
 Stacktrace:
  [1] top-level scope
@@ -1984,6 +2011,45 @@ Stacktrace:
   - [`@forward_properties`](@ref)
 """
 @concrete struct PropertyPathError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a [`DynamicAbstractWeights`](@ref) cannot resolve observation weights for the data it was handed, because no [`get_observation_weights`](@ref) method is implemented for that input's shape.
+
+[`get_observation_weights`](@ref) returns `nothing` to mean *no weights were requested*, never *weights were unavailable*. Every `isnothing` branch downstream reads it the first way and computes an unweighted result, so a `DynamicAbstractWeights` that resolved to `nothing` would silently produce a numerically plausible but unweighted answer with no diagnostic. It raises instead.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ObservationWeightsError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(ObservationWeightsError(\"MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)\"))
+ERROR: ObservationWeightsError: MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+@concrete struct ObservationWeightsError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -2287,7 +2353,7 @@ julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, set
            return arr
        end
 
-julia> sets = AssetSets(; dict = Dict("nx" => ["sha", "bis", "man"]))
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
 AssetSets
    key ┼ String: "nx"
   ukey ┼ String: "ux"
@@ -2544,6 +2610,10 @@ const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 
 Get the observation weights for statistical estimation.
 
+`nothing` is returned only when `w === nothing`, and means *no weights were requested* — every `isnothing` branch downstream reads it that way and computes an unweighted result. It never means *weights were unavailable*: a [`DynamicAbstractWeights`](@ref) with no method for the given input shape throws [`ObservationWeightsError`](@ref) rather than resolving to `nothing`, because returning `nothing` there would silently yield an unweighted answer that looks plausible.
+
+This is why call sites need no strictness check of their own. A `DynamicAbstractWeights` is resolved *before* dispatch (see [`average_drawdown`](@ref) for the pattern), so the estimator downstream only ever sees a concrete weight vector or a deliberate `nothing`.
+
 # Arguments
 
   - $(arg_dict[:oow])
@@ -2552,14 +2622,30 @@ Get the observation weights for statistical estimation.
 
 # Returns
 
-  - `w::Option{<:VecNum}`: The observation weights, or `nothing` for when `w` is [`DynamicAbstractWeights`](@ref) or `nothing`.
+  - `w::Option{<:VecNum}`: The observation weights, or `nothing` when `w` is `nothing`.
+
+# Throws
+
+  - [`ObservationWeightsError`](@ref): if `w` is a [`DynamicAbstractWeights`](@ref) with no `get_observation_weights` method for the shape of the given input.
 
 # Related
 
   - [`ObsWeights`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`ObservationWeightsError`](@ref)
 """
-function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
+function get_observation_weights(::Nothing, args...; kwargs...)
     return nothing
+end
+function get_observation_weights(w::DynamicAbstractWeights, args...; kwargs...)
+    name = nameof(typeof(w))
+    X = isempty(args) ? nothing : first(args)
+    shape = if isa(X, AbstractArray)
+        "a $(ndims(X))-dimensional input of size $(size(X))"
+    else
+        "the given input"
+    end
+    return throw(ObservationWeightsError("$name is a DynamicAbstractWeights with no `get_observation_weights` method for $shape. Implement `get_observation_weights(w::$name, X::VecNum; kwargs...)` and/or `get_observation_weights(w::$name, X::MatNum; dims::Int = 1, kwargs...)`, or pass a `StatsBase.AbstractWeights` instead (or `nothing` to compute unweighted). See the `DynamicAbstractWeights` docstring for a worked example."))
 end
 function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
@@ -2883,6 +2969,33 @@ Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val) < val < one(val),
               DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a matrix-source selector names one of the two carriers.
+
+Source selectors pick which of the two carriers a matrix is read from: `:prior` reads the prior result, `:data` reads the raw returns result. `x_src` selects the returns matrix `X`.
+
+# Arguments
+
+  - `src`: Selector to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+  - [`NestedClustered`](@ref)
+"""
+function assert_source_selector(src::Symbol, sym::Sym_Str = :x_src)::Nothing
+    @argcheck(src in (:prior, :data),
+              ArgumentError("$sym must be :prior or :data, got $(repr(src))"))
     return nothing
 end
 """
@@ -3617,4 +3730,5 @@ function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
-       PropertyPathError, VecScalar, L2Norm, SquaredL2Norm, L1Norm, LpNorm, LInfNorm
+       PropertyPathError, ObservationWeightsError, VecScalar, L2Norm, SquaredL2Norm, L1Norm,
+       LpNorm, LInfNorm
