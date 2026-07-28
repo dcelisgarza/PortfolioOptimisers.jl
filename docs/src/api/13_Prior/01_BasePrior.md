@@ -5,6 +5,7 @@ LowOrderPrior
 HighOrderPrior
 prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
+assert_prior_regression
 clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true, kwargs...)
 AbstractPriorEstimator
 AbstractLowOrderPriorEstimator

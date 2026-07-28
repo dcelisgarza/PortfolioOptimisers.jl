@@ -701,3 +701,44 @@ end
                     rd)
     @test all(isfinite, pr_unif.mu)
 end
+
+@testset "Factor block guard on wrapped priors" begin
+    # `pe` is typed `AbstractLowOrderPriorEstimator_F_AF`, whose `_AF` half uses factor
+    # returns only *optionally* — so the type constrains which returns an estimator
+    # consumes, not whether the result it produces carries a regression. Both estimators
+    # below project factor moments through the loadings and used to die on `rr === nothing`
+    # with a bare `FieldError`/`MethodError` from deep inside the projection.
+    no_rr = EntropyPoolingPrior(; pe = EmpiricalPrior())          # never computes one
+    drops_rr = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,     # computes then discards
+                                   tau = 1 / size(rd.X, 1),
+                                   views = LinearConstraintEstimator(;
+                                                                     val = ["AAPL == 0.001"]))
+    @test isnothing(prior(no_rr, rd).rr)
+    @test isnothing(prior(drops_rr, rd).rr)
+
+    for pe in (no_rr, drops_rr)
+        hofpe_err = try
+            prior(HighOrderFactorPriorEstimator(; pe = pe), rd)
+        catch e
+            e
+        end
+        @test hofpe_err isa PortfolioOptimisers.IsNothingError
+        @test occursin("regression", hofpe_err.msg)
+        @test occursin("`pe`", hofpe_err.msg)
+
+        bbl_err = try
+            prior(BayesianBlackLittermanPrior(; pe = pe, sets = fsets,
+                                              tau = 1 / size(rd.X, 1),
+                                              views = LinearConstraintEstimator(;
+                                                                                val = ["MTUM == 0.0001"])),
+                  rd)
+        catch e
+            e
+        end
+        @test bbl_err isa PortfolioOptimisers.IsNothingError
+        @test occursin("regression", bbl_err.msg)
+    end
+
+    # A prior that does carry loadings still goes through untouched.
+    @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = FactorPrior()), rd).rr)
+end

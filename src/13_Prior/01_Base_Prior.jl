@@ -233,6 +233,35 @@ function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a wrapped prior result carries a factor block, so its loadings can be projected.
+
+Estimators whose `pe` field is typed [`AbstractLowOrderPriorEstimator_F_AF`](@ref) accept the [`AbstractLowOrderPriorEstimator_AF`](@ref) half of that union, whose members use factor returns only *optionally*. The type therefore constrains which returns an estimator **consumes**, not whether the result it **produces** carries a regression. An estimator that projects factor moments through the loadings needs the latter, and must check for it.
+
+There are two ways to arrive with `pr.rr === nothing`: the wrapped estimator never computed a regression (`EntropyPoolingPrior(; pe = EmpiricalPrior())`), or it wrapped one that did and discarded it ([`BlackLittermanPrior`](@ref) forwards neither `rr` nor `f_mu`/`f_sigma`). Checking `rr` covers the whole factor block, because [`LowOrderPrior`](@ref) already requires `rr`, `f_mu` and `f_sigma` to be provided together or not at all.
+
+# Arguments
+
+  - `pr`: Prior result produced by the wrapped estimator.
+  - `sym`: Name of the field holding the wrapped estimator, used in the error message.
+
+# Validation
+
+  - `!isnothing(pr.rr)`.
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`Regression`](@ref)
+"""
+function assert_prior_regression(pr::AbstractPriorResult, sym::Sym_Str = :pe)::Nothing
+    @argcheck(!isnothing(pr.rr),
+              IsNothingError("this estimator projects factor moments through the regression loadings, so the prior it wraps must carry one, but `$sym` produced a result with `rr === nothing`. `$sym` accepts estimators that use factor returns only optionally, so the type does not guarantee a regression. Either `$sym` never computed one (e.g. `EntropyPoolingPrior(; pe = EmpiricalPrior())`), or it wrapped a prior that did and discarded it (`BlackLittermanPrior` forwards neither `rr` nor `f_mu`/`f_sigma`). Use an estimator that produces loadings, such as `FactorPrior`."))
+    return nothing
+end
+"""
     prior(pr::AbstractPriorResult, args...; kwargs...)
 
 Propagate or pass through prior result objects.
