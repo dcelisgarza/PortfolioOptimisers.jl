@@ -124,6 +124,7 @@ assert_nonempty_finite_val
 assert_matrix_issquare
 assert_unit_interval
 assert_all_finite
+assert_source_selector
 ```
 
 ## Base type aliases

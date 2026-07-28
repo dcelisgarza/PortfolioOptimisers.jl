@@ -318,6 +318,38 @@ function port_opt_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
     return pr
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Pick the returns matrix the clustering, phylogeny and centrality estimators read.
+
+Two carriers can supply asset returns: the prior result and the raw returns result. `x_src` names which one wins — `:prior` takes `pr.X`, `:data` takes `rd.X`. When no returns result is available there is nothing to select between, so `pr.X` is used and `x_src` is inert.
+
+# Arguments
+
+  - `pr`: Prior result or returns result object.
+  - `rd`: Optional returns result.
+  - `x_src`: Source selector, `:prior` or `:data`.
+
+# Validation
+
+  - `x_src in (:prior, :data)`.
+
+# Returns
+
+  - `X::MatNum`: Asset returns matrix from the selected carrier.
+
+# Related
+
+  - [`assert_source_selector`](@ref)
+  - [`clusterise`](@ref)
+  - [`phylogeny_matrix`](@ref)
+  - [`centrality_vector`](@ref)
+"""
+function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Symbol)
+    assert_source_selector(x_src, :x_src)
+    return isnothing(rd) || x_src == :prior ? pr.X : rd.X
+end
+"""
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
@@ -341,8 +373,9 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`clusterise`](@ref)
 """
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
-                    rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true, kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+                    rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                    kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src)
     return clusterise(cle, X; kwargs...)
 end
 """
@@ -371,8 +404,8 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          cle_pr::Bool = true, kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+                          x_src::Symbol = :prior, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src)
     return phylogeny_matrix(pl, X; kwargs...)
 end
 """
@@ -380,14 +413,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute phylogeny constraints from asset returns in a prior result using a phylogeny constraint estimator.
 
-`phylogeny_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `cle_pr` is false).
+`phylogeny_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `x_src` is `:data`).
 
 # Arguments
 
   - `plc`: Phylogeny constraint estimator.
   - `pr`: Prior result or returns result object.
-  - `rd`: Optional returns result (used when `cle_pr = false`).
-  - `cle_pr`: If `true`, use asset returns from `pr`; otherwise, use `rd`. Default is `true`.
+  - `rd`: Optional returns result (used when `x_src = :data`).
+  - `x_src`: If `:prior`, use asset returns from `pr`; if `:data`, use `rd`. Default is `:prior`.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -401,9 +434,9 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
   - [`phylogeny_constraints`](@ref)
 """
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
-                               rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
-                               kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+                               rd::Option{<:ReturnsResult} = nothing,
+                               x_src::Symbol = :prior, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src)
     return phylogeny_constraints(plc, X; kwargs...)
 end
 """
@@ -430,9 +463,9 @@ Compute the centrality vector for a centrality estimator and prior result.
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    X = returns_matrix_picker(pr, rd, x_src)
     return centrality_vector(cte, X; kwargs...)
 end
 """
@@ -462,9 +495,9 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                            kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    X = returns_matrix_picker(pr, rd, x_src)
     return centrality_vector(pl, ct, X; kwargs...)
 end
 """
@@ -497,8 +530,8 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                            cle_pr::Bool = true, kwargs...)
-    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, cle_pr = cle_pr,
+                            x_src::Symbol = :prior, kwargs...)
+    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, x_src = x_src,
                                                kwargs...).X, w)
 end
 """
@@ -527,9 +560,9 @@ Compute the weighted average centrality for a centrality estimator.
   - [`average_centrality`](@ref)
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
-                            rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                             kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    X = returns_matrix_picker(pr, rd, x_src)
     return average_centrality(cte, w, X; kwargs...)
 end
 """
@@ -568,9 +601,9 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`asset_phylogeny`](@ref)
 """
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
-                         rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                         rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
                          kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    X = returns_matrix_picker(pr, rd, x_src)
     return asset_phylogeny(pl, w, X; kwargs...)
 end
 """
@@ -578,14 +611,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute centrality constraints from asset returns in a prior result using a centrality constraint estimator.
 
-`centrality_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `cle_pr` is false).
+`centrality_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `x_src` is `:data`).
 
 # Arguments
 
   - `ccs`: Centrality constraint estimator or vector thereof.
   - `pr`: Prior result or returns result object.
-  - `rd`: Optional returns result (used when `cle_pr = false`).
-  - `cle_pr`: If `true`, use asset returns from `pr`; otherwise, use `rd`. Default is `true`.
+  - `rd`: Optional returns result (used when `x_src = :data`).
+  - `x_src`: If `:prior`, use asset returns from `pr`; if `:data`, use `rd`. Default is `:prior`.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -598,9 +631,9 @@ Compute centrality constraints from asset returns in a prior result using a cent
   - [`centrality_constraints`](@ref)
 """
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
-                                rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
-                                kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+                                rd::Option{<:ReturnsResult} = nothing,
+                                x_src::Symbol = :prior, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src)
     return centrality_constraints(ccs, X; kwargs...)
 end
 """

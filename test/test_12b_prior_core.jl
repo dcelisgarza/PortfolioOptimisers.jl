@@ -742,3 +742,47 @@ end
     # A prior that does carry loadings still goes through untouched.
     @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = FactorPrior()), rd).rr)
 end
+
+@testset "Returns source selector (x_src)" begin
+    # `x_src` picks which of the two asset-returns carriers the clustering, phylogeny and
+    # centrality bridges read: `:prior` takes `pr.X`, `:data` takes `rd.X`. It replaced the
+    # `cle_pr::Bool` flag in ADR 0044, whose name and documented meaning were both wrong.
+    pr = prior(EmpiricalPrior(), rd)
+    rd_alt = ReturnsResult(; nx = reverse(rd.nx), X = reverse(rd.X; dims = 2))
+    @test pr.X !== rd_alt.X
+
+    # The picker is the single point where the decision is made; all eight bridge sites
+    # delegate to it.
+    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :prior) === pr.X
+    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :prior) === pr.X
+    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :data) === rd_alt.X
+    # Without a returns result there is nothing to select between, so `x_src` is inert.
+    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :data) === pr.X
+
+    # A `Bool` could not be wrong; a `Symbol` can, so the typo throws where it was written.
+    for src in (:Prior, :data_, :returns, :pr)
+        @test_throws ArgumentError PortfolioOptimisers.returns_matrix_picker(pr, rd_alt,
+                                                                             src)
+    end
+
+    # The kwarg is wired through the bridge under its new name.
+    ne = NetworkEstimator(;)
+    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X ==
+          phylogeny_matrix(ne, rd_alt.X).X
+    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X ==
+          phylogeny_matrix(ne, pr.X).X
+    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X !=
+          phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X
+    @test_throws ArgumentError phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :Prior)
+
+    # Every optimiser carrying `x_src` validates it at construction.
+    @test_throws ArgumentError HierarchicalOptimiser(; x_src = :typo)
+    @test_throws ArgumentError JuMPOptimiser(; slv = slv, x_src = :typo)
+    @test_throws ArgumentError NestedClustered(; opti = EqualWeighted(),
+                                               opto = EqualWeighted(), x_src = :typo)
+    # The `cle_pr` spelling is gone: a Bool no longer constructs.
+    @test_throws Exception HierarchicalOptimiser(; x_src = true)
+    @test HierarchicalOptimiser().x_src == :prior
+    @test JuMPOptimiser(; slv = slv).x_src == :prior
+    @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
+end

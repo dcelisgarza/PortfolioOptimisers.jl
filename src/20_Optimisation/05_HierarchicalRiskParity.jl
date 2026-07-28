@@ -115,7 +115,7 @@ HierarchicalRiskParity
       │       wf ┼ IterativeWeightFinaliser
       │          │   iter ┴ Int64: 100
       │      brt ┼ Bool: false
-      │   cle_pr ┼ Bool: true
+      │    x_src ┼ Symbol: :prior
       │   strict ┴ Bool: false
     r ┼ Variance
       │   settings ┼ RiskMeasureSettings
@@ -289,7 +289,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     cle_pr = hrp.opt.cle_pr)
+                     x_src = hrp.opt.x_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
@@ -389,7 +389,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     cle_pr = hrp.opt.cle_pr)
+                     x_src = hrp.opt.x_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
