@@ -82,10 +82,21 @@ A pervasive Algorithm distinction in moment estimation: `FullMoment` includes al
 ## 2. Data
 
 **ReturnsResult**
-The central data structure carrying all return series through the library. Fields: `X` (asset returns matrix, observations × assets), `F` (factor returns matrix), `B` (benchmark returns matrix), `nx`/`nf`/`nb` (asset/factor/benchmark names), `ts` (timestamps), `iv` (implied volatility), `ivpa` (implied volatility premium). Produced by `prices_to_returns` from raw price data. Every Prior Estimator and Optimisation Estimator consumes a `ReturnsResult`.
+The central data structure carrying all return series through the library. Fields: `X` (asset returns matrix, observations × assets), `F` (factor returns matrix), `B` (benchmark returns matrix), `nx`/`nf`/`nb` (asset/factor/benchmark names), `ts` (timestamps), `iv` (implied volatility), `ivpa` (implied volatility premium), `nz`/`Z` (Feature Matrix and its names). Produced by `prices_to_returns` from raw price data. Every Prior Estimator and Optimisation Estimator consumes a `ReturnsResult`.
 
 **PricesResult**
 The container of aligned, time-indexed *price-level* series — asset prices plus optional factor, benchmark, and implied-volatility series — the prices-level mirror of `ReturnsResult`. The input to price Preprocessing Estimators and to prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline Cross-Validation. Like `ReturnsResult`, user-constructible yet classified as a Result (produced by filtering steps); `FiniteAllocationInput` remains the glossary's only data-as-Estimator deviation.
+
+**Feature Matrix** (`Z` / `nz`)
+An **assets × features** matrix of per-asset quantities that are *not* return series — a sector or industry taxonomy, a fundamentals or ESG panel, fitted factor loadings, a graph neighbourhood. One row per asset, one column per measured quantity; `nz` names the columns. Time-varying features add a leading observation axis (`obs × assets × features`), the two shapes distinguished by `ndims` with no wrapper type. Its point is being **exogenous**: it lets the clustering and network stack see structure the returns do not encode, via a Feature Distance.
+**It is data, not estimator configuration** (ADR 0045) — it is carried on `ReturnsResult`/`PricesResult` as user-supplied data and on `LowOrderPrior` as derived data, so `port_opt_view` slices it wherever it slices the returns; an estimator-held matrix would survive an asset subset still describing the full universe. A carried matrix is canonically assets-major and the constructor rejects any other orientation; only the raw-matrix `distance(de, Z; dims)` entry point lets `dims` retarget from `X` to `Z`.
+Which carrier is read is chosen by `z_src::Symbol = :data` — the counterpart to `x_src` (ADR 0044), defaulting the other way because between two real sources, one hand-typed, explicit outranks derived. The two do different things under subsetting: `:data` **slices**, `:prior` **refits** on the subproblem's own returns.
+When `nz == nx` — compared by *name*, not by axis length — the features **are** the assets, the matrix is square (`z_sq` on the prior carrier, which has no names), and an asset view slices **both** axes. That is the one shape in which distance does not commute with an asset view.
+*Avoid*: confusing a Feature with a **Characteristic Vector** (§3.9) — near-synonyms held deliberately apart. A Characteristic Vector is *one* per-asset quantity that an ℓ1 Uncertainty Set is built around, and stays reserved for that family; a Feature is *one column of many* in a matrix whose rows are turned into a distance. Also avoid reading "feature" as *factor*: factor returns are `F`/`nf`, and factor loadings become features only by passing through the `RegressionFeatures` producer.
+
+**Feature Matrix Estimator** (*producer*)
+Turns something the library already computes into a Feature Matrix, running inside the wrapping `FeaturePrior`, which attaches the result to the prior it wraps. `RegressionFeatures` (factor loadings — reads `rr.L`, the reduced-dimension coordinate system, not `rr.M`), `AssetSetsFeatures` (exogenous taxonomy memberships, rectangular), `PhylogenyFeatures` (a square neighbourhood matrix under `BinaryNeighbourhood` or `GradedNeighbourhood` decay — the only `z_sq = true` producer). A literal matrix passed as `FeaturePrior(; ze = Z)` is the identity producer.
+*Avoid*: a producer that clusters the returns and re-encodes the clustering. Cluster memberships from nested cuts recode the cophenetic distance of the hierarchy that produced them, so clustering the result returns that hierarchy; a single partition is worse still, giving a distance matrix with at most two distinct values (ADR 0045).
 
 **Implied Volatility**
 A forward-looking estimate of how much an asset's price is expected to fluctuate, derived from current options contract prices using models such as Black-Scholes. Stored as `iv`. Not a historical measurement.
@@ -183,6 +194,14 @@ A symmetric, zero-diagonal matrix where larger values mean less relatedness. Usu
 **Distance Estimator**
 Converts correlation/returns into a distance. Algorithms: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance` (variation of information), `CanonicalDistance`. `Distance` is the configurable container (supports a generalised power distance); `DistanceDistance` computes a distance-of-distances.
 
+**Feature Distance** (`FeatureDistance`)
+The one Distance Estimator that measures something other than returns: it applies a metric to the **rows** of a Feature Matrix (§2), so the resulting hierarchy expresses exogenous structure. Configuration only — `metric`, `alg`, `sim`; the matrix itself is data and arrives from its carrier (ADR 0045). The metric family is **open**: any `Distances.SemiMetric`, including user-defined ones, defaulting to `AngularDist` (`acos(clamp(1 - CosineDist, -1, 1))/π`, a true metric where `CosineDist` is not). `alg` is an `AbstractFeatureCollapseAlgorithm` deciding how a *window* of time-varying features becomes one distance matrix — `LastObservation` (default), `AggregateFeatures`, `AggregateDistances` (both taking `MeanCollapse`/`MedianCollapse`), `StackObservations` — and is inert, not an error, for a static matrix.
+*Avoid*: assuming metric choice is free of the data. Every metric other than `AngularDist` and `CorrDist` is scale-sensitive, so heterogeneous features need standardising; the Ruzicka `Jaccard`, `BrayCurtis` and `ChiSqDist` require a non-negative matrix, checked in the kernel rather than at construction because the metric is unknown when the carrier is built.
+
+**Similarity Matrix Algorithm** (`AbstractSimilarityMatrixAlgorithm`)
+Fills `cor_and_dist`'s `S` slot by transforming a Distance Matrix — `distance_to_similarity(sim; D)`. Members: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity` (`1 .- D`), `AngularSimilarity` (`cos.(π .* D)`). Lives in the Distance layer, not in DBHT, because a Feature Distance must name it. `FeatureDistance.sim` is non-optional and defaulted from the metric by `default_similarity`, so the resolved choice prints on the object. `DBHT` has a `sim` field of the same type doing the same job; when both are set DBHT's wins, because `clusterise` overwrites `S` immediately after `cor_and_dist` returns.
+*Avoid*: reading `ComplementSimilarity` as bounded. It is unbounded below whenever `D` is (a `Euclidean` distance of 7 gives `S = -6`), which `plot_clusters` silently clips rather than rejecting.
+
 ### 3.8 Phylogeny
 
 **Phylogeny**
@@ -193,6 +212,10 @@ The characterisation of asset relationships derived from a Distance Matrix. The 
 - **Centrality**: which assets are most influential — `BetweennessCentrality`, `ClosenessCentrality`, `DegreeCentrality`, `EigenvectorCentrality`, `KatzCentrality`, `Pagerank`, `RadialityCentrality`, `StressCentrality`.
 
 `PhylogenyResult` carries the resulting matrix/vector. Required input to clustering-based Optimisation Estimators and to phylogeny constraints.
+
+**Phylogeny Features** (`PhylogenyFeatures` / `phylogeny_features`)
+The reverse direction: a phylogeny reused as a **Feature Matrix** (§2) rather than consumed as one. An `assets × assets` neighbourhood matrix *is* an `assets × features` matrix whose features are "how close is asset *k*", so the graph a Network Estimator builds — or a precomputed `PhylogenyResult` — can drive a Feature Distance. `AbstractPhylogenyFeatureAlgorithm` sets the decay from hop counts: `BinaryNeighbourhood` (adjacent or not) or `GradedNeighbourhood` (default, linear in hops). **Self is always included**, so the diagonal is just the zero-hop value: excluding it measures *structural equivalence* rather than proximity — the two non-adjacent endpoints of a three-node path come out identical — and, under an asset view that isolates every selected vertex, leaves zero rows that the zero-vector convention declares mutually identical. A precomputed `PhylogenyResult` is used **as given** (`alg` inert, no hop transform); only its diagonal is set.
+*Avoid*: reading the square shape as cosmetic. It is the `z_sq = true` case, so an asset view slices both axes and a subproblem is measured against its own neighbourhood structure, not the universe's. This is deliberately endogenous — it is the one producer derived from the returns — and what it buys was measured: a different merge order and different weights from a correlation distance, but identical cuts at `k = 2` and `k = 3`.
 
 ### 3.9 Uncertainty Sets
 
@@ -211,6 +234,7 @@ The three ways to ask an Uncertainty Set estimator for its sets: `ucs` returns t
 
 **Characteristic Vector**
 The per-asset quantity an ℓ1 uncertainty set is built around. Usually the expected return, but the construction is indifferent: a prior built on `StandardDeviationExpectedReturns` ranks on volatility instead. The radius `eps` decides how many assets the resulting portfolio holds — small radius, one asset; moderate, a quintile; large, all of them equally — which is what makes the *quintile* and *1/N* heuristics exact solutions of a robust optimisation problem rather than folk wisdom (ADR 0032). There is deliberately no quintile optimiser: the portfolios are a `MeanRisk` recipe over this set.
+*Avoid*: using *characteristic* for a column of a **Feature Matrix** (§2), and vice versa. The two are near-synonyms held apart on purpose: a Characteristic Vector is a *single* per-asset quantity that this family builds an uncertainty budget around, and the word stays reserved for it (`CharacteristicUncertaintySet`); a Feature is *one column of many*, and the matrix's rows become a distance. `Characteristic…` naming was the first candidate for the feature work and was rejected on exactly this collision (ADR 0045).
 
 **Radius Calibration** (`ActiveAssetsUncertaintyAlgorithm`)
 The conversion from "how many assets should I hold?" to the opaque radius `eps` that produces it, by inverting the closed forms. A *calibration, not a constraint*: exact only for the bare budget-and-sign problem the closed forms assume, so any further constraint may move the realised count. `card` remains the tool for a hard cardinality bound.

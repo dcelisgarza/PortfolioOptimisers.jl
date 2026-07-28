@@ -23,7 +23,7 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
 ### Returns
 
-  - `ckurt::MatNum`: Cokurtosis tensor `features^2 × features^2`.
+  - `ckurt::MatNum`: Cokurtosis tensor `assets^2 × assets^2`.
 
 ## Factory
 

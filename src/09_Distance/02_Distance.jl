@@ -173,7 +173,7 @@ This method computes the correlation matrix using the provided covariance estima
 
   - `ce`: Covariance estimator.
 
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
 
   - $(arg_dict[:dims])
 
@@ -228,7 +228,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 
   - `de::Distance{<:Any, <:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
   - `ce`: LTD covariance estimator or a PortfolioOptimisersCovariance wrapping an LTD estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
@@ -262,7 +262,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 
   - `de::Distance{<:Any, <:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
   - `::Any`: Covariance estimator placeholder for API compatibility (ignored).
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -364,7 +364,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
 
   - `de`: Distance estimator.
   - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
@@ -477,7 +477,7 @@ Compute the canonical distance matrix using the covariance estimator and data ma
 
   - `de::Distance{<:Any, <:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
   - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 

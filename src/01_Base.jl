@@ -28,7 +28,7 @@ const arg_dict = Dict(
                       :pw => "`w`: Portfolio weights vector `assets × 1`.",#
                       :ow => "`w`: Observation weights vector `observations × 1`.",#
                       :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
-                      :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
+                      :eqw => "`eqw`: Equilibrium weights vector `assets × 1`.",#
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
                       :opdm => "`pdm`: Optional positive definite matrix estimator.",
@@ -63,7 +63,7 @@ const arg_dict = Dict(
                       :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
                       :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
                       :b => "`b`: Regression intercept vector.",#
-                      :crit => "`crit`: Feature selection criterion.",#
+                      :crit => "`crit`: Factor selection criterion.",#
                       :realg => "`alg`: Regression algorithm.",#
                       :retgt => "`tgt`: Regression model target.",#
                       :dretgt => "`retgt`: Regression model target.",#
@@ -118,7 +118,7 @@ const arg_dict = Dict(
                       :D => "`D`: Distance matrix",#
                       :ck => "`k`: Optimal number of clusters.",#
                       :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
-                      :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(features))`.",#
+                      :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(assets))`.",#
                       :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
                       :clalg => "`alg`: Clustering algorithm.",#
                       :onc => "`onc`: Optimal number of clusters estimator.",#
@@ -131,7 +131,7 @@ const arg_dict = Dict(
                       :sim => "`sim`: Similarity matrix algorithm.",#
                       :root => "`root`: Root selection method.",#
                       # Estimators
-                      :sets => "`sets`: Sets used to map estimator values to features.",#
+                      :sets => "`sets`: Sets used to map estimator values to assets.",#
                       :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
                       :ekey => "`key`: Key to specify the asset universe in `sets.dict`. If `nothing`, the key is taken from `sets.key`.",#
                       :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
@@ -164,15 +164,15 @@ const arg_dict = Dict(
                       :feesr => "`fees`: Fees result.",
                       :feeser => "`fees`: Fees estimator or result.",
                       # Stats.
-                      :sigma => "`sigma`: Covariance matrix `features × features`.",#
-                      :mu => "`mu`: Expected returns vector `features × 1`.",#
-                      :rho => "`rho`: Correlation matrix `features × features`.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `features × features`.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
-                      :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
-                      :sk => "`sk`: Coskewness matrix `features × features^2`.",#
-                      :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `features × features`.",
-                      :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
+                      :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
+                      :mu => "`mu`: Expected returns vector `assets × 1`.",#
+                      :rho => "`rho`: Correlation matrix `assets × assets`.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `assets × assets`.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `assets × assets`.",
+                      :kt => "`kt`: Cokurtosis matrix `assets^2 × assets^2`.",#
+                      :sk => "`sk`: Coskewness matrix `assets × assets^2`.",#
+                      :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `assets × assets`.",
+                      :X => "`X`: Data matrix `observations × assets` if the `dims` keyword does not exist or `dims = 1`, `assets × observations` when `dims = 2`.",#
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :X_Xv => "`X`: Data matrix or vector.",#
@@ -722,14 +722,14 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
-                      :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
-                      :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
-                      :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
-                      :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
-                      :cskew => "`cskew::MatNum`: Coskewness tensor `features x features²`.",#
-                      :cskewV => "`V::MatNum`: Processed coskewness matrix `features x features`.",#
-                      :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
+const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
+                      :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
+                      :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
+                      :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
+                      :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
+                      :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
+                      :cskewV => "`V::MatNum`: Processed coskewness matrix `assets x assets`.",#
+                      :kte => "`kte::MatNum`: Cokurtosis matrix `assets x assets`.",#
                       :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                       :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
                       :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
@@ -2358,7 +2358,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
 
   - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
       + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value to use if `val` is `nothing`.
-      + `nx = sets.dict[ifelse(isnothing(key), sets.key, key)]`: Gets the universe to use for mapping values to features.
+      + `nx = sets.dict[ifelse(isnothing(key), sets.key, key)]`: Gets the universe to use for mapping values to assets.
 
 ## Arguments
 

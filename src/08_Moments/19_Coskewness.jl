@@ -23,8 +23,8 @@ In order to implement a new coskewness estimator which will work seamlessly with
 
 ### Returns
 
-  - `cskew::MatNum`: Coskewness tensor `features × features^2`.
-  - `V::MatNum`: Processed coskewness matrix `features × features`.
+  - `cskew::MatNum`: Coskewness tensor `assets × assets^2`.
+  - `V::MatNum`: Processed coskewness matrix `assets × assets`.
 
 ## Factory
 

@@ -97,7 +97,7 @@ This method applies PCA as a dimension reduction technique for regression-based 
 # Arguments
 
   - `drtgt`: A [`PCA`](@ref) dimension reduction target, specifying keyword arguments for PCA.
-  - `X`: Data matrix (observations × features) to which PCA will be fitted.
+  - `X`: Data matrix (observations × factors) to which PCA will be fitted.
 
 # Returns
 
@@ -167,7 +167,7 @@ This method applies PPCA as a dimension reduction technique for regression-based
 # Arguments
 
   - `drtgt`: A [`PPCA`](@ref) dimension reduction target, specifying keyword arguments for PPCA.
-  - `X`: Data matrix (observations × features) to which PPCA will be fitted.
+  - `X`: Data matrix (observations × factors) to which PPCA will be fitted.
 
 # Returns
 
@@ -262,16 +262,16 @@ end
 
 Prepare data for dimension reduction regression.
 
-This helper function standardizes the feature matrix `X` (using Z-score normalization), fits the specified dimension reduction model (e.g., PCA or PPCA), and projects the standardized data into the reduced-dimensional space. It returns the projected data (with an intercept column) and the projection matrix.
+This helper function standardizes the factor matrix `X` (using Z-score normalization), fits the specified dimension reduction model (e.g., PCA or PPCA), and projects the standardized data into the reduced-dimensional space. It returns the projected data (with an intercept column) and the projection matrix.
 
 # Arguments
 
   - `drtgt`: Dimension reduction target (e.g., `PCA()`, `PPCA()`).
-  - `X`: Feature matrix (observations × features) to be reduced.
+  - `X`: Factor matrix (observations × factors) to be reduced.
 
 # Returns
 
-  - `x1::MatNum`: Projected feature matrix with an intercept column prepended.
+  - `x1::MatNum`: Projected factor matrix with an intercept column prepended.
   - `Vp::MatNum`: Projection matrix from the fitted dimension reduction model.
 
 # Details
@@ -300,9 +300,9 @@ end
     _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
                sigma::VecNum, x1::MatNum, Vp::MatNum)
 
-Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
+Fit a regression model in reduced-dimensional space and recover coefficients in the original factor space.
 
-This function fits a regression model (as specified by `retgt`) to the response vector `y` using the projected feature matrix `x1` (typically obtained from a dimension reduction method such as PCA or PPCA). It then transforms the estimated coefficients from the reduced space back to the original feature space using the projection matrix `Vp` and rescales them by the standard deviations `sigma`. The intercept is adjusted to account for the mean of `y` and the means of the original features.
+This function fits a regression model (as specified by `retgt`) to the response vector `y` using the projected factor matrix `x1` (typically obtained from a dimension reduction method such as PCA or PPCA). It then transforms the estimated coefficients from the reduced space back to the original factor space using the projection matrix `Vp` and rescales them by the standard deviations `sigma`. The intercept is adjusted to account for the mean of `y` and the means of the original factors.
 
 # Mathematical definition
 
@@ -318,32 +318,32 @@ Where:
 
   - ``\\hat{y}``: Fitted response.
   - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced (PC) space.
-  - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original feature space.
+  - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original factor space.
   - ``\\hat{\\beta}_0``: Intercept adjusted to the original space.
-  - ``\\mathbf{X}_1``: Projected feature matrix in the reduced space.
+  - ``\\mathbf{X}_1``: Projected factor matrix in the reduced space.
   - ``\\mathbf{V}_p``: PCA/PPCA projection matrix.
-  - ``\\boldsymbol{\\sigma}``: Feature standard deviations.
-  - ``\\boldsymbol{\\mu}``: Feature means.
+  - ``\\boldsymbol{\\sigma}``: Factor standard deviations.
+  - ``\\boldsymbol{\\mu}``: Factor means.
   - ``\\oslash``: Element-wise division.
 
 # Arguments
 
   - `re`: Dimension reduction regression.
   - `y`: Response vector.
-  - `mu`: Mean vector of the original features.
-  - `sigma`: Standard deviation vector of the original features.
-  - `x1`: Projected feature matrix with intercept column (from dimension reduction).
+  - `mu`: Mean vector of the original factors.
+  - `sigma`: Standard deviation vector of the original factors.
+  - `x1`: Projected factor matrix with intercept column (from dimension reduction).
   - `Vp`: Projection matrix from the fitted dimension reduction model.
 
 # Returns
 
-  - `beta::VecNum`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
+  - `beta::VecNum`: Vector of regression coefficients in the original factor space, with the intercept as the first element.
 
 # Details
 
   - Fits the regression model in the reduced space using `x1` and `y`.
   - Extracts the coefficients for the principal components (excluding the intercept).
-  - Transforms the coefficients back to the original feature space using `Vp` and rescales by `sigma`.
+  - Transforms the coefficients back to the original factor space using `Vp` and rescales by `sigma`.
   - Computes the intercept so that predictions are unbiased with respect to the means.
 
 # Related
@@ -370,26 +370,26 @@ end
 
 Apply dimension reduction regression to each column of a response matrix.
 
-This method fits a regression model with dimension reduction (e.g., PCA or PPCA) to each column of the response matrix `X`, using the feature matrix `F` as predictors. For each response vector (column of `X`), the features are first standardized and projected into a lower-dimensional space using the dimension reduction target specified in `re.drtgt`. A regression model (specified by `re.retgt`) is then fitted in the reduced space, and the coefficients are mapped back to the original feature space.
+This method fits a regression model with dimension reduction (e.g., PCA or PPCA) to each column of the response matrix `X`, using the factor matrix `F` as predictors. For each response vector (column of `X`), the factors are first standardized and projected into a lower-dimensional space using the dimension reduction target specified in `re.drtgt`. A regression model (specified by `re.retgt`) is then fitted in the reduced space, and the coefficients are mapped back to the original factor space.
 
 # Arguments
 
   - `re`: Dimension reduction regression estimator specifying the expected returns estimator, variance estimator, dimension reduction target, and regression target.
   - `X`: Response matrix (observations × targets/assets).
-  - `F`: Feature matrix (observations × features).
+  - `F`: Factor matrix (observations × factors).
 
 # Returns
 
   - `reg::Regression`: A regression result object containing:
 
       + `b`: Vector of intercepts for each response.
-      + `M`: Matrix of coefficients for each response and feature (in the original feature space).
+      + `M`: Matrix of coefficients for each response and factor (in the original factor space).
       + `L`: Matrix of coefficients in the reduced (projected) space.
 
 # Details
 
-  - For each column in `X`, the features in `F` are standardized, projected using the dimension reduction model, and a regression is fitted in the reduced space.
-  - The resulting coefficients are transformed back to the original feature space and rescaled.
+  - For each column in `X`, the factors in `F` are standardized, projected using the dimension reduction model, and a regression is fitted in the reduced space.
+  - The resulting coefficients are transformed back to the original factor space and rescaled.
   - The output `Regression` object contains the intercepts, coefficient matrix in the original space, and the projected coefficients.
 
 # Related

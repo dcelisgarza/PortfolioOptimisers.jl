@@ -525,7 +525,7 @@ If `plcs` is a vector, this method broadcasts over each element, returning a vec
 # Arguments
 
   - `plc`: A phylogeny constraint estimator, result, or `nothing`.
-  - `X`: Data matrix of asset features or returns (ignored when `plc` is not an estimator).
+  - `X`: Data matrix (`observations × assets`) (ignored when `plc` is not an estimator).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny matrix routine (ignored when `est` is not an estimator).
 
@@ -712,7 +712,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 # Arguments
 
   - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of such estimators.
-  - `X`: Data matrix of asset features or returns.
+  - `X`: Data matrix (`observations × assets`).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 

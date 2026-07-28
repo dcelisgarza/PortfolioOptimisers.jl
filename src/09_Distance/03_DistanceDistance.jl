@@ -105,7 +105,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
   - `de`: Distance-of-distances estimator.
   - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
@@ -164,7 +164,7 @@ This method first computes the correlation and base distance matrices using [`Di
 
   - `de`: Distance-of-distances estimator.
   - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
