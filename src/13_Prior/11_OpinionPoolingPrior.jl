@@ -93,17 +93,17 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> OpinionPoolingPrior(;
                            pes = [EntropyPoolingPrior(; sets = sets,
                                                       mu_views = LinearConstraintEstimator(;
-                                                                                           val = ["A == 0.03",
-                                                                                                  "B + C == 0.04"])),
+                                                                                           val = [\"A == 0.03\",
+                                                                                                  \"B + C == 0.04\"])),
                                   EntropyPoolingPrior(; sets = sets,
                                                       mu_views = LinearConstraintEstimator(;
-                                                                                           val = ["A == 0.05",
-                                                                                                  "B + C >= 0.06"]))])
+                                                                                           val = [\"A == 0.05\",
+                                                                                                  \"B + C >= 0.06\"]))])
 OpinionPoolingPrior
   pes ┼ 2-element Vector{EntropyPoolingPrior}
       │ EntropyPoolingPrior ⋯

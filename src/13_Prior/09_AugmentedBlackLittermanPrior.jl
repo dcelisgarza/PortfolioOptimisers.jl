@@ -87,16 +87,16 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> AugmentedBlackLittermanPrior(;
-                                    a_sets = AssetSets(; key = "nx",
-                                                       dict = Dict("nx" => ["A", "B", "C"])),
-                                    f_sets = AssetSets(; key = "nx",
-                                                       dict = Dict("nx" => ["F1", "F2"])),
+                                    a_sets = AssetSets(; key = \"nx\",
+                                                       dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                    f_sets = AssetSets(; key = \"nx\",
+                                                       dict = Dict(\"nx\" => [\"F1\", \"F2\"])),
                                     a_views = LinearConstraintEstimator(;
-                                                                        val = ["A == 0.03",
-                                                                               "B + C == 0.04"]),
+                                                                        val = [\"A == 0.03\",
+                                                                               \"B + C == 0.04\"]),
                                     f_views = LinearConstraintEstimator(;
-                                                                        val = ["F1 == 0.01",
-                                                                               "F2 == 0.02"]))
+                                                                        val = [\"F1 == 0.01\",
+                                                                               \"F2 == 0.02\"]))
 AugmentedBlackLittermanPrior
           a_pe ┼ EmpiricalPrior
                │        ce ┼ PortfolioOptimisersCovariance

@@ -287,7 +287,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]))
+julia> AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]))
 AssetSets
    key ┼ String: "nx"
   ukey ┼ String: "ux"
@@ -599,7 +599,7 @@ Custom weight bounds constraint for uniformly distributing asset weights, `1/N` 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> PortfolioOptimisers.estimator_to_val(UniformValues(), sets)
 StepRangeLen(0.3333333333333333, 0.0, 3)
@@ -1050,7 +1050,7 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 # Examples
 
 ```jldoctest
-julia> parse_equation("w_A + 2w_B <= 1")
+julia> parse_equation(\"w_A + 2w_B <= 1\")
 ParsingResult
   vars ┼ Vector{String}: ["w_A", "w_B"]
   coef ┼ Vector{Float64}: [1.0, 2.0]
@@ -1199,9 +1199,9 @@ This function takes a [`ParsingResult`](@ref) containing variable names (which m
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
-julia> res = parse_equation("group1 + 2C == 1")
+julia> res = parse_equation(\"group1 + 2C == 1\")
 ParsingResult
   vars ┼ Vector{String}: ["C", "group1"]
   coef ┼ Vector{Float64}: [2.0, 1.0]
@@ -1444,9 +1444,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> lce = LinearConstraintEstimator(; val = ["w_A + w_B == 1", "w_A >= 0.1"]);
+julia> lce = LinearConstraintEstimator(; val = [\"w_A + w_B == 1\", \"w_A >= 0.1\"]);
 
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["w_A", "w_B"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\"]));
 
 julia> linear_constraints(lce, sets)
 LinearConstraint
@@ -1606,9 +1606,9 @@ This function parses one or more constraint equations (as strings, expressions, 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["w_A", "w_B", "w_C"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\", \"w_C\"]));
 
-julia> linear_constraints(["w_A + w_B == 1", "w_A >= 0.1"], sets)
+julia> linear_constraints([\"w_A + w_B == 1\", \"w_A >= 0.1\"], sets)
 LinearConstraint
   ineq ┼ PartialLinearConstraint
        │   A ┼ 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}

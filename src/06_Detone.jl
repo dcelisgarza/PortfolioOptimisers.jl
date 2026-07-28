@@ -30,13 +30,13 @@ julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator e
 
 julia> function PortfolioOptimisers.detone!(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place detoning estimator here.
-           println("Detoning matrix in-place...")
+           println(\"Detoning matrix in-place...\")
            return X
        end
 
 julia> function PortfolioOptimisers.detone(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           println("Copy X...")
+           println(\"Copy X...\")
            detone!(dt, X)
            return X
        end

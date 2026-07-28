@@ -32,14 +32,14 @@ julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator
 julia> function PortfolioOptimisers.denoise!(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum,
                                              q::Number)
            # Implement your in-place denoising estimator here.
-           println("Denoising matrix in-place...")
+           println(\"Denoising matrix in-place...\")
            return X
        end
 
 julia> function PortfolioOptimisers.denoise(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum,
                                             q::Number)
            X = copy(X)
-           println("Copy X...")
+           println(\"Copy X...\")
            denoise!(dn, X, q)
            return X
        end
@@ -104,7 +104,7 @@ julia> function PortfolioOptimisers._denoise!(dn::MyDenoiseAlgorithm,
                                               vecs::PortfolioOptimisers.MatNum,
                                               num_factors::Integer)
            # Implement your in-place denoising logic here.
-           println("Denoising matrix using custom algorithm...")
+           println(\"Denoising matrix using custom algorithm...\")
            return X
        end
 

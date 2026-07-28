@@ -49,9 +49,9 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 # Examples
 
 ```jldoctest
-julia> FeesEstimator(; tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1)),
-                     l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                     fl = Dict("A" => 5.0), fs = ["B" => 10.0])
+julia> FeesEstimator(; tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1)),
+                     l = Dict(\"A\" => 0.001, \"B\" => 0.002), s = [\"A\" => 0.001, \"B\" => 0.002],
+                     fl = Dict(\"A\" => 5.0), fs = [\"B\" => 10.0])
 FeesEstimator
       tn ┼ TurnoverEstimator
          │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
@@ -402,13 +402,13 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> fees = FeesEstimator(;
-                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1),
                                                    dval = 0.0),
-                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+                            l = Dict(\"A\" => 0.001, \"B\" => 0.002), s = [\"A\" => 0.001, \"B\" => 0.002],
+                            fl = Dict(\"A\" => 5.0), fs = [\"B\" => 10.0]);
 
 julia> fees_constraints(fees, sets)
 Fees
@@ -423,10 +423,10 @@ Fees
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 
 julia> fees = FeesEstimator(;
-                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1),
                                                    dval = 0.0, fixed = true),
-                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+                            l = Dict(\"A\" => 0.001, \"B\" => 0.002), s = [\"A\" => 0.001, \"B\" => 0.002],
+                            fl = Dict(\"A\" => 5.0), fs = [\"B\" => 10.0]);
 
 julia> fees_constraints(fees, sets)
 Fees

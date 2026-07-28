@@ -490,10 +490,10 @@ The comparison operators accepted in each view's constraint strings depend on th
 # Examples
 
 ```jldoctest
-julia> EntropyPoolingPrior(; sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"])),
+julia> EntropyPoolingPrior(; sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                            mu_views = LinearConstraintEstimator(;
-                                                                val = ["A == 0.03",
-                                                                       "B + C == 0.04"]))
+                                                                val = [\"A == 0.03\",
+                                                                       \"B + C == 0.04\"]))
 EntropyPoolingPrior
            pe ┼ EmpiricalPrior
               │        ce ┼ PortfolioOptimisersCovariance

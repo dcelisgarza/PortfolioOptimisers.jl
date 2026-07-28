@@ -84,12 +84,12 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> RiskBudgetEstimator(; val = Dict("A" => 0.2, "B" => 0.3, "C" => 0.5))
+julia> RiskBudgetEstimator(; val = Dict(\"A\" => 0.2, \"B\" => 0.3, \"C\" => 0.5))
 RiskBudgetEstimator
    val ┼ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
   dval ┴ nothing
 
-julia> RiskBudgetEstimator(; val = ["A" => 0.2, "B" => 0.3, "C" => 0.5])
+julia> RiskBudgetEstimator(; val = [\"A\" => 0.2, \"B\" => 0.3, \"C\" => 0.5])
 RiskBudgetEstimator
    val ┼ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
   dval ┴ nothing
@@ -235,9 +235,9 @@ This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group n
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]));
+julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
-julia> risk_budget_constraints(Dict("A" => 0.2, "group1" => 0.8), sets)
+julia> risk_budget_constraints(Dict(\"A\" => 0.2, \"group1\" => 0.8), sets)
 RiskBudget
   val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```

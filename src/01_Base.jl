@@ -846,7 +846,7 @@ julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
            half_life::T
            function MyWeights(half_life::Integer)
                if half_life < one(half_life)
-                   throw(DomainError(half_life, "half_life must be an integer greater than zero"))
+                   throw(DomainError(half_life, \"half_life must be an integer greater than zero\"))
                end
                return new{typeof(half_life)}(half_life)
            end
@@ -1846,7 +1846,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsNothingError("Input data must not be nothing"))
+julia> throw(IsNothingError(\"Input data must not be nothing\"))
 ERROR: IsNothingError: Input data must not be nothing
 Stacktrace:
  [1] top-level scope
@@ -1884,7 +1884,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsEmptyError("Input array must not be empty"))
+julia> throw(IsEmptyError(\"Input array must not be empty\"))
 ERROR: IsEmptyError: Input array must not be empty
 Stacktrace:
  [1] top-level scope
@@ -1922,7 +1922,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(IsNonFiniteError("Input array contains non-finite values"))
+julia> throw(IsNonFiniteError(\"Input array contains non-finite values\"))
 ERROR: IsNonFiniteError: Input array contains non-finite values
 Stacktrace:
  [1] top-level scope
@@ -1960,7 +1960,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator"))
+julia> throw(ConflictingArgumentError(\"sbgt must be nothing when bgt is a BudgetCostEstimator\"))
 ERROR: ConflictingArgumentError: sbgt must be nothing when bgt is a BudgetCostEstimator
 Stacktrace:
  [1] top-level scope
@@ -1998,7 +1998,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(PropertyPathError("cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`"))
+julia> throw(PropertyPathError(\"cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`\"))
 ERROR: PropertyPathError: cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`
 Stacktrace:
  [1] top-level scope
@@ -2036,7 +2036,7 @@ Arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> throw(ObservationWeightsError("MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)"))
+julia> throw(ObservationWeightsError(\"MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)\"))
 ERROR: ObservationWeightsError: MyWeights has no `get_observation_weights` method for a 2-dimensional input of size (3, 10)
 Stacktrace:
  [1] top-level scope
@@ -2353,7 +2353,7 @@ julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, set
            return arr
        end
 
-julia> sets = AssetSets(; dict = Dict("nx" => ["sha", "bis", "man"]))
+julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
 AssetSets
    key ┼ String: "nx"
   ukey ┼ String: "ux"

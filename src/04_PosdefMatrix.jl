@@ -30,13 +30,13 @@ julia> struct MyPosdefEstimator <: PortfolioOptimisers.AbstractPosdefEstimator e
 
 julia> function PortfolioOptimisers.posdef!(pdm::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place PD projection logic here.
-           println("Projecting to positive definite matrix in-place...")
+           println(\"Projecting to positive definite matrix in-place...\")
            return X
        end
 
 julia> function PortfolioOptimisers.posdef(pdm::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           println("Copy X...")
+           println(\"Copy X...\")
            posdef!(pdm, X)
            return X
        end

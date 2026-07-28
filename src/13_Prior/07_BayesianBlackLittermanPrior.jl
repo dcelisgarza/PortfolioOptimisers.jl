@@ -37,11 +37,11 @@ Keywords correspond to the struct's fields.
 
 ```jldoctest
 julia> BayesianBlackLittermanPrior(;
-                                   sets = AssetSets(; key = "nx",
-                                                    dict = Dict("nx" => ["A", "B", "C"])),
+                                   sets = AssetSets(; key = \"nx\",
+                                                    dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                                    views = LinearConstraintEstimator(;
-                                                                     val = ["A == 0.03",
-                                                                            "B + C == 0.04"]))
+                                                                     val = [\"A == 0.03\",
+                                                                            \"B + C == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
              │    pe ┼ EmpiricalPrior
