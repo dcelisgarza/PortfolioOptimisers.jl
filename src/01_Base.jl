@@ -177,6 +177,9 @@ const arg_dict = Dict(
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :X_Xv => "`X`: Data matrix or vector.",#
                       :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
+                      :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from an `AssetSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
+                      :z_sq => "`z_sq`: Whether the feature axis of `Z` *is* the asset axis, as it is for a square adjacency matrix reused as features. Stated by the producer that built `Z`, because a prior result carries no feature names to compare against. When `true`, an asset view slices the feature axis too.",#
+                      :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",
                       :stdvec => "`sd`: Vector of standard deviations for each asset.",#
@@ -2161,6 +2164,19 @@ Alias for a union of a numeric type or an abstract matrix of numeric types.
   - [`MatNum`](@ref)
 """
 const VecNum_MatNum = Union{<:VecNum, <:MatNum}
+"""
+    const MatNum_Arr3Num = Union{<:MatNum, <:Arr3Num}
+
+Alias for a union of an abstract matrix and an abstract 3-dimensional array of numeric types.
+
+The two admissible shapes of a feature matrix: a static `assets × features` matrix, and a window of time-varying features whose observation axis leads, `observations × assets × features`. Both shapes are carried by [`PricesResult`](@ref) and [`ReturnsResult`](@ref) and consumed by [`FeatureDistance`](@ref), which distinguishes them by dispatch rather than by an `ndims` branch.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`Arr3Num`](@ref)
+"""
+const MatNum_Arr3Num = Union{<:MatNum, <:Arr3Num}
 """
     const Num_VecNum = Union{<:Number, <:VecNum}
 

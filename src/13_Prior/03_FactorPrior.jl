@@ -197,6 +197,10 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
         posdef!(pe.mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
+    # No `Z` is forwarded: `f_prior` is fit on the factors, so its feature matrix would be
+    # factors × features and would not describe the asset axis. To attach features here, wrap
+    # this estimator — `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads
+    # the loadings back off the result.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
                                                   :)), w = f_prior.w, rr = rr, f_mu = f_mu,

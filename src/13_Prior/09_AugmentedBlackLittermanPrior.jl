@@ -402,9 +402,14 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
+    # The feature matrix comes from `a_prior` only: `f_prior` is fit on the factors, so its
+    # `Z` would be factors × features and would not describe this asset axis. The augmented
+    # system is truncated straight back to the assets, so `a_prior.Z` still binds correctly.
+    # `posterior_X` is reconstructed from the factors, so a forwarded `Z` is dimension-correct
+    # but was derived from the pre-reconstruction returns (see [`LowOrderPrior`](@ref)).
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          rr = rr, f_mu = f_prior_mu, f_sigma = f_prior_sigma,
-                         f_w = f_prior.w)
+                         f_w = f_prior.w, Z = a_prior.Z, z_sq = a_prior.z_sq)
 end
 
 export AugmentedBlackLittermanPrior

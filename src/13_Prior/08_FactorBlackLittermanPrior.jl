@@ -328,6 +328,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
         posdef!(pe.mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
+    # No `Z` is forwarded: the only wrapped prior here is `f_prior`, fit on the factors, so
+    # its feature matrix would be factors × features and would not describe the asset axis.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
                                                   :)), w = f_prior.w, rr = rr,

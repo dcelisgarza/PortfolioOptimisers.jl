@@ -71,6 +71,324 @@ function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:M
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that feature names are provided alongside their feature matrix and are internally consistent.
+
+The **names layer** of [`check_names_and_feature_matrix`](@ref): both-or-neither, non-empty, and unique. Everything that depends only on the matrix — non-emptiness, finiteness and shape — belongs to [`check_feature_matrix`](@ref), so a nameless carrier such as [`LowOrderPrior`](@ref) can reuse it.
+
+# Arguments
+
+  - `nz`: Feature names.
+  - `Z`: Feature matrix.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`check_names_and_feature_matrix`](@ref)
+  - [`check_feature_matrix`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function check_feature_names(nz::Option{<:VecStr}, ::MatNum_Arr3Num)::Nothing
+    @argcheck(!isnothing(nz),
+              IsNothingError("nz cannot be nothing if Z is not `nothing`. Got\n!isnothing(nz) => $(!isnothing(nz))\n!isnothing(Z) => true"))
+    @argcheck(!isempty(nz), IsEmptyError("nz cannot be empty."))
+    @argcheck(allunique(nz),
+              ArgumentError("nz names must be unique. Got\nallunique(nz) => $(allunique(nz))"))
+    return nothing
+end
+"""
+    check_feature_matrix(Z::Nothing, na, nobs, na_sym)
+    check_feature_matrix(Z::MatNum, na, nobs, na_sym)
+    check_feature_matrix(Z::Arr3Num, na, nobs, na_sym)
+
+Validate a feature matrix against the asset and observation axes of the result carrying it, without reference to feature names.
+
+The **shape layer**. It holds every check that depends only on the matrix: non-emptiness, finiteness, and the binding of the asset (and, when time-varying, observation) axis. A feature matrix is never imputed, so a `NaN` or `±Inf` entry is rejected at construction rather than carried into a metric that would map it to a finite, plausible, wrong distance.
+
+Two carriers use it. [`ReturnsResult`](@ref) and [`PricesResult`](@ref) reach it through [`check_names_and_feature_matrix`](@ref), which adds the names layer on top. [`LowOrderPrior`](@ref) calls it directly: a prior-side feature matrix is **nameless** by design — a producer runs inside `prior(pe, X, F; …)` with raw matrices and no names — so it has a shape to check and nothing to check it against by name.
+
+The three methods dispatch on the shape rather than branching on `ndims`.
+
+# Arguments
+
+  - `Z`: Feature matrix.
+  - `na`: Number of assets the feature matrix must bind to, or `nothing` when the carrier has no asset axis.
+  - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
+  - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - `Z` is non-empty and every entry is finite.
+  - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
+  - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
+
+# Related
+
+  - [`check_names_and_feature_matrix`](@ref)
+  - [`check_feature_names`](@ref)
+  - [`assert_square_feature_axis`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`MatNum_Arr3Num`](@ref)
+  - [`Sym_Str`](@ref)
+"""
+function check_feature_matrix(::Nothing, ::Option{<:Integer}, ::Option{<:Integer},
+                              ::Sym_Str)::Nothing
+    return nothing
+end
+function check_feature_matrix(Z::MatNum, na::Option{<:Integer}, ::Option{<:Integer},
+                              na_sym::Sym_Str)::Nothing
+    assert_nonempty(Z, :Z)
+    assert_all_finite(Z, :Z)
+    @argcheck(!isnothing(na),
+              IsNothingError("a static feature matrix (Z) is assets × features, so it needs an asset axis to bind to, but $na_sym is nothing"))
+    @argcheck(size(Z, 1) == na,
+              DimensionMismatch("a static feature matrix (Z) is assets × features, so its rows must be the assets, got size(Z, 1) = $(size(Z, 1)) and $na_sym = $na. If Z is features × assets, transpose it: the carried feature matrix is always assets-major, because port_opt_view has no `dims` keyword to declare an orientation with."))
+    return nothing
+end
+function check_feature_matrix(Z::Arr3Num, na::Option{<:Integer}, nobs::Option{<:Integer},
+                              na_sym::Sym_Str)::Nothing
+    assert_nonempty(Z, :Z)
+    assert_all_finite(Z, :Z)
+    @argcheck(!isnothing(na),
+              IsNothingError("a time-varying feature matrix (Z) is observations × assets × features, so it needs an asset axis to bind to, but $na_sym is nothing"))
+    @argcheck(!isnothing(nobs),
+              IsNothingError("a time-varying feature matrix (Z) is observations × assets × features, so it needs an observation axis to bind to; provide the asset data its observations are parallel to, or pass a static assets × features Z instead"))
+    @argcheck(size(Z, 1) == nobs,
+              DimensionMismatch("a time-varying feature matrix (Z) is observations × assets × features, so its leading axis must be the observations, got size(Z, 1) = $(size(Z, 1)) and $nobs observations"))
+    @argcheck(size(Z, 2) == na,
+              DimensionMismatch("a time-varying feature matrix (Z) is observations × assets × features, so its second axis must be the assets, got size(Z, 2) = $(size(Z, 2)) and $na_sym = $na. If the trailing axes are features × assets, permute them: the carried feature matrix is always assets-major, because port_opt_view has no `dims` keyword to declare an orientation with."))
+    return nothing
+end
+"""
+    assert_square_feature_axis(Z::Nothing, sq::Bool)
+    assert_square_feature_axis(Z::MatNum, sq::Bool)
+    assert_square_feature_axis(Z::Arr3Num, sq::Bool)
+
+Assert that a feature matrix declared square really is square on its feature axis.
+
+The one check a nameless carrier cannot get for free. On [`ReturnsResult`](@ref) squareness is *derived* — [`features_are_assets`](@ref) compares `nz` with `nx`, so the axes cannot disagree. On [`LowOrderPrior`](@ref) it is *stated* by whichever producer built `Z`, and a `z_sq` that lies is silent: [`feature_matrix_view`](@ref) does `view(Z, j, j)` on a rectangular matrix and surfaces as a `BoundsError` deep inside a cluster fold rather than at construction.
+
+A `false` flag asserts nothing — a non-square feature axis is the ordinary case.
+
+# Arguments
+
+  - `Z`: Feature matrix.
+  - `sq`: Whether the feature axis is claimed to be the asset axis.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`check_feature_matrix`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`feature_matrix_view`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function assert_square_feature_axis(::Nothing, ::Bool)::Nothing
+    return nothing
+end
+function assert_square_feature_axis(Z::MatNum, sq::Bool)::Nothing
+    if sq
+        @argcheck(size(Z, 1) == size(Z, 2),
+                  DimensionMismatch("z_sq = true declares the feature axis to be the asset axis, so a static feature matrix (Z) must be square, got size(Z) = $(size(Z))"))
+    end
+    return nothing
+end
+function assert_square_feature_axis(Z::Arr3Num, sq::Bool)::Nothing
+    if sq
+        @argcheck(size(Z, 2) == size(Z, 3),
+                  DimensionMismatch("z_sq = true declares the feature axis to be the asset axis, so a time-varying feature matrix (Z) must be square on its two trailing axes, got size(Z) = $(size(Z))"))
+    end
+    return nothing
+end
+"""
+    check_names_and_feature_matrix(nz::Option{<:VecStr}, Z::Nothing, na, nobs, na_sym)
+    check_names_and_feature_matrix(nz::Option{<:VecStr}, Z::MatNum, na, nobs, na_sym)
+    check_names_and_feature_matrix(nz::Option{<:VecStr}, Z::Arr3Num, na, nobs, na_sym)
+
+Validate a feature matrix and its names against the asset and observation axes of the result carrying them.
+
+The carried feature matrix is **canonically assets-major**: `assets × features` when static, `observations × assets × features` when time-varying. Unlike the raw-matrix [`distance`](@ref) entry point, there is no `dims` keyword here to declare an orientation — [`port_opt_view`](@ref) has none to consult either, and it already indexes `X` as `observations × assets` unconditionally. Fixing the layout is what makes the two agree: a transposed non-square `Z` fails here instead of surviving into a fold whose asset axis points at the wrong universe.
+
+This is the **names layer**: it composes [`check_feature_names`](@ref) and [`check_feature_matrix`](@ref) and adds the one check that needs both, binding the trailing feature axis to `length(nz)`. A carrier that has a feature matrix but no names — [`LowOrderPrior`](@ref) — calls [`check_feature_matrix`](@ref) directly instead.
+
+The three methods dispatch on the shape rather than branching on `ndims`.
+
+# Arguments
+
+  - `nz`: Feature names.
+  - `Z`: Feature matrix.
+  - `na`: Number of assets the feature matrix must bind to, or `nothing` when the carrier has no asset axis.
+  - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
+  - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - `nz` and `Z` are both `nothing` or both given (see [`check_feature_names`](@ref)).
+  - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
+  - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
+  - `size(Z, ndims(Z)) == length(nz)`.
+
+# Related
+
+  - [`check_feature_names`](@ref)
+  - [`check_feature_matrix`](@ref)
+  - [`PricesResult`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`MatNum_Arr3Num`](@ref)
+  - [`Sym_Str`](@ref)
+"""
+function check_names_and_feature_matrix(nz::Option{<:VecStr}, ::Nothing,
+                                        ::Option{<:Integer}, ::Option{<:Integer},
+                                        ::Sym_Str)::Nothing
+    @argcheck(isnothing(nz),
+              IsNothingError("Z cannot be nothing if nz is not `nothing`. Got\n!isnothing(nz) => true\n!isnothing(Z) => false"))
+    return nothing
+end
+function check_names_and_feature_matrix(nz::Option{<:VecStr}, Z::MatNum,
+                                        na::Option{<:Integer}, ::Option{<:Integer},
+                                        na_sym::Sym_Str)::Nothing
+    check_feature_names(nz, Z)
+    check_feature_matrix(Z, na, nothing, na_sym)
+    @argcheck(size(Z, 2) == length(nz),
+              DimensionMismatch("length(nz) == size(Z, 2) must hold. Got\nlength(nz) => $(length(nz))\nsize(Z, 2) => $(size(Z, 2))"))
+    return nothing
+end
+function check_names_and_feature_matrix(nz::Option{<:VecStr}, Z::Arr3Num,
+                                        na::Option{<:Integer}, nobs::Option{<:Integer},
+                                        na_sym::Sym_Str)::Nothing
+    check_feature_names(nz, Z)
+    check_feature_matrix(Z, na, nobs, na_sym)
+    @argcheck(size(Z, 3) == length(nz),
+              DimensionMismatch("length(nz) == size(Z, 3) must hold. Got\nlength(nz) => $(length(nz))\nsize(Z, 3) => $(size(Z, 3))"))
+    return nothing
+end
+"""
+    features_are_assets(nz::Option{<:VecStr}, nx::Option{<:VecStr}) -> Bool
+
+Report whether the feature axis *is* the asset axis, so a view must slice both.
+
+True when the feature names equal the asset names, which is what a square phylogeny or adjacency matrix reused as a feature source produces: an `assets × assets` matrix whose features are "adjacent to asset ``k``". Subselecting assets without also subselecting the feature axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
+
+Compares the names rather than the axis lengths: a rectangular-by-accident coincidence of counts is not a claim that the axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices.
+
+# Arguments
+
+  - `nz`: Feature names.
+  - `nx`: Asset names.
+
+# Returns
+
+  - `Bool`.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function features_are_assets(nz::Option{<:VecStr}, nx::Option{<:VecStr})::Bool
+    return !isnothing(nz) && !isnothing(nx) && nz == nx
+end
+"""
+    feature_matrix_view(Z::Nothing, sq::Bool, i, j)
+    feature_matrix_view(Z::MatNum, sq::Bool, i, j)
+    feature_matrix_view(Z::Arr3Num, sq::Bool, i, j)
+
+Subselect a carried feature matrix by observations `i` and assets `j`.
+
+`Z` is assets-major, so the asset index `j` addresses axis 1 of a static feature matrix and axis 2 of a time-varying one. The static shape has no observation axis and therefore ignores `i` — the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
+
+When `sq` is `true` the feature axis is the asset axis ([`features_are_assets`](@ref)) and is sliced by `j` as well. A `Colon` asset index touches neither axis, so a static feature matrix passes through unchanged rather than being wrapped in a no-op view — the same passthrough `ivpa` gets when only observations are selected.
+
+# Arguments
+
+  - `Z`: Feature matrix.
+  - `sq`: Whether the feature axis is the asset axis.
+  - `i`: Observation indices.
+  - `j`: Asset indices.
+
+# Returns
+
+  - A view of `Z`, or `nothing`.
+
+# Related
+
+  - [`features_are_assets`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function feature_matrix_view(::Nothing, ::Bool, ::Any, ::Any)
+    return nothing
+end
+function feature_matrix_view(Z::MatNum, sq::Bool, ::Any, j)
+    return sq ? view(Z, j, j) : view(Z, j, :)
+end
+function feature_matrix_view(Z::MatNum, ::Bool, ::Any, ::Colon)
+    return Z
+end
+function feature_matrix_view(Z::Arr3Num, sq::Bool, i, j)
+    return sq ? view(Z, i, j, j) : view(Z, i, j, :)
+end
+function feature_matrix_view(Z::Arr3Num, ::Bool, i, ::Colon)
+    return view(Z, i, :, :)
+end
+"""
+    feature_row_indices(Z::Nothing, ts_new, ts_old) -> Colon
+    feature_row_indices(Z::MatNum, ts_new, ts_old) -> Colon
+    feature_row_indices(Z::Arr3Num, ts_new, ts_old) -> VecInt
+
+Recover the positional row indices of a time-varying feature matrix from a timestamp window.
+
+A feature matrix is a plain array, so at price level its observation axis is parallel to `TimeSeries.timestamp(X)` positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows `Z` must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing `Z` positionally from there would silently pair each asset with another period's features.
+
+The static and absent shapes have no observation axis, so they return `Colon` and cost nothing.
+
+# Arguments
+
+  - `Z`: Feature matrix.
+  - `ts_new`: Timestamps surviving the selection.
+  - `ts_old`: Timestamps of the clock `Z`'s observation axis is parallel to.
+
+# Returns
+
+  - `Colon` for a static or absent `Z`; otherwise the row indices, as a `Vector{Int}`.
+
+# Related
+
+  - [`feature_matrix_view`](@ref)
+  - [`PricesResult`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
+function feature_row_indices(::Nothing, ::Any, ::Any)
+    return Colon()
+end
+function feature_row_indices(::MatNum, ::Any, ::Any)
+    return Colon()
+end
+function feature_row_indices(::Arr3Num, ::Nothing, ::Any)
+    return throw(ArgumentError("a time-varying feature matrix (Z) has its observation axis parallel to the price timestamps, but no timestamps survived the conversion, so the rows of Z to keep cannot be recovered. Pass a static assets × features Z instead."))
+end
+function feature_row_indices(::Arr3Num, ts_new, ts_old)
+    rows = indexin(ts_new, ts_old)
+    missed = findfirst(isnothing, rows)
+    @argcheck(isnothing(missed),
+              ArgumentError("a time-varying feature matrix (Z) has its observation axis parallel to the price timestamps, but the timestamp $(ts_new[missed]) selected here is absent from them, so the row of Z it corresponds to cannot be recovered. This happens when the surviving timestamps are not a subset of the original clock — a `collapse_args` timestamp function that synthesises timestamps, or an outer join that introduced rows the asset prices never had. Pass a static assets × features Z, or align the feature matrix to the price clock first."))
+    return Vector{Int}(rows)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A container for aligned, time-indexed price-level data.
@@ -78,6 +396,8 @@ A container for aligned, time-indexed price-level data.
 `PricesResult` is the prices-level mirror of [`ReturnsResult`](@ref): it bundles asset prices with optional factor, benchmark, and implied volatility series, all as `TimeSeries.TimeArray`s. It is the input to price-level preprocessing estimators and prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline cross-validation via [`port_opt_view`](@ref).
 
 The asset price series `X` is the master clock: [`port_opt_view`](@ref) selects observation windows on `X` and aligns the other series to the selected timestamps.
+
+The feature matrix `Z` is the exception to that alignment. It is a plain array, not a `TimeArray` — `TimeSeries.jl` has no 3-dimensional `TimeArray`, and the static shape has no clock at all — so it cannot be aligned by timestamp, only indexed positionally. Its axes are therefore held *parallel* to `X`: the asset axis to `TimeSeries.colnames(X)`, and, for the time-varying shape, the observation axis to `TimeSeries.timestamp(X)` row for row. Every routine that drops an asset or an observation from `X` must drop it from `Z` in the same step, which is what [`port_opt_view`](@ref), [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do.
 
 # Fields
 
@@ -91,6 +411,8 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:TimeSeries.TimeArray} = nothing,
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
+        nz::Option{<:VecStr} = nothing,
+        Z::Option{<:MatNum_Arr3Num} = nothing,
     ) -> PricesResult
 
 Keywords correspond to the struct's fields.
@@ -102,6 +424,7 @@ Keywords correspond to the struct's fields.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `iv` is not `nothing`: `!isempty(iv)`, `all(x -> x >= 0, values(iv))`, `all(x -> isfinite(x), values(iv))`, and `size(values(iv), 2) == size(values(X), 2)`.
   - If `ivpa` is not `nothing`: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(values(X), 2)`.
+  - `nz` and `Z` are both `nothing` or both given; see [`check_names_and_feature_matrix`](@ref) for the shape rules, which bind `Z`'s asset axis to `size(values(X), 2)` and, for a time-varying `Z`, its observation axis to `size(values(X), 1)`.
 
 # Examples
 
@@ -123,6 +446,8 @@ julia> size(values(pr.X))
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
   - [`Num_VecNum`](@ref)
+  - [`MatNum_Arr3Num`](@ref)
+  - [`check_names_and_feature_matrix`](@ref)
 """
 @concrete struct PricesResult <: AbstractPricesResult
     """
@@ -145,9 +470,18 @@ julia> size(values(pr.X))
     Implied volatility risk premium adjustment, if a vector (assets × 1).
     """
     ivpa
+    """
+    Names or identifiers of feature columns (features × 1).
+    """
+    nz
+    """
+    Optional feature matrix, static (assets × features) or time-varying (observations × assets × features). Not a `TimeArray`: its axes are held positionally parallel to `X`.
+    """
+    Z
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
                           B::Option{<:TimeSeries.TimeArray},
-                          iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum})
+                          iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
+                          nz::Option{<:VecStr}, Z::Option{<:MatNum_Arr3Num})
         @argcheck(!isempty(X), IsEmptyError)
         if !isnothing(F)
             @argcheck(!isempty(F), IsEmptyError)
@@ -166,16 +500,19 @@ julia> size(values(pr.X))
                 @argcheck(length(ivpa) == size(values(X), 2), DimensionMismatch)
             end
         end
-        return new{typeof(X), typeof(F), typeof(B), typeof(iv), typeof(ivpa)}(X, F, B, iv,
-                                                                              ivpa)
+        check_names_and_feature_matrix(nz, Z, size(values(X), 2), size(values(X), 1),
+                                       "size(values(X), 2)")
+        return new{typeof(X), typeof(F), typeof(B), typeof(iv), typeof(ivpa), typeof(nz),
+                   typeof(Z)}(X, F, B, iv, ivpa, nz, Z)
     end
 end
 function PricesResult(; X::TimeSeries.TimeArray,
                       F::Option{<:TimeSeries.TimeArray} = nothing,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
-                      ivpa::Option{<:Num_VecNum} = nothing)::PricesResult
-    return PricesResult(X, F, B, iv, ivpa)
+                      ivpa::Option{<:Num_VecNum} = nothing, nz::Option{<:VecStr} = nothing,
+                      Z::Option{<:MatNum_Arr3Num} = nothing)::PricesResult
+    return PricesResult(X, F, B, iv, ivpa, nz, Z)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -199,6 +536,7 @@ The asset price series is the master clock: `i` selects rows of `X`, and the fac
   - Integer windows index the rows of `pr.X` directly; the selected timestamps are then used to align `F`, `B`, and `iv`.
   - Timestamp windows are applied to all series directly.
   - `ivpa` is per-asset and passes through unchanged.
+  - A static feature matrix `Z` is per-asset and passes through unchanged; a time-varying one is sliced to the rows the selected timestamps occupy in the original clock (see [`feature_row_indices`](@ref)). When `Z`'s features *are* the assets, the asset subselection slices its feature axis too (see [`features_are_assets`](@ref)).
 
 # Examples
 
@@ -237,7 +575,9 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
         pr.B[i]
     end
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa)
+    rows = feature_row_indices(pr.Z, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
+    Z = feature_matrix_view(pr.Z, false, rows, :)
+    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, nz = pr.nz, Z = Z)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        j::AbstractVector)
@@ -252,7 +592,11 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     end
     iv = isnothing(pr.iv) ? nothing : pr.iv[i][TimeSeries.colnames(pr.iv)[j]]
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa)
+    sq = features_are_assets(pr.nz, string.(TimeSeries.colnames(pr.X)))
+    rows = feature_row_indices(pr.Z, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
+    nz = sq ? nothing_scalar_array_view(pr.nz, j) : pr.nz
+    Z = feature_matrix_view(pr.Z, sq, rows, j)
+    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,
@@ -267,6 +611,8 @@ Stores the results of asset and factor returns calculations.
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
 
 It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimisation and analysis routines.
+
+It also carries the optional feature matrix `Z` that [`FeatureDistance`](@ref) turns into a distance. `Z` is *data*, not configuration, which is why it is held here rather than on the estimator: the clustering stack is asset-subset-blind by construction, so an estimator-held feature matrix would survive a nested-clustered subproblem or a cross-validation fold unsliced, with its asset axis silently pointing at the full universe. `ReturnsResult` implements [`port_opt_view`](@ref), so a carried `Z` is subselected in step with `X`.
 
 # Fields
 
@@ -284,6 +630,8 @@ $(DocStringExtensions.FIELDS)
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
+        nz::Option{<:VecStr} = nothing,
+        Z::Option{<:MatNum_Arr3Num} = nothing,
     ) -> ReturnsResult
 
 Keywords correspond to the struct's fields.
@@ -299,6 +647,7 @@ Keywords correspond to the struct's fields.
   - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
   - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+  - `nz` and `Z` are both `nothing` or both given; see [`check_names_and_feature_matrix`](@ref) for the shape rules, which bind `Z`'s asset axis to `length(nx)` and, for a time-varying `Z`, its observation axis to `size(X, 1)`.
 
 # Examples
 
@@ -313,7 +662,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 ```
 
 # Related
@@ -363,10 +714,19 @@ ReturnsResult
     Implied volatility risk premium adjustment, if a vector (assets × 1).
     """
     ivpa
+    """
+    Names or identifiers of feature columns (features × 1).
+    """
+    nz
+    """
+    Optional feature matrix, static (assets × features) or time-varying (observations × assets × features).
+    """
+    Z
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
-                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
+                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
+                           nz::Option{<:VecStr}, Z::Option{<:MatNum_Arr3Num})
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
@@ -414,16 +774,22 @@ ReturnsResult
                           DimensionMismatch("the implied-volatility risk-premium adjustment (ivpa), when a vector, must have one entry per asset (implied-volatility column), got length(ivpa) = $(length(ivpa)) and size(iv, 2) = $(size(iv, 2))"))
             end
         end
+        check_names_and_feature_matrix(nz, Z, isnothing(nx) ? nothing : length(nx),
+                                       isnothing(X) ? nothing : size(X, 1), "length(nx)")
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf, F, nb, B, ts, iv, ivpa)
+                   typeof(ts), typeof(iv), typeof(ivpa), typeof(nz), typeof(Z)}(nx, X, nf,
+                                                                                F, nb, B,
+                                                                                ts, iv,
+                                                                                ivpa, nz, Z)
     end
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
-                       ivpa::Option{<:Num_VecNum} = nothing)::ReturnsResult
-    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
+                       ivpa::Option{<:Num_VecNum} = nothing, nz::Option{<:VecStr} = nothing,
+                       Z::Option{<:MatNum_Arr3Num} = nothing)::ReturnsResult
+    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, nz, Z)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -450,6 +816,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
   - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `i`.
   - Preserves factor, timestamp, and other fields from the original object.
   - Returns `nothing` for fields that are not present.
+  - Subselects the feature matrix `Z` on its asset axis — axis 1 when static, axis 2 when time-varying, since `Z` is carried assets-major. Its observation axis is untouched by this arity. When `Z`'s features *are* the assets, its feature axis and `nz` are subselected too (see [`features_are_assets`](@ref)).
 
 # Examples
 
@@ -464,7 +831,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(rd, 2:2)
 ReturnsResult
@@ -476,7 +845,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 ```
 
 # Related
@@ -521,6 +892,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
   - Preserves factor names and returns for the selected observations.
   - Preserves timestamps for the selected observations.
   - Returns `nothing` for fields that are not present in the original object.
+  - Subselects the feature matrix `Z` by assets `j` and, when time-varying, by observations `i` as well. A static `Z` has no observation axis and ignores `i` — the same asymmetry `ivpa` has. When `Z`'s features *are* the assets, its feature axis and `nz` are subselected by `j` too (see [`features_are_assets`](@ref)).
 
 # Related
 
@@ -545,7 +917,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(rd, 1:2, 2:2)
 ReturnsResult
@@ -557,7 +931,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 ```
 
 * * *
@@ -567,6 +943,8 @@ ReturnsResult
 Erroring tripwire for [`AbstractReturnsResult`](@ref) subtypes that do not implement [`port_opt_view`](@ref).
 
 Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would hand back the returns result *unsubselected*, and a meta-optimiser or cross-validation fold would silently train on the full universe. Returns data is never a leaf value, so an unhandled subtype is a missing method, not a pass-through.
+
+Subtypes carrying a feature matrix owe it the same treatment as `X`: subselect its asset axis on every arity, its observation axis on the arities that take one, and — when its features *are* the assets ([`features_are_assets`](@ref)) — its feature axis as well. A feature matrix that survives a fold unsliced is the same silent-wrongness as an unsliced returns matrix, one level down: the distance it produces is finite, plausible, and computed over the wrong universe. [`feature_matrix_view`](@ref) implements the rule; the [`ReturnsResult`](@ref) methods are the reference.
 
 # Related
 
@@ -593,8 +971,11 @@ function port_opt_view(rd::ReturnsResult, i)
     B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
+    sq = features_are_assets(rd.nz, rd.nx)
+    nz = sq ? nothing_scalar_array_view(rd.nz, i) : rd.nz
+    Z = feature_matrix_view(rd.Z, sq, :, i)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
-                         iv = iv, ivpa = ivpa)
+                         iv = iv, ivpa = ivpa, nz = nz, Z = Z)
 end
 function port_opt_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)
@@ -612,8 +993,11 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
+    sq = features_are_assets(rd.nz, rd.nx)
+    nz = sq ? nothing_scalar_array_view(rd.nz, j) : rd.nz
+    Z = feature_matrix_view(rd.Z, sq, i, j)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
-                         ivpa = ivpa)
+                         ivpa = ivpa, nz = nz, Z = Z)
 end
 function port_opt_view(rd::ReturnsResult, args...; kwargs...)
     kws = keys(kwargs)
@@ -782,7 +1166,9 @@ ReturnsResult
      B ┼ Vector{Float64}: [0.01, 0.02]
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 
 julia> rd2 = returns_result_picker(rd, false)  # no change when brt is false
 ReturnsResult
@@ -794,7 +1180,9 @@ ReturnsResult
      B ┼ Vector{Float64}: [0.01, 0.02]
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 
 julia> rd === rd2
 true
@@ -809,7 +1197,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 
 julia> rd.X .- rd.B == rd3.X
 true
@@ -831,7 +1221,7 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
     else
         X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
         ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = rd.iv,
-                      ivpa = rd.ivpa)
+                      ivpa = rd.ivpa, nz = rd.nz, Z = rd.Z)
     end
 end
 """
@@ -888,7 +1278,9 @@ end
         collapse_args::Tuple = (),
         map_func::Option{<:Function} = nothing,
         join_method::Symbol = :outer,
-        impute_method = nothing
+        impute_method = nothing,
+        nz::Option{<:VecStr} = nothing,
+        Z::Option{<:MatNum_Arr3Num} = nothing
     ) -> ReturnsResult
 
 Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
@@ -929,6 +1321,8 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
   - `impute_method`: Optional imputation method for missing data. `nothing`, or an `Impute.Imputor` — which requires `using Impute`, since `Impute` is a weak dependency loaded through `PortfolioOptimisersImputeExt`. Unrelated to [`Imputer`](@ref), which is a PortfolioOptimisers estimator and is not accepted here.
+  - `nz`: Optional feature names.
+  - `Z`: Optional feature matrix, static (assets × features) or time-varying (observations × assets × features), with its axes parallel to `X`'s columns and rows.
 
 # Returns
 
@@ -956,6 +1350,8 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
 
       + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
 
+  - Carries the feature matrix `Z` across, subselected to the assets that survive the conversion — an asset dropped for being entirely missing takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is also subselected to the surviving observations, matching them back into the original price timestamps ([`feature_row_indices`](@ref)); a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp — last-observation semantics, matching [`LastObservation`](@ref).
+
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples
@@ -982,7 +1378,9 @@ ReturnsResult
      B ┼ nothing
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
-  ivpa ┴ nothing
+  ivpa ┼ nothing
+    nz ┼ nothing
+     Z ┴ nothing
 ```
 
 # Related
@@ -1007,7 +1405,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                            missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Option{<:Function} = nothing,
-                           join_method::Symbol = :outer, impute_method = nothing)
+                           join_method::Symbol = :outer, impute_method = nothing,
+                           nz::Option{<:VecStr} = nothing,
+                           Z::Option{<:MatNum_Arr3Num} = nothing)
     @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
@@ -1017,6 +1417,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                   one(missing_row_percent), DomainError)
     end
     asset_names = string.(TimeSeries.colnames(X))
+    asset_ts = TimeSeries.timestamp(X)
+    check_names_and_feature_matrix(nz, Z, length(asset_names), length(asset_ts),
+                                   "the number of asset price columns")
     factor_names = String[]
     benchmark_names = String[]
     if !isnothing(F)
@@ -1081,6 +1484,14 @@ function prices_to_returns(X::TimeSeries.TimeArray,
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end
     end
+    if !isnothing(Z)
+        @argcheck(!isempty(nx),
+                  IsEmptyError("every asset was dropped during the conversion, so the feature matrix (Z) has no asset axis left to bind to"))
+        acols = Vector{Int}(indexin(nx, asset_names))
+        sq = features_are_assets(nz, asset_names)
+        Z = Array(feature_matrix_view(Z, sq, feature_row_indices(Z, ts, asset_ts), acols))
+        nz = sq ? nz[acols] : nz
+    end
     if isempty(nf)
         nf = nothing
         F = nothing
@@ -1100,7 +1511,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         X = Matrix(X[!, nx])
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
-                         ivpa = ivpa)
+                         ivpa = ivpa, nz = nz, Z = Z)
 end
 """
     find_complete_indices(X::AbstractMatrix; dims::Int = 1) -> VecInt
@@ -1676,7 +2087,7 @@ function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResul
     return prices_to_returns(pr.X, pr.F; B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                              ret_method = ptr.ret_method, padding = ptr.padding,
                              collapse_args = ptr.collapse_args, map_func = ptr.map_func,
-                             join_method = ptr.join_method)
+                             join_method = ptr.join_method, nz = pr.nz, Z = pr.Z)
 end
 function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
     return ptr
@@ -1691,7 +2102,7 @@ Preprocessing estimator dropping assets and observations with excessive missing 
 
 The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
 
-This estimator supersedes the `missing_col_percent`/`missing_row_percent` keywords of [`prices_to_returns`](@ref), making the thresholds fitted state and independently tunable. Only the asset series `X` (and the matching implied volatility columns) participate; factor and benchmark series pass through unchanged.
+This estimator supersedes the `missing_col_percent`/`missing_row_percent` keywords of [`prices_to_returns`](@ref), making the thresholds fitted state and independently tunable. Only the asset series `X` (and the matching implied volatility columns, and the feature matrix, whose axes are parallel to `X`) participate; factor and benchmark series pass through unchanged.
 
 # Fields
 
@@ -1804,7 +2215,10 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
                                    TimeSeries.colnames(pr.iv)[cols])
         ivm, isa(pr.ivpa, VecNum) ? pr.ivpa[cols] : pr.ivpa
     end
-    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa)
+    sq = features_are_assets(pr.nz, string.(TimeSeries.colnames(pr.X)))
+    nz = sq ? nothing_scalar_array_view(pr.nz, cols) : pr.nz
+    Z = feature_matrix_view(pr.Z, sq, rows, cols)
+    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1918,7 +2332,8 @@ function apply_preprocessing(res::ImputerResult, pr::PricesResult)::PricesResult
         end
     end
     X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals, names)
-    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa)
+    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa, nz = pr.nz,
+                        Z = pr.Z)
 end
 export PricesResult, ReturnsResult, prices_to_returns, returns_result_picker,
        fit_preprocessing, apply_preprocessing, PricesToReturns, MissingDataFilter,

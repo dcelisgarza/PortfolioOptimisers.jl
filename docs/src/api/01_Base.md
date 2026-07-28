@@ -138,6 +138,7 @@ MatNum
 ArrNum
 Arr3Num
 VecNum_MatNum
+MatNum_Arr3Num
 Num_VecNum
 Func_Num_VecNum
 Num_ArrNum

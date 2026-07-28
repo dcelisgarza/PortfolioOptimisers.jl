@@ -383,6 +383,12 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
   - ::: details Opinion pooling prior estimator for asset returns. [`OpinionPoolingPrior`](@ref)
     - Linear opinion pooling algorithm for consensus prior estimation. [`LinearOpinionPooling`](@ref)
     - Logarithmic opinion pooling algorithm for consensus prior estimation. [`LogarithmicOpinionPooling`](@ref)
+  - ::: details Prior estimator that attaches a feature matrix to the prior it wraps. [`FeaturePrior`](@ref)
+
+    A feature prior attaches an `assets × features` matrix to the prior it wraps, without touching a single moment, so any prior becomes a source for [`FeatureDistance`](@ref). The matrix comes from a feature matrix estimator.
+
+    - Compute the derived feature matrix and its squareness flag. [`feature_matrix`](@ref) and [`AbstractFeatureMatrixEstimator`](@ref)
+    - Feature matrix producer that reads the regression loadings off the wrapped prior result. [`RegressionFeatures`](@ref)
 - ::: details Container type for high order prior results. [`HighOrderPrior`](@ref)
   - High order prior estimator for asset returns. [`HighOrderPriorEstimator`](@ref)
   - Represents the High Order Factor Prior Estimator. [`HighOrderFactorPriorEstimator`](@ref)

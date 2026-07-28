@@ -155,6 +155,10 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
         nb = ["_b$(i)" for i in 1:N]
     end
     iv = iv_flag ? reshape(iv, :, N) : nothing
+    # `nz`/`Z` are deliberately dropped: this result's assets are the predicted sub-portfolios,
+    # not the original ones, so a feature matrix indexed by real assets has no axis to bind to.
+    # Collapsing it into synthetic-asset features the way `prepare_outer_rd` collapses `iv`
+    # and `ivpa` is tracked separately; do not thread `rd.Z` through unchanged.
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
                          nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa)
 end

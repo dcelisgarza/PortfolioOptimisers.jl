@@ -628,10 +628,22 @@ $(DocStringExtensions.FIELDS)
         rr::Option{<:Regression} = nothing,
         f_mu::Option{<:VecNum} = nothing,
         f_sigma::Option{<:MatNum} = nothing,
-        f_w::Option{<:VecNum} = nothing
+        f_w::Option{<:VecNum} = nothing,
+        Z::Option{<:MatNum_Arr3Num} = nothing,
+        z_sq::Bool = false
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
+
+## The feature matrix
+
+`Z` is **derived only**: it is populated by a producer that declares a matrix to be features — [`FeaturePrior`](@ref) — and never by pass-through of a user's `ReturnsResult.Z`. That is what keeps the two carriers from disagreeing: they cannot both hold the same matrix, so `z_src` selects a provenance rather than one of two copies.
+
+It carries **no feature names**. A producer runs inside `prior(pe, X, F; …)` with raw matrices, so names are structurally unavailable there; squareness is therefore *stated* by the producer as `z_sq` rather than derived by comparing `nz` with `nx`.
+
+Every prior estimator that wraps another **forwards both fields**, so nesting order does not matter: `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive with `Z` set. This is unconditionally safe because no prior estimator changes the asset set or the observation count. The exceptions are the estimators whose wrapped prior is fit on **factors** rather than assets — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref), and the factor half of [`AugmentedBlackLittermanPrior`](@ref) — which drop it, because a factor-space feature matrix does not describe the asset axis.
+
+`FactorPrior`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` *reconstruct* `X` as `F * transpose(M) .+ transpose(b)`, so a `Z` forwarded through them is dimension-correct but was derived from the pre-reconstruction returns.
 
 ## Validation
 
@@ -645,6 +657,8 @@ Keywords correspond to the struct's fields.
   - If `f_sigma` is not `nothing`, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
   - If `f_w` is not `nothing`, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
+  - If `Z` is not `nothing`, it is non-empty, all-finite, and assets-major against `X`: `size(Z, 1) == size(X, 2)` when static, `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)` when time-varying (see [`check_feature_matrix`](@ref)).
+  - If `z_sq` is `true`, `Z`'s feature axis is square (see [`assert_square_feature_axis`](@ref)).
 
 # Examples
 
@@ -663,7 +677,9 @@ LowOrderPrior
        rr ┼ nothing
      f_mu ┼ nothing
   f_sigma ┼ nothing
-      f_w ┴ nothing
+      f_w ┼ nothing
+        Z ┼ nothing
+     z_sq ┴ Bool: false
 ```
 
 # Related
@@ -671,6 +687,10 @@ LowOrderPrior
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
   - [`HighOrderPrior`](@ref)
+  - [`FeaturePrior`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`check_feature_matrix`](@ref)
+  - [`assert_square_feature_axis`](@ref)
 """
 @concrete struct LowOrderPrior <: AbstractPriorResult
     """
@@ -721,11 +741,20 @@ LowOrderPrior
     $(field_dict[:f_w])
     """
     f_w
+    """
+    $(field_dict[:Z_prior])
+    """
+    Z
+    """
+    $(field_dict[:z_sq])
+    """
+    z_sq
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:ObsWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
-                           f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
+                           f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum},
+                           Z::Option{<:MatNum_Arr3Num}, z_sq::Bool)
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -771,10 +800,15 @@ LowOrderPrior
             @argcheck(length(f_w) == size(X, 1),
                       DimensionMismatch("length(f_w) ($(length(f_w))) must match size(X, 1) ($(size(X, 1)))"))
         end
+        check_feature_matrix(Z, size(X, 2), size(X, 1), "size(X, 2)")
+        assert_square_feature_axis(Z, z_sq)
         return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
                    typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
-                   typeof(f_sigma), typeof(f_w)}(X, mu, sigma, chol, w, ens, kld, ow, rr,
-                                                 f_mu, f_sigma, f_w)
+                   typeof(f_sigma), typeof(f_w), typeof(Z), typeof(z_sq)}(X, mu, sigma,
+                                                                          chol, w, ens, kld,
+                                                                          ow, rr, f_mu,
+                                                                          f_sigma, f_w, Z,
+                                                                          z_sq)
     end
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
@@ -782,26 +816,32 @@ function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,
-                       f_sigma::Option{<:MatNum} = nothing,
-                       f_w::Option{<:VecNum} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
+                       f_sigma::Option{<:MatNum} = nothing, f_w::Option{<:VecNum} = nothing,
+                       Z::Option{<:MatNum_Arr3Num} = nothing,
+                       z_sq::Bool = false)::LowOrderPrior
+    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w, Z,
+                         z_sq)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
 
+The feature matrix is subselected on its asset axis, and — when `z_sq` declares the feature axis to *be* the asset axis — on its feature axis too. Observations are taken whole (`Colon`): folds slice observations *before* the prior is fit, so a derived `Z` is already fold-local by the time it reaches here.
+
 # Related
 
   - [`LowOrderPrior`](@ref)
   - [`port_opt_view`](@ref)
+  - [`feature_matrix_view`](@ref)
 """
 function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
+                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w,
+                         Z = feature_matrix_view(pr.Z, pr.z_sq, :, i), z_sq = pr.z_sq)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -859,7 +899,9 @@ HighOrderPrior
        │        rr ┼ nothing
        │      f_mu ┼ nothing
        │   f_sigma ┼ nothing
-       │       f_w ┴ nothing
+       │       f_w ┼ nothing
+       │         Z ┼ nothing
+       │      z_sq ┴ Bool: false
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}

@@ -283,8 +283,11 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
+    # `prior_result` is fit on the assets, so its feature matrix is over this asset axis and
+    # is forwarded (see [`LowOrderPrior`](@ref)); `posterior_X` is `prior_result.X` unchanged.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         rr = rr, f_mu = f_mu, f_sigma = f_sigma)
+                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, Z = prior_result.Z,
+                         z_sq = prior_result.z_sq)
 end
 
 export BayesianBlackLittermanPrior

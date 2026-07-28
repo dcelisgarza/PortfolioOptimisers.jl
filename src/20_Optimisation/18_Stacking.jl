@@ -473,6 +473,10 @@ function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsR
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, pr, fees)
     end
+    # `nz`/`Z` are deliberately dropped: this result's assets are the inner portfolios, not
+    # the original ones, so a feature matrix indexed by real assets has no axis to bind to.
+    # Collapsing it into synthetic-asset features the way `prepare_outer_rd` collapses `iv`
+    # and `ivpa` is tracked separately; do not thread `rd.Z` through unchanged.
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
