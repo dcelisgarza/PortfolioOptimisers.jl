@@ -8,7 +8,7 @@ feature_matrix
 RegressionFeatures
 FeaturePrior
 PortfolioOptimisers.feature_estimator_view
-port_opt_view(::FeaturePrior, ::Any)
+port_opt_view(pe::FeaturePrior, i, args...)
 prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1,
                kwargs...)
 ```

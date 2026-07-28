@@ -56,7 +56,7 @@ where the position is required and neither exists — throws a structured
   it.** A field is admissible for a schedule iff it is *problem definition* (what is being
   solved: `pe`, `ret`, `sca`, `sets`, `cle`, `wf`, `r`, `obj`, `wi`, constraint fields, `fb`,
   the metas' `opti`/`opto`/`opt`, `scale`, `subset_size`, `n_subsets`, …), never *execution
-  control* (how it is solved: `slv`, `ex`, `rng`, `seed`, `sc`, `so`, `brt`, `cle_pr`,
+  control* (how it is solved: `slv`, `ex`, `rng`, `seed`, `sc`, `so`, `brt`, `x_src`,
   `strict`, `sq`, and `NestedClustered.cv`, which *is* the inner fold loop). The criterion is
   applied per constructor and the widened signatures are the admissibility table — the single
   source of truth for which inputs may vary over folds, spelled with a small family of aliases:

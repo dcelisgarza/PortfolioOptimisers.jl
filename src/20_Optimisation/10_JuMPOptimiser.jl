@@ -374,14 +374,15 @@ $(DocStringExtensions.FIELDS)
         linf::TD_Option{<:Number} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         brt::Bool = false,
-        cle_pr::Bool = true,
+        x_src::Symbol = :prior,
         strict::Bool = false,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `cle_pr`, `strict`) stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `x_src`, `strict`) stays static.
 
 ## Validation
 
+  - `x_src in (:prior, :data)`.
   - If `slv` is a vector: `!isempty(slv)`.
   - If `bgt` is a number: `isfinite(bgt)`.
   - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
@@ -572,9 +573,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     brt
     """
-    $(field_dict[:cle_pr])
+    $(field_dict[:x_src])
     """
-    cle_pr
+    x_src
     """
     $(field_dict[:strict_opt])
     """
@@ -604,7 +605,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            lpc::TD_Option{<:LpReg_VecLpReg}, linfc::TD_Option{<:Number},
                            l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
-                           brt::Bool, cle_pr::Bool, strict::Bool)
+                           brt::Bool, x_src::Symbol, strict::Bool)
+        assert_source_selector(x_src, :x_src)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -791,7 +793,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                                             lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
                                             sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
                                             sca, ccnt, cobj, sc, so, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, linf, lp, brt, cle_pr,
+                                            lpc, linfc, l1, l2, linf, lp, brt, x_src,
                                             strict), jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
@@ -801,22 +803,21 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                    typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
                    typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
                    typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, slv, wb,
-                                                                            bgt, sbgt, gbgt,
-                                                                            xbgt, lt, st,
-                                                                            lcse, cte,
-                                                                            gcarde, sgcarde,
-                                                                            smtx, sgmtx,
-                                                                            slt, sst, sglt,
-                                                                            sgst, tn, fees,
-                                                                            sets, tr, ple,
-                                                                            ret, sca, ccnt,
-                                                                            cobj, sc, so,
-                                                                            ss, card, scard,
-                                                                            l2c, lpc, linfc,
-                                                                            l1, l2, linf,
-                                                                            lp, brt, cle_pr,
-                                                                            strict)
+                   typeof(lp), typeof(brt), typeof(x_src), typeof(strict)}(pe, slv, wb, bgt,
+                                                                           sbgt, gbgt, xbgt,
+                                                                           lt, st, lcse,
+                                                                           cte, gcarde,
+                                                                           sgcarde, smtx,
+                                                                           sgmtx, slt, sst,
+                                                                           sglt, sgst, tn,
+                                                                           fees, sets, tr,
+                                                                           ple, ret, sca,
+                                                                           ccnt, cobj, sc,
+                                                                           so, ss, card,
+                                                                           scard, l2c, lpc,
+                                                                           linfc, l1, l2,
+                                                                           linf, lp, brt,
+                                                                           x_src, strict)
     end
 end
 function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -854,11 +855,11 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
                        linf::TD_Option{<:Number} = nothing,
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
-                       cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
+                       x_src::Symbol = :prior, strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
                          sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
                          ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                         linfc, l1, l2, linf, lp, brt, cle_pr, strict)
+                         linfc, l1, l2, linf, lp, brt, x_src, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -946,7 +947,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
+                         brt = opt.brt, x_src = opt.x_src, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1024,8 +1025,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc,
                          linfc = opt.linfc, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
-                         strict = opt.strict)
+                         lp = opt.lp, brt = opt.brt, x_src = opt.x_src, strict = opt.strict)
 end
 """
     processed_jump_optimiser_attributes(
@@ -1072,7 +1072,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 cle_pr = opt.cle_pr, kwargs...)
+                                 x_src = opt.x_src, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx
@@ -1102,7 +1102,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                cle_pr = opt.cle_pr, kwargs...)
+                                x_src = opt.x_src, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,

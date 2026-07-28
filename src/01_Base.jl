@@ -434,7 +434,7 @@ const arg_dict = Dict(
                       :lpreg_p => "`p`: Norm order, `p > 1`.",#
                       :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
                       :brt => "`brt`: Whether to use bootstrap returns.",#
-                      :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
+                      :x_src => "`x_src`: Which returns matrix the clustering, phylogeny and centrality estimators read: `:prior` takes the prior result's `X`, `:data` takes the raw returns result's `X`. Ignored when no returns result is available, in which case the prior result's `X` is used.",#
                       :wf => "`wf`: Weight finaliser.",#
                       :rkb => "`rkb`: Risk budget estimator or result.",#
                       :rba => "`rba`: Risk budget algorithm.",#
@@ -3004,6 +3004,33 @@ Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val) < val < one(val),
               DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a matrix-source selector names one of the two carriers.
+
+Source selectors pick which of the two carriers a matrix is read from: `:prior` reads the prior result, `:data` reads the raw returns result. `x_src` selects the returns matrix `X`.
+
+# Arguments
+
+  - `src`: Selector to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+  - [`NestedClustered`](@ref)
+"""
+function assert_source_selector(src::Symbol, sym::Sym_Str = :x_src)::Nothing
+    @argcheck(src in (:prior, :data),
+              ArgumentError("$sym must be :prior or :data, got $(repr(src))"))
     return nothing
 end
 """
