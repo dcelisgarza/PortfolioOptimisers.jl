@@ -113,4 +113,5 @@ VecOptE
 extract_fees
 extract_pr
 synthetic_asset_weights
+collapse_feature_matrix
 ```

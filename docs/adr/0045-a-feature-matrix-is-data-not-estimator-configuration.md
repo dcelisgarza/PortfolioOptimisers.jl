@@ -280,11 +280,12 @@ all-zero distance matrix for three unrelated assets inside a cluster.
 - **A price-level `Z` is not on the master clock and cannot be** — no three-dimensional `TimeArray`
   exists — so it is held positionally parallel to `X`, and three sites re-establish that alignment by
   hand: `port_opt_view`, `MissingDataFilter`'s preprocessing, and `prices_to_returns`.
-- **A meta-optimiser's outer problem has no features, deliberately and loudly.** All three
-  synthetic-universe builders drop `Z`, because their assets are sub-portfolios, clusters or
-  predictions rather than the universe. An outer estimator asking for a `FeatureDistance` gets an
-  `IsNothingError`, never a stale full-universe matrix. Whether `Z` should instead be *collapsed* onto
-  the synthetic assets is [#179](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/179).
+- **A meta-optimiser's outer problem has no features, deliberately and loudly** (superseded; see the
+  second amendment). All three synthetic-universe builders drop `Z`, because their assets are
+  sub-portfolios, clusters or predictions rather than the universe. An outer estimator asking for a
+  `FeatureDistance` gets an `IsNothingError`, never a stale full-universe matrix. Whether `Z` should
+  instead be *collapsed* onto the synthetic assets is
+  [#179](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/179).
 - **`z_src = :data` slices, `z_src = :prior` refits.** Under a fold or a cluster the carried matrix is
   subselected while the derived one is recomputed on the subproblem's own returns — so the derived
   one's feature axis stays the full factor set while the carried square one's does not. The two
@@ -393,3 +394,64 @@ a literal `false` as two sites already did. The collapse onto synthetic assets
 `features_are_assets` on the data carrier, so it is unchanged either way. And the literal-`ze` gap in
 the consequence above is neither opened nor closed: the literal path never declared its axes in the
 first place.
+
+## Amendment (2026-07-29): the feature matrix collapses onto a meta-optimiser's synthetic assets
+
+The consequence above — "a meta-optimiser's outer problem has no features, deliberately and loudly" —
+recorded a *boundary*, not a decision: `NestedClustered` and `Stacking` build an outer
+`ReturnsResult` whose assets are clusters or sub-portfolios, so a matrix indexed by real assets had no
+axis to bind to and was dropped. Issue
+[#179](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/179) settled the question the
+bullet deferred: **the feature matrix is aggregated onto the synthetic assets**, and that collapse is
+the primary route, since `z_src` defaults to `:data`. Refit and collapse remain two different claims —
+re-estimating a synthetic asset's feature in its own right versus aggregating its members' — and
+`z_src` still selects between them. The source is `rd.Z` only: writing a collapsed `pr.Z` onto the
+outer result would land a *derived* matrix on the *data* carrier, undoing the strictness decision 5
+exists for.
+
+**Features are intensive, so the collapse is a convex combination**, sharing `synthetic_asset_weights`
+with `iv` and `ivpa` rather than restating the normalisation. Under the default `AngularDist` this is
+a mathematical no-op for a rectangular matrix — it scales one row of the result — and it is *not* one
+in the square case, where the two-sided product rescales feature columns too. It is also what keeps
+the collapse bounded for any gross exposure, so only the exact zero needs a guard, and a degenerate
+synthetic asset lands on the zero-feature-vector convention rather than throwing. An *extensive*
+feature wanting a weighted sum is unsupported, and a caller cannot pre-scale their way to one: the
+divisor depends on the inner solve. The per-column intensive/extensive tag belongs to the `Z`-transform
+question the map still carries.
+
+Two things this ADR should state, because the collapse is not one operation but two.
+
+- **Squareness is preserved where the weights allow it.** With the whole weight matrix in hand —
+  `prepare_outer_rd`, the fold-less path — a square feature matrix collapses two-sided, and its
+  feature axis is renamed after the synthetic assets so `features_are_assets` stays true one level up.
+  The diagonal is left exactly as computed: re-zeroing it would turn a cluster with no cross-cluster
+  edges into a zero row, and zero rows are declared mutually identical — the same fold argument that
+  made self-inclusion load-bearing one level down.
+- **Inside a cross-validation fold there is only one weight vector, and that changes the answer.**
+  `reconstruct_rd` collapses onto a single synthetic asset, so the second contraction of the square
+  case is unavailable; performing it one-sidedly with the vector in hand would leave *one number* per
+  synthetic asset, a feature space in which every asset is trivially identical. The fold path
+  therefore leaves the feature axis alone, and a square matrix reads there as the synthetic asset's
+  weighted-average neighbourhood over the real assets. The kernel says so by shape: its vector arity
+  takes no `sq` argument at all.
+
+**The fold path is time-varying by construction**, because each fold collapses with its own weights.
+`reconstruct_rd` gives its result an observation axis — a static source is genuinely constant within a
+fold and different in the next — folds stack down that axis, and `rebuild_returns_result` lays the sub-
+portfolios out along the asset axis, giving `observations × assets × features` with the same row count
+as `X`. The outer optimiser's default `LastObservation` then reads the most recent fold, and the rest
+of the collapse family reads as many as it is asked to. That path needs a **fourth carrier**, `nz`/`Z`
+on `PredictionReturnsResult`: pure transport, and write-only by construction, since a
+`PredictionReturnsResult` can never reach the `Pr_RR` bridge.
+
+One combination still drops the matrix, and it is the intersection of the two paragraphs above:
+`NestedClustered` **with** cross-validation **and** a square feature matrix. Its folds see
+cluster-sliced returns, so each cluster's feature axis is its own asset subset and there is nothing to
+stack them against. The matrix is dropped and an outer estimator asking for features gets the error it
+would get had none been supplied — never a matrix assembled from mismatched axes.
+
+`prepare_outer_rd` returning `nz`/`Z` is **breaking on a documented overload point**, same reasoning as
+`x_src` and the producer return above. It returns them **before** the returns buffer `X`, not after,
+and that ordering is the whole point: Julia's destructuring discards trailing values without
+complaint, so appending the pair would have let a stale `predict_outer_*` overload keep building a
+feature-less result in silence — decision 1's failure class arriving through the fix for it.

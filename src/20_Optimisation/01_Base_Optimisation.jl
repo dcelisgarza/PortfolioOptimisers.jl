@@ -2511,6 +2511,83 @@ function synthetic_asset_weights(w::MatNum)
     return w ./ map(x -> iszero(x) ? one(x) : x, s)
 end
 """
+    collapse_feature_matrix(Z::Nothing, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::Nothing, w::VecNum)
+    collapse_feature_matrix(Z::MatNum, w::VecNum)
+    collapse_feature_matrix(Z::Arr3Num, w::VecNum)
+
+Aggregate a feature matrix onto the synthetic assets a meta-optimiser builds for its outer problem.
+
+A meta-optimiser's outer problem allocates across *synthetic* assets — [`NestedClustered`](@ref)'s clusters, [`Stacking`](@ref)'s inner portfolios — each of which is a weighted combination of the real ones. Every quantity the outer [`ReturnsResult`](@ref) carries has to be re-expressed on that universe, and a feature matrix is no exception: without this collapse the outer optimiser has no feature matrix at all, so a [`FeatureDistance`](@ref) there throws rather than clustering the synthetic universe.
+
+Features are treated as **intensive**, exactly as `iv` and `ivpa` are: the collapse is a convex combination, obtained by pushing the inner weights through [`synthetic_asset_weights`](@ref) first. An un-normalised weighted sum would scale each synthetic asset's feature vector by its gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, inflating it under leverage or shorting. Under the default [`AngularDist`](@ref) the normalisation is a mathematical no-op for a rectangular feature matrix — scaling one row of the result leaves every cosine unchanged — but it is *not* one in the square case, where the two-sided product rescales feature columns as well, and it is what keeps the collapse bounded for any `sⱼ > 0`. An extensive feature (a market capitalisation, a headcount) wanting a weighted *sum* is not supported: the divisor depends on the inner solve, so a caller cannot pre-scale their way to one.
+
+## The two weight shapes
+
+  - A weight **matrix** `wi` (assets × synthetic assets) collapses the whole universe at once. When `sq` is `true` the feature axis *is* the asset axis ([`features_are_assets`](@ref)), so it is contracted too and the result is again square on the synthetic universe.
+  - A weight **vector** `w` collapses onto a *single* synthetic asset, which is all [`reconstruct_rd`](@ref) has in scope within a cross-validation fold. It takes no `sq` argument, and that absence is the statement: the second contraction of the square case needs every synthetic asset's weights simultaneously, and contracting the feature axis with the one vector available would collapse it to a single number per synthetic asset — a feature space in which every asset is trivially identical. A square feature matrix therefore keeps the real assets as its feature axis through the fold path, reading as "this synthetic asset's weighted-average neighbourhood".
+
+## Degenerate synthetic assets
+
+A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_asset_weights`](@ref) leaves the column alone rather than dividing, so the collapse gives that asset a **zero feature vector** instead of throwing. It then lands on the zero-feature-vector convention the distance kernel already implements, matching the zero returns column, `iv` and `ivpa` the same degenerate weights already produce.
+
+# Arguments
+
+  - `Z`: Feature matrix, static (assets × features) or time-varying (observations × assets × features).
+  - `sq`: Whether the feature axis is the asset axis, from [`features_are_assets`](@ref).
+  - `wi`: Inner weights, assets × synthetic assets.
+  - `w`: Inner weights for a single synthetic asset, assets × 1.
+
+# Returns
+
+  - `nothing` when `Z` is `nothing`.
+  - Matrix arity: `synthetic assets × features`, or `synthetic assets × synthetic assets` when `sq`; `observations × …` with the same trailing axes for a time-varying `Z`.
+  - Vector arity: a `features`-length vector for a static `Z`, an `observations × features` matrix for a time-varying one.
+
+# Related
+
+  - [`synthetic_asset_weights`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`reconstruct_rd`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function collapse_feature_matrix(::Nothing, ::Bool, ::MatNum)
+    return nothing
+end
+function collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
+    wi = synthetic_asset_weights(wi)
+    Zc = transpose(wi) * Z
+    return sq ? Zc * wi : Zc
+end
+function collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
+    wi = synthetic_asset_weights(wi)
+    k = size(wi, 2)
+    nf = sq ? k : size(Z, 3)
+    Zc = Array{promote_type(eltype(Z), eltype(wi))}(undef, size(Z, 1), k, nf)
+    @inbounds for t in axes(Z, 1)
+        Zt = transpose(wi) * view(Z, t, :, :)
+        Zc[t, :, :] = sq ? Zt * wi : Zt
+    end
+    return Zc
+end
+function collapse_feature_matrix(::Nothing, ::VecNum)
+    return nothing
+end
+function collapse_feature_matrix(Z::MatNum, w::VecNum)
+    return transpose(Z) * synthetic_asset_weights(w)
+end
+function collapse_feature_matrix(Z::Arr3Num, w::VecNum)
+    w = synthetic_asset_weights(w)
+    Zc = Matrix{promote_type(eltype(Z), eltype(w))}(undef, size(Z, 1), size(Z, 3))
+    @inbounds for t in axes(Z, 1)
+        Zc[t, :] = transpose(view(Z, t, :, :)) * w
+    end
+    return Zc
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Extracts the prior result for risk calculation from an optimisation result. Checks for an explicitly provided `pr`, then looks for `res.pr` and `res.pa.pr` before throwing an error if none are found.

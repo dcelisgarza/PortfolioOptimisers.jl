@@ -601,18 +601,14 @@ Predict outer portfolio returns for [`NestedClustered`](@ref) optimisation. Over
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
-    nb, B, iv, ivpa, X = prepare_outer_rd(rd, wi)
+    nb, B, iv, ivpa, nz, Z, X = prepare_outer_rd(rd, wi)
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = port_opt_view(pr, cl)
         feesi = port_opt_view(fees, cl)
         X[:, i] = calc_net_returns(res, pri, feesi)
     end
-    # `nz`/`Z` are deliberately dropped: this result's assets are the clusters, not the
-    # original ones, so a feature matrix indexed by real assets has no axis to bind to.
-    # Collapsing it into synthetic-asset features the way `prepare_outer_rd` collapses `iv`
-    # and `ivpa` is tracked separately; do not thread `rd.Z` through unchanged.
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,

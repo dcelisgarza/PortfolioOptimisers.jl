@@ -218,6 +218,54 @@ Abstract supertype for non-sequential non-optimisation cross-validation result t
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
 """
+    check_prediction_feature_matrix(nz, Z, X)
+
+Validate the collapsed feature matrix a [`PredictionReturnsResult`](@ref) transports.
+
+The asset axis is gone by the time a feature matrix reaches this carrier — [`collapse_feature_matrix`](@ref) contracted it against the fold's weights — so the checks [`check_names_and_feature_matrix`](@ref) runs for [`ReturnsResult`](@ref) do not apply. What is left is the pair rule, the feature axis against `nz`, and the observation axis against `X`, which is the axis the fold stacking relies on.
+
+# Arguments
+
+  - `nz`: Feature names.
+  - `Z`: Collapsed feature matrix, or one per weight vector.
+  - `X`: Portfolio returns, whose shape `Z`'s parallels.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PredictionReturnsResult`](@ref)
+  - [`collapse_feature_matrix`](@ref)
+  - [`MatNum_VecMatNum`](@ref)
+"""
+function check_prediction_feature_matrix(nz::Option{<:VecStr}, ::Nothing, ::Any)::Nothing
+    @argcheck(isnothing(nz),
+              IsNothingError("Z cannot be nothing if nz is not `nothing`. Got\n!isnothing(nz) => true\n!isnothing(Z) => false"))
+    return nothing
+end
+function check_prediction_feature_matrix(nz::Option{<:VecStr}, Z::MatNum, X::Any)::Nothing
+    check_feature_names(nz, Z)
+    assert_all_finite(Z, :Z)
+    @argcheck(size(Z, 2) == length(nz),
+              DimensionMismatch("length(nz) == size(Z, 2) must hold. Got\nlength(nz) => $(length(nz))\nsize(Z, 2) => $(size(Z, 2))"))
+    if isa(X, VecNum)
+        @argcheck(size(Z, 1) == length(X),
+                  DimensionMismatch("a collapsed feature matrix (Z) is observations × features, so it must have one row per portfolio-returns (X) observation, got size(Z, 1) = $(size(Z, 1)) and length(X) = $(length(X))"))
+    end
+    return nothing
+end
+function check_prediction_feature_matrix(nz::Option{<:VecStr}, Z::VecMatNum,
+                                         X::Any)::Nothing
+    @argcheck(isa(X, VecVecNum) && length(Z) == length(X),
+              DimensionMismatch("a feature matrix collapsed onto several weight vectors (Z) needs one matrix per portfolio-returns (X) entry, got typeof(X) = $(typeof(X)) and length(Z) = $(length(Z))"))
+    for (Zi, Xi) in zip(Z, X)
+        check_prediction_feature_matrix(nz, Zi, Xi)
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Stores the portfolio returns data associated with a cross-validation prediction. Packages
@@ -239,10 +287,18 @@ $(DocStringExtensions.FIELDS)
         B::Option{<:VecNum_VecVecNum} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:VecNum_VecVecNum} = nothing,
-        ivpa::Option{<:Num_VecNum} = nothing
+        ivpa::Option{<:Num_VecNum} = nothing,
+        nz::Option{<:VecStr} = nothing,
+        Z::Option{<:MatNum_VecMatNum} = nothing
     ) -> PredictionReturnsResult
 
 Keywords correspond to the struct's fields.
+
+## The feature matrix is transport only
+
+`nz`/`Z` are the fourth carrier of a feature matrix, after [`ReturnsResult`](@ref), [`PricesResult`](@ref) and the prior results — and the only one nothing ever *reads* from. [`reconstruct_rd`](@ref) collapses the fold's feature matrix onto its synthetic asset, [`MultiPeriodPredictionResult`](@ref) stacks the folds, and [`rebuild_returns_result`](@ref) assembles the outer [`ReturnsResult`](@ref); this carrier only has to survive that journey. A `PredictionReturnsResult` cannot reach the `Pr_RR` bridge that routes a feature matrix to a distance, because that alias names the concrete [`ReturnsResult`](@ref), so validation here is the minimum that keeps the shapes honest rather than a copy of [`ReturnsResult`](@ref)'s.
+
+Its shape parallels `X`: a `MatNum` (observations × features) when `X` is a `VecNum`, and one such matrix per weight vector when `X` is a `VecVecNum`. The asset axis is already gone — that is what the collapse did.
 
 ## Validation
 
@@ -252,11 +308,13 @@ Keywords correspond to the struct's fields.
   - If `ts` provided: `!isempty(ts)`; at least one of `X`, `F` is not `nothing`; lengths of `ts` match `X`, `F`, and `B` where applicable.
   - If `iv` is a `VecNum`: `ivpa` is scalar or nothing; `iv` is non-empty, non-negative, and finite; `length(iv) == length(X)`.
   - If `iv` is a `VecVecNum`: `ivpa` is `VecNum` or nothing; `length(iv) == length(X) == length(ivpa)`; each sub-vector non-empty, non-negative, finite, and same length as corresponding `X`.
+  - `nz` and `Z` are both `nothing` or both given; `size(Z, 2) == length(nz)`, and `Z` has one row per observation of `X`.
 
 # Related
 
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
+  - [`collapse_feature_matrix`](@ref)
 """
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
     """
@@ -295,11 +353,20 @@ Keywords correspond to the struct's fields.
     $(field_dict[:ivpa])
     """
     ivpa
+    """
+    $(field_dict[:pred_nz])
+    """
+    nz
+    """
+    $(field_dict[:pred_Z])
+    """
+    Z
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
-                                     ivpa::Option{<:Num_VecNum})
+                                     ivpa::Option{<:Num_VecNum}, nz::Option{<:VecStr},
+                                     Z::Option{<:MatNum_VecMatNum})
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
             if isa(X, VecNum)
@@ -357,8 +424,12 @@ Keywords correspond to the struct's fields.
                 @argcheck(length(ivi) == length(Xi), DimensionMismatch)
             end
         end
+        check_prediction_feature_matrix(nz, Z, X)
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf, F, nb, B, ts, iv, ivpa)
+                   typeof(ts), typeof(iv), typeof(ivpa), typeof(nz), typeof(Z)}(nx, X, nf,
+                                                                                F, nb, B,
+                                                                                ts, iv,
+                                                                                ivpa, nz, Z)
     end
 end
 function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
@@ -369,8 +440,10 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  B::Option{<:VecNum_VecVecNum} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
-                                 ivpa::Option{<:Num_VecNum} = nothing)::PredictionReturnsResult
-    return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
+                                 ivpa::Option{<:Num_VecNum} = nothing,
+                                 nz::Option{<:VecStr} = nothing,
+                                 Z::Option{<:MatNum_VecMatNum} = nothing)::PredictionReturnsResult
+    return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, nz, Z)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -481,6 +554,35 @@ function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:
     return X
 end
 """
+    mapreduce_FeatMtx(rd)
+
+Stack the per-fold collapsed feature matrices of a vector of [`PredictionReturnsResult`](@ref) objects down their observation axis.
+
+The asset axis is already gone, so unlike [`mapreduce_RetMtx`](@ref) this is a plain row concatenation in both shapes; the vector shape carries one matrix per weight vector and stacks each independently.
+
+# Arguments
+
+  - `rd`: Vector of [`PredictionReturnsResult`](@ref) objects.
+
+# Returns
+
+  - `nothing` when the folds carry no feature matrix; otherwise the stacked matrix, or a vector of them.
+
+# Related
+
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`collapse_feature_matrix`](@ref)
+"""
+function mapreduce_FeatMtx(rd::AbstractVector{<:PredictionReturnsResult})
+    Z = rd[1].Z
+    if isnothing(Z)
+        return nothing
+    elseif isa(Z, MatNum)
+        return mapreduce(x -> x.Z, vcat, rd)
+    end
+    return [mapreduce(x -> x.Z[i], vcat, rd) for i in eachindex(Z)]
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Stores predictions from multiple cross-validation folds as a single combined result.
@@ -488,6 +590,8 @@ Concatenates the test-period returns from all folds into an aggregated
 [`PredictionReturnsResult`](@ref).
 
 Per-observation quantities (`X`, `F`, `B`, `ts`, `iv`) stack across folds. `ivpa` is per-asset, not per-observation, and each fold's [`reconstruct_rd`](@ref) has already collapsed it to one value per synthetic asset using *that fold's* weights, so it cannot stack — it is **reduced to the last fold's value**. This matches [`predict_realised_vols`](@ref), which reads the last row of the stacked `iv`: the premium divisor is paired with the implied volatility it divides.
+
+The collapsed feature matrix `Z` **does** stack, because [`reconstruct_rd`](@ref) gives it an observation axis to stack on. A fold's collapse is fold-specific — the weights differ — so a static feature matrix becomes constant within a fold and changes at the fold boundaries, which is exactly what the time-varying `observations × assets × features` shape exists to express. The outer optimiser's default [`LastObservation`](@ref) then reads the most recent fold, and the other collapse rules read as many as they are asked to.
 
 # Fields
 
@@ -527,8 +631,10 @@ $(DocStringExtensions.FIELDS)
         # Per-asset, so it cannot stack; reduced to the last fold to pair with the last
         # row of `iv`, which is what `predict_realised_vols` divides by it.
         ivpa = rd[end].ivpa
+        nz = rd[1].nz
+        Z = mapreduce_FeatMtx(rd)
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
-                                      ts = ts, iv = iv, ivpa = ivpa)
+                                      ts = ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
         return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
     end
 end
@@ -698,11 +804,51 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseR
     # return sorted_predictions[idx]
 end
 """
+    fold_feature_matrix(Z::Nothing, w, nobs)
+    fold_feature_matrix(Z::MatNum, w, nobs)
+    fold_feature_matrix(Z::Arr3Num, w, nobs)
+
+Collapse a fold's feature matrix onto its synthetic asset and give it an observation axis.
+
+The collapse itself is [`collapse_feature_matrix`](@ref)'s vector arity. What this adds is the observation axis, which a static feature matrix does not have: the fold's single collapsed feature vector is repeated across the fold's `nobs` observations, because the collapse is a function of *this fold's* weights and is therefore constant within the fold and different in the next one. Stacking the folds then yields a genuinely time-varying feature matrix whose row count matches the stacked returns, which is the shape [`rebuild_returns_result`](@ref) needs.
+
+# Arguments
+
+  - `Z`: Feature matrix carried by the fold's returns data.
+  - `w`: The fold's weights for one synthetic asset.
+  - `nobs`: Number of observations in the fold.
+
+# Returns
+
+  - `nothing`, or an `observations × features` matrix.
+
+# Related
+
+  - [`collapse_feature_matrix`](@ref)
+  - [`reconstruct_rd`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+"""
+function fold_feature_matrix(::Nothing, ::VecNum, ::Integer)
+    return nothing
+end
+function fold_feature_matrix(Z::MatNum, w::VecNum, nobs::Integer)
+    return repeat(transpose(collapse_feature_matrix(Z, w)), nobs)
+end
+function fold_feature_matrix(Z::Arr3Num, w::VecNum, ::Integer)
+    return collapse_feature_matrix(Z, w)
+end
+"""
     reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X)
 
 Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
 
-Computes benchmark, investment vehicle, and per-asset allocation data from the optimisation result weights and the original returns data.
+Computes benchmark, investment vehicle, per-asset allocation and feature data from the optimisation result weights and the original returns data.
+
+## The feature matrix
+
+`rd.Z` is collapsed onto this fold's synthetic asset by [`collapse_feature_matrix`](@ref) and given an observation axis, so [`MultiPeriodPredictionResult`](@ref) can stack the folds and [`rebuild_returns_result`](@ref) can assemble a time-varying feature matrix for the outer problem. A static `rd.Z` has no observation axis of its own, so the fold's single collapsed feature vector is repeated across the fold's observations: it genuinely is constant within the fold and changes with the weights at the fold boundary.
+
+Only one weight vector is in scope here, so a square feature matrix — one whose features *are* the assets — keeps the real assets as its feature axis rather than being contracted onto the synthetic universe; see [`collapse_feature_matrix`](@ref) for why the second contraction is unavailable and what the one-sided collapse means.
 
 # Arguments
 
@@ -712,12 +858,13 @@ Computes benchmark, investment vehicle, and per-asset allocation data from the o
 
 # Returns
 
-  - [`PredictionReturnsResult`](@ref) with updated benchmark and investment vehicle data.
+  - [`PredictionReturnsResult`](@ref) with updated benchmark, investment vehicle and feature data.
 
 # Related
 
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`PredictionReturnsResult`](@ref)
+  - [`collapse_feature_matrix`](@ref)
 """
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
@@ -737,8 +884,10 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
             ivpa = LinearAlgebra.dot(rd.ivpa, w)
         end
     end
+    Z = fold_feature_matrix(rd.Z, res.w, length(X))
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
-                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = rd.nz,
+                                   Z = Z)
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecVecNum)
@@ -767,8 +916,14 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
     if isa(ivpa, Number)
         ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
     end
+    Z = if isnothing(rd.Z)
+        nothing
+    else
+        [fold_feature_matrix(rd.Z, wi, length(Xi)) for (wi, Xi) in zip(res.w, X)]
+    end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
-                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = rd.nz,
+                                   Z = Z)
 end
 """
     predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)

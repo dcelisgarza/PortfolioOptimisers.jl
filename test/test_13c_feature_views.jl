@@ -176,7 +176,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test all(rs.seen[i] == Zsq[cols2[i], cols2[i]] for i in eachindex(cols2))
     end
 
-    @testset "A meta-optimiser's outer synthetic universe carries no features" begin
+    @testset "A meta-optimiser's outer synthetic universe carries collapsed features" begin
         # Stacking's own inner optimisers all see the full universe -- it subsets nothing.
         ri = RecordingDistance(FeatureDistance())
         st = Stacking(;
@@ -191,31 +191,29 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test isapprox(sum(res.w), 1)
 
         #=
-        The outer problem's assets are sub-portfolios, not the universe, so all three
-        synthetic-universe builders deliberately drop `Z`. The point of this test is that
-        the drop is LOUD: an outer estimator asking for features gets an error naming the
-        missing carrier, not a stale full-universe matrix silently measured against `k`
-        synthetic assets. Whether the outer problem should instead collapse `Z` onto those
-        assets is issue #179 and is deliberately not decided here.
+        The outer problem's assets are sub-portfolios, not the universe, so `Z` cannot ride
+        through unchanged -- it is *collapsed* onto them. This testset owns the boundary
+        itself: the outer estimator receives a matrix on the synthetic universe rather than
+        the error it used to get. `test_13d_feature_collapse.jl` owns the arithmetic.
         =#
-        for outer in (Stacking(;
-                               opti = [plain_hrp(),
-                                       HierarchicalEqualRiskContribution(;
-                                                                         opt = HierarchicalOptimiser(;
-                                                                                                     slv = slv))],
-                               opto = HierarchicalRiskParity(; opt = hopt(FeatureDistance())),
-                               ex = seq),
-                      NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
-                                      opti = plain_hrp(),
-                                      opto = HierarchicalRiskParity(; opt = hopt(FeatureDistance())),
-                                      ex = seq))
-            e = try
-                optimise(outer, rd_sq)
-            catch err
-                err
-            end
-            @test isa(e, PO.IsNothingError)
-            @test occursin("neither the returns result nor the prior result", e.msg)
+        for mk in (de -> Stacking(;
+                                  opti = [plain_hrp(),
+                                          HierarchicalEqualRiskContribution(;
+                                                                            opt = HierarchicalOptimiser(;
+                                                                                                        slv = slv))],
+                                  opto = HierarchicalRiskParity(; opt = hopt(de)), ex = seq),
+                   de -> NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
+                                         opti = plain_hrp(),
+                                         opto = HierarchicalRiskParity(; opt = hopt(de)),
+                                         ex = seq))
+            ro = RecordingDistance(FeatureDistance())
+            res = optimise(mk(ro), rd_sq)
+            @test isapprox(sum(res.w), 1)
+            # A square carrier collapses two-sided, so the outer universe is square in its
+            # own assets rather than in the original ones.
+            @test length(ro.seen) == 1
+            @test size(ro.seen[1], 1) == size(ro.seen[1], 2)
+            @test size(ro.seen[1], 1) < N
         end
     end
 

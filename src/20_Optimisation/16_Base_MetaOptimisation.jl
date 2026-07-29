@@ -61,7 +61,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa` accordingly.
+Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa`, and the feature matrix `rd.Z`, accordingly.
+
+!!! warning
+
+    This function returns `nz` and `Z` in addition to the five values it returned before the feature matrix was collapsed onto the synthetic universe, and it returns them **before** the returns buffer `X`. A custom [`predict_outer_nco_estimator_returns`](@ref) or [`predict_outer_st_estimator_returns`](@ref) overload written against the old tuple therefore breaks loudly — it binds `nz` where it expects `X` and fails on the first write — rather than silently continuing to build an outer [`ReturnsResult`](@ref) with no feature matrix and never learning that it should have one. Appending the pair would not have done this: Julia's destructuring discards trailing values without complaint.
 
 # Arguments
 
@@ -74,6 +78,8 @@ Prepares the ReturnsResult for outer optimisation, applying the inner cluster we
   - `B`: Adjusted benchmarkreturns matrix after applying inner weights (if `rd.B` is a matrix).
   - `iv`: Adjusted independent variable matrix (if present).
   - `ivpa`: Adjusted independent variable per asset matrix (if present).
+  - `nz`: Feature names for the collapsed feature matrix (if present). Unchanged when the feature axis is rectangular; the synthetic asset names when it *is* the asset axis, since the collapse is two-sided there.
+  - `Z`: Feature matrix collapsed onto the synthetic assets (if present), see [`collapse_feature_matrix`](@ref).
   - `X`: Buffer for the outer returns matrix.
 
 # Related
@@ -81,6 +87,8 @@ Prepares the ReturnsResult for outer optimisation, applying the inner cluster we
   - [`ReturnsResult`](@ref)
   - [`NestedClustered`](@ref)
   - [`Stacking`](@ref)
+  - [`collapse_feature_matrix`](@ref)
+  - [`features_are_assets`](@ref)
 """
 function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     nb, B = if !isa(rd.B, MatNum)
@@ -94,16 +102,22 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
         # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
-        wi = synthetic_asset_weights(wi)
+        wn = synthetic_asset_weights(wi)
         if iv_flag
-            iv = iv * wi
+            iv = iv * wn
         end
         if ivpa_flag
-            ivpa = transpose(wi) * ivpa
+            ivpa = transpose(wn) * ivpa
         end
     end
+    # Features are intensive too. When the feature axis *is* the asset axis the collapse is
+    # two-sided, so the synthetic universe keeps a square feature matrix whose names are the
+    # synthetic asset names — which is what keeps `features_are_assets` true one level up.
+    sq = features_are_assets(rd.nz, rd.nx)
+    Z = collapse_feature_matrix(rd.Z, sq, wi)
+    nz = sq ? ["_$(i)" for i in 1:size(wi, 2)] : rd.nz
     X = Matrix{eltype(rd.X)}(undef, size(rd.X, 1), size(wi, 2))
-    return nb, B, iv, ivpa, X
+    return nb, B, iv, ivpa, nz, Z, X
 end
 """
     rebuild_returns_result(rd, predictions)
@@ -111,6 +125,12 @@ end
 Reconstruct a returns result from cross-validation predictions.
 
 Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout.
+
+## The feature matrix
+
+Each prediction has already had its feature matrix collapsed onto its own synthetic asset, fold by fold, and stacked down the observation axis (see [`reconstruct_rd`](@ref) and [`MultiPeriodPredictionResult`](@ref)). All that is left here is to lay the `N` sub-portfolios out along the asset axis, giving the `observations × assets × features` shape the time-varying carrier takes — with the same row count as `X`, since `X` is stacked the same way. The outer optimiser's default [`LastObservation`](@ref) then reduces it to the most recent fold's collapse.
+
+A feature matrix survives only when every sub-portfolio collapsed onto the *same* feature axis. That holds whenever the feature axis is rectangular, since it is never subselected by assets. It does not hold for a square feature matrix under [`NestedClustered`](@ref), whose folds see cluster-sliced returns: each cluster's feature axis is its own asset subset, so there is nothing to stack them against and the feature matrix is dropped. An outer estimator that then asks for features gets the same error it would get had none been supplied, rather than a matrix assembled from mismatched axes.
 
 # Arguments
 
@@ -125,6 +145,8 @@ Combines individual fold predictions from `predictions` into a new `ReturnsResul
 
   - [`NestedClustered`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
+  - [`reconstruct_rd`](@ref)
+  - [`collapse_feature_matrix`](@ref)
 """
 function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
     N = length(predictions)
@@ -137,6 +159,15 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
     B = B_flag ? rd1.B : nothing
     iv = rd1.iv
     ivpa = ivpa_flag ? [rd1.ivpa] : nothing
+    nz = rd1.nz
+    Z_flag = !isnothing(rd1.Z) && all(x -> x.mrd.nz == nz, predictions)
+    Z = nothing
+    if Z_flag
+        Z = Array{eltype(rd1.Z)}(undef, size(rd1.Z, 1), N, size(rd1.Z, 2))
+        Z[:, 1, :] = rd1.Z
+    else
+        nz = nothing
+    end
     @inbounds for i in 2:N
         rdi = predictions[i].mrd
         append!(X, rdi.X)
@@ -149,6 +180,9 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
         if B_flag
             append!(B, rdi.B)
         end
+        if Z_flag
+            Z[:, i, :] = rdi.Z
+        end
     end
     X = reshape(X, :, N)
     if B_flag
@@ -156,10 +190,6 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
         nb = ["_b$(i)" for i in 1:N]
     end
     iv = iv_flag ? reshape(iv, :, N) : nothing
-    # `nz`/`Z` are deliberately dropped: this result's assets are the predicted sub-portfolios,
-    # not the original ones, so a feature matrix indexed by real assets has no axis to bind to.
-    # Collapsing it into synthetic-asset features the way `prepare_outer_rd` collapses `iv`
-    # and `ivpa` is tracked separately; do not thread `rd.Z` through unchanged.
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
 end
