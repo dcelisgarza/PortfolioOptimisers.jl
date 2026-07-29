@@ -14,6 +14,7 @@ strips the ``"`name`: "`` prefix. A few illustrative entries:
     :oow  => "`w`: Optional observation weights vector `observations × 1`, ..."
     :per  => "`pr`: Prior estimator or result."
     :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result."
+    :plsrc => "`pl`: Network estimator or clustering estimator -- a source that refits, never a precomputed result."
 
 The `const` definition below is the single source of truth; consult it for the full
 table of keys and descriptions.
@@ -125,6 +126,7 @@ const arg_dict = Dict(
                       :phX_Xv => "`X`: Phylogeny matrix or vector.",#
                       :phX => "`X`: Phylogeny matrix.",#
                       :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
+                      :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
                       :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
@@ -180,7 +182,7 @@ const arg_dict = Dict(
                       :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from an `AssetSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
                       :z_sq => "`z_sq`: Whether the feature axis of `Z` *is* the asset axis, as it is for a square adjacency matrix reused as features. Stated by the producer that built `Z`, because a prior result carries no feature names to compare against. When `true`, an asset view slices the feature axis too.",#
                       :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
-                      :plfe => "`pl`: Graph source. A network estimator, refit from the returns per fold, or a precomputed square phylogeny result carrying exogenous structure. Clustering sources are excluded: their square matrix is a partition recoding.",#
+                      :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, where `alg` selects the hop decay) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                       :plfalg => "`alg`: Phylogeny feature algorithm: the decay turning hop counts into feature values. Inert for a precomputed phylogeny result, which is used as given.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",

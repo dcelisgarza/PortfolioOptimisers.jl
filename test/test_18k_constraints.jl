@@ -380,7 +380,7 @@ end
                     -1.778276197103779e-13, -1.9695027660052278e-13, 0.20146961053707255],
                    rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
@@ -392,12 +392,12 @@ end
                         wb = WeightBounds(; lb = -1, ub = 1))
     @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-    plc = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pl = clr, p = 10), rd.X)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 10)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
@@ -413,7 +413,7 @@ end
                     2.284039630442464e-9, 4.098035458673607e-9, 2.8259584736181038e-9,
                     1.9502905591238874e-9, 0.4730283635464767], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 5)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
@@ -430,7 +430,7 @@ end
                     2.3540415362795815e-11, 6.674140406117119e-11, 3.620870179464855e-11,
                     2.9544937962876324e-11, 0.5589695057771867], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
@@ -446,7 +446,7 @@ end
                     1.2549206102211462e-9, 5.816904347357348e-10, 9.192974758044433e-10,
                     1.3752920313726993e-9, 0.05823418837805521], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 5)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),

@@ -183,10 +183,6 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     cluster_lvls = [get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
-    # A single cluster has no silhouette, so index 1 is never computed by the loop below.
-    # It must still be *written*, or `argmax` reads uninitialised memory and returns `k = 1`
-    # whenever that garbage happens to exceed every real score. `typemin` matches the three
-    # sibling methods and keeps the `all(!isfinite, W_list)` fallback below intact.
     W_list[1] = typemin(eltype(D))
     for i in 2:c1
         sl = Clustering.silhouettes(cluster_lvls[i], D)

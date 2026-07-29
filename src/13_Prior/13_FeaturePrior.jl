@@ -145,30 +145,35 @@ Unreachable pairs score `0`, which needs no special case: `hops` is `typemax` th
 """
 struct GradedNeighbourhood <: AbstractPhylogenyFeatureAlgorithm end
 """
-    phylogeny_features(alg::AbstractPhylogenyFeatureAlgorithm,
-                       pl::PhylogenyResult{<:MatNum}, args...; kwargs...)
     phylogeny_features(alg::BinaryNeighbourhood, pl::AbstractNetworkEstimator,
                        X::MatNum; kwargs...)
     phylogeny_features(alg::GradedNeighbourhood, pl::AbstractNetworkEstimator,
                        X::MatNum; kwargs...)
+    phylogeny_features(alg::AbstractPhylogenyFeatureAlgorithm,
+                       pl::AbstractClustersEstimator, X::MatNum; kwargs...)
 
 Turn a graph source into a square `assets × assets` feature matrix.
 
 The kernel behind [`PhylogenyFeatures`](@ref). Every method returns a `Float64` matrix — not the `Int` or `BitMatrix` the phylogeny routines produce — so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
 
-# The two source kinds are treated differently, on purpose
+# The source is always refit
 
-  - **A precomputed [`PhylogenyResult`](@ref) is used as given.** Its matrix already *is* the relatedness matrix; `alg` is inert, no hop transform runs, and a weighted graph keeps its weights rather than being binarised. This is the only exogenous path in the whole producer family for square structure — a supply chain, a shared-ownership graph, a country adjacency — and a literal `ze` cannot serve it, because a bare matrix is `z_sq = false` by dispatch (see [`feature_matrix`](@ref)).
-  - **A [`NetworkEstimator`](@ref) is refit from `X`,** so the graph tracks a cross-validation fold, and `alg` selects the decay. Its adjacency is already `0`/`1` by construction — `Graphs.adjacency_matrix` of a minimum spanning tree or a PMFG — so there are no edge weights left to preserve or discard on this path.
+`pl` is an estimator — a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref) — never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result (see `CONTEXT.md` §1). The structure is therefore rebuilt from `X` on every call, so it tracks a cross-validation fold or a meta-optimiser's subproblem instead of describing a universe it no longer sees.
+
+# `alg` applies to a graph, and is inert for a partition
+
+A **graph** source has hop structure, so `alg` selects the decay over it. Its adjacency is `0`/`1` by construction — `Graphs.adjacency_matrix` of a minimum spanning tree or a PMFG — so there are no edge weights to preserve or discard.
+
+A **partition** has none: two assets are in the same cluster or they are not, and there is nothing between them to decay. Both algorithms therefore give the same co-membership matrix, and `alg` is inert rather than an error — the same treatment `FeatureDistance`'s collapse `alg` gets on a static feature matrix.
 
 # The diagonal
 
-`Z[i, i]` is the top of the scale, never zero: `1` for [`BinaryNeighbourhood`](@ref), `n + 1` for [`GradedNeighbourhood`](@ref), and `maximum(pl.X)` for a precomputed matrix, which has no decay function to continue and whose diagonal [`PhylogenyResult`](@ref) forces to zero. An all-zero precomputed matrix falls back to `1`, leaving the identity: with no edges at all, no two assets share anything, which is the honest answer rather than a degenerate one.
+`Z[i, i]` is the top of the scale, never zero: `1` for [`BinaryNeighbourhood`](@ref) and for any clustering source, `n + 1` for [`GradedNeighbourhood`](@ref) over a graph.
 
 # Arguments
 
   - `alg`: Phylogeny feature algorithm.
-  - `pl`: Graph source — a network estimator, or a precomputed square phylogeny result.
+  - `pl`: Structure source — a network estimator (a graph) or a clustering estimator (a partition).
   - `X`: Asset returns matrix `observations × assets`.
   - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny routines.
 
@@ -184,32 +189,31 @@ The kernel behind [`PhylogenyFeatures`](@ref). Every method returns a `Float64` 
   - [`calc_adjacency`](@ref)
 """
 function phylogeny_features end
-# `alg` is inert here, the same way `FeatureDistance`'s collapse `alg` is inert on a static
-# feature matrix: there is no hop structure to decay, only a relatedness matrix to carry
-# through with its diagonal restored.
-function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
-                            pl::PhylogenyResult{<:MatNum}, args...;
-                            kwargs...)::Matrix{Float64}
-    Z = Matrix{Float64}(pl.X)
-    d = maximum(Z)
-    return Z + ifelse(iszero(d), one(d), d) * LinearAlgebra.I
-end
 function phylogeny_features(::BinaryNeighbourhood, pl::AbstractNetworkEstimator, X::MatNum;
-                            kwargs...)::Matrix{Float64}
-    return Matrix{Float64}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) + LinearAlgebra.I
+                            kwargs...)::Matrix
+    return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
+           LinearAlgebra.I
+end
+# `alg` is inert here: a partition is flat, so there is no hop structure to decay. See the
+# docstring's caveat -- the resulting distance carries the partition and nothing more.
+function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
+                            pl::AbstractClustersEstimator, X::MatNum; kwargs...)::Matrix
+    return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
+           LinearAlgebra.I
 end
 function phylogeny_features(::GradedNeighbourhood, pl::AbstractNetworkEstimator, X::MatNum;
-                            kwargs...)::Matrix{Float64}
+                            kwargs...)::Matrix
     A = calc_adjacency(pl, X; dims = 1, kwargs...)
     g = Graphs.SimpleGraph(A)
     n = pl.n
-    Z = zeros(Float64, Graphs.nv(g), Graphs.nv(g))
+    et = eltype(X)
+    Z = zeros(et, Graphs.nv(g), Graphs.nv(g))
     for v in Graphs.vertices(g)
         h = Graphs.gdistances(g, v)
         for u in Graphs.vertices(g)
             # `gdistances` reports `typemax` for an unreachable vertex, so the comparison
             # must run before the subtraction or `n + 1 - h[u]` would overflow.
-            @inbounds Z[u, v] = ifelse(h[u] <= n, Float64(n + 1 - h[u]), 0.0)
+            @inbounds Z[u, v] = ifelse(h[u] <= n, et(n + 1 - h[u]), 0.0)
         end
     end
     return Z
@@ -228,7 +232,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PhylogenyFeatures(;
-        pl::NwE_PlM = NetworkEstimator(),
+        pl::NwE_ClE = NetworkEstimator(),
         alg::AbstractPhylogenyFeatureAlgorithm = GradedNeighbourhood()
     ) -> PhylogenyFeatures
 
@@ -247,13 +251,17 @@ With a zero diagonal the two **non-adjacent** endpoints come out identical and t
 
 Including self also keeps subproblems well defined. An asset view of a spanning tree routinely isolates a vertex, and a zero-diagonal row for an isolated asset is a **zero row**: [`AngularDist`](@ref)'s zero-vector convention then puts every isolated asset at distance `0` from every other isolated asset, clustering them together for no reason. With self included they sit at maximal distance from everything, including each other.
 
-# Why a clustering source is rejected
+# A clustering source is admitted, with a caveat worth reading
 
-`pl` is bound by [`NwE_PlM`](@ref), which admits a graph and excludes a partition — a [`ClustersEstimator`](@ref) or [`Clusters`](@ref) is a `MethodError` here, not a silent degeneracy. Its square matrix is `P * transpose(P) - I`, whose row `i` is the co-membership indicator of asset `i`, so the distance depends on nothing but cluster size. On a seven-asset universe clustered `[1, 1, 1, 2, 2, 3, 3]` it takes three values in total, and the size-two cluster's **within**-cluster distance is `0.5` — exactly its across-cluster distance, because `- I` leaves each row of a pair as a lone `1` pointing at the other member, making the two rows orthogonal. The partition is recoded and then lost. This is the single-partition case of the round-trip argument that closed the endogenous branch for [`AssetSetsFeatures`](@ref).
+`pl` is bound by [`NwE_ClE`](@ref): a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are *estimators*, so both refit.
+
+A partition carries much less than a graph, and the shortfall is measurable rather than stylistic. Its matrix is `P * transpose(P)` with the diagonal restored, so row `i` is the co-membership indicator of asset `i` and the distance between two rows depends on nothing but cluster membership and cluster size. On a seven-asset universe clustered `[1, 1, 1, 2, 2, 3, 3]` the whole distance matrix takes **three** distinct values. Worse, `phylogeny_matrix`'s `- I` makes each row of a *pair* a lone `1` pointing at the other member, so the two rows are orthogonal and a size-two cluster's **within**-cluster distance equals its **across**-cluster distance — this producer restores the diagonal, which repairs exactly that case, but the coarseness remains.
+
+This is the single-partition case of the round-trip argument that closed the endogenous branch for [`AssetSetsFeatures`](@ref): clustering a re-encoded clustering largely returns the clustering. Prefer a graph source unless the partition is what you actually want to measure.
 
 # Provenance
 
-The [`NetworkEstimator`](@ref) source is **endogenous** — the graph is filtered from the returns correlation — so it measures topology the correlation implies rather than structure outside it, and it refits per fold. The [`PhylogenyResult`](@ref) source is **exogenous** and is the only route by which user-supplied square structure reaches a distance at all.
+The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result (see `CONTEXT.md` §1). This producer is therefore **endogenous**: the graph is filtered from the returns correlation, so it measures topology the correlation implies rather than structure outside it, and it refits on every fold and every subproblem.
 
 A `FeatureDistance` nested inside the source's own `de` does not recurse: the producer runs inside `prior(pe, X, F; …)`, before `pr.Z` exists, so it fails loudly with an `IsNothingError` naming the missing feature matrix.
 
@@ -264,11 +272,33 @@ A `FeatureDistance` nested inside the source's own `de` does not recurse: the pr
 # Examples
 
 ```jldoctest
-julia> PhylogenyFeatures(; pl = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]))
+julia> PhylogenyFeatures(; alg = BinaryNeighbourhood())
 PhylogenyFeatures
-   pl ┼ PhylogenyResult
-      │   X ┴ 3×3 Matrix{Int64}
-  alg ┴ GradedNeighbourhood()
+   pl ┼ NetworkEstimator
+      │    ce ┼ PortfolioOptimisersCovariance
+      │       │   ce ┼ Covariance
+      │       │      │    me ┼ SimpleExpectedReturns
+      │       │      │       │   w ┴ nothing
+      │       │      │    ce ┼ GeneralCovariance
+      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │      │       │    w ┴ nothing
+      │       │      │   alg ┴ FullMoment()
+      │       │   mp ┼ MatrixProcessing
+      │       │      │     pdm ┼ Posdef
+      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      │      dn ┼ nothing
+      │       │      │      dt ┼ nothing
+      │       │      │     alg ┼ nothing
+      │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │    de ┼ Distance
+      │       │   power ┼ nothing
+      │       │     alg ┴ CanonicalDistance()
+      │   alg ┼ KruskalTree
+      │       │     args ┼ Tuple{}: ()
+      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     n ┴ Int64: 1
+  alg ┴ BinaryNeighbourhood()
 ```
 
 # Related
@@ -279,7 +309,7 @@ PhylogenyFeatures
   - [`feature_matrix`](@ref)
   - [`FeaturePrior`](@ref)
   - [`FeatureDistance`](@ref)
-  - [`NwE_PlM`](@ref)
+  - [`NwE_ClE`](@ref)
 """
 @propagatable @concrete struct PhylogenyFeatures <: AbstractFeatureMatrixEstimator
     """
@@ -290,14 +320,11 @@ PhylogenyFeatures
     $(field_dict[:plfalg])
     """
     alg
-    function PhylogenyFeatures(pl::NwE_PlM, alg::AbstractPhylogenyFeatureAlgorithm)
-        if isa(pl, PhylogenyResult)
-            assert_matrix_issquare(pl.X, :pl)
-        end
+    function PhylogenyFeatures(pl::NwE_ClE, alg::AbstractPhylogenyFeatureAlgorithm)
         return new{typeof(pl), typeof(alg)}(pl, alg)
     end
 end
-function PhylogenyFeatures(; pl::NwE_PlM = NetworkEstimator(),
+function PhylogenyFeatures(; pl::NwE_ClE = NetworkEstimator(),
                            alg::AbstractPhylogenyFeatureAlgorithm = GradedNeighbourhood())::PhylogenyFeatures
     return PhylogenyFeatures(pl, alg)
 end
@@ -306,10 +333,7 @@ function feature_matrix(ze::PhylogenyFeatures, ::AbstractPriorResult, X::MatNum,
     # `prior(pe::FeaturePrior, …)` has already transposed `X` to observations x assets and
     # consumed `dims` as a named keyword, so it is not in `kwargs` and the hop routines are
     # called at `dims = 1`, matching the canonically assets-major carried layout.
-    Z = phylogeny_features(ze.alg, ze.pl, X; kwargs...)
-    @argcheck(size(Z, 1) == size(X, 2),
-              DimensionMismatch("a square feature matrix (Z) is assets x assets, so it must bind to the asset axis of X, got size(Z) = $(size(Z)) and size(X, 2) = $(size(X, 2)). A precomputed PhylogenyResult is indexed by the full asset universe: it must cover exactly the assets the prior is fit on."))
-    return Z, true
+    return phylogeny_features(ze.alg, ze.pl, X; kwargs...), true
 end
 """
     feature_estimator_view(ze::AbstractFeatureMatrixEstimator, i, args...)
@@ -317,7 +341,7 @@ end
 
 Subselect a [`FeaturePrior`](@ref)'s `ze` slot by assets `i`.
 
-A producer is usually *configuration*: it recomputes from the viewed prior on the next call, so it passes through unchanged — which the universal [`port_opt_view`](@ref) fallback already does for an estimator with nothing to slice. A producer that *embeds data* is the exception, and must slice it: [`PhylogenyFeatures`](@ref) over a precomputed [`PhylogenyResult`](@ref) holds a matrix indexed by the full asset universe. Delegating to [`port_opt_view`](@ref) rather than returning `ze` is what lets the exception exist without every other producer opting in.
+A producer is usually *configuration*: it recomputes from the viewed prior on the next call, so it passes through unchanged — which the universal [`port_opt_view`](@ref) fallback already does for an estimator with nothing to slice. A producer that *embeds data* is the exception, and delegating to [`port_opt_view`](@ref) rather than returning `ze` is what lets the exception exist without every other producer opting in.
 
 A literal feature matrix is *data* and must be sliced on its asset axis, exactly as the carried matrix is — otherwise its columns would keep pointing at the full universe while the rows point at a cluster.
 

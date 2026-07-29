@@ -36,9 +36,12 @@ matrix would be the wrong size — or, worse, the right size and the wrong numbe
 tags `ce` and `de` `@fprop` only, and `HierarchicalOptimiser` does not `@vprop` its `cle`, so
 `@propagatable` emits no `port_opt_view` for either: nothing exists that *could* have sliced it.
 This is not hypothetical. Issue
-[#184](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/184) records the same hole live
+[#184](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/184) found the same hole live
 elsewhere in the library — `SemiDefinitePhylogenyEstimator` holds a precomputed `PhylogenyResult`
-with no `@vprop`, so a three-asset subproblem gets an `8 × 8` constraint matrix without complaint.
+with no `@vprop`, so a three-asset subproblem got an `8 × 8` constraint matrix without complaint.
+That issue also marks the boundary of "data is sliced": a phylogeny is data, but it is not
+**separable** over the asset universe, so slicing it is not a restriction of the same quantity. Its
+resolution is a refusal rather than a view — see the last consequence below.
 
 Data, by contrast, is already sliced everywhere by machinery that exists and is tested.
 
@@ -227,9 +230,11 @@ the wrapping `FeaturePrior`, which attaches its output to the prior it wraps.
    becoming a second live spelling of `pr.rr.L`.
 3. **`AssetSetsFeatures`** — exogenous taxonomy memberships, built from the `AssetSets` machinery
    already behind group constraints. Rectangular, `z_sq = false`.
-4. **`PhylogenyFeatures`** — a square neighbourhood matrix from a network estimator or a precomputed
-   `PhylogenyResult`, under `BinaryNeighbourhood` or `GradedNeighbourhood` decay. The only producer
-   with `z_sq = true`, and the only exogenous route for *square* structure.
+4. **`PhylogenyFeatures`** — a square neighbourhood matrix from a network estimator (a graph, under
+   `BinaryNeighbourhood` or `GradedNeighbourhood` decay) or a clustering estimator (a partition, for
+   which the decay is inert). The only producer
+   with `z_sq = true`. Both sources are estimators and both refit, so this producer is
+   endogenous; a partition source is admitted but coarse (see the type's docstring).
 
 Producer three was originally specified as a non-square **phylogeny** routine, and that framing was
 wrong. Phylogeny routines are endogenous to the returns by construction, and the value of a feature
@@ -282,6 +287,37 @@ all-zero distance matrix for three unrelated assets inside a cluster.
   selectors pick between two semantics, not merely two sources.
 - **A time-varying literal `ze` cannot survive an observation fold** and throws at construction. Only
   a producer derives a per-fold time-varying `Z`.
+- **A phylogeny is why "data is sliced" needed a boundary at all.** A `PhylogenyResult` is data, but
+  it is not *separable* over the asset universe: every entry states something about the whole graph,
+  so no slice of it is the phylogeny of the slice. The subgraph of a spanning tree is not the
+  spanning tree of the subgraph, and is routinely disconnected — an eight-asset minimum spanning tree
+  restricted to three assets keeps two of its fourteen edge entries and can leave a selected asset
+  attached to nothing. Worse, the slice re-validates (symmetric, zero diagonal), so nothing
+  downstream could have caught it. Rather than teach the view layer to refuse, the shape was removed:
+  no estimator holds a `PhylogenyResult`, so nothing ever presents one to a view (next consequence).
+- **No estimator holds a precomputed result any more, and that is the root-cause half of
+  the same fix.** `SemiDefinitePhylogenyEstimator`, `IntegerPhylogenyEstimator`,
+  `CentralityEstimator` and `PhylogenyFeatures` all took a `PhylogenyResult` or a `Clusters` — an estimator
+  presenting as configuration while holding data one level down, invisible to every guard aimed at
+  results, which is exactly how #184 got through. All four `pl` slots are now bounded by `NwE_ClE`
+  (sources only), so the shape is rejected by the **type** rather than policed at runtime, and
+  nothing is lost: precomputed structure belongs in the constraint *result* (`SemiDefinitePhylogeny`
+  / `IntegerPhylogeny`, whose `A` takes a `PhylogenyResult` or a matrix), which is precisely what
+  `phylogeny_constraints(estimator, X)` returns. Removing the shape removed the checks with it —
+  there is no predicate walking estimators for embedded data, because there is nothing to walk. The
+  single runtime guard left is `assert_external_optimiser` rejecting a precomputed constraint result
+  in `ple`, which no type bound can take over because `ple` legitimately accepts a result outside a
+  meta-optimiser. That guard also had a latent bug: `||` binds looser than `&&`, so its vector branch
+  was unreachable and a result inside a vector passed in exactly the case the branch was written for.
+  This generalises beyond phylogeny and is recorded as a library-wide rule in `CONTEXT.md` §1: **an
+  Estimator never holds a Result.** One consequence is worth stating precisely — with
+  `PhylogenyFeatures` narrowed, every `z_sq = true` *producer* now refits from the returns, so the
+  **prior** carrier has no exogenous route to square structure. The **data** carrier still does, and
+  it is the default: a hand-supplied adjacency goes on `ReturnsResult` as `nz`/`Z` with `nz == nx`,
+  where squareness is derived from the names rather than declared, so it cannot be stated wrongly.
+  What a caller must not do is pass a square matrix as a literal `ze` — that path reports
+  `z_sq = false` by dispatch, and its columns then keep pointing at the full universe inside a
+  subproblem.
 - **Breaking, twice.** `cle_pr` became `x_src` (ADR
   [0044](0044-matrix-sources-are-named-not-flagged.md)), and `dbht_similarity` became
   `distance_to_similarity` when the similarity family moved from `11_Phylogeny/04_DBHT.jl` into

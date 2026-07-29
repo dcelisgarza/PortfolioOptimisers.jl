@@ -392,50 +392,58 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                                                      z_sq = true)
     end
 
-    @testset "A data-embedding feature producer is sliced inside a real fold" begin
+    @testset "A square feature producer refits inside a real fold" begin
         #=
-        `PhylogenyFeatures` over a *precomputed* `PhylogenyResult` is the one producer that
-        is data rather than configuration: it holds a square matrix indexed by the full
-        universe. `feature_estimator_view` is unit-tested against it elsewhere; what only a
-        fold can prove is that the optimiser's own view reaches through `FeaturePrior` to
-        the producer, so a cluster's prior is built from the cluster's neighbourhood and
-        not from all eight assets'.
+        No producer embeds data: `PhylogenyFeatures` holds an *estimator*, so every fold and
+        every cluster refits the graph on its own universe. What only a fold can prove is
+        that the refit actually reaches through the optimiser's own view and `FeaturePrior`
+        to the producer, so a cluster's feature matrix is square over the cluster rather
+        than over the universe it came from.
         =#
         rd_plain = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts)
         PEX = phylogeny_matrix(NetworkEstimator(; alg = KruskalTree()), rd_plain).X
         @test issymmetric(PEX) && all(iszero, diag(PEX))
-        fpe_data = FeaturePrior(; ze = PhylogenyFeatures(; pl = PhylogenyResult(; X = PEX)))
+        fpe_cle = FeaturePrior(; ze = PhylogenyFeatures(; pl = ClustersEstimator()))
         fpe_conf = FeaturePrior(;
                                 ze = PhylogenyFeatures(;
                                                        pl = NetworkEstimator(;
                                                                              alg = KruskalTree())))
 
-        for fpe in (fpe_data, fpe_conf)
-            ri = RecordingDistance(FeatureDistance())
-            ro = RecordingDistance(FeatureDistance())
-            nco = NestedClustered(; pe = fpe, cle = ClustersEstimator(; de = ro),
-                                  z_src = :prior,
-                                  opti = HierarchicalRiskParity(;
-                                                                opt = HierarchicalOptimiser(;
-                                                                                            pe = fpe,
-                                                                                            cle = ClustersEstimator(;
-                                                                                                                    de = ri),
-                                                                                            slv = slv,
-                                                                                            z_src = :prior)),
-                                  opto = plain_hrp(), ex = seq)
-            res = optimise(nco, rd_plain)
-            idx = assignments(res.clr)
-            cls = [findall(==(i), idx) for i in 1:(res.clr.k)]
+        mk_nco(fpe, ri, ro) = NestedClustered(; pe = fpe,
+                                              cle = ClustersEstimator(; de = ro),
+                                              z_src = :prior,
+                                              opti = HierarchicalRiskParity(;
+                                                                            opt = HierarchicalOptimiser(;
+                                                                                                        pe = fpe,
+                                                                                                        cle = ClustersEstimator(;
+                                                                                                                                de = ri),
+                                                                                                        slv = slv,
+                                                                                                        z_src = :prior)),
+                                              opto = plain_hrp(), ex = seq)
 
-            @test ro.seen[1] == prior(fpe, rd_plain).Z
-            @test [size(z) for z in ri.seen] == [(length(cl), length(cl)) for cl in cls]
-            # The reference is the producer viewed the same way the fold views it: for the
-            # embedded matrix that is a slice, for the network source a refit.
-            @test all(ri.seen[i] ==
-                      prior(port_opt_view(fpe, cls[i]), port_opt_view(rd_plain, cls[i])).Z
-                      for i in eachindex(cls))
-            @test isapprox(sum(res.w), 1)
-        end
+        # A clustering source refits per cluster too, and its matrix is square over the
+        # cluster -- the shape that would have been wrong had anything been carried through.
+        ric = RecordingDistance(FeatureDistance())
+        resc = optimise(mk_nco(fpe_cle, ric, RecordingDistance(FeatureDistance())),
+                        rd_plain)
+        idxc = assignments(resc.clr)
+        clsc = [findall(==(i), idxc) for i in 1:(resc.clr.k)]
+        @test [size(z) for z in ric.seen] == [(length(cl), length(cl)) for cl in clsc]
+
+        # The network source refits per cluster as well.
+        ri = RecordingDistance(FeatureDistance())
+        ro = RecordingDistance(FeatureDistance())
+        res = optimise(mk_nco(fpe_conf, ri, ro), rd_plain)
+        idx = assignments(res.clr)
+        cls = [findall(==(i), idx) for i in 1:(res.clr.k)]
+
+        @test ro.seen[1] == prior(fpe_conf, rd_plain).Z
+        @test [size(z) for z in ri.seen] == [(length(cl), length(cl)) for cl in cls]
+        # The reference is the producer viewed the same way the fold views it -- a refit.
+        @test all(ri.seen[i] ==
+                  prior(port_opt_view(fpe_conf, cls[i]), port_opt_view(rd_plain, cls[i])).Z
+                  for i in eachindex(cls))
+        @test isapprox(sum(res.w), 1)
 
         # A literal matrix in the `ze` slot is the other data-carrying shape, and slices on
         # its asset axis only -- `feature_matrix` reports `z_sq = false` for a bare matrix,
@@ -478,18 +486,17 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         ri = RecordingDistance(FeatureDistance())
         cv = MultipleRandomised(IndexWalkForward(80, 40); rng = StableRNG(11), seed = 7,
                                 n_subsets = 2, subset_size = 5)
-        cross_val_predict(HierarchicalRiskParity(;
-                                                 opt = HierarchicalOptimiser(;
-                                                                             pe = fpe_data,
+        mk_hrp(fpe, de) = HierarchicalRiskParity(;
+                                                 opt = HierarchicalOptimiser(; pe = fpe,
                                                                              cle = ClustersEstimator(;
-                                                                                                     de = ri),
+                                                                                                     de = de),
                                                                              slv = slv,
-                                                                             z_src = :prior)),
-                          rd_plain, cv; ex = seq)
+                                                                             z_src = :prior))
+        cross_val_predict(mk_hrp(fpe_conf, ri), rd_plain, cv; ex = seq)
         sp = split(cv, rd_plain)
         @test length(ri.seen) == length(sp.train_idx)
         @test all(size(z) == (cv.subset_size, cv.subset_size) for z in ri.seen)
-        @test all(ri.seen[i] == prior(port_opt_view(fpe_data, sp.asset_idx[i]),
+        @test all(ri.seen[i] == prior(port_opt_view(fpe_conf, sp.asset_idx[i]),
                     port_opt_view(rd_plain, sp.train_idx[i], sp.asset_idx[i])).Z
                   for i in eachindex(sp.train_idx))
     end

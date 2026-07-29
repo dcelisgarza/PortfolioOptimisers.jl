@@ -108,13 +108,14 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SemiDefinitePhylogenyEstimator(;
-        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        pl::NwE_ClE = NetworkEstimator(),
         p::Number = 0.05
     ) -> SemiDefinitePhylogenyEstimator
 
 ## Validation
 
   - `p >= 0`.
+  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`SemiDefinitePhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -157,20 +158,20 @@ SemiDefinitePhylogenyEstimator
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
-    $(field_dict[:pler])
+    $(field_dict[:plsrc])
     """
     pl
     """
     $(field_dict[:p_phylo])
     """
     p
-    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl,
+    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE,
                                             p::Number)::SemiDefinitePhylogenyEstimator
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
                                         p::Number = 0.05)::SemiDefinitePhylogenyEstimator
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
@@ -354,7 +355,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     IntegerPhylogenyEstimator(;
-        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        pl::NwE_ClE = NetworkEstimator(),
         B::Int_VecInt = 1,
         scale::Number = 100_000.0
     ) -> IntegerPhylogenyEstimator
@@ -364,6 +365,8 @@ $(DocStringExtensions.FIELDS)
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
       + `AbstractVector`: It is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
+
+  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`IntegerPhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -407,7 +410,7 @@ IntegerPhylogenyEstimator
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
-    $(field_dict[:pler])
+    $(field_dict[:plsrc])
     """
     pl
     """
@@ -418,7 +421,7 @@ IntegerPhylogenyEstimator
     $(field_dict[:scale_phylo])
     """
     scale
-    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt,
+    function IntegerPhylogenyEstimator(pl::NwE_ClE, B::Int_VecInt,
                                        scale::Number)::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
@@ -427,8 +430,7 @@ IntegerPhylogenyEstimator
         return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   B::Int_VecInt = 1,
+function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_VecInt = 1,
                                    scale::Number = 100_000.0)::IntegerPhylogenyEstimator
     return IntegerPhylogenyEstimator(pl, B, scale)
 end

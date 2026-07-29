@@ -1,6 +1,6 @@
 @testset "Phylogeny tests" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StableRNGs,
-          StatsBase, SparseArrays, LinearAlgebra
+          StatsBase, SparseArrays, LinearAlgebra, Clarabel
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPrior(), rd)
@@ -1148,4 +1148,70 @@
         @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
     =#
+    @testset "Subsetting optimisers reject a precomputed phylogeny" begin
+        #=
+        A meta-optimiser hands its subproblems a subset of the universe, and a phylogeny
+        cannot follow them there. #184 got there through a phylogeny constraint *estimator*
+        holding a precomputed result in `pl` -- configuration on the outside, data one level
+        down, invisible to every check aimed at results.
+
+        That shape is now unconstructible rather than guarded: `pl` is bounded by `NwE_ClE`,
+        which admits only sources, on all three estimators that have the slot. So the checks
+        below assert a *type* error at construction, and the runtime guard is left with one
+        job -- a precomputed constraint result -- which is what it was originally written
+        for, and which no type bound can take over because `ple` legitimately accepts a
+        result outside a meta-optimiser.
+        =#
+        Xp = rd.X
+        plr = phylogeny_matrix(NetworkEstimator(), Xp)
+        clr = clusterise(ClustersEstimator(), Xp)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        mk(ple) = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ple = ple))
+
+        # The root cause: no estimator accepts precomputed structure in `pl` any more.
+        # A `Clusters` is rejected for the same reason as a `PhylogenyResult` -- both answer
+        # for the universe they were built on, and the slot asks how to build for any.
+        # The bound rejects at construction, so there is no runtime check to reach.
+        @test_throws TypeError SemiDefinitePhylogenyEstimator(; pl = plr)
+        @test_throws TypeError SemiDefinitePhylogenyEstimator(; pl = clr)
+        @test_throws TypeError IntegerPhylogenyEstimator(; pl = plr)
+        @test_throws TypeError IntegerPhylogenyEstimator(; pl = clr)
+        @test_throws TypeError CentralityEstimator(; pl = plr)
+        @test_throws TypeError CentralityEstimator(; pl = clr)
+        @test isa(CentralityEstimator(; pl = NetworkEstimator()), CentralityEstimator)
+        # Sources still construct, by keyword and positionally.
+        @test isa(SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator()),
+                  SemiDefinitePhylogenyEstimator)
+        @test isa(SemiDefinitePhylogenyEstimator(ClustersEstimator(), 0.05),
+                  SemiDefinitePhylogenyEstimator)
+        @test isa(IntegerPhylogenyEstimator(; pl = ClustersEstimator()),
+                  IntegerPhylogenyEstimator)
+        #=
+        Known and NOT specific to these two types: `@concrete` emits a fully generic
+        positional constructor (`ConcreteStructs.jl:146`) that is more specific than
+        nothing and shadows the annotated one, so every type bound in the package is
+        bypassable positionally. `PhylogenyFeatures(vector_shaped_result, alg)` does the
+        same thing and predates this. Pinned here so the limit of the guarantee is on the
+        record: the keyword constructor is the enforced API.
+        =#
+        @test isa(SemiDefinitePhylogenyEstimator(plr, 0.05), SemiDefinitePhylogenyEstimator)
+
+        # What the runtime guard is still for: a precomputed constraint *result* in `ple`.
+        # It was already rejected when held directly...
+        plres = phylogeny_constraints(SemiDefinitePhylogenyEstimator(), Xp)
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(mk(plres))
+        @test_throws ArgumentError PortfolioOptimisers.assert_internal_optimiser(mk(plres))
+        # ...but not when held in a vector: the branch meant to catch that was unreachable,
+        # because `||` binds looser than `&&`, so a vector satisfied the first clause and
+        # short-circuited to pass -- in exactly the case the branch was written for.
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(mk([plres]))
+        @test_throws ArgumentError PortfolioOptimisers.assert_internal_optimiser(mk([plres]))
+
+        # An estimator that refits per subproblem is the supported form and still passes.
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk(SemiDefinitePhylogenyEstimator())))
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk(nothing)))
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk([SemiDefinitePhylogenyEstimator()])))
+    end
 end

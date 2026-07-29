@@ -28,7 +28,6 @@ clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
 CentralityEstimator
 phylogeny_matrix
 centrality_vector
-port_opt_view(plr::PhylogenyResult{<:MatNum}, i, args...)
 average_centrality
 asset_phylogeny
 AbstractCentralityAlgorithm
@@ -39,8 +38,7 @@ AbstractCentralityEstimator
 calc_adjacency
 calc_centrality
 Tree_SimMat
-NwE_PlM_ClE_Cl
-NwE_PlM
+NwE_ClE
 NwE_ClE_Cl
 NwE_Pl_ClE_Cl
 HClE_HCl

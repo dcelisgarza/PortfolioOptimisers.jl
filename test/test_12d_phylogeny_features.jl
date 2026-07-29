@@ -1,19 +1,20 @@
 include(joinpath(@__DIR__, "test12_setup.jl"))
 using Clustering, StableRNGs, LinearAlgebra
 
-# A square graph source built once from the fixture universe. `Pex` stands in for an
-# exogenous graph — a supply chain, a shared-ownership network — and is only *derived* here
-# so the two source kinds can be checked against each other on identical input.
+# The two source kinds. Both are *estimators* -- `PhylogenyFeatures` holds no Result -- so
+# both refit from whatever `X` they are handed. `PEX` is `NTE`'s graph materialised once, as
+# the reference the kernels are checked against.
 const NTE = NetworkEstimator(; n = 2)
+const CLE = ClustersEstimator()
 const PEX = Matrix{Float64}(phylogeny_matrix(NTE, rd.X).X)
 const NA = size(rd.X, 2)
 
 @testset "phylogeny_features: the three kernels" begin
     Zb = phylogeny_features(BinaryNeighbourhood(), NTE, rd.X)
     Zg = phylogeny_features(GradedNeighbourhood(), NTE, rd.X)
-    Zp = phylogeny_features(GradedNeighbourhood(), PhylogenyResult(; X = PEX))
+    Zc = phylogeny_features(GradedNeighbourhood(), CLE, rd.X)
 
-    for Z in (Zb, Zg, Zp)
+    for Z in (Zb, Zg, Zc)
         @test isa(Z, Matrix{Float64})       # never Int or BitMatrix: the gemm path needs it
         @test size(Z) == (NA, NA)
         @test issymmetric(Z)
@@ -32,23 +33,14 @@ const NA = size(rd.X, 2)
     # Their supports agree: grading changes the values, not which pairs are within `n` hops.
     @test (Zg .> 0) == (Zb .> 0)
 
-    # A precomputed result is used as given, only the diagonal is set. `PEX` is this graph,
-    # so the exogenous path reproduces the binary one exactly.
-    @test Zp == PEX + I
-    @test Zp == Zb
-    # `alg` is inert on that path.
-    @test phylogeny_features(BinaryNeighbourhood(), PhylogenyResult(; X = PEX)) == Zp
-
-    # Weights survive rather than being binarised.
-    W = [0.0 0.4 0.0; 0.4 0.0 2.5; 0.0 2.5 0.0]
-    Zw = phylogeny_features(GradedNeighbourhood(), PhylogenyResult(; X = W))
-    @test Zw == W + 2.5 * I
-    @test sort(unique(Zw)) == [0.0, 0.4, 2.5]
-
-    # An edgeless matrix falls back to the identity rather than to a degenerate all-zero
-    # feature matrix: with no edges, no two assets share anything.
-    @test phylogeny_features(GradedNeighbourhood(), PhylogenyResult(; X = zeros(4, 4))) ==
-          Matrix(1.0I, 4, 4)
+    # A clustering source is a partition: co-membership with the diagonal restored, so the
+    # matrix is 0/1 and every row is a cluster indicator.
+    @test Zc == Matrix{Float64}(phylogeny_matrix(CLE, rd.X).X) + I
+    @test all(z -> z in (0.0, 1.0), Zc)
+    @test all(isone, diag(Zc))
+    # A partition has no hop structure to decay, so `alg` is inert rather than an error --
+    # the same treatment a static feature matrix gets from `FeatureDistance`'s collapse alg.
+    @test phylogeny_features(BinaryNeighbourhood(), CLE, rd.X) == Zc
 end
 
 @testset "The diagonal picks between two different algorithms" begin
@@ -62,8 +54,9 @@ end
     @test Dopen[1, 2] == 0.5                     # adjacent, yet maximally distant
     @test Dopen[1, 3] < Dopen[1, 2]
 
-    Dclosed = distance(de,
-                       phylogeny_features(BinaryNeighbourhood(), PhylogenyResult(; X = A)))
+    # `+ I` is exactly what every kernel does to the graph it builds; applying it here lets
+    # the diagonal argument be made on a hand-built path rather than a fitted universe.
+    Dclosed = distance(de, A + I)
     @test Dclosed[1, 2] < Dclosed[1, 3]          # monotone in hop count, as promised
     @test Dclosed[1, 2] == Dclosed[2, 3]
     @test all(>(0), Dclosed[i, k] for i in 1:3, k in 1:3 if i != k)
@@ -77,18 +70,19 @@ end
               if k[1] < k[2] < k[3] && all(iszero, A1[collect(k), collect(k)]))
     sub = A1[collect(j), collect(j)]
     @test all(iszero, distance(de, sub))         # every isolated asset "identical"
-    Dsub = distance(de,
-                    phylogeny_features(GradedNeighbourhood(), PhylogenyResult(; X = sub)))
+    Dsub = distance(de, sub + I)
     @test all(iszero, diag(Dsub))
     @test all(==(0.5), Dsub[i, k] for i in 1:3, k in 1:3 if i != k)
 end
 
-@testset "A clustering source is rejected, and why" begin
-    # `pl` is bound by `NwE_PlM`, so a partition never reaches the producer.
-    @test_throws TypeError PhylogenyFeatures(; pl = ClustersEstimator())
+@testset "A clustering source is admitted, and what it costs" begin
+    # `pl` is bound by `NwE_ClE`: both source kinds, both estimators. A precomputed result
+    # of either kind is rejected by the type -- an Estimator does not hold a Result.
+    @test isa(PhylogenyFeatures(; pl = CLE), PhylogenyFeatures)
     @test_throws TypeError PhylogenyFeatures(; pl = clusterise(ClustersEstimator(), rd.X))
+    @test_throws TypeError PhylogenyFeatures(; pl = PhylogenyResult(; X = PEX))
 
-    # The degeneracy that bound is protecting against: `P * transpose(P) - I` has row `i`
+    # The cost of the partition source, which is why a graph is preferred: `P * transpose(P) - I` has row `i`
     # equal to the co-membership indicator of asset `i`, so the distance depends on nothing
     # but cluster size — and a size-two cluster's *within*-cluster distance equals its
     # across-cluster distance, because `- I` leaves each row a lone 1 pointing at the other
@@ -109,19 +103,9 @@ end
     @test isa(GradedNeighbourhood(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
     @test isa(BinaryNeighbourhood(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
 
-    # A non-square precomputed matrix cannot even be wrapped in a `PhylogenyResult`, so the
-    # producer's own squareness check guards the path that can: a square matrix over the
-    # wrong universe.
-    @test_throws DimensionMismatch prior(FeaturePrior(;
-                                                      ze = PhylogenyFeatures(;
-                                                                             pl = PhylogenyResult(;
-                                                                                                  X = PEX[1:5,
-                                                                                                          1:5]))),
-                                         rd)
-
-    for alg in (BinaryNeighbourhood(), GradedNeighbourhood()),
-        pl in (NTE, PhylogenyResult(; X = PEX))
-
+    # Both sources refit, so the universe always matches by construction -- there is no
+    # stored matrix left that could describe a different one.
+    for alg in (BinaryNeighbourhood(), GradedNeighbourhood()), pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
         @test pr.z_sq                            # the only producer that says true
         @test size(pr.Z) == (NA, NA)
@@ -136,7 +120,7 @@ end
 @testset "z_sq = true slices both axes under an asset view" begin
     i = [1, 4, 7, 11, 15]
     de = FeatureDistance()
-    for pl in (NTE, PhylogenyResult(; X = PEX))
+    for pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl)), rd)
         prv = PortfolioOptimisers.port_opt_view(pr, i)
         @test size(prv.Z) == (length(i), length(i))
@@ -160,39 +144,26 @@ end
           distance(de, prf.Z)[i, i]
 end
 
-@testset "A producer embedding data is sliced, not passed through" begin
-    # `feature_estimator_view` delegates to `port_opt_view`, so a producer holding a
-    # precomputed matrix indexed by the full universe slices it. Returning the estimator
-    # unchanged would leave a full-universe matrix in a subproblem.
+@testset "Every producer is configuration, so a view passes it through" begin
+    # No producer embeds data any more: `PhylogenyFeatures` holds an estimator, so a view has
+    # nothing to slice and the source refits on the viewed returns instead. That is what
+    # makes `feature_estimator_view`'s delegation to `port_opt_view` a no-op for every
+    # producer in the family.
     i = [2, 5, 9, 13]
-    pe = FeaturePrior(; ze = PhylogenyFeatures(; pl = PhylogenyResult(; X = PEX)))
-    pev = PortfolioOptimisers.port_opt_view(pe, i)
-    @test size(pev.ze.pl.X) == (length(i), length(i))
-    @test pev.ze.pl.X == PEX[i, i]
-    @test pev.ze.alg == pe.ze.alg
-
-    rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
-    @test prior(pev, rdv).Z == prior(pe, rd).Z[i, i]
-
-    # A network source is configuration and refits on the viewed returns instead.
-    pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
-    @test PortfolioOptimisers.port_opt_view(pen, i).ze.pl === NTE
-    # A producer with nothing to slice is still passed through unchanged.
+    for pl in (NTE, CLE)
+        pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = pl))
+        @test PortfolioOptimisers.port_opt_view(pen, i).ze.pl === pl
+    end
     @test PortfolioOptimisers.port_opt_view(FeaturePrior(; ze = RegressionFeatures()), i).ze ==
           RegressionFeatures()
-end
 
-@testset "port_opt_view on a PhylogenyResult" begin
-    # Previously a `MethodError`: the universal fallback reaches `nothing_scalar_array_view`,
-    # which has no method for a result type.
-    i = [1, 3, 6]
-    plr = PortfolioOptimisers.port_opt_view(PhylogenyResult(; X = PEX), i)
-    @test isa(plr, PhylogenyResult)
-    @test plr.X == PEX[i, i]
-    @test issymmetric(plr.X) && all(iszero, diag(plr.X))
-
-    v = PortfolioOptimisers.port_opt_view(PhylogenyResult(; X = collect(1.0:10.0)), i)
-    @test v.X == [1.0, 3.0, 6.0]
+    # The viewed producer refits on the viewed universe, which is the whole point: the
+    # feature matrix a subproblem sees describes the subproblem's assets.
+    rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
+    pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
+    Zv = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    @test size(Zv) == (length(i), length(i))
+    @test Zv == phylogeny_features(GradedNeighbourhood(), NTE, rd.X[:, i])
 end
 
 @testset "A square feature matrix drives an optimisation end to end" begin
@@ -205,17 +176,18 @@ end
                                                                 z_src = :prior))
     wb = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = BinaryNeighbourhood())), rd).w
     wg = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = GradedNeighbourhood())), rd).w
-    we = optimise(mk(PhylogenyFeatures(; pl = PhylogenyResult(; X = PEX))), rd).w
+    wc = optimise(mk(PhylogenyFeatures(; pl = CLE)), rd).w
 
-    for w in (wb, wg, we)
+    for w in (wb, wg, wc)
         @test length(w) == NA
         @test sum(w) ≈ 1
         @test all(isfinite, w)
     end
     # Graded is not binary in disguise: the retained step count changes the hierarchy.
     @test wb != wg
-    # `PEX` is this network's own phylogeny matrix, so the exogenous path reproduces it.
-    @test we ≈ wb
+    # A partition is a different structure again, not a relabelling of either graph variant.
+    @test wc != wb
+    @test wc != wg
 
     # How far neighbourhood overlap departs from the returns correlation depends on which
     # source it came from, and the two cases are genuinely different.
@@ -233,17 +205,14 @@ end
     @test Clustering.cutree(hf; k = 3) == Clustering.cutree(hc; k = 3)
     @test Clustering.cutree(hf; k = 4) != Clustering.cutree(hc; k = 4)
 
-    # Exogenous: a graph that never passed through the returns. Two disjoint cliques over an
-    # asset ordering unrelated to any correlation structure, which is the case the whole
-    # `PhylogenyResult` path exists for. It disagrees with the correlation at every cut.
-    grp = [isodd(k) for k in 1:NA]
-    Pxo = Float64[(i != k && grp[i] == grp[k]) for i in 1:NA, k in 1:NA]
-    prx = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = PhylogenyResult(; X = Pxo))),
-                rd)
-    hx = Clustering.hclust(distance(FeatureDistance(), prx.Z); linkage = :ward)
-    @test Clustering.cutree(hx; k = 2) != Clustering.cutree(hc; k = 2)
-    @test Clustering.cutree(hx; k = 2) == (grp .+ 1) ||
-          Clustering.cutree(hx; k = 2) == (2 .- grp)
+    # Both sources are now endogenous -- every `z_sq = true` producer refits from the
+    # returns, so there is no exogenous square route left in the family. A partition source
+    # is endogenous too, and coarser: it recodes a clustering of the same returns, so it
+    # agrees with the correlation hierarchy at the cut that defined it.
+    prc = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = CLE)), rd)
+    hxc = Clustering.hclust(distance(FeatureDistance(), prc.Z); linkage = :ward)
+    @test size(prc.Z) == (NA, NA)
+    @test length(unique(prc.Z)) == 2
 end
 
 @testset "The recursion hazard fails loudly rather than looping" begin

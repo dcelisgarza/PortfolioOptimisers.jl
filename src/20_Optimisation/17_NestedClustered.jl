@@ -163,9 +163,9 @@ function assert_rc_pl(::Any)::Nothing
     return nothing
 end
 function assert_rc_pl(opt::FactorRiskContribution)::Nothing
-    @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) ||
-              isa(opt.frc_ple, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple),
+    @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) &&
+              !(isa(opt.frc_ple, AbstractVector) &&
+                any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple)),
               ArgumentError("opt.frc_ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO outer optimiser; use an estimator instead"))
     return nothing
 end
@@ -186,9 +186,9 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
                 isa(opt.opt.sgcarde, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)),
               ArgumentError("opt.opt.sgcarde cannot be a LinearConstraint in NCO inner optimiser"))
-    @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) ||
-              isa(opt.opt.ple, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple),
+    @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) &&
+              !(isa(opt.opt.ple, AbstractVector) &&
+                any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple)),
               ArgumentError("opt.opt.ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO inner optimiser; use an estimator instead"))
     return nothing
 end
