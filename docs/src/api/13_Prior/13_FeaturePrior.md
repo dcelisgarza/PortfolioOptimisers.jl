@@ -11,6 +11,7 @@ BinaryNeighbourhood
 GradedNeighbourhood
 phylogeny_features
 PhylogenyFeatures
+AssetSetsFeatures
 FeaturePrior
 PortfolioOptimisers.feature_estimator_view
 port_opt_view(pe::FeaturePrior, i, args...)

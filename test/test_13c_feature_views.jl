@@ -341,7 +341,6 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # rectangular factor loadings.
         @test size(rd_sq.Z) == (N, N)
         @test size(pr_z.Z) == (N, K)
-        @test !pr_z.z_sq
 
         function run_nco(z_src)
             ri, ro = RecordingDistance(FeatureDistance()),
@@ -379,17 +378,13 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test all(ri_p.seen[i] == prior(fpe, port_opt_view(rd_sq, cls_p[i])).Z
                   for i in eachindex(cls_p))
 
-        # A `LowOrderPrior` view slices its own carrier on the asset axis, and on the
-        # feature axis only when `z_sq` says the feature axis IS the asset axis.
+        # A `LowOrderPrior` view slices its own carrier on the asset axis and never on the
+        # feature axis -- a square derived `Z` included, since the producer that built it
+        # refits rather than being cut down.
         i = [1, 3, 5]
         @test port_opt_view(pr_z, i).Z == pr_z.Z[i, :]
-        pr_sq = LowOrderPrior(; X = pr_z.X, mu = pr_z.mu, sigma = pr_z.sigma, Z = Zsq,
-                              z_sq = true)
-        @test port_opt_view(pr_sq, i).Z == Zsq[i, i]
-        # A lying flag is a construction error, not a `BoundsError` inside a fold.
-        @test_throws DimensionMismatch LowOrderPrior(; X = pr_z.X, mu = pr_z.mu,
-                                                     sigma = pr_z.sigma, Z = pr_z.Z,
-                                                     z_sq = true)
+        pr_sq = LowOrderPrior(; X = pr_z.X, mu = pr_z.mu, sigma = pr_z.sigma, Z = Zsq)
+        @test port_opt_view(pr_sq, i).Z == Zsq[i, :]
     end
 
     @testset "A square feature producer refits inside a real fold" begin
@@ -446,8 +441,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test isapprox(sum(res.w), 1)
 
         # A literal matrix in the `ze` slot is the other data-carrying shape, and slices on
-        # its asset axis only -- `feature_matrix` reports `z_sq = false` for a bare matrix,
-        # so its columns are features and stay whole.
+        # its asset axis only: its columns are features and stay whole.
         Zlit = abs.(randn(StableRNG(2468), N, 4))
         fpe_lit = FeaturePrior(; ze = Zlit)
         rl = RecordingDistance(FeatureDistance())

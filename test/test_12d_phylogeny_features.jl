@@ -95,7 +95,7 @@ end
     @test D[4, 5] == maximum(D)
 end
 
-@testset "PhylogenyFeatures constructs, validates and is the only z_sq = true producer" begin
+@testset "PhylogenyFeatures constructs, validates and produces a square matrix" begin
     ze = PhylogenyFeatures()
     @test isa(ze, PortfolioOptimisers.AbstractFeatureMatrixEstimator)
     @test isa(ze.pl, NetworkEstimator)
@@ -107,39 +107,46 @@ end
     # stored matrix left that could describe a different one.
     for alg in (BinaryNeighbourhood(), GradedNeighbourhood()), pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
-        @test pr.z_sq                            # the only producer that says true
-        @test size(pr.Z) == (NA, NA)
+        @test size(pr.Z) == (NA, NA)              # the only producer whose axes coincide
         @test pr.Z == phylogeny_features(alg, pl, rd.X)
     end
 
-    # `RegressionFeatures` and a literal still say false, so `z_sq` is a real statement.
-    @test !prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd).z_sq
-    @test !prior(FeaturePrior(; ze = rand(StableRNG(987654321), NA, 3)), rd).z_sq
+    # Squareness is a property of the matrix, not a claim on the carrier: the other producers
+    # are rectangular and the carrier says nothing about either case.
+    @test size(prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd).Z,
+               2) != NA
+    @test size(prior(FeaturePrior(; ze = rand(StableRNG(987654321), NA, 3)), rd).Z) ==
+          (NA, 3)
 end
 
-@testset "z_sq = true slices both axes under an asset view" begin
+@testset "A subproblem measures its own neighbourhood, by refitting" begin
     i = [1, 4, 7, 11, 15]
     de = FeatureDistance()
+
+    # The carrier slices the asset axis only, square matrix or not: a derived `Z` carries no
+    # squareness flag, because there is nothing here a producer could not recompute.
     for pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl)), rd)
         prv = PortfolioOptimisers.port_opt_view(pr, i)
-        @test size(prv.Z) == (length(i), length(i))
-        @test prv.Z == pr.Z[i, i]
-        @test prv.z_sq
+        @test size(prv.Z) == (length(i), NA)
+        @test prv.Z == pr.Z[i, :]
     end
 
-    # `distance` does **not** commute with the view here, and that is the whole meaning of
-    # `z_sq = true`. Slicing the feature axis truncates every row's feature vector, so a
-    # subproblem is measured on its own neighbourhood structure — "related to asset k, for k
-    # in this subproblem" — rather than on the full universe's.
-    prs = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE)), rd)
-    @test distance(de, PortfolioOptimisers.port_opt_view(prs, i).Z) !=
-          distance(de, prs.Z)[i, i]
+    # The semantics survive the flag, reached by the better route. A subproblem is measured
+    # on its own neighbourhood structure — "related to asset k, for k in this subproblem" —
+    # because the producer **refits** on the subproblem's universe rather than having a
+    # matrix describing a larger one cut down. `distance` therefore still does not commute
+    # with the subselection, which was the whole content of the deleted flag.
+    pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
+    prs = prior(pen, rd)
+    rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i])
+    Zr = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
+    @test size(Zr) == (length(i), length(i))
+    @test distance(de, Zr) != distance(de, prs.Z)[i, i]
 
-    # A `z_sq = false` carrier is the contrast: its view slices rows only, every row's
-    # feature vector survives intact, and the distance therefore does commute.
+    # A rectangular producer is the contrast: its feature axis is not the asset axis, so a
+    # view keeps every row's feature vector intact and the distance does commute.
     prf = prior(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()), rd)
-    @test !prf.z_sq
     @test distance(de, PortfolioOptimisers.port_opt_view(prf, i).Z) ==
           distance(de, prf.Z)[i, i]
 end
@@ -205,7 +212,7 @@ end
     @test Clustering.cutree(hf; k = 3) == Clustering.cutree(hc; k = 3)
     @test Clustering.cutree(hf; k = 4) != Clustering.cutree(hc; k = 4)
 
-    # Both sources are now endogenous -- every `z_sq = true` producer refits from the
+    # Both sources are now endogenous -- every square-producing source refits from the
     # returns, so there is no exogenous square route left in the family. A partition source
     # is endogenous too, and coarser: it recodes a clustering of the same returns, so it
     # agrees with the correlation hierarchy at the cut that defined it.

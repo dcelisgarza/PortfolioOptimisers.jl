@@ -207,6 +207,177 @@ function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a list of taxonomy keys can produce a graded feature matrix.
+
+Shared by [`asset_sets_features`](@ref) and [`AssetSetsFeatures`](@ref), so the estimator rejects a bad key list at construction and the bare entry point rejects it at the call, from one encoding of the rule.
+
+# Two keys is a floor, not a style preference
+
+Every `Distances.jl` semimetric is invariant to permuting coordinates, so a **one-hot** feature matrix — which is what a single partition gives — can only distinguish "same group" from "different group": the distance takes at most two values for *every* metric, and clustering it recovers the partition it was built from. Grading relatedness needs at least two partitions to agree or disagree about.
+
+Duplicate keys are refused rather than deduplicated: repeating a key doubles its block, silently reweighting that partition against the others.
+
+# Arguments
+
+  - `vals`: Group name keys to stack into the feature axis.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - `length(vals) >= 2`.
+  - `allunique(vals)`.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`AssetSetsFeatures`](@ref)
+"""
+function assert_feature_keys(vals::AbstractVector{<:AbstractString})::Nothing
+    @argcheck(length(vals) >= 2,
+              ArgumentError("`vals` must name at least two keys, because a single partition is one-hot and its distance matrix is two-valued for every metric. Got\nlength(vals) => $(length(vals))\nvals => $vals"))
+    @argcheck(allunique(vals),
+              ArgumentError("`vals` must not repeat a key, because a repeated key doubles its block and silently reweights that partition. Got\nvals => $vals"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Stack taxonomy memberships into an `assets × features` feature matrix.
+
+`asset_sets_features` concatenates one [`asset_sets_matrix`](@ref) block per key in `vals`, transposed to assets-major, into the exogenous feature matrix [`FeatureDistance`](@ref) consumes. Feature `k` reads "belongs to group `k`", so two assets are close when they are classified together across many taxonomies.
+
+This is the **exogenous** feature source: a sector, industry or country classification is structure that return correlations do not contain, which is exactly what a feature distance exists to bring in. Every other producer in the library derives `Z` from the returns.
+
+# Arguments
+
+  - `vals`: Group name keys in `sets.dict`, at least two (see [`assert_feature_keys`](@ref)).
+  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+
+# Returns
+
+  - `Z::Matrix{Float64}`: An `assets × features` matrix, `Z[i, k] == 1` when asset `i` belongs to group `k`. The feature count is the total number of distinct group values across every key.
+
+# Nested versus crossed taxonomies
+
+The reading depends on how the keys relate, and both are useful:
+
+  - **Nested** (sector ⊃ industry ⊃ sub-industry): two assets share a level only if they share every coarser one, so the cosine similarity `shared / L` *counts the classification levels they agree on* — a depth-graded relatedness.
+  - **Crossed** (sector + country): the keys are independent, so the same count reads as how many independent attributes two assets happen to share.
+
+# The row norms are equal, exactly
+
+`asset_sets_matrix` builds its groups from `unique(all_sets)`, so **every key is a partition**: each asset lands in exactly one group per key, giving every row exactly `L = length(vals)` ones. All rows therefore have norm `sqrt(L)` and
+
+```
+cos(i, j) = shared(i, j) / L ∈ [0, 1]
+```
+
+exactly, with no standardisation needed — the only producer with that property.
+
+# `Float64`, not `BitMatrix`
+
+The result is dense `Float64` rather than the `BitMatrix` [`asset_sets_matrix`](@ref) returns, so [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+
+# Views
+
+An asset view of an `AssetSets` slices the groups prefixed by `sets.key` and leaves the rest alone, so a key named for a view to reach must carry that prefix — `\"nx_sector\"`, not `\"sector\"`. An unprefixed key does not fail silently: [`asset_sets_matrix`](@ref)'s length check throws on the next call, because the sliced universe no longer matches the unsliced group.
+
+# Validation
+
+  - `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)).
+  - Each key exists in `sets.dict` and has the length of the asset universe (enforced by [`asset_sets_matrix`](@ref)).
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; key = \"nx\",
+                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
+                                    \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
+
+julia> Z = asset_sets_features([\"nx_sector\", \"nx_country\"], sets)
+3×4 Matrix{Float64}:
+ 1.0  0.0  1.0  0.0
+ 1.0  0.0  0.0  1.0
+ 0.0  1.0  0.0  1.0
+```
+
+# Feeding the user-supplied carrier
+
+[`ReturnsResult`](@ref) requires `nz` whenever `Z` is set. Take it from [`asset_sets_feature_names`](@ref) rather than rebuilding the column order by hand:
+
+```julia
+ReturnsResult(; nx = nx, X = X, nz = asset_sets_feature_names(vals, sets),
+              Z = asset_sets_features(vals, sets))
+```
+
+# Related
+
+  - [`AssetSets`](@ref)
+  - [`asset_sets_matrix`](@ref)
+  - [`asset_sets_feature_names`](@ref)
+  - [`assert_feature_keys`](@ref)
+  - [`AssetSetsFeatures`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function asset_sets_features(vals::AbstractVector{<:AbstractString},
+                             sets::AssetSets)::Matrix{Float64}
+    assert_feature_keys(vals)
+    return Float64.(reduce(hcat, (transpose(asset_sets_matrix(v, sets)) for v in vals)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Name the columns [`asset_sets_features`](@ref) produces, in their own order.
+
+[`ReturnsResult`](@ref) requires `nz` whenever `Z` is set, so the user-supplied carrier needs these names — and reproducing the column order by hand is exactly the kind of restatement that drifts. The pair is built from one traversal of `vals`, so the two can only agree.
+
+# Names are qualified by their key
+
+Each name is `\"<key>=<group>\"` rather than the bare group value, because a **nested** taxonomy reuses its values across levels: an integrated-oil producer is in industry `IntegratedOil` and sub-industry `IntegratedOil`, so bare values would collide and [`ReturnsResult`](@ref)'s uniqueness check would reject them.
+
+# Arguments
+
+  - `vals`: The same group name keys, in the same order, passed to [`asset_sets_features`](@ref).
+  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+
+# Returns
+
+  - `nz::Vector{String}`: One name per feature column, `length(nz) == size(Z, 2)`.
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; key = \"nx\",
+                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
+                                    \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
+
+julia> asset_sets_feature_names([\"nx_sector\", \"nx_country\"], sets)
+4-element Vector{String}:
+ "nx_sector=Tech"
+ "nx_sector=Finance"
+ "nx_country=US"
+ "nx_country=UK"
+```
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`AssetSets`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function asset_sets_feature_names(vals::AbstractVector{<:AbstractString},
+                                  sets::AssetSets)::Vector{String}
+    assert_feature_keys(vals)
+    return [string(v, "=", g) for v in vals for g in unique(sets.dict[v])]
+end
+"""
     port_opt_view(smtx, i; kwargs...)
 
 Get a column view or subset of an asset sets membership matrix for asset index `i`.
@@ -239,4 +410,5 @@ function port_opt_view(smtx::VecMatNum_ASetMatE, i, args...; kwargs...)
     return val
 end
 
-export AssetSetsMatrixEstimator, asset_sets_matrix
+export AssetSetsMatrixEstimator, asset_sets_matrix, asset_sets_features,
+       asset_sets_feature_names

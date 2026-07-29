@@ -2398,12 +2398,12 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z, z_sq) = pr
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
                          kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z, z_sq = z_sq)
+                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z)
 end
 """
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -2531,12 +2531,12 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z, z_sq) = pr
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
                          kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z, z_sq = z_sq)
+                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z)
 end
 
 export RhoParsingResult, LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior,

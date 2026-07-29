@@ -180,7 +180,6 @@ const arg_dict = Dict(
                       :X_Xv => "`X`: Data matrix or vector.",#
                       :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
                       :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from an `AssetSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
-                      :z_sq => "`z_sq`: Whether the feature axis of `Z` *is* the asset axis, as it is for a square adjacency matrix reused as features. Stated by the producer that built `Z`, because a prior result carries no feature names to compare against. When `true`, an asset view slices the feature axis too.",#
                       :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
                       :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, where `alg` selects the hop decay) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                       :plfalg => "`alg`: Phylogeny feature algorithm: the decay turning hop counts into feature values. Inert for a precomputed phylogeny result, which is used as given.",#
@@ -600,6 +599,7 @@ const arg_dict = Dict(
                       :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
                       :lce_val => "`val`: Constraint equation(s) to parse.",#
                       :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
+                      :asets_vals => "`vals`: Group name keys whose partitions are stacked into the feature axis, at least two. One partition alone is one-hot, which makes the distance two-valued for every metric.",#
                       :thr_val => "`val`: Asset-specific threshold value(s).",#
                       :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
                       # Entropy pooling.

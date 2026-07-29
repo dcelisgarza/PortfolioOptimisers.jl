@@ -134,7 +134,6 @@ The three methods dispatch on the shape rather than branching on `ndims`.
 
   - [`check_names_and_feature_matrix`](@ref)
   - [`check_feature_names`](@ref)
-  - [`assert_square_feature_axis`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`MatNum_Arr3Num`](@ref)
   - [`Sym_Str`](@ref)
@@ -165,50 +164,6 @@ function check_feature_matrix(Z::Arr3Num, na::Option{<:Integer}, nobs::Option{<:
               DimensionMismatch("a time-varying feature matrix (Z) is observations × assets × features, so its leading axis must be the observations, got size(Z, 1) = $(size(Z, 1)) and $nobs observations"))
     @argcheck(size(Z, 2) == na,
               DimensionMismatch("a time-varying feature matrix (Z) is observations × assets × features, so its second axis must be the assets, got size(Z, 2) = $(size(Z, 2)) and $na_sym = $na. If the trailing axes are features × assets, permute them: the carried feature matrix is always assets-major, because port_opt_view has no `dims` keyword to declare an orientation with."))
-    return nothing
-end
-"""
-    assert_square_feature_axis(Z::Nothing, sq::Bool)
-    assert_square_feature_axis(Z::MatNum, sq::Bool)
-    assert_square_feature_axis(Z::Arr3Num, sq::Bool)
-
-Assert that a feature matrix declared square really is square on its feature axis.
-
-The one check a nameless carrier cannot get for free. On [`ReturnsResult`](@ref) squareness is *derived* — [`features_are_assets`](@ref) compares `nz` with `nx`, so the axes cannot disagree. On [`LowOrderPrior`](@ref) it is *stated* by whichever producer built `Z`, and a `z_sq` that lies is silent: [`feature_matrix_view`](@ref) does `view(Z, j, j)` on a rectangular matrix and surfaces as a `BoundsError` deep inside a cluster fold rather than at construction.
-
-A `false` flag asserts nothing — a non-square feature axis is the ordinary case.
-
-# Arguments
-
-  - `Z`: Feature matrix.
-  - `sq`: Whether the feature axis is claimed to be the asset axis.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`check_feature_matrix`](@ref)
-  - [`features_are_assets`](@ref)
-  - [`feature_matrix_view`](@ref)
-  - [`LowOrderPrior`](@ref)
-"""
-function assert_square_feature_axis(::Nothing, ::Bool)::Nothing
-    return nothing
-end
-function assert_square_feature_axis(Z::MatNum, sq::Bool)::Nothing
-    if sq
-        @argcheck(size(Z, 1) == size(Z, 2),
-                  DimensionMismatch("z_sq = true declares the feature axis to be the asset axis, so a static feature matrix (Z) must be square, got size(Z) = $(size(Z))"))
-    end
-    return nothing
-end
-function assert_square_feature_axis(Z::Arr3Num, sq::Bool)::Nothing
-    if sq
-        @argcheck(size(Z, 2) == size(Z, 3),
-                  DimensionMismatch("z_sq = true declares the feature axis to be the asset axis, so a time-varying feature matrix (Z) must be square on its two trailing axes, got size(Z) = $(size(Z))"))
-    end
     return nothing
 end
 """

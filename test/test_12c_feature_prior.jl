@@ -31,10 +31,8 @@ end
         wrapped = prior(FeaturePrior(; pe = pe, ze = Zlit), rd)
         @test same_moments(base, wrapped)
         @test wrapped.Z == Zlit
-        @test wrapped.z_sq == false
         # The wrapped estimator itself never grows a feature matrix.
         @test isnothing(base.Z)
-        @test base.z_sq == false
     end
 end
 
@@ -45,7 +43,6 @@ end
     # `rr.L` falls back to `rr.M` when unset, so the producer needs no branch.
     @test pr.Z == fp.rr.L
     @test size(pr.Z, 1) == size(rd.X, 2)
-    @test pr.z_sq == false
 
     # `L` proper, not the reconstructed `M`: a dimension-reduction regression sets both, and
     # they are different matrices.
@@ -87,7 +84,6 @@ end
                                                         ze = Zlit), sets = sets,
                                       views = views), rd)
     @test outer.Z == inner.Z == Zlit
-    @test outer.z_sq == inner.z_sq == false
     @test same_moments(outer, inner)
 
     # The outermost declaration wins rather than merging.
@@ -97,7 +93,7 @@ end
     @test nested.Z == Zother
 end
 
-@testset "Every wrapping prior forwards Z and z_sq" begin
+@testset "Every wrapping prior forwards Z" begin
     na = size(rd.X, 2)
     rng = StableRNG(246813579)
     Zlit = rand(rng, na, 3)
@@ -139,7 +135,6 @@ end
     # `HighOrderPrior` needs no edits at all — it forwards any property of its child.
     hop = prior(HighOrderPriorEstimator(; pe = fpe), rd)
     @test hop.Z == Zlit
-    @test hop.z_sq == false
 end
 
 @testset "port_opt_view slices the feature matrix" begin
@@ -149,15 +144,18 @@ end
     i = [1, 4, 7, 11]
     base = prior(EmpiricalPrior(), rd)
 
-    for (Z, sq, expected) in ((rand(rng, na, 4), false, (idx, Z) -> Z[idx, :]),
-                              (rand(rng, na, na), true, (idx, Z) -> Z[idx, idx]),
-                              (rand(rng, nobs, na, 4), false, (idx, Z) -> Z[:, idx, :]),
-                              (rand(rng, nobs, na, na), true, (idx, Z) -> Z[:, idx, idx]))
+    # The asset axis is sliced and the feature axis never is, whatever the shape -- a square
+    # derived `Z` included. The prior carrier has no squareness vocabulary: every producer
+    # that builds a square feature matrix refits on the subproblem's own universe, so there
+    # is no full-universe square matrix here to cut down.
+    for (Z, expected) in ((rand(rng, na, 4), (idx, Z) -> Z[idx, :]),
+                          (rand(rng, na, na), (idx, Z) -> Z[idx, :]),
+                          (rand(rng, nobs, na, 4), (idx, Z) -> Z[:, idx, :]),
+                          (rand(rng, nobs, na, na), (idx, Z) -> Z[:, idx, :]))
         pr = PortfolioOptimisers.LowOrderPrior(; X = base.X, mu = base.mu,
-                                               sigma = base.sigma, Z = Z, z_sq = sq)
+                                               sigma = base.sigma, Z = Z)
         v = PortfolioOptimisers.port_opt_view(pr, i)
         @test v.Z == expected(i, Z)
-        @test v.z_sq == sq
         # Observations are taken whole: folds slice them before the prior is fit.
         @test size(v.Z, 1) == (ndims(Z) == 3 ? nobs : length(i))
         # Repeated views compose.
@@ -199,12 +197,12 @@ end
     lop(; kwargs...) = PortfolioOptimisers.LowOrderPrior(; X = base.X, mu = base.mu,
                                                          sigma = base.sigma, kwargs...)
 
-    # `z_sq = true` must imply a square feature axis, or `view(Z, j, j)` blows up deep
-    # inside a cluster fold instead of here.
-    @test_throws DimensionMismatch lop(; Z = rand(rng, na, na - 1), z_sq = true)
-    @test_throws DimensionMismatch lop(; Z = rand(rng, nobs, na, na - 1), z_sq = true)
-    @test lop(; Z = rand(rng, na, na), z_sq = true).z_sq
-    @test lop(; Z = rand(rng, nobs, na, na), z_sq = true).z_sq
+    # The carrier has no squareness flag, and the break is loud rather than silently
+    # absorbed: there is no `kwargs...` on the keyword constructor to swallow it.
+    @test_throws MethodError lop(; Z = rand(rng, na, na), z_sq = true)
+    # A square derived `Z` is an ordinary matrix here -- nothing to declare, nothing to check.
+    @test size(lop(; Z = rand(rng, na, na)).Z) == (na, na)
+    @test size(lop(; Z = rand(rng, nobs, na, na)).Z) == (nobs, na, na)
 
     # Assets-major, bound to `X`.
     @test_throws DimensionMismatch lop(; Z = rand(rng, 4, na))
@@ -224,7 +222,6 @@ end
 
     # No `Z` is the default, and it is not an error.
     @test isnothing(lop().Z)
-    @test lop().z_sq == false
 
     # A literal `ze` is checked for emptiness at construction.
     @test_throws PortfolioOptimisers.IsEmptyError FeaturePrior(; pe = EmpiricalPrior(),

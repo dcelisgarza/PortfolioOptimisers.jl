@@ -11,7 +11,6 @@ check_names_and_returns_matrix
 check_feature_names
 check_feature_matrix
 check_names_and_feature_matrix
-assert_square_feature_axis
 features_are_assets
 feature_matrix_view
 feature_row_indices

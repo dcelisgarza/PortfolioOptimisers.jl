@@ -387,14 +387,18 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
     A feature prior attaches an `assets × features` matrix to the prior it wraps, without touching a single moment, so any prior becomes a source for [`FeatureDistance`](@ref). The matrix comes from a feature matrix estimator.
 
-    - Compute the derived feature matrix and its squareness flag. [`feature_matrix`](@ref) and [`AbstractFeatureMatrixEstimator`](@ref)
+    - Compute the derived feature matrix. [`feature_matrix`](@ref) and [`AbstractFeatureMatrixEstimator`](@ref)
     - Feature matrix producer that reads the regression loadings off the wrapped prior result. [`RegressionFeatures`](@ref)
     - ::: details Feature matrix producer reusing a square phylogeny or adjacency matrix as a feature source. [`PhylogenyFeatures`](@ref) and [`phylogeny_features`](@ref)
 
-      Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer that sets `z_sq = true`, and via a precomputed [`PhylogenyResult`](@ref) the only route by which user-supplied exogenous square structure reaches a distance.
+      Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer whose feature axis *is* the asset axis; its source is always an estimator, so every fold and subproblem refits the graph on its own universe. Exogenous square structure travels on [`ReturnsResult`](@ref) instead.
 
       - Phylogeny feature algorithm giving each asset its `n`-hop neighbourhood indicator. [`BinaryNeighbourhood`](@ref)
       - Phylogeny feature algorithm grading each asset's neighbourhood by hop count. [`GradedNeighbourhood`](@ref)
+    - ::: details Feature matrix producer reading exogenous taxonomy memberships off an [`AssetSets`](@ref). [`AssetSetsFeatures`](@ref), [`asset_sets_features`](@ref), and [`asset_sets_feature_names`](@ref)
+
+      Stacks taxonomy memberships -- sector, industry, country -- from an [`AssetSets`](@ref) into the feature axis. The only *exogenous* rectangular source: a classification is structure return correlations do not contain, which is what a feature distance exists to bring in. Because every key is a partition, the rows have equal norms and the cosine similarity is exactly the fraction of classification levels two assets agree on. [`asset_sets_features`](@ref) is also public on its own, for building the matrix straight onto a [`ReturnsResult`](@ref).
+
 - ::: details Container type for high order prior results. [`HighOrderPrior`](@ref)
   - High order prior estimator for asset returns. [`HighOrderPriorEstimator`](@ref)
   - Represents the High Order Factor Prior Estimator. [`HighOrderFactorPriorEstimator`](@ref)

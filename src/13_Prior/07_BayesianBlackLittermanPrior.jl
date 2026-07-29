@@ -286,8 +286,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     # `prior_result` is fit on the assets, so its feature matrix is over this asset axis and
     # is forwarded (see [`LowOrderPrior`](@ref)); `posterior_X` is `prior_result.X` unchanged.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, Z = prior_result.Z,
-                         z_sq = prior_result.z_sq)
+                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, Z = prior_result.Z)
 end
 
 export BayesianBlackLittermanPrior

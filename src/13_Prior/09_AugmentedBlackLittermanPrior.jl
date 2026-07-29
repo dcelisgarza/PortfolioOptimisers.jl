@@ -409,7 +409,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # but was derived from the pre-reconstruction returns (see [`LowOrderPrior`](@ref)).
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          rr = rr, f_mu = f_prior_mu, f_sigma = f_prior_sigma,
-                         f_w = f_prior.w, Z = a_prior.Z, z_sq = a_prior.z_sq)
+                         f_w = f_prior.w, Z = a_prior.Z)
 end
 
 export AugmentedBlackLittermanPrior

@@ -108,13 +108,16 @@ axes mean the same thing — the feature axis *is* the asset axis, and an asset 
 `view(Z, j, j)`, or `view(Z, i, j, j)` in three dimensions. Without this, a square adjacency survives
 an `NestedClustered` cluster with its column axis still pointing at the full universe.
 
-The prior carrier cannot make that comparison — it holds no names at all (decision 6) — so it carries
-an explicit `z_sq::Bool` stated by whoever built the matrix, validated to actually be square.
+The prior carrier cannot make that comparison — it holds no names at all (decision 6) — so it carried
+an explicit `z_sq::Bool` stated by whoever built the matrix, validated to actually be square. **That
+flag has since been deleted** and this decision now applies to the data carrier alone; see the
+amendment at the end.
 
 This is the one carrier shape where **`distance` does not commute with an asset view**. Slicing the
 feature axis truncates every row's feature vector, so a subproblem is measured against its own
 neighbourhood structure rather than against the whole universe. That is the intended reading, and it
-is a real semantic difference from the rectangular case, which does commute.
+is a real semantic difference from the rectangular case, which does commute. On the prior carrier the
+same reading survives the flag's deletion by a different mechanism — a refit rather than a slice.
 
 ### 5. An open metric family, and a similarity counterpart derived from the distance
 
@@ -179,7 +182,8 @@ The two selectors' **defaults differ deliberately**, which is the argument for n
 than flagging them: `x_src = :prior` because the prior is what the optimisation is defined on, and
 `z_src = :data` because between two real sources, one of them hand-typed, explicit outranks derived.
 
-The prior carrier is `Z` plus `z_sq::Bool` and **no `nz`**. A prior result has never carried names —
+The prior carrier is `Z` and **no `nz`** — originally `Z` plus a `z_sq::Bool`, now the matrix alone
+(see the amendment). A prior result has never carried names —
 asset names for `X` live on the `ReturnsResult` or an `AssetSets` — and a producer runs inside
 `prior(pe, X, F; …)` where no names exist to record.
 
@@ -229,12 +233,12 @@ the wrapping `FeaturePrior`, which attaches its output to the prior it wraps.
    branch. Exposed as an explicit producer rather than populated directly, which keeps `pr.Z` from
    becoming a second live spelling of `pr.rr.L`.
 3. **`AssetSetsFeatures`** — exogenous taxonomy memberships, built from the `AssetSets` machinery
-   already behind group constraints. Rectangular, `z_sq = false`.
+   already behind group constraints. Rectangular: its feature axis indexes groups, never assets.
 4. **`PhylogenyFeatures`** — a square neighbourhood matrix from a network estimator (a graph, under
    `BinaryNeighbourhood` or `GradedNeighbourhood` decay) or a clustering estimator (a partition, for
    which the decay is inert). The only producer
-   with `z_sq = true`. Both sources are estimators and both refit, so this producer is
-   endogenous; a partition source is admitted but coarse (see the type's docstring).
+   whose feature axis *is* the asset axis. Both sources are estimators and both refit, so this
+   producer is endogenous; a partition source is admitted but coarse (see the type's docstring).
 
 Producer three was originally specified as a non-square **phylogeny** routine, and that framing was
 wrong. Phylogeny routines are endogenous to the returns by construction, and the value of a feature
@@ -270,9 +274,9 @@ all-zero distance matrix for three unrelated assets inside a cluster.
 - **`ReturnsResult` and `PricesResult` gain `nz` and `Z`, appended last**, so
   `returns_result_picker`'s partially-applied dispatch keeps working untouched. Nine pretty-print
   doctests gain two rows.
-- **`LowOrderPrior` gains `Z` and `z_sq`, appended last.** `HighOrderPrior` needs no edit — its
-  `@forward_properties` branch forwards any property. Every `LowOrderPrior(; …)` construction site
-  forwards both, so nesting order does not matter.
+- **`LowOrderPrior` gains `Z`, appended last** (originally `Z` and `z_sq`; see the amendment).
+  `HighOrderPrior` needs no edit — its `@forward_properties` branch forwards any property. Every
+  `LowOrderPrior(; …)` construction site forwards it, so nesting order does not matter.
 - **A price-level `Z` is not on the master clock and cannot be** — no three-dimensional `TimeArray`
   exists — so it is held positionally parallel to `X`, and three sites re-establish that alignment by
   hand: `port_opt_view`, `MissingDataFilter`'s preprocessing, and `prices_to_returns`.
@@ -311,13 +315,12 @@ all-zero distance matrix for three unrelated assets inside a cluster.
   was unreachable and a result inside a vector passed in exactly the case the branch was written for.
   This generalises beyond phylogeny and is recorded as a library-wide rule in `CONTEXT.md` §1: **an
   Estimator never holds a Result.** One consequence is worth stating precisely — with
-  `PhylogenyFeatures` narrowed, every `z_sq = true` *producer* now refits from the returns, so the
+  `PhylogenyFeatures` narrowed, every square-producing *producer* now refits from the returns, so the
   **prior** carrier has no exogenous route to square structure. The **data** carrier still does, and
   it is the default: a hand-supplied adjacency goes on `ReturnsResult` as `nz`/`Z` with `nz == nx`,
   where squareness is derived from the names rather than declared, so it cannot be stated wrongly.
-  What a caller must not do is pass a square matrix as a literal `ze` — that path reports
-  `z_sq = false` by dispatch, and its columns then keep pointing at the full universe inside a
-  subproblem.
+  What a caller must not do is pass a square matrix as a literal `ze` — the literal path never
+  declares its axes, and its columns then keep pointing at the full universe inside a subproblem.
 - **Breaking, twice.** `cle_pr` became `x_src` (ADR
   [0044](0044-matrix-sources-are-named-not-flagged.md)), and `dbht_similarity` became
   `distance_to_similarity` when the similarity family moved from `11_Phylogeny/04_DBHT.jl` into
@@ -340,3 +343,53 @@ all-zero distance matrix for three unrelated assets inside a cluster.
   its own vocabulary for asset attributes. Feeding a `FeatureDistance` to `LoGo` is unreachable by
   construction: `logo!` is called from matrix processing with only `sigma` and `X` in hand, so no
   carrier can reach it, and it throws rather than silently measuring returns.
+
+## Amendment (2026-07-29): the prior carrier's `z_sq` is deleted
+
+Decision 4 gave the prior carrier an explicit `z_sq::Bool`, and decision 6 justified it: the carrier
+is nameless, so squareness could not be *derived* there the way `features_are_assets` derives it on
+the data carrier, and had to be *stated* by the producer instead. The flag's whole job was one
+branch — `port_opt_view(::LowOrderPrior, i)` slicing the feature axis as well as the asset axis when
+the two coincided.
+
+**That branch lost its last reachable consumer**, and the change that emptied it is recorded three
+paragraphs above: with `PhylogenyFeatures` narrowed to an estimator source (issue
+[#184](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/184) and the library-wide *an
+Estimator never holds a Result* rule), every producer that builds a square feature matrix now
+**refits** — the one path that never reaches `feature_matrix_view`. The asset-subsetting
+meta-optimisers view the estimator and the `ReturnsResult`, not the fitted prior; the single site that
+does view a fitted prior discards the slice; and all three of them refuse a user-supplied precomputed
+prior outright. Issue
+[#192](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/192) measured the emptiness rather
+than arguing it: with the branch and the flag both neutered, every failing assertion was one that
+hand-constructed a `LowOrderPrior` and called `port_opt_view` on it directly, while every test driving
+a real fold, cluster or resample stayed green. Not one optimiser, distance or weight changes.
+
+So `z_sq`, `assert_square_feature_axis` and the `(Z, z_sq)` producer return are deleted:
+`feature_matrix(ze, pr, X, F, sets)` returns `Z` alone. **Breaking on a documented extension point** —
+a user-written `AbstractFeatureMatrixEstimator` fails on tuple arity, which is the intended failure
+mode and the same reasoning as `x_src` and `prepare_outer_rd` — with no deprecation shim, as above.
+
+Three things are worth stating precisely.
+
+- **The semantics survive the flag, by a better route.** A subproblem is still measured on its own
+  neighbourhood structure; it gets there by recomputing the graph on its own universe instead of
+  slicing a matrix that describes a larger one. That is #184's non-separability argument arriving where
+  it was headed: no slice of a phylogeny is the phylogeny of the slice.
+- **It makes this ADR internally consistent.** The consequence above already declared that the prior
+  carrier has no exogenous route to square structure and that the data carrier is the only one. The
+  flag was a squareness vocabulary on the carrier that has no squareness to state; deleting it leaves
+  the *derived* carrier saying only "these are features" and the *data* carrier the sole place where
+  the features can be the assets — and there squareness is derived, so it cannot be stated wrongly.
+- **It retires a silent-wrongness hazard that guarded nothing.** `assert_square_feature_axis` existed
+  because a lying `z_sq` surfaced as a `BoundsError` deep inside a cluster fold rather than at
+  construction. A flag whose only failure mode is silent, protecting a branch with no consumer, is a
+  bad trade in both directions.
+
+Unaffected: `feature_matrix_view`'s `sq` parameter stays — `ReturnsResult` and `PricesResult` still
+derive it from names and still need it, and only the prior-carrier call site changes, which now passes
+a literal `false` as two sites already did. The collapse onto synthetic assets
+([#188](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/188)) detects squareness with
+`features_are_assets` on the data carrier, so it is unchanged either way. And the literal-`ze` gap in
+the consequence above is neither opened nor closed: the literal path never declared its axes in the
+first place.

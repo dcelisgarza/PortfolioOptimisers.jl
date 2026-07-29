@@ -483,13 +483,13 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    # `Z` and `z_sq` are forwarded from the wrapped prior so nesting order does not matter:
+    # `Z` is forwarded from the wrapped prior so nesting order does not matter:
     # `BlackLittermanPrior(; pe = FeaturePrior(…))` reaches `distance` with the same feature
     # matrix as `FeaturePrior(; pe = BlackLittermanPrior(…))`. Safe because Black-Litterman
     # leaves `X` untouched (`posterior_X === prior_model.X`), so the asset axis `Z` is
     # indexed by is the same one it was derived from.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         Z = prior_model.Z, z_sq = prior_model.z_sq)
+                         Z = prior_model.Z)
 end
 
 export BlackLittermanPrior

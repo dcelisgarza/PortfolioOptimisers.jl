@@ -386,13 +386,13 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     pe2 = factory(pe.pe2, w)
     # Opinion pooling reweights observations without touching either axis of `Z`, so the
     # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z, z_sq) = prior(pe2, X, F; strict = strict,
-                                                               kwargs...)
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z) = prior(pe2, X, F; strict = strict,
+                                                         kwargs...)
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
                          kld = kld, ow = ow, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = ifelse(!isnothing(rr), w, nothing), Z = Z, z_sq = z_sq)
+                         f_w = ifelse(!isnothing(rr), w, nothing), Z = Z)
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

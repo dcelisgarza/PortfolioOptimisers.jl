@@ -19,11 +19,11 @@ abstract type AbstractFeatureMatrixEstimator <: AbstractEstimator end
     feature_matrix(ze::MatNum_Arr3Num, pr::AbstractPriorResult, X, F, sets; kwargs...)
     feature_matrix(ze::RegressionFeatures, pr::AbstractPriorResult, X, F, sets; kwargs...)
 
-Compute the derived feature matrix and its squareness flag.
+Compute the derived feature matrix.
 
-Returns the pair `(Z, z_sq)` that [`FeaturePrior`](@ref) writes onto the prior result. `Z` is **canonically assets-major** — `assets × features` when static, `observations × assets × features` when time-varying — and is validated as such by [`LowOrderPrior`](@ref).
+Returns the `Z` that [`FeaturePrior`](@ref) writes onto the prior result. `Z` is **canonically assets-major** — `assets × features` when static, `observations × assets × features` when time-varying — and is validated as such by [`LowOrderPrior`](@ref).
 
-`z_sq` is **stated here, by the producer**, because a producer runs inside `prior(pe, X, F; …)` with raw matrices and no feature names: a prior result carries none, so [`features_are_assets`](@ref) is structurally unavailable and squareness cannot be derived. A producer that has both name vectors — one whose features *are* the assets, given `sets` — must still run the `nx == nz` comparison rather than assume, because a `z_sq` that lies is silent, not loud: [`feature_matrix_view`](@ref) slices the feature axis that is not there.
+A producer declares a matrix to be features and nothing else. It does *not* declare the feature axis to be the asset axis, even when it happens to build a square matrix: the prior carrier has no squareness vocabulary, because a derived `Z` is never sliced down its feature axis. A producer runs inside `prior(pe, X, F; …)`, so it refits on whatever universe the subproblem hands it — which recomputes a square matrix on that universe rather than cutting one describing a larger one. Exogenous square structure travels on the *data* carrier instead, where [`features_are_assets`](@ref) derives squareness from `nz` against `nx`.
 
 `pr` is the **already-computed** wrapped prior result, not an estimator. That ordering is required: [`RegressionFeatures`](@ref) reads `pr.rr`, which does not exist until the wrapped prior has run.
 
@@ -38,7 +38,7 @@ Returns the pair `(Z, z_sq)` that [`FeaturePrior`](@ref) writes onto the prior r
 
 # Returns
 
-  - `(Z, z_sq)::Tuple{<:MatNum_Arr3Num, Bool}`.
+  - `Z::MatNum_Arr3Num`.
 
 # Related
 
@@ -48,12 +48,8 @@ Returns the pair `(Z, z_sq)` that [`FeaturePrior`](@ref) writes onto the prior r
   - [`features_are_assets`](@ref)
 """
 function feature_matrix end
-# A literal matrix declares nothing about its own axes, so it is never treated as square. To
-# reuse an `assets × assets` adjacency matrix as features — where an asset view must slice
-# the feature axis too — use a producer that states `z_sq` rather than passing the matrix in
-# bare.
 function feature_matrix(ze::MatNum_Arr3Num, ::AbstractPriorResult, args...; kwargs...)
-    return ze, false
+    return ze
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -66,7 +62,7 @@ Feature matrix producer that reads the regression loadings off the wrapped prior
 
 `L` is `assets × reduced_dimensions`, set by [`DimensionReductionRegression`](@ref): the low-dimensional coordinate system the asset actually lives in. `M` is the *reconstructed* full-factor loadings. `pr.rr.L` always resolves — [`Regression`](@ref) swaps in `M` when `L` is unset — so this producer needs no branch and works behind every regression estimator.
 
-Both are assets-major and both are row-sliced by `port_opt_view(re, i)`, so the carried layout holds with no transpose. Sets `z_sq = false`: reduced dimensions are not assets.
+Both are assets-major and both are row-sliced by `port_opt_view(re, i)`, so the carried layout holds with no transpose. Its feature axis is the reduced dimensions, which are not assets.
 
 # Validation
 
@@ -91,7 +87,7 @@ RegressionFeatures()
 struct RegressionFeatures <: AbstractFeatureMatrixEstimator end
 function feature_matrix(::RegressionFeatures, pr::AbstractPriorResult, args...; kwargs...)
     assert_prior_regression(pr, :pe)
-    return pr.rr.L, false
+    return pr.rr.L
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -223,7 +219,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Feature matrix producer reusing a square phylogeny or adjacency matrix as a feature source.
 
-An `assets × assets` adjacency matrix *is* an `assets × features` feature matrix whose feature `k` reads "is related to asset `k`", so `pairwise` over its rows measures **neighbourhood overlap** — a standard notion of topological similarity — and needs almost no new estimation code. It is the only producer that sets `z_sq = true`.
+An `assets × assets` adjacency matrix *is* an `assets × features` feature matrix whose feature `k` reads "is related to asset `k`", so `pairwise` over its rows measures **neighbourhood overlap** — a standard notion of topological similarity — and needs almost no new estimation code. It is the only producer whose feature axis *is* the asset axis, which needs no flag on the carrier: it refits, so a subproblem gets its own square matrix over its own universe rather than a slice of a larger one.
 
 # Fields
 
@@ -267,7 +263,7 @@ A `FeatureDistance` nested inside the source's own `de` does not recurse: the pr
 
 # Validation
 
-  - `Z` is square and binds to the asset axis of `X` (see [`check_feature_matrix`](@ref) and [`assert_square_feature_axis`](@ref) on [`LowOrderPrior`](@ref)).
+  - `Z` binds to the asset axis of `X` (see [`check_feature_matrix`](@ref) on [`LowOrderPrior`](@ref)). Squareness is guaranteed by [`phylogeny_features`](@ref) rather than checked on the carrier.
 
 # Examples
 
@@ -333,7 +329,83 @@ function feature_matrix(ze::PhylogenyFeatures, ::AbstractPriorResult, X::MatNum,
     # `prior(pe::FeaturePrior, …)` has already transposed `X` to observations x assets and
     # consumed `dims` as a named keyword, so it is not in `kwargs` and the hop routines are
     # called at `dims = 1`, matching the canonically assets-major carried layout.
-    return phylogeny_features(ze.alg, ze.pl, X; kwargs...), true
+    return phylogeny_features(ze.alg, ze.pl, X; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Feature matrix producer reading exogenous taxonomy memberships off an [`AssetSets`](@ref).
+
+`AssetSetsFeatures` is the thin producer wrapping [`asset_sets_features`](@ref), so a sector, industry or country classification reaches [`FeatureDistance`](@ref) through the *derived* carrier as well as through the user's own [`ReturnsResult`](@ref). It reads its taxonomy from [`FeaturePrior`](@ref)'s `sets` field.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AssetSetsFeatures(;
+        vals::AbstractVector{<:AbstractString}
+    ) -> AssetSetsFeatures
+
+Keywords correspond to the struct's fields.
+
+# The only exogenous rectangular source
+
+Every other producer in this file derives `Z` from the returns: [`RegressionFeatures`](@ref) from a factor fit, [`PhylogenyFeatures`](@ref) from a graph filtered out of the correlation. A taxonomy comes from outside the price history entirely, which is the structure a feature distance exists to bring in — see [`asset_sets_features`](@ref) for the nested-versus-crossed reading and the exact `cos = shared / L` identity.
+
+# Two entry points, because a producer alone would not reach the default
+
+Producers run inside `prior(pe::FeaturePrior, …)`, so they can only ever populate the **derived** carrier — and `z_src` defaults to `:data`. [`asset_sets_features`](@ref) is therefore public in its own right, for building an `assets × features` matrix to hand to [`ReturnsResult`](@ref) directly. The two routes give the identical matrix; they differ only in which carrier holds it, and hence in what a fold does to it.
+
+# The feature axis is groups, never assets
+
+Even when the group values happen to number as many as the assets. The feature axis indexes *groups*, so a coincidence of counts is not a claim about what the columns mean — and an asset view rebuilds the axis from the viewed taxonomy rather than slicing it, so a group with no members left in the view simply disappears.
+
+# Validation
+
+  - `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)), at construction.
+  - `FeaturePrior.sets` is not `nothing`, and each key resolves against it, when the producer runs.
+
+# Examples
+
+```jldoctest
+julia> AssetSetsFeatures(; vals = [\"nx_sector\", \"nx_country\"])
+AssetSetsFeatures
+  vals ┴ Vector{String}: ["nx_sector", "nx_country"]
+```
+
+# Related
+
+  - [`AbstractFeatureMatrixEstimator`](@ref)
+  - [`asset_sets_features`](@ref)
+  - [`assert_feature_keys`](@ref)
+  - [`AssetSets`](@ref)
+  - [`feature_matrix`](@ref)
+  - [`FeaturePrior`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+@concrete struct AssetSetsFeatures <: AbstractFeatureMatrixEstimator
+    """
+    $(field_dict[:asets_vals])
+    """
+    vals
+    function AssetSetsFeatures(vals::AbstractVector{<:AbstractString})::AssetSetsFeatures
+        assert_feature_keys(vals)
+        return new{typeof(vals)}(vals)
+    end
+end
+function AssetSetsFeatures(; vals::AbstractVector{<:AbstractString})::AssetSetsFeatures
+    return AssetSetsFeatures(vals)
+end
+# The taxonomy is the whole input, so an absent `sets` is a missing argument rather than a
+# defaulted one: there is nothing to fall back to, and a returns-derived substitute would be
+# the exact endogeneity this producer exists to escape.
+function feature_matrix(ze::AssetSetsFeatures, ::AbstractPriorResult, ::Any, ::Any,
+                        sets::Option{<:AssetSets}; kwargs...)
+    @argcheck(!isnothing(sets),
+              IsNothingError("AssetSetsFeatures reads its taxonomy from `FeaturePrior.sets`, which is nothing. Pass `FeaturePrior(; ze = AssetSetsFeatures(; vals = $(ze.vals)), sets = AssetSets(…))`."))
+    return asset_sets_features(ze.vals, sets)
 end
 """
     feature_estimator_view(ze::AbstractFeatureMatrixEstimator, i, args...)
@@ -345,7 +417,7 @@ A producer is usually *configuration*: it recomputes from the viewed prior on th
 
 A literal feature matrix is *data* and must be sliced on its asset axis, exactly as the carried matrix is — otherwise its columns would keep pointing at the full universe while the rows point at a cluster.
 
-The literal path slices with `sq = false`, matching the `z_sq = false` that [`feature_matrix`](@ref) reports for a bare matrix.
+The literal path slices with `sq = false`, matching the prior carrier's own view: a derived `Z`'s feature axis is never sliced, because a producer refits rather than being cut down.
 
 # Related
 
@@ -365,7 +437,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Prior estimator that attaches a feature matrix to the prior it wraps.
 
-`FeaturePrior` delegates every moment to the wrapped estimator `pe` and adds nothing but `Z` and `z_sq`, so it is a **provably pure addition**: the moments it returns are the wrapped estimator's, unchanged. That is what makes every existing prior feature-capable without any of them knowing about features.
+`FeaturePrior` delegates every moment to the wrapped estimator `pe` and adds nothing but `Z`, so it is a **provably pure addition**: the moments it returns are the wrapped estimator's, unchanged. That is what makes every existing prior feature-capable without any of them knowing about features.
 
 # Fields
 
@@ -384,7 +456,7 @@ Keywords correspond to the struct's fields.
 # Details
 
   - **Moments first, features second.** The wrapped prior is computed before `ze` runs, because a producer may need the result — [`RegressionFeatures`](@ref) reads `pr.rr`.
-  - **Nesting order does not matter.** Every wrapping prior estimator forwards `Z` and `z_sq`, so `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive at [`distance`](@ref) with the same feature matrix. The exception is the estimators whose wrapped prior is fit on *factors* — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) — which drop it deliberately; wrap those from the outside.
+  - **Nesting order does not matter.** Every wrapping prior estimator forwards `Z`, so `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive at [`distance`](@ref) with the same feature matrix. The exception is the estimators whose wrapped prior is fit on *factors* — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) — which drop it deliberately; wrap those from the outside.
   - **The outermost declaration wins.** Nesting one `FeaturePrior` inside another overwrites the inner feature matrix rather than merging.
   - **A literal `ze` must be static to survive a fold.** An `assets × features` matrix is observation-independent and is correct under any cross-validation fold. A time-varying literal is not: folds slice observations *before* the prior is fit and never touch the estimator, so its observation axis would no longer match — which [`LowOrderPrior`](@ref) rejects at construction. Use a producer to derive a time-varying `Z` per fold.
 
@@ -493,7 +565,7 @@ end
 
 Compute the wrapped prior's moments and attach a feature matrix to them.
 
-Every moment is the wrapped estimator's, untouched. The only additions are `Z` and `z_sq`, produced by `pe.ze` from the *already-computed* prior result — the ordering [`RegressionFeatures`](@ref) needs, since it reads `pr.rr`.
+Every moment is the wrapped estimator's, untouched. The only addition is `Z`, produced by `pe.ze` from the *already-computed* prior result — the ordering [`RegressionFeatures`](@ref) needs, since it reads `pr.rr`.
 
 # Arguments
 
@@ -505,7 +577,7 @@ Every moment is the wrapped estimator's, untouched. The only additions are `Z` a
 
 # Returns
 
-  - `pr::LowOrderPrior`: The wrapped result, with `Z` and `z_sq` set.
+  - `pr::LowOrderPrior`: The wrapped result, with `Z` set.
 
 # Validation
 
@@ -534,12 +606,12 @@ function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims:
                   DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
     end
     pr = prior(pe.pe, X, F; kwargs...)
-    Z, z_sq = feature_matrix(pe.ze, pr, X, F, pe.sets; kwargs...)
+    Z = feature_matrix(pe.ze, pr, X, F, pe.sets; kwargs...)
     return LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, chol = pr.chol, w = pr.w,
                          ens = pr.ens, kld = pr.kld, ow = pr.ow, rr = pr.rr, f_mu = pr.f_mu,
-                         f_sigma = pr.f_sigma, f_w = pr.f_w, Z = Z, z_sq = z_sq)
+                         f_sigma = pr.f_sigma, f_w = pr.f_w, Z = Z)
 end
 
 export AbstractFeatureMatrixEstimator, RegressionFeatures, FeaturePrior, feature_matrix,
        AbstractPhylogenyFeatureAlgorithm, BinaryNeighbourhood, GradedNeighbourhood,
-       PhylogenyFeatures, phylogeny_features
+       PhylogenyFeatures, phylogeny_features, AssetSetsFeatures
