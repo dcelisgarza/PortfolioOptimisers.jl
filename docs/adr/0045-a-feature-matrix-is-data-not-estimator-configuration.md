@@ -442,7 +442,8 @@ portfolios out along the asset axis, giving `observations × assets × features`
 as `X`. The outer optimiser's default `LastObservation` then reads the most recent fold, and the rest
 of the collapse family reads as many as it is asked to. That path needs a **fourth carrier**, `nz`/`Z`
 on `PredictionReturnsResult`: pure transport, and write-only by construction, since a
-`PredictionReturnsResult` can never reach the `Pr_RR` bridge.
+`PredictionReturnsResult` can never reach the `Pr_RR` bridge. (The amendment below tested that claim
+against a second, non-bridge reader and it held — for a reason the bridge argument did not anticipate.)
 
 One combination still drops the matrix, and it is the intersection of the two paragraphs above:
 `NestedClustered` **with** cross-validation **and** a square feature matrix. Its folds see
@@ -455,3 +456,54 @@ would get had none been supplied — never a matrix assembled from mismatched ax
 and that ordering is the whole point: Julia's destructuring discards trailing values without
 complaint, so appending the pair would have let a stale `predict_outer_*` overload keep building a
 feature-less result in silence — decision 1's failure class arriving through the fix for it.
+
+## Amendment (2026-07-29): preselection reads the data carrier, and carries no `z_src`
+
+Decision 5 gave the clustering and network estimators a `z_src` selector on the optimiser, choosing
+between the data carrier and the prior carrier. Asset preselection is the first consumer that reaches
+`clusterise` from *outside* an optimiser, and issue
+[#180](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/180) asked what `z_src` means
+there. It means nothing — but the useful finding is stronger than that: **at a pre-prior site `z_src`
+is not merely meaningless, it is unreferenceable**, because there is no prior for it to name.
+
+A prior is unreachable from an asset selector by three independent mechanisms, each sufficient on its
+own. `run_step(::AbstractReturnsPreprocessingEstimator, ctx)` passes `ctx.returns` and never the
+context, so a selector cannot see a prior even when one exists. `maybe_inject_step` has methods for an
+`OptimisationEstimator`, a result and a `PipelineStep`, so a preprocessing estimator hits the identity
+fallback and nothing can be injected into it. And a selector writes `:returns`, which
+`PIPELINE_INVALIDATES` declares invalidates `:prior` — the pipeline's own lattice forbids the very
+ordering a `z_src = :prior` would need. So `ClusterGroups` gains **no field**: a knob with one legal
+position is not a knob, and a throw needs something to throw on. **The absence of the flag is the
+statement**, the same shape as the fold-path kernel above whose vector arity takes no `sq` argument.
+The same fact settles `x_src`.
+
+`ClusterGroups` therefore reads `rd.Z` directly, calling the raw `clusterise(cle, rd.X; Z = rd.Z,
+z_src = :data_only)` rather than going through the `Pr_RR` bridge. That **widens an implicit contract**
+— an `AbstractReturnsResult` reaching an asset selector must now supply `{nx, X, Z}`, not `{nx, X}` —
+which is the right side to widen: `Pr_RR`'s concreteness is load-bearing at nine routing sites, while
+this contract is local to the selector family and documented on `AbstractReturnsResult` and
+`select_assets`.
+
+The diagnostic family gains a **fifth** member, `:data_only`. It is needed because `:neither`'s remedy —
+"use a `FeaturePrior` to derive it" — is *actively wrong* here and would send the user to debug the
+unreachable half of a decision. It is named for the **situation**, not for the caller, so any future
+pre-prior site inherits it; `ClusterGroups` is simply the one that exists. It is an explicit branch
+rather than a widened `else`, so an unrecognised symbol still falls through to `:neither`.
+
+Two things this amendment settles that #180 got the other way round.
+
+- **`PredictionReturnsResult.Z` stays write-only.** #180 expected this site to make it readable for
+  the first time, by a direct `fit_preprocessing(sel, prediction_result)` call. It does not, and the
+  reason has nothing to do with `Z` or with the bridge: `PredictionReturnsResult.X` is a *portfolio*
+  return vector — the asset axis is exactly what the collapse removed — while `nx` still names the
+  real assets, so `size(X, 2) == 1 ≠ length(nx)`. The type satisfies neither the old contract nor the
+  widened one, and every entry point refuses it loudly: the selectors on `X`'s shape, and the replay
+  half on the `port_opt_view` tripwire. Even `CompleteAssetSelector`, which touches no feature matrix,
+  is refused. The transport carrier is therefore write-only for a second, independent reason, and the
+  claim above is stronger than the argument that first established it.
+- **The replay half needed nothing.** `apply_preprocessing(::AssetSelectorResult, rd)` already
+  delegates to `port_opt_view`, so a selected universe propagates to `Z` — one axis for a rectangular
+  matrix, both for a square one. The ordering is right rather than lucky: the selection is decided on
+  the **full** universe and sliced only afterwards, which is the same semantics as a square producer
+  one layer down, where a subproblem is measured on its own neighbourhood structure only after the
+  structure over everything has been computed.

@@ -5,10 +5,18 @@ Abstract supertype for all returns result types.
 
 All concrete and/or types representing the result of returns calculations should be subtypes of `AbstractReturnsResult`.
 
+## The asset-selector contract
+
+[`select_assets`](@ref) and [`fit_preprocessing`](@ref) dispatch on this supertype, so any subtype reaching an [`AbstractAssetSelector`](@ref) must carry `nx` and an `observations × assets` matrix `X`, plus a [`port_opt_view`](@ref) that replays a selected universe. [`ClusterGroups`](@ref) widens that to `{nx, X, Z}`: it reads the feature matrix `Z` straight off the carrier, because preselection runs before any prior exists and no other source is reachable.
+
+Widening the contract rather than the `Pr_RR` bridge is deliberate — that alias's concreteness is load-bearing at nine routing sites. The cost is that the contract is implicit: it is satisfied by [`ReturnsResult`](@ref) and enforced by nothing. [`PredictionReturnsResult`](@ref) subtypes this supertype and carries `nz`/`Z`, but its `X` is a *portfolio* return vector rather than an asset matrix — the asset axis is already collapsed away — so it satisfies neither the old contract nor the widened one, and every entry point refuses it loudly rather than measuring the wrong axis.
+
 # Related
 
   - [`AbstractResult`](@ref)
   - [`ReturnsResult`](@ref)
+  - [`select_assets`](@ref)
+  - [`port_opt_view`](@ref)
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
@@ -1874,6 +1882,8 @@ end
 Return the keep-mask over the asset columns of `rd`.
 
 This is the single method a concrete [`AbstractAssetSelector`](@ref) must implement. It is called by [`fit_preprocessing`](@ref) on the *training* window only; the resulting universe is then replayed on every later window by [`apply_preprocessing`](@ref).
+
+`rd` is read for `nx` and an `observations × assets` `X`; [`ClusterGroups`](@ref) also reads `rd.Z`, widening the implicit contract to `{nx, X, Z}` (see [`AbstractReturnsResult`](@ref)). A selector is fitted from returns data alone and never sees a prior result, so `z_src` has no referent here and no selector carries one.
 
 # Arguments
 

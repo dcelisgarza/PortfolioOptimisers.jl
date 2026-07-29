@@ -723,16 +723,20 @@ end
 
 Assert that a feature matrix reached [`FeatureDistance`](@ref)'s three-argument entry point, and name the reason when none did.
 
-Every way of failing to supply `Z` arrives here identically, as `Z === nothing`. `z_src` is the diagnostic that tells them apart — it is resolved by [`feature_matrix_picker`](@ref) and rides the wire beside `Z` purely so this message can be specific:
+Every way of failing to supply `Z` arrives here identically, as `Z === nothing`. `z_src` is the diagnostic that tells them apart — usually resolved by [`feature_matrix_picker`](@ref), and riding the wire beside `Z` purely so this message can be specific:
 
   - `:none`: nothing supplied `Z` at all. The estimator was driven from a raw returns matrix, which carries no feature matrix — the two-argument `distance(de, Z; dims)` entry point, a [`ReturnsResult`](@ref) or a prior result is needed.
   - `:neither`: a carrier was available but neither it nor the returns result holds a feature matrix. The feature matrix has not been supplied or produced.
   - `:data` / `:prior`: `z_src` selected a carrier that holds no feature matrix, while the *other* one does. This is the typo/wrong-selector case, and the message says which value to use instead.
+  - `:data_only`: the call runs *before* any prior exists, so the data carrier is the only one that could have supplied a feature matrix and it holds none. It is named for the situation rather than for the caller, so any pre-prior site inherits it; [`ClusterGroups`](@ref) is the one that exists today. Sending the user to a [`FeaturePrior`](@ref) — `:neither`'s remedy — would be actively wrong here, because a prior is structurally unreachable from a selector.
+
+Any unrecognised symbol falls through to `:neither`'s text.
 
 # Related
 
   - [`FeatureDistance`](@ref)
   - [`feature_matrix_picker`](@ref)
+  - [`ClusterGroups`](@ref)
   - [`IsNothingError`](@ref)
 """
 function assert_feature_matrix_supplied(Z::Option{<:ArrNum}, z_src::Symbol)::Nothing
@@ -743,6 +747,8 @@ function assert_feature_matrix_supplied(Z::Option{<:ArrNum}, z_src::Symbol)::Not
                                  "FeatureDistance requires a feature matrix `Z`, but `z_src = :data` selected the returns result and it carries no `Z`. The prior result does carry one — set `z_src = :prior`."
                              elseif z_src == :prior
                                  "FeatureDistance requires a feature matrix `Z`, but `z_src = :prior` selected the prior result and it carries no `Z`. The returns result does carry one — set `z_src = :data`."
+                             elseif z_src == :data_only
+                                 "FeatureDistance requires a feature matrix `Z`, but the returns result carries none. This call runs before any prior exists, so only the data carrier can supply one: set `Z` on the `ReturnsResult`."
                              else
                                  "FeatureDistance requires a feature matrix `Z`, but neither the returns result nor the prior result carries one. Supply `Z` on the ReturnsResult, or use a FeaturePrior to derive it."
                              end))
