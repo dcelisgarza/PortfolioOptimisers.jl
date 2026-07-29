@@ -216,10 +216,23 @@ function render_catalogue(io::IO = IOBuffer(); base_level::Int = 2)
     for node in CATALOGUE
         render(buf, node, base_level, 0)
     end
-    # Blocks emit their own separators without knowing what precedes them, so
-    # collapse the resulting runs to a single blank line.
-    print(io, replace(String(take!(buf)), r"\n{3,}" => "\n\n"))
+    print(io, collapse_blank_runs(String(take!(buf))))
     return io
+end
+
+"""
+    collapse_blank_runs(md) -> String
+
+Collapse every run of blank lines in `md` to a single one.
+
+Blocks emit their own separators without knowing what precedes them, so a run is
+the normal outcome of concatenating two of them. It must be applied to whatever
+text is *finally written* — collapsing the rendered body alone leaves the seam
+where the preamble meets it, which is one such concatenation and produced a
+double blank line that `markdownlint` then stripped back out on every commit.
+"""
+function collapse_blank_runs(md::AbstractString)::String
+    return replace(md, r"\n{3,}" => "\n\n")
 end
 
 const _PREAMBLE = """
@@ -365,7 +378,8 @@ end
 function generate_capability_catalogue(path::String = joinpath(@__DIR__, "src",
                                                                "capability_catalogue.md"))
     assert_complete()
-    body = string(_PREAMBLE, "\n", String(take!(render_catalogue(IOBuffer()))))
+    body = collapse_blank_runs(string(_PREAMBLE, "\n",
+                                      String(take!(render_catalogue(IOBuffer())))))
     assert_refs_survive(body)
     write(path, body)
     return path
