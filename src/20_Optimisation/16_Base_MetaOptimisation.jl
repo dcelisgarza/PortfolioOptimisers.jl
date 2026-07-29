@@ -93,7 +93,8 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     iv_flag = !isnothing(iv)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
-        wi = abs.(wi)
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
+        wi = synthetic_asset_weights(wi)
         if iv_flag
             iv = iv * wi
         end

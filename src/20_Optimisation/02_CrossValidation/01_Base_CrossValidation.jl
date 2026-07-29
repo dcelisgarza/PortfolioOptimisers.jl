@@ -487,6 +487,8 @@ Stores predictions from multiple cross-validation folds as a single combined res
 Concatenates the test-period returns from all folds into an aggregated
 [`PredictionReturnsResult`](@ref).
 
+Per-observation quantities (`X`, `F`, `B`, `ts`, `iv`) stack across folds. `ivpa` is per-asset, not per-observation, and each fold's [`reconstruct_rd`](@ref) has already collapsed it to one value per synthetic asset using *that fold's* weights, so it cannot stack — it is **reduced to the last fold's value**. This matches [`predict_realised_vols`](@ref), which reads the last row of the stacked `iv`: the premium divisor is paired with the implied volatility it divides.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -522,7 +524,9 @@ $(DocStringExtensions.FIELDS)
         B = isnothing(rd[1].B) ? nothing : mapreduce_RetMtx(rd, :B)
         ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
         iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
-        ivpa = rd[1].ivpa
+        # Per-asset, so it cannot stack; reduced to the last fold to pair with the last
+        # row of `iv`, which is what `predict_realised_vols` divides by it.
+        ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ts = ts, iv = iv, ivpa = ivpa)
         return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
@@ -724,7 +728,8 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
     iv_flag = !isnothing(iv)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
-        w = abs.(res.w)
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
+        w = synthetic_asset_weights(res.w)
         if iv_flag
             iv = iv * w
         end
@@ -750,7 +755,8 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
     iv_flag = !isnothing(iv)
     ivpa_flag = isa(ivpa, AbstractVector)
     if iv_flag || ivpa_flag
-        w = [abs.(wi) for wi in res.w]
+        # `iv` and `ivpa` are intensive, so they collapse as convex combinations.
+        w = [synthetic_asset_weights(wi) for wi in res.w]
         if iv_flag
             iv = [iv * w for w in w]
         end

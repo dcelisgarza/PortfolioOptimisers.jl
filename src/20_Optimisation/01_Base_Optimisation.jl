@@ -2481,6 +2481,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Normalises inner weights into the convex weights that collapse real assets onto a meta-optimiser's synthetic assets.
+
+Quantities carried alongside the returns matrix are either *extensive* (returns, benchmark returns) and collapse as a plain weighted sum `w'x`, or *intensive* (rates such as `rd.iv` and `rd.ivpa`) and collapse as a weighted *average*. A plain weighted sum scales an intensive quantity by the gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, so a shorting or leveraged portfolio (`sⱼ ≠ 1`) inflates a rate that should not depend on gross exposure at all.
+
+Normalising the weights once here makes every subsequent product a convex combination, so callers collapsing an intensive quantity need only pass their weights through this function.
+
+# Arguments
+
+  - `w`: Inner weights. A vector collapses onto a single synthetic asset; a matrix (assets × synthetic assets) collapses each column independently.
+
+# Returns
+
+  - `w`: `abs.(w)`, with each column scaled to sum to one. A column summing to zero — a degenerate synthetic asset — is left as-is rather than divided, preserving the zero row it already produced.
+
+# Related
+
+  - [`prepare_outer_rd`](@ref)
+  - [`reconstruct_rd`](@ref)
+"""
+function synthetic_asset_weights(w::VecNum)
+    w = abs.(w)
+    s = sum(w)
+    return iszero(s) ? w : w / s
+end
+function synthetic_asset_weights(w::MatNum)
+    w = abs.(w)
+    s = sum(w; dims = 1)
+    return w ./ map(x -> iszero(x) ? one(x) : x, s)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Extracts the prior result for risk calculation from an optimisation result. Checks for an explicitly provided `pr`, then looks for `res.pr` and `res.pa.pr` before throwing an error if none are found.
 
 # Arguments

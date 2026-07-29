@@ -112,4 +112,5 @@ VecOpt
 VecOptE
 extract_fees
 extract_pr
+synthetic_asset_weights
 ```
