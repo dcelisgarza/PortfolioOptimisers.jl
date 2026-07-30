@@ -19,4 +19,5 @@ feature_distance
 collapse_features
 stack_observations
 collapse_weights
+assert_feature_matrix_supplied
 ```
