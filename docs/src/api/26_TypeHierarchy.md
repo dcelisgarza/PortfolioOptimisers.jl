@@ -419,7 +419,9 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[Distance](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[DistanceDistance](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[DistanceDistance](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[FeatureDistance](@ref)
 
 ├──&nbsp;[AbstractEntropyPoolingOptimiser](@ref)
 
@@ -450,6 +452,14 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[VarianceExpectedReturns](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[WindowedExpectedReturns](@ref)
+
+├──&nbsp;[AbstractFeatureMatrixEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AssetSetsFeatures](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[PhylogenyFeatures](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[RegressionFeatures](@ref)
 
 ├──&nbsp;[AbstractMatrixProcessingEstimator](@ref)
 
@@ -602,6 +612,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[BlackLittermanPrior](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[EntropyPoolingPrior](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[FeaturePrior](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[OpinionPoolingPrior](@ref)
 
@@ -827,6 +839,12 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[HacineGharbiRavier](@ref)
 
+├──&nbsp;[AbstractCollapseAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[MeanCollapse](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[MedianCollapse](@ref)
+
 ├──&nbsp;[AbstractDenoiseAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[FixedDenoise](@ref)
@@ -884,6 +902,16 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[MeanSquaredError](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[VolatilityWeighted](@ref)
+
+├──&nbsp;[AbstractFeatureCollapseAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AggregateDistances](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AggregateFeatures](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LastObservation](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[StackObservations](@ref)
 
 ├──&nbsp;[AbstractMatrixProcessingAlgorithm](@ref)
 
@@ -989,6 +1017,12 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[PrimTree](@ref)
 
+├──&nbsp;[AbstractPhylogenyFeatureAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[BinaryNeighbourhood](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[GradedNeighbourhood](@ref)
+
 ├──&nbsp;[AbstractPreorderBy](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PreorderTreeByID](@ref)
@@ -1052,6 +1086,10 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[ThresholdRule](@ref)
 
 ├──&nbsp;[AbstractSimilarityMatrixAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AngularSimilarity](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ComplementSimilarity](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[ExponentialSimilarity](@ref)
 
