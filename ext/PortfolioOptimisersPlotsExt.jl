@@ -851,22 +851,26 @@ function PortfolioOptimisers.plot_sigma(pred::PredictionResult, rd::ReturnsResul
     return PortfolioOptimisers.plot_sigma(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_factor_loadings
+# The factor-space entry points all guard through `assert_prior_regression`: `rr` and `fpr`
+# travel together on the carrier, so checking `rr` covers the whole block, and the block is
+# what `f_mu`/`f_sigma` are virtual reads of. Each supplies its own `lead` — the shared
+# diagnosis lives in `prior_regression_remedy`. Optional axis-name arguments must therefore
+# default to `nothing` rather than to a size taken off the block, or the default argument
+# would be evaluated before the guard could run.
+const NO_FACTOR_BLOCK_HINT = "The prior result supplied carries no factor block: `rr === nothing`, and `rr` and `fpr` are provided together or not at all."
+const NO_FACTOR_LOADINGS_LEAD = "`plot_factor_loadings` draws the regression loadings `rr.M`. $NO_FACTOR_BLOCK_HINT Pass the loadings directly as `plot_factor_loadings(M, nx, nf)` if you hold them."
 function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.AbstractPriorResult,
                                                   nx::Option{<:AbstractVector} = nothing,
                                                   nf::Option{<:AbstractVector} = nothing;
                                                   kwargs...)
-    if isnothing(pr.rr)
-        throw(ArgumentError("prior has no factor regression model (rr is nothing); pass M directly"))
-    end
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_LOADINGS_LEAD)
     nx_use = isnothing(nx) ? (1:size(pr.rr.M, 1)) : nx
     nf_use = isnothing(nf) ? (1:size(pr.rr.M, 2)) : nf
     return PortfolioOptimisers.plot_factor_loadings(pr.rr.M, nx_use, nf_use; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.AbstractPriorResult,
                                                   rd::ReturnsResult; kwargs...)
-    if isnothing(pr.rr)
-        throw(ArgumentError("prior has no factor regression model (rr is nothing); pass M directly"))
-    end
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_LOADINGS_LEAD)
     nx = isnothing(rd.nx) ? (1:size(pr.rr.M, 1)) : rd.nx
     nf = isnothing(rd.nf) ? (1:size(pr.rr.M, 2)) : rd.nf
     return PortfolioOptimisers.plot_factor_loadings(pr.rr.M, nx, nf; kwargs...)
@@ -886,19 +890,17 @@ function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult; kwargs
     return PortfolioOptimisers.plot_factor_loadings(extract_pr(pred.res); kwargs...)
 end
 ## plot_factor_sigma
+const NO_FACTOR_SIGMA_LEAD = "`plot_factor_sigma` draws the factor covariance `fpr.sigma`. $NO_FACTOR_BLOCK_HINT Pass the factor covariance directly as `plot_factor_sigma(f_sigma, nf)` if you hold it."
 function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
-                                               nf::AbstractVector = 1:size(pr.f_sigma, 1);
+                                               nf::Option{<:AbstractVector} = nothing;
                                                kwargs...)
-    if isnothing(pr.f_sigma)
-        throw(ArgumentError("prior has no factor covariance (f_sigma is nothing); pass f_sigma directly"))
-    end
-    return PortfolioOptimisers.plot_factor_sigma(pr.f_sigma, nf; kwargs...)
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_SIGMA_LEAD)
+    nf_use = isnothing(nf) ? (1:size(pr.f_sigma, 1)) : nf
+    return PortfolioOptimisers.plot_factor_sigma(pr.f_sigma, nf_use; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
                                                rd::ReturnsResult; kwargs...)
-    if isnothing(pr.f_sigma)
-        throw(ArgumentError("prior has no factor covariance (f_sigma is nothing); pass f_sigma directly"))
-    end
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_SIGMA_LEAD)
     nf = isnothing(rd.nf) ? (1:size(pr.f_sigma, 1)) : rd.nf
     return PortfolioOptimisers.plot_factor_sigma(pr.f_sigma, nf; kwargs...)
 end
@@ -1021,20 +1023,18 @@ function PortfolioOptimisers.plot_prior(pred::PredictionResult, rd::ReturnsResul
     return PortfolioOptimisers.plot_prior(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_factor_mu
+const NO_FACTOR_MU_LEAD = "`plot_factor_mu` draws the factor expected returns `fpr.mu`. $NO_FACTOR_BLOCK_HINT Pass the factor expected returns directly as `plot_factor_mu(f_mu, nf)` if you hold them."
 function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPriorResult,
-                                            nf::AbstractVector = 1:length(pr.f_mu);
+                                            nf::Option{<:AbstractVector} = nothing;
                                             N::Option{<:Number} = nothing, kwargs...)
-    if isnothing(pr.f_mu)
-        throw(ArgumentError("prior has no factor expected returns (`f_mu` is `nothing`); pass `f_mu` directly"))
-    end
-    return PortfolioOptimisers.plot_factor_mu(pr.f_mu, nf; N = N, kwargs...)
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_MU_LEAD)
+    nf_use = isnothing(nf) ? (1:length(pr.f_mu)) : nf
+    return PortfolioOptimisers.plot_factor_mu(pr.f_mu, nf_use; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPriorResult,
                                             rd::ReturnsResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    if isnothing(pr.f_mu)
-        throw(ArgumentError("prior has no factor expected returns (`f_mu` is `nothing`); pass `f_mu` directly"))
-    end
+    PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_FACTOR_MU_LEAD)
     nf = isnothing(rd.nf) ? (1:length(pr.f_mu)) : rd.nf
     return PortfolioOptimisers.plot_factor_mu(pr.f_mu, nf; N = N, kwargs...)
 end

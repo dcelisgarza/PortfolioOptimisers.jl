@@ -137,14 +137,32 @@ end
     @test occursin("cokurtosis", kt_err.msg)
     @test occursin("`kt`", kt_err.msg)
 
-    rr_err = try
-        HighOrderPrior(; pr = lopr, f_kt = ones(1, 1))
+    # The factor low order prior is reachable as `fpr.pr` and as `pr.fpr`, and the two must
+    # be the same object. Nesting the co-moments over a prior with no factor block at all.
+    no_block_err = try
+        HighOrderPrior(; pr = lopr, fpr = HighOrderPrior(; pr = lopr))
     catch e
         e
     end
-    @test rr_err isa PortfolioOptimisers.IsNothingError
-    @test occursin("regression result", rr_err.msg)
-    @test occursin("`rr`", rr_err.msg)
+    @test no_block_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("pr.fpr === nothing", no_block_err.msg)
+    @test occursin("FactorPrior", no_block_err.msg)
+
+    # Nesting a block whose inner prior is a *different* distribution from `pr.fpr`.
+    mismatch_err = try
+        HighOrderPrior(; pr = pr1, fpr = HighOrderPrior(; pr = lopr))
+    catch e
+        e
+    end
+    @test mismatch_err isa PortfolioOptimisers.ConflictingArgumentError
+    @test occursin("`fpr.pr`", mismatch_err.msg)
+    @test occursin("`pr.fpr`", mismatch_err.msg)
+
+    # The consistent nesting is accepted, and a low order factor block with no factor
+    # co-moments over it stays ordinary.
+    @test HighOrderPrior(; pr = pr1, fpr = HighOrderPrior(; pr = pr1.fpr)).fpr.pr ===
+          pr1.fpr
+    @test isnothing(HighOrderPrior(; pr = pr1).fpr)
 end
 
 @testset "High Order Factor Prior" begin
@@ -170,6 +188,32 @@ end
     @test isapprox(df[(N4 + N3 + N2 + Nf4 + 1):(N4 + N3 + N2 + Nf4 + Nf3), 1], vec(pr.f_sk))
     @test isapprox(df[(N4 + N3 + N2 + Nf4 + Nf3 + 1):(N4 + N3 + N2 + Nf4 + Nf3 + Nf2), 1],
                    vec(pr.f_V))
+
+    # The flat `f_*` names are virtual reads of the nested block, and the nested block's own
+    # prior is the low order carrier's factor block — the enforced invariant, on a real fit.
+    @test pr.fpr isa HighOrderPrior
+    @test pr.fpr.pr === pr.pr.fpr
+    @test pr.f_kt === pr.fpr.kt
+    @test pr.f_sk === pr.fpr.sk
+    @test pr.f_V === pr.fpr.V
+    @test pr.f_D2 === pr.fpr.D2
+    @test pr.f_L2 === pr.fpr.L2
+    @test pr.f_S2 === pr.fpr.S2
+    @test pr.f_skmp === pr.fpr.skmp
+    # `fpr` names the high order block, but reading through it still reaches the factor
+    # low order moments, because the nested carrier forwards to its own `pr`.
+    @test pr.fpr.mu === pr.f_mu
+    @test pr.fpr.sigma === pr.f_sigma
+    # An asset view forwards the factor block whole, so the invariant survives it.
+    v = PortfolioOptimisers.port_opt_view(pr, [1, 3, 5])
+    @test v.fpr === pr.fpr
+    @test v.fpr.pr === v.pr.fpr
+    # No factor block: every flat read is `nothing`, exactly as the fields were.
+    hopr = prior(HighOrderPriorEstimator(), rd)
+    @test isnothing(hopr.fpr)
+    @test all(isnothing,
+              (hopr.f_kt, hopr.f_sk, hopr.f_V, hopr.f_D2, hopr.f_L2, hopr.f_S2,
+               hopr.f_skmp))
 end
 
 @testset "Vanilla and Bayesian Black Litterman" begin
@@ -705,42 +749,137 @@ end
 @testset "Factor block guard on wrapped priors" begin
     # `pe` is typed `AbstractLowOrderPriorEstimator_F_AF`, whose `_AF` half uses factor
     # returns only *optionally* — so the type constrains which returns an estimator
-    # consumes, not whether the result it produces carries a regression. Both estimators
-    # below project factor moments through the loadings and used to die on `rr === nothing`
-    # with a bare `FieldError`/`MethodError` from deep inside the projection.
-    no_rr = EntropyPoolingPrior(; pe = EmpiricalPrior())          # never computes one
-    drops_rr = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,     # computes then discards
-                                   tau = 1 / size(rd.X, 1),
-                                   views = LinearConstraintEstimator(;
-                                                                     val = ["AAPL == 0.001"]))
+    # consumes, not whether the result it produces carries a regression. An estimator that
+    # never computes one projects factor moments through loadings that do not exist, and
+    # used to die on `rr === nothing` with a bare `FieldError`/`MethodError` from deep
+    # inside the projection.
+    no_rr = EntropyPoolingPrior(; pe = EmpiricalPrior())
     @test isnothing(prior(no_rr, rd).rr)
-    @test isnothing(prior(drops_rr, rd).rr)
 
-    for pe in (no_rr, drops_rr)
-        hofpe_err = try
-            prior(HighOrderFactorPriorEstimator(; pe = pe), rd)
-        catch e
-            e
-        end
-        @test hofpe_err isa PortfolioOptimisers.IsNothingError
-        @test occursin("regression", hofpe_err.msg)
-        @test occursin("`pe`", hofpe_err.msg)
-
-        bbl_err = try
-            prior(BayesianBlackLittermanPrior(; pe = pe, sets = fsets,
-                                              tau = 1 / size(rd.X, 1),
-                                              views = LinearConstraintEstimator(;
-                                                                                val = ["MTUM == 0.0001"])),
-                  rd)
-        catch e
-            e
-        end
-        @test bbl_err isa PortfolioOptimisers.IsNothingError
-        @test occursin("regression", bbl_err.msg)
+    hofpe_err = try
+        prior(HighOrderFactorPriorEstimator(; pe = no_rr), rd)
+    catch e
+        e
     end
+    @test hofpe_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("regression", hofpe_err.msg)
+    @test occursin("`pe`", hofpe_err.msg)
+
+    bbl_err = try
+        prior(BayesianBlackLittermanPrior(; pe = no_rr, sets = fsets,
+                                          tau = 1 / size(rd.X, 1),
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["MTUM == 0.0001"])),
+              rd)
+    catch e
+        e
+    end
+    @test bbl_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("regression", bbl_err.msg)
+
+    # The *other* way to arrive here — a wrapper that computed loadings and discarded them
+    # — no longer exists: every wrapping estimator forwards `rr` and the factor block
+    # `fpr` (ADR 0046), so nesting order does not matter. `BlackLittermanPrior` over a
+    # `FactorPrior` used to be the canonical case and now goes straight through.
+    forwards_rr = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,
+                                      tau = 1 / size(rd.X, 1),
+                                      views = LinearConstraintEstimator(;
+                                                                        val = ["AAPL == 0.001"]))
+    @test !isnothing(prior(forwards_rr, rd).rr)
+    @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = forwards_rr), rd).rr)
+    @test !isnothing(prior(BayesianBlackLittermanPrior(; pe = forwards_rr, sets = fsets,
+                                                       tau = 1 / size(rd.X, 1),
+                                                       views = LinearConstraintEstimator(;
+                                                                                         val = ["MTUM == 0.0001"])),
+                           rd).rr)
 
     # A prior that does carry loadings still goes through untouched.
     @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = FactorPrior()), rd).rr)
+end
+
+@testset "The factor block is a nested prior result" begin
+    pr = prior(FactorPrior(), rd)
+
+    # `fpr` is the factor-axis prior itself, not a copy of three of its fields: its `X` is
+    # the factor returns matrix, over the same observations as the asset block.
+    @test pr.fpr isa LowOrderPrior
+    @test size(pr.fpr.X) == size(rd.F)
+    @test size(pr.fpr.X, 1) == size(pr.X, 1)
+    @test length(pr.fpr.mu) == size(pr.rr.M, 2)
+
+    # The flat `f_*` names are virtual reads of it, so code written against the pre-nesting
+    # shape is unaffected — and the three that did not exist before come with them.
+    @test pr.f_mu === pr.fpr.mu
+    @test pr.f_sigma === pr.fpr.sigma
+    @test pr.f_w === pr.fpr.w
+    @test pr.f_ens === pr.fpr.ens
+    @test pr.f_kld === pr.fpr.kld
+    @test pr.f_ow === pr.fpr.ow
+    for sym in (:f_mu, :f_sigma, :f_w, :f_ens, :f_kld, :f_ow)
+        @test sym in propertynames(pr)
+        @test !hasfield(LowOrderPrior, sym)
+    end
+
+    # With no factor block they read `nothing` rather than throwing — the behaviour the flat
+    # fields had, and the reason these are `compute` with a lambda and not `alias`.
+    bare = prior(EmpiricalPrior(), rd)
+    @test isnothing(bare.fpr)
+    @test all(isnothing,
+              (bare.f_mu, bare.f_sigma, bare.f_w, bare.f_ens, bare.f_kld, bare.f_ow))
+
+    # `rr` and `fpr` are one block: neither half is constructible alone.
+    @test_throws ArgumentError LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                             rr = pr.rr)
+    @test_throws ArgumentError LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                             fpr = pr.fpr)
+    # The flag names in that message used to be inverted — a present `rr` reported
+    # `isnothing(rr) = true`.
+    block_err = try
+        LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, rr = pr.rr)
+    catch e
+        e
+    end
+    @test occursin("isnothing(rr) = false", block_err.msg)
+    @test occursin("isnothing(fpr) = true", block_err.msg)
+
+    # A view slices assets, so the factor block is forwarded whole: factors are not assets.
+    i = [1, 3, 5]
+    prv = PortfolioOptimisers.port_opt_view(pr, i)
+    @test prv.fpr === pr.fpr
+    @test size(prv.rr.M, 1) == length(i)
+
+    # Every wrapping estimator that reports a factor block reports it nested, and the flat
+    # reads keep returning the same values they did as fields.
+    for pe in (FactorPrior(),
+               FactorBlackLittermanPrior(; sets = fsets, tau = 1 / size(rd.X, 1),
+                                         views = LinearConstraintEstimator(;
+                                                                           val = ["MTUM == 0.0001"])),
+               BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = fsets,
+                                           tau = 1 / size(rd.X, 1),
+                                           views = LinearConstraintEstimator(;
+                                                                             val = ["MTUM == 0.0001"])),
+               EntropyPoolingPrior(; pe = FactorPrior()),
+               FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()))
+        prf = prior(pe, rd)
+        @test prf.fpr isa LowOrderPrior
+        @test prf.f_mu === prf.fpr.mu
+        @test prf.f_sigma === prf.fpr.sigma
+        @test size(prf.fpr.X, 1) == size(prf.X, 1)
+    end
+
+    # The one place `f_w`'s *value* changed: the pooling producers used to stamp their own
+    # pooled weights onto the factor slot (`f_w = !isnothing(rr) ? w : nothing`), which was a
+    # duplicate of `w` rather than anything the factor prior computed. The nested block now
+    # reports what its own producer recorded — and `EmpiricalPrior` records no `w`, so behind
+    # a plain `FactorPrior` that is `nothing`. Closing *that* gap belongs to the producer.
+    pooled = prior(EntropyPoolingPrior(; pe = FactorPrior(), sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = ["AAPL == 0.001"])),
+                   rd)
+    @test !isnothing(pooled.rr)
+    @test pooled.w isa StatsBase.AbstractWeights
+    @test isnothing(pooled.f_w)
+    @test isnothing(pooled.fpr.w)
 end
 
 @testset "Returns source selector (x_src)" begin
@@ -785,4 +924,51 @@ end
     @test HierarchicalOptimiser().x_src == :prior
     @test JuMPOptimiser(; slv = slv).x_src == :prior
     @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
+end
+
+@testset "The prior carrier's `w` is documented as observation weights" begin
+    # `field_dict[:w_prior]` is what `LowOrderPrior`'s `# Fields` entry for `w` interpolates,
+    # and it read "Portfolio weights vector used in prior computation" — the wrong noun and
+    # the wrong axis. `w::Option{<:ObsWeights}` is validated against `size(X, 1)` and is
+    # consumed as observation weights: `@pprop w` selects it into risk measures, which
+    # resolve it with `get_observation_weights` against a length-`T` return series.
+    entry = PortfolioOptimisers.field_dict[:w_prior]
+    @test occursin("Observation weights", entry)
+    @test !occursin("Portfolio weights", entry)
+
+    pr = prior(EntropyPoolingPrior(; sets = sets,
+                                   mu_views = LinearConstraintEstimator(;
+                                                                        val = "AAPL == 0.002")),
+               rd)
+    @test length(pr.w) == size(pr.X, 1)
+    @test length(pr.w) != size(pr.X, 2)
+    @test pr.w isa PortfolioOptimisers.ObsWeights
+    # The axis the old wording named is the one the constructor refuses.
+    @test_throws DimensionMismatch LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                                 w = StatsBase.pweights(fill(1 /
+                                                                             size(pr.X, 2),
+                                                                             size(pr.X, 2))))
+
+    # The neighbouring entry that would have been reached for instead is gone: `:rr` read
+    # "Returns result" while sitting in the prior-result block, where the field named `rr`
+    # is the *regression*. It had no consumer, so nothing stated it — but the next docstring
+    # to interpolate it would have. `:reg_rr` is the entry every prior docstring uses.
+    @test !haskey(PortfolioOptimisers.arg_dict, :rr)
+    @test occursin("Regression result", PortfolioOptimisers.field_dict[:reg_rr])
+
+    # `kld` is `Option{<:Num_VecNum}`: scalar from entropy pooling, one entry per opinion
+    # from opinion pooling. The entry described only the scalar.
+    @test occursin("one entry per opinion", PortfolioOptimisers.field_dict[:kld])
+    @test pr.kld isa Number
+    pooled = prior(OpinionPoolingPrior(;
+                                       pes = [EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*1.5")),
+                                              EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*2"))],
+                                       w = [0.5, 0.5]), rd)
+    @test pooled.kld isa AbstractVector
+    @test length(pooled.kld) == 2
+    @test all(isfinite, pooled.kld)
 end

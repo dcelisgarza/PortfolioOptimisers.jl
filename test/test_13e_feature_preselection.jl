@@ -1,4 +1,4 @@
-using PortfolioOptimisers, Test, StableRNGs, Statistics, LinearAlgebra
+using PortfolioOptimisers, Test, StableRNGs, Statistics, LinearAlgebra, Random
 
 const PO = PortfolioOptimisers
 
@@ -173,7 +173,12 @@ leaf ordering.
         for cle in (ClustersEstimator(), ClustersEstimator(; alg = DBHT()),
                     ClustersEstimator(; alg = KMeansAlgorithm()))
             sel = RedundancySelector(; alg = ClusterGroups(; cle = cle), score = SCM())
-            @test fit_preprocessing(sel, rd_tax).nx == fit_preprocessing(sel, rd_bare).nx
+            # `KMeansAlgorithm` draws its starts from the global RNG, so the two calls must
+            # begin from the same state or the comparison measures the RNG rather than the
+            # presence of `Z`.
+            with_tax = (Random.seed!(1); fit_preprocessing(sel, rd_tax).nx)
+            without = (Random.seed!(1); fit_preprocessing(sel, rd_bare).nx)
+            @test with_tax == without
         end
     end
 

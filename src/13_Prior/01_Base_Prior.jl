@@ -233,18 +233,38 @@ function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
+    prior_regression_remedy
+
+The cause-and-remedy half of every "this prior carries no factor block" message, written
+once so the two kinds of consumer cannot drift apart on it.
+
+Consumers differ in *what* they wanted the loadings for — projecting factor moments through
+them, or drawing them — so each supplies its own opening sentence via
+[`assert_prior_regression`](@ref)'s `lead`. What none of them may restate is the diagnosis:
+there is exactly one way to arrive with `rr === nothing`, and exactly one remedy, and both
+are consequences of ADR 0046 rather than of the consumer.
+
+# Related
+
+  - [`assert_prior_regression`](@ref)
+"""
+const prior_regression_remedy = "No regression was ever computed: wrapping estimators forward `rr` and the factor block `fpr` (ADR 0046), so nesting order does not matter, but nothing in the chain produces loadings (e.g. `EntropyPoolingPrior(; pe = EmpiricalPrior())`). Put an estimator that produces them at the bottom, such as `FactorPrior`."
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a wrapped prior result carries a factor block, so its loadings can be projected.
+Assert that a prior result carries a factor block, so its loadings can be read.
 
 Estimators whose `pe` field is typed [`AbstractLowOrderPriorEstimator_F_AF`](@ref) accept the [`AbstractLowOrderPriorEstimator_AF`](@ref) half of that union, whose members use factor returns only *optionally*. The type therefore constrains which returns an estimator **consumes**, not whether the result it **produces** carries a regression. An estimator that projects factor moments through the loadings needs the latter, and must check for it.
 
-There are two ways to arrive with `pr.rr === nothing`: the wrapped estimator never computed a regression (`EntropyPoolingPrior(; pe = EmpiricalPrior())`), or it wrapped one that did and discarded it ([`BlackLittermanPrior`](@ref) forwards neither `rr` nor `f_mu`/`f_sigma`). Checking `rr` covers the whole factor block, because [`LowOrderPrior`](@ref) already requires `rr`, `f_mu` and `f_sigma` to be provided together or not at all.
+There is one way to arrive with `pr.rr === nothing`: nothing in the chain ever computed a regression (`EntropyPoolingPrior(; pe = EmpiricalPrior())`). Discarding one is no longer possible — every wrapping estimator forwards `rr` and the factor block `fpr` under ADR 0046, so nesting order does not matter. Checking `rr` covers the whole factor block, because [`LowOrderPrior`](@ref) already requires `rr` and `fpr` to be provided together or not at all — which is why the plotting entry points that want `fpr.mu` or `fpr.sigma` check `rr` here rather than testing the virtual read they are about to take.
+
+Estimators are not the only consumer: the factor-space plotting entry points need the same block, and get the same diagnosis. Only the opening sentence differs, so `lead` carries it and [`prior_regression_remedy`](@ref) carries the rest.
 
 # Arguments
 
-  - `pr`: Prior result produced by the wrapped estimator.
-  - `sym`: Name of the field holding the wrapped estimator, used in the error message.
+  - `pr`: Prior result handed to the consumer.
+  - `sym`: Name of the field or argument the result arrived through, used in the error message.
+  - `lead`: Opening sentence naming what needed the loadings and what it found instead. Defaults to the wrapping-estimator case; a consumer that is not an estimator must supply its own, because the default's claim about the *type* not guaranteeing a regression is an estimator-field claim.
 
 # Validation
 
@@ -255,10 +275,11 @@ There are two ways to arrive with `pr.rr === nothing`: the wrapped estimator nev
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`Regression`](@ref)
+  - [`prior_regression_remedy`](@ref)
 """
-function assert_prior_regression(pr::AbstractPriorResult, sym::Sym_Str = :pe)::Nothing
-    @argcheck(!isnothing(pr.rr),
-              IsNothingError("this estimator projects factor moments through the regression loadings, so the prior it wraps must carry one, but `$sym` produced a result with `rr === nothing`. `$sym` accepts estimators that use factor returns only optionally, so the type does not guarantee a regression. Either `$sym` never computed one (e.g. `EntropyPoolingPrior(; pe = EmpiricalPrior())`), or it wrapped a prior that did and discarded it (`BlackLittermanPrior` forwards neither `rr` nor `f_mu`/`f_sigma`). Use an estimator that produces loadings, such as `FactorPrior`."))
+function assert_prior_regression(pr::AbstractPriorResult, sym::Sym_Str = :pe;
+                                 lead::AbstractString = "this estimator projects factor moments through the regression loadings, so the prior it wraps must carry one, but `$sym` produced a result with `rr === nothing`. `$sym` accepts estimators that use factor returns only optionally, so the type does not guarantee a regression.")::Nothing
+    @argcheck(!isnothing(pr.rr), IsNothingError("$lead $prior_regression_remedy"))
     return nothing
 end
 """
@@ -299,7 +320,7 @@ Two fields are *bound* to another field's value rather than being independent, s
 
 A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from the carrier.
 
-Everything else the constructor already covers: `rr`, `f_mu` and `f_sigma` must be supplied together or not at all, and `w`, `chol` and `Z` are re-checked against the shape of `X` and `mu`.
+Everything else the constructor already covers: `rr` and `fpr` must be supplied together or not at all, and `w`, `chol` and `Z` are re-checked against the shape of `X` and `mu`.
 
 ## What does not fit
 
@@ -829,13 +850,19 @@ $(DocStringExtensions.FIELDS)
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:Regression} = nothing,
-        f_mu::Option{<:VecNum} = nothing,
-        f_sigma::Option{<:MatNum} = nothing,
-        f_w::Option{<:VecNum} = nothing,
+        fpr::Option{<:LowOrderPrior} = nothing,
         Z::Option{<:MatNum_Arr3Num} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
+
+## The factor block
+
+A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`; `fpr.Z` is therefore factors × features, which is why an asset-axis `Z` never comes from it.
+
+`fpr` travels with `rr`: the two are the factor block, and the constructor requires them together or not at all. `rr` is what projects the block onto the assets (`mu ≈ rr.M * fpr.mu + rr.b`), so a factor distribution with no loadings could not be read against this asset axis.
+
+The flat names are **virtual reads** of the nested block, so code written against the old shape is unaffected: `pr.f_mu`, `pr.f_sigma` and `pr.f_w` return `fpr.mu`, `fpr.sigma` and `fpr.w`, or `nothing` when there is no factor block, and `pr.f_ens`, `pr.f_kld` and `pr.f_ow` come with them. They are properties, not fields — [`forward_prior`](@ref) and [`prior_field_values`](@ref) see only `fpr`.
 
 ## Composition: what a wrapping estimator forwards
 
@@ -863,10 +890,9 @@ Every prior estimator that wraps another **forwards it**, so nesting order does 
   - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
   - If `ow` is not `nothing`, `!isempty(ow)`.
-  - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
-  - If `f_sigma` is not `nothing`, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
+  - `rr` and `fpr` must be provided together or not at all.
+  - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `f_w` is not `nothing`, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
   - If `Z` is not `nothing`, it is non-empty, all-finite, and assets-major against `X`: `size(Z, 1) == size(X, 2)` when static, `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)` when time-varying (see [`check_feature_matrix`](@ref)).
 
 # Examples
@@ -875,19 +901,17 @@ Every prior estimator that wraps another **forwards it**, so nesting order does 
 julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                      sigma = [0.0001 0.0002; 0.0002 0.0003])
 LowOrderPrior
-        X ┼ 2×2 Matrix{Float64}
-       mu ┼ Vector{Float64}: [0.02, 0.03]
-    sigma ┼ 2×2 Matrix{Float64}
-     chol ┼ nothing
-        w ┼ nothing
-      ens ┼ nothing
-      kld ┼ nothing
-       ow ┼ nothing
-       rr ┼ nothing
-     f_mu ┼ nothing
-  f_sigma ┼ nothing
-      f_w ┼ nothing
-        Z ┴ nothing
+      X ┼ 2×2 Matrix{Float64}
+     mu ┼ Vector{Float64}: [0.02, 0.03]
+  sigma ┼ 2×2 Matrix{Float64}
+   chol ┼ nothing
+      w ┼ nothing
+    ens ┼ nothing
+    kld ┼ nothing
+     ow ┼ nothing
+     rr ┼ nothing
+    fpr ┼ nothing
+      Z ┴ nothing
 ```
 
 # Related
@@ -938,17 +962,9 @@ LowOrderPrior
     """
     rr
     """
-    $(field_dict[:f_mu])
+    $(field_dict[:fpr])
     """
-    f_mu
-    """
-    $(field_dict[:f_sigma])
-    """
-    f_sigma
-    """
-    $(field_dict[:f_w])
-    """
-    f_w
+    fpr
     """
     $(field_dict[:Z_prior])
     """
@@ -956,8 +972,7 @@ LowOrderPrior
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:ObsWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
-                           rr::Option{<:Regression}, f_mu::Option{<:VecNum},
-                           f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum},
+                           rr::Option{<:Regression}, fpr::Option{<:LowOrderPrior},
                            Z::Option{<:MatNum_Arr3Num})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -976,49 +991,52 @@ LowOrderPrior
         if !isnothing(ow)
             @argcheck(!isempty(ow), IsEmptyError("ow cannot be empty"))
         end
-        loadings_flag = !isnothing(rr)
-        f_mu_flag = !isnothing(f_mu)
-        f_sigma_flag = !isnothing(f_sigma)
-        if loadings_flag || f_mu_flag || f_sigma_flag
-            @argcheck(loadings_flag,
-                      ArgumentError("rr must be provided when f_mu or f_sigma is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
-            @argcheck(f_mu_flag,
-                      ArgumentError("f_mu must be provided when rr or f_sigma is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
-            @argcheck(f_sigma_flag,
-                      ArgumentError("f_sigma must be provided when rr or f_mu is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
-            @argcheck(!isempty(f_mu), IsEmptyError("f_mu cannot be empty"))
-            @argcheck(!isempty(f_sigma), IsEmptyError("f_sigma cannot be empty"))
-            assert_matrix_issquare(f_sigma, :f_sigma)
-            @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1),
-                      DimensionMismatch("size(rr.M, 2) = $(size(rr.M, 2)), length(f_mu) = $(length(f_mu)), and size(f_sigma, 1) = $(size(f_sigma, 1)) must all match"))
+        # `rr` and `fpr` are the factor block. The block is validated as a whole here and
+        # only against this asset axis: everything internal to it — its own `mu`/`sigma`
+        # shapes, and its own `w` against its own `X` — is its own constructor's job.
+        rr_is_nothing = isnothing(rr)
+        fpr_is_nothing = isnothing(fpr)
+        @argcheck(rr_is_nothing == fpr_is_nothing,
+                  ArgumentError("rr and fpr are the factor block and must be provided together or not at all, isnothing(rr) = $(rr_is_nothing), isnothing(fpr) = $(fpr_is_nothing)"))
+        if !rr_is_nothing
+            @argcheck(size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1),
+                      DimensionMismatch("size(rr.M, 2) = $(size(rr.M, 2)), length(fpr.mu) = $(length(fpr.mu)), and size(fpr.sigma, 1) = $(size(fpr.sigma, 1)) must all match"))
             @argcheck(size(rr.M, 1) == length(mu),
                       DimensionMismatch("size(rr.M, 1) = $(size(rr.M, 1)) must match length(mu) = $(length(mu))"))
+            @argcheck(size(fpr.X, 1) == size(X, 1),
+                      DimensionMismatch("size(fpr.X, 1) ($(size(fpr.X, 1))) must match size(X, 1) ($(size(X, 1))): the asset and factor blocks describe the same observations"))
         end
         if !isnothing(chol)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
-        if !isnothing(f_w)
-            @argcheck(!isempty(f_w), IsEmptyError("f_w cannot be empty"))
-            @argcheck(length(f_w) == size(X, 1),
-                      DimensionMismatch("length(f_w) ($(length(f_w))) must match size(X, 1) ($(size(X, 1)))"))
-        end
         check_feature_matrix(Z, size(X, 2), size(X, 1), "size(X, 2)")
         return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
-                   typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
-                   typeof(f_sigma), typeof(f_w), typeof(Z)}(X, mu, sigma, chol, w, ens, kld,
-                                                            ow, rr, f_mu, f_sigma, f_w, Z)
+                   typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
+                   typeof(Z)}(X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
     end
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        chol::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
-                       f_mu::Option{<:VecNum} = nothing,
-                       f_sigma::Option{<:MatNum} = nothing, f_w::Option{<:VecNum} = nothing,
+                       fpr::Option{<:LowOrderPrior} = nothing,
                        Z::Option{<:MatNum_Arr3Num} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w, Z)
+    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+end
+# The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
+# against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
+# `compute` with a lambda rather than `alias(f_mu, fpr.mu)`: a dotted locator guards each
+# intermediate and throws a [`PropertyPathError`](@ref) when a node is `nothing`, where these
+# must return `nothing` — that is what the old flat fields did when there was no factor block.
+@forward_properties LowOrderPrior begin
+    compute(f_mu, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.mu)
+    compute(f_sigma, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.sigma)
+    compute(f_w, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.w)
+    compute(f_ens, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.ens)
+    compute(f_kld, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.kld)
+    compute(f_ow, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.ow)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1026,6 +1044,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
 
 The feature matrix is subselected on its asset axis only. Its feature axis is never sliced: a prior-side `Z` is *derived*, and every producer that builds a square one refits on the subproblem's own universe, so there is no full-universe square matrix here to cut down. Observations are taken whole (`Colon`): folds slice observations *before* the prior is fit, so a derived `Z` is already fold-local by the time it reaches here.
+
+The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a distribution over factors. Only `rr` is cut down, on its asset axis.
 
 # Related
 
@@ -1038,8 +1058,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w,
-                         Z = feature_matrix_view(pr.Z, false, :, i))
+                         fpr = pr.fpr, Z = feature_matrix_view(pr.Z, false, :, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1052,6 +1071,12 @@ Container type for high order prior results.
 
 $(DocStringExtensions.FIELDS)
 
+## The factor block
+
+A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the carrier has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
+
+`fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the low order carrier's own factor block, and the constructor **enforces that the two are the same object** — see the validation below.
+
 # Constructors
 
     HighOrderPrior(;
@@ -1062,7 +1087,8 @@ $(DocStringExtensions.FIELDS)
         S2::Option{<:MatNum} = nothing,
         sk::Option{<:MatNum} = nothing,
         V::Option{<:MatNum} = nothing,
-        skmp::Option{<:AbstractMatrixProcessingEstimator} = MatrixProcessing()
+        skmp::Option{<:AbstractMatrixProcessingEstimator} = MatrixProcessing(),
+        fpr::Option{<:HighOrderPrior} = nothing
     ) -> HighOrderPrior
 
 Keywords correspond to the struct's fields.
@@ -1073,6 +1099,7 @@ Defining `N = length(pr.mu)`.
 
   - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty, and `size(kt) == (N^2, N^2)`, `size(L2) == size(S2) == (div(N * (N + 1), 2), N^2)`.
   - If `sk` or `V` are provided, both must be provided, non-empty, and `size(sk) == (N, N^2)`, `size(V) == (N, N)`.
+  - If `fpr` is provided, `pr.fpr` must be provided and `fpr.pr === pr.fpr` — the factor distribution the factor co-moments were computed against is the low order carrier's own factor block, not a second copy of it. The converse does not hold: a low order factor block with no factor co-moments is ordinary, so `fpr === nothing` is always allowed. Everything internal to the factor block, including its own shapes against its own `N`, is validated by its own constructor.
 
 # Examples
 
@@ -1086,19 +1113,17 @@ julia> HighOrderPrior(;
                       V = rand(2, 2))
 HighOrderPrior
     pr ┼ LowOrderPrior
-       │         X ┼ 2×2 Matrix{Float64}
-       │        mu ┼ Vector{Float64}: [0.02, 0.03]
-       │     sigma ┼ 2×2 Matrix{Float64}
-       │      chol ┼ nothing
-       │         w ┼ nothing
-       │       ens ┼ nothing
-       │       kld ┼ nothing
-       │        ow ┼ nothing
-       │        rr ┼ nothing
-       │      f_mu ┼ nothing
-       │   f_sigma ┼ nothing
-       │       f_w ┼ nothing
-       │         Z ┴ nothing
+       │       X ┼ 2×2 Matrix{Float64}
+       │      mu ┼ Vector{Float64}: [0.02, 0.03]
+       │   sigma ┼ 2×2 Matrix{Float64}
+       │    chol ┼ nothing
+       │       w ┼ nothing
+       │     ens ┼ nothing
+       │     kld ┼ nothing
+       │      ow ┼ nothing
+       │      rr ┼ nothing
+       │     fpr ┼ nothing
+       │       Z ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
@@ -1106,9 +1131,7 @@ HighOrderPrior
     sk ┼ 2×4 Matrix{Float64}
      V ┼ 2×2 Matrix{Float64}
   skmp ┼ nothing
-  f_kt ┼ nothing
-  f_sk ┼ nothing
-   f_V ┴ nothing
+   fpr ┴ nothing
 ```
 
 # Related
@@ -1153,24 +1176,14 @@ HighOrderPrior
     """
     skmp
     """
-    $(field_dict[:f_kt])
+    $(field_dict[:fpr])
     """
-    f_kt
-    # chol_kt
-    """
-    $(field_dict[:f_sk])
-    """
-    f_sk
-    """
-    $(field_dict[:f_V])
-    """
-    f_V
+    fpr
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             D2::Option{<:MatNum}, L2::Option{<:MatNum},
                             S2::Option{<:MatNum}, sk::Option{<:MatNum}, V::Option{<:MatNum},
                             skmp::Option{<:AbstractMatrixProcessingEstimator},
-                            f_kt::Option{<:MatNum}, #chol_kt::Option{<:MatNum},
-                            f_sk::Option{<:MatNum}, f_V::Option{<:MatNum})
+                            fpr::Option{<:HighOrderPrior})
         N = length(pr.mu)
         sk_flag = isa(sk, MatNum)
         kt_flag = isa(kt, MatNum)
@@ -1217,38 +1230,22 @@ HighOrderPrior
             @argcheck(size(sk) == (N, N^2),
                       DimensionMismatch("size(sk) = $(size(sk)) must be ($N, $(N^2))"))
         end
-        f_kt_flag = !isnothing(f_kt)
-        f_sk_flag = !isnothing(f_sk)
-        if f_kt_flag || f_sk_flag
-            rr = pr.rr
-            @argcheck(!isnothing(rr),
-                      IsNothingError("factor cokurtosis/coskewness (`f_kt`/`f_sk`) require a regression result, but the prior's `rr` is nothing — supply a factor-based prior whose `rr` is set"))
-            Nf = size(rr.M, 2)
-            if f_kt_flag
-                @argcheck(!isempty(f_kt),
-                          IsEmptyError("$(err_name_dict[:f_kt]) (`f_kt`) cannot be empty"))
-                # @argcheck(!isempty(chol_kt))
-                assert_matrix_issquare(f_kt, :f_kt)
-                @argcheck(Nf^2 == size(f_kt, 1),
-                          DimensionMismatch("Nf^2 ($( Nf^2)) must match size(f_kt, 1) ($(size(f_kt, 1)))"))
-                # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
-            end
-            if f_sk_flag
-                @argcheck(!isempty(f_sk),
-                          IsEmptyError("$(err_name_dict[:f_sk]) (`f_sk`) cannot be empty"))
-                @argcheck(!isempty(f_V),
-                          IsEmptyError("$(err_name_dict[:f_V]) (`f_V`) cannot be empty"))
-                @argcheck(size(f_sk) == (Nf, Nf^2),
-                          DimensionMismatch("size(f_sk) ($(size(f_sk))) must be ($Nf, $(Nf^2))"))
-                @argcheck(size(f_V) == (Nf, Nf),
-                          DimensionMismatch("size(f_V) ($(size(f_V))) must be ($Nf, $Nf)"))
-            end
+        # The factor low-order prior is reachable two ways once the factor co-moments nest:
+        # `hop.fpr.pr` and `hop.pr.fpr`. They are the same distribution, so they must be the
+        # same object — otherwise `hop.fpr.mu` and `hop.f_mu` could disagree, and nothing
+        # downstream would say which is the prior the co-moments were computed against.
+        # Everything internal to the block is validated by its own constructor, against its
+        # own `N = length(fpr.pr.mu)`, which is why no factor shape is restated here.
+        if !isnothing(fpr)
+            inner = pr.fpr
+            @argcheck(!isnothing(inner),
+                      IsNothingError("factor co-moments (`fpr`) describe the same factors as the low order prior's own factor block, but the wrapped prior has none: `pr.fpr === nothing`. A `HighOrderPrior` only carries factor co-moments over a prior that already carries a factor distribution — fit it through a factor-based estimator such as `FactorPrior`."))
+            @argcheck(fpr.pr === inner,
+                      ConflictingArgumentError("the factor low order prior is reachable two ways, as `fpr.pr` and as `pr.fpr`, and they must be the same object, but they differ. `fpr.pr` is the distribution the factor co-moments were computed against, so a mismatch would make `hop.fpr.mu` and `hop.f_mu` disagree with no way to tell which is right. Build the nested block from the wrapped prior's own factor block: `HighOrderPrior(; pr = pr.fpr, kt = ...)`."))
         end
         return new{typeof(pr), typeof(kt), typeof(D2), typeof(L2), typeof(S2), typeof(sk),
-                   typeof(V), typeof(skmp), typeof(f_kt), #typeof(chol_kt),
-                   typeof(f_sk), typeof(f_V)}(pr, kt, D2, L2, S2, sk, V, skmp, f_kt,
-                                              #  chol_kt,
-                                              f_sk, f_V)
+                   typeof(V), typeof(skmp), typeof(fpr)}(pr, kt, D2, L2, S2, sk, V, skmp,
+                                                         fpr)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
@@ -1256,17 +1253,15 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
                         S2::Option{<:MatNum} = nothing, sk::Option{<:MatNum} = nothing,
                         V::Option{<:MatNum} = nothing,
                         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
-                        f_kt::Option{<:MatNum} = nothing,
-                        # chol_kt::Option{<:MatNum} = nothing,
-                        f_sk::Option{<:MatNum} = nothing,
-                        f_V::Option{<:MatNum} = nothing)::HighOrderPrior
-    return HighOrderPrior(pr, kt, D2, L2, S2, sk, V, skmp, f_kt, #chol_kt,
-                          f_sk, f_V)
+                        fpr::Option{<:HighOrderPrior} = nothing)::HighOrderPrior
+    return HighOrderPrior(pr, kt, D2, L2, S2, sk, V, skmp, fpr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`HighOrderPrior`](@ref) restricted to assets at index `i`, slicing all relevant moment tensors accordingly.
+
+The factor block is forwarded **unsliced**, as it is on [`LowOrderPrior`](@ref): `i` indexes assets, and `fpr` holds co-moments over factors. Forwarding it by identity is also what keeps `fpr.pr === pr.fpr` true of the view, since the low order view forwards its own factor block the same way.
 
 # Related
 
@@ -1294,12 +1289,31 @@ function port_opt_view(pr::HighOrderPrior, i, args...)
     end
     return HighOrderPrior(; pr = port_opt_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), D2 = D2, L2 = L2,
-                          S2 = S2, sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt,
-                          f_sk = pr.f_sk, f_V = pr.f_V)
+                          S2 = S2, sk = sk, V = V, skmp = skmp, fpr = pr.fpr)
 end
-# ForwardSelection unknown property names to the embedded `pr` prior, allowing transparent access to
-# low-order moment fields (see [`@forward_properties`](@ref)).
+# The flat `f_`-prefixed names are virtual reads of the nested factor block, mirroring
+# [`LowOrderPrior`](@ref): code written against the pre-nesting shape is unaffected, and
+# `f_D2`/`f_L2`/`f_S2`/`f_skmp` come for free. `compute` with a lambda rather than a dotted
+# locator, because a dotted locator throws a [`PropertyPathError`](@ref) on a `nothing` node
+# where these must return `nothing` — that is what the old flat fields did with no factor
+# block. They are declared before `forward(pr)` only for reading order: the embedded
+# `LowOrderPrior` has no `f_kt`/`f_sk`/`f_V` of its own to shadow.
+#
+# `fpr` is the carrier's own field, so it resolves before `forward(pr)` and names the *high*
+# order factor block rather than the low order one. Reads through it are unaffected by the
+# shift: the nested carrier forwards to its own `pr`, which the constructor pins to
+# `pr.fpr`, so `hop.fpr.mu` is the factor mean either way.
+#
+# ForwardSelection of the remaining unknown property names to the embedded `pr` prior gives
+# transparent access to the low-order moment fields (see [`@forward_properties`](@ref)).
 @forward_properties HighOrderPrior begin
+    compute(f_kt, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.kt)
+    compute(f_sk, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.sk)
+    compute(f_V, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.V)
+    compute(f_D2, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.D2)
+    compute(f_L2, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.L2)
+    compute(f_S2, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.S2)
+    compute(f_skmp, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.skmp)
     forward(pr)
 end
 """

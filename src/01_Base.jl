@@ -231,13 +231,10 @@ const arg_dict = Dict(
                       :window => "`window`: Observation window.",
                       # Prior results.
                       :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
-                      :w_prior => "`w`: Portfolio weights vector used in prior computation.",#
+                      :w_prior => "`w`: Observation weights the prior was computed under `observations × 1` (see [`ObsWeights`](@ref)), or `nothing` if it was computed unweighted. Binds `ens`, `kld` and `ow`, which are diagnostics of it (see [`forward_prior`](@ref)).",#
                       :ens => "`ens`: Effective sample size.",#
-                      :kld => "`kld`: Kullback-Leibler divergence.",#
-                      :rr => "`rr`: Returns result.",#
-                      :f_mu => "`f_mu`: Factor expected returns vector.",#
-                      :f_sigma => "`f_sigma`: Factor covariance matrix.",#
-                      :f_w => "`f_w`: Factor weights vector.",#
+                      :kld => "`kld`: Kullback-Leibler divergence of `w` from the weights it was derived from: a scalar against the prior observation weights for a single reweighting, or one entry per opinion when `w` came from pooling several.",#
+                      :fpr => "`fpr`: Prior result over the factor axis, or `nothing`. Its `X` is the factor returns matrix, so its `mu`, `sigma` and `w` describe factors rather than assets, over the same observations as the asset block.",#
                       :op_w => "`ow`: Opinion pooling weights.",#
                       :reg_rr => "`rr`: Regression result.",#
                       # Prior estimators.
@@ -279,9 +276,6 @@ const arg_dict = Dict(
                       :Q => "`Q`: Views values vector `views × 1`.",#
                       :excl => "`excl`: Indices of views to exclude.",#
                       # High order priors.
-                      :f_kt => "`f_kt`: Factor cokurtosis matrix.",#
-                      :f_sk => "`f_sk`: Factor coskewness matrix.",#
-                      :f_V => "`f_V`: Factor sum of negative spectral slices of the coskewness matrix.",#
                       :skmp => "`skmp`: Coskewness matrix processing estimator.",#
                       :D2 => "`D2`: Duplication matrix.",#
                       :L2 => "`L2`: Elimination matrix.",#
@@ -671,9 +665,7 @@ symbol. The symbol itself is appended at the call site, giving messages like
 const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
                            :V => "negative spectral coskewness",
                            :D2 => "duplication matrix", :L2 => "elimination matrix",
-                           :S2 => "summation matrix", :f_kt => "factor cokurtosis",
-                           :f_sk => "factor coskewness",
-                           :f_V => "factor negative spectral coskewness")
+                           :S2 => "summation matrix")
 """
     const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 

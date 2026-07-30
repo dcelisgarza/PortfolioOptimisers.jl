@@ -3,7 +3,8 @@ Unit tests for `forward_prior` and the `reconstruct_prior` it is built on
 (ADR 0046). These pin the composition rule's mechanics — forwarding is the
 default, drops are explicit, the two field bindings are enforced, and the
 carrier's own validation runs on every reconstruction — without going through any
-estimator, since no construction site calls the helper yet.
+estimator. What the construction sites actually forward is pinned separately, in
+`test_12g_forwarding_rule.jl`.
 =#
 const PO = PortfolioOptimisers
 
@@ -49,7 +50,7 @@ end
     @test fpr isa LowOrderPrior
     @test fpr.mu == [0.05, 0.06]
     # Every other field is the very same object, not a copy or a recomputation.
-    for sym in (:X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :f_mu, :f_sigma, :f_w, :Z)
+    for sym in (:X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :Z)
         @test getfield(fpr, sym) === getfield(pr, sym)
     end
     # In particular, the three fields whose silent loss motivated ADR 0046.
@@ -157,20 +158,38 @@ end
     pr = factor_prior()
     @test !isnothing(pr.rr)
 
-    # The factor block is all-or-none, so dropping one third of it throws — the
+    # The factor block is all-or-none, so dropping one half of it throws — the
     # point of routing through the carrier's own constructor.
-    @test_throws ArgumentError PO.forward_prior(pr; f_mu = nothing)
-    @test_throws ArgumentError PO.forward_prior(pr; f_sigma = nothing)
     @test_throws ArgumentError PO.forward_prior(pr; rr = nothing)
+    @test_throws ArgumentError PO.forward_prior(pr; fpr = nothing)
     # Dropping the whole block at once is valid.
-    @test isnothing(PO.forward_prior(pr; rr = nothing, f_mu = nothing, f_sigma = nothing).rr)
+    dropped = PO.forward_prior(pr; rr = nothing, fpr = nothing)
+    @test isnothing(dropped.rr)
+    @test isnothing(dropped.fpr)
+
+    # The flat `f_*` names read the nested block but are not fields of the carrier, so
+    # they cannot be patched — the same refusal `mu` gets on a `HighOrderPrior`.
+    for sym in (:f_mu, :f_sigma, :f_w)
+        err = try
+            PO.forward_prior(pr; NamedTuple{(sym,)}((nothing,))...)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin(string(sym), sprint(showerror, err))
+        @test occursin("cannot be forwarded", sprint(showerror, err))
+    end
+
+    # The asset and factor blocks must describe the same observations — a check
+    # nothing enforced while the factor moments were flat fields.
+    short_fpr = LowOrderPrior(; X = pr.fpr.X[1:32, :], mu = pr.fpr.mu, sigma = pr.fpr.sigma)
+    @test_throws DimensionMismatch PO.forward_prior(pr; fpr = short_fpr)
 
     # Dimension checks fire on the reconstructed carrier, not on the original.
     bare = plain_prior()
     @test_throws DimensionMismatch PO.forward_prior(bare; mu = [0.1, 0.2, 0.3])
     @test_throws DimensionMismatch PO.forward_prior(bare;
                                                     w = StatsBase.pweights([0.2, 0.3, 0.5]))
-    @test_throws DimensionMismatch PO.forward_prior(bare; f_w = [0.2, 0.3, 0.5])
     @test_throws PortfolioOptimisers.IsEmptyError PO.forward_prior(bare; mu = Float64[],
                                                                    sigma = Matrix{Float64}(undef,
                                                                                            0,
@@ -206,6 +225,24 @@ end
 
     # The bindings are inert on a carrier that owns neither field.
     @test_throws ArgumentError PO.forward_prior(hop; sigma = hop.sigma)
+
+    # `pr` binds `fpr` on a `HighOrderPrior`, but not through a `forward_prior` binding:
+    # the carrier's own `fpr.pr === pr.fpr` invariant catches a patched `pr` that leaves
+    # the nested factor block pointing at the old factor distribution.
+    fhop = Logging.with_logger(Logging.NullLogger()) do
+        rng = StableRNG(987654321)
+        return prior(HighOrderFactorPriorEstimator(), randn(rng, 64, 4) / 100,
+                     randn(rng, 64, 2) / 100)
+    end
+    @test fhop.fpr.pr === fhop.pr.fpr
+    strayed = PO.forward_prior(fhop.fpr;
+                               pr = PO.forward_prior(fhop.pr.fpr; mu = fill(0.01, 2)))
+    @test_throws PO.ConflictingArgumentError PO.forward_prior(fhop; fpr = strayed)
+    # Naming both keeps it consistent, and the invariant survives the round trip.
+    inner = PO.forward_prior(fhop.pr; mu = fill(0.01, 4))
+    patched = PO.forward_prior(fhop; pr = inner, fpr = fhop.fpr)
+    @test patched.mu == fill(0.01, 4)
+    @test patched.fpr.pr === patched.pr.fpr
 end
 
 @testset "reconstruct_prior: the field list is derived, not written out" begin

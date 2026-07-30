@@ -407,9 +407,21 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # system is truncated straight back to the assets, so `a_prior.Z` still binds correctly.
     # `posterior_X` is reconstructed from the factors, so a forwarded `Z` is dimension-correct
     # but was derived from the pre-reconstruction returns (see [`LowOrderPrior`](@ref)).
+    #
+    # The factor block *is* `f_prior`: the augmented posterior is truncated back to the assets,
+    # so the factor distribution this result reports is the prior one, unmodified. Its own `w`
+    # and diagnostics travel with it, which is how the two priors' weightings stay
+    # distinguishable — `w` is `a_prior`'s, `fpr.w` is `f_prior`'s. The asset slot takes
+    # `a_prior`'s because a `@pprop w` consumer applies `w` to a portfolio return series over
+    # the *assets*; two priors disagreeing about observation weights is a legitimate
+    # configuration, and there are two slots to hold them. The diagnostics follow their
+    # weights (ADR 0046), so `ens`/`kld`/`ow` come from `a_prior` too. `chol` is dropped:
+    # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
+    # two priors rather than forwarding one along its own axis, so it builds the carrier
+    # directly instead of going through [`forward_prior`](@ref).
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         rr = rr, f_mu = f_prior_mu, f_sigma = f_prior_sigma,
-                         f_w = f_prior.w, Z = a_prior.Z)
+                         w = a_prior.w, ens = a_prior.ens, kld = a_prior.kld,
+                         ow = a_prior.ow, rr = rr, fpr = f_prior, Z = a_prior.Z)
 end
 
 export AugmentedBlackLittermanPrior

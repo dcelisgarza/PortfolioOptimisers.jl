@@ -675,7 +675,8 @@ function plot_sigma end
 Heatmap of the factor loadings matrix B (assets × factors) from a prior with a regression
 model. Uses a diverging colour scale centred at zero.
 
-Requires that `pr.rr` is not `nothing` (i.e. the prior was estimated with a factor model).
+Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
+`pr.rr` must not be `nothing`. The matrix arity takes `M` directly and needs no prior.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -683,6 +684,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`plot_factor_sigma`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`assert_prior_regression`](@ref)
 """
 function plot_factor_loadings end
 
@@ -703,7 +705,9 @@ function plot_factor_loadings end
 Correlation/covariance heatmap of the factor covariance matrix (`pr.f_sigma`). Behaves
 identically to [`plot_correlation`](@ref) but operates on the factor space.
 
-Requires that `pr.f_sigma` is not `nothing`.
+Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
+`pr.f_sigma` is a virtual read of `pr.fpr.sigma`, and `fpr` travels with `rr`, so the check
+is on `rr`. The matrix arity takes `f_sigma` directly and needs no prior.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -712,6 +716,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
   - [`plot_factor_loadings`](@ref)
   - [`plot_correlation`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`assert_prior_regression`](@ref)
 """
 function plot_factor_sigma end
 
@@ -921,7 +926,9 @@ function plot_prior end
 
 Bar chart of per-factor expected returns (the `f_mu` vector from a factor model prior).
 
-Requires that the prior was estimated with a factor model (`pr.f_mu` is not `nothing`).
+Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
+`pr.f_mu` is a virtual read of `pr.fpr.mu`, and `fpr` travels with `rr`, so the check is on
+`rr`. The vector arity takes `f_mu` directly and needs no prior.
 
 # Arguments
 
@@ -936,6 +943,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`plot_mu`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`assert_prior_regression`](@ref)
 """
 function plot_factor_mu end
 

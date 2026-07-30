@@ -2398,12 +2398,18 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z) = pr
+    # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the
+    # pooled weights: `w1` is threaded into the wrapped estimator by `factory` above, so a
+    # factor prior that records its own weighting will report it here, and one that does not
+    # (`EmpiricalPrior` never sets `w`) is a gap to close at that producer rather than to
+    # paper over from out here — see #217. Writing `w1` on would also owe the factor block
+    # `ens`/`kld` under ADR 0046's binding, which is the coupling that made the flat `f_w` a
+    # duplicate of `w` at five of six producers in the first place.
+    (; X, mu, sigma, chol, rr, fpr, Z) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
-                         kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z)
+                         kld = kld, rr = rr, fpr = fpr, Z = Z)
 end
 """
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -2531,12 +2537,18 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    (; X, mu, sigma, chol, rr, f_mu, f_sigma, Z) = pr
+    # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the
+    # pooled weights: `w1` is threaded into the wrapped estimator by `factory` above, so a
+    # factor prior that records its own weighting will report it here, and one that does not
+    # (`EmpiricalPrior` never sets `w`) is a gap to close at that producer rather than to
+    # paper over from out here — see #217. Writing `w1` on would also owe the factor block
+    # `ens`/`kld` under ADR 0046's binding, which is the coupling that made the flat `f_w` a
+    # duplicate of `w` at five of six producers in the first place.
+    (; X, mu, sigma, chol, rr, fpr, Z) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
-                         kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(rr) ? w1 : nothing, Z = Z)
+                         kld = kld, rr = rr, fpr = fpr, Z = Z)
 end
 
 export RhoParsingResult, LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior,

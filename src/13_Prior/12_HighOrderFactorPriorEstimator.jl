@@ -327,6 +327,9 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     D2 = nothing
     L2 = nothing
     S2 = nothing
+    f_D2 = nothing
+    f_L2 = nothing
+    f_S2 = nothing
     posterior_kt = nothing
     posterior_sk = nothing
     posterior_V = nothing
@@ -347,10 +350,14 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         end
         posterior_sk = M * f_sk * transpose(kM)
     end
+    # The same all-or-none branching the asset block gets, at the factor dimension: the
+    # nested carrier validates its own `kt`/`L2`/`S2` triple against `length(pr.fpr.mu)`.
     if !isnothing(f_kt) && !isnothing(f_sk)
         D2, L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))
+        f_D2, f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))
     elseif !isnothing(f_kt) && isnothing(f_sk)
         L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
+        f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))[2:3]
     end
     if pe.rsd
         err = X - posterior_X
@@ -379,10 +386,18 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     if !isnothing(f_sk)
         posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
     end
+    # The nested block's `pr` is the wrapped prior's own factor block, which is what the
+    # `fpr.pr === pr.fpr` invariant asks for — the factor co-moments and the factor
+    # low-order moments describe one distribution, reachable by either route.
+    fpr = if isnothing(f_kt) && isnothing(f_sk)
+        nothing
+    else
+        HighOrderPrior(; pr = pr.fpr, kt = f_kt, D2 = f_D2, L2 = f_L2, S2 = f_S2, sk = f_sk,
+                       V = f_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp)
+    end
     return HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
                           sk = posterior_sk, V = posterior_V,
-                          skmp = isnothing(f_sk) ? nothing : pe.ske.mp, f_kt = f_kt,
-                          f_sk = f_sk, f_V = f_V)
+                          skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
 end
 
 export HighOrderFactorPriorEstimator

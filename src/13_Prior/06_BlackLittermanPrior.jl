@@ -483,13 +483,17 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    # `Z` is forwarded from the wrapped prior so nesting order does not matter:
-    # `BlackLittermanPrior(; pe = FeaturePrior(…))` reaches `distance` with the same feature
-    # matrix as `FeaturePrior(; pe = BlackLittermanPrior(…))`. Safe because Black-Litterman
-    # leaves `X` untouched (`posterior_X === prior_model.X`), so the asset axis `Z` is
-    # indexed by is the same one it was derived from.
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         Z = prior_model.Z)
+    # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
+    # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
+    # Black-Litterman leaves the observation axis untouched (`posterior_X === prior_model.X`),
+    # so the wrapped `w` still describes exactly the rows of the returned `X`, its `ens`/`kld`/
+    # `ow` still describe that `w`, and `Z` is still indexed by the axis it was derived from —
+    # which is also why nesting order does not matter: `BlackLittermanPrior(; pe =
+    # FeaturePrior(…))` reaches `distance` with the same feature matrix as the other order.
+    # `rr` is structural — the regression of `X` on `F`, over data Black-Litterman does not
+    # modify — and the factor block `fpr` travels with it.
+    return forward_prior(prior_model; mu = posterior_mu, sigma = posterior_sigma,
+                         chol = nothing)
 end
 
 export BlackLittermanPrior

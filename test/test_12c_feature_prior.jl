@@ -3,8 +3,7 @@ using Clustering, StableRNGs, LinearAlgebra
 
 # Every field of a `LowOrderPrior` except the two feature fields. A `FeaturePrior` is a
 # provably pure addition only if all of these come back identical.
-const MOMENT_FIELDS = (:X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :f_mu, :f_sigma,
-                       :f_w)
+const MOMENT_FIELDS = (:X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr)
 # Result structs are immutable, so `==` falls back to `===`, which compares the arrays they
 # hold by identity — two separately computed `Regression`s never match. Recurse instead.
 function eq_moment(a, b)
@@ -57,16 +56,20 @@ end
                                                                        pe = EmpiricalPrior(),
                                                                        ze = RegressionFeatures()),
                                                           rd)
-    # `BlackLittermanPrior` forwards neither `rr` nor `f_mu`/`f_sigma`, so it must be
-    # wrapped from the inside, not the outside.
-    @test_throws PortfolioOptimisers.IsNothingError prior(FeaturePrior(;
-                                                                       pe = BlackLittermanPrior(;
-                                                                                                pe = FactorPrior(),
-                                                                                                sets = sets,
-                                                                                                views = LinearConstraintEstimator(;
-                                                                                                                                  val = ["$(rd.nx[1]) == 0.03"])),
-                                                                       ze = RegressionFeatures()),
-                                                          rd)
+    # `BlackLittermanPrior` forwards `rr` and the factor block `fpr` (ADR 0046), so it no
+    # longer has to be wrapped from the inside: the loadings producer reads through it, and
+    # both nesting orders produce the same feature matrix.
+    blv = LinearConstraintEstimator(; val = ["$(rd.nx[1]) == 0.03"])
+    blout = prior(FeaturePrior(;
+                               pe = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,
+                                                        views = blv),
+                               ze = RegressionFeatures()), rd)
+    blin = prior(BlackLittermanPrior(;
+                                     pe = FeaturePrior(; pe = FactorPrior(),
+                                                       ze = RegressionFeatures()),
+                                     sets = sets, views = blv), rd)
+    @test blout.Z == fp.rr.L
+    @test blout.Z == blin.Z
 end
 
 @testset "Nesting order does not matter" begin

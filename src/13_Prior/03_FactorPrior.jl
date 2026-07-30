@@ -201,10 +201,20 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
     # factors × features and would not describe the asset axis. To attach features here, wrap
     # this estimator — `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads
     # the loadings back off the result.
+    #
+    # The factor block *is* the prior that was fit on the factors: it needs no reconstruction,
+    # because nothing here modifies the factor distribution — the asset moments are its
+    # projection through `rr`.
+    #
+    # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
+    # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
+    # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
+    # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
+    # sizes every uncertainty set built on this result.
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, rr = rr, f_mu = f_mu,
-                         f_sigma = f_sigma, f_w = f_prior.w)
+                                                  :)), w = f_prior.w, ens = f_prior.ens,
+                         kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = f_prior)
 end
 
 export FactorPrior

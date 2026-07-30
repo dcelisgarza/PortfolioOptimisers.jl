@@ -269,9 +269,9 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
               DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
-    posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
-                                                  prior_result.f_mu, prior_result.f_sigma,
-                                                  prior_result.rr
+    posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
+                                        prior_result.fpr, prior_result.rr
+    f_mu, f_sigma = fpr.mu, fpr.sigma
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
                                  size(F, 1), eltype(posterior_X), strict)
     (; b, M) = rr
@@ -283,10 +283,15 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
-    # `prior_result` is fit on the assets, so its feature matrix is over this asset axis and
-    # is forwarded (see [`LowOrderPrior`](@ref)); `posterior_X` is `prior_result.X` unchanged.
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, Z = prior_result.Z)
+    # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
+    # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
+    # `posterior_X` is `prior_result.X` unchanged, so the wrapped `w` still describes exactly
+    # the rows of the returned `X`, its `ens`/`kld`/`ow` still describe that `w`, and the
+    # feature matrix is still over this asset axis. The views are applied to the factor
+    # distribution only to reach the assets through `rr`; the factor block this result reports
+    # is the wrapped prior's, forwarded whole.
+    return forward_prior(prior_result; mu = posterior_mu, sigma = posterior_sigma,
+                         chol = nothing)
 end
 
 export BayesianBlackLittermanPrior

@@ -330,11 +330,22 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     end
     # No `Z` is forwarded: the only wrapped prior here is `f_prior`, fit on the factors, so
     # its feature matrix would be factors × features and would not describe the asset axis.
+    #
+    # This is the one site that *modifies* the factor block rather than passing it through:
+    # the views land on the factor distribution. `chol` is dropped because `f_posterior_sigma`
+    # supersedes the factor prior's covariance (see [`forward_prior`](@ref)); everything else
+    # the factor prior carried — its `w` and that weighting's diagnostics — is forwarded.
+    fpr = forward_prior(f_prior; mu = f_posterior_mu, sigma = f_posterior_sigma,
+                        chol = nothing)
+    #
+    # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
+    # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
+    # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
+    # — a weighting with no provenance cannot be interrogated (ADR 0046).
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, rr = rr,
-                         f_mu = f_posterior_mu, f_sigma = f_posterior_sigma,
-                         f_w = f_prior.w)
+                                                  :)), w = f_prior.w, ens = f_prior.ens,
+                         kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)
 end
 
 export FactorBlackLittermanPrior

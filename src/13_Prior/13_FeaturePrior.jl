@@ -66,7 +66,7 @@ Both are assets-major and both are row-sliced by `port_opt_view(re, i)`, so the 
 
 # Validation
 
-  - The wrapped prior must carry a regression (see [`assert_prior_regression`](@ref)). `BlackLittermanPrior` forwards neither `rr` nor `f_mu`/`f_sigma`, so `FeaturePrior(; pe = BlackLittermanPrior(…), ze = RegressionFeatures())` throws; nest the other way round instead.
+  - The wrapped prior must carry a regression (see [`assert_prior_regression`](@ref)). Nesting order does not matter: every wrapping estimator forwards `rr` and the factor block `fpr` (ADR 0046), so `FeaturePrior(; pe = BlackLittermanPrior(; pe = FactorPrior(…)), ze = RegressionFeatures())` and `BlackLittermanPrior(; pe = FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures()))` both resolve. What throws is a wrapped prior that never computed a regression at all, such as `EmpiricalPrior`.
 
 # Examples
 
@@ -607,9 +607,9 @@ function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims:
     end
     pr = prior(pe.pe, X, F; kwargs...)
     Z = feature_matrix(pe.ze, pr, X, F, pe.sets; kwargs...)
-    return LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, chol = pr.chol, w = pr.w,
-                         ens = pr.ens, kld = pr.kld, ow = pr.ow, rr = pr.rr, f_mu = pr.f_mu,
-                         f_sigma = pr.f_sigma, f_w = pr.f_w, Z = Z)
+    # This estimator only attaches a feature matrix, so `Z` is the single deviation from the
+    # wrapped result and everything else forwards untouched (see [`forward_prior`](@ref)).
+    return forward_prior(pr; Z = Z)
 end
 
 export AbstractFeatureMatrixEstimator, RegressionFeatures, FeaturePrior, feature_matrix,

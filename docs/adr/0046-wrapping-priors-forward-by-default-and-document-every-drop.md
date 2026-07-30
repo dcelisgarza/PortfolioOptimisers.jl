@@ -187,3 +187,145 @@ of the factor prior along its own axis.
   exported, following `port_opt_view` and `assert_prior_regression`), so an estimator defined outside
   the package composes correctly by default instead of having to rediscover the field-by-field
   contract.
+
+## Amendment (2026-07-30): the factor block is one field, `fpr`
+
+`LowOrderPrior`'s factor block is no longer the three flat fields `f_mu`, `f_sigma` and `f_w`. It is a
+single nested prior result, `fpr::Option{<:LowOrderPrior}`, whose `X` is the factor returns matrix
+over the same observations as the asset block. Two statements above are therefore read with `fpr` in
+place of `f_mu`/`f_sigma`:
+
+- What the constructor enforces is now that **`rr` and `fpr`** are supplied together or not at all,
+  plus `size(fpr.X, 1) == size(X, 1)` — the shared observation axis, which nothing checked while the
+  factor moments were flat fields. Everything internal to the block, including its own `w` against
+  its own `X`, is validated by its own constructor rather than restated here.
+- The docstring warning about forwarding the factor block through Black-Litterman is unchanged in
+  substance — `mu != M * fpr.mu + b` — but it now covers the whole block in one field rather than a
+  pair of fields that could drift apart.
+
+Two consequences for the rule's mechanics:
+
+- **The question "which factor fields does a wrapper forward?" no longer exists.** A wrapper forwards
+  the factor block or it does not; there is no subset to disagree about, which was the failure mode
+  this ADR exists to end. `f_ens`, `f_kld` and `f_ow` come with it at no storage cost.
+- **`forward_prior` refuses the flat names**, because they are properties rather than fields — the
+  same refusal `mu` gets on a `HighOrderPrior`. A construction site names `fpr`.
+
+The flat names remain readable — `pr.f_mu`, `pr.f_sigma`, `pr.f_w` and now `pr.f_ens`, `pr.f_kld`,
+`pr.f_ow` are computed properties of the nested block, returning `nothing` when there is no factor
+block, exactly as the fields did. Whether they or `pr.fpr.mu` are the idiomatic public read is not
+settled here.
+
+## Amendment (2026-07-30): `HighOrderPrior` nests too, and the shared inner prior is enforced
+
+`HighOrderPrior` gets the same treatment as `LowOrderPrior`: `f_kt`, `f_sk` and `f_V` are replaced by
+a single nested `fpr::Option{<:HighOrderPrior}` over the factors, taking the carrier from eleven
+fields to nine. As before, the flat names survive as computed properties, and `f_D2`, `f_L2`, `f_S2`
+and `f_skmp` come with them at no storage cost. The direction is one-way: factor co-moments require a
+low order factor block, but a low order factor block with no co-moments over it is ordinary, so
+`fpr === nothing` is always allowed.
+
+Nesting at two orders makes the factor low order prior reachable by two routes — `hop.fpr.pr`, the
+nested high order block's own prior, and `hop.pr.fpr`, the wrapped low order carrier's factor block.
+**They must be the same object, and the constructor enforces it** (`fpr.pr === inner`), rather than
+leaving the two free to drift. The alternative — deriving one from the other so there is only one
+route — was rejected: `fpr` has to be a `HighOrderPrior` for its own constructor to validate the
+factor co-moment shapes, and a `HighOrderPrior` has a `pr`. The redundancy is inherent to the shape;
+what is avoidable is letting it be inconsistent.
+
+Two decisions follow from that:
+
+- **The check is `===`, not `==`.** Both carriers are immutable, so `===` is field-wise egality with
+  arrays compared by identity: it accepts a nested block rebuilt around the very same arrays and
+  refuses one refit to numerically equal values. "Refit and it happened to agree" is exactly the case
+  worth refusing, because the two routes would then be two computations rather than one distribution.
+- **The error message is the whole user-facing surface of this design**, so it distinguishes the two
+  ways to get it wrong. Nesting over a prior with no factor block at all raises `IsNothingError`
+  naming `pr.fpr === nothing` and pointing at `FactorPrior`; nesting a block whose inner prior
+  differs raises `ConflictingArgumentError` naming both routes, saying what would go wrong
+  (`hop.fpr.mu` and `hop.f_mu` disagreeing with no way to tell which is right), and giving the fix
+  (`HighOrderPrior(; pr = pr.fpr, kt = ...)`).
+
+`forward_prior` gains no new binding for this. Patching `pr` on a `HighOrderPrior` without patching
+`fpr` is caught by the constructor with the message above, which is more specific than a binding
+error could be — the same reason `rr`/`fpr` togetherness is left to the constructor.
+
+One name shifts meaning: `hop.fpr` is now the carrier's own field, the *high* order factor block,
+where before it resolved through `forward(pr)` to the low order one. Reads through it are unaffected,
+because the nested carrier forwards to its own `pr` and the invariant pins that to `pr.fpr` — so
+`hop.fpr.mu` is the factor mean either way, and `hop.fpr` is simply "the factor prior at this order".
+
+## Amendment (2026-07-30): the rule is applied at every construction site
+
+The Consequences above open with "no estimator's behaviour changes when this lands", which was true
+of the helper on its own. Applying the rule at the sites is where the behaviour changes, and it has
+now landed. This records what changed and what it fixed.
+
+Two sites became a `forward_prior` call, because they wrap one prior along its own axis and change
+only the asset moments:
+
+- [`BlackLittermanPrior`](../../src/13_Prior/06_BlackLittermanPrior.jl) — was forwarding `X`, `mu`,
+  `sigma` and `Z`, and dropping the other seven fields. Now `chol` is its only drop.
+- [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl) — same, and
+  it was already forwarding `rr` and the factor block.
+
+[`FeaturePrior`](../../src/13_Prior/13_FeaturePrior.jl) also collapses to one, with `Z` as the single
+deviation; it was already forwarding everything by hand, so the change is that the hand-written list
+can no longer drift from the carrier's field list.
+
+Three sites keep a direct constructor call, as the Decision section says they should, and gained the
+diagnostics that were missing from the `w` they already forwarded:
+
+- [`FactorPrior`](../../src/13_Prior/03_FactorPrior.jl) and
+  [`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl) — `w =
+  f_prior.w` was correct and stays; `ens`/`kld`/`ow` now travel with it.
+- [`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) — the asset
+  slot takes `a_prior`'s `w` and diagnostics, the factor block is `f_prior` whole, so the two
+  weightings stay distinguishable. `chol` is dropped.
+
+### The three silent defects this closed
+
+Each has a regression test in `test/test_12g_forwarding_rule.jl` that carries its own falsification
+witness — a carrier rebuilt exactly as the pre-fix site built it, asserted to show the old behaviour.
+
+1. **Pooled observation weights never reached the risk-measure layer.**
+   `BlackLittermanPrior(; pe = EntropyPoolingPrior(…))` dropped `w`, so the 29 `@pprop w` sites saw
+   nothing and the optimisation ran unweighted, silently.
+2. **Every uncertainty set built on such a prior was sized off the wrong sample count.**
+   `choose_scaling_parameter` prefers `pr.ens` and falls back to `size(pr.X, 1)`; with `ens` dropped
+   the set scaled by `T/ens`, measured at `1008/499 ≈ 2.0x` too large on the test fixture.
+3. **The same defect through `FactorPrior(; pe = EntropyPoolingPrior(…))`**, which forwarded `w`
+   without the `ens` that describes it.
+
+### One behaviour change, deliberate
+
+`HighOrderFactorPriorEstimator(; pe = BlackLittermanPrior(; pe = FactorPrior(…)))` went from throwing
+`IsNothingError` to returning numbers: `rr` is structural — the regression of `X` on `F`, over data
+Black-Litterman does not modify — so it is now forwarded and the factor block travels with it. The
+higher co-moments project through `rr.M` while `mu`/`sigma` carry the views. Black-Litterman makes no
+claim about third and fourth moments, so the factor projection is the only estimate available.
+
+Two consequences of that follow through the prose. `assert_prior_regression` used to name two causes;
+there is now only one — nothing in the chain ever computed a regression — because discarding one is no
+longer possible. And `RegressionFeatures` no longer has to be nested inside a Black-Litterman prior:
+its docstring instructed callers to "nest the other way round instead", and that instruction is gone.
+
+## Amendment (2026-07-30): the factor-space plotting entry points guard through the same helper
+
+`assert_prior_regression` now serves two kinds of consumer, not one. `plot_factor_loadings`,
+`plot_factor_sigma` and `plot_factor_mu` each carried their own bare `ArgumentError` naming neither the
+cause nor the remedy — and the latter two never reached it, because their optional axis-name argument
+defaulted to a size taken off the block they were checking for (`1:size(pr.f_sigma, 1)`,
+`1:length(pr.f_mu)`), which Julia evaluates before the method body. The one-argument form therefore died
+on `size(::Nothing, ::Int64)` / `length(::Nothing)` with the guard sitting unreachable below.
+
+All six prior-taking arities now call `assert_prior_regression`, and their axis-name arguments default to
+`nothing`. Only the opening sentence differs between consumers, so it moves to a `lead` keyword; the
+diagnosis — one cause, one remedy — is the `prior_regression_remedy` constant, shared verbatim. The
+default `lead` stays estimator-framed, because the half of it that explains why the *field type* did not
+catch this is only true of an estimator field.
+
+This makes the plotting guards depend on an invariant recorded above: `rr` and `fpr` are provided
+together or not at all, so checking `rr` covers a block whose `mu` and `sigma` the caller reaches through
+the `f_mu`/`f_sigma` virtual reads. Relaxing that binding would silently stop these three guards covering
+what they guard.
