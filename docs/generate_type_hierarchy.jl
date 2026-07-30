@@ -96,24 +96,24 @@ function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
              "AbstractCovarianceEstimator" =>
                  PortfolioOptimisers.AbstractCovarianceEstimator]
     open(path, "w") do io
-        println(io,
-                """
-                # Type hierarchy
+        print(io,
+              """
+              # Type hierarchy
 
-                The trees below are generated automatically from the live type hierarchy
-                every time the documentation is built (see [docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)),
-                so they always reflect the current state of the package. Each type links to
-                its docstring.
-                """)
+              The trees below are generated automatically from the live type hierarchy
+              every time the documentation is built (see [docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)),
+              so they always reflect the current state of the package. Each type links to
+              its docstring.
+              """)
         for (name, T) in roots
-            println(io, "## [", name, "](@id type-hierarchy-", name, ")\n")
+            println(io, "\n## [", name, "](@id type-hierarchy-", name, ")\n")
             println(io, "```@raw html")
             println(io, "<div class=\"type-tree\">")
             println(io, "```\n")
             print(io, type_tree(T))
             println(io, "```@raw html")
             println(io, "</div>")
-            println(io, "```\n")
+            println(io, "```")
         end
     end
     return path
