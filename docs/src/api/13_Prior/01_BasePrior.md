@@ -6,6 +6,10 @@ HighOrderPrior
 prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
 assert_prior_regression
+forward_prior
+reconstruct_prior
+prior_field_values
+bound_field_is_stale
 returns_matrix_picker
 clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior, kwargs...)
 AbstractPriorEstimator

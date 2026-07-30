@@ -262,6 +262,128 @@ function assert_prior_regression(pr::AbstractPriorResult, sym::Sym_Str = :pe)::N
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a prior result's own **fields** as a named tuple, keyed in declaration order.
+
+Reads through `getfield`, so it sees only what the carrier stores — never a name a [`@forward_properties`](@ref) block exposes on top. That is the distinction [`forward_prior`](@ref) needs: `HighOrderPrior` forwards the whole of its `pr`, so `mu` and `sigma` are *properties* of it without being fields, and only a field can be patched. The field list is derived rather than written out, so adding a field to a carrier does not need an edit here.
+
+# Related
+
+  - [`forward_prior`](@ref)
+  - [`reconstruct_prior`](@ref)
+"""
+function prior_field_values(pr::AbstractPriorResult)
+    fnames = fieldnames(typeof(pr))
+    return NamedTuple{fnames}(getfield.((pr,), fnames))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Forward a wrapped prior result, spelling out only what the wrapping estimator changes or drops.
+
+This is the mechanical half of the composition rule recorded in ADR 0046:
+
+> **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
+
+Forwarding is the default and costs nothing to write, so a wrapper cannot accidentally return a narrower result than the one it wraps. Every deviation is spelled at the call site — a new value as `field = value`, a drop as `field = nothing` — which makes the set of drops greppable and reviewable instead of implicit in a hand-written constructor call listing all thirteen fields.
+
+Reconstruction goes through the carrier's ordinary keyword constructor (see [`reconstruct_prior`](@ref)), so **every `@argcheck` runs**: a forward that leaves the carrier internally inconsistent throws exactly as a hand-written constructor call would. Only the carrier's own **fields** may be named — a forwarded or computed property is a view of a nested value, so setting it could only ever mean setting the field that value came from.
+
+## The two enforced bindings
+
+Two fields are *bound* to another field's value rather than being independent, so forwarding them past a change to the field they describe is what the rule calls stating something false. Because the binding is mechanical, the helper enforces it rather than leaving it to reviewer memory — naming the field on the left obliges the caller to name the fields on the right, either with a rebuilt value or with `nothing`:
+
+  - **`sigma` binds `chol`.** `chol` *takes precedence over* `sigma` at every consumer, so a stale `chol` makes the optimisation silently ignore the posterior covariance.
+  - **`w` binds `ens`, `kld` and `ow`.** Those are diagnostics *of* `w`; weights carrying another weighting's provenance cannot be interrogated.
+
+A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from the carrier.
+
+Everything else the constructor already covers: `rr`, `f_mu` and `f_sigma` must be supplied together or not at all, and `w`, `chol` and `Z` are re-checked against the shape of `X` and `mu`.
+
+## What does not fit
+
+The estimators that *lift* a factor-axis prior into an asset-axis result ([`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref)) and the one that *merges two priors* ([`AugmentedBlackLittermanPrior`](@ref)) are not forwarding a single wrapped result along its own axis, so they construct their carrier directly and should not be forced through this helper. `forward_prior` still applies to the *factor block* they build, which is an ordinary forward of the factor prior.
+
+# Arguments
+
+  - `pr`: Prior result produced by the wrapped estimator.
+  - `overrides...`: Field overrides; a value to replace, or `nothing` to drop.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The wrapped result with `overrides` applied, or `pr` itself when there are none.
+
+# Validation
+
+  - Naming `sigma` requires naming `chol`, unless `pr.chol` is already `nothing`.
+  - Naming `w` requires naming each of `ens`, `kld` and `ow` that is not already `nothing`.
+  - Every name in `overrides` is a field of `typeof(pr)`.
+  - Every `@argcheck` of the constructor of `typeof(pr)`.
+
+# Examples
+
+```jldoctest
+julia> pr = LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
+                          sigma = [0.0004 0.0002; 0.0002 0.0003], chol = [0.02 0.01; 0.0 0.01415]);
+
+julia> PortfolioOptimisers.forward_prior(pr) === pr
+true
+
+julia> pr2 = PortfolioOptimisers.forward_prior(pr; mu = [0.05, 0.06], chol = nothing);
+
+julia> (pr2.mu, pr2.chol, pr2.sigma === pr.sigma)
+([0.05, 0.06], nothing, true)
+
+julia> PortfolioOptimisers.forward_prior(pr; sigma = [0.0009 0.0001; 0.0001 0.0004])
+ERROR: ConflictingArgumentError: forwarding `chol` past a change to `sigma` would state something false: `chol` takes precedence over `sigma` at every consumer, so a stale factor makes the optimisation silently ignore the updated covariance. Pass `chol = nothing` to drop it, or a factor rebuilt from the new `sigma`.
+[...]
+```
+
+# Related
+
+  - [`reconstruct_prior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`bound_field_is_stale`](@ref)
+  - [`assert_prior_regression`](@ref)
+  - [`ConflictingArgumentError`](@ref)
+"""
+function forward_prior(pr::AbstractPriorResult; overrides...)::AbstractPriorResult
+    patch = NamedTuple(overrides)
+    if isempty(patch)
+        return pr
+    end
+    fnames = fieldnames(typeof(pr))
+    extra = filter(sym -> sym ∉ fnames, propertynames(patch))
+    @argcheck(isempty(extra),
+              ArgumentError("$(extra) cannot be forwarded onto a $(nameof(typeof(pr))), whose fields are $(fnames). A forwarded or computed property is a view of a nested value; name the field holding that value instead."))
+    if haskey(patch, :sigma) && !haskey(patch, :chol) && bound_field_is_stale(pr, :chol)
+        throw(ConflictingArgumentError("forwarding `chol` past a change to `sigma` would state something false: `chol` takes precedence over `sigma` at every consumer, so a stale factor makes the optimisation silently ignore the updated covariance. Pass `chol = nothing` to drop it, or a factor rebuilt from the new `sigma`."))
+    end
+    if haskey(patch, :w)
+        stale = filter(sym -> !haskey(patch, sym) && bound_field_is_stale(pr, sym),
+                       (:ens, :kld, :ow))
+        @argcheck(isempty(stale),
+                  ConflictingArgumentError("forwarding $(stale) past a change to `w` would state something false: they are diagnostics of the weights they were computed with, and diagnostics follow their weights. Pass each as `nothing` to drop it, or a value recomputed alongside the new `w`."))
+    end
+    return reconstruct_prior(pr, patch)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` when field `sym` of `pr` holds a value that would go stale if the field it is bound to changed without it.
+
+A field that the carrier does not have, or holds as `nothing`, has nothing to go stale. Reads through `getfield` so a forwarded property of the same name cannot answer for a field the carrier does not own.
+
+# Related
+
+  - [`forward_prior`](@ref)
+"""
+function bound_field_is_stale(pr::AbstractPriorResult, sym::Symbol)::Bool
+    return hasfield(typeof(pr), sym) && !isnothing(getfield(pr, sym))
+end
+"""
     prior(pr::AbstractPriorResult, args...; kwargs...)
 
 Propagate or pass through prior result objects.
@@ -715,6 +837,14 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what a wrapping estimator forwards
+
+Most prior estimators wrap another and return a carrier built from the one they were handed. Which fields survive that hop is governed by a single rule, recorded in ADR 0046 and enforced by [`forward_prior`](@ref):
+
+> **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
+
+Consistency of the returned result is the criterion, and destroying a value the caller explicitly computed is not an acceptable way to buy it — so forwarding is the default, and each estimator's docstring lists the fields it drops and why. Two fields are *bound* to another and therefore never forwarded alone: `chol` is bound to `sigma` (it takes precedence over `sigma` at every consumer, so a stale factor is silently used in place of the updated covariance), and `ens`, `kld` and `ow` are bound to `w` (they are diagnostics *of* those weights). `forward_prior` refuses a forward that would break either binding.
+
 ## The feature matrix
 
 `Z` is **derived only**: it is populated by a producer that declares a matrix to be features — [`FeaturePrior`](@ref) — and never by pass-through of a user's `ReturnsResult.Z`. That is what keeps the two carriers from disagreeing: they cannot both hold the same matrix, so `z_src` selects a provenance rather than one of two copies.
@@ -765,6 +895,7 @@ LowOrderPrior
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
   - [`HighOrderPrior`](@ref)
+  - [`forward_prior`](@ref)
   - [`FeaturePrior`](@ref)
   - [`FeatureDistance`](@ref)
   - [`check_feature_matrix`](@ref)
@@ -986,6 +1117,7 @@ HighOrderPrior
   - [`LowOrderPrior`](@ref)
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
+  - [`forward_prior`](@ref)
 """
 @concrete struct HighOrderPrior <: AbstractPriorResult
     """
@@ -1170,5 +1302,39 @@ end
 @forward_properties HighOrderPrior begin
     forward(pr)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a prior result through its ordinary keyword constructor, patching the fields named in `patch`.
+
+One method per carrier, because the carrier's constructor is *named* here rather than recovered by reflection. Recovering it generically would mean either `Base.typename(T).wrapper` or a dependency on `ConstructionBase`, and neither buys anything: the field *list* is already derived, via [`prior_field_values`](@ref), so a carrier that gains a field needs no edit here. Only a new carrier type needs a method — and until it has one it gets a `MethodError` naming this function, rather than being reconstructed by machinery that has never seen it.
+
+Reconstruction runs the carrier's full validation, which is the point of routing through the constructor at all: a patch that leaves the carrier internally inconsistent throws exactly as a hand-written constructor call would. Keyword arguments are order-independent, so `patch` may name fields in any order.
+
+These methods are defined here, after both carriers, because they dispatch on the concrete types.
+
+# Arguments
+
+  - `pr`: Prior result to rebuild.
+  - `patch`: Named tuple of field overrides. Every name must be a field of `typeof(pr)` — [`forward_prior`](@ref) checks that before calling, so a bad name is reported against the rule rather than as an unsupported keyword.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: Reconstructed result of the same carrier type.
+
+# Related
+
+  - [`forward_prior`](@ref)
+  - [`prior_field_values`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
+function reconstruct_prior(pr::LowOrderPrior, patch::NamedTuple)::LowOrderPrior
+    return LowOrderPrior(; merge(prior_field_values(pr), patch)...)
+end
+function reconstruct_prior(pr::HighOrderPrior, patch::NamedTuple)::HighOrderPrior
+    return HighOrderPrior(; merge(prior_field_values(pr), patch)...)
+end
 
 export prior, LowOrderPrior, HighOrderPrior
+public forward_prior
