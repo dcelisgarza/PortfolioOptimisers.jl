@@ -112,8 +112,10 @@
         @test pred.rd.nx == rd.nx
         @test pred.rd.X == calc_net_returns(pred.res, rd.X)
         @test pred.rd.ts == rd.ts
-        @test pred.rd.iv == [rd.iv * w for w in pred.res.w]
-        @test pred.rd.ivpa == [dot(rd.ivpa, w) for w in pred.res.w]
+        @test pred.rd.iv ==
+              [rd.iv * PortfolioOptimisers.synthetic_asset_weights(w) for w in pred.res.w]
+        @test pred.rd.ivpa == [dot(rd.ivpa, PortfolioOptimisers.synthetic_asset_weights(w))
+                               for w in pred.res.w]
         res2 = optimise(NearOptimalCentering(;
                                              r = StandardDeviation(;
                                                                    settings = RiskMeasureSettings(;
@@ -398,7 +400,9 @@
         # (slow progress or numerical error, seen with ellipsoidal sets) are acceptable;
         # a proven INFEASIBLE noc_opt is the bug and must fail.
         function noc_solver_stalled(rc)
-            isa(rc, OptimisationFailure) || return false
+            if !(isa(rc, OptimisationFailure))
+                return false
+            end
             err = string(get(get(rc.res, :clarabel1, Dict()), :err, ""))
             return occursin("SLOW_PROGRESS", err) || occursin("NUMERICAL_ERROR", err)
         end

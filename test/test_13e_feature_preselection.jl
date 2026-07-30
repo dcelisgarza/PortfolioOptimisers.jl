@@ -12,7 +12,7 @@ writes `:returns`, which `PIPELINE_INVALIDATES` says invalidates `:prior`. So a 
 unreachable from here by three independent mechanisms, `ClusterGroups` carries no `z_src`,
 and the absence of that field is the statement — see ADR 0045.
 
-Unlike the rest of the feature suite, these tests do *not* need the `RecordingDistance`
+Unlike the rest of the feature suite, these tests do *not* need the `_test_RecordingDistance`
 instrument. The observable here is the selected **universe**, not the weights, so a wrong
 feature matrix changes the answer directly rather than being absorbed by a dendrogram's
 leaf ordering.

@@ -14,30 +14,32 @@ collapse still produces a finite, symmetric, plausible distance matrix over `k` 
 assets, and `HierarchicalRiskParity` consumes the dendrogram's *leaf ordering* rather than
 its merges, so it can return byte-identical weights from a wrong matrix. Every end-to-end
 test below therefore asserts on the matrix that reached the kernel, through the same
-`RecordingDistance` instrument `test_13c_feature_views.jl` uses, and not on the weights.
+`_test_RecordingDistance` instrument `test_13c_feature_views.jl` uses, and not on the weights.
 =#
-mutable struct RecordingDistance{T} <: PO.AbstractDistanceEstimator
+mutable struct _test_RecordingDistance{T} <: PO.AbstractDistanceEstimator
     de::T
     seen::Vector{Any}
     lock::ReentrantLock
 end
-RecordingDistance(de) = RecordingDistance(de, Any[], ReentrantLock())
-function record!(de::RecordingDistance, Z)
+_test_RecordingDistance(de) = _test_RecordingDistance(de, Any[], ReentrantLock())
+function record!(de::_test_RecordingDistance, Z)
     lock(de.lock) do
         return push!(de.seen, Z)
     end
     return nothing
 end
-function PO.distance(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
+function PO.distance(de::_test_RecordingDistance, ce, X; Z = nothing, kwargs...)
     record!(de, Z)
     return PO.distance(de.de, ce, X; Z = Z, kwargs...)
 end
-function PO.cor_and_dist(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
+function PO.cor_and_dist(de::_test_RecordingDistance, ce, X; Z = nothing, kwargs...)
     record!(de, Z)
     return PO.cor_and_dist(de.de, ce, X; Z = Z, kwargs...)
 end
-PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
-PO.cor_and_dist(de::RecordingDistance, Z; kwargs...) = PO.cor_and_dist(de.de, Z; kwargs...)
+PO.distance(de::_test_RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
+function PO.cor_and_dist(de::_test_RecordingDistance, Z; kwargs...)
+    return PO.cor_and_dist(de.de, Z; kwargs...)
+end
 
 @testset "Collapsing the feature matrix onto synthetic assets" begin
     collapse = PO.collapse_feature_matrix
@@ -254,7 +256,7 @@ PO.cor_and_dist(de::RecordingDistance, Z; kwargs...) = PO.cor_and_dist(de.de, Z;
         for (mk, weights_of) in ((mk_st, stacked_wi), (mk_nco, clustered_wi))
             for (rd, Zsrc, sq) in
                 ((rd_r, Zr, false), (rd_sq, Zsq, true), (rd_3d, Z3, false))
-                ro = RecordingDistance(FeatureDistance())
+                ro = _test_RecordingDistance(FeatureDistance())
                 res = optimise(mk(ro), rd)
                 @test isapprox(sum(res.w), 1)
                 @test length(ro.seen) == 1
@@ -290,7 +292,7 @@ PO.cor_and_dist(de::RecordingDistance, Z; kwargs...) = PO.cor_and_dist(de.de, Z;
                                      cv = cvopt, ex = seq)
         for mk in (mk_st, mk_nco)
             for (rd, nfeat) in ((rd_r, K), (rd_3d, K))
-                ro = RecordingDistance(FeatureDistance())
+                ro = _test_RecordingDistance(FeatureDistance())
                 res = optimise(mk(ro), rd)
                 @test isapprox(sum(res.w), 1)
                 Zo = ro.seen[1]
@@ -302,7 +304,7 @@ PO.cor_and_dist(de::RecordingDistance, Z; kwargs...) = PO.cor_and_dist(de.de, Z;
 
             # A static source is constant within each fold and changes at the boundaries:
             # one distinct feature row per fold, per synthetic asset.
-            ro = RecordingDistance(FeatureDistance())
+            ro = _test_RecordingDistance(FeatureDistance())
             optimise(mk(ro), rd_r)
             Zo = ro.seen[1]
             for i in axes(Zo, 2)
@@ -320,7 +322,7 @@ PO.cor_and_dist(de::RecordingDistance, Z; kwargs...) = PO.cor_and_dist(de.de, Z;
         collapsed matrix reads as the synthetic asset's weighted-average neighbourhood.
         =#
         cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
-        ro = RecordingDistance(FeatureDistance())
+        ro = _test_RecordingDistance(FeatureDistance())
         st = Stacking(;
                       opti = [plain_hrp(),
                               HierarchicalEqualRiskContribution(;
