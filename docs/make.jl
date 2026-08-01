@@ -1,6 +1,7 @@
 using PortfolioOptimisers
-using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI, Random
+using Documenter, DocumenterTools, DocumenterCitations, DocumenterCodeBlocks, Literate,
+      StatsPlots, GraphRecipes, Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP,
+      StatsAPI, Random
 
 f = x -> !contains(string(x), r"#|^eval$|^include$")
 exported_symbols = filter!(f, names(PortfolioOptimisers))
@@ -208,7 +209,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "Contribute" => contribute;
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
-                                         style = :numeric)])
+                                         style = :numeric), CodeBlocks()])
 
 DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
                                target = "build", devbranch = "main", branch = "gh-pages",
