@@ -53,10 +53,12 @@ end;
 #=
 ## 1. Data, sets, and the equilibrium baseline
 
-We load the S&P 500 slice **with** its factor block, then declare two `UniverseSets`: one over the
-assets (with a couple of groups, for the augmented asset views) and one over the factor names.
-The [`EquilibriumExpectedReturns`](@ref) prior is the neutral anchor every Black–Litterman
-posterior tilts away from.
+We load the S&P 500 slice **with** its factor block, then declare the `UniverseSets` the three
+variants need: one over the assets (with a couple of groups, for the augmented asset views), one
+over the factor names, and one that **declares both axes** — assets under `xkey`, factors under
+`fkey` — which is the shape [`FactorBlackLittermanPrior`](@ref) reads. The
+[`EquilibriumExpectedReturns`](@ref) prior is the neutral anchor every Black–Litterman posterior
+tilts away from.
 =#
 
 using CSV, TimeSeries
@@ -69,6 +71,9 @@ asset_sets = UniverseSets(;
                           dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
                                       "energy" => ["CVX"]))
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nf))
+## `FactorBlackLittermanPrior` reads the *declared* factor axis, so its sets names both:
+## assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+universe_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
 pr_eq = prior(EmpiricalPrior(; me = EquilibriumExpectedReturns()), rd)
@@ -102,7 +107,10 @@ pr_bayes = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = Empirical
 ## 3. Factor Black–Litterman: views on factor premia
 
 [`FactorBlackLittermanPrior`](@ref) also takes factor views, but propagates them to the assets
-through the factor regression rather than a factor prior. Two knobs matter:
+through the factor regression rather than a factor prior. Its views resolve against the
+**declared factor axis**, `sets.dict[sets.fkey]`, which is why it takes `universe_sets` rather
+than `factor_sets`: the names must be looked up on the axis they were written in, and the asset
+axis is what a view over a subset of assets slices. Two knobs matter:
 
   - `rsd` — keep the idiosyncratic **residual** variance (`true`) or drop it (`false`), i.e.
     whether the posterior covariance is the full asset covariance or only its factor-explained
@@ -114,13 +122,13 @@ posterior.
 =#
 
 pr_fbl_rsd = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
-                                             sets = factor_sets, tau = tau,
+                                             sets = universe_sets, tau = tau,
                                              views = factor_views), rd)
 pr_fbl_nors = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = false,
-                                              sets = factor_sets, tau = tau,
+                                              sets = universe_sets, tau = tau,
                                               views = factor_views), rd)
 pr_fbl_l = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true, l = 5.0,
-                                           sets = factor_sets, tau = tau,
+                                           sets = universe_sets, tau = tau,
                                            views = factor_views), rd)
 
 i_aapl = findfirst(==("AAPL"), rd.nx)

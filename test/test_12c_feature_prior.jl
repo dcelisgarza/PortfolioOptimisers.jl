@@ -132,7 +132,7 @@ end
     f_na = size(rd.F, 2)
     f_fpe = FeaturePrior(; pe = EmpiricalPrior(), ze = rand(rng, f_na, 3))
     @test isnothing(prior(FactorPrior(; pe = f_fpe), rd).Z)
-    @test isnothing(prior(FactorBlackLittermanPrior(; pe = f_fpe, sets = fsets,
+    @test isnothing(prior(FactorBlackLittermanPrior(; pe = f_fpe, sets = xfsets,
                                                     views = f_views), rd).Z)
 
     # `HighOrderPrior` needs no edits at all — it forwards any property of its child.

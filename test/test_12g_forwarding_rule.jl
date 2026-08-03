@@ -168,7 +168,7 @@ end
     # `FactorBlackLittermanPrior` — keeps `w = f_prior.w` and now its diagnostics.
     # Its factor block is *modified*, not passed through, and it builds its own
     # `chol` from the posterior factor covariance rather than dropping one.
-    fbl = prior(FactorBlackLittermanPrior(; pe = ep_factor, sets = fsets, views = f_views),
+    fbl = prior(FactorBlackLittermanPrior(; pe = ep_factor, sets = xfsets, views = f_views),
                 rd)
     @test fbl.w == f_pooled.w
     @test fbl.ens == f_pooled.ens
@@ -211,7 +211,7 @@ end
 
     # `FactorBlackLittermanPrior` — `posterior_mu` *is* `M * f_posterior_mu + b`,
     # so the identity is exact by construction rather than by cancellation.
-    fbl = prior(FactorBlackLittermanPrior(; pe = ep_factor, sets = fsets, views = f_views),
+    fbl = prior(FactorBlackLittermanPrior(; pe = ep_factor, sets = xfsets, views = f_views),
                 rd)
     @test identity_gap(fbl) == 0
 

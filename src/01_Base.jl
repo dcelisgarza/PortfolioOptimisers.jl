@@ -135,7 +135,8 @@ const arg_dict = Dict(
                       # Estimators
                       :sets => "`sets`: Sets used to map estimator values to assets.",#
                       :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
-                      :ekey => "`key`: Key to specify the asset universe in `sets.dict`. If `nothing`, the key is taken from `sets.xkey`.",#
+                      :ekey => "`key`: Key to specify the universe in `sets.dict` that names resolve against. If `nothing`, the key is taken from `sets.xkey` — or, where the caller is written against another declared axis, from that axis' key.",#
+                      :sets_f => "`sets`: Universe sets. The **factor** axis, `sets.dict[sets.fkey]`, is what this estimator reads: it is the universe the views are written in, and it must name the columns of `F` in order. The asset axis is required by [`UniverseSets`](@ref) and is what a view slices — the factor entries come back from [`port_opt_view`](@ref) untouched.",#
                       :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
                       :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
                       # Constraints

@@ -58,7 +58,9 @@ asset_sets = UniverseSets(;
                           dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
                                       "energy" => ["CVX", "XOM", "RRC"],
                                       "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
-factor_sets = UniverseSets(; dict = Dict("nx" => rd.nf))
+## `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
+## both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
 factor_views = LinearConstraintEstimator(; val = ["MTUM == 0.0005", "VLUE == 0.0003"])

@@ -267,7 +267,7 @@ end
 
 @testset "Factor Black Litterman" begin
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman1.csv.gz"), DataFrame)
-    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = false, sets = fsets,
+    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = false, sets = xfsets,
                                    tau = 1 / size(rd.X, 1),
                                    views = LinearConstraintEstimator(;
                                                                      val = ["MTUM == 0.0001",
@@ -295,7 +295,7 @@ end
     @test success
 
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman2.csv.gz"), DataFrame)
-    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), sets = fsets, l = 2,
+    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), sets = xfsets, l = 2,
                                    tau = 1 / size(rd.X, 1),
                                    views = LinearConstraintEstimator(;
                                                                      val = ["MTUM == 0.0001",
@@ -321,6 +321,80 @@ end
         find_tol(vec(pr.chol), df[421:end, i])
     end
     @test success
+end
+
+@testset "Factor Black Litterman reads the declared factor axis" begin
+    # The golden tests above are the bit-identity proof: they run on `xfsets`, whose factors
+    # live under `fkey`, and still match `FactorBlackLitterman[12].csv.gz` to the same
+    # tolerance they matched under the pre-migration shape. Only the *lookup* changed.
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # The pre-migration shape — factor names under `xkey`, no factor axis at all — is the
+    # error worth getting right, because the naive migration failure is an *asset*-axis
+    # complaint about a user who never wrote an asset name.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by FactorBlackLittermanPrior", msg)
+    @test occursin("it is not optional here", msg)
+    @test !occursin("asset", msg)
+    @test_throws KeyError prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views),
+                                rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; sets = shortf,
+                                                                   views = f_views), rd)
+    # An *asset* name is now the thing that cannot resolve, and the message says so.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = xfsets,
+                                        views = LinearConstraintEstimator(;
+                                                                          val = ["$(rd.nx[1]) == 0.0001"])),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in factor universe", msg)
+    @test occursin("$(length(rd.nf)) factors under key `nf`", msg)
+    # The wrapped estimator's own `key` wins over the axis the estimator routes at — the
+    # precedence `rebase_linear_constraints` already uses. Before this migration the field
+    # was dropped on the Black-Litterman path entirely, so pointing it at the asset axis
+    # was a silent no-op; now it is honoured, and factor names cannot resolve there.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = xfsets,
+                                        views = LinearConstraintEstimator(;
+                                                                          val = ["MTUM == 0.0001",
+                                                                                 "QUAL == 0.0001"],
+                                                                          key = "nx")), rd;
+              strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in asset universe", msg)
+    @test occursin("$(length(rd.nx)) assets under key `nx`", msg)
+    # A sets carrying both axes, under a view. The factor axis has no meaning for an asset
+    # index, so it must come back untouched; the asset axis must slice. `sets` is `@vprop`
+    # because the object can now carry both — the exemption is a property of the data.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = FactorBlackLittermanPrior(; sets = both, views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # And the views still resolve after the slice: the axis they are written against did
+    # not move.
+    @test isapprox(prior(pev,
+                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
+                                       F = rd.F)).mu,
+                   prior(pe,
+                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
+                                       F = rd.F)).mu)
 end
 
 @testset "Augmented Black Litterman" begin
@@ -851,7 +925,7 @@ end
     # Every wrapping estimator that reports a factor block reports it nested, and the flat
     # reads keep returning the same values they did as fields.
     for pe in (FactorPrior(),
-               FactorBlackLittermanPrior(; sets = fsets, tau = 1 / size(rd.X, 1),
+               FactorBlackLittermanPrior(; sets = xfsets, tau = 1 / size(rd.X, 1),
                                          views = LinearConstraintEstimator(;
                                                                            val = ["MTUM == 0.0001"])),
                BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = fsets,

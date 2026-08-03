@@ -182,24 +182,20 @@ const EcE_LcE_Lc_VecEcE_LcE_Lc = Union{<:EcE_LcE_Lc, <:VecEcE_LcE_Lc}
 
 Resolve the basis a re-based constraint projects through, and the key its names resolve against, throwing if either is unusable.
 
-Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings exist, the factor axis is declared, and the two agree on how many factors there are.
+Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings exist, and — via [`factor_universe`](@ref), shared with every other consumer of the declared axis — the factor axis is declared and agrees with the loadings on how many factors there are.
 
 # Related
 
   - [`ExposureConstraintEstimator`](@ref)
   - [`FactorSpace`](@ref)
+  - [`factor_universe`](@ref)
 """
 function constraint_space_basis(::FactorSpace, sets::UniverseSets,
                                 rr::Option{<:AbstractRegressionResult})
     @argcheck(!isnothing(rr),
               IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a prior that carries one, but `rr === nothing`. Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure. $prior_regression_remedy"))
-    fkey = sets.fkey
-    @argcheck(haskey(sets.dict, fkey),
-              KeyError("$fkey (the factor universe), required by a $(FactorSpace) constraint. The factor axis is optional on UniverseSets, but a constraint written against it is not: add `sets.fkey => <factor names>` to `sets.dict`, in the column order of the loadings."))
-    nf = sets.dict[fkey]
-    @argcheck(size(rr.M, 2) == length(nf),
-              DimensionMismatch("the loadings and the declared factor axis disagree on how many factors there are. Got\nsize(rr.M, 2) => $(size(rr.M, 2))\nlength(sets.dict[$fkey]) => $(length(nf))"))
-    return rr, fkey
+    factor_universe(sets, size(rr.M, 2), "a $(FactorSpace) constraint", "rr.M")
+    return rr, sets.fkey
 end
 """
     project_linear_constraint(lc::LinearConstraint, M::MatNum) -> LinearConstraint

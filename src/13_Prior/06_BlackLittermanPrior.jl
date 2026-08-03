@@ -199,16 +199,19 @@ Pre-compute shared Black-Litterman inputs from views, prior covariance, and blen
 
 Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
 
+`key` is the axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) leaves it `nothing` (the asset axis), while a member whose views update the **factor** distribution passes `sets.fkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+
 # Arguments
 
   - $(arg_dict[:views])
   - $(arg_dict[:sets])
   - $(arg_dict[:views_conf])
-  - `prior_sigma::MatNum`: Prior covariance matrix of asset returns `assets × assets`.
+  - `prior_sigma::MatNum`: Prior covariance matrix of the distribution the views update, `n × n` over that axis.
   - `pe_tau::Option{<:Number}`: Optional user-specified blending parameter. If `nothing`, defaults to `1/T`.
   - `T::Integer`: Number of observations used to compute the default `tau = 1/T`.
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
+  - $(arg_dict[:ekey])
 
 # Returns
 
@@ -227,8 +230,9 @@ Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from
   - [`remove_excl_views`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict)
-    (; P, Q, excl) = black_litterman_views(views, sets; datatype = datatype,
+function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict,
+                    key::Option{<:AbstractString} = nothing)
+    (; P, Q, excl) = black_litterman_views(views, sets, key; datatype = datatype,
                                            strict = strict)
     tau = isnothing(pe_tau) ? inv(T) : pe_tau
     views_conf = remove_excl_views(views_conf, excl)

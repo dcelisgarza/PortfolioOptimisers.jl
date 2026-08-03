@@ -407,6 +407,32 @@ function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
                         dict = dict)
 end
 """
+    factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
+                    source::AbstractString) -> VecStr
+
+Read the **declared** factor universe, `sets.dict[sets.fkey]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
+
+The factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `sets.fkey` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
+
+`need` names the consumer ("a `FactorSpace` constraint"), `source` the matrix (`"rr.M"`, `"F"`) — so one helper serves every consumer of the axis without any of them re-encoding the checks.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`constraint_space_basis`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+"""
+function factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
+                         source::AbstractString)
+    fkey = sets.fkey
+    @argcheck(haskey(sets.dict, fkey),
+              KeyError("$fkey (the factor universe), required by $need. The factor axis is optional on UniverseSets; it is not optional here: add `sets.fkey => <factor names>` to `sets.dict`, in the column order of `$source`."))
+    nf = sets.dict[fkey]
+    @argcheck(length(nf) == K,
+              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$fkey]) => $(length(nf))"))
+    return nf
+end
+"""
     group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
                   arr::VecNum, strict::Bool, nxkey::AbstractString)
 
@@ -1379,6 +1405,22 @@ function constraint_row_axis(::Nothing)::String
 end
 function constraint_row_axis(::AbstractRegressionResult)::String
     return "factor"
+end
+"""
+    universe_axis(sets::UniverseSets, key::AbstractString) -> String
+
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. Like [`constraint_row_axis`](@ref) it exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+
+The two answer the same question from different evidence, and each is the only evidence its caller has. A constraint knows it is on the factor axis because it is being re-based; a Black-Litterman view is *never* re-based — it resolves directly against whichever universe its estimator points it at — so the key is what it has. The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
+
+# Related
+
+  - [`constraint_row_axis`](@ref)
+  - [`get_black_litterman_views`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function universe_axis(sets::UniverseSets, key::AbstractString)::String
+    return ifelse(startswith(key, sets.fkey), "factor", "asset")
 end
 """
     constraint_row_length(rr, nx::VecStr) -> Int

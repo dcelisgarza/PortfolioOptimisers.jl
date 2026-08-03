@@ -16,6 +16,9 @@ sets = UniverseSets(;
                                     [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
                                      1, 2]))
 fsets = UniverseSets(; dict = Dict("nx" => rd.nf))
+# The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
+# `fkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
+xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = "verbose" => false),

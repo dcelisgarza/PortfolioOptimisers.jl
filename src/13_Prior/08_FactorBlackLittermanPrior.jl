@@ -40,6 +40,12 @@ This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing
 
 Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the identity exactly, while [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) do not — see their warnings.
 
+## The views are written on the factor axis
+
+`views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because that is the distribution they update. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
+
+`sets.dict[sets.fkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
+
 ## Validation
 
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
@@ -51,11 +57,12 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
 
 ```jldoctest
 julia> FactorBlackLittermanPrior(;
-                                 sets = UniverseSets(; xkey = \"nx\",
-                                                     dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                 sets = UniverseSets(;
+                                                     dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                                 \"nf\" => [\"F1\", \"F2\"])),
                                  views = LinearConstraintEstimator(;
-                                                                   val = [\"A == 0.03\",
-                                                                          \"B + C == 0.04\"]))
+                                                                   val = [\"F1 == 0.03\",
+                                                                          \"F2 == 0.04\"]))
 FactorBlackLittermanPrior
           pe ┼ EmpiricalPrior
              │        ce ┼ PortfolioOptimisersCovariance
@@ -105,14 +112,14 @@ FactorBlackLittermanPrior
              │           w ┼ nothing
              │   corrected ┴ Bool: true
        views ┼ LinearConstraintEstimator
-             │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+             │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
         sets ┼ UniverseSets
              │    xkey ┼ String: "nx"
              │   uxkey ┼ String: "ux"
              │    fkey ┼ String: "nf"
              │   ufkey ┼ String: "uf"
-             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
            w ┼ nothing
           rf ┼ Float64: 0.0
@@ -156,9 +163,9 @@ FactorBlackLittermanPrior
     """
     views
     """
-    $(field_dict[:sets])
+    $(field_dict[:sets_f])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:views_conf])
     """
@@ -269,7 +276,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.xkey]) == size(F, 2)`.
+  - `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -277,7 +284,7 @@ Where:
   - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
   - The factor prior is computed using the embedded asset prior estimator `pe.pe`.
   - Factor regression is performed using the regression estimator `pe.re`.
-  - Views are extracted using [`black_litterman_views`](@ref), which returns the view matrix `P` and view returns vector `Q`.
+  - Views are extracted using [`black_litterman_views`](@ref) **at `pe.sets.fkey`**, which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
   - If leverage is specified, the prior mean is adjusted accordingly.
@@ -302,8 +309,11 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(F, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
+    # The views land on the *factor* distribution, so they resolve against the declared factor
+    # axis — not against `xkey`, which names the assets this estimator projects onto.
+    factor_universe(pe.sets, size(F, 2),
+                    "FactorBlackLittermanPrior, whose views are written in factor names",
+                    "F")
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
@@ -312,7 +322,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict)
+                                      size(X, 1), eltype(posterior_X), strict, pe.sets.fkey)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @argcheck(length(pe.w) == size(X, 2),
