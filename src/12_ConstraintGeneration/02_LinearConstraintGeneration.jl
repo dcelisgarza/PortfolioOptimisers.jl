@@ -252,13 +252,19 @@ const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for asset set and group information used in constraint generation.
+Container for the universe axes and group information used in constraint generation.
 
-`UniverseSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
+`UniverseSets` provides a unified interface for specifying the universes a portfolio problem is written against and any groupings or partitions of them. It is used throughout constraint generation and estimator routines to expand group references, map group names to member lists, and validate membership.
+
+It **declares every axis it carries**, each with its own pair of keys: `xkey`/`uxkey` for assets and `fkey`/`ufkey` for factors. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor axis is **optional**: requiring it would invalidate every sets object built for a problem with no factor model, so a consumer that needs the factor axis and does not find it throws at the point of need rather than at construction.
 
 If a key in `dict` starts with the same value as `xkey`, it means that the corresponding group must have the same length as the asset universe, `dict[xkey]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
 If a key in `dict` starts with the same value as `uxkey`, it identifies a unique-entry group variant. The corresponding `xkey`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `uxkey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
+
+The `fkey`/`ufkey` prefixes mean the same thing on the factor axis, but they buy something different. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on the factor side they buy length validation at construction and one shared mental model.
+
+A key matching none of the four prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
 
 # Fields
 
@@ -269,6 +275,8 @@ $(DocStringExtensions.FIELDS)
     UniverseSets(;
         xkey::AbstractString = "nx",
         uxkey::AbstractString = "ux",
+        fkey::AbstractString = "nf",
+        ufkey::AbstractString = "uf",
         dict::AbstractDict{<:AbstractString, <:Any}
     ) -> UniverseSets
 
@@ -278,11 +286,11 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(dict)`.
   - `haskey(dict, xkey)`.
-  - `xkey !== uxkey`.
-  - `!startswith(xkey, uxkey)`.
-  - `!startswith(uxkey, xkey)`.
-  - If a key in `dict` starts with the same value as `xkey`, `length(dict[nx]) == length(dict[xkey])`.
-  - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and `length(dict[replace(k, uxkey => xkey)]) == length(dict[xkey])`.
+  - No two of `xkey`, `uxkey`, `fkey`, `ufkey` may be a prefix of one another (12 ordered checks, which also rules out any two being equal).
+  - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
+  - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
+  - If a key in `dict` starts with the same value as `fkey`, `haskey(dict, fkey)` and `length(dict[k]) == length(dict[fkey])`.
+  - If a key in `dict` starts with the same value as `ufkey`, there must be a corresponding key in `dict` where the `ufkey` prefix is replaced by the `fkey` prefix, and its length must equal `length(dict[fkey])`.
 
 # Examples
 
@@ -291,6 +299,8 @@ julia> UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]
 UniverseSets
    xkey ┼ String: "nx"
   uxkey ┼ String: "ux"
+   fkey ┼ String: "nf"
+  ufkey ┼ String: "uf"
    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
@@ -310,33 +320,59 @@ UniverseSets
     """
     uxkey
     """
+    $(field_dict[:us_fkey])
+    """
+    fkey
+    """
+    $(field_dict[:us_ufkey])
+    """
+    ufkey
+    """
     $(field_dict[:dict])
     """
     dict
-    function UniverseSets(xkey::AbstractString, uxkey::AbstractString,
+    function UniverseSets(xkey::AbstractString, uxkey::AbstractString, fkey::AbstractString,
+                          ufkey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, xkey), KeyError)
-        @argcheck(xkey !== uxkey, ValueError)
-        @argcheck(!startswith(xkey, uxkey),
-                  ArgumentError("xkey ($xkey) must not start with uxkey ($uxkey)"))
-        @argcheck(!startswith(uxkey, xkey),
-                  ArgumentError("uxkey ($uxkey) must not start with xkey ($xkey)"))
-        for k in setdiff(keys(dict), (xkey,))
+        knames = ("xkey", "uxkey", "fkey", "ufkey")
+        kvals = (xkey, uxkey, fkey, ufkey)
+        for i in eachindex(kvals), j in eachindex(kvals)
+            i == j && continue
+            @argcheck(!startswith(kvals[i], kvals[j]),
+                      ArgumentError("$(knames[i]) ($(kvals[i])) must not start with $(knames[j]) ($(kvals[j]))"))
+        end
+        for k in setdiff(keys(dict), (xkey, fkey))
             if startswith(k, xkey)
                 @argcheck(length(dict[k]) == length(dict[xkey]), DimensionMismatch)
             elseif startswith(k, uxkey)
-                tmp_key = replace(k, uxkey => xkey)
+                tmp_key = xkey * chopprefix(k, uxkey)
                 @argcheck(haskey(dict, tmp_key), KeyError)
                 @argcheck(length(dict[tmp_key]) == length(dict[xkey]), DimensionMismatch)
+            elseif startswith(k, fkey)
+                @argcheck(haskey(dict, fkey),
+                          KeyError("$fkey (the factor universe), required by the factor partition $k"))
+                @argcheck(length(dict[k]) == length(dict[fkey]), DimensionMismatch)
+            elseif startswith(k, ufkey)
+                @argcheck(haskey(dict, fkey),
+                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k"))
+                tmp_key = fkey * chopprefix(k, ufkey)
+                @argcheck(haskey(dict, tmp_key), KeyError)
+                @argcheck(length(dict[tmp_key]) == length(dict[fkey]), DimensionMismatch)
             end
         end
-        return new{typeof(xkey), typeof(uxkey), typeof(dict)}(xkey, uxkey, dict)
+        return new{typeof(xkey), typeof(uxkey), typeof(fkey), typeof(ufkey), typeof(dict)}(xkey,
+                                                                                           uxkey,
+                                                                                           fkey,
+                                                                                           ufkey,
+                                                                                           dict)
     end
 end
 function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
+                      fkey::AbstractString = "nf", ufkey::AbstractString = "uf",
                       dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
-    return UniverseSets(xkey, uxkey, dict)
+    return UniverseSets(xkey, uxkey, fkey, ufkey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -344,6 +380,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return a view of a [`UniverseSets`](@ref) restricted to the assets at index `i`.
 
 Slices all `xkey`-prefixed groups by `i`, and derives unique-entry `uxkey`-prefixed groups from the corresponding sliced `xkey` group.
+
+# The factor axis is left alone
+
+`fkey`- and `ufkey`-prefixed entries come back **bit-identical**: an asset index has no meaning on the factor axis. Declaring the axis is what makes that exemption a property of the *data* — before it, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, per field.
+
+There is deliberately **no factor-index arity**. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`; a user who slices factors updates their sets themselves.
 
 # Related
 
@@ -357,12 +399,12 @@ function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
         if startswith(k, xkey)
             v = view(v, i)
         elseif startswith(k, uxkey)
-            tmp_key = replace(k, uxkey => xkey)
-            v = unique(view(sets.dict[tmp_key], i))
+            v = unique(view(sets.dict[xkey * chopprefix(k, uxkey)], i))
         end
         push!(dict, k => v)
     end
-    return UniverseSets(; xkey = xkey, uxkey = uxkey, dict = dict)
+    return UniverseSets(; xkey = xkey, uxkey = uxkey, fkey = sets.fkey, ufkey = sets.ufkey,
+                        dict = dict)
 end
 """
     group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,

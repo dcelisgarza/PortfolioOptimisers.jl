@@ -181,10 +181,14 @@ AugmentedBlackLittermanPrior
         a_sets ┼ UniverseSets
                │    xkey ┼ String: "nx"
                │   uxkey ┼ String: "ux"
+               │    fkey ┼ String: "nf"
+               │   ufkey ┼ String: "uf"
                │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ UniverseSets
                │    xkey ┼ String: "nx"
                │   uxkey ┼ String: "ux"
+               │    fkey ┼ String: "nf"
+               │   ufkey ┼ String: "uf"
                │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing

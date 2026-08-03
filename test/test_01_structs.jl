@@ -2192,4 +2192,79 @@
         chain_opt = factory(chain_opt, w0)
         @test chain_opt.fb.fb.fb.r.w === w0
     end
+    @testset "UniverseSets" begin
+        both = Dict{String, Vector{String}}("nx" => ["AAPL", "MSFT", "JPM"],
+                                            "nx_sector" => ["Tech", "Tech", "Fin"],
+                                            "ux_sector" => ["Tech", "Fin"],
+                                            "nf" => ["MTUM", "VLUE", "QUAL"],
+                                            "nf_style" => ["Mom", "Val", "Qual"],
+                                            "uf_style" => ["Mom", "Val", "Qual"],
+                                            "defensive" => ["VLUE", "QUAL"])
+        sets = UniverseSets(; dict = both)
+        @test sets.xkey == "nx"
+        @test sets.uxkey == "ux"
+        @test sets.fkey == "nf"
+        @test sets.ufkey == "uf"
+
+        # The factor axis is optional: the asset axis alone must still construct.
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).fkey == "nf"
+
+        # Factor partitions are length-checked against the factor universe.
+        @test_throws DimensionMismatch UniverseSets(;
+                                                    dict = Dict("nx" => ["A", "B"],
+                                                                "nf" => ["F1", "F2"],
+                                                                "nf_style" => ["Mom"]))
+        # A `ufkey` group needs its matching `fkey` partition to exist.
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "nf" => ["F1", "F2"],
+                                                       "uf_style" => ["Mom"]))
+        # A factor-prefixed key without a factor universe is incoherent, not optional.
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "nf_style" => ["Mom", "Val"]))
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "uf_style" => ["Mom", "Val"]))
+
+        # All four keys must be pairwise prefix-disjoint, in both orders. In turn: two keys
+        # equal, xkey == fkey, fkey prefixes ufkey, xkey prefixes fkey, uxkey prefixes ufkey.
+        for (xkey, uxkey, fkey, ufkey) in
+            (("nx", "nx", "nf", "uf"), ("nx", "ux", "nx", "uf"), ("nx", "ux", "nf", "nf_"),
+             ("n", "ux", "nf", "uf"), ("nx", "u", "nf", "uf"))
+            @test_throws ArgumentError UniverseSets(; xkey = xkey, uxkey = uxkey,
+                                                    fkey = fkey, ufkey = ufkey,
+                                                    dict = Dict("nx" => ["A", "B"],
+                                                                "n" => ["A", "B"]))
+        end
+
+        # A view slices the asset axis and leaves the factor axis bit-identical.
+        v = PortfolioOptimisers.port_opt_view(sets, [1, 3])
+        @test v.dict["nx"] == ["AAPL", "JPM"]
+        @test v.dict["nx_sector"] == ["Tech", "Fin"]
+        @test v.dict["ux_sector"] == ["Tech", "Fin"]
+        @test v.dict["nf"] === sets.dict["nf"]
+        @test v.dict["nf_style"] === sets.dict["nf_style"]
+        @test v.dict["uf_style"] === sets.dict["uf_style"]
+        @test v.dict["defensive"] === sets.dict["defensive"]
+        @test (v.xkey, v.uxkey, v.fkey, v.ufkey) ==
+              (sets.xkey, sets.uxkey, sets.fkey, sets.ufkey)
+
+        # A view collapsing the asset universe to one sector recomputes only `ux_sector`.
+        v = PortfolioOptimisers.port_opt_view(sets, [1, 2])
+        @test v.dict["ux_sector"] == ["Tech"]
+        @test v.dict["uf_style"] == ["Mom", "Val", "Qual"]
+
+        # Non-default axis keys are honoured, not just the defaults.
+        alt = UniverseSets(; xkey = "assets", uxkey = "uassets", fkey = "factors",
+                           ufkey = "ufactors",
+                           dict = Dict("assets" => ["A", "B"],
+                                       "assets_sector" => ["Tech", "Fin"],
+                                       "factors" => ["F1"], "factors_style" => ["Mom"],
+                                       "ufactors_style" => ["Mom"]))
+        v = PortfolioOptimisers.port_opt_view(alt, [2])
+        @test v.dict["assets"] == ["B"]
+        @test v.dict["assets_sector"] == ["Fin"]
+        @test v.dict["factors_style"] === alt.dict["factors_style"]
+    end
 end

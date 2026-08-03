@@ -532,6 +532,8 @@ EntropyPoolingPrior
          sets ┼ UniverseSets
               │    xkey ┼ String: "nx"
               │   uxkey ┼ String: "ux"
+              │    fkey ┼ String: "nf"
+              │   ufkey ┼ String: "uf"
               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
        ds_opt ┼ nothing
        dm_opt ┼ nothing

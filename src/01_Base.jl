@@ -307,8 +307,7 @@ const arg_dict = Dict(
                       :ucsa => "`alg`: Uncertainty set algorithm.",#
                       # Constraint generation.
                       :dval => "`dval`: Default value for assets not specified in `val`.",#
-                      :ukey => "`ukey`: Universe key identifying the full set of assets.",#
-                      :dict => "`dict`: Dictionary mapping group identifiers to asset labels.",#
+                      :dict => "`dict`: Dictionary mapping group identifiers to member labels.",#
                       :vars => "`vars`: Variable names in the parsed constraint expression.",#
                       :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
                       :op => "`op`: Comparison operator (`==`, `<=`, or `>=`).",#
@@ -584,8 +583,10 @@ const arg_dict = Dict(
                       # Constraint generation.
                       :rkb_val => "`val`: Vector of risk budget allocations.",#
                       :rkbe_val => "`val`: Mapping of names to risk budget values.",#
-                      :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list.",#
-                      :us_uxkey => "`uxkey`: Key prefix for unique-entry group variants in `dict`.",#
+                      :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
+                      :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
+                      :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
+                      :us_ufkey => "`ufkey`: Key prefix for unique-entry factor group variants in `dict`. Validated at construction, never recomputed by a view.",#
                       :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
                       :A_phylo => "`A`: Phylogeny constraint matrix.",#
                       :B_phylo => "`B`: Group sizes or allocations vector.",#
@@ -2391,6 +2392,8 @@ julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
 UniverseSets
    xkey ┼ String: "nx"
   uxkey ┼ String: "ux"
+   fkey ┼ String: "nf"
+  ufkey ┼ String: "uf"
    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
 
 julia> estimator_to_val(MyIncreasingValue(), sets)

@@ -138,6 +138,8 @@ BayesianBlackLittermanPrior
         sets ┼ UniverseSets
              │    xkey ┼ String: "nx"
              │   uxkey ┼ String: "ux"
+             │    fkey ┼ String: "nf"
+             │   ufkey ┼ String: "uf"
              │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
