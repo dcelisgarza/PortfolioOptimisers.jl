@@ -82,6 +82,7 @@ set_string_distance!
 with_string_distance
 did_you_mean
 unknown_variable_msg
+misaligned_axis_msg
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg

@@ -10,6 +10,7 @@ needs_previous_weights(opt::JuMPOptimiser)
 factory(opt::JuMPOptimiser, w::AbstractVector)
 port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)
 jump_optimiser_td_defaults
+assert_universe_axis_order
 processed_jump_optimiser_attributes
 processed_jump_optimiser
 assemble_jump_model!

@@ -394,7 +394,7 @@ const arg_dict = Dict(
                       :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
                       :lt => "`lt`: Long-side minimum holding threshold.",#
                       :st => "`st`: Short-side minimum holding threshold.",#
-                      :lcse => "`lcse`: Linear constraint set estimator(s).",#
+                      :lcse => "`lcse`: Linear constraint set estimator(s). This is the one constraint slot that also admits an `ExposureConstraintEstimator`, so a row may be written in the names of another basis — factor names, say — and re-based through the prior's loadings at generation time. What reaches the model is an ordinary asset-space `LinearConstraint` either way.",#
                       :gcarde => "`gcarde`: Grouped cardinality constraint estimator.",#
                       :sgcarde => "`sgcarde`: Sub-grouped cardinality constraint estimator(s).",#
                       :smtx => "`smtx`: Sub-group selection matrix or estimator.",#
@@ -1559,6 +1559,29 @@ function missing_group_assets_msg(group, missing_assets, nx, key)
     return "group `$(group)`: $(length(missing_assets)) member(s) not in asset universe " *
            "($(length(nx)) assets under key `$(key)`): $(missing_assets); dropped" *
            did_you_mean(string(first(missing_assets)), nx)
+end
+"""
+    misaligned_axis_msg(declared, names, axis, key, sym) -> String
+
+Build the error text for a universe declared under `key` that disagrees with the axis `sym` of the data it will be used against — `declared` against `names`.
+
+Position is the only link between a name and a column, so a disagreement is not a naming inconvenience: every constraint row, bound and group would be attached to the wrong column and the optimisation would succeed with the wrong answer. The message therefore names what to fix, not just what is wrong.
+
+Two disagreements are reported differently because they have different causes. Different lengths mean the two describe different universes — usually a stale `sets` against freshly sliced data. Equal lengths mean they describe the same universe in a different order, and the first differing position is the whole diagnosis. Names the sizes and the *first* differing pair only — never either universe in full, the same info-leak-safe discipline as [`unknown_variable_msg`](@ref).
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
+"""
+function misaligned_axis_msg(declared, names, axis, key, sym)
+    detail = if length(declared) != length(names)
+        "$(length(declared)) $(axis)s are declared, but the data has $(length(names))"
+    else
+        i = findfirst(declared .!= names)
+        "both have $(length(names)) $(axis)s but the order differs, first at position $(i): `$(declared[i])` vs `$(names[i])`"
+    end
+    return "the $(axis) universe declared under key `$(key)` does not describe the returns data: $(detail). Position is the only link between a name and a column, so this attaches constraints, bounds and groups to the wrong $(axis) rather than failing. Set `sets.dict[\"$(key)\"]` to `rd.$(sym)`, or slice the sets to match the data."
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

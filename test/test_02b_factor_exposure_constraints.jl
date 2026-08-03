@@ -1,5 +1,5 @@
 @testset "Factor exposure constraints" begin
-    using PortfolioOptimisers, Test, Logging, LinearAlgebra
+    using PortfolioOptimisers, Test, Logging, LinearAlgebra, Clarabel, StableRNGs
     # Hand-built loadings and universes throughout: the point of these tests is that the row
     # that comes out is `M * a`, so anything estimated would obscure the arithmetic.
     #
@@ -290,5 +290,169 @@
         # The axis check counts `M`'s columns, not `L`'s: `L` has two here and the constraint
         # still builds against a three-factor axis.
         @test size(rrl.L, 2) != length(sets.dict[sets.fkey])
+    end
+    # A tiny factor market for the optimiser tests: the assets are combinations of two
+    # factors plus noise, so a fitted `M` is close to `Mo` without being it. Every assertion
+    # reads the *fitted* loadings off the result — the claim is that the realised exposure
+    # is the one the row was written against, not that the regression recovers `Mo`.
+    orng = StableRNG(987654321)
+    Fo = randn(orng, 400, 2) * 0.01
+    Mo = [1.0 0.0; 0.5 0.5; 0.0 1.0]
+    Xo = Fo * transpose(Mo) + randn(orng, 400, 3) * 0.001
+    rdo = ReturnsResult(; nx = ["A", "B", "C"], X = Xo, nf = ["MTUM", "VLUE"], F = Fo)
+    osets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["MTUM", "VLUE"]))
+    oslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = "verbose" => false)
+    oece = ExposureConstraintEstimator(;
+                                       lce = LinearConstraintEstimator(;
+                                                                       val = "MTUM <= 0.3"),
+                                       space = fs)
+    @testset "`lcse` is the only slot that admits a re-basis" begin
+        @test JuMPOptimiser(; slv = oslv, sets = osets, lcse = oece) isa JuMPOptimiser
+        # Cardinality rows index the binary held-indicators rather than `w`, so a projected
+        # row is neither integral nor an index into them. ADR 0047 makes that
+        # *unrepresentable* rather than validated: the narrow bound rejects it outright.
+        @test_throws TypeError JuMPOptimiser(; slv = oslv, sets = osets, gcarde = oece)
+        @test_throws TypeError JuMPOptimiser(; slv = oslv, sets = osets, sgcarde = oece)
+        # A vector may mix bases. It needs the explicit element type for the same reason
+        # `VecLcE_Lc` does — a heterogeneous literal promotes to the abstract supertype.
+        mixed = PortfolioOptimisers.EcE_LcE_Lc[oece,
+                                               LinearConstraintEstimator(;
+                                                                         val = "A >= 0.05")]
+        @test JuMPOptimiser(; slv = oslv, sets = osets, lcse = mixed) isa JuMPOptimiser
+        # The names resolve against `sets`, so a re-basis without one fails at construction
+        # like every other estimator-typed field. This holds for a wrapped *precomputed*
+        # constraint too: `constraint_space_basis` needs the sets to find the factor axis.
+        @test_throws PortfolioOptimisers.IsNothingError JuMPOptimiser(; slv = oslv,
+                                                                      lcse = oece)
+        @test_throws PortfolioOptimisers.IsNothingError JuMPOptimiser(; slv = oslv,
+                                                                      lcse = mixed)
+    end
+    @testset "End to end: the realised exposure is the requested one" begin
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                    sets = osets, lcse = oece)), rdo)
+        Mf = res.pa.pr.rr.M
+        # The mandate binds: momentum exposure sits on the cap it was written against.
+        @test isapprox(dot(Mf[:, 1], res.w), 0.3; atol = 1e-6)
+        # What reached the model is an ordinary asset-space constraint — one row, one column
+        # per asset. There is no factor-length row anywhere and no second pathway.
+        @test isa(res.lcsr, LinearConstraint)
+        @test size(res.lcsr.ineq.A) == (1, length(rdo.nx))
+        @test vec(res.lcsr.ineq.A) ≈ Mf[:, 1]
+        # Handing the optimiser the projected row directly is the same problem, which is the
+        # operational content of "re-basing is a change of coordinates, not a feature".
+        hand = LinearConstraint(;
+                                ineq = PartialLinearConstraint(; A = transpose(Mf[:, 1:1]),
+                                                               B = [0.3]))
+        resh = optimise(MeanRisk(;
+                                 opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                     sets = osets, lcse = hand)), rdo)
+        @test isapprox(res.w, resh.w; rtol = 5e-5)
+    end
+    @testset "Every JuMP optimiser inherits it" begin
+        # They all share `JuMPOptimiser`, so the wiring is one edit rather than one per
+        # optimiser.
+        for est in (MeanRisk, RiskBudgeting, RelaxedRiskBudgeting)
+            res = optimise(est(;
+                               opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                   sets = osets, lcse = oece)), rdo)
+            @test dot(res.pa.pr.rr.M[:, 1], res.w) <= 0.3 + 1e-6
+        end
+        # Near Optimal Centering round-trips `lcsr` back into an `lcse` slot through
+        # `jump_optimiser_from_attributes`, where the pass-through method for a precomputed
+        # `LinearConstraint` keeps it from being projected a second time. Its *constrained*
+        # algorithm is the one that carries the linear constraints into the centering model
+        # — the default `UnconstrainedNearOptimalCentering` deliberately drops them there,
+        # and does so for an asset-space constraint just the same.
+        noc = optimise(NearOptimalCentering(; alg = ConstrainedNearOptimalCentering(),
+                                            opt = JuMPOptimiser(; pe = FactorPrior(),
+                                                                slv = oslv, sets = osets,
+                                                                lcse = oece)), rdo)
+        @test isapprox(dot(noc.pa.pr.rr.M[:, 1], noc.w), 0.3; atol = 1e-6)
+    end
+    @testset "Missing loadings throw at the optimiser, ignoring `strict`" begin
+        # `strict` governs recoverable per-row name failures. Dropping every row of a factor
+        # mandate would yield a feasible, plausible portfolio carrying none of the requested
+        # exposure, so this is not that.
+        for strict in (false, true)
+            mre = MeanRisk(;
+                           opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = oslv,
+                                               sets = osets, lcse = oece, strict = strict))
+            @test_throws PortfolioOptimisers.IsNothingError optimise(mre, rdo)
+        end
+    end
+    @testset "Axis order is checked against the data" begin
+        fmr(s) = MeanRisk(;
+                          opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv, sets = s,
+                                              lcse = oece))
+        # Same factors, wrong order: every row would be attached to the wrong loadings
+        # column, and the problem would still solve.
+        badf = UniverseSets(;
+                            dict = Dict("nx" => ["A", "B", "C"], "nf" => ["VLUE", "MTUM"]))
+        @test_throws ArgumentError optimise(fmr(badf), rdo)
+        # Same assets, wrong order.
+        badx = UniverseSets(;
+                            dict = Dict("nx" => ["A", "C", "B"], "nf" => ["MTUM", "VLUE"]))
+        @test_throws ArgumentError optimise(fmr(badx), rdo)
+        # Different universes entirely is a different diagnosis, and says so.
+        shortx = UniverseSets(; dict = Dict("nx" => ["A", "B"], "nf" => ["MTUM", "VLUE"]))
+        @test_throws DimensionMismatch optimise(fmr(shortx), rdo)
+        # The asset check is new behaviour on a path with nothing to do with factors: it
+        # fires with no factor axis declared and no re-basis in sight.
+        amr = MeanRisk(;
+                       opt = JuMPOptimiser(; slv = oslv,
+                                           sets = UniverseSets(;
+                                                               dict = Dict("nx" =>
+                                                                               ["A", "C",
+                                                                                "B"])),
+                                           lcse = LinearConstraintEstimator(;
+                                                                            val = "A >= 0.05")))
+        @test_throws ArgumentError optimise(amr, ReturnsResult(; nx = rdo.nx, X = rdo.X))
+        # Only where both sides exist. The factor axis is optional on `UniverseSets`, and an
+        # undeclared one is silence, not disagreement.
+        nofsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        @test optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                    sets = nofsets)), rdo) isa
+              MeanRiskResult
+        msg = try
+            optimise(fmr(badf), rdo)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("factor universe declared under key `nf`", msg)
+        @test occursin("first at position 1: `VLUE` vs `MTUM`", msg)
+        # Info-leak-safe, as the other constraint messages are: sizes and the first
+        # differing pair only, never a universe in full.
+        msg = try
+            optimise(fmr(badx), rdo)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("first at position 2: `C` vs `B`", msg)
+        @test !occursin("\"A\"", msg)
+    end
+    @testset "A schedule of exposure constraints" begin
+        # ADR 0030: constraints are problem definition, so `lcse` is `TD_Option` and the
+        # widened bound widens with it. Fold two tightens the momentum cap.
+        cv = IndexWalkForward(200, 100)
+        tight = ExposureConstraintEstimator(;
+                                            lce = LinearConstraintEstimator(;
+                                                                            val = "MTUM <= 0.05"),
+                                            space = fs)
+        mre = MeanRisk(;
+                       opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv, sets = osets,
+                                           lcse = TimeDependent([oece, tight])))
+        preds = cross_val_predict(mre, rdo, cv)
+        @test length(preds.pred) == 2
+        for (k, cap) in enumerate((0.3, 0.05))
+            r = preds.pred[k].res
+            @test dot(r.pa.pr.rr.M[:, 1], r.w) <= cap + 1e-6
+        end
+        # The loadings are refit per fold, which is the whole reason the constraint is
+        # re-based at generation time rather than written out once by the caller.
+        @test preds.pred[1].res.pa.pr.rr.M != preds.pred[2].res.pa.pr.rr.M
     end
 end

@@ -342,7 +342,7 @@ $(DocStringExtensions.FIELDS)
         xbgt::Bool = false,
         lt::TD_Option{<:BtE_Bt} = nothing,
         st::TD_Option{<:BtE_Bt} = nothing,
-        lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
         cte::TD_Option{<:Lc_CC_VecCC} = nothing,
         gcarde::TD_Option{<:LcE_Lc} = nothing,
         sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
@@ -590,7 +590,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            bgt::TD_Option{<:Num_BgtCE}, sbgt::TD_Option{<:Num_BgtRg},
                            gbgt::TD_Option{<:Num_BgtRg}, xbgt::Bool,
                            lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
-                           lcse::TD_Option{<:LcE_Lc_VecLcE_Lc},
+                           lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
                            cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
                            sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
                            smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
@@ -771,6 +771,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
            isa(sglt, ThresholdEstimator) ||
            isa(sgst, ThresholdEstimator) ||
            isa(lcse, LinearConstraintEstimator) ||
+           isa(lcse, ExposureConstraintEstimator) ||
            isa(cte, LinearConstraintEstimator) ||
            isa(gcarde, LinearConstraintEstimator) ||
            isa(sgcarde, LinearConstraintEstimator) ||
@@ -782,7 +783,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
            isa(sst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sst) ||
            isa(sglt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sglt) ||
            isa(sgst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sgst) ||
-           isa(lcse, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), lcse) ||
+           isa(lcse, AbstractVector) &&
+           any(x -> isa(x, LinearConstraintEstimator) || isa(x, ExposureConstraintEstimator),
+               lcse) ||
            isa(cte, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), cte) ||
            isa(gcarde, AbstractVector) &&
            any(x -> isa(x, LinearConstraintEstimator), gcarde) ||
@@ -862,7 +865,7 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        sbgt::TD_Option{<:Num_BgtRg} = nothing,
                        gbgt::TD_Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                        lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
-                       lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
                        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
                        gcarde::TD_Option{<:LcE_Lc} = nothing,
                        sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
@@ -1067,6 +1070,40 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          strict = opt.strict)
 end
 """
+    assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult) -> Nothing
+
+Assert that every axis [`UniverseSets`](@ref) declares agrees, name for name and in order, with the returns data it is about to be used against.
+
+Nothing else in the library ties a declared universe to the data's column order. Names resolve to *positions* in `sets.dict[sets.xkey]`, and those positions index the columns of `pr.X`; if the two disagree the model is still feasible and still solves — it just constrains the wrong assets. Converting the one silent-wrong-answer failure mode into an error is the whole point, which is why this runs even though no supported path is expected to trip it.
+
+Both axes are checked, but only where both sides exist: `rd.nx` and `rd.nf` are optional on [`ReturnsResult`](@ref), and the factor axis is optional on [`UniverseSets`](@ref). The factor check is redundant with the one [`constraint_space_basis`](@ref) makes against the loadings and costs nothing when a caller copies `rd.nf` into the dict; the asset check is new behaviour on a path that has nothing to do with factors, and it may surface pre-existing misconfigurations — that is intended.
+
+`_update_asset_sets` rebuilds `sets.dict[sets.xkey]` from `rdo.nx` before a [`NestedClustered`](@ref) outer solve, and [`port_opt_view`](@ref) slices the asset axis alongside the data, so the synthetic-universe and subset paths satisfy this by construction.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`misaligned_axis_msg`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+"""
+function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult)
+    if isnothing(sets)
+        return nothing
+    end
+    for (axis, key, names, sym) in
+        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.fkey, rd.nf, "nf"))
+        if isnothing(names) || !haskey(sets.dict, key)
+            continue
+        end
+        declared = sets.dict[key]
+        @argcheck(length(declared) == length(names),
+                  DimensionMismatch(misaligned_axis_msg(declared, names, axis, key, sym)))
+        @argcheck(declared == names,
+                  ArgumentError(misaligned_axis_msg(declared, names, axis, key, sym)))
+    end
+    return nothing
+end
+"""
     processed_jump_optimiser_attributes(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
@@ -1102,6 +1139,7 @@ processing happens exactly once per `optimise` call.
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, opt.brt)
+    assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd; dims = dims)
     X = pr.X
     datatype = eltype(X)
@@ -1109,7 +1147,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                    datatype = datatype)
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
-    lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict)
+    lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
+                              rr = pr.rr)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                  x_src = opt.x_src, z_src = opt.z_src, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
