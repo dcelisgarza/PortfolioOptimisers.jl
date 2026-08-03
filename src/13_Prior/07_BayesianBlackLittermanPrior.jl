@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
                 me = EquilibriumExpectedReturns()
             )
         ),
+        f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         views::Lc_BLV,
         sets::Option{<:AssetSets} = nothing,
@@ -26,6 +27,20 @@ $(DocStringExtensions.FIELDS)
     ) -> BayesianBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
+
+## Composition: what this estimator forwards
+
+The views are applied to the **factors** and reach the assets through the regression loadings, so this estimator produces a posterior over both blocks. Under ADR 0046 it forwards the wrapped prior whole and spells out its deviations:
+
+  - `mu` and `sigma` are the asset posterior; `chol` is **dropped**, because the posterior covariance supersedes the one it factorises.
+  - The factor block `fpr` carries the **posterior** factor moments — `mu_hat` and the inverse of the posterior precision — processed by `f_mp`. Its `chol` is dropped for the same reason; its `w` and that weighting's diagnostics forward untouched, because the views do not touch the observation axis.
+  - Everything else forwards: `X` is the wrapped prior's unchanged, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` is a regression over data the views do not modify.
+
+Because both blocks are posterior, the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds exactly. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
+
+!!! warning
+
+    The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
 
 ## Validation
 
@@ -101,6 +116,14 @@ BayesianBlackLittermanPrior
              │       │           w ┼ nothing
              │       │   corrected ┴ Bool: true
              │   rsd ┴ Bool: true
+        f_mp ┼ MatrixProcessing
+             │     pdm ┼ Posdef
+             │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      dn ┼ nothing
+             │      dt ┼ nothing
+             │     alg ┼ nothing
+             │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
           mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -137,6 +160,10 @@ BayesianBlackLittermanPrior
     """
     @fprop @vprop pe
     """
+    $(field_dict[:f_mp])
+    """
+    f_mp
+    """
     $(field_dict[:mp])
     """
     mp
@@ -161,25 +188,28 @@ BayesianBlackLittermanPrior
     """
     tau
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
+                                         f_mp::AbstractMatrixProcessingEstimator,
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Lc_BLV, sets::Option{<:AssetSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number})
         assert_bl(views, sets, views_conf, tau)
-        return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
-                   typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
+        return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(views), typeof(sets),
+                   typeof(views_conf), typeof(rf), typeof(tau)}(pe, f_mp, mp, views, sets,
+                                                                views_conf, rf, tau)
     end
 end
 function BayesianBlackLittermanPrior(;
                                      pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
                                                                                            pe = EmpiricalPrior(;
                                                                                                                me = EquilibriumExpectedReturns())),
+                                     f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                      views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
                                      rf::Number = 0.0,
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
-    return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
+    return BayesianBlackLittermanPrior(pe, f_mp, mp, views, sets, views_conf, rf, tau)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -248,8 +278,8 @@ Where:
   - `tau` defaults to `1/T` if not specified, where `T` is the number of factor observations.
   - The view uncertainty matrix `f_omega` is computed using [`calc_omega`](@ref).
   - Bayesian posterior mean and covariance are computed via the model's update equations.
-  - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
-  - The result includes factor prior mean and covariance, and regression details.
+  - Matrix processing is applied to the asset posterior covariance using `pe.mp`, and to the factor posterior covariance using `pe.f_mp`.
+  - The result's factor block holds the **posterior** factor moments, so `pr.mu == pr.rr.M * pr.fpr.mu + pr.rr.b` holds exactly.
 
 # Related
 
@@ -283,15 +313,29 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
-    # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
-    # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
-    # `posterior_X` is `prior_result.X` unchanged, so the wrapped `w` still describes exactly
-    # the rows of the returned `X`, its `ens`/`kld`/`ow` still describe that `w`, and the
-    # feature matrix is still over this asset axis. The views are applied to the factor
-    # distribution only to reach the assets through `rr`; the factor block this result reports
-    # is the wrapped prior's, forwarded whole.
+    # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
+    # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
+    # inverse. Reporting them rather than the prior ones is what makes this carrier internally
+    # consistent: `mu == rr.M * fpr.mu + rr.b` holds exactly afterwards, where forwarding the
+    # prior block left the asset and factor halves describing different distributions.
+    # `pe.f_mp` processes the factor block for the same reason `pe.mp` processes the asset one,
+    # and is separate for the same reason `FactorBlackLittermanPrior` keeps the two apart.
+    f_posterior_sigma = sigma_hat \ LinearAlgebra.I
+    matrix_processing!(pe.f_mp, f_posterior_sigma, F; kwargs...)
+    # `chol` is the factor block's only drop — `f_posterior_sigma` supersedes the covariance it
+    # factorises. The views do not touch the observation axis, so the factor prior's `w` and
+    # that weighting's diagnostics forward untouched (ADR 0046).
+    posterior_fpr = forward_prior(fpr; mu = mu_hat, sigma = f_posterior_sigma,
+                                  chol = nothing)
+    # Everything else the wrapped prior carried is forwarded (see [`forward_prior`](@ref));
+    # `chol` is the only drop, because `posterior_sigma` supersedes the covariance it
+    # factorises. `posterior_X` is `prior_result.X` unchanged, so the wrapped `w` still
+    # describes exactly the rows of the returned `X`, its `ens`/`kld`/`ow` still describe that
+    # `w`, and the feature matrix is still over this asset axis. `rr` is unchanged — the
+    # regression is over data the views do not modify — so the factor block it projects is now
+    # the posterior one.
     return forward_prior(prior_result; mu = posterior_mu, sigma = posterior_sigma,
-                         chol = nothing)
+                         chol = nothing, fpr = posterior_fpr)
 end
 
 export BayesianBlackLittermanPrior

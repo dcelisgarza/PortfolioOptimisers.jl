@@ -74,6 +74,26 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what this estimator forwards
+
+This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its carrier directly; the rule of ADR 0046 still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
+
+  - `mu` and `sigma` are the asset half of the augmented posterior; the factor block `fpr` is the **factor half**, so both are posterior. `chol` is dropped on both sides, because the posterior covariances supersede the ones they factorise.
+  - `w`, `ens`, `kld` and `ow` come from the **asset** prior, and `fpr`'s own come from the **factor** prior. Two priors disagreeing about observation weights is a legitimate configuration, and the nested block is what keeps the two weightings distinguishable rather than forcing a choice.
+  - `Z` comes from the asset prior only: the factor prior's would be factors × features and would not describe this asset axis.
+
+!!! warning
+
+    The returned `mu` and `sigma` are the augmented posterior, but `w` is the **asset prior's** observation weighting, forwarded unchanged (and `fpr.w` is the factor prior's). Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the asset prior, not of the posterior.
+
+!!! warning
+
+    `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`, even though **both** blocks are posterior. The gap is opened by the update, and its cause is **idiosyncratic variance**. (Give `a_pe` and `f_pe` the same observation weighting and the two *priors* do satisfy the identity to machine precision, because least squares with an intercept reproduces the mean. Weighting them differently — two independently pooled priors, say — breaks it before the update as well, so that case carries both causes at once.)
+
+    The augmented covariance stacks the full asset covariance `sigma_a` — factor *and* residual variance — against a cross-covariance `M * sigma_f` that is pure factor. The Black-Litterman update therefore moves the asset half by `tau * sigma_a * P'(…)` and the factor half by `tau * sigma_f * M' * P'(…)`, and for the two to stay related by `M` it would need `sigma_a == M * sigma_f * M'`. That holds only when the factor model is exact. The gap scales with the residual variance and closes to machine precision when there is none; both view sets contribute, so muting either one does not remove it.
+
+    [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) satisfy the identity exactly, because they update the factor distribution alone and *project* it onto the assets rather than updating an asset block alongside it. [`BlackLittermanPrior`](@ref) breaks it for the opposite reason — it takes asset views only and never computes a posterior factor distribution at all.
+
 ## Validation
 
   - If `w` is not `nothing`, `!isempty(w)`.
@@ -337,7 +357,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - The augmented Black-Litterman posterior mean and covariance are computed using `vanilla_posteriors`.
   - Matrix processing is applied to the augmented posterior covariance.
   - The final asset posterior mean and covariance are extracted from the augmented results and adjusted for regression intercepts and risk-free rate.
-  - The result includes asset returns, posterior mean, posterior covariance, regression result, and factor prior details.
+  - The factor block is the **factor half** of the same augmented posterior, so both halves are posterior. It takes no intercept and no risk-free adjustment (the intercept is the regression's, hence asset-only) and no second matrix processing pass, since the augmented covariance was processed as a whole and a principal submatrix of it is already processed.
 
 # Related
 
@@ -402,17 +422,28 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
+    # The augmented system is jointly posterior over `[assets; factors]`, so truncating it to
+    # the asset half discards a factor half that *is* the posterior factor distribution. The
+    # factor block reports that half rather than `f_prior`'s prior moments. No `rf` shift and
+    # no `b`: the intercept is the regression's, hence asset-only, and `vanilla_posteriors`
+    # already returns the factor half on the same scale `f_prior.mu` was supplied on. No second
+    # `matrix_processing!` either — `aug_posterior_sigma` was processed as a whole above, and a
+    # principal submatrix of the result is already processed.
+    f_idx = (size(X, 2) + 1):length(aug_posterior_mu)
+    # `chol` is the factor block's only drop: the posterior covariance supersedes the one
+    # `f_prior.chol` factorises. The views do not touch the observation axis, so `f_prior`'s own
+    # `w` and its diagnostics forward untouched (ADR 0046).
+    fpr = forward_prior(f_prior; mu = aug_posterior_mu[f_idx],
+                        sigma = aug_posterior_sigma[f_idx, f_idx], chol = nothing)
     # The feature matrix comes from `a_prior` only: `f_prior` is fit on the factors, so its
     # `Z` would be factors × features and would not describe this asset axis. The augmented
     # system is truncated straight back to the assets, so `a_prior.Z` still binds correctly.
     # `posterior_X` is reconstructed from the factors, so a forwarded `Z` is dimension-correct
     # but was derived from the pre-reconstruction returns (see [`LowOrderPrior`](@ref)).
     #
-    # The factor block *is* `f_prior`: the augmented posterior is truncated back to the assets,
-    # so the factor distribution this result reports is the prior one, unmodified. Its own `w`
-    # and diagnostics travel with it, which is how the two priors' weightings stay
-    # distinguishable — `w` is `a_prior`'s, `fpr.w` is `f_prior`'s. The asset slot takes
-    # `a_prior`'s because a `@pprop w` consumer applies `w` to a portfolio return series over
+    # The factor block's `w` and diagnostics are `f_prior`'s, which is how the two priors'
+    # weightings stay distinguishable — `w` is `a_prior`'s, `fpr.w` is `f_prior`'s. The asset
+    # slot takes `a_prior`'s because a `@pprop w` consumer applies `w` to a return series over
     # the *assets*; two priors disagreeing about observation weights is a legitimate
     # configuration, and there are two slots to hold them. The diagnostics follow their
     # weights (ADR 0046), so `ens`/`kld`/`ow` come from `a_prior` too. `chol` is dropped:
@@ -421,7 +452,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # directly instead of going through [`forward_prior`](@ref).
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          w = a_prior.w, ens = a_prior.ens, kld = a_prior.kld,
-                         ow = a_prior.ow, rr = rr, fpr = f_prior, Z = a_prior.Z)
+                         ow = a_prior.ow, rr = rr, fpr = fpr, Z = a_prior.Z)
 end
 
 export AugmentedBlackLittermanPrior

@@ -25,6 +25,20 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what this estimator forwards
+
+The views are applied to the **assets**. Under ADR 0046 the wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
+
+!!! warning
+
+    The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
+
+!!! warning
+
+    When the wrapped prior carries a factor block, `pr.fpr` describes the **prior** factor distribution while `pr.mu` is a **posterior** asset mean, so `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`. The block stays *structurally* true — the regression is over data Black-Litterman does not modify — while becoming *distributionally* inconsistent with the asset block. There is nothing better to report: the views land on the assets, so this estimator never computes a posterior factor distribution at all.
+
+    Its siblings differ, and the difference is worth knowing. [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) apply their views to the factors and report the resulting posterior block, so both satisfy `mu == rr.M * fpr.mu + rr.b` exactly. [`AugmentedBlackLittermanPrior`](@ref) reports a posterior factor block too, but stays inconsistent for a different reason — see its own warning.
+
 ## Validation
 
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.

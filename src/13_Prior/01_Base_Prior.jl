@@ -864,6 +864,14 @@ A prior fit through a factor model carries two distributions: one over the asset
 
 The flat names are **virtual reads** of the nested block, so code written against the old shape is unaffected: `pr.f_mu`, `pr.f_sigma` and `pr.f_w` return `fpr.mu`, `fpr.sigma` and `fpr.w`, or `nothing` when there is no factor block, and `pr.f_ens`, `pr.f_kld` and `pr.f_ow` come with them. They are properties, not fields — [`forward_prior`](@ref) and [`prior_field_values`](@ref) see only `fpr`.
 
+### Which read is idiomatic
+
+**`pr.fpr.mu` is the public read**; the flat `f_`-prefixed names are a **compatibility surface**, kept so that code written against the pre-nesting shape keeps working, and useful where a value-or-`nothing` read without branching is wanted.
+
+The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over eleven fields, so `fpr.X` — the factor returns matrix — and `fpr.Z`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
+
+The two reads also differ where the block is absent, which is the one case worth checking before choosing: `pr.f_mu` returns `nothing`, while `pr.fpr.mu` throws, because `fpr` is `nothing`. Guard with [`assert_prior_regression`](@ref) — `rr` and `fpr` are supplied together or not at all, so checking `rr` establishes the whole block — and then read through `fpr`.
+
 ## Composition: what a wrapping estimator forwards
 
 Most prior estimators wrap another and return a carrier built from the one they were handed. Which fields survive that hop is governed by a single rule, recorded in ADR 0046 and enforced by [`forward_prior`](@ref):
@@ -1076,6 +1084,14 @@ $(DocStringExtensions.FIELDS)
 A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the carrier has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
 
 `fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the low order carrier's own factor block, and the constructor **enforces that the two are the same object** — see the validation below.
+
+`fpr` is this carrier's own field, so it resolves ahead of the `forward(pr)` block and names the **high** order factor block, where before nesting it resolved through to the low order one. Reads through it are unaffected by that shift: the nested carrier forwards to its own `pr`, which the invariant pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way and `hop.fpr` is simply "the factor prior at this order".
+
+### Which read is idiomatic
+
+**`pr.fpr.kt` is the public read**, on the same terms as on [`LowOrderPrior`](@ref) — see the fuller reasoning there. The seven flat names here are a **frozen compatibility surface**: `f_kt`, `f_sk`, `f_V`, `f_D2`, `f_L2`, `f_S2` and `f_skmp`, and no more will be added. A field added to this carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart.
+
+As there, the two reads differ where the block is absent — `pr.f_kt` returns `nothing`, `pr.fpr.kt` throws — so guard first and then read through `fpr`.
 
 # Constructors
 

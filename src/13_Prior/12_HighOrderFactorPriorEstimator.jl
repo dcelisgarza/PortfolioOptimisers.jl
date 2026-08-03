@@ -308,6 +308,22 @@ Where:
   - `dims in (1, 2)`.
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
+# Details
+
+The factor co-moments are computed from `F` directly and nested as a [`HighOrderPrior`](@ref) over the wrapped prior's own factor block, so `fpr.pr === pr.fpr` — the co-moments and the low order factor moments describe one distribution, reachable by either route.
+
+!!! note
+
+    A Black-Litterman prior underneath this estimator now **returns numbers where it used to throw**. Every wrapping estimator forwards `rr` and the factor block under ADR 0046, so `HighOrderFactorPriorEstimator(; pe = BlackLittermanPrior(; pe = FactorPrior(…)))` reaches a regression instead of an `IsNothingError`.
+
+    What comes back is worth understanding. The higher co-moments project through `rr.M` while `mu` and `sigma` carry the views — Black-Litterman makes no claim about third and fourth moments, so the factor projection is the only estimate available.
+
+!!! warning
+
+    The co-moments are computed from `F` as supplied, so they always describe the **pre-view** factor distribution, whichever Black-Litterman member is underneath. Where that member reports a *posterior* factor block — [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) — the nested `fpr` therefore mixes orders: `fpr.mu` and `fpr.sigma` carry the views, `fpr.kt`, `fpr.sk` and `fpr.V` do not. The `fpr.pr === pr.fpr` invariant still holds, because both routes reach the same posterior low order block; what differs is the order at which the views stop.
+
+    This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the carrier happens to be uniform.
+
 # Related
 
   - [`HighOrderFactorPriorEstimator`](@ref)

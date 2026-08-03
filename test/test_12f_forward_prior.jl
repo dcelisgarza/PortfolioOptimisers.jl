@@ -6,6 +6,10 @@ carrier's own validation runs on every reconstruction — without going through 
 estimator. What the construction sites actually forward is pinned separately, in
 `test_12g_forwarding_rule.jl`.
 =#
+# Imported explicitly rather than inherited from whichever suite file ran first, so this
+# file also runs standalone.
+using Test, PortfolioOptimisers, StableRNGs, Logging, LinearAlgebra, StatsBase, Random
+
 const PO = PortfolioOptimisers
 
 # Small synthetic priors, built directly rather than fitted: these tests are about

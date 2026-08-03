@@ -702,12 +702,12 @@ function plot_factor_loadings end
     plot_factor_sigma(res::OptimisationResult[, rd]; kwargs...) -> Plot
     plot_factor_sigma(pred::PredictionResult[, rd]; kwargs...) -> Plot
 
-Correlation/covariance heatmap of the factor covariance matrix (`pr.f_sigma`). Behaves
+Correlation/covariance heatmap of the factor covariance matrix (`pr.fpr.sigma`). Behaves
 identically to [`plot_correlation`](@ref) but operates on the factor space.
 
 Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
-`pr.f_sigma` is a virtual read of `pr.fpr.sigma`, and `fpr` travels with `rr`, so the check
-is on `rr`. The matrix arity takes `f_sigma` directly and needs no prior.
+`fpr` travels with `rr`, so the check is on `rr` and establishes the whole block. The matrix
+arity takes `f_sigma` directly and needs no prior.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -924,11 +924,11 @@ function plot_prior end
     plot_factor_mu(res::OptimisationResult[, rd]; N, kwargs...) -> Plot
     plot_factor_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
-Bar chart of per-factor expected returns (the `f_mu` vector from a factor model prior).
+Bar chart of per-factor expected returns (`pr.fpr.mu`, from a factor model prior).
 
 Requires that the prior carries a factor block, checked by [`assert_prior_regression`](@ref):
-`pr.f_mu` is a virtual read of `pr.fpr.mu`, and `fpr` travels with `rr`, so the check is on
-`rr`. The vector arity takes `f_mu` directly and needs no prior.
+`fpr` travels with `rr`, so the check is on `rr` and establishes the whole block. The vector
+arity takes `f_mu` directly and needs no prior.
 
 # Arguments
 

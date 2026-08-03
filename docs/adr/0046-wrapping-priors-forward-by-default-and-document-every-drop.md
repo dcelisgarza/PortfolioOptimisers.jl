@@ -329,3 +329,78 @@ This makes the plotting guards depend on an invariant recorded above: `rr` and `
 together or not at all, so checking `rr` covers a block whose `mu` and `sigma` the caller reaches through
 the `f_mu`/`f_sigma` virtual reads. Relaxing that binding would silently stop these three guards covering
 what they guard.
+
+## Amendment (2026-08-03): `pr.fpr.mu` is the idiomatic read, and the flat set is frozen
+
+Nesting the factor block left two ways to read the same value, and no rule saying which docs,
+examples and library code should use. **`pr.fpr.mu` is the public read.** The flat `f_`-prefixed
+names remain, as a compatibility surface for code written against the pre-nesting shape and for
+the occasional value-or-`nothing` read.
+
+The argument is not stylistic. The flat surface is **partial**, and always was: `LowOrderPrior`
+has eleven fields and six flat names, so `fpr.X` — the factor returns matrix — along with
+`fpr.Z`, `fpr.chol` and `fpr.rr` have no flat spelling at all. A surface that cannot express the
+whole block cannot be the way to read it. This also settles the question the first amendment above
+left open.
+
+**The set is frozen at thirteen** — six on `LowOrderPrior`, seven on `HighOrderPrior`. A field
+added to either carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so
+"the factor block gains every field for free" stays true of the storage *and* of the read, instead
+of becoming an obligation to declare a fourteenth `compute` out of symmetry. Recording the freeze is
+what makes a future reviewer's answer "no" rather than "why not?".
+
+The two reads are not interchangeable, and the difference is where the block is absent: `pr.f_mu`
+returns `nothing`, `pr.fpr.mu` throws. That is not an argument for the flat names, because the
+consumers that read the block are already guarded — `assert_prior_regression` checks `rr`, which
+covers `fpr` by the togetherness invariant. Guard, then read through `fpr`.
+
+Applied at the only production reads that were still flat: `plot_factor_sigma` and `plot_factor_mu`
+in the Plots extension, whose bodies took `pr.f_sigma`/`pr.f_mu` while their own error messages
+named `fpr.sigma`/`fpr.mu`. Everything else in `src/` already read `fpr` directly.
+
+## Amendment (2026-08-03): two estimators report a posterior factor block
+
+The first amendment's warning — "forwarding the factor block through Black-Litterman leaves
+`mu != M * fpr.mu + b`" — was written as though the choice were between forwarding a factor block
+and dropping it. At two estimators there was a third option that neither the ADR nor the survey had
+noticed: **the posterior factor moments were computed and then discarded**, and the prior ones
+reported in their place. That is the same defect class this ADR exists to close — a value computed
+and silently not carried — arriving from the opposite direction, so the rule applies and both now
+report the posterior block.
+
+- [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl) builds
+  `mu_hat` and `sigma_hat` — the posterior factor mean and *precision* — uses them to reach the
+  assets, and previously forwarded the wrapped prior's factor block untouched. It now forwards
+  `mu_hat` and `inv(sigma_hat)`. The estimator gains an **`f_mp` field**, defaulting to
+  `MatrixProcessing()`, mirroring `FactorBlackLittermanPrior`: the factor posterior covariance is a
+  new matrix and wants its own processing, and `pe.mp` runs on the asset block.
+- [`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) solves one
+  augmented system over `[assets; factors]` and truncated it to the asset half, discarding a factor
+  half that *is* the posterior factor distribution. It now reports that half. No second processing
+  pass: `aug_posterior_sigma` is processed as a whole, and a principal submatrix of the result is
+  already processed. No `rf` shift and no `b` either — the intercept is the regression's, hence
+  asset-only.
+
+**The consistency warning does not survive uniformly, which is the point of the change.**
+
+| estimator | `mu == rr.M * fpr.mu + rr.b` | why |
+| --- | --- | --- |
+| `FactorBlackLittermanPrior` | exact (`0.0`) | `posterior_mu` *is* `M * f_posterior_mu + b` |
+| `BayesianBlackLittermanPrior` | exact (`1.0e-16`) | views update the factors; the assets are their projection |
+| `AugmentedBlackLittermanPrior` | no (`3.9e-4`, was `2.6e-2`) | see below |
+| `BlackLittermanPrior` | no | views are on the assets; no posterior factor distribution exists |
+
+`BayesianBlackLittermanPrior`'s warning is therefore **deleted**, not softened.
+`AugmentedBlackLittermanPrior`'s is **rewritten**, because the first explanation reached for was
+wrong. It is not that the asset views enter the asset block directly: muting either view set leaves
+a gap of the same order, and the two *priors* satisfy the identity to `2.4e-18` (least squares with
+an intercept reproduces the mean). The cause is **idiosyncratic variance**. The augmented covariance
+stacks the full `sigma_a`, factor and residual, against a cross-covariance `M * sigma_f` that is pure
+factor; the update moves the asset half by `tau * sigma_a * P'(…)` and the factor half by
+`tau * sigma_f * M' * P'(…)`, and the two stay related by `M` only if `sigma_a == M * sigma_f * M'`.
+Refitting the same fixture on an exact factor model closes the gap to `3.6e-14`.
+
+`BlackLittermanPrior` keeps both warnings unchanged: the observation-weighting split, and a factor
+block that is structurally true while distributionally inconsistent. It has nothing better to report,
+and each estimator's docstring now names where it sits in that table rather than stating the
+inconsistency as though it were uniform across the family.
