@@ -82,6 +82,14 @@ The names are looked up on the factor axis, but the *basis* comes from the prior
   - **A missing factor axis throws**, naming `fkey`. The axis is optional on [`UniverseSets`](@ref); it is not optional for a constraint written against it.
   - **`size(rr.M, 2) == length(sets.dict[fkey])` always.** The name-level cross-check against `rd.nf` needs the returns and lives at the optimiser.
 
+# As a pipeline step
+
+An `ExposureConstraintEstimator` is also usable as a bare [`Pipeline`](@ref) step, where it reads the `prior` slot for its basis and writes an ordinary asset-space [`LinearConstraint`](@ref) into `constraints`. The factor names resolve against the `nf` axis [`pipeline_asset_sets`](@ref) builds from `rd.nf`, so the axis and the loadings agree by construction.
+
+!!! warning
+
+    A step-generated constraint is **pinned to the pipeline's prior**. The projection happens once, when the step runs, and a downstream optimiser that refits its own prior receives rows computed against the loadings the *step* saw — under [`cross_val_predict`](@ref) that is the loadings of whatever prior step preceded it in the same fold, which is right only if the optimiser shares that prior. Passing the estimator to a [`JuMPOptimiser`](@ref)'s `lcse` field instead re-projects it with the optimiser's own prior, and is the default advice for a factor mandate. This is the same trade-off a phylogeny constraint step already makes.
+
 # Examples
 
 ```jldoctest
@@ -111,6 +119,7 @@ julia> lcr.ineq.B
   - [`LinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
   - [`UniverseSets`](@ref)
+  - [`Pipeline`](@ref)
 """
 @concrete struct ExposureConstraintEstimator <: AbstractConstraintEstimator
     """

@@ -1664,20 +1664,23 @@ Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
+    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)
 
-No-op fallback for returning an existing `LinearConstraint` object or `nothing`.
+No-op fallback for returning an existing `LinearConstraint` object, `nothing`, or a vector of them.
 
 This method is used to pass through an already constructed [`LinearConstraint`](@ref) object or `nothing` without modification. It enables composability and uniform interface handling in constraint generation workflows, allowing functions to accept either raw equations or pre-built constraint objects.
 
+The vector arity is narrowed to a `nothing` universe on purpose. A vector needs no [`UniverseSets`](@ref) precisely because every element is already assembled, and that is the shape a [`Pipeline`](@ref) hands an optimiser when more than one constraint step ran; with a real `UniverseSets` the broader vector methods take over and map this one over the elements.
+
 # Arguments
 
-  - `lcs`: An existing [`LinearConstraint`](@ref) object or `nothing`.
+  - `lcs`: An existing [`LinearConstraint`](@ref) object, `nothing`, or a vector of constraints.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `lcs::Option{<:LinearConstraint}`: The input, unchanged.
+  - `lcs`: The input, unchanged.
 
 # Related
 
@@ -1687,6 +1690,10 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 """
 function linear_constraints(lcs::Option{<:LinearConstraint}, args...;
                             kwargs...)::Option{<:LinearConstraint}
+    return lcs
+end
+function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
+                            kwargs...)::AbstractVector{<:LinearConstraint}
     return lcs
 end
 """

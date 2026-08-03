@@ -309,6 +309,8 @@ Return the [`PipelineContext`](@ref) slots a pipeline step requires to be popula
 
 These are the *required* reads used for construction-time dependency validation, not every slot the step may consume. Slots an estimator can compute internally when absent (for example a phylogeny-constraint estimator's own phylogeny) are not listed.
 
+Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a bare constraint step resolves against is built from the returns' names (see [`pipeline_asset_sets`](@ref)). An [`ExposureConstraintEstimator`](@ref) additionally reads `:prior`, because the basis it re-bases through is the prior's regression loadings.
+
 # Arguments
 
   - `est`: The step estimator.
@@ -339,6 +341,7 @@ pipe_reads(::AbstractPriorEstimator) = (:returns,)
 pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
 pipe_reads(::AbstractConstraintEstimator) = (:returns,)
+pipe_reads(::ExposureConstraintEstimator) = (:returns, :prior)
 pipe_reads(::OptimisationEstimator) = (:returns,)
 """
 $(DocStringExtensions.TYPEDEF)

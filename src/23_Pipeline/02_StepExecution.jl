@@ -188,9 +188,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the [`UniverseSets`](@ref) a constraint-generation step needs from the asset names of the context's `returns` slot.
+Build the [`UniverseSets`](@ref) a constraint-generation step needs from the universe names of the context's `returns` slot.
 
-Constraint estimators referencing groups beyond the plain asset names cannot be satisfied by this minimal set; precompute their result instead, or wrap a callable in a [`PipelineStep`](@ref) that supplies richer sets.
+Every axis the returns declare is declared here: `nx` always, and `nf` whenever the returns carry factors. The factor axis is what an [`ExposureConstraintEstimator`](@ref) step resolves its names against, and taking it from `rd.nf` is what makes it agree with the loadings by construction — the columns of `rr.M` are the factors the regression was fitted on, which are the columns of `rd.F`.
+
+Constraint estimators referencing groups beyond the plain universe names cannot be satisfied by this minimal set; precompute their result instead, or wrap a callable in a [`PipelineStep`](@ref) that supplies richer sets.
 
 # Arguments
 
@@ -199,7 +201,7 @@ Constraint estimators referencing groups beyond the plain asset names cannot be 
 
 # Returns
 
-  - `sets::UniverseSets`: Asset sets whose `nx` entry holds the asset names.
+  - `sets::UniverseSets`: Universe sets whose `nx` entry holds the asset names, plus an `nf` entry holding the factor names when the returns carry them.
 
 # Related
 
@@ -208,19 +210,32 @@ Constraint estimators referencing groups beyond the plain asset names cannot be 
 """
 function pipeline_asset_sets(ctx::PipelineContext, est)::UniverseSets
     require_slot(ctx, :returns, est)
-    return UniverseSets(; dict = Dict("nx" => ctx.returns.nx))
+    nf = ctx.returns.nf
+    dict = if isnothing(nf)
+        Dict("nx" => ctx.returns.nx)
+    else
+        Dict("nx" => ctx.returns.nx, "nf" => nf)
+    end
+    return UniverseSets(; dict = dict)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    add_constraint_result(ctx::PipelineContext, res::AbstractConstraintResult) -> PipelineContext
+    add_constraint_result(ctx::PipelineContext, res::AbstractVector) -> PipelineContext
+    add_constraint_result(ctx::PipelineContext, ::Nothing) -> PipelineContext
 
 Append a constraint result to the `constraints` slot of the context.
 
 The slot accumulates: the first result is stored as-is, later results widen it into a `Vector{AbstractConstraintResult}` preserving step order.
 
+Two shapes constraint generation can return are absorbed rather than rejected, because both are ordinary outcomes of a step rather than errors:
+
+  - `nothing`, which is what [`linear_constraints`](@ref) returns when every row was dropped — a non-`strict` run whose names were all unknown, or a re-basis the loadings annihilated. The step contributed no constraint, so the slot is left untouched; the slot's job is to carry constraints, not to re-diagnose a condition generation already decided was recoverable.
+  - a vector, which is what a step wrapping a vector of estimators returns. Its elements are appended individually, so they reach [`constraint_targets`](@ref) as siblings of every other step's result rather than as a nested vector it has no case for.
+
 # Arguments
 
   - `ctx`: The pipeline context.
-  - `res`: The constraint result to append.
+  - `res`: The constraint result to append, `nothing`, or a vector of either.
 
 # Returns
 
@@ -230,6 +245,7 @@ The slot accumulates: the first result is stored as-is, later results widen it i
 
   - [`run_step`](@ref)
   - [`PipelineContext`](@ref)
+  - [`constraint_targets`](@ref)
 """
 function add_constraint_result(ctx::PipelineContext,
                                res::AbstractConstraintResult)::PipelineContext
@@ -242,6 +258,15 @@ function add_constraint_result(ctx::PipelineContext,
         AbstractConstraintResult[cur, res]
     end
     return set_slot(ctx, :constraints, val)
+end
+function add_constraint_result(ctx::PipelineContext, ::Nothing)::PipelineContext
+    return ctx
+end
+function add_constraint_result(ctx::PipelineContext, res::AbstractVector)::PipelineContext
+    for r in res
+        ctx = add_constraint_result(ctx, r)
+    end
+    return ctx
 end
 function run_step(ce::WeightBoundsEstimator, ctx::PipelineContext)
     res = weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce))
@@ -257,6 +282,29 @@ function run_step(ce::ThresholdEstimator, ctx::PipelineContext)
 end
 function run_step(ce::RiskBudgetEstimator, ctx::PipelineContext)
     res = risk_budget_constraints(ce, pipeline_asset_sets(ctx, ce))
+    return res, add_constraint_result(ctx, res)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute an [`ExposureConstraintEstimator`](@ref) step: re-base its rows through the loadings of the *pipeline's* prior and append the resulting asset-space [`LinearConstraint`](@ref) to the `constraints` slot.
+
+This is the one constraint step that reads a computed slot other than `:returns`. The basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
+
+!!! warning
+
+    The constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+  - [`linear_constraints`](@ref)
+  - [`pipeline_asset_sets`](@ref)
+"""
+function run_step(ce::ExposureConstraintEstimator, ctx::PipelineContext)
+    require_slot(ctx, :prior, ce)
+    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr)
     return res, add_constraint_result(ctx, res)
 end
 function run_step(ce::AbstractPhylogenyConstraintEstimator, ctx::PipelineContext)
