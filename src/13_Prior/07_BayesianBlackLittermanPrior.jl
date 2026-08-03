@@ -20,7 +20,7 @@ $(DocStringExtensions.FIELDS)
         f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         views::Lc_BLV,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
         tau::Option{<:Number} = nothing
@@ -52,8 +52,8 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
 ```jldoctest
 julia> BayesianBlackLittermanPrior(;
-                                   sets = AssetSets(; key = \"nx\",
-                                                    dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                   sets = UniverseSets(; xkey = \"nx\",
+                                                       dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                                    views = LinearConstraintEstimator(;
                                                                      val = [\"A == 0.03\",
                                                                             \"B + C == 0.04\"]))
@@ -135,10 +135,10 @@ BayesianBlackLittermanPrior
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
-        sets ┼ AssetSets
-             │    key ┼ String: "nx"
-             │   ukey ┼ String: "ux"
-             │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        sets ┼ UniverseSets
+             │    xkey ┼ String: "nx"
+             │   uxkey ┼ String: "ux"
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -149,7 +149,7 @@ BayesianBlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`FactorPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -190,7 +190,7 @@ BayesianBlackLittermanPrior
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          f_mp::AbstractMatrixProcessingEstimator,
                                          mp::AbstractMatrixProcessingEstimator,
-                                         views::Lc_BLV, sets::Option{<:AssetSets},
+                                         views::Lc_BLV, sets::Option{<:UniverseSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number})
         assert_bl(views, sets, views_conf, tau)
@@ -205,7 +205,7 @@ function BayesianBlackLittermanPrior(;
                                                                                                                me = EquilibriumExpectedReturns())),
                                      f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                                     views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                                     views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
                                      rf::Number = 0.0,
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
@@ -267,7 +267,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
+  - `length(pe.sets.dict[pe.sets.xkey]) == size(F, 2)`.
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
 # Details
@@ -295,8 +295,8 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
+    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(F, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,

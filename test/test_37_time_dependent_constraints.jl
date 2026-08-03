@@ -618,7 +618,7 @@ end
         # A field that statically accepts a vector of constraints holds a per-fold vector
         # of such vectors: entry i is fold i's whole constraint vector. Here fold 1 gets
         # one linear constraint and fold 2 gets two.
-        sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C", "D", "E"]))
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D", "E"]))
         lce1 = LinearConstraintEstimator(; val = "A <= 0.5")
         lce2 = LinearConstraintEstimator(; val = "B <= 0.5")
         mr_vv = MeanRisk(;
@@ -709,8 +709,8 @@ end
         tdpe = TimeDependent([EmpiricalPrior(), pe_semi])
         tdret = TimeDependent([ArithmeticReturn(), ArithmeticReturn(; lb = 0.0005)])
         tdsca = TimeDependent([SumScalariser(), MaxScalariser()])
-        setsA = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
-        setsB = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
+        setsA = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
+        setsB = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
         tdsets = TimeDependent([setsA, setsB])
         @testset "Widened fields, defaults and required-field types" begin
             opt = JuMPOptimiser(; slv = slv, pe = tdpe, ret = tdret, sca = tdsca,
@@ -1623,8 +1623,8 @@ end
                                                                     ce = Covariance(;
                                                                                     alg = SemiMoment())))
         tdpe = TimeDependent([EmpiricalPrior(), pe_semi])
-        setsA = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
-        setsB = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
+        setsA = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
+        setsB = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
         tdsets = TimeDependent([setsA, setsB])
         tdwf = TimeDependent([IterativeWeightFinaliser(),
                               IterativeWeightFinaliser(; iter = 7)])

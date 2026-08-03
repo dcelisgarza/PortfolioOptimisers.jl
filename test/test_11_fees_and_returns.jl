@@ -12,9 +12,9 @@
                      settings = Dict("log_to_console" => false),
                      check_sol = (; allow_local = true, allow_almost = true))
     da = DiscreteAllocation(; slv = mip_slv)
-    sets = AssetSets(;
-                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                                 "group2" => rd.nx[2:2:end]))
+    sets = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                    "group2" => rd.nx[2:2:end]))
     fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = Dict("BAC" => 0.001)),
                          l = Dict("group2" => 0.002), s = Dict("group1" => 0.003),
                          fl = Dict("XOM" => 0.005, "WMT" => 0.005, "LLY" => 0.005),

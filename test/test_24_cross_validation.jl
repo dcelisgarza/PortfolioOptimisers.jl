@@ -632,7 +632,8 @@
         test_pred(walkforward_pred, "walkforward_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = "AAPL" => 0.003,
                                                                  dval = Inf, w = w0),
                                           slv = slv))
@@ -640,7 +641,8 @@
         test_pred(walkforward_serial_1_pred, "walkforward_serial_1_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = 0.003, w = w0),
                                           slv = slv))
         walkforward_serial_2_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
@@ -664,7 +666,8 @@
         test_pred(multiple_rand_pred, "multiple_rand_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = "JPM" => 0.003,
                                                                  dval = 100000.0,
                                                                  w = fill(1 / 100, 20)),

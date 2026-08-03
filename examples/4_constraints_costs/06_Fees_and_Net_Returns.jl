@@ -83,13 +83,13 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 Costs are rarely uniform — some instruments are expensive to hold. A [`FeesEstimator`](@ref)
 (the estimator counterpart of [`Fees`](@ref)) accepts per-asset or per-group rates over an
-[`AssetSets`](@ref), exactly like the linear constraints. Charging a punitive fee on the sector
+[`UniverseSets`](@ref), exactly like the linear constraints. Charging a punitive fee on the sector
 the baseline loved makes the optimiser walk away from it.
 =#
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx,
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx,
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 res_diff = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                              opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                  fees = FeesEstimator(;
@@ -136,7 +136,7 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src - New deep dive; closes the 4_constraints_costs group. Verified on kaimon (f102cae9):
 #src   - calc_net_returns / calc_fees: base gross 19.98 bps/day, Fees(l=0.002) costs 20.0 bps →
 #src     net -0.02 bps. Clean "fees erase the edge" story.
-#src   - Differential fee via FeesEstimator(l=["healthcare"=>0.02]) over AssetSets: base
+#src   - Differential fee via FeesEstimator(l=["healthcare"=>0.02]) over UniverseSets: base
 #src     healthcare 66%→0%. (NOTE: Fees the RESULT type takes only Number/Vector; group/pair
 #src     rates need FeesEstimator, the estimator — easy to trip over, the error is a TypeError on
 #src     the `l` kwarg. Documented in §4.)

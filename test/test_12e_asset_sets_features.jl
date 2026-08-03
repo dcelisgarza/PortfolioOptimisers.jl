@@ -11,31 +11,34 @@ universe: sector ⊃ industry ⊃ sub-industry, so two assets sharing a finer le
 coarser one. That nesting is what makes `cos = shared / L` read as "how many classification
 levels do these two agree on".
 =#
-const TAX = AssetSets(; key = "nx",
-                      dict = Dict("nx" => rd.nx,
-                                  "nx_sector" => ["Technology", "Technology", "Financials",
-                                                  "ConsumerDiscretionary", "Energy", "Industrials",
-                                                  "ConsumerDiscretionary", "HealthCare", "Financials",
-                                                  "ConsumerStaples", "HealthCare", "HealthCare",
-                                                  "Technology", "ConsumerStaples", "HealthCare",
-                                                  "ConsumerStaples", "Energy", "HealthCare",
-                                                  "ConsumerStaples", "Energy"],
-                                  "nx_industry" => ["Hardware", "Semiconductors", "Banks",
-                                                    "SpecialtyRetail", "IntegratedOil", "Aerospace",
-                                                    "SpecialtyRetail", "Pharma", "Banks", "Beverages",
-                                                    "Pharma", "Pharma", "Software", "Beverages",
-                                                    "Pharma", "HouseholdProducts",
-                                                    "ExplorationProduction", "ManagedCare", "FoodRetail",
-                                                    "IntegratedOil"],
-                                  "nx_subindustry" =>
-                                      ["ConsumerElectronics", "Semiconductors",
-                                       "DiversifiedBanks", "ComputerRetail",
-                                       "IntegratedOil", "AerospaceDefense",
-                                       "HomeImprovementRetail", "Pharma",
-                                       "DiversifiedBanks", "SoftDrinks", "Pharma", "Pharma",
-                                       "SystemsSoftware", "SoftDrinks", "Pharma",
-                                       "HouseholdProducts", "OilGasEP", "ManagedHealthCare",
-                                       "Hypermarkets", "IntegratedOil"]))
+const TAX = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => rd.nx,
+                                     "nx_sector" =>
+                                         ["Technology", "Technology", "Financials",
+                                          "ConsumerDiscretionary", "Energy", "Industrials",
+                                          "ConsumerDiscretionary", "HealthCare",
+                                          "Financials", "ConsumerStaples", "HealthCare",
+                                          "HealthCare", "Technology", "ConsumerStaples",
+                                          "HealthCare", "ConsumerStaples", "Energy",
+                                          "HealthCare", "ConsumerStaples", "Energy"],
+                                     "nx_industry" =>
+                                         ["Hardware", "Semiconductors", "Banks",
+                                          "SpecialtyRetail", "IntegratedOil", "Aerospace",
+                                          "SpecialtyRetail", "Pharma", "Banks", "Beverages",
+                                          "Pharma", "Pharma", "Software", "Beverages",
+                                          "Pharma", "HouseholdProducts",
+                                          "ExplorationProduction", "ManagedCare",
+                                          "FoodRetail", "IntegratedOil"],
+                                     "nx_subindustry" =>
+                                         ["ConsumerElectronics", "Semiconductors",
+                                          "DiversifiedBanks", "ComputerRetail",
+                                          "IntegratedOil", "AerospaceDefense",
+                                          "HomeImprovementRetail", "Pharma",
+                                          "DiversifiedBanks", "SoftDrinks", "Pharma",
+                                          "Pharma", "SystemsSoftware", "SoftDrinks",
+                                          "Pharma", "HouseholdProducts", "OilGasEP",
+                                          "ManagedHealthCare", "Hypermarkets",
+                                          "IntegratedOil"]))
 const KEYS = ["nx_sector", "nx_industry", "nx_subindustry"]
 const NA = length(rd.nx)
 const IDX = Dict(n => i for (i, n) in pairs(rd.nx))
@@ -145,9 +148,9 @@ end
     # A key that is not in the taxonomy, or whose length does not match the universe, is
     # `asset_sets_matrix`'s existing job.
     @test_throws KeyError asset_sets_features(["nx_sector", "nx_nope"], TAX)
-    short = AssetSets(; key = "nx",
-                      dict = Dict("nx" => rd.nx, "nx_sector" => TAX.dict["nx_sector"],
-                                  "shortgroup" => ["a", "b"]))
+    short = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => rd.nx, "nx_sector" => TAX.dict["nx_sector"],
+                                     "shortgroup" => ["a", "b"]))
     @test_throws AssertionError asset_sets_features(["nx_sector", "shortgroup"], short)
 end
 
@@ -170,10 +173,10 @@ end
     # The columns index groups even when the group count coincides with the asset count: a
     # coincidence of counts is not a claim about what they mean, and an asset view must not
     # truncate every row's feature vector on the strength of it.
-    sq = AssetSets(; key = "nx",
-                   dict = Dict("nx" => rd.nx,
-                               "nx_pairA" => string.(repeat(1:(NA ÷ 2); inner = 2)),
-                               "nx_pairB" => string.(repeat(1:(NA ÷ 2); outer = 2))))
+    sq = UniverseSets(; xkey = "nx",
+                      dict = Dict("nx" => rd.nx,
+                                  "nx_pairA" => string.(repeat(1:(NA ÷ 2); inner = 2)),
+                                  "nx_pairB" => string.(repeat(1:(NA ÷ 2); outer = 2))))
     prsq = prior(FeaturePrior(; ze = AssetSetsFeatures(; vals = ["nx_pairA", "nx_pairB"]),
                               sets = sq), rd)
     @test size(prsq.Z, 2) == NA
@@ -213,13 +216,13 @@ end
     @test size(Zv, 2) == sum(length(unique(TAX.dict[k][i])) for k in KEYS)
     @test all(==(Float64(length(KEYS))), sum(Zv; dims = 2))
 
-    # A key not prefixed by `sets.key` is not sliced by the view, which does *not* fail
+    # A key not prefixed by `sets.xkey` is not sliced by the view, which does *not* fail
     # silently: `asset_sets_matrix`'s length check throws on the next call because the
     # sliced universe no longer matches the unsliced group. Name taxonomy keys with the
     # prefix if they are to survive a fold or an NCO cluster.
-    bare = AssetSets(; key = "nx",
-                     dict = Dict("nx" => rd.nx, "sector" => TAX.dict["nx_sector"],
-                                 "nx_industry" => TAX.dict["nx_industry"]))
+    bare = UniverseSets(; xkey = "nx",
+                        dict = Dict("nx" => rd.nx, "sector" => TAX.dict["nx_sector"],
+                                    "nx_industry" => TAX.dict["nx_industry"]))
     peb = FeaturePrior(; ze = AssetSetsFeatures(; vals = ["sector", "nx_industry"]),
                        sets = bare)
     @test_throws AssertionError prior(PortfolioOptimisers.port_opt_view(peb, i), rd.X[:, i])

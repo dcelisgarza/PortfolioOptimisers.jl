@@ -8,7 +8,7 @@ objective and prior you use. This deep dive works through the linear and group c
 weight bounds, per-member vs group-sum limits, relative and sum constraints — and shows where
 the boundary to mixed-integer constraints (thresholds, cardinality) lies.
 
-The unifying idea is the [`AssetSets`](@ref): you name assets and groups once, then every
+The unifying idea is the [`UniverseSets`](@ref): you name assets and groups once, then every
 constraint refers to those names. The same `"name op value"` string grammar drives both the
 linear constraints here and the views in the [prior examples](../2_moments_priors/07_Entropy_Pooling.md).
 
@@ -49,17 +49,17 @@ rf = 4.2 / 100 / 252
 #=
 ## 2. Naming assets and groups
 
-[`AssetSets`](@ref) maps names to members. The `nx` key holds every asset; the rest are the
+[`UniverseSets`](@ref) maps names to members. The `nx` key holds every asset; the rest are the
 groups — here, sectors — that constraints will reference.
 =#
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "financials" => ["BAC", "JPM"],
-                             "energy" => ["CVX", "XOM", "RRC"],
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"],
-                             "staples" => ["KO", "PEP", "PG", "WMT"],
-                             "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "financials" => ["BAC", "JPM"],
+                                "energy" => ["CVX", "XOM", "RRC"],
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"],
+                                "staples" => ["KO", "PEP", "PG", "WMT"],
+                                "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
 
 #=
 Our baseline is an unconstrained maximum-ratio portfolio. On this one-year slice it is starkly

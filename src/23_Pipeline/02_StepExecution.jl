@@ -188,7 +188,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the [`AssetSets`](@ref) a constraint-generation step needs from the asset names of the context's `returns` slot.
+Build the [`UniverseSets`](@ref) a constraint-generation step needs from the asset names of the context's `returns` slot.
 
 Constraint estimators referencing groups beyond the plain asset names cannot be satisfied by this minimal set; precompute their result instead, or wrap a callable in a [`PipelineStep`](@ref) that supplies richer sets.
 
@@ -199,16 +199,16 @@ Constraint estimators referencing groups beyond the plain asset names cannot be 
 
 # Returns
 
-  - `sets::AssetSets`: Asset sets whose `nx` entry holds the asset names.
+  - `sets::UniverseSets`: Asset sets whose `nx` entry holds the asset names.
 
 # Related
 
   - [`run_step`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function pipeline_asset_sets(ctx::PipelineContext, est)::AssetSets
+function pipeline_asset_sets(ctx::PipelineContext, est)::UniverseSets
     require_slot(ctx, :returns, est)
-    return AssetSets(; dict = Dict("nx" => ctx.returns.nx))
+    return UniverseSets(; dict = Dict("nx" => ctx.returns.nx))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

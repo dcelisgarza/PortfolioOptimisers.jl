@@ -352,7 +352,7 @@
                                              pr), w, pr), 6.522750683623699e-5)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
-        sets = AssetSets(; dict = Dict("nx" => rd.nx))
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx))
         pr2 = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                         opt = OptimEntropyPooling(;
                                                                   args = (Optim.Fminbox(;

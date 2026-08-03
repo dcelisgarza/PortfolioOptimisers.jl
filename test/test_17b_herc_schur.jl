@@ -97,17 +97,17 @@ end
     end
 end
 @testset "Weight bounds" begin
-    sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
+    sets = UniverseSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
     eqn = WeightBoundsEstimator(; lb = ["JNJ" => 0.03, "group1" => 0.035],
                                 ub = Dict("PEP" => 0.08, "JNJ" => 0.03))
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn)
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
-    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
-    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                      for i in sets.dict["group1"]]] .>= 0.035)
-    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
@@ -115,10 +115,10 @@ end
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
-    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
-    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
+    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
-    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
@@ -126,10 +126,10 @@ end
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
-    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
-    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
+    @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                           for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
-    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
@@ -137,10 +137,10 @@ end
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
-    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
-    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
+    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                      for i in sets.dict["group1"]]] .>= 0.035)
-    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                 wf = JuMPWeightFinaliser(;
@@ -148,10 +148,10 @@ end
                                                          slv = slv))
     res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
     @test isa(res.retcode, OptimisationSuccess)
-    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
-    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+    @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.xkey])], 0.03)
+    @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.xkey])
                      for i in sets.dict["group1"]]] .>= 0.035)
-    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.xkey])] - 0.08) < 5e-10
 end
 @testset "SchurComplementHierarchicalRiskParity" begin
     r = factory(Variance(), pr)

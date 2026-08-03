@@ -157,7 +157,7 @@ $(DocStringExtensions.FIELDS)
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         x_src::Symbol = :prior,
@@ -298,8 +298,9 @@ HierarchicalOptimiser
     function HierarchicalOptimiser(pe::TD{<:PrE_Pr}, cle::TD{<:HClE_HCl},
                                    slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
                                    fees::TD_Option{<:FeesE_Fees},
-                                   sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
-                                   brt::Bool, x_src::Symbol, z_src::Symbol, strict::Bool)
+                                   sets::TD_Option{<:UniverseSets},
+                                   wf::TD{<:WeightFinaliser}, brt::Bool, x_src::Symbol,
+                                   z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
         assert_source_selector(z_src, :z_src)
         if isa(wb, WeightBoundsEstimator)
@@ -320,7 +321,7 @@ function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
-                               sets::TD_Option{<:AssetSets} = nothing,
+                               sets::TD_Option{<:UniverseSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, x_src::Symbol = :prior,
                                z_src::Symbol = :data,

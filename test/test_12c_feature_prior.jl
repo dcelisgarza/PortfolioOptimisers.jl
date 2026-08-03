@@ -172,7 +172,7 @@ end
     pv = PortfolioOptimisers.port_opt_view(FeaturePrior(; pe = EmpiricalPrior(), ze = Zlit,
                                                         sets = sets), i)
     @test pv.ze == Zlit[i, :]
-    @test pv.sets.dict[pv.sets.key] == rd.nx[i]
+    @test pv.sets.dict[pv.sets.xkey] == rd.nx[i]
     @test PortfolioOptimisers.port_opt_view(FeaturePrior(; pe = FactorPrior(),
                                                          ze = RegressionFeatures()), i).ze ===
           RegressionFeatures()

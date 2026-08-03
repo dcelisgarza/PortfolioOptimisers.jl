@@ -231,7 +231,7 @@ $(DocStringExtensions.FIELDS)
     InverseVolatility(;
         pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         sq::Bool = false,
@@ -334,7 +334,7 @@ InverseVolatility
     """
     strict
     function InverseVolatility(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
-                               sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
+                               sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
                                strict::Bool)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
@@ -352,7 +352,7 @@ InverseVolatility
 end
 function InverseVolatility(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                            wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-                           sets::TD_Option{<:AssetSets} = nothing,
+                           sets::TD_Option{<:UniverseSets} = nothing,
                            wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                            fb::TDO_Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
@@ -455,7 +455,7 @@ $(DocStringExtensions.FIELDS)
 
     EqualWeighted(;
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false
@@ -520,7 +520,7 @@ EqualWeighted
     $(field_dict[:strict_opt])
     """
     strict
-    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:AssetSets},
+    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:UniverseSets},
                            wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
                            strict::Bool)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
@@ -537,7 +537,7 @@ EqualWeighted
     end
 end
 function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-                       sets::TD_Option{<:AssetSets} = nothing,
+                       sets::TD_Option{<:UniverseSets} = nothing,
                        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                        fb::TDO_Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
@@ -617,7 +617,7 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         wb::TD_Option{<:WbE_Wb} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false
@@ -703,7 +703,7 @@ RandomWeighted
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
-                            sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
+                            sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
                             fb::TDO_Option{<:OptE_Opt}, strict::Bool)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         if !isnothing(alpha)
@@ -725,7 +725,7 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing,
                         wb::TD_Option{<:WbE_Wb} = nothing,
-                        sets::TD_Option{<:AssetSets} = nothing,
+                        sets::TD_Option{<:UniverseSets} = nothing,
                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                         fb::TDO_Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted

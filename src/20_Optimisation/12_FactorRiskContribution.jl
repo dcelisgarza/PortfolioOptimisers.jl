@@ -126,7 +126,7 @@ $(DocStringExtensions.FIELDS)
         r::TD{<:RM_VecRM} = Variance(),
         obj::TD{<:ObjectiveFunction} = MinimumRisk(),
         frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
         fb::TDO_Option{<:OptE_Opt} = nothing
@@ -196,8 +196,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     function FactorRiskContribution(opt::JuMPOptimiser, re::TD{<:RegE_Reg},
                                     r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
                                     frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
-                                    sets::TD_Option{<:AssetSets}, wi::TD_Option{<:VecNum},
-                                    flag::Bool, fb::TDO_Option{<:OptE_Opt})
+                                    sets::TD_Option{<:UniverseSets},
+                                    wi::TD_Option{<:VecNum}, flag::Bool,
+                                    fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :FactorRiskContribution)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
@@ -220,7 +221,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser,
                                 r::TD{<:RM_VecRM} = Variance(),
                                 obj::TD{<:ObjectiveFunction} = MinimumRisk(),
                                 frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                                sets::TD_Option{<:AssetSets} = nothing,
+                                sets::TD_Option{<:UniverseSets} = nothing,
                                 wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)

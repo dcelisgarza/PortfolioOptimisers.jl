@@ -169,14 +169,14 @@ rs = [StandardDeviation(), Variance(), LowOrderMoment(),
       OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
       OrderedWeightsArrayRange(), NegativeSkewness(),
       NegativeSkewness(; alg = SquaredSOCRiskExpr())]
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                             "group2" => rd.nx[2:2:end],
-                             "clusters1" =>
-                                 [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                                  3],
-                             "clusters2" =>
-                                 [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
-                                  2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
-                             "c3" => rd.nx[3:3:end]))
-fsets = AssetSets(; dict = Dict("nx" => rd.nf))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                "group2" => rd.nx[2:2:end],
+                                "clusters1" =>
+                                    [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                     3, 3],
+                                "clusters2" =>
+                                    [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                     1, 2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
+                                "c3" => rd.nx[3:3:end]))
+fsets = UniverseSets(; dict = Dict("nx" => rd.nf))

@@ -53,13 +53,13 @@ budget `sbgt` let you build long/short and leveraged mandates — see
 
 ## 2. Linear and group constraints
 
-Group and linear constraints are written as plain strings over an [`AssetSets`](@ref) and passed
+Group and linear constraints are written as plain strings over a [`UniverseSets`](@ref) and passed
 through `lcse` as a [`LinearConstraintEstimator`](@ref) — the same syntax used for views. Name a
 group, then bound it. Here we require the tech group to hold at least 15% (a floor the
 unconstrained minimum-risk portfolio would not give it).
 =#
 
-sets = AssetSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
+sets = UniverseSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
 res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                 lcse = LinearConstraintEstimator(;

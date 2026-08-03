@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimator for constructing asset set membership matrices from asset groupings.
 
-`AssetSetsMatrixEstimator` is a container type for specifying the key or group name used to generate a binary asset-group membership matrix from an [`AssetSets`](@ref) object. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
+`AssetSetsMatrixEstimator` is a container type for specifying the key or group name used to generate a binary asset-group membership matrix from a [`UniverseSets`](@ref) object. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
 
 # Fields
 
@@ -24,9 +24,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\",
-                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
-                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                       \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
 
 julia> est = AssetSetsMatrixEstimator(; val = \"nx_sector\")
 AssetSetsMatrixEstimator
@@ -40,7 +40,7 @@ julia> asset_sets_matrix(est, sets)
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`asset_sets_matrix`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
@@ -102,12 +102,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Construct a binary asset-group membership matrix from asset set groupings.
 
-`asset_sets_matrix` generates a binary (0/1) matrix indicating asset membership in groups or categories, based on the key or group name `smtx` in the provided [`AssetSets`](@ref). Each row corresponds to a unique group value, and each column to an asset in the universe. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
+`asset_sets_matrix` generates a binary (0/1) matrix indicating asset membership in groups or categories, based on the key or group name `smtx` in the provided [`UniverseSets`](@ref). Each row corresponds to a unique group value, and each column to an asset in the universe. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
 
 # Arguments
 
   - `smtx`: The key or group name to extract from the asset sets.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
 
 # Returns
 
@@ -127,9 +127,9 @@ Construct a binary asset-group membership matrix from asset set groupings.
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\",
-                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
-                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                       \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
 
 julia> asset_sets_matrix(\"nx_sector\", sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
@@ -139,14 +139,14 @@ julia> asset_sets_matrix(\"nx_sector\", sets)
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
 """
-function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
+function asset_sets_matrix(smtx::AbstractString, sets::UniverseSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
-    @argcheck(length(sets.dict[sets.key]) == length(all_sets),
-              AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.key] and `all_sets` must be equal:\nlength(sets.dict[sets.key]) => length(sets.dict[$(sets.key)]) => $(length(sets.dict[sets.key]))\nlength(all_sets) => $(length(all_sets))"))
+    @argcheck(length(sets.dict[sets.xkey]) == length(all_sets),
+              AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.xkey] and `all_sets` must be equal:\nlength(sets.dict[sets.xkey]) => length(sets.dict[$(sets.xkey)]) => $(length(sets.dict[sets.xkey]))\nlength(all_sets) => $(length(all_sets))"))
     unique_sets = unique(all_sets)
     A = BitMatrix(undef, length(all_sets), length(unique_sets))
     for (i, val) in pairs(unique_sets)
@@ -172,7 +172,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
@@ -180,7 +180,7 @@ function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
 end
 """
-    asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
+    asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
 
 This method is a wrapper calling:
 
@@ -192,18 +192,18 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::UniverseSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
-                      sets::AssetSets)
+                      sets::UniverseSets)
 
 Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
@@ -256,7 +256,7 @@ This is the **exogenous** feature source: a sector, industry or country classifi
 # Arguments
 
   - `vals`: Group name keys in `sets.dict`, at least two (see [`assert_feature_keys`](@ref)).
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
 
 # Returns
 
@@ -285,7 +285,7 @@ The result is dense `Float64` rather than the `BitMatrix` [`asset_sets_matrix`](
 
 # Views
 
-An asset view of an `AssetSets` slices the groups prefixed by `sets.key` and leaves the rest alone, so a key named for a view to reach must carry that prefix — `\"nx_sector\"`, not `\"sector\"`. An unprefixed key does not fail silently: [`asset_sets_matrix`](@ref)'s length check throws on the next call, because the sliced universe no longer matches the unsliced group.
+An asset view of a `UniverseSets` slices the groups prefixed by `sets.xkey` and leaves the rest alone, so a key named for a view to reach must carry that prefix — `\"nx_sector\"`, not `\"sector\"`. An unprefixed key does not fail silently: [`asset_sets_matrix`](@ref)'s length check throws on the next call, because the sliced universe no longer matches the unsliced group.
 
 # Validation
 
@@ -295,10 +295,10 @@ An asset view of an `AssetSets` slices the groups prefixed by `sets.key` and lea
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\",
-                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
-                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
-                                    \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                       \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
+                                       \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
 
 julia> Z = asset_sets_features([\"nx_sector\", \"nx_country\"], sets)
 3×4 Matrix{Float64}:
@@ -318,7 +318,7 @@ ReturnsResult(; nx = nx, X = X, nz = asset_sets_feature_names(vals, sets),
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`asset_sets_matrix`](@ref)
   - [`asset_sets_feature_names`](@ref)
   - [`assert_feature_keys`](@ref)
@@ -326,7 +326,7 @@ ReturnsResult(; nx = nx, X = X, nz = asset_sets_feature_names(vals, sets),
   - [`FeatureDistance`](@ref)
 """
 function asset_sets_features(vals::AbstractVector{<:AbstractString},
-                             sets::AssetSets)::Matrix{Float64}
+                             sets::UniverseSets)::Matrix{Float64}
     assert_feature_keys(vals)
     return Float64.(reduce(hcat, (transpose(asset_sets_matrix(v, sets)) for v in vals)))
 end
@@ -344,7 +344,7 @@ Each name is `\"<key>=<group>\"` rather than the bare group value, because a **n
 # Arguments
 
   - `vals`: The same group name keys, in the same order, passed to [`asset_sets_features`](@ref).
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
 
 # Returns
 
@@ -353,10 +353,10 @@ Each name is `\"<key>=<group>\"` rather than the bare group value, because a **n
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\",
-                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
-                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
-                                    \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                       \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
+                                       \"nx_country\" => [\"US\", \"UK\", \"UK\"]));
 
 julia> asset_sets_feature_names([\"nx_sector\", \"nx_country\"], sets)
 4-element Vector{String}:
@@ -369,11 +369,11 @@ julia> asset_sets_feature_names([\"nx_sector\", \"nx_country\"], sets)
 # Related
 
   - [`asset_sets_features`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`ReturnsResult`](@ref)
 """
 function asset_sets_feature_names(vals::AbstractVector{<:AbstractString},
-                                  sets::AssetSets)::Vector{String}
+                                  sets::UniverseSets)::Vector{String}
     assert_feature_keys(vals)
     return [string(v, "=", g) for v in vals for g in unique(sets.dict[v])]
 end

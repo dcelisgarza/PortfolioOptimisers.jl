@@ -27,12 +27,13 @@ leaf ordering.
     # A nested taxonomy: three sectors, each split into two industries. This is the
     # motivating case — keeping one representative per sector is a statement about the
     # classification, not about the sample correlation.
-    sets = AssetSets(; key = "nx",
-                     dict = Dict("nx" => nx,
-                                 "Sector" => repeat(["Tech", "Energy", "Fin"], inner = 4),
-                                 "Industry" =>
-                                     repeat(["Semis", "Soft", "Oil", "Gas", "Bank", "Ins"],
-                                            inner = 2)))
+    sets = UniverseSets(; xkey = "nx",
+                        dict = Dict("nx" => nx,
+                                    "Sector" =>
+                                        repeat(["Tech", "Energy", "Fin"], inner = 4),
+                                    "Industry" =>
+                                        repeat(["Semis", "Soft", "Oil", "Gas", "Bank",
+                                                "Ins"], inner = 2)))
     vals = ["Sector", "Industry"]
     nz = asset_sets_feature_names(vals, sets)
     Z = asset_sets_features(vals, sets)

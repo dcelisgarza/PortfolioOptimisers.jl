@@ -37,7 +37,7 @@
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(EmpiricalPrior(), rd)
-    sets = AssetSets(; dict = Dict("nx" => rd.nf))
+    sets = UniverseSets(; dict = Dict("nx" => rd.nf))
     lcs = LinearConstraintEstimator(; val = ["VLUE <= 0.74", "QUAL >= -0.07", "MTUM==0.09"])
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     r = Variance(; rc = lcs)

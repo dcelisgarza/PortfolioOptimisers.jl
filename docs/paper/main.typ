@@ -90,7 +90,7 @@ $<eq1>
         # 0 ≤ w ≤ 1 (default value except AAPL), w_"AAPL" ≤ 0.2
         wb = WBE(; lb = 0, ub = "AAPL" => 0.2),
         # Map asset name to the asset index in the returns matrix.
-        sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
         # L2 regularisation with a factor of 0.0001
         l2 = L2Reg(; val = 0.0001),
         # 100 between the lower and upper bounds of the efficient frontier.

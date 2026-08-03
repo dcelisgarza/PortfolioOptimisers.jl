@@ -26,7 +26,7 @@ mr = MR(;
                       # Weight bounds using an estimator (it builds the constraint based on the data). Lower bound for all assets is 0, upper bound for AAPL is 0.2, for the rest it's 1.
                       wb = WBE(; lb = 0, ub = "AAPL" => 0.2),
                       # This maps asset names to their indices in the data, as well as sets to which they belong. It is needed to build constraints from estimators and is used by other components such as some prior statistics.
-                      sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                       # L2 regularisation using a squared L2 norm with a scalar value of 0.0001. This is used to prevent weight concentration and thus reduce overfitting and improve generalisation.
                       l2 = L2Reg(; val = 0.0001, alg = SOCRiskExpr()),
                       # Arithmetic returns with 100 evenly distributed points between the minimum and maximum returns in the training set. This way we can compute the efficient frontier, which is a subset of pareto fronts.

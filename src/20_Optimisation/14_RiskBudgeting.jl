@@ -241,7 +241,7 @@ $(DocStringExtensions.FIELDS)
 
     AssetRiskBudgeting(;
         rkb::Option{<:RkbE_Rkb} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         alg::RiskBudgetingFormulation = LogRiskBudgeting()
     ) -> AssetRiskBudgeting
 
@@ -270,7 +270,7 @@ Keywords correspond to the struct's fields.
     $(field_dict[:rba])
     """
     @vprop alg
-    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
+    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:UniverseSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
@@ -279,7 +279,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
-                            sets::Option{<:AssetSets} = nothing,
+                            sets::Option{<:UniverseSets} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
     return AssetRiskBudgeting(rkb, sets, alg)
 end
@@ -299,7 +299,7 @@ $(DocStringExtensions.FIELDS)
     FactorRiskBudgeting(;
         re::RegE_Reg = StepwiseRegression(),
         rkb::Option{<:RkbE_Rkb} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         flag::Bool = true
     ) -> FactorRiskBudgeting
 
@@ -333,7 +333,7 @@ Keywords correspond to the struct's fields.
     """
     flag
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
-                                 sets::Option{<:AssetSets}, flag::Bool)
+                                 sets::Option{<:UniverseSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
@@ -342,7 +342,7 @@ Keywords correspond to the struct's fields.
 end
 function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              rkb::Option{<:RkbE_Rkb} = nothing,
-                             sets::Option{<:AssetSets} = nothing,
+                             sets::Option{<:UniverseSets} = nothing,
                              flag::Bool = true)::FactorRiskBudgeting
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end

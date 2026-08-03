@@ -51,9 +51,9 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX"]))
 
 #=
 ## 2. Three opinions

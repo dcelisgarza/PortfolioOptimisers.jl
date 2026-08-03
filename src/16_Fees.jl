@@ -5,7 +5,7 @@ Estimator for portfolio transaction fees constraints.
 
 `FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Supports asset-specific fees via dictionaries, pairs, or vectors of pairs.
 
-This estimator can be converted into a concrete [`Fees`](@ref) constraint using the [`fees_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`AssetSets`](@ref) object.
+This estimator can be converted into a concrete [`Fees`](@ref) constraint using the [`fees_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`UniverseSets`](@ref) object.
 
 !!! warning
 
@@ -375,7 +375,7 @@ function needs_previous_weights(fe::FeesE_Fees)::Bool
     return needs_previous_weights(fe.tn)
 end
 """
-    fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
+    fees_constraints(fees::FeesEstimator, sets::UniverseSets; datatype::DataType = Float64,
                      strict::Bool = false)
 
 Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set.
@@ -385,7 +385,7 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 # Arguments
 
   - `fees`: [`FeesEstimator`](@ref) specifying turnover, proportional, and fixed fee values.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `datatype`: Output data type for fee values.
   - `strict`: If `true`, enforces strict matching between assets and fee values (throws error on mismatch); if `false`, issues a warning.
 
@@ -402,7 +402,7 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> fees = FeesEstimator(;
                             tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1),
@@ -447,9 +447,9 @@ Fees
   - [`Fees`](@ref)
   - [`turnover_constraints`](@ref)
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function fees_constraints(fees::FeesEstimator, sets::AssetSets;
+function fees_constraints(fees::FeesEstimator, sets::UniverseSets;
                           datatype::DataType = Float64, strict::Bool = false)::Fees
     return Fees(;
                 tn = turnover_constraints(fees.tn, sets; datatype = datatype,

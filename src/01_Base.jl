@@ -135,7 +135,7 @@ const arg_dict = Dict(
                       # Estimators
                       :sets => "`sets`: Sets used to map estimator values to assets.",#
                       :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
-                      :ekey => "`key`: Key to specify the asset universe in `sets.dict`. If `nothing`, the key is taken from `sets.key`.",#
+                      :ekey => "`key`: Key to specify the asset universe in `sets.dict`. If `nothing`, the key is taken from `sets.xkey`.",#
                       :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
                       :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
                       # Constraints
@@ -179,7 +179,7 @@ const arg_dict = Dict(
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :X_Xv => "`X`: Data matrix or vector.",#
                       :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
-                      :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from an `AssetSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
+                      :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from a `UniverseSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
                       :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
                       :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, where `alg` selects the hop decay) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                       :plfalg => "`alg`: Phylogeny feature algorithm: the decay turning hop counts into feature values. Inert for a precomputed phylogeny result, which is used as given.",#
@@ -584,8 +584,8 @@ const arg_dict = Dict(
                       # Constraint generation.
                       :rkb_val => "`val`: Vector of risk budget allocations.",#
                       :rkbe_val => "`val`: Mapping of names to risk budget values.",#
-                      :as_key => "`key`: Key in `dict` identifying the primary asset list.",#
-                      :as_ukey => "`ukey`: Key prefix for unique-entry group variants in `dict`.",#
+                      :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list.",#
+                      :us_uxkey => "`uxkey`: Key prefix for unique-entry group variants in `dict`.",#
                       :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
                       :A_phylo => "`A`: Phylogeny constraint matrix.",#
                       :B_phylo => "`B`: Group sizes or allocations vector.",#
@@ -2352,9 +2352,9 @@ Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing
 
 In order to implement a new estimator value algorithm which will work seamlessly with the library, subtype `AbstractEstimatorValueAlgorithm` with all necessary parameters struct, and implement the following method:
 
-  - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
+  - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
       + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value to use if `val` is `nothing`.
-      + `nx = sets.dict[ifelse(isnothing(key), sets.key, key)]`: Gets the universe to use for mapping values to assets.
+      + `nx = sets.dict[ifelse(isnothing(key), sets.xkey, key)]`: Gets the universe to use for mapping values to assets.
 
 ## Arguments
 
@@ -2376,22 +2376,22 @@ We can create a dummy estimator value algorithm as follows:
 ```jldoctest
 julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
 
-julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::AssetSets,
+julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::UniverseSets,
                                                      val::PortfolioOptimisers.Option{<:Number} = nothing,
                                                      key::PortfolioOptimisers.Option{<:AbstractString} = nothing;
                                                      datatype::DataType = Float64,
                                                      strict::Bool = false)
            val = ifelse(isnothing(val), zero(datatype), val)
-           nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+           nx = sets.dict[ifelse(isnothing(key), sets.xkey, key)]
            arr = ((1 - val):(length(nx) - val))
            return arr
        end
 
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
-AssetSets
-   key ┼ String: "nx"
-  ukey ┼ String: "ux"
-  dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"sha\", \"bis\", \"man\"]))
+UniverseSets
+   xkey ┼ String: "nx"
+  uxkey ┼ String: "ux"
+   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
 
 julia> estimator_to_val(MyIncreasingValue(), sets)
 1.0:1.0:3.0

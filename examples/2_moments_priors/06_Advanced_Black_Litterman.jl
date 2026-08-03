@@ -53,7 +53,7 @@ end;
 #=
 ## 1. Data, sets, and the equilibrium baseline
 
-We load the S&P 500 slice **with** its factor block, then declare two `AssetSets`: one over the
+We load the S&P 500 slice **with** its factor block, then declare two `UniverseSets`: one over the
 assets (with a couple of groups, for the augmented asset views) and one over the factor names.
 The [`EquilibriumExpectedReturns`](@ref) prior is the neutral anchor every Black–Litterman
 posterior tilts away from.
@@ -65,10 +65,10 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X, F)
 
-asset_sets = AssetSets(;
-                       dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                                   "energy" => ["CVX"]))
-factor_sets = AssetSets(; dict = Dict("nx" => rd.nf))
+asset_sets = UniverseSets(;
+                          dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                      "energy" => ["CVX"]))
+factor_sets = UniverseSets(; dict = Dict("nx" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
 pr_eq = prior(EmpiricalPrior(; me = EquilibriumExpectedReturns()), rd)

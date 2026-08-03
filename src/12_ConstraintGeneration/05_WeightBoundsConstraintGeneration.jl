@@ -247,7 +247,7 @@ Matches either a [`WeightBoundsEstimator`](@ref) (specifying how to generate wei
 """
 const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
 """
-    weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,
+    weight_bounds_constraints(wb::WeightBoundsEstimator, sets::UniverseSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)
 
 Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and asset set.
@@ -257,7 +257,7 @@ Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and 
 # Arguments
 
   - `wb`: [`WeightBoundsEstimator`](@ref) specifying lower and upper bounds.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `strict`: If `true`, enforces strict matching between assets and bounds (throws error on mismatch); if `false`, issues a warning.
   - `datatype`: Output data type for bounds.
   - `kwargs...`: Additional keyword arguments passed to bound extraction routines.
@@ -275,7 +275,7 @@ Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> wb = WeightBoundsEstimator(; lb = Dict(\"A\" => 0.1, \"B\" => 0.2), ub = 1.0);
 
@@ -290,9 +290,9 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
+function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::UniverseSets;
                                    strict::Bool = false, datatype::DataType = Float64,
                                    kwargs...)::WeightBounds
     return WeightBounds(;

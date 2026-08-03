@@ -1,7 +1,7 @@
 # Asset sets matrix
 
 ```@docs
-AssetSets
+UniverseSets
 AssetSetsMatrixEstimator
 MatNum_ASetMatE
 MatNum_ASetMatE_VecMatNum_ASetMatE

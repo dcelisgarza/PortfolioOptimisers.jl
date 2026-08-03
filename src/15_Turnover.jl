@@ -5,7 +5,7 @@ Estimator for turnover portfolio constraints.
 
 `TurnoverEstimator` specifies turnover constraints for each asset in a portfolio, based on current portfolio weights `w`, asset-specific turnover values `val`, and a default value for assets not explicitly specified. Supports asset-specific turnover via dictionaries, pairs, or vectors of pairs.
 
-This estimator can be converted into a concrete [`Turnover`](@ref) constraint using the [`turnover_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`AssetSets`](@ref) object.
+This estimator can be converted into a concrete [`Turnover`](@ref) constraint using the [`turnover_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`UniverseSets`](@ref) object.
 
 # Fields
 
@@ -154,7 +154,7 @@ function factory(tn::TurnoverEstimator, w::VecNum)::TurnoverEstimator
     end
 end
 """
-    turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; datatype::DataType = Float64,
+    turnover_constraints(tn::TurnoverEstimator, sets::UniverseSets; datatype::DataType = Float64,
                          strict::Bool = false)
 
 Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set.
@@ -164,7 +164,7 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 # Arguments
 
   - `tn`: [`TurnoverEstimator`](@ref) specifying current weights, asset-specific turnover values, and default value.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `datatype`: Data type for default turnover values when `dval` is `nothing`.
   - `strict`: If `true`, enforces strict matching between assets and turnover values (throws error on mismatch); if `false`, issues a warning.
 
@@ -179,7 +179,7 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2));
 
@@ -194,9 +194,9 @@ Turnover
 
   - [`TurnoverEstimator`](@ref)
   - [`Turnover`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
+function turnover_constraints(tn::TurnoverEstimator, sets::UniverseSets;
                               datatype::DataType = Float64, strict::Bool = false)::Turnover
     return Turnover(; w = tn.w,
                     val = estimator_to_val(tn.val, sets, tn.dval; datatype = datatype,
@@ -468,7 +468,7 @@ Supports flexible dispatch for turnover constraint generation and processing, ac
 """
 const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
 """
-    turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
+    turnover_constraints(tn::VecTnE_Tn, sets::UniverseSets; datatype::DataType = Float64,
                          strict::Bool = false)
 
 Broadcasts [`turnover_constraints`](@ref) over the vector.
@@ -478,7 +478,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 # Arguments
 
   - `tn`: Vector of turnover constraints or estimators.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `datatype`: Data type for default turnover values when `dval` is `nothing`.
   - `strict`: If `true`, enforces strict matching between assets and turnover values (throws error on mismatch); if `false`, issues a warning.
 
@@ -489,7 +489,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> tn1 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict(\"A\" => 0.1, \"B\" => 0.2));
 
@@ -511,10 +511,10 @@ julia> turnover_constraints([tn1, tn2], sets)
 # Related
 
   - [`VecTnE_Tn`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
-                              strict::Bool = false)
+function turnover_constraints(tn::VecTnE_Tn, sets::UniverseSets;
+                              datatype::DataType = Float64, strict::Bool = false)
     return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
             for tni in tn]
 end

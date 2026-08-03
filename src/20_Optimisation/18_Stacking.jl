@@ -138,7 +138,7 @@ $(DocStringExtensions.FIELDS)
         pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         scale::TD_Option{<:VecNum} = nothing,
         opti::Union{<:AbstractVector, <:TD_VecOptE_Opt},
         opto::OptE_TD,
@@ -253,7 +253,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     function Stacking(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
-                      fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
+                      fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                       scale::TD_Option{<:VecNum},
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
@@ -300,7 +300,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 end
 function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                  sets::TD_Option{<:AssetSets} = nothing,
+                  sets::TD_Option{<:UniverseSets} = nothing,
                   scale::TD_Option{<:VecNum} = nothing,
                   opti::Union{<:AbstractVector, <:TD_VecOptE_Opt}, opto::OptE_TD,
                   cv::Option{<:OptimisationCrossValidation} = nothing,

@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
         re::AbstractRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         views::Lc_BLV,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         w::Option{<:ObsWeights} = nothing,
         rf::Number = 0.0,
@@ -51,8 +51,8 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
 
 ```jldoctest
 julia> FactorBlackLittermanPrior(;
-                                 sets = AssetSets(; key = \"nx\",
-                                                  dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                 sets = UniverseSets(; xkey = \"nx\",
+                                                     dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                                  views = LinearConstraintEstimator(;
                                                                    val = [\"A == 0.03\",
                                                                           \"B + C == 0.04\"]))
@@ -107,10 +107,10 @@ FactorBlackLittermanPrior
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
-        sets ┼ AssetSets
-             │    key ┼ String: "nx"
-             │   ukey ┼ String: "ux"
-             │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        sets ┼ UniverseSets
+             │    xkey ┼ String: "nx"
+             │   uxkey ┼ String: "ux"
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
            w ┼ nothing
           rf ┼ Float64: 0.0
@@ -124,7 +124,7 @@ FactorBlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -186,7 +186,7 @@ FactorBlackLittermanPrior
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractRegressionEstimator,
                                        ve::AbstractVarianceEstimator, views::Lc_BLV,
-                                       sets::Option{<:AssetSets},
+                                       sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
@@ -203,7 +203,7 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                                   views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
@@ -267,7 +267,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
+  - `length(pe.sets.dict[pe.sets.xkey]) == size(F, 2)`.
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -300,8 +300,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
+    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(F, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma

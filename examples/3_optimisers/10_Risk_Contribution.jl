@@ -59,7 +59,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 pr = prior(EmpiricalPrior(), rd)
 opt = JuMPOptimiser(; pe = pr, slv = slv)
-sets_asset = AssetSets(; dict = Dict("nx" => rd.nx))
+sets_asset = UniverseSets(; dict = Dict("nx" => rd.nx))
 opt_asset = JuMPOptimiser(; pe = pr, slv = slv, sets = sets_asset)
 
 #=
@@ -117,7 +117,7 @@ pass `rd` directly to [`optimise`](@ref).
 The factor side mirrors the same idea: `rc` constraints are fixed, while objectives vary.
 =#
 
-sets = AssetSets(; dict = Dict("nx" => rd.nf))
+sets = UniverseSets(; dict = Dict("nx" => rd.nf))
 lcs = LinearConstraintEstimator(; val = ["VLUE <= 0.74", "QUAL >= -0.07", "MTUM==0.09"])
 r_fac = Variance(; rc = lcs)
 

@@ -62,8 +62,8 @@ $(DocStringExtensions.FIELDS)
         re::AbstractRegressionEstimator = StepwiseRegression(),
         a_views::Lc_BLV,
         f_views::Lc_BLV,
-        a_sets::Option{<:AssetSets} = nothing,
-        f_sets::Option{<:AssetSets} = nothing,
+        a_sets::Option{<:UniverseSets} = nothing,
+        f_sets::Option{<:UniverseSets} = nothing,
         a_views_conf::Option{<:Num_VecNum} = nothing,
         f_views_conf::Option{<:Num_VecNum} = nothing,
         w::Option{<:VecNum} = nothing,
@@ -107,10 +107,10 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
 ```jldoctest
 julia> AugmentedBlackLittermanPrior(;
-                                    a_sets = AssetSets(; key = \"nx\",
-                                                       dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
-                                    f_sets = AssetSets(; key = \"nx\",
-                                                       dict = Dict(\"nx\" => [\"F1\", \"F2\"])),
+                                    a_sets = UniverseSets(; xkey = \"nx\",
+                                                          dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                    f_sets = UniverseSets(; xkey = \"nx\",
+                                                          dict = Dict(\"nx\" => [\"F1\", \"F2\"])),
                                     a_views = LinearConstraintEstimator(;
                                                                         val = [\"A == 0.03\",
                                                                                \"B + C == 0.04\"]),
@@ -178,14 +178,14 @@ AugmentedBlackLittermanPrior
        f_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
                │   key ┴ nothing
-        a_sets ┼ AssetSets
-               │    key ┼ String: "nx"
-               │   ukey ┼ String: "ux"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-        f_sets ┼ AssetSets
-               │    key ┼ String: "nx"
-               │   ukey ┼ String: "ux"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
+        a_sets ┼ UniverseSets
+               │    xkey ┼ String: "nx"
+               │   uxkey ┼ String: "ux"
+               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        f_sets ┼ UniverseSets
+               │    xkey ┼ String: "nx"
+               │   uxkey ┼ String: "ux"
+               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing
@@ -199,7 +199,7 @@ AugmentedBlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -265,8 +265,8 @@ AugmentedBlackLittermanPrior
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
                                           re::AbstractRegressionEstimator, a_views::Lc_BLV,
-                                          f_views::Lc_BLV, a_sets::Option{<:AssetSets},
-                                          f_sets::Option{<:AssetSets},
+                                          f_views::Lc_BLV, a_sets::Option{<:UniverseSets},
+                                          f_sets::Option{<:UniverseSets},
                                           a_views_conf::Option{<:Num_VecNum},
                                           f_views_conf::Option{<:Num_VecNum},
                                           w::Option{<:VecNum}, rf::Number,
@@ -300,8 +300,8 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,
-                                      a_sets::Option{<:AssetSets} = nothing,
-                                      f_sets::Option{<:AssetSets} = nothing,
+                                      a_sets::Option{<:UniverseSets} = nothing,
+                                      f_sets::Option{<:UniverseSets} = nothing,
                                       a_views_conf::Option{<:Num_VecNum} = nothing,
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
@@ -341,8 +341,8 @@ Compute augmented Black-Litterman prior moments for asset returns.
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2)`.
-  - `length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2)`.
+  - `length(pe.a_sets.dict[pe.a_sets.xkey]) == size(X, 2)`.
+  - `length(pe.f_sets.dict[pe.f_sets.xkey]) == size(F, 2)`.
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -374,10 +374,10 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2),
-              DimensionMismatch("length(pe.a_sets.dict[pe.a_sets.key]) ($(length(pe.a_sets.dict[pe.a_sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
-    @argcheck(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2),
-              DimensionMismatch("length(pe.f_sets.dict[pe.f_sets.key]) ($(length(pe.f_sets.dict[pe.f_sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
+    @argcheck(length(pe.a_sets.dict[pe.a_sets.xkey]) == size(X, 2),
+              DimensionMismatch("length(pe.a_sets.dict[pe.a_sets.xkey]) ($(length(pe.a_sets.dict[pe.a_sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
+    @argcheck(length(pe.f_sets.dict[pe.f_sets.xkey]) == size(F, 2),
+              DimensionMismatch("length(pe.f_sets.dict[pe.f_sets.xkey]) ($(length(pe.f_sets.dict[pe.f_sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
     # Asset prior.
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma

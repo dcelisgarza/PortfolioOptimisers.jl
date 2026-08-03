@@ -99,7 +99,7 @@ RiskBudgetEstimator
 
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
     """
@@ -206,19 +206,19 @@ function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)::RiskBudget
     return rb
 end
 """
-    risk_budget_constraints(rb::EstValType, sets::AssetSets,
+    risk_budget_constraints(rb::EstValType, sets::UniverseSets,
                             dval::Option{<:Number} = nothing; strict::Bool = false,
                             kwargs...)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
-This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`AssetSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Asset and group names are resolved using `sets`, and the resulting risk budget vector is normalised to sum to one.
+This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`UniverseSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Asset and group names are resolved using `sets`, and the resulting risk budget vector is normalised to sum to one.
 
 # Arguments
 
   - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
-  - `dval`: Default value to use for assets not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[sets.key])` is used.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `dval`: Default value to use for assets not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[sets.xkey])` is used.
   - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
 
 # Details
@@ -235,7 +235,8 @@ This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group n
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
 julia> risk_budget_constraints(Dict(\"A\" => 0.2, \"group1\" => 0.8), sets)
 RiskBudget
@@ -245,21 +246,21 @@ RiskBudget
 # Related
 
   - [`RiskBudget`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::EstValType, sets::AssetSets,
+function risk_budget_constraints(rb::EstValType, sets::UniverseSets,
                                  dval::Option{<:Number} = nothing; strict::Bool = false,
                                  kwargs...)::RiskBudget
     if isnothing(dval)
-        dval = inv(length(sets.dict[sets.key]))
+        dval = inv(length(sets.dict[sets.xkey]))
     end
     val = estimator_to_val(rb, sets, dval; strict = strict)
     return RiskBudget(; val = val / sum(val))
 end
 """
-    risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
+    risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets;
                             strict::Bool = false, kwargs...)
 
 This method is a wrapper calling:
@@ -272,12 +273,12 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
+function risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets;
                                  strict::Bool = false, kwargs...)::RiskBudget
     return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
 end
 # const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
-# function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
+# function risk_budget_constraints(rb::VecRkbE, sets::UniverseSets; strict::Bool = false,
 #                                  kwargs...)
 #     return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
 # end

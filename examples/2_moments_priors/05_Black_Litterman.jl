@@ -14,7 +14,7 @@ then [Entropy Pooling](07_Entropy_Pooling.md), then [Opinion Pooling](08_Opinion
 Each builds on the last, but each page also stands alone.
 
 In `PortfolioOptimisers`, [`BlackLittermanPrior`](@ref) takes a base estimator `pe` (whose
-default mean is [`EquilibriumExpectedReturns`](@ref)), an [`AssetSets`](@ref) that names assets
+default mean is [`EquilibriumExpectedReturns`](@ref)), a [`UniverseSets`](@ref) that names assets
 and groups, and a `views` estimator. Views are written as plain string constraints through a
 [`LinearConstraintEstimator`](@ref), and their conviction is controlled by `views_conf` and the
 global scaling parameter `tau`.
@@ -84,13 +84,13 @@ plot_mu(pr_eq, rd.nx)
 #=
 ## 3. Naming assets and groups
 
-Views refer to assets and groups by name, so we declare an [`AssetSets`](@ref): the `nx` key
+Views refer to assets and groups by name, so we declare a [`UniverseSets`](@ref): the `nx` key
 holds every asset, and we add two illustrative groups so we can express a group-level view.
 =#
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX"]))
 
 #=
 ## 4. The three kinds of views

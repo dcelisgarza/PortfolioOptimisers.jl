@@ -281,7 +281,7 @@ $(DocStringExtensions.FIELDS)
         cle::TD{<:ClE_Cl} = ClustersEstimator(),
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         opti::OptE_TD,
         opto::OptE_TD,
         cv::Option{<:OptimisationCrossValidation} = nothing,
@@ -397,7 +397,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     function NestedClustered(pe::TD{<:PrE_Pr}, cle::TD{<:ClE_Cl}, wb::TD_Option{<:WbE_Wb},
-                             fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
+                             fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                              opti::OptE_TD, opto::OptE_TD,
                              cv::Option{<:OptimisationCrossValidation},
                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
@@ -450,7 +450,7 @@ function NestedClustered(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                          cle::TD{<:ClE_Cl} = ClustersEstimator(),
                          wb::TD_Option{<:WbE_Wb} = nothing,
                          fees::TD_Option{<:FeesE_Fees} = nothing,
-                         sets::TD_Option{<:AssetSets} = nothing, opti::OptE_TD,
+                         sets::TD_Option{<:UniverseSets} = nothing, opti::OptE_TD,
                          opto::OptE_TD, cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -655,7 +655,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Align the outer optimiser's asset sets with the synthetic universe produced by the inner optimisations.
 
-The outer optimiser of a [`NestedClustered`](@ref) does not see the original assets. It sees one synthetic asset per cluster, whose names are carried by the outer returns result `rdo`. An outer optimiser configured with [`AssetSets`](@ref) built over the original universe would therefore resolve its constraints against the wrong names, so the sets are rebuilt over the cluster names before the outer solve.
+The outer optimiser of a [`NestedClustered`](@ref) does not see the original assets. It sees one synthetic asset per cluster, whose names are carried by the outer returns result `rdo`. An outer optimiser configured with [`UniverseSets`](@ref) built over the original universe would therefore resolve its constraints against the wrong names, so the sets are rebuilt over the cluster names before the outer solve.
 
 # Arguments
 
@@ -669,27 +669,27 @@ The outer optimiser of a [`NestedClustered`](@ref) does not see the original ass
 # Details
 
   - Handles both shapes of outer optimiser: one that nests its own optimiser (`nco.opto.opt.sets`) and one that carries the sets directly (`nco.opto.sets`).
-  - The dictionary is copied before being reset, so the caller's [`AssetSets`](@ref) is not mutated.
+  - The dictionary is copied before being reset, so the caller's [`UniverseSets`](@ref) is not mutated.
 
 # Related
 
   - [`NestedClustered`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`predict_outer_nco_estimator_returns`](@ref)
 """
 function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
     return if (hasproperty(nco.opto, :opt) &&
                hasproperty(nco.opto.opt, :sets) &&
                !isnothing(nco.opto.opt.sets) &&
-               get(nco.opto.opt.sets.dict, nco.opto.opt.sets.key, nothing) !== rdo.nx)
+               get(nco.opto.opt.sets.dict, nco.opto.opt.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.opt.sets.dict)
-        ndict[nco.opto.opt.sets.key] = rdo.nx
+        ndict[nco.opto.opt.sets.xkey] = rdo.nx
         Accessors.@reset nco.opto.opt.sets.dict = ndict
     elseif (hasproperty(nco.opto, :sets) &&
             !isnothing(nco.opto.sets) &&
-            get(nco.opto.sets.dict, nco.opto.sets.key, nothing) !== rdo.nx)
+            get(nco.opto.sets.dict, nco.opto.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.sets.dict)
-        ndict[nco.opto.sets.key] = rdo.nx
+        ndict[nco.opto.sets.xkey] = rdo.nx
         Accessors.@reset nco.opto.sets.dict = ndict
     else
         nco

@@ -17,7 +17,7 @@ $(DocStringExtensions.FIELDS)
         ),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         views::Lc_BLV,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
         tau::Option{<:Number} = nothing
@@ -48,7 +48,9 @@ The views are applied to the **assets**. Under ADR 0046 the wrapped prior is for
 # Examples
 
 ```jldoctest
-julia> BlackLittermanPrior(; sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+julia> BlackLittermanPrior(;
+                           sets = UniverseSets(; xkey = \"nx\",
+                                               dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                            views = LinearConstraintEstimator(;
                                                              val = [\"A == 0.03\", \"B + C == 0.04\"]))
 BlackLittermanPrior
@@ -100,10 +102,10 @@ BlackLittermanPrior
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
-        sets ┼ AssetSets
-             │    key ┼ String: "nx"
-             │   ukey ┼ String: "ux"
-             │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        sets ┼ UniverseSets
+             │    xkey ┼ String: "nx"
+             │   uxkey ┼ String: "ux"
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -114,7 +116,7 @@ BlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_AF`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -149,7 +151,7 @@ BlackLittermanPrior
     tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
-                                 sets::Option{<:AssetSets},
+                                 sets::Option{<:UniverseSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
                                  tau::Option{<:Number})
         assert_bl(views, sets, views_conf, tau)
@@ -161,7 +163,7 @@ function BlackLittermanPrior(;
                              pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                         me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                             views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                             views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
                              tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
@@ -176,7 +178,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that the Black-Litterman prior's views, sets, view confidences, and blending parameter are valid.
 """
-function assert_bl(views::Lc_BLV, sets::Option{<:AssetSets},
+function assert_bl(views::Lc_BLV, sets::Option{<:UniverseSets},
                    views_conf::Option{<:Num_VecNum}, tau::Option{<:Number})
     if isa(views, LinearConstraintEstimator)
         @argcheck(!isnothing(sets),
@@ -459,7 +461,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.key]) == size(X, 2)`.
+  - `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
 
 # Details
 
@@ -488,8 +490,8 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
             F = transpose(F)
         end
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
+    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,

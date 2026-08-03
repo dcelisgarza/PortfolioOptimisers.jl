@@ -5,7 +5,7 @@
     pr = prior(EmpiricalPrior(), rd)
     N = size(pr.X, 2)
 
-    sets = AssetSets(; dict = Dict("nx" => rd.nx))
+    sets = UniverseSets(; dict = Dict("nx" => rd.nx))
     wb = WeightBoundsEstimator(; lb = "AAPL" => 0.07)
 
     res = optimise(InverseVolatility(; pe = pr), rd)

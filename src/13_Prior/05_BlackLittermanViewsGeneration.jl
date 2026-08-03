@@ -100,17 +100,17 @@ Alias for a union of linear constraint estimator and Black-Litterman views types
 const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
     get_black_litterman_views(lcs::PR_VecPR,
-                              sets::AssetSets; datatype::DataType = Float64,
+                              sets::UniverseSets; datatype::DataType = Float64,
                               strict::Bool = false)
 
 Convert parsed Black-Litterman view equations into a `BlackLittermanViews` object.
 
-`get_black_litterman_views` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`AssetSets`](@ref), and assembles the canonical views matrix `P` and expected returns vector `Q` for Black-Litterman prior construction. The result is a [`BlackLittermanViews`](@ref) object suitable for use in portfolio optimisation routines.
+`get_black_litterman_views` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`UniverseSets`](@ref), and assembles the canonical views matrix `P` and expected returns vector `Q` for Black-Litterman prior construction. The result is a [`BlackLittermanViews`](@ref) object suitable for use in portfolio optimisation routines.
 
 # Arguments
 
   - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed Black-Litterman view equations.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
   - `datatype`: Numeric type for coefficients and expected returns.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
 
@@ -128,7 +128,7 @@ Convert parsed Black-Litterman view equations into a `BlackLittermanViews` objec
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> lcs = parse_equation([\"A + B == 0.05\", \"C == 0.02\"]);
 
@@ -143,9 +143,9 @@ BlackLittermanViews
 
   - [`BlackLittermanViews`](@ref)
   - [`parse_equation`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
+function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets;
                                    datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError("lcs cannot be empty"))
@@ -153,21 +153,21 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
     excl = Vector{Int}(undef, 0)
-    nx = sets.dict[sets.key]
+    nx = sets.dict[sets.xkey]
     At = Vector{datatype}(undef, length(nx))
     for (i, lc) in enumerate(lcs)
         fill!(At, zero(eltype(At)))
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = unknown_variable_msg(v, nx, sets.key)
+                msg = unknown_variable_msg(v, nx, sets.xkey)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
                 continue
             end
             At += Ai * c
         end
         if !any(!iszero, At)
-            msg = empty_row_msg(lc.eqn, nx, sets.key; noun = "view")
+            msg = empty_row_msg(lc.eqn, nx, sets.xkey; noun = "view")
             if strict
                 throw(ArgumentError(msg))
             else
@@ -189,8 +189,8 @@ end
 """
     black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     black_litterman_views(views::EqnType,
-                          sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
-    black_litterman_views(views::LinearConstraintEstimator, sets::AssetSets;
+                          sets::UniverseSets; datatype::DataType = Float64, strict::Bool = false)
+    black_litterman_views(views::LinearConstraintEstimator, sets::UniverseSets;
                           datatype::DataType = Float64, strict::Bool = false)
 
 Unified interface for constructing or passing through Black-Litterman investor views.
@@ -205,7 +205,7 @@ Unified interface for constructing or passing through Black-Litterman investor v
       + `EqnType`: The view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
       + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator.
 
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
 
   - `datatype`: Numeric type for coefficients and expected returns.
 
@@ -218,7 +218,7 @@ Unified interface for constructing or passing through Black-Litterman investor v
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> black_litterman_views([\"A + B == 0.05\", \"C == 0.02\"], sets)
 BlackLittermanViews
@@ -240,19 +240,19 @@ BlackLittermanViews
   - [`BlackLittermanViews`](@ref)
   - [`get_black_litterman_views`](@ref)
   - [`parse_equation`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LinearConstraintEstimator`](@ref)
 """
 function black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     return views
 end
-function black_litterman_views(eqn::EqnType, sets::AssetSets; datatype::DataType = Float64,
-                               strict::Bool = false)
+function black_litterman_views(eqn::EqnType, sets::UniverseSets;
+                               datatype::DataType = Float64, strict::Bool = false)
     lcs = parse_equation(eqn; ops1 = ("==",), ops2 = (:call, :(==)), datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, true)
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
 end
-function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
+function black_litterman_views(lcs::LinearConstraintEstimator, sets::UniverseSets;
                                datatype::DataType = Float64, strict::Bool = false)
     return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
 end

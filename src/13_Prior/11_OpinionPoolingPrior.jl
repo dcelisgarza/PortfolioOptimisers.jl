@@ -93,7 +93,7 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> OpinionPoolingPrior(;
                            pes = [EntropyPoolingPrior(; sets = sets,

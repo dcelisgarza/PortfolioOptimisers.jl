@@ -456,7 +456,7 @@ $(DocStringExtensions.FIELDS)
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
         var_alpha::Number = 0.05,
         cvar_alpha::Number = 0.05,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         ds_opt::Option{<:CVaREntropyPooling} = nothing,
         dm_opt::Option{<:OptimEntropyPooling} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
@@ -490,7 +490,9 @@ The comparison operators accepted in each view's constraint strings depend on th
 # Examples
 
 ```jldoctest
-julia> EntropyPoolingPrior(; sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+julia> EntropyPoolingPrior(;
+                           sets = UniverseSets(; xkey = \"nx\",
+                                               dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                            mu_views = LinearConstraintEstimator(;
                                                                 val = [\"A == 0.03\",
                                                                        \"B + C == 0.04\"]))
@@ -527,10 +529,10 @@ EntropyPoolingPrior
     rho_views ┼ nothing
     var_alpha ┼ nothing
    cvar_alpha ┼ nothing
-         sets ┼ AssetSets
-              │    key ┼ String: "nx"
-              │   ukey ┼ String: "ux"
-              │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+         sets ┼ UniverseSets
+              │    xkey ┼ String: "nx"
+              │   uxkey ┼ String: "ux"
+              │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
        ds_opt ┼ nothing
        dm_opt ┼ nothing
           opt ┼ OptimEntropyPooling
@@ -550,7 +552,7 @@ EntropyPoolingPrior
   - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`LinearConstraintEstimator`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`CVaREntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
@@ -636,7 +638,7 @@ EntropyPoolingPrior
                                  cov_views::Option{<:LinearConstraintEstimator},
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  var_alpha::Option{<:Number}, cvar_alpha::Option{<:Number},
-                                 sets::Option{<:AssetSets},
+                                 sets::Option{<:UniverseSets},
                                  ds_opt::Option{<:CVaREntropyPooling},
                                  dm_opt::Option{<:OptimEntropyPooling}, opt::NonCVaREP,
                                  w::Option{<:StatsBase.ProbabilityWeights},
@@ -695,7 +697,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              rho_views::Option{<:LinearConstraintEstimator} = nothing,
                              var_alpha::Option{<:Number} = nothing,
                              cvar_alpha::Option{<:Number} = nothing,
-                             sets::Option{<:AssetSets} = nothing,
+                             sets::Option{<:UniverseSets} = nothing,
                              ds_opt::Option{<:CVaREntropyPooling} = nothing,
                              dm_opt::Option{<:OptimEntropyPooling} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
@@ -755,7 +757,7 @@ function add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Sy
     return nothing
 end
 """
-    replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
+    replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::UniverseSets,
                         key::Symbol; alpha::Option{<:Number} = nothing,
                         strict::Bool = false)
 
@@ -792,14 +794,14 @@ Replace prior references in view parsing results with their corresponding prior 
 
   - [`ParsingResult`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`prior`](@ref)
 """
-function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                             key::Symbol, alpha::Option{<:Number} = nothing;
-                             strict::Bool = false)
+function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
+                             sets::UniverseSets, key::Symbol,
+                             alpha::Option{<:Number} = nothing; strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
-    nx = sets.dict[sets.key]
+    nx = sets.dict[sets.xkey]
     variables, coeffs = res.vars, res.coef
     idx_rm = Vector{Int}(undef, 0)
     rhs::typeof(res.rhs) = res.rhs
@@ -812,7 +814,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
         end
         j = findfirst(x -> x == m.captures[1], nx)
         if isnothing(j)
-            msg = unknown_variable_msg(m.captures[1], nx, sets.key)
+            msg = unknown_variable_msg(m.captures[1], nx, sets.xkey)
             strict ? throw(ArgumentError(msg)) : @warn(msg)
             push!(idx_rm, i)
             continue
@@ -852,7 +854,7 @@ Broadcast prior reference replacement across multiple view constraints.
 
   - [`ParsingResult`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
 function replace_prior_views(res::VecPR, args...; kwargs...)
     return replace_prior_views.(res, args...; kwargs...)
@@ -912,7 +914,7 @@ function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
 end
 """
     ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add mean (expected return) view constraints to the entropy pooling constraint dictionary.
 
@@ -944,7 +946,7 @@ Parse and add mean (expected return) view constraints to the entropy pooling con
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     mu_views = parse_equation(mu_views.val; datatype = eltype(X))
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
@@ -1053,7 +1055,7 @@ function ep_var_views!(var_views::Nothing, args...; kwargs...)
 end
 """
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::AssetSets, alpha::Number; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets, alpha::Number; strict::Bool = false)
 
 Parse and add variance (VaR) view constraints to the entropy pooling constraint dictionary.
 
@@ -1087,7 +1089,7 @@ Parse and add variance (VaR) view constraints to the entropy pooling constraint 
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::AssetSets, alpha::Number;
+                       pr::AbstractPriorResult, sets::UniverseSets, alpha::Number;
                        strict::Bool = false)
     X = pr.X
     var_views = parse_equation(var_views.val; ops1 = ("==", ">="),
@@ -1511,7 +1513,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::
 end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
+                         pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
                          w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser,
                          ds_opt::Option{<:CVaREntropyPooling},
                          dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
@@ -1554,7 +1556,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
   - [`entropy_pooling`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                              pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
+                              pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
                               w::StatsBase.ProbabilityWeights,
                               opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Option{<:CVaREntropyPooling},
@@ -1658,7 +1660,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args..
 end
 """
     ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                    pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                    pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add variance (sigma) view constraints to the entropy pooling constraint dictionary.
 
@@ -1690,7 +1692,7 @@ Parse and add variance (sigma) view constraints to the entropy pooling constrain
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                         pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     sigma_views = parse_equation(sigma_views.val; datatype = eltype(X))
     sigma_views = replace_group_by_assets(sigma_views, sets, false, true, false)
@@ -1749,7 +1751,7 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
     return nothing
 end
 """
-    replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets, key::Symbol;
+    replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::UniverseSets, key::Symbol;
                           strict::Bool = false)
 
 Replace correlation prior references in view parsing results with their corresponding prior values.
@@ -1781,15 +1783,15 @@ Replace correlation prior references in view parsing results with their correspo
   - [`ParsingResult`](@ref)
   - [`RhoParsingResult`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`prior`](@ref)
 """
-function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                               key::Symbol; strict::Bool = false)
+function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
+                               sets::UniverseSets, key::Symbol; strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     prior_corr_pattern = r"prior\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
     corr_pattern = r"\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
-    nx = sets.dict[sets.key]
+    nx = sets.dict[sets.xkey]
     variables, coeffs = res.vars, res.coef
     jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
@@ -1813,11 +1815,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
                 j = findfirst(x -> x == asset1, nx)
                 k = findfirst(x -> x == asset2, nx)
                 if isnothing(j)
-                    msg = unknown_variable_msg(asset1, nx, sets.key)
+                    msg = unknown_variable_msg(asset1, nx, sets.xkey)
                     strict ? throw(ArgumentError(msg)) : @warn(msg)
                 end
                 if isnothing(k)
-                    msg = unknown_variable_msg(asset2, nx, sets.key)
+                    msg = unknown_variable_msg(asset2, nx, sets.xkey)
                     strict ? throw(ArgumentError(msg)) : @warn(msg)
                 end
                 if isnothing(j) || isnothing(k)
@@ -1842,11 +1844,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
             j = findfirst(x -> x == asset1, nx)
             k = findfirst(x -> x == asset2, nx)
             if isnothing(j)
-                msg = unknown_variable_msg(asset1, nx, sets.key)
+                msg = unknown_variable_msg(asset1, nx, sets.xkey)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
             end
             if isnothing(k)
-                msg = unknown_variable_msg(asset2, nx, sets.key)
+                msg = unknown_variable_msg(asset2, nx, sets.xkey)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
             end
             if isnothing(j) || isnothing(k)
@@ -1890,7 +1892,7 @@ Broadcast prior reference replacement across multiple view constraints.
 
   - [`ParsingResult`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
 function replace_coprior_views(res::VecPR, args...; kwargs...)
     return replace_coprior_views.(res, args...; kwargs...)
@@ -1955,7 +1957,7 @@ function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add correlation view constraints to the entropy pooling constraint dictionary.
 
@@ -1987,7 +1989,7 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     cov_views = parse_equation(cov_views.val; datatype = eltype(X))
     cov_views = replace_group_by_assets(cov_views, sets, false, true, true)
@@ -2010,7 +2012,7 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add correlation view constraints to the entropy pooling constraint dictionary.
 
@@ -2042,7 +2044,7 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     rho_views = parse_equation(rho_views.val; datatype = eltype(X))
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
@@ -2102,7 +2104,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add skewness view constraints to the entropy pooling constraint dictionary.
 
@@ -2134,7 +2136,7 @@ Parse and add skewness view constraints to the entropy pooling constraint dictio
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     skew_views = parse_equation(skew_views.val; datatype = eltype(X))
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
@@ -2187,7 +2189,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, arg
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
 Parse and add kurtosis view constraints to the entropy pooling constraint dictionary.
 
@@ -2219,7 +2221,7 @@ Parse and add kurtosis view constraints to the entropy pooling constraint dictio
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
     X = pr.X
     kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(X))
     kurtosis_views = replace_group_by_assets(kurtosis_views, sets, false, true, false)

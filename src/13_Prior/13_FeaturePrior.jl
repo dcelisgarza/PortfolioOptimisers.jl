@@ -334,7 +334,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature matrix producer reading exogenous taxonomy memberships off an [`AssetSets`](@ref).
+Feature matrix producer reading exogenous taxonomy memberships off a [`UniverseSets`](@ref).
 
 `AssetSetsFeatures` is the thin producer wrapping [`asset_sets_features`](@ref), so a sector, industry or country classification reaches [`FeatureDistance`](@ref) through the *derived* carrier as well as through the user's own [`ReturnsResult`](@ref). It reads its taxonomy from [`FeaturePrior`](@ref)'s `sets` field.
 
@@ -380,7 +380,7 @@ AssetSetsFeatures
   - [`AbstractFeatureMatrixEstimator`](@ref)
   - [`asset_sets_features`](@ref)
   - [`assert_feature_keys`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`feature_matrix`](@ref)
   - [`FeaturePrior`](@ref)
   - [`FeatureDistance`](@ref)
@@ -402,9 +402,9 @@ end
 # defaulted one: there is nothing to fall back to, and a returns-derived substitute would be
 # the exact endogeneity this producer exists to escape.
 function feature_matrix(ze::AssetSetsFeatures, ::AbstractPriorResult, ::Any, ::Any,
-                        sets::Option{<:AssetSets}; kwargs...)
+                        sets::Option{<:UniverseSets}; kwargs...)
     @argcheck(!isnothing(sets),
-              IsNothingError("AssetSetsFeatures reads its taxonomy from `FeaturePrior.sets`, which is nothing. Pass `FeaturePrior(; ze = AssetSetsFeatures(; vals = $(ze.vals)), sets = AssetSets(…))`."))
+              IsNothingError("AssetSetsFeatures reads its taxonomy from `FeaturePrior.sets`, which is nothing. Pass `FeaturePrior(; ze = AssetSetsFeatures(; vals = $(ze.vals)), sets = UniverseSets(…))`."))
     return asset_sets_features(ze.vals, sets)
 end
 """
@@ -448,7 +448,7 @@ $(DocStringExtensions.FIELDS)
     FeaturePrior(;
         pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
         ze::Union{<:MatNum_Arr3Num, <:AbstractFeatureMatrixEstimator},
-        sets::Option{<:AssetSets} = nothing
+        sets::Option{<:UniverseSets} = nothing
     ) -> FeaturePrior
 
 Keywords correspond to the struct's fields.
@@ -463,7 +463,7 @@ Keywords correspond to the struct's fields.
 # Validation
 
   - If `ze` is a literal matrix, it is non-empty.
-  - If `sets` is not `nothing`, `length(sets.dict[sets.key]) == size(X, 2)`.
+  - If `sets` is not `nothing`, `length(sets.dict[sets.xkey]) == size(X, 2)`.
 
 # Examples
 
@@ -524,7 +524,7 @@ EmpiricalPrior
     sets
     function FeaturePrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                           ze::Union{<:MatNum_Arr3Num, <:AbstractFeatureMatrixEstimator},
-                          sets::Option{<:AssetSets})
+                          sets::Option{<:UniverseSets})
         if isa(ze, MatNum_Arr3Num)
             assert_nonempty(ze, :ze)
         end
@@ -533,7 +533,7 @@ EmpiricalPrior
 end
 function FeaturePrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                       ze::Union{<:MatNum_Arr3Num, <:AbstractFeatureMatrixEstimator},
-                      sets::Option{<:AssetSets} = nothing)::FeaturePrior
+                      sets::Option{<:UniverseSets} = nothing)::FeaturePrior
     return FeaturePrior(pe, ze, sets)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
@@ -582,7 +582,7 @@ Every moment is the wrapped estimator's, untouched. The only addition is `Z`, pr
 # Validation
 
   - `dims in (1, 2)`.
-  - If `pe.sets` is not `nothing`, `length(pe.sets.dict[pe.sets.key]) == size(X, 2)`.
+  - If `pe.sets` is not `nothing`, `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
   - `Z` is validated against `X` by [`LowOrderPrior`](@ref).
 
 # Related
@@ -602,8 +602,8 @@ function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims:
         end
     end
     if !isnothing(pe.sets)
-        @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2),
-                  DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
+        @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
+                  DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     end
     pr = prior(pe.pe, X, F; kwargs...)
     Z = feature_matrix(pe.ze, pr, X, F, pe.sets; kwargs...)
