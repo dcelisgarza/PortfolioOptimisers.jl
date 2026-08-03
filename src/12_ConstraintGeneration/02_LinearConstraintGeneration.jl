@@ -1365,9 +1365,68 @@ function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
+    constraint_row_axis(rr) -> String
+
+Name of the universe a constraint row's variables resolve against: `"asset"` when there is no re-basis, `"factor"` when the row is projected through a regression's loadings. Used only to make [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) name the axis the user wrote in.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`constraint_row_term`](@ref)
+"""
+function constraint_row_axis(::Nothing)::String
+    return "asset"
+end
+function constraint_row_axis(::AbstractRegressionResult)::String
+    return "factor"
+end
+"""
+    constraint_row_length(rr, nx::VecStr) -> Int
+
+Length of the assembled constraint row. Without a re-basis this is the size of the universe the names resolve against; with one it is the number of *assets* the loadings project onto, because the projection is applied while the row is assembled and what leaves is an ordinary asset-space row.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`constraint_row_term`](@ref)
+"""
+function constraint_row_length(::Nothing, nx::VecStr)::Int
+    return length(nx)
+end
+function constraint_row_length(rr::AbstractRegressionResult, ::VecStr)::Int
+    return size(rr.M, 1)
+end
+"""
+    constraint_row_term(rr, Ai, c)
+
+Contribution of one matched variable to a constraint row.
+
+Without a re-basis this is the indicator `Ai` scaled by the coefficient `c`. With one it is the corresponding columns of the loadings, summed and scaled — which is the identity
+
+```math
+\\boldsymbol{a}^\\intercal \\boldsymbol{w}_f = \\boldsymbol{a}^\\intercal \\mathbf{M}^\\intercal \\boldsymbol{w}_a = (\\mathbf{M} \\boldsymbol{a})^\\intercal \\boldsymbol{w}_a
+```
+
+applied one term at a time. The columns are **summed** rather than indexed by `findfirst`, so a factor universe carrying a duplicated name contributes every column bearing it, matching how the asset path treats a duplicated asset name.
+
+`rr.M` is used, never `rr.L`: `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation. Risk decomposition wants `L` and is right to; see ADR 0047.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function constraint_row_term(::Nothing, Ai, c)
+    return Ai * c
+end
+function constraint_row_term(rr::AbstractRegressionResult, Ai, c)
+    return vec(sum(view(rr.M, :, Ai); dims = 2)) * c
+end
+"""
     get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                            key::Option{<:AbstractString} = nothing;
-                           datatype::DataType = Float64, strict::Bool = false)
+                           datatype::DataType = Float64, strict::Bool = false,
+                           rr::Option{<:AbstractRegressionResult} = nothing)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
@@ -1376,14 +1435,17 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
 # Arguments
 
   - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed constraint equations.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
+  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.fkey`.
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
+  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. See [`ExposureConstraintEstimator`](@ref) — callers do not pass this directly.
 
 # Details
 
-  - For each constraint, variable names are matched to the asset universe in `sets`.
+  - For each constraint, variable names are matched to the universe stored under `key` in `sets`.
   - Coefficient vectors are assembled for each constraint, with entries corresponding to the order of assets in `sets`.
+  - When `rr` is supplied, each matched term is projected through `rr.M` as it is accumulated, so the assembled row is asset-length and what the function returns is an ordinary asset-space [`LinearConstraint`](@ref).
   - Constraints are separated into equality (`==`) and inequality (`<=`, `>=`) types.
   - The function validates that all constraints reference valid assets or groups, using `@argcheck` for defensive programming.
   - Returns `nothing` if no valid constraints are found after processing.
@@ -1398,10 +1460,12 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`LinearConstraint`](@ref)
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
+  - [`constraint_row_term`](@ref)
 """
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
-                                datatype::DataType = Float64, strict::Bool = false)
+                                datatype::DataType = Float64, strict::Bool = false,
+                                rr::Option{<:AbstractRegressionResult} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -1411,20 +1475,32 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     B_eq = Vector{datatype}(undef, 0)
     k = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[k]
-    At = Vector{datatype}(undef, length(nx))
+    axis = constraint_row_axis(rr)
+    N = constraint_row_length(rr, nx)
+    At = Vector{datatype}(undef, N)
     for lc in lcs
         fill!(At, zero(eltype(At)))
+        matched = false
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = unknown_variable_msg(v, nx, k)
+                msg = unknown_variable_msg(v, nx, k; axis = axis)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
                 continue
             end
-            At += Ai * c
+            matched = true
+            At += constraint_row_term(rr, Ai, c)
         end
         if !any(!iszero, At)
-            msg = empty_row_msg(lc.eqn, nx, k)
+            # Two distinct failures land here once a re-basis is possible: the names missed the
+            # universe (`matched === false`, the pre-existing diagnosis), or they hit it and the
+            # loadings annihilated them. Reporting the first for the second would send a user
+            # hunting for a typo that is not there.
+            msg = if matched && !isnothing(rr)
+                empty_projected_row_msg(lc.eqn, nx, k, N)
+            else
+                empty_row_msg(lc.eqn, nx, k; axis = axis)
+            end
             if strict
                 throw(ArgumentError(msg))
             else
@@ -1449,11 +1525,11 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     ineq = nothing
     eq = nothing
     if ineq_flag
-        A_ineq = transpose(reshape(A_ineq, length(nx), :))
+        A_ineq = transpose(reshape(A_ineq, N, :))
         ineq = PartialLinearConstraint(; A = A_ineq, B = B_ineq)
     end
     if eq_flag
-        A_eq = transpose(reshape(A_eq, length(nx), :))
+        A_eq = transpose(reshape(A_eq, N, :))
         eq = PartialLinearConstraint(; A = A_eq, B = B_eq)
     end
     return if ineq_flag || eq_flag
@@ -1675,10 +1751,12 @@ function linear_constraints(eqn::EqnType, sets::UniverseSets,
                             ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)::Option{<:LinearConstraint}
+                            bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
-    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,
+                                  rr = rr)
 end
 function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorValueAlgorithm},
                             sets::UniverseSets, key::Option{<:AbstractString} = nothing;
@@ -1701,20 +1779,27 @@ This method is a wrapper calling:
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
 
+# The loadings are accepted and dropped
+
+`rr` is accepted so that a caller holding loadings — [`processed_jump_optimiser_attributes`](@ref) does — can pass them uniformly to whatever sits in `lcse`, without inspecting its type first. A bare [`LinearConstraintEstimator`](@ref) **drops** them: the asset frame is the absence of a re-basis, and an estimator that quietly re-based itself because loadings happened to be available would make the space depend on the prior rather than on what the user wrote. A re-basis is asked for by wrapping in an [`ExposureConstraintEstimator`](@ref) and by nothing else.
+
 # Related
 
   - [`linear_constraints`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
 """
 function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)::Option{<:LinearConstraint}
+                            bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
-                            strict::Bool = false, bl_flag::Bool = false)
+                            strict::Bool = false, bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag) for lc in lcs]
+                               bl_flag = bl_flag, rr = rr) for lc in lcs]
 end
 
 export UniverseSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

@@ -595,6 +595,8 @@ const arg_dict = Dict(
                       :cc_B => "`B`: Centrality threshold or reduction measure.",#
                       :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
                       :lce_val => "`val`: Constraint equation(s) to parse.",#
+                      :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
+                      :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
                       :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                       :asets_vals => "`vals`: Group name keys whose partitions are stacked into the feature axis, at least two. One partition alone is one-hot, which makes the distance two-valued for every metric.",#
                       :thr_val => "`val`: Asset-specific threshold value(s).",#
@@ -1483,11 +1485,13 @@ function did_you_mean(name::AbstractString, candidates)
     return isnothing(match) ? "" : " (did you mean `$(match)`?)"
 end
 """
-    unknown_variable_msg(v, nx, key; candidates = nx) -> String
+    unknown_variable_msg(v, nx, key; candidates = nx, axis = "asset") -> String
 
-Build the warning/error text for a constraint or view variable `v` that is absent from the asset universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
+Build the warning/error text for a constraint or view variable `v` that is absent from the universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
 
-`candidates` is the pool searched for the typo suggestion (default: the asset universe `nx`). Callers whose valid namespace is broader than the raw asset universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+`candidates` is the pool searched for the typo suggestion (default: the universe `nx`). Callers whose valid namespace is broader than the raw universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+
+`axis` names the universe the variable was looked up in. It defaults to `"asset"` because that is the axis every constraint resolved against before [`ExposureConstraintEstimator`](@ref); a re-based constraint resolves its names against the *factor* universe and passes `"factor"`, so the message names the axis the user actually wrote in.
 
 Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`group_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
 
@@ -1495,24 +1499,43 @@ Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, ent
 
   - [`did_you_mean`](@ref)
   - [`empty_row_msg`](@ref)
+  - [`empty_projected_row_msg`](@ref)
 """
-function unknown_variable_msg(v, nx, key; candidates = nx)
-    return "variable `$(v)` not in asset universe ($(length(nx)) assets under key `$(key)`); term dropped" *
+function unknown_variable_msg(v, nx, key; candidates = nx, axis::AbstractString = "asset")
+    return "variable `$(v)` not in $(axis) universe ($(length(nx)) $(axis)s under key `$(key)`); term dropped" *
            did_you_mean(string(v), candidates)
 end
 """
-    empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint") -> String
+    empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
+                  axis::AbstractString = "asset") -> String
 
-Build the warning/error text for a parsed equation `eqn` whose every term missed the asset universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views.
+Build the warning/error text for a parsed equation `eqn` whose every term missed the universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views; `axis` names the universe, as in [`unknown_variable_msg`](@ref).
 
 Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
 
 # Related
 
   - [`unknown_variable_msg`](@ref)
+  - [`empty_projected_row_msg`](@ref)
 """
-function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint")
-    return "$(noun) `$(eqn)` matched no assets in the universe ($(length(nx)) assets under key `$(key)`); row dropped"
+function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint",
+                       axis::AbstractString = "asset")
+    return "$(noun) `$(eqn)` matched no $(axis)s in the universe ($(length(nx)) $(axis)s under key `$(key)`); row dropped"
+end
+"""
+    empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint") -> String
+
+Build the warning/error text for a re-based equation `eqn` whose terms *did* resolve against the factor universe `nf` (stored under `key`), but whose projection through the loadings is an all-zero row over `n` assets.
+
+This diagnosis exists only under a re-basis, and it is a different failure from [`empty_row_msg`](@ref): there the names missed the universe, here they hit it and the basis annihilated them. Reporting the first for the second would send a user hunting for a typo that is not there — the real cause is a factor no asset loads on.
+
+# Related
+
+  - [`empty_row_msg`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint")
+    return "$(noun) `$(eqn)` resolved against the factor universe ($(length(nf)) factors under key `$(key)`) but projected to an all-zero row over $(n) assets: every matched factor has zero loadings; row dropped"
 end
 """
     missing_group_assets_msg(group, missing_assets, nx, key) -> String

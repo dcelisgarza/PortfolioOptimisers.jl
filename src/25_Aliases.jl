@@ -981,6 +981,12 @@ Alias for [`LinearConstraintEstimator`](@ref).
 """
 const LCE = LinearConstraintEstimator
 """
+    ECE
+
+Alias for [`ExposureConstraintEstimator`](@ref).
+"""
+const ECE = ExposureConstraintEstimator
+"""
     WBE
 
 Alias for [`WeightBoundsEstimator`](@ref).
@@ -1048,5 +1054,5 @@ export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD
        OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1, G2, GerberCov, SBCov,
        SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
        DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
-       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS, LCE, WBE, RkSet, HRkSet,
+       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS, LCE, ECE, WBE, RkSet, HRkSet,
        JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxSR, L2Reg, LpReg

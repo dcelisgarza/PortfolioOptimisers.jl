@@ -84,6 +84,7 @@ did_you_mean
 unknown_variable_msg
 missing_group_assets_msg
 empty_row_msg
+empty_projected_row_msg
 failed_solve_msg
 first_error_line
 EquationLimits

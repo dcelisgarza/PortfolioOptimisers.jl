@@ -220,6 +220,7 @@ TTS
 
 ```@docs
 LCE
+ECE
 WBE
 L2Reg
 LpReg
