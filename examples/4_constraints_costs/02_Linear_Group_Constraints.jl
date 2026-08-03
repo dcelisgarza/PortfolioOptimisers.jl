@@ -158,6 +158,11 @@ MIP). Passing a threshold to a continuous-only solver returns a failed `retcode`
 silent wrong answer. See [Budget Constraints](01_Budget_Constraints.md) for the MIP solver
 setup.
 
+Every constraint on this page is written in *asset* names. A mandate written in **factor** names —
+"at most 10% momentum", "market-neutral to value" — is the same linear form in a different basis,
+and is covered in
+[Factor Exposure Constraints](10_Factor_Exposure_Constraints.md).
+
 ## 7. Comparing the constraints
 
 Same prior, same objective — each constraint reshapes the book differently. The baseline's

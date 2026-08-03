@@ -176,3 +176,66 @@ detectable but not prevented.
 `xkey`-prefixed groups are sliced, `uxkey`-prefixed ones recomputed from them. Factors are never
 sliced, so on the factor side the identical rules buy only length validation and one shared mental
 model. That was judged worth the validation code the view side will never exercise.
+
+## Amendment (2026-08-03): what the implementation found
+
+Five statements above were written from the design and turned out to be too strong, or to have
+missed a case. Each is corrected here; the decision itself stands.
+
+### Near Optimal Centering does *not* compose for free by default
+
+"Near Optimal Centering, time-dependent schedules, and every JuMP optimiser sharing
+`JuMPOptimiser` get factor exposure constraints without knowing they exist" is true of the
+projection — nothing downstream needs a factor concept — but it overstated what NOC does with a
+linear constraint.
+[`UnconstrainedNearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl), which
+is the **default**, builds its centering model with weight bounds, budget, risk and return only. It
+never calls `set_linear_weight_constraints!`, so `lcsr` is dropped from the model whose solution is
+returned. This is by design, is long-standing, and applies to an asset-space linear constraint
+exactly as much as to a re-based one — the re-basis changed nothing here. But it means a factor
+mandate written under a default `NearOptimalCentering` does not hold in the reported weights, so
+the documentation shows `ConstrainedNearOptimalCentering` wherever NOC and a mandate appear
+together.
+
+### The axis-order check runs only where both sides exist
+
+"`processed_jump_optimiser_attributes` throws when `sets.dict[fkey] != rd.nf`" describes the check
+as unconditional. As written that throws a `KeyError` on the common case: every factor-prior run
+that declares no factor axis has an `rd.nf` and no `sets.dict[fkey]`, and the factor axis is
+*optional* by the decision two paragraphs above it.
+[`assert_universe_axis_order`](../../src/20_Optimisation/10_JuMPOptimiser.jl) therefore skips an
+axis when **either** side is absent, and checks the pair only when both are declared. It also runs
+*before* the prior is fitted, so a misaligned universe is reported without paying for a regression
+first.
+
+### A re-basis creates a third diagnosis
+
+The design recognised two failure modes for a row — an unknown name, and an empty row — and both
+already had messages. Projection adds a third that neither can express: **every name resolved, and
+the loadings annihilated the row** (a factor no asset loads on, or a long/short combination whose
+loadings cancel). The all-zero coefficient check cannot tell this apart from "no name matched",
+because both leave a zero row. Assembly therefore carries a `matched` flag, and
+`empty_projected_row_msg` reports the case with the remedy it actually needs — inspect the
+loadings, not the spelling.
+
+### The `lcse` type bound was not the whole enforcement
+
+"`ExposureConstraintEstimator`'s bound is exactly what `lcse` accepts" is a statement about types,
+and it holds. It does not follow that widening `lcse` was enough. The `sets`-required guard in
+`JuMPOptimiser`'s inner constructor is a **hand-written `isa` chain**, not derived from the field
+bounds, so widening the bound alone left `JuMPOptimiser(; lcse = ece)` with no `sets` constructing
+happily and failing later. The decorator is now named there **unconditionally** — including when it
+wraps a *precomputed* `LinearConstraint`, which needs no names but still needs `sets`, because
+`constraint_space_basis` reads `sets.fkey` before it looks at what is wrapped.
+
+### The pipeline step's axis comes from the returns, by construction
+
+The consequence "a pipeline step pins its projection" stands, and is documented on the estimator
+and on `run_step`. Two details were missing. First, the step was **unreachable as specified**:
+`pipeline_asset_sets` declared only the asset axis, so every `FactorSpace` row would have died on
+the missing-`fkey` error. It now declares every axis the returns carry, taking the factor names
+from `rd.nf` — which makes the axis and the loadings agree *by construction*, and makes
+`FactorSpace`'s missing-axis error unreachable from a pipeline. Second, the step declares
+`pipe_reads = (:returns, :prior)`, and `Pipeline`'s constructor checks declared reads, so a
+pipeline carrying the step but no prior step is rejected at **construction** rather than at run
+time.
