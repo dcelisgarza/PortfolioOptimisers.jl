@@ -157,6 +157,19 @@ end
     a_pooled = prior(ep_asset, rd)
     f_pooled = prior(ep_factor, rd.F)
 
+    # `FactorPrior` — the plain lift. `Z` is its only drop, and dropping it from the
+    # asset slot is a *relocation* rather than a destruction: the factor prior is
+    # forwarded whole, so its factors × features matrix is still reachable at
+    # `pr.fpr.Z`, which is where a factor-axis feature matrix belongs.
+    Zfac = rand(StableRNG(24680), size(rd.F, 2), 3)
+    f_withZ_pe = FeaturePrior(; pe = ep_factor, ze = Zfac)
+    fp_lift = prior(FactorPrior(; pe = f_withZ_pe), rd)
+    @test isnothing(fp_lift.Z)
+    @test fp_lift.fpr.Z == Zfac
+    @test fp_lift.w == f_pooled.w
+    @test fp_lift.ens == f_pooled.ens
+    @test !isnothing(fp_lift.chol)           # rebuilt on the asset axis, not forwarded
+
     # `BayesianBlackLittermanPrior` — forwards the bundle; `chol` is the only drop.
     bbl = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
                                             sets = xfsets, views = f_views), rd)
@@ -177,6 +190,10 @@ end
     @test fbl.fpr.w == f_pooled.w
     @test fbl.fpr.mu != f_pooled.mu          # the views landed on the factor block
     @test isnothing(fbl.fpr.chol)            # superseded by the posterior covariance
+    fbl_withZ = prior(FactorBlackLittermanPrior(; pe = f_withZ_pe, sets = xfsets,
+                                                views = f_views), rd)
+    @test isnothing(fbl_withZ.Z)             # same relocation as the plain lift
+    @test fbl_withZ.fpr.Z == Zfac
 
     # `AugmentedBlackLittermanPrior` — symmetric, and the two weightings stay
     # distinguishable: the asset slot is `a_prior`'s, the factor block is `f_prior`.

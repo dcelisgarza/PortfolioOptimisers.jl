@@ -21,6 +21,16 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what this estimator forwards
+
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
+
+  - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * cholesky(fpr.sigma).L` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
+  - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
+  - No `Z` is carried: the only wrapped prior is fit on factors, so its feature matrix would be factors × features and would not describe the asset axis. The drop is a *relocation* rather than a destruction — the factor prior is forwarded whole, so a feature matrix it carried is still reachable at `pr.fpr.Z`, which is where a factor-axis one belongs. For an asset-axis one, wrap this estimator from the *outside*: `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads the loadings back off the result.
+
 # Examples
 
 ```jldoctest
