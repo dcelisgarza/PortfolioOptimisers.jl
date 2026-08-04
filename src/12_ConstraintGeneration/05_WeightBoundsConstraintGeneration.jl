@@ -140,8 +140,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     WeightBoundsEstimator(;
-        lb::Option{<:EstValType} = nothing,
-        ub::Option{<:EstValType} = nothing,
+        lb::Option{<:EstValType} = 0.0,
+        ub::Option{<:EstValType} = 1.0,
         dlb::Option{<:Number} = nothing,
         dub::Option{<:Number} = nothing
     ) -> WeightBoundsEstimator
@@ -226,8 +226,8 @@ WeightBoundsEstimator
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
-function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
-                               ub::Option{<:EstValType} = nothing,
+function WeightBoundsEstimator(; lb::Option{<:EstValType} = 0.0,
+                               ub::Option{<:EstValType} = 1.0,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)

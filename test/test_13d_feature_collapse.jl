@@ -313,13 +313,19 @@ end
         end
     end
 
-    @testset "A square carrier through a fold keeps the real assets as its features" begin
+    @testset "A square carrier through a fold collapses onto the synthetic universe" begin
         #=
-        Only one weight vector is in scope inside a fold, so the second contraction of the
-        square case is unavailable -- and doing it one-sidedly with that single vector
-        would leave one number per synthetic asset, a feature space in which every asset is
-        trivially identical. The fold path therefore leaves the feature axis alone, and the
-        collapsed matrix reads as the synthetic asset's weighted-average neighbourhood.
+        This testset used to pin the opposite: a square carrier kept the *real* assets as
+        its feature axis through a fold, because only one weight vector is in scope inside
+        one, and it used to be the fold that collapsed. It is not any more -- the collapse
+        happens once at the assembly seam, where every sub-portfolio's weights are in scope
+        simultaneously, so the second contraction is available and the outer feature axis is
+        the synthetic universe on both paths.
+
+        `Stacking` is the milder half of the defect the recompute closes: it never dropped
+        the matrix, it just switched its outer feature axis between the synthetic and the
+        real universe depending on whether `cv` was set. That is the assertion below, and
+        it is a deliberate behaviour change from `T x N x nassets`.
         =#
         cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
         ro = _test_RecordingDistance(FeatureDistance())
@@ -331,48 +337,230 @@ end
                       opto = HierarchicalRiskParity(; opt = hopt(ro)), cv = cvopt, ex = seq)
         res = optimise(st, rd_sq)
         @test isapprox(sum(res.w), 1)
-        @test size(ro.seen[1]) == (T, 2, N)
+        Zo = ro.seen[1]
+        @test size(Zo) == (T, 2, 2)
+        @test size(Zo, 3) != N
+        # Two-sided against a symmetric source, so every observation is symmetric, and the
+        # feature axis being the synthetic asset axis is what keeps `features_are_assets`
+        # true for a `Stacking` nested inside something that collapses again.
+        @test all(t -> Zo[t, :, :] ≈ transpose(Zo[t, :, :]), 1:T)
+        @test all(isfinite, Zo)
 
         #=
-        `NestedClustered` is the one combination this cannot serve: its folds see
-        cluster-sliced returns, so a square carrier comes back with a *different* feature
-        axis per cluster and there is nothing to stack them against. The matrix is dropped,
-        and an outer estimator asking for features gets the same error it would get had
-        none been supplied -- never a matrix assembled from mismatched axes.
+        `NestedClustered` is the intersection that used to be dropped outright: its folds
+        see cluster-sliced returns, so a fold-side collapse came back with a *different*
+        feature axis per cluster and there was nothing to stack them against. The seam has
+        the full universe legitimately in scope, so it never faces that mismatch.
         =#
+        rn = _test_RecordingDistance(FeatureDistance())
         nco = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                               opti = plain_hrp(),
-                              opto = HierarchicalRiskParity(;
-                                                            opt = hopt(FeatureDistance())),
-                              cv = cvopt, ex = seq)
+                              opto = HierarchicalRiskParity(; opt = hopt(rn)), cv = cvopt,
+                              ex = seq)
+        res = optimise(nco, rd_sq)
+        @test isapprox(sum(res.w), 1)
+        Zn = rn.seen[1]
+        @test ndims(Zn) == 3
+        @test size(Zn, 1) == T
+        @test size(Zn, 2) == size(Zn, 3)
+        @test size(Zn, 3) != N
+        @test all(t -> Zn[t, :, :] ≈ transpose(Zn[t, :, :]), 1:T)
+        @test all(isfinite, Zn)
+
+        # A 3-D square source reaches the same place, and gets genuine per-observation
+        # variation inside each fold on top of the per-fold weight variation.
+        Z3sq = Array{Float64}(undef, T, N, N)
+        for t in 1:T
+            Z3sq[t, :, :] = Zsq .* (1 + t / T)
+        end
+        rd_3dsq = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, nz = nx,
+                                Z = Z3sq)
+        r3 = _test_RecordingDistance(FeatureDistance())
+        nco3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
+                               opti = plain_hrp(),
+                               opto = HierarchicalRiskParity(; opt = hopt(r3)), cv = cvopt,
+                               ex = seq)
+        optimise(nco3, rd_3dsq)
+        Z3o = r3.seen[1]
+        @test size(Z3o, 1) == T
+        @test size(Z3o, 2) == size(Z3o, 3)
+        @test length(unique(eachrow(reshape(Z3o, T, :)))) == T
+    end
+
+    @testset "cv and non-cv agree: the seam makes the same collapse call" begin
+        #=
+        The headline property. `cv` is execution control (ADR 0030), so toggling it must
+        not change the data the outer problem is measured on. The two paths now share one
+        implementation, and this asserts they agree: for every shape, and for both the
+        full-universe (`Stacking`) and cluster-sliced (`NestedClustered`) layouts, each
+        fold's block of the assembled matrix equals what `prepare_outer_rd` -- the non-`cv`
+        path -- returns when handed that same fold's weights and rows.
+
+        `≈`, not bit-for-bit: the seam contracts the whole universe at once where the
+        non-`cv` path is called per fold, and gemm reassociation makes the last bits differ.
+        =#
+        cv = KFold(; n = 3)
+        test_idx = PO.split(cv, rd_r).test_idx
+        cls = [[1, 2, 3, 4], [5, 6, 7, 8]]
+        herc() = HierarchicalEqualRiskContribution(;
+                                                   opt = HierarchicalOptimiser(; slv = slv))
+        #=
+        One prediction vector, reused across all six combinations below. That is itself an
+        assertion: `rebuild_returns_result` stacks into *copies* of the first prediction's
+        buffers, so it leaves `predictions` untouched and is safe to call repeatedly. It
+        used to append into `predictions[1].mrd.X` itself, which silently doubled the
+        stacked height on a second call.
+        =#
+        preds_st = [PO.cross_val_predict(o, rd_r, cv; ex = seq)
+                    for o in (plain_hrp(), herc())]
+        preds_nc = [PO.cross_val_predict(plain_hrp(), rd_r, cv; cols = cl, ex = seq)
+                    for cl in cls]
+        nobs_st = [length(p.mrd.X) for p in preds_st]
+        for (rd, sq) in ((rd_r, false), (rd_sq, true), (rd_3d, false))
+            for (predictions, clsi) in ((preds_st, nothing), (preds_nc, cls))
+                Ws = [PO.fold_weight_matrix(predictions, clsi, f, N)
+                      for f in eachindex(test_idx)]
+                rdo = PO.rebuild_returns_result(rd, predictions, clsi)
+                @test size(rdo.Z, 1) == size(rdo.X, 1) == T
+                @test size(rdo.Z, 2) == length(rdo.nx)
+                @test PO.features_are_assets(rdo.nz, rdo.nx) == sq
+                r = 0
+                for (f, rows) in enumerate(test_idx)
+                    _, _, _, _, nz_e, Z_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rd,
+                                                                                    rows,
+                                                                                    :),
+                                                                   Ws[f])
+                    blk = rdo.Z[(r + 1):(r + length(rows)), :, :]
+                    # A static source has no observation axis of its own, so the non-`cv`
+                    # result is the fold's constant; a time-varying one already carries one.
+                    expected = if ndims(Z_e) == 3
+                        Z_e
+                    else
+                        permutedims(repeat(Z_e, 1, 1, length(rows)), (3, 1, 2))
+                    end
+                    @test blk ≈ expected
+                    @test rdo.nz == nz_e
+                    r += length(rows)
+                end
+            end
+        end
+        # The predictions came through all six calls unchanged.
+        @test [length(p.mrd.X) for p in preds_st] == nobs_st
+    end
+
+    @testset "Fold rows are selected by the clock, not by a cumulative count" begin
+        #=
+        `IndexWalkForward`'s first test block does not start at row 1 -- its warmup window
+        comes first -- so a seam that counted observations instead of locating them would
+        pair every fold with the wrong slice of a time-varying feature matrix. `Z3[t, i, j]`
+        names its own position, so a mis-indexed observation axis shows up in the values.
+        =#
+        cvwf = IndexWalkForward(60, 63)
+        test_idx = PO.split(cvwf, rd_3d).test_idx
+        @test first(first(test_idx)) != 1
+        herc() = HierarchicalEqualRiskContribution(;
+                                                   opt = HierarchicalOptimiser(; slv = slv))
+        predictions = [PO.cross_val_predict(o, rd_3d, cvwf; ex = seq)
+                       for o in (plain_hrp(), herc())]
+        Ws = [PO.fold_weight_matrix(predictions, nothing, f, N)
+              for f in eachindex(test_idx)]
+        rdo = PO.rebuild_returns_result(rd_3d, predictions, nothing)
+        # The folds cover fewer rows than the clock has, which is the point: a cumulative
+        # count would have started at row 1 and run out before the last fold.
+        @test size(rdo.Z, 1) == sum(length, test_idx) < T
+        r = 0
+        for (f, rows) in enumerate(test_idx)
+            @test rdo.Z[(r + 1):(r + length(rows)), :, :] ≈
+                  PO.collapse_feature_matrix(Z3[rows, :, :], false, Ws[f])
+            r += length(rows)
+        end
+    end
+
+    @testset "A time-varying feature matrix needs a clock to survive the folds" begin
+        #=
+        The fold's rows are recovered from its timestamps rather than stored on the
+        prediction -- `port_opt_view` slices `ts` with the very `test_idx` the fold was
+        built from, so a fold's `ts` *is* its slice of the clock. Without one there is
+        nothing to match, and a time-varying feature matrix cannot say which observation
+        each fold's observations are. That is refused, loudly and by name.
+        =#
+        cv = KFold(; n = 3)
+        herc() = HierarchicalEqualRiskContribution(;
+                                                   opt = HierarchicalOptimiser(; slv = slv))
+        rd_3d_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nz = nf, Z = Z3)
+        preds = [PO.cross_val_predict(o, rd_3d_nots, cv; ex = seq)
+                 for o in (plain_hrp(), herc())]
         e = try
-            optimise(nco, rd_sq)
+            PO.rebuild_returns_result(rd_3d_nots, preds, nothing)
         catch err
             err
         end
         @test isa(e, PO.IsNothingError)
-        @test occursin("neither the returns result nor the prior result", e.msg)
+        @test occursin("ts", e.msg)
+
+        # The requirement is scoped to the shape that needs it: a static feature matrix has
+        # no observation axis to align, so it runs on fold sizes alone and never asks.
+        rd_r_nots = ReturnsResult(; nx = nx, X = X, nf = nf, F = F,
+                                  nz = ["z$i" for i in 1:K], Z = Zr)
+        preds_r = [PO.cross_val_predict(o, rd_r_nots, cv; ex = seq)
+                   for o in (plain_hrp(), herc())]
+        @test size(PO.rebuild_returns_result(rd_r_nots, preds_r, nothing).Z) == (T, 2, K)
+
+        # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
+        # now refuses a repeated timestamp outright.
+        dup_ts = copy(ts)
+        dup_ts[5] = dup_ts[4]
+        @test_throws ArgumentError ReturnsResult(; nx = nx, X = X, ts = dup_ts)
     end
 
-    @testset "The transport carrier keeps its shapes honest" begin
-        # `PredictionReturnsResult` never has its feature matrix read -- it only has to
-        # survive the stack -- so it validates the pair rule, the feature axis and the
-        # observation axis, and nothing else.
+    @testset "The seam asserts the fold alignment it has always assumed" begin
+        #=
+        `reshape(X, :, N)` is only meaningful if every sub-portfolio's fold `f` covers the
+        same observations, and the per-fold weight matrix is only well defined if it does.
+        The invariant predates this map; nothing ever stated it. It matters most on the
+        combinatorial path, where each sub-portfolio's `scorer` picks a path independently.
+        =#
+        p3 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 3); ex = seq)
+        p4 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 4); ex = seq)
+        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [p3, p4], nothing)
+
+        # Same number of folds, different rows in them.
+        pw = PO.cross_val_predict(plain_hrp(), rd_r, IndexWalkForward(60, 63); ex = seq)
+        pk = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = length(pw.pred)); ex = seq)
+        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [pw, pk], nothing)
+    end
+
+    @testset "The transport carrier is gone" begin
+        #=
+        `PredictionReturnsResult` used to be the fourth carrier of a feature matrix, and
+        the only one nothing ever read from: the fold collapsed, the folds stacked, and the
+        seam assembled. Under the recompute that journey has no destination, and keeping it
+        would have meant keeping the sole square special case in the collapse -- the one
+        site where square structurally cannot be treated like non-square, since a single
+        weight vector cannot index both axes.
+
+        This testset used to pin that carrier's validation. It now pins its absence.
+        =#
         Xf = collect(1.0:5.0)
         Zf = randn(StableRNG(2), 5, 2)
-        rdp = PredictionReturnsResult(; nx = ["_1"], X = Xf, nz = ["a", "b"], Z = Zf)
-        @test rdp.Z === Zf
-        @test rdp.nz == ["a", "b"]
-        @test isnothing(PredictionReturnsResult(; nx = ["_1"], X = Xf).Z)
-        @test_throws PO.IsNothingError PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                               nz = ["a"])
-        @test_throws DimensionMismatch PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                               nz = ["a"], Z = Zf)
-        @test_throws DimensionMismatch PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                               nz = ["a", "b"],
-                                                               Z = Zf[1:4, :])
-        # The vector shape needs one matrix per portfolio-returns entry.
-        @test_throws DimensionMismatch PredictionReturnsResult(; nx = ["_1"], X = Xf,
-                                                               nz = ["a", "b"], Z = [Zf])
+        @test !hasproperty(PredictionReturnsResult(; nx = ["_1"], X = Xf), :Z)
+        @test !hasproperty(PredictionReturnsResult(; nx = ["_1"], X = Xf), :nz)
+        @test :Z ∉ fieldnames(PredictionReturnsResult)
+        @test :nz ∉ fieldnames(PredictionReturnsResult)
+        @test_throws MethodError PredictionReturnsResult(; nx = ["_1"], X = Xf,
+                                                         nz = ["a", "b"], Z = Zf)
+        # Nothing is lost: the seam reaches every fold's weights and rows through `pred`.
+        pred = PO.cross_val_predict(plain_hrp(), rd_3d, KFold(; n = 3); ex = seq)
+        @test length(pred.pred) == 3
+        @test all(p -> isa(p.res.w, AbstractVector{<:Real}), pred.pred)
+        @test all(p -> !isnothing(p.rd.ts), pred.pred)
+        @test PO.fold_row_indices(rd_3d, pred.pred) ==
+              PO.split(KFold(; n = 3), rd_3d).test_idx
+        # A static carrier has no observation axis to locate, so the recovery is a no-op
+        # there -- which is why that shape never asks for a clock at all.
+        pred_r = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 3); ex = seq)
+        @test PO.fold_row_indices(rd_r, pred_r.pred) == fill(Colon(), 3)
+        @test PO.fold_feature_anchors(rd_r, pred_r.pred) ==
+              [length(p.rd.X) for p in pred_r.pred]
     end
 end

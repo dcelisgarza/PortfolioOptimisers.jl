@@ -451,6 +451,12 @@ cluster-sliced returns, so each cluster's feature axis is its own asset subset a
 stack them against. The matrix is dropped and an outer estimator asking for features gets the error it
 would get had none been supplied — never a matrix assembled from mismatched axes.
 
+> **Superseded in part by the fifth amendment below.** The cross-validated collapse no longer happens
+> inside the fold: it moved to the assembly seam, where every synthetic asset's weights are in scope
+> at once. So the fold-path paragraphs above describe history — the one-sided square collapse, the
+> fourth carrier, and this drop are all gone — while the fold-less path and the intensive-collapse
+> argument are unchanged.
+
 `prepare_outer_rd` returning `nz`/`Z` is **breaking on a documented overload point**, same reasoning as
 `x_src` and the producer return above. It returns them **before** the returns buffer `X`, not after,
 and that ordering is the whole point: Julia's destructuring discards trailing values without
@@ -599,7 +605,7 @@ Entries apply in order and every write is a pure overwrite, so **last wins**.
   default `z_src = :data` carrier, so a grammar landing on the producer alone would be reachable from
   one carrier and not the other.
 
-### Consequences
+### Consequences of the changes
 
 - **One type now carries two contracts**, and the equal-row-norm identity holds on only one of them.
   Accepted, and chosen over a fifth producer, because the grammar strictly *subsumes* the key list:
@@ -632,3 +638,92 @@ Entries apply in order and every write is a pure overwrite, so **last wins**.
 
 - Every `UniverseSets` doctest gains exactly one line and nothing re-indents: `zkey` is four
   characters and `uxkey`/`ufkey` already set the right-alignment width.
+
+## Amendment (2026-08-04): the cross-validated collapse moves to the assembly seam
+
+The second amendment recorded two things it treated as facts of life: that inside a fold there is only
+one weight vector, so a square feature matrix keeps the real assets as its feature axis; and that one
+combination — `NestedClustered` **with** cross-validation **and** a square matrix — drops the matrix
+outright. Issue [#194](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/194) asked whether
+that drop should be closed, and answered **yes — but the criterion that closes it is *path-consistency*,
+not "features must survive folds"**.
+
+The deciding fact is not that a matrix is lost. It is that **`cv` is execution control** (ADR 0030),
+and toggling it silently changed the data the outer problem saw:
+
+| | non-`cv` (`prepare_outer_rd`) | `cv` (`rebuild_returns_result`) |
+| --- | --- | --- |
+| `Stacking`, square `Z` | `N × N`, `nz` = synthetic names, two-sided | `T × N × nassets`, `nz` = **real** assets, one-sided |
+| `NestedClustered`, square `Z` | `k × k`, `nz` = synthetic names, two-sided | **dropped** |
+
+Same carrier, same shape, same producer, two outer semantics selected by an execution knob. So the
+drop was never the whole defect — `Stacking` had the same defect in a milder form, and the second
+amendment's "one combination" undercounted it.
+
+**The collapse moves out of the fold and into the assembly seam.** `rebuild_returns_result` now makes
+the *same* `collapse_feature_matrix(rd.Z, sq, W_f)` call `prepare_outer_rd` makes, once per fold, from
+the original **unsliced** `rd.Z` — with `sq` from `features_are_assets` flowing through unchanged and
+**no square branch**, since square indexes both trailing axes precisely because they are the same axis.
+`W_f` is the `assets × sub-portfolios` weight matrix, zero-padded onto `cls[i]` for `NestedClustered`
+and used directly for `Stacking`; the padding invents nothing, because `cls` partitions the universe.
+The inner solves are untouched — each still sees its own cluster-sliced matrix, so the second
+amendment's "measured on the subproblem's own neighbourhood structure" survives intact one level down.
+
+Consequences worth stating.
+
+- **The fourth carrier is deleted.** `nz`/`Z` leave `PredictionReturnsResult`, along with
+  `fold_feature_matrix`'s vector arity, `mapreduce_FeatMtx`, and the `Z` computation in both
+  `reconstruct_rd` arities. The argument is not "unused" but **"it is the one site where square
+  cannot be treated like non-square"** — structurally, not by choice, since one weight vector cannot
+  index both axes. Keeping the carrier meant keeping the sole square special case in the collapse.
+  The third amendment's finding that it was write-only for a second, independent reason stands, and
+  is now moot: there is nothing left to write.
+
+- **Re-expanding each cluster's collapsed vector onto the full asset axis is dead by arithmetic**, not
+  by the zero-row convention. `cls` is a disjoint partition, so cluster *i*'s re-expanded row is
+  supported only on `cls[i]`; disjoint supports ⇒ every off-diagonal inner product is exactly `0` ⇒
+  under `AngularDist` **every pair of synthetic assets sits at exactly `0.5`**. A constant distance
+  matrix carries no information at all — this ADR's `P·Pᵀ - I` degeneracy arriving one level up, and
+  worse, since there it was two distinct values and here it is one.
+
+- **The fold's rows are recovered, not stored.** A time-varying `rd.Z` must be row-sliced per fold,
+  and cumulative counts cannot stand in: `IndexWalkForward` and `KFold` test blocks do not start at
+  row 1. Rather than add fold provenance to `PredictionResult`, the rows are recovered from the fold's
+  **timestamps** — `port_opt_view` slices `ts` with the very `test_idx` the fold was built from, so a
+  fold's `ts` *is* its slice of the clock, and `feature_row_indices` (already the price-level mechanism
+  for exactly this) matches it back. Recovering beats storing on the combinatorial path in particular,
+  where `sort_predictions!` assembles a path's folds in split order rather than chronologically: the
+  timestamps carry whatever order actually happened, while re-deriving the split would have to
+  reproduce it.
+
+- **`ts` therefore *keys* the observation axis, and `ReturnsResult` now requires `allunique(ts)`.**
+  A repeated timestamp resolves to its first occurrence and would pair an asset with another period's
+  features. This is a **breaking** validation change, and library-wide rather than local to this seam,
+  because the axis either is uniquely keyed or it is not. The clock requirement itself stays narrow:
+  only a *time-varying* matrix needs rows at all, so a static one runs on fold sizes alone and a
+  missing `ts` is refused only where it is actually load-bearing.
+
+- **Two invariants the seam had always assumed are now asserted.** That every sub-portfolio's fold `f`
+  covers the same observations — `reshape(X, :, N)` has depended on it since before this map, and
+  `W_f` is only well defined if it holds; it matters most on the combinatorial path, where each
+  sub-portfolio's `scorer` picks a path independently. And that the stacked rows really are the fold
+  rows. Neither is introduced here; they are made visible.
+
+- **`rebuild_returns_result` stacks into copies.** It used to `append!` into `predictions[1].mrd`'s own
+  buffers, mutating the predictions and silently doubling the stacked height on a second call. Found
+  by the row-count assertion above, and fixed at the source rather than worked around.
+
+- **`cls` is a positional third argument, deliberately.** A keyword with a full-universe default would
+  let a stale two-argument call keep working — correct for `Stacking`, and for `NestedClustered`
+  silently writing every cluster's weights to the wrong rows, which by the arithmetic above produces
+  not an error but a *plausible-looking* matrix. Same reasoning as `prepare_outer_rd` returning
+  `nz`/`Z` *before* `X`: the break has to be arranged to be loud, and `Stacking`'s explicit `nothing`
+  reads as a statement rather than an omission.
+
+Two candidates #194 weighed and rejected, recorded because their bases were real. **Refusing the
+combination at construction** is structurally impossible — `NestedClustered` construction never sees
+`rd`, and squareness is `nz == nx`, knowable only once data arrives. **Accepting the drop** rested on a
+verified fact: `z_src = :prior` on the outer optimiser refits `PhylogenyFeatures` on the synthetic
+returns and yields a genuine `k × k` needing no carrier, so the only thing actually lost was the
+*exogenous* square data carrier. That narrowness is why it was a fair candidate — but it answers "is
+anything unreachable", not "does an execution knob change the data", and the latter is the criterion.

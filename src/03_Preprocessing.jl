@@ -315,7 +315,9 @@ end
 
 Recover the positional row indices of a time-varying feature matrix from a timestamp window.
 
-A feature matrix is a plain array, so at price level its observation axis is parallel to `TimeSeries.timestamp(X)` positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows `Z` must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing `Z` positionally from there would silently pair each asset with another period's features.
+A feature matrix is a plain array, so its observation axis is parallel to the carrier's clock positionally rather than aligned by timestamp. Whenever a routine selects rows of `X` by timestamp, the surviving timestamps are matched back into the original clock to recover the rows `Z` must keep. A surviving timestamp absent from that clock throws: it means the row bookkeeping has been broken (a synthesised timestamp, or an outer join that introduced a row `X` never had), and slicing `Z` positionally from there would silently pair each asset with another period's features.
+
+Two sites use it. At **price level** the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. At the **cross-validation assembly seam** the clock is `ReturnsResult.ts` and the selection is a fold: [`fold_row_indices`](@ref) recovers a fold's rows from the timestamps its view of the returns already carries, which is why `ts` must be unique — it *keys* the observation axis rather than merely labelling it.
 
 The static and absent shapes have no observation axis, so they return `Colon` and cost nothing.
 
@@ -334,6 +336,7 @@ The static and absent shapes have no observation axis, so they return `Colon` an
   - [`feature_matrix_view`](@ref)
   - [`PricesResult`](@ref)
   - [`prices_to_returns`](@ref)
+  - [`fold_row_indices`](@ref)
 """
 function feature_row_indices(::Nothing, ::Any, ::Any)
     return Colon()
@@ -606,7 +609,7 @@ Keywords correspond to the struct's fields.
   - If `nb` or `B` is not `nothing` and `B` is a matrix: `!isempty(nb)`, `!isempty(B)`, and `length(nb) == size(B, 2)`.
   - If `nb` or `B` is not `nothing` and `B` is a vector: `length(nb) == 1`.
   - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
-  - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `ts` is not `nothing`, `!isempty(ts)`, `allunique(ts)`, and `length(ts) == size(X, 1)`. Uniqueness is required because `ts` *keys* the observation axis rather than merely labelling it: [`feature_row_indices`](@ref) recovers a subset's rows by matching its surviving timestamps back into this clock, and a repeated timestamp would resolve to the first occurrence and pair an asset with another period's features.
   - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
   - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
@@ -714,6 +717,13 @@ ReturnsResult
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
             @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
+            # `ts` is an *index* into the observation axis, not merely a label on it: a
+            # subset's surviving timestamps are matched back into it to recover the rows a
+            # time-varying feature matrix must keep (see `feature_row_indices`). A repeated
+            # timestamp makes that recovery pick the first occurrence and silently pair an
+            # asset with another period's features, so the axis must be uniquely keyed.
+            @argcheck(allunique(ts),
+                      ArgumentError("timestamps (ts) must be unique — they key the observation axis, and a repeated timestamp makes a row unrecoverable by time. Got $(length(ts) - length(unique(ts))) duplicate(s), the first being $(ts[findfirst(i -> ts[i] in view(ts, 1:(i - 1)), eachindex(ts))])"))
             if !isnothing(X)
                 @argcheck(length(ts) == size(X, 1),
                           DimensionMismatch("timestamps (ts) must have one entry per asset-returns (X) observation (row), got length(ts) = $(length(ts)) and size(X, 1) = $(size(X, 1))"))

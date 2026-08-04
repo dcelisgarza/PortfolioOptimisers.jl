@@ -22,13 +22,11 @@ NonOptimisationCrossValidationResult
 NonOptimisationSequentialCrossValidationResult
 NonOptimisationNonSequentialCrossValidationResult
 AbstractPredictionResult
-check_prediction_feature_matrix
 PredictionReturnsResult
 PredictionResult
 VecPredRes
 PredRes_MultiPredRes
 mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}}, sym = :X)
-mapreduce_FeatMtx
 MultiPeriodPredictionResult
 VecMPredRes
 PopulationPredictionResult
@@ -37,7 +35,6 @@ fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 sort_by_measure
 quantile_by_measure
 fit_and_predict
-fold_feature_matrix
 reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
 sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
 VecVecPredRes

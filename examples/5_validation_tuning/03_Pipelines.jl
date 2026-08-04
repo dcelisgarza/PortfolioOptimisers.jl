@@ -206,7 +206,7 @@ pipe = Pipeline(;
                 steps = ("filter" => MissingDataFilter(; col_thr = 0.4),
                          "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
                          SemiDefinitePhylogenyEstimator(),
-                         "wb" => WeightBoundsEstimator(; ub = 0.4),
+                         "wb" => WeightBoundsEstimator(; lb = nothing, ub = 0.4),
                          MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
 pipe.names
 

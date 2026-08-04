@@ -490,7 +490,9 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
-    return rebuild_returns_result(rd, predictions)
+    # `nothing`: Stacking's inner optimisers see the whole universe, so their weight vectors
+    # need no padding at the feature-collapse seam.
+    return rebuild_returns_result(rd, predictions, nothing)
 end
 function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, <:Any,
@@ -510,7 +512,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
         scorer = NearestQuantilePrediction()
     end
     best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions)
+    return rebuild_returns_result(rd, best_predictions, nothing)
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,

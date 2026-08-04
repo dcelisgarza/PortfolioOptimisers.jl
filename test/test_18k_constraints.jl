@@ -660,7 +660,7 @@ end
     # Estimator form (lb defaulting to nothing) must also assemble and solve. The
     # WeightBoundsEstimator resolves per-name bounds, so it needs `sets`.
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
-                        wb = WeightBoundsEstimator(; ub = 0.15))
+                        wb = WeightBoundsEstimator(; lb = nothing, ub = 0.15))
     res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
     @test isapprox(sum(res.w), 1; rtol = 1e-6)
     @test all(res.w .<= 0.15 + 1e-6)

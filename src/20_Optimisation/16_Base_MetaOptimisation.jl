@@ -120,22 +120,256 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     return nb, B, iv, ivpa, nz, Z, X
 end
 """
-    rebuild_returns_result(rd, predictions)
+    assert_fold_alignment(predictions) -> VecPredRes
 
-Reconstruct a returns result from cross-validation predictions.
+Assert that every sub-portfolio's fold `f` covers the same test period, and return the first sub-portfolio's folds.
 
-Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout.
+A meta-optimiser runs the *same* cross-validation scheme over the *same* returns result for every sub-portfolio, so fold `f` covers the same observations whichever sub-portfolio produced it. [`rebuild_returns_result`](@ref) has relied on that silently since long before it was stated — `reshape(X, :, N)` is only meaningful if the `N` stacked return vectors line up row for row — and the per-fold weight matrix it now assembles is only well defined if it holds. This makes the invariant explicit, and it matters most on the combinatorial path, where each sub-portfolio's `scorer` selects a path independently.
 
-## The feature matrix
+Folds are compared on their timestamps where the returns result has a clock, and on their observation counts where it does not — which is the strongest statement available in each case, and exactly the statement `reshape` needs.
 
-Each prediction has already had its feature matrix collapsed onto its own synthetic asset, fold by fold, and stacked down the observation axis (see [`reconstruct_rd`](@ref) and [`MultiPeriodPredictionResult`](@ref)). All that is left here is to lay the `N` sub-portfolios out along the asset axis, giving the `observations × assets × features` shape the time-varying carrier takes — with the same row count as `X`, since `X` is stacked the same way. The outer optimiser's default [`LastObservation`](@ref) then reduces it to the most recent fold's collapse.
+# Arguments
 
-A feature matrix survives only when every sub-portfolio collapsed onto the *same* feature axis. That holds whenever the feature axis is rectangular, since it is never subselected by assets. It does not hold for a square feature matrix under [`NestedClustered`](@ref), whose folds see cluster-sliced returns: each cluster's feature axis is its own asset subset, so there is nothing to stack them against and the feature matrix is dropped. An outer estimator that then asks for features gets the same error it would get had none been supplied, rather than a matrix assembled from mismatched axes.
+  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+
+# Returns
+
+  - The first sub-portfolio's per-fold [`PredictionResult`](@ref) objects, which every other sub-portfolio now agrees with.
+
+# Related
+
+  - [`rebuild_returns_result`](@ref)
+  - [`fold_row_indices`](@ref)
+"""
+function assert_fold_alignment(predictions::VecMPredRes)
+    pred1 = predictions[1].pred
+    nf = length(pred1)
+    for (i, prediction) in enumerate(predictions)
+        predi = prediction.pred
+        @argcheck(length(predi) == nf,
+                  DimensionMismatch("every sub-portfolio must run the same number of cross-validation folds, but sub-portfolio 1 has $(nf) and sub-portfolio $(i) has $(length(predi))"))
+        for f in 1:nf
+            ts1 = pred1[f].rd.ts
+            aligned = if isnothing(ts1)
+                length(predi[f].rd.X) == length(pred1[f].rd.X)
+            else
+                predi[f].rd.ts == ts1
+            end
+            @argcheck(aligned,
+                      DimensionMismatch("sub-portfolios 1 and $(i) disagree on the observations fold $(f) covers, so their predictions cannot be laid out side by side. Every sub-portfolio of a meta-optimiser must run the same cross-validation over the same returns result."))
+        end
+    end
+    return pred1
+end
+"""
+    fold_row_indices(rd, pred) -> VecVecInt
+
+Recover the rows of the original returns result each cross-validation fold covers.
+
+The folds do not store their row indices, and they do not need to: [`port_opt_view`](@ref) slices `ts` with the very `test_idx` the fold was built from, so a fold's `rd.ts` *is* its slice of the original clock and [`feature_row_indices`](@ref) matches it straight back. Recovering rather than storing is what keeps this correct on the combinatorial path, where [`sort_predictions!`](@ref) assembles a path's folds in split order rather than chronologically: the timestamps carry whatever order actually happened, while a re-derived split would have to reproduce it.
+
+Only a **time-varying** feature matrix needs this — a static one has no observation axis to slice — which is why the clock is required exactly there and nowhere else.
+
+# Arguments
+
+  - `rd`: Original [`ReturnsResult`](@ref), whose `ts` is the clock `rd.Z`'s observation axis is parallel to.
+  - `pred`: Per-fold [`PredictionResult`](@ref) objects from one sub-portfolio.
+
+# Returns
+
+  - One row-index vector per fold.
+
+# Related
+
+  - [`feature_row_indices`](@ref)
+  - [`rebuild_feature_matrix`](@ref)
+  - [`assert_fold_alignment`](@ref)
+"""
+function fold_row_indices(rd::ReturnsResult, pred::VecPredRes)
+    @argcheck(!isnothing(rd.ts),
+              IsNothingError("a time-varying feature matrix (Z) has its observation axis parallel to the returns result's timestamps, so collapsing it onto a meta-optimiser's synthetic assets fold by fold needs `ts` to say which observation of Z each fold's observations are. Got ts => nothing. Supply timestamps, or pass a static assets × features Z, which has no observation axis to align."))
+    return [feature_row_indices(rd.Z, p.rd.ts, rd.ts) for p in pred]
+end
+"""
+    fold_weight_matrix(predictions, cls::Nothing, f, na)
+    fold_weight_matrix(predictions, cls::VecVecInt, f, na)
+
+Lay fold `f`'s sub-portfolio weights out as the `assets × sub-portfolios` matrix the outer collapse contracts against.
+
+[`Stacking`](@ref)'s inner optimisers see the whole universe, so their weight vectors are already full length and `cls` is `nothing`. [`NestedClustered`](@ref)'s see one cluster each, so sub-portfolio `i`'s weights are zero-padded onto `cls[i]`. The padding invents nothing: `cls` partitions the universe, so a padded column *is* the sub-portfolio's real weight on the full asset axis.
+
+# Arguments
+
+  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
+  - `f`: Fold index.
+  - `na`: Number of real assets.
+
+# Returns
+
+  - An `assets × sub-portfolios` weight matrix.
+
+# Related
+
+  - [`rebuild_returns_result`](@ref)
+  - [`collapse_feature_matrix`](@ref)
+"""
+function fold_weight_matrix(predictions::VecMPredRes, ::Nothing, f::Integer, na::Integer)
+    ws = [prediction.pred[f].res.w for prediction in predictions]
+    W = Matrix{mapreduce(eltype, promote_type, ws)}(undef, na, length(ws))
+    @inbounds for (i, w) in enumerate(ws)
+        W[:, i] = w
+    end
+    return W
+end
+function fold_weight_matrix(predictions::VecMPredRes, cls::VecVecInt, f::Integer,
+                            na::Integer)
+    ws = [prediction.pred[f].res.w for prediction in predictions]
+    W = zeros(mapreduce(eltype, promote_type, ws), na, length(ws))
+    @inbounds for (i, (w, cl)) in enumerate(zip(ws, cls))
+        W[cl, i] = w
+    end
+    return W
+end
+"""
+    fold_feature_matrix(Z::Nothing, sq, wi, anchor)
+    fold_feature_matrix(Z::MatNum, sq, wi, nobs::Integer)
+    fold_feature_matrix(Z::Arr3Num, sq, wi, rows::VecInt)
+
+Collapse the original feature matrix onto a fold's synthetic universe, with an observation axis.
+
+The collapse itself is [`collapse_feature_matrix`](@ref)'s matrix arity, applied to the *original*, unsliced feature matrix and the fold's weights. What the two shapes need from the fold differs, and dispatch says which:
+
+  - A **static** `Z` has no observation axis, so it needs only the fold's `nobs`. Its single collapsed matrix is repeated across them, because the collapse is a function of *this fold's* weights and is therefore constant within the fold and different in the next one — which is how a static source becomes genuinely time-varying at the outer problem.
+  - A **time-varying** `Z` needs the fold's `rows` in the original clock, and comes back with an observation axis already. This is the only place a fold's absolute rows are needed, and [`fold_row_indices`](@ref) recovers them from the fold's timestamps.
+
+# Arguments
+
+  - `Z`: The original feature matrix, unsliced.
+  - `sq`: Whether the feature axis is the asset axis, from [`features_are_assets`](@ref).
+  - `wi`: The fold's weights, assets × synthetic assets.
+  - `nobs`: Number of observations in the fold, for a static `Z`.
+  - `rows`: The rows of the original returns result this fold covers, for a time-varying `Z`.
+
+# Returns
+
+  - `nothing`, or an `observations × synthetic assets × features` array.
+
+# Related
+
+  - [`collapse_feature_matrix`](@ref)
+  - [`fold_weight_matrix`](@ref)
+  - [`fold_row_indices`](@ref)
+  - [`rebuild_feature_matrix`](@ref)
+"""
+function fold_feature_matrix(::Nothing, ::Bool, ::MatNum, ::Any)
+    return nothing
+end
+function fold_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum, nobs::Integer)
+    Zc = collapse_feature_matrix(Z, sq, wi)
+    Zf = Array{eltype(Zc)}(undef, nobs, size(Zc, 1), size(Zc, 2))
+    @inbounds for t in axes(Zf, 1)
+        Zf[t, :, :] = Zc
+    end
+    return Zf
+end
+function fold_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum, rows::VecInt)
+    return collapse_feature_matrix(view(Z, rows, :, :), sq, wi)
+end
+"""
+    fold_feature_anchors(rd, pred)
+
+Give each fold whatever [`fold_feature_matrix`](@ref) needs from it: an observation count for a static feature matrix, absolute rows for a time-varying one.
+
+Scoping the row recovery to the shape that needs it is what keeps the clock requirement narrow. A static feature matrix has no observation axis to align, so it runs on fold sizes alone and never asks the returns result for timestamps.
 
 # Arguments
 
   - `rd`: Original [`ReturnsResult`](@ref).
-  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects from cross-validation.
+  - `pred`: Per-fold [`PredictionResult`](@ref) objects from one sub-portfolio.
+
+# Returns
+
+  - One anchor per fold: an `Integer` for a static `Z`, a row-index vector for a time-varying one.
+
+# Related
+
+  - [`fold_feature_matrix`](@ref)
+  - [`fold_row_indices`](@ref)
+"""
+function fold_feature_anchors(rd::ReturnsResult, pred::VecPredRes)
+    return isa(rd.Z, Arr3Num) ? fold_row_indices(rd, pred) : [length(p.rd.X) for p in pred]
+end
+"""
+    rebuild_feature_matrix(rd, predictions, cls, pred1)
+
+Recompute the outer problem's feature matrix at the cross-validation assembly seam.
+
+Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — same `sq`, same weight-matrix arity, same original `rd.Z` — and stacks the results down the observation axis. That shared call is the whole point: `cv` is execution control, so toggling it must not change what the outer optimiser measures.
+
+# Arguments
+
+  - `rd`: Original [`ReturnsResult`](@ref), whose `nz`/`Z` are read unsliced.
+  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
+  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
+  - `pred1`: The first sub-portfolio's folds, from [`assert_fold_alignment`](@ref) — every sub-portfolio agrees with them, so they define the fold boundaries.
+
+# Returns
+
+  - `(nz, Z)`: The synthetic asset names when the feature axis *is* the asset axis, `rd.nz` otherwise; and the stacked `observations × synthetic assets × features` matrix. Both `nothing` when `rd` carries no feature matrix.
+
+# Related
+
+  - [`rebuild_returns_result`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`fold_feature_matrix`](@ref)
+  - [`fold_feature_anchors`](@ref)
+"""
+function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
+                                cls::Option{<:VecVecInt}, pred1::VecPredRes)
+    if isnothing(rd.Z)
+        return nothing, nothing
+    end
+    N = length(predictions)
+    na = size(rd.X, 2)
+    # Identical to `prepare_outer_rd`: square indexes both trailing axes precisely because
+    # they are the same axis, so there is no square branch here either.
+    sq = features_are_assets(rd.nz, rd.nx)
+    Zs = [fold_feature_matrix(rd.Z, sq, fold_weight_matrix(predictions, cls, f, na),
+                              anchor)
+          for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
+    Z = Array{eltype(Zs[1])}(undef, sum(x -> size(x, 1), Zs), size(Zs[1], 2),
+                             size(Zs[1], 3))
+    r = 0
+    @inbounds for Zf in Zs
+        n = size(Zf, 1)
+        Z[(r + 1):(r + n), :, :] = Zf
+        r += n
+    end
+    return sq ? ["_$(i)" for i in 1:N] : rd.nz, Z
+end
+"""
+    rebuild_returns_result(rd, predictions, cls)
+
+Reconstruct a returns result from cross-validation predictions.
+
+Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout. `cls` is the asset index set of each sub-portfolio — [`NestedClustered`](@ref)'s clusters — or `nothing` when the sub-portfolios are full-universe, as [`Stacking`](@ref)'s are.
+
+!!! warning
+
+    `cls` is **positional**, not a keyword with a full-universe default. A default would let a stale two-argument call keep working: correct for [`Stacking`](@ref), and for [`NestedClustered`](@ref) silently writing every cluster's weights to the wrong rows — which yields not an error but a plausible-looking feature matrix. The one configuration that most needs the argument is the one a default would mis-serve, so the break is arranged to be loud.
+
+## The feature matrix
+
+The folds carry none. Instead, the collapse onto the synthetic universe is **recomputed here** from the original, unsliced `rd.Z`, using the same [`collapse_feature_matrix`](@ref) call [`prepare_outer_rd`](@ref) makes on the non-cross-validated path — with `sq` from [`features_are_assets`](@ref) flowing through unchanged, and the per-fold `assets × sub-portfolios` weight matrix assembled from `pred[f].res.w` (see [`rebuild_feature_matrix`](@ref)). The fold results stack down the observation axis, giving the `observations × assets × features` shape the time-varying carrier takes, and the outer optimiser's default [`LastObservation`](@ref) reduces them to the most recent fold's collapse.
+
+The inner solves are untouched: each still sees its own cluster-sliced feature matrix. What the recompute buys is that `cv`, which is execution control, no longer changes what the outer problem measures — and it closes the one intersection where the matrix used to be dropped altogether, a square feature matrix under [`NestedClustered`](@ref), whose folds see cluster-sliced returns and so could never agree on a feature axis to stack.
+
+# Arguments
+
+  - `rd`: Original [`ReturnsResult`](@ref).
+  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects from cross-validation, one per sub-portfolio.
+  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
 
 # Returns
 
@@ -144,30 +378,31 @@ A feature matrix survives only when every sub-portfolio collapsed onto the *same
 # Related
 
   - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
-  - [`reconstruct_rd`](@ref)
-  - [`collapse_feature_matrix`](@ref)
+  - [`rebuild_feature_matrix`](@ref)
+  - [`assert_fold_alignment`](@ref)
+  - [`prepare_outer_rd`](@ref)
 """
-function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
+function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
+                                cls::Option{<:VecVecInt})
     N = length(predictions)
     nb = rd.nb
     B_flag = !isnothing(rd.B)
     iv_flag = !isnothing(rd.iv)
     ivpa_flag = !isnothing(rd.ivpa)
     rd1 = predictions[1].mrd
-    X = rd1.X
-    B = B_flag ? rd1.B : nothing
-    iv = rd1.iv
+    # Copies, not the first prediction's own buffers: the loop below grows these, and
+    # appending into `predictions[1].mrd` would leave the predictions mutated — a second
+    # call on the same vector would then assemble a result of the wrong height. `ivpa` is
+    # per-sub-portfolio rather than per-observation, so it is *wrapped*, not copied: each
+    # fold already collapsed it to one number and `MultiPeriodPredictionResult` kept the
+    # last fold's, so this builds the length-`N` vector from `N` scalars.
+    X = copy(rd1.X)
+    B = B_flag ? copy(rd1.B) : nothing
+    iv = iv_flag ? copy(rd1.iv) : nothing
     ivpa = ivpa_flag ? [rd1.ivpa] : nothing
-    nz = rd1.nz
-    Z_flag = !isnothing(rd1.Z) && all(x -> x.mrd.nz == nz, predictions)
-    Z = nothing
-    if Z_flag
-        Z = Array{eltype(rd1.Z)}(undef, size(rd1.Z, 1), N, size(rd1.Z, 2))
-        Z[:, 1, :] = rd1.Z
-    else
-        nz = nothing
-    end
+    pred1 = assert_fold_alignment(predictions)
     @inbounds for i in 2:N
         rdi = predictions[i].mrd
         append!(X, rdi.X)
@@ -180,11 +415,14 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
         if B_flag
             append!(B, rdi.B)
         end
-        if Z_flag
-            Z[:, i, :] = rdi.Z
-        end
     end
     X = reshape(X, :, N)
+    # The stacked rows are the fold rows, in fold order. `reshape` above has assumed it
+    # since before the feature matrix existed; the recompute below depends on it too.
+    nobs = sum(p -> length(p.rd.X), pred1)
+    @argcheck(nobs == size(X, 1),
+              DimensionMismatch("the stacked sub-portfolio returns must have one row per cross-validated observation, but the folds cover $(nobs) observations and the stacked returns have $(size(X, 1))"))
+    nz, Z = rebuild_feature_matrix(rd, predictions, cls, pred1)
     if B_flag
         B = reshape(B, :, N)
         nb = ["_b$(i)" for i in 1:N]

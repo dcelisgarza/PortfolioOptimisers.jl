@@ -626,7 +626,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
-    return rebuild_returns_result(rd, predictions)
+    return rebuild_returns_result(rd, predictions, cls)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
@@ -648,7 +648,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
         scorer = NearestQuantilePrediction()
     end
     best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions)
+    return rebuild_returns_result(rd, best_predictions, cls)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

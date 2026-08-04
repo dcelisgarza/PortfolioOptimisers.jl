@@ -95,8 +95,8 @@ res_cap = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 There are **two different things** you might mean by "the staples bound". A
 [`WeightBoundsEstimator`](@ref) with a group key applies the bound to **each member** of the
 group; a [`LinearConstraintEstimator`](@ref) bounds the **group sum**. They are not the same:
-with four staples names, `WeightBoundsEstimator(lb = ["staples" => 0.15])` forces *each* of them
-to at least 15% — 60% in total — whereas `LinearConstraintEstimator(val = ["staples >= 0.15"])`
+with four staples names, `WeightBoundsEstimator(lb = ["staples" => 0.15], ub = nothing)` forces *each*
+of them to at least 15% — 60% in total — whereas `LinearConstraintEstimator(val = ["staples >= 0.15"])`
 asks only that the four *together* reach 15%.
 =#
 
@@ -104,7 +104,8 @@ res_member = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                    wb = WeightBoundsEstimator(;
                                                                               lb = ["staples" =>
-                                                                                        0.15]))))
+                                                                                        0.15],
+                                                                              ub = nothing))))
 res_groupsum = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                      lcse = LinearConstraintEstimator(;
@@ -183,7 +184,7 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   the real SP500 slice with a MaximumRatio base (concentrates ~66% healthcare / 34% energy,
 #src   so caps/floors on the ignored sectors bite cleanly):
 #src   - WeightBounds ub=0.15: max weight 37%→15%, holdings 2→8.
-#src   - PER-MEMBER vs GROUP-SUM (the teaching highlight): WeightBoundsEstimator(lb=["staples"=>0.15])
+#src   - PER-MEMBER vs GROUP-SUM (the teaching highlight): WeightBoundsEstimator(lb=["staples"=>0.15], ub=nothing))
 #src     → each of 4 staples ≥15% → 60% total; LinearConstraintEstimator("staples >= 0.15") → 15%
 #src     total. Genuinely confusable; documented explicitly in §4.
 #src   - Sum cap "healthcare + energy <= 0.6" binds at 60%, pushes 40% into previously-zero sectors.

@@ -6,7 +6,7 @@
     N = size(pr.X, 2)
 
     sets = UniverseSets(; dict = Dict("nx" => rd.nx))
-    wb = WeightBoundsEstimator(; lb = "AAPL" => 0.07)
+    wb = WeightBoundsEstimator(; lb = "AAPL" => 0.07, ub = nothing)
 
     res = optimise(InverseVolatility(; pe = pr), rd)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))

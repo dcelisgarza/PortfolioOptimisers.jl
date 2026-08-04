@@ -203,18 +203,24 @@ leaf ordering.
         @test fit(pipe_zs, rd_tax).ctx.returns.nx == kept
     end
 
-    @testset "PredictionReturnsResult is refused, so its Z stays write-only" begin
-        # #180 expected this carrier to become readable here. It does not: `X` is a
+    @testset "PredictionReturnsResult is refused, and no longer carries a Z at all" begin
+        # #180 expected this carrier to become readable here. It never did: `X` is a
         # *portfolio* return vector — the asset axis is the thing the collapse removed — so
         # the type satisfies neither the old `{nx, X}` contract nor the widened `{nx, X, Z}`
-        # one, and the refusal has nothing to do with `Z`.
-        prd = PO.PredictionReturnsResult(; nx = nx, X = X * fill(1 / N, N), nz = nz,
-                                         Z = rand(rng, T, size(Z, 2)))
-        @test !isnothing(prd.Z)
+        # one, and the refusal has nothing to do with `Z`. That independence is why the
+        # refusal survives the carrier's `nz`/`Z` being deleted outright: the selectors
+        # never depended on them.
+        prd = PO.PredictionReturnsResult(; nx = nx, X = X * fill(1 / N, N))
+        @test :Z ∉ fieldnames(PO.PredictionReturnsResult)
         @test size(prd.X, 2) == 1 != length(prd.nx)
 
-        # loud at every entry point, and never a distance over the wrong axis
-        @test_throws MethodError PO.redundancy_keep(ClusterGroups(), prd, ones(N), true)
+        # loud at every entry point, and never a distance over the wrong axis. The direct
+        # `redundancy_keep` call now fails one step earlier and one step more precisely:
+        # with the field gone the carrier misses the widened `{nx, X, Z}` contract
+        # *structurally* rather than on `X`'s shape, so it is a `FieldError` naming `Z`
+        # rather than a `MethodError`. No reachable path changes — the three entry points
+        # below still refuse first, and they are the only ways in.
+        @test_throws FieldError PO.redundancy_keep(ClusterGroups(), prd, ones(N), true)
         @test_throws MethodError fit_preprocessing(sel_feat, prd)
         @test_throws MethodError fit_preprocessing(sel_ret, prd)
         # even a selector that reads no feature matrix at all

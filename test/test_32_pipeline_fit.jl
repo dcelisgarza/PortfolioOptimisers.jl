@@ -206,7 +206,7 @@
     @testset "constraint steps and routing" begin
         rd = make_returns()
         pipe = Pipeline(;
-                        steps = (WeightBoundsEstimator(; ub = 0.3),
+                        steps = (WeightBoundsEstimator(; lb = nothing, ub = 0.3),
                                  LinearConstraintEstimator(; val = "A1 <= 0.25"),
                                  EmpiricalPrior()))
         @test pipe.names == ("constraints_1", "constraints_2", "prior")

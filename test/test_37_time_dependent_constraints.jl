@@ -806,7 +806,7 @@ end
         @testset "Per-fold asset sets" begin
             # The same group-keyed bound estimator caps a different group of assets each
             # fold, because the sets it resolves against are scheduled.
-            wbe = WeightBoundsEstimator(; ub = ["g1" => 0.15])
+            wbe = WeightBoundsEstimator(; lb = nothing, ub = ["g1" => 0.15])
             p = cross_val_predict(MeanRisk(;
                                            opt = JuMPOptimiser(; slv = slv, wb = wbe,
                                                                sets = tdsets)), rd, cvw)
@@ -1758,7 +1758,7 @@ end
             pv = cross_val_predict(mkopt(iv), rd, cv)
             @test length(mp.pred) == n
             for i in 1:n
-                expected = (sched.val[i] === iv ? pv : pe).pred[i].res.w
+                expected = (sched.val[i]===iv ? pv : pe).pred[i].res.w
                 @test isapprox(mp.pred[i].res.w, expected)
             end
             return n
@@ -1882,7 +1882,7 @@ end
             pv = cross_val_predict(iv, rd, cvw)
             for i in 1:n
                 picked = log[findfirst(e -> e[2] == i, log)][3]
-                @test isapprox(mp.pred[i].res.w, (picked === :odd ? pe : pv).pred[i].res.w)
+                @test isapprox(mp.pred[i].res.w, (picked===:odd ? pe : pv).pred[i].res.w)
             end
         end
     end

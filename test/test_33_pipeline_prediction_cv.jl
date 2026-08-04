@@ -291,7 +291,7 @@ end
         @testset "the fold's computed slots reach the fold's optimiser" begin
             hrp = HierarchicalRiskParity()
             capped = (MissingDataFilter(), Imputer(), PricesToReturns(),
-                      WeightBoundsEstimator(; ub = 0.3))
+                      WeightBoundsEstimator(; lb = nothing, ub = 0.3))
             p = cross_val_predict(Pipeline(;
                                            steps = (capped..., TimeDependent([hrp, hrp]))),
                                   pr, cvw)
