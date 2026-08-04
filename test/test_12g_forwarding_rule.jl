@@ -181,8 +181,8 @@ end
     # `AugmentedBlackLittermanPrior` — symmetric, and the two weightings stay
     # distinguishable: the asset slot is `a_prior`'s, the factor block is `f_prior`.
     abl = prior(AugmentedBlackLittermanPrior(; a_pe = ep_asset, f_pe = ep_factor,
-                                             a_sets = sets, f_sets = fsets,
-                                             a_views = bl_views, f_views = f_views), rd)
+                                             sets = afsets, a_views = bl_views,
+                                             f_views = f_views), rd)
     @test abl.w == a_pooled.w
     @test abl.ens == a_pooled.ens
     @test abl.kld == a_pooled.kld
@@ -258,7 +258,7 @@ end
     # discarded value. Reporting the posterior half is nonetheless a large
     # improvement over reporting the prior one.
     abl_pe = AugmentedBlackLittermanPrior(; a_pe = ep_asset, f_pe = ep_factor,
-                                          a_sets = sets, f_sets = fsets, a_views = bl_views,
+                                          sets = afsets, a_views = bl_views,
                                           f_views = f_views)
     abl = prior(abl_pe, rd)
     f_prior = prior(ep_factor, rd.F)

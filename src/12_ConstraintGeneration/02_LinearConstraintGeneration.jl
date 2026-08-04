@@ -1391,31 +1391,17 @@ function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    constraint_row_axis(rr) -> String
+    universe_axis(sets::UniverseSets, key::AbstractString) -> String
 
-Name of the universe a constraint row's variables resolve against: `"asset"` when there is no re-basis, `"factor"` when the row is projected through a regression's loadings. Used only to make [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) name the axis the user wrote in.
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+
+The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.fkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
+
+The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
 
 # Related
 
   - [`get_linear_constraints`](@ref)
-  - [`constraint_row_term`](@ref)
-"""
-function constraint_row_axis(::Nothing)::String
-    return "asset"
-end
-function constraint_row_axis(::AbstractRegressionResult)::String
-    return "factor"
-end
-"""
-    universe_axis(sets::UniverseSets, key::AbstractString) -> String
-
-Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. Like [`constraint_row_axis`](@ref) it exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
-
-The two answer the same question from different evidence, and each is the only evidence its caller has. A constraint knows it is on the factor axis because it is being re-based; a Black-Litterman view is *never* re-based — it resolves directly against whichever universe its estimator points it at — so the key is what it has. The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
-
-# Related
-
-  - [`constraint_row_axis`](@ref)
   - [`get_black_litterman_views`](@ref)
   - [`UniverseSets`](@ref)
 """
@@ -1517,7 +1503,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
     B_eq = Vector{datatype}(undef, 0)
     k = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[k]
-    axis = constraint_row_axis(rr)
+    axis = universe_axis(sets, k)
     N = constraint_row_length(rr, nx)
     At = Vector{datatype}(undef, N)
     for lc in lcs

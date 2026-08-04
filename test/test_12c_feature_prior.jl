@@ -110,9 +110,8 @@ end
                                             pe = FeaturePrior(; pe = FactorPrior(),
                                                               ze = Zlit), sets = xfsets,
                                             views = f_views), rd).Z == Zlit
-    @test prior(AugmentedBlackLittermanPrior(; a_pe = fpe, a_sets = sets, a_views = views,
-                                             f_sets = fsets, f_views = f_views), rd).Z ==
-          Zlit
+    @test prior(AugmentedBlackLittermanPrior(; a_pe = fpe, sets = xfsets, a_views = views,
+                                             f_views = f_views), rd).Z == Zlit
     @test prior(EntropyPoolingPrior(; pe = fpe, sets = sets,
                                     mu_views = LinearConstraintEstimator(;
                                                                          val = ["$(rd.nx[1]) == 0.01"])),

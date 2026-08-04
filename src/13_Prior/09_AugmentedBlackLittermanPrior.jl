@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Augmented Black-Litterman prior estimator for asset returns.
 
-`AugmentedBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using an augmented Black-Litterman model. It combines asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views, asset and factor sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
+`AugmentedBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using an augmented Black-Litterman model. It combines asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views over one dual-axis universe sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
 # Mathematical definition
 
@@ -62,8 +62,7 @@ $(DocStringExtensions.FIELDS)
         re::AbstractRegressionEstimator = StepwiseRegression(),
         a_views::Lc_BLV,
         f_views::Lc_BLV,
-        a_sets::Option{<:UniverseSets} = nothing,
-        f_sets::Option{<:UniverseSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         a_views_conf::Option{<:Num_VecNum} = nothing,
         f_views_conf::Option{<:Num_VecNum} = nothing,
         w::Option{<:VecNum} = nothing,
@@ -94,11 +93,16 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
     [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) satisfy the identity exactly, because they update the factor distribution alone and *project* it onto the assets rather than updating an asset block alongside it. [`BlackLittermanPrior`](@ref) breaks it for the opposite reason — it takes asset views only and never computes a posterior factor distribution at all.
 
+## One sets, two axes
+
+This is the only estimator whose views land on **both** distributions, and the two axes it needs are the two [`UniverseSets`](@ref) declares: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.fkey]`. Before the axis was declared this took two separate sets objects, and the factor-flavoured one had to be exempted from [`port_opt_view`](@ref) **by hand** — a missing annotation was all that stood between a view and a factor universe sliced by asset indices. With one dual-axis object the exemption is a property of the data: the field is `@vprop`, the slice moves the asset entries and the factor entries come back untouched.
+
+Each axis is required only by the views that resolve names against it. A [`BlackLittermanViews`](@ref) result carries its own `P` and needs no universe at all, so asset-views-only and factor-views-only mandates are both expressible with a single `sets` — and a pair of precomputed view sets needs none.
+
 ## Validation
 
   - If `w` is not `nothing`, `!isempty(w)`.
-  - If `a_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(a_sets)`.
-  - If `f_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(f_sets)`.
+  - If either `a_views` or `f_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `a_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `f_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
@@ -107,10 +111,9 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
 ```jldoctest
 julia> AugmentedBlackLittermanPrior(;
-                                    a_sets = UniverseSets(; xkey = \"nx\",
-                                                          dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
-                                    f_sets = UniverseSets(; xkey = \"nx\",
-                                                          dict = Dict(\"nx\" => [\"F1\", \"F2\"])),
+                                    sets = UniverseSets(;
+                                                        dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                                    \"nf\" => [\"F1\", \"F2\"])),
                                     a_views = LinearConstraintEstimator(;
                                                                         val = [\"A == 0.03\",
                                                                                \"B + C == 0.04\"]),
@@ -178,18 +181,12 @@ AugmentedBlackLittermanPrior
        f_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
                │   key ┴ nothing
-        a_sets ┼ UniverseSets
+          sets ┼ UniverseSets
                │    xkey ┼ String: "nx"
                │   uxkey ┼ String: "ux"
                │    fkey ┼ String: "nf"
                │   ufkey ┼ String: "uf"
-               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-        f_sets ┼ UniverseSets
-               │    xkey ┼ String: "nx"
-               │   uxkey ┼ String: "ux"
-               │    fkey ┼ String: "nf"
-               │   ufkey ┼ String: "uf"
-               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
+               │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing
@@ -234,13 +231,9 @@ AugmentedBlackLittermanPrior
     """
     f_views
     """
-    $(field_dict[:a_sets])
+    $(field_dict[:sets_af])
     """
-    @vprop a_sets
-    """
-    $(field_dict[:f_sets])
-    """
-    f_sets
+    @vprop sets
     """
     $(field_dict[:a_views_conf])
     """
@@ -269,8 +262,7 @@ AugmentedBlackLittermanPrior
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
                                           re::AbstractRegressionEstimator, a_views::Lc_BLV,
-                                          f_views::Lc_BLV, a_sets::Option{<:UniverseSets},
-                                          f_sets::Option{<:UniverseSets},
+                                          f_views::Lc_BLV, sets::Option{<:UniverseSets},
                                           a_views_conf::Option{<:Num_VecNum},
                                           f_views_conf::Option{<:Num_VecNum},
                                           w::Option{<:VecNum}, rf::Number,
@@ -278,18 +270,20 @@ AugmentedBlackLittermanPrior
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
-        assert_bl(a_views, a_sets, a_views_conf, tau)
-        assert_bl(f_views, f_sets, f_views_conf, tau)
+        # One sets now serves both view sets, so the shared helper takes it twice and differs
+        # only in which views it is validating — the axis each resolves against is a property
+        # of the *read*, checked in `prior` where the matrices are in hand, not of the field.
+        assert_bl(a_views, sets, a_views_conf, tau)
+        assert_bl(f_views, sets, f_views_conf, tau)
         return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
-                   typeof(f_views), typeof(a_sets), typeof(f_sets), typeof(a_views_conf),
+                   typeof(f_views), typeof(sets), typeof(a_views_conf),
                    typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
                                                                                         f_pe,
                                                                                         mp,
                                                                                         re,
                                                                                         a_views,
                                                                                         f_views,
-                                                                                        a_sets,
-                                                                                        f_sets,
+                                                                                        sets,
                                                                                         a_views_conf,
                                                                                         f_views_conf,
                                                                                         w,
@@ -304,15 +298,14 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,
-                                      a_sets::Option{<:UniverseSets} = nothing,
-                                      f_sets::Option{<:UniverseSets} = nothing,
+                                      sets::Option{<:UniverseSets} = nothing,
                                       a_views_conf::Option{<:Num_VecNum} = nothing,
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
                                       tau::Option{<:Number} = nothing)::AugmentedBlackLittermanPrior
-    return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
-                                        f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
+    return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, sets,
+                                        a_views_conf, f_views_conf, w, rf, l, tau)
 end
 # Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
 # factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).
@@ -327,7 +320,7 @@ end
 
 Compute augmented Black-Litterman prior moments for asset returns.
 
-`prior` estimates the mean and covariance of asset returns using the augmented Black-Litterman model, combining asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views, asset and factor sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
+`prior` estimates the mean and covariance of asset returns using the augmented Black-Litterman model, combining asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views over one dual-axis universe sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
 # Arguments
 
@@ -345,8 +338,8 @@ Compute augmented Black-Litterman prior moments for asset returns.
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.a_sets.dict[pe.a_sets.xkey]) == size(X, 2)`.
-  - `length(pe.f_sets.dict[pe.f_sets.xkey]) == size(F, 2)`.
+  - If `pe.a_views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
+  - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -354,7 +347,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
   - Asset and factor priors are computed using the embedded prior estimators `pe.a_pe` and `pe.f_pe`.
   - Factor regression is performed using the regression estimator `pe.re`.
-  - Asset and factor views are extracted using `black_litterman_views`, which returns the view matrices and view returns vectors.
+  - Asset and factor views are extracted using [`black_litterman_views`](@ref), which returns the view matrices and view returns vectors. The asset views resolve at `pe.sets.xkey` and the factor views **at `pe.sets.fkey`**, out of the one dual-axis sets.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - View uncertainty matrices for assets and factors are computed using `calc_omega`.
   - The augmented prior mean and covariance are constructed by combining asset and factor priors and regression loadings.
@@ -378,10 +371,21 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.a_sets.dict[pe.a_sets.xkey]) == size(X, 2),
-              DimensionMismatch("length(pe.a_sets.dict[pe.a_sets.xkey]) ($(length(pe.a_sets.dict[pe.a_sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
-    @argcheck(length(pe.f_sets.dict[pe.f_sets.xkey]) == size(F, 2),
-              DimensionMismatch("length(pe.f_sets.dict[pe.f_sets.xkey]) ($(length(pe.f_sets.dict[pe.f_sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
+    # Each axis is checked only by the views that resolve names against it. A
+    # `BlackLittermanViews` result carries its own `P` and never touches `sets`, so demanding a
+    # universe for it would reject the legitimate precomputed-views configuration — which, with
+    # both view sets precomputed, is allowed to supply no `sets` at all.
+    if isa(pe.a_views, LinearConstraintEstimator)
+        @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
+                  DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
+    end
+    if isa(pe.f_views, LinearConstraintEstimator)
+        # The factor views land on the *factor* distribution, so they resolve against the
+        # declared factor axis — not against `xkey`, which names the assets `a_views` uses.
+        factor_universe(pe.sets, size(F, 2),
+                        "AugmentedBlackLittermanPrior, whose `f_views` are written in factor names",
+                        "F")
+    end
     # Asset prior.
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
@@ -394,11 +398,16 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     posterior_X = F * transpose(M) .+ transpose(b)
     dt = eltype(posterior_X)
     T = size(X, 1)
-    (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.a_sets, pe.a_views_conf, a_prior_sigma,
+    # One sets, two keys: the asset views take the default (`xkey`), the factor views `fkey`.
+    # Precomputed views ignore both the sets and the key, and are the one shape that reaches
+    # here with `pe.sets === nothing`, so the key is read only when there is a sets to read it
+    # from.
+    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
+    (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.sets, pe.a_views_conf, a_prior_sigma,
                                       pe.tau, T, dt, strict)
     a_omega = omega
-    f_result = bl_preroll(pe.f_views, pe.f_sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
-                          dt, strict)
+    f_result = bl_preroll(pe.f_views, pe.sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
+                          dt, strict, f_key)
     f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))

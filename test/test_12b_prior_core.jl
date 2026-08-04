@@ -479,8 +479,7 @@ end
 
 @testset "Augmented Black Litterman" begin
     df = CSV.read(joinpath(@__DIR__, "./assets/AugmentedBlackLitterman.csv.gz"), DataFrame)
-    pes = [AugmentedBlackLittermanPrior(; a_sets = sets, f_sets = fsets,
-                                        tau = 1 / size(rd.X, 1),
+    pes = [AugmentedBlackLittermanPrior(; sets = afsets, tau = 1 / size(rd.X, 1),
                                         a_views = LinearConstraintEstimator(;
                                                                             val = Union{String,
                                                                                         Expr}[:(AAPL ==
@@ -495,8 +494,7 @@ end
                                                                                    :(QUAL -
                                                                                      USMV ==
                                                                                      -0.0003)])),
-           AugmentedBlackLittermanPrior(; a_sets = sets, f_sets = fsets,
-                                        tau = 1 / size(rd.X, 1), l = 2,
+           AugmentedBlackLittermanPrior(; sets = afsets, tau = 1 / size(rd.X, 1), l = 2,
                                         a_views = LinearConstraintEstimator(;
                                                                             val = ["AAPL == 0.00002",
                                                                                    "BAC == CVX",
@@ -521,6 +519,97 @@ end
         end
         @test success
     end
+end
+
+@testset "Augmented Black Litterman reads both declared axes" begin
+    # The golden tests above are the bit-identity proof: they run on `afsets` — one dual-axis
+    # sets — and still match `AugmentedBlackLitterman.csv.gz` to the tolerance they matched
+    # when the asset views took `sets` and the factor views a separate factors-under-`xkey`
+    # `fsets`. Only the *lookup* changed.
+    a_views = LinearConstraintEstimator(; val = ["$(rd.nx[1]) == 0.0002"])
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # Precomputed halves. A `BlackLittermanViews` result carries its own `P` and resolves no
+    # names, so it is how each half is muted while the other keeps writing in names.
+    a_blv = BlackLittermanViews(; P = reshape(Float64.(rd.nx .== rd.nx[1]), 1, :),
+                                Q = [0.0002])
+    f_blv = BlackLittermanViews(; P = reshape(Float64.(rd.nf .== "MTUM"), 1, :),
+                                Q = [0.0001])
+    # Each axis is required only by the half that resolves names against it, so a mandate
+    # written on one axis alone is expressible with the same single sets.
+    @test isapprox(prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_views,
+                                                      f_views = f_blv), rd).mu,
+                   prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_views,
+                                                      f_views = f_views), rd).mu;
+                   rtol = 1e-6)
+    @test !isnothing(prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_blv,
+                                                        f_views = f_views), rd).mu)
+    # Both halves precomputed: no universe is read at all, so no sets is needed. Under the two
+    # unconditional length checks this shape threw on `nothing.dict` before reaching the model.
+    @test isapprox(prior(AugmentedBlackLittermanPrior(; a_views = a_blv, f_views = f_blv),
+                         rd).mu,
+                   prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_blv,
+                                                      f_views = f_blv), rd).mu)
+    # The pre-migration factor shape — factor names under `xkey`, no factor axis declared — is
+    # the error worth getting right. Muting the asset half keeps the asset check out of the
+    # way, so what is reported is the *factor* universe the user never declared.
+    msg = try
+        prior(AugmentedBlackLittermanPrior(; sets = fsets, a_views = a_blv,
+                                           f_views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by AugmentedBlackLittermanPrior", msg)
+    @test occursin("`f_views` are written in factor names", msg)
+    @test_throws KeyError prior(AugmentedBlackLittermanPrior(; sets = fsets,
+                                                             a_views = a_blv,
+                                                             f_views = f_views), rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(AugmentedBlackLittermanPrior(; sets = shortf,
+                                                                      a_views = a_views,
+                                                                      f_views = f_views),
+                                         rd)
+    # And the asset axis is still checked, by the half that reads it.
+    shortx = UniverseSets(; dict = Dict("nx" => rd.nx[1:2], "nf" => rd.nf))
+    @test_throws DimensionMismatch prior(AugmentedBlackLittermanPrior(; sets = shortx,
+                                                                      a_views = a_views,
+                                                                      f_views = f_views),
+                                         rd)
+    # The latent bug, closed. One sets carrying both axes, under a view: the factor axis has no
+    # meaning for an asset index and must come back untouched, the asset axis must slice. This
+    # is the test the old shape could not have — `f_sets` was a *separate* object kept safe
+    # only by the missing `@vprop`, so marking it would have sliced factor names by asset
+    # indices and the mismatch would have surfaced as a length error inside `bl_preroll`.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = AugmentedBlackLittermanPrior(; sets = both, a_views = a_views, f_views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # The slice is load-bearing on one axis and inert on the other, and this is where the two
+    # differ from the factor-only members: there the asset axis is unread, so a view changes
+    # nothing. Here `a_views` reads it, so the *unsliced* estimator must reject the sliced
+    # data, and the viewed one must be indistinguishable from the sets written by hand — the
+    # asset entries cut to `i`, the factor entries whole.
+    rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
+    @test_throws DimensionMismatch prior(pe, rdv)
+    hand = UniverseSets(;
+                        dict = Dict("nx" => rd.nx[i], "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(i)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    peh = AugmentedBlackLittermanPrior(; sets = hand, a_views = a_views, f_views = f_views)
+    @test prior(pev, rdv).mu == prior(peh, rdv).mu
+    # Had `sets` been sliced blindly the factor entries would have been cut to `i` too, and
+    # the factor views would have resolved against a truncated axis. They do not: the factor
+    # half of the posterior is the one the unsliced factor universe produces.
+    @test prior(pev, rdv).fpr.mu == prior(peh, rdv).fpr.mu
+    @test length(prior(pev, rdv).fpr.mu) == length(rd.nf)
 end
 
 @testset "LogEntropyPooling" begin

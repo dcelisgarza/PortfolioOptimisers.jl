@@ -22,7 +22,6 @@ get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false,
                                 rr::Option{<:AbstractRegressionResult} = nothing)
-constraint_row_axis
 universe_axis
 constraint_row_length
 constraint_row_term
