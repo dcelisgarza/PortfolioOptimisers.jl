@@ -276,7 +276,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -310,10 +310,15 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
         F = transpose(F)
     end
     # The views land on the *factor* distribution, so they resolve against the declared factor
-    # axis — not against `xkey`, which names the assets this estimator projects onto.
-    factor_universe(pe.sets, size(F, 2),
-                    "FactorBlackLittermanPrior, whose views are written in factor names",
-                    "F")
+    # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
+    # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own
+    # `P`, so demanding one for it would reject the legitimate precomputed-views configuration,
+    # which `assert_bl` deliberately permits to supply no `sets` at all.
+    if isa(pe.views, LinearConstraintEstimator)
+        factor_universe(pe.sets, size(F, 2),
+                        "FactorBlackLittermanPrior, whose views are written in factor names",
+                        "F")
+    end
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
@@ -321,8 +326,11 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
+    # Precomputed views ignore both the sets and the key, and are the one shape that reaches here
+    # with `pe.sets === nothing`, so the key is read only when there is a sets to read it from.
+    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict, pe.sets.fkey)
+                                      size(X, 1), eltype(posterior_X), strict, f_key)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @argcheck(length(pe.w) == size(X, 2),

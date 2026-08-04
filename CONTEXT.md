@@ -326,7 +326,7 @@ User-facing utilities converting high-level specifications into the numeric form
 - **LinearConstraint / LinearConstraintEstimator**: parses equations into `A·w ≤/= B` (`PartialLinearConstraint`, `ParsingResult`).
 - **ExposureConstraintEstimator**: re-bases a linear constraint into another Constraint Space.
 - **WeightBounds**: per-asset lower/upper bounds (scalar = same for all; vector = per asset). `UniformValues` gives `1/N…1`. Group-level sum bounds are linear constraints, not Weight Bounds.
-- **RiskBudget**: per-asset/group risk-contribution targets.
+- **RiskBudget**: per-name/group risk-contribution targets. Which axis the names live on is a property of the *algorithm*, not of the sets: `AssetRiskBudgeting` budgets the asset weights and resolves against `xkey`, `FactorRiskBudgeting` budgets the factor weights `w1` and resolves against `fkey`. The factor budget is indexed by the columns of `L` — the reduced basis the risk decomposition works in — so under a dimension-reducing regression it is shorter than the factor universe, and the mismatch is reported against `L` rather than silently mis-attributed.
 - **Phylogeny constraints**: `SemiDefinitePhylogeny` (SDP coupling) and `IntegerPhylogeny` (cardinality/grouping); `CentralityConstraint` constrains by centrality.
 - **Threshold**: buy-in thresholds (minimum non-zero position size).
 - **AssetSetsMatrixEstimator**: builds binary group-membership matrices.

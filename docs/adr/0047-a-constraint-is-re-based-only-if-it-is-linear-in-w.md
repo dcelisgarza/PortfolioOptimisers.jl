@@ -239,3 +239,33 @@ from `rd.nf` — which makes the axis and the loadings agree *by construction*, 
 `pipe_reads = (:returns, :prior)`, and `Pipeline`'s constructor checks declared reads, so a
 pipeline carrying the step but no prior step is rejected at **construction** rather than at run
 time.
+
+## Amendment (2026-08-04): the declared factor axis names `M`'s columns, and a factor risk budget indexes `L`'s
+
+"`FactorRiskBudgeting` wants `L`" and "`FactorRiskBudgeting` migrates onto the declared factor
+axis" were both written above, one paragraph apart, and they are in tension the ADR did not notice.
+The declared axis names the **original** factors — the columns of `F`, and so of `M`. A factor risk
+budget is a vector over `w1`, the factor weights, whose length is `size(rr.L, 2)`. Under
+`StepwiseRegression` `L` is unset and falls back to `M`, the two agree, and nothing is visible.
+Under `DimensionReductionRegression` `L`'s columns are the retained principal components: fewer
+than the named factors, and carrying no names at all. There is nothing to name them *with*, so a
+**named** factor budget is well defined only when the reduced basis coincides with the declared
+one.
+
+This is not a new restriction — the pre-migration shape had the same arithmetic and simply failed
+further down, at the bare `length(rb) == N` check, with a message about two numbers. What the
+migration changes is where it is diagnosed:
+[`risk_budget_universe_key`](../../src/20_Optimisation/14_RiskBudgeting.jl) checks the declared axis
+against `size(rr.L, 2)` through the shared `factor_universe`, so the message names `rr.L`, the axis
+key, and the two lengths. Reading the axis off `M` instead would accept a budget of the wrong length
+and mis-attribute it silently, which is the failure this ADR exists to prevent one level up.
+
+The corollary is that the axis a named budget resolves against belongs to the **algorithm**, not to
+the sets: `AssetRiskBudgeting` and `FactorRiskBudgeting` share one `risk_budget_constraints`, one
+`_set_risk_budgeting_constraints!` and one `UniverseSets`, and differ only in the key they pass.
+The asset path passes `nothing` and is bit-identical to what it was.
+
+The consequence recorded above — that `FactorRiskBudgeting.sets` must **become** `@vprop` once it
+carries both axes — held exactly as written, and is now the case. `rkb` deliberately does not: an
+asset index has no meaning on a factor budget, and unlike `AssetRiskBudgeting.rkb` it must not be
+sliced.

@@ -207,23 +207,25 @@ function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)::RiskBudget
 end
 """
     risk_budget_constraints(rb::EstValType, sets::UniverseSets,
-                            dval::Option{<:Number} = nothing; strict::Bool = false,
+                            dval::Option{<:Number} = nothing,
+                            key::Option{<:AbstractString} = nothing; strict::Bool = false,
                             kwargs...)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
-This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`UniverseSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Asset and group names are resolved using `sets`, and the resulting risk budget vector is normalised to sum to one.
+This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`UniverseSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Names are resolved against the universe `key` selects, and the resulting risk budget vector is normalised to sum to one.
 
 # Arguments
 
   - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
-  - `dval`: Default value to use for assets not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[sets.xkey])` is used.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
+  - `dval`: Default value to use for names not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[key])` is used.
+  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes `sets.fkey`, because its budget is written in factor names.
   - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
 
 # Details
 
-  - Asset and group names in `rb` are mapped to indices in the asset universe using `sets`.
+  - Names and groups in `rb` are mapped to indices in the selected universe using `sets`.
   - If a key is a group, all assets in the group are assigned the specified value.
   - The resulting vector is normalised to sum to one.
   - If `strict` is `true`, missing keys cause an error; otherwise, a warning is issued.
@@ -243,29 +245,42 @@ RiskBudget
   val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```
 
+A budget written in factor names resolves against the declared factor axis, which is what [`FactorRiskBudgeting`](@ref) passes — the unspecified factors take the `1/length(sets.dict[key])` default before normalisation:
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"nf\" => [\"F1\", \"F2\"]));
+
+julia> risk_budget_constraints(Dict(\"F1\" => 0.25), sets, nothing, sets.fkey)
+RiskBudget
+  val ┴ Vector{Float64}: [0.3333333333333333, 0.6666666666666666]
+```
+
 # Related
 
   - [`RiskBudget`](@ref)
   - [`UniverseSets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
 """
 function risk_budget_constraints(rb::EstValType, sets::UniverseSets,
-                                 dval::Option{<:Number} = nothing; strict::Bool = false,
-                                 kwargs...)::RiskBudget
+                                 dval::Option{<:Number} = nothing,
+                                 key::Option{<:AbstractString} = nothing;
+                                 strict::Bool = false, kwargs...)::RiskBudget
     if isnothing(dval)
-        dval = inv(length(sets.dict[sets.xkey]))
+        dval = inv(length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]))
     end
-    val = estimator_to_val(rb, sets, dval; strict = strict)
+    val = estimator_to_val(rb, sets, dval, key; strict = strict)
     return RiskBudget(; val = val / sum(val))
 end
 """
-    risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets;
-                            strict::Bool = false, kwargs...)
+    risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets,
+                            key::Option{<:AbstractString} = nothing; strict::Bool = false,
+                            kwargs...)
 
 This method is a wrapper calling:
 
-    risk_budget_constraints(rb.val, sets; strict = strict)
+    risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
 
@@ -273,9 +288,10 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets;
+function risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets,
+                                 key::Option{<:AbstractString} = nothing;
                                  strict::Bool = false, kwargs...)::RiskBudget
-    return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
+    return risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict, kwargs...)
 end
 # const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
 # function risk_budget_constraints(rb::VecRkbE, sets::UniverseSets; strict::Bool = false,

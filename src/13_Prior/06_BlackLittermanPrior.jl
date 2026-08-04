@@ -199,7 +199,13 @@ Pre-compute shared Black-Litterman inputs from views, prior covariance, and blen
 
 Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
 
-`key` is the axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) leaves it `nothing` (the asset axis), while a member whose views update the **factor** distribution passes `sets.fkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+`key` is the axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) leaves it `nothing` (the asset axis), while a member whose views update the **factor** distribution passes `sets.fkey`. It is the last argument because it is the only one an asset-space caller never supplies. A caller that admits `sets === nothing` passes `nothing` here too — reading `sets.fkey` to describe a universe that does not exist is the same error as reading the universe itself.
+
+This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
+
+# Validation
+
+  - `size(P, 2) == size(prior_sigma, 1)`.
 
 # Arguments
 
@@ -234,6 +240,12 @@ function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, s
                     key::Option{<:AbstractString} = nothing)
     (; P, Q, excl) = black_litterman_views(views, sets, key; datatype = datatype,
                                            strict = strict)
+    # A `P` assembled from names is the right width by construction — the universe it resolved
+    # against is the one the caller already checked. A **precomputed** `P` resolves no names, so
+    # this is the only thing that sees its width at all, and without it a wrong one surfaces as a
+    # bare `DimensionMismatch` from the multiplication below.
+    @argcheck(size(P, 2) == size(prior_sigma, 1),
+              DimensionMismatch("the view matrix and the distribution the views update disagree on how many variables there are. Got\nsize(P, 2) => $(size(P, 2))\nsize(prior_sigma, 1) => $(size(prior_sigma, 1))"))
     tau = isnothing(pe_tau) ? inv(T) : pe_tau
     views_conf = remove_excl_views(views_conf, excl)
     omega = tau * calc_omega(views_conf, P, prior_sigma)
@@ -467,7 +479,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
 
 # Details
 
@@ -496,8 +508,14 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
             F = transpose(F)
         end
     end
-    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
+    # The axis is checked only by the views that resolve names against it. A `BlackLittermanViews`
+    # result carries its own `P` and never touches `sets`, so demanding a universe for it would
+    # reject the legitimate precomputed-views configuration, which `assert_bl` deliberately permits
+    # to supply no `sets` at all.
+    if isa(pe.views, LinearConstraintEstimator)
+        @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
+                  DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
+    end
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,

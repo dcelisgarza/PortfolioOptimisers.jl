@@ -1215,3 +1215,42 @@ end
     @test length(pooled.kld) == 2
     @test all(isfinite, pooled.kld)
 end
+
+@testset "Precomputed Black-Litterman views need no sets" begin
+    # `assert_bl` deliberately permits `sets === nothing` when the views are a
+    # `BlackLittermanViews` *result*: it carries its own `P` and `Q` and resolves no names.
+    # Every member then read its universe unconditionally and died before reaching the model
+    # — #232 closed this for `AugmentedBlackLittermanPrior`, the other three inherited it.
+    fblv = BlackLittermanViews(; P = reshape(Float64.(rd.nf .== "MTUM"), 1, :),
+                               Q = [0.0001])
+    ablv = BlackLittermanViews(; P = reshape(Float64.(rd.nx .== rd.nx[1]), 1, :),
+                               Q = [0.0002])
+
+    @test isa(prior(FactorBlackLittermanPrior(; views = fblv), rd), LowOrderPrior)
+    @test isa(prior(BayesianBlackLittermanPrior(; pe = FactorPrior(), views = fblv), rd),
+              LowOrderPrior)
+    @test isa(prior(BlackLittermanPrior(; views = ablv), rd), LowOrderPrior)
+    @test isa(prior(AugmentedBlackLittermanPrior(; a_views = ablv, f_views = fblv), rd),
+              LowOrderPrior)
+
+    # The gate is on the views, not on the sets: supplying a sets alongside precomputed views
+    # is still legal and still changes nothing, so the two agree bit for bit.
+    @test prior(FactorBlackLittermanPrior(; views = fblv, sets = xfsets), rd).mu ==
+          prior(FactorBlackLittermanPrior(; views = fblv), rd).mu
+    @test prior(BlackLittermanPrior(; views = ablv, sets = sets), rd).mu ==
+          prior(BlackLittermanPrior(; views = ablv), rd).mu
+
+    # Named views still demand — and still check — the axis they resolve against.
+    f_views = LinearConstraintEstimator(; val = "MTUM == 0.0001")
+    @test_throws IsNothingError FactorBlackLittermanPrior(; views = f_views)
+    @test_throws KeyError prior(FactorBlackLittermanPrior(; views = f_views, sets = sets),
+                                rd)
+
+    # Not crashing is not the same as being right. A precomputed `P` resolves no names, so
+    # `bl_preroll` — where `P` first meets the distribution it updates — is the only place its
+    # width is ever seen; before, a wrong one reached the linear algebra as a bare
+    # `DimensionMismatch` about two matrices the caller never wrote down.
+    wide = BlackLittermanViews(; P = ones(1, size(rd.F, 2) + 1), Q = [0.0001])
+    @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; views = wide), rd)
+    @test_throws DimensionMismatch prior(BlackLittermanPrior(; views = wide), rd)
+end

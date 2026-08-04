@@ -276,7 +276,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
 # Details
@@ -305,17 +305,25 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
         F = transpose(F)
     end
     # The views update the *factor* distribution — the assets are its projection through the
-    # loadings — so they resolve against the declared factor axis, not against `xkey`.
-    factor_universe(pe.sets, size(F, 2),
-                    "BayesianBlackLittermanPrior, whose views are written in factor names",
-                    "F")
+    # loadings — so they resolve against the declared factor axis, not against `xkey`. Only the
+    # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own
+    # `P`, so demanding one for it would reject the legitimate precomputed-views configuration,
+    # which `assert_bl` deliberately permits to supply no `sets` at all.
+    if isa(pe.views, LinearConstraintEstimator)
+        factor_universe(pe.sets, size(F, 2),
+                        "BayesianBlackLittermanPrior, whose views are written in factor names",
+                        "F")
+    end
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
                                         prior_result.fpr, prior_result.rr
     f_mu, f_sigma = fpr.mu, fpr.sigma
+    # Precomputed views ignore both the sets and the key, and are the one shape that reaches here
+    # with `pe.sets === nothing`, so the key is read only when there is a sets to read it from.
+    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                 size(F, 1), eltype(posterior_X), strict, pe.sets.fkey)
+                                 size(F, 1), eltype(posterior_X), strict, f_key)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))

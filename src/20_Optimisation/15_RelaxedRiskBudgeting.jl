@@ -334,7 +334,9 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   w::VecJuMPScalar, sigma::MatNum,
                                                   chol::Option{<:MatNum} = nothing)
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
+    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets,
+                                  risk_budget_universe_key(rrb.rba, N); N = N,
+                                  strict = rrb.opt.strict)
     rb = rkb.val
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)

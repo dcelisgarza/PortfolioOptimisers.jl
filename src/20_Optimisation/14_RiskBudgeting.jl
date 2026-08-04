@@ -290,6 +290,8 @@ Factor-level Risk Budgeting algorithm.
 
 `FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
 
+A named budget is written in **factor** names and resolved against the declared factor axis, `sets.dict[sets.fkey]`, which must name the columns of `rr.L` in order — see [`risk_budget_universe_key`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -309,11 +311,19 @@ Keywords correspond to the struct's fields.
 
   - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `re`: Loadings sliced to the selected assets via [`port_opt_view`](@ref).
+  - `sets`: Sliced via [`port_opt_view`](@ref), which subsets the **asset** axis and leaves the factor entries untouched. The field participates in views because it may carry both axes; `rkb` does not, because a factor budget has no asset index to slice by.
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
   - [`AssetRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
+  - [`risk_budget_universe_key`](@ref)
 """
 @propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     """
@@ -325,9 +335,9 @@ Keywords correspond to the struct's fields.
     """
     rkb
     """
-    $(field_dict[:sets])
+    $(field_dict[:sets_frb])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:flag])
     """
@@ -335,7 +345,8 @@ Keywords correspond to the struct's fields.
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:UniverseSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the declared factor axis, `sets.dict[sets.fkey]`"))
         end
         return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
@@ -508,6 +519,42 @@ function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end
 """
+    risk_budget_universe_key(rba::RiskBudgetingAlgorithm,
+                             N::Integer) -> Option{<:AbstractString}
+
+Return the key of the universe a named risk budget resolves against, or `nothing` for the asset frame.
+
+The budget vector is indexed by the variables the budget is *over*, so the universe naming it is a property of the algorithm rather than of the sets: [`AssetRiskBudgeting`](@ref) budgets the asset weights and takes the default axis, while [`FactorRiskBudgeting`](@ref) budgets the factor weights `w1` and takes the declared factor axis, `sets.fkey`.
+
+The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`RiskBudget`](@ref) result carries its own vector and resolves no names, so an unread axis is left unvalidated, as it is in every other consumer of the declared axis. When it *is* read, [`factor_universe`](@ref) checks it against `N`, the number of factor weights, which is `size(rr.L, 2)`: under a [`DimensionReductionRegression`](@ref) that is the reduced basis the risk is decomposed in and not the columns of `F`, so a budget named after the original factors is rejected here rather than by a bare `DimensionMismatch` further down.
+
+# Arguments
+
+  - `rba`: Risk budgeting algorithm.
+  - `N`: Number of budgeted variables, `length(w)` at the call site.
+
+# Returns
+
+  - `key::Option{<:AbstractString}`: The universe key, or `nothing` to use `sets.xkey`.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`factor_universe`](@ref)
+  - [`risk_budget_constraints`](@ref)
+"""
+function risk_budget_universe_key(::AssetRiskBudgeting, ::Integer)
+    return nothing
+end
+function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
+    if !isa(rba.rkb, RiskBudgetEstimator)
+        return nothing
+    end
+    factor_universe(rba.sets, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
+    return rba.sets.fkey
+end
+"""
     _set_risk_budgeting_constraints!(model, rb, ...)
 
 Internal function to set risk budgeting constraints in the JuMP model.
@@ -531,7 +578,9 @@ Configures the equality constraints ensuring each asset's marginal risk contribu
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
+    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets,
+                                  risk_budget_universe_key(rb.rba, N); N = N,
+                                  strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
