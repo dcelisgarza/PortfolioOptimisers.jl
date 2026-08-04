@@ -127,6 +127,10 @@ const arg_dict = Dict(
                       :phX => "`X`: Phylogeny matrix.",#
                       :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                       :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
+                      ## Separation decay
+                      :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
+                      :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. Larger values decay faster. The per-step retention form, `ratio^d`, is `rate = -log(ratio)`.",#
+                      :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. Larger values decay faster.",#
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
                       :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
@@ -701,6 +705,8 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                       :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
                       :dbhtpower => "`power > 0`.",#
                       :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
+                      :sdrate => "`rate > 0`.",#
+                      :sdpower => "`power > 0`.",#
                       :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
                       :ntn => "`n >= 1`.",#
                       :A => "`!isempty(A)`.",#

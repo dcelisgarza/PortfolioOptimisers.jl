@@ -233,3 +233,204 @@ end
                                                                              rd.X)
     @test occursin("FeatureDistance requires a feature matrix", res.value.msg)
 end
+
+# The separation decay family. It lives in `11_Phylogeny/01_Base_Phylogeny.jl` for include
+# order rather than for ownership -- `GradedNeighbourhood` is its only consumer -- so its
+# tests live beside that consumer.
+@testset "The decay members honour the contract they are held to" begin
+    dks = (LinearDecay(), ExponentialDecay(), ExponentialDecay(; rate = 0.25),
+           ExponentialDecay(; rate = 4.0), ReciprocalDecay(),
+           ReciprocalDecay(; power = 0.5), ReciprocalDecay(; power = 3.0))
+    for dk in dks
+        @test isa(dk, PortfolioOptimisers.AbstractSeparationDecayAlgorithm)
+        for dmax in (1, 2, 5, 8)
+            fs = [separation_decay(dk, d, dmax) for d in 0:dmax]
+            @test all(isfinite, fs)
+            @test fs[1] > 0                       # `f(0) > 0`
+            @test all(<=(fs[1]), fs)              # and maximal
+            @test issorted(fs; rev = true)        # monotone non-increasing
+            # Truncation is `n`'s job alone, so nothing inside the budget may reach zero:
+            # that is what makes a zero in `Z` mean "unreachable" and nothing else.
+            @test all(>(0), fs)
+        end
+    end
+
+    # `d` is a *real* separation, not a hop count. One family serves both variants, so the
+    # members must not assume an integer -- and the halfway point must sit between.
+    for dk in dks
+        @test separation_decay(dk, 0.5, 3) < separation_decay(dk, 0, 3)
+        @test separation_decay(dk, 0.5, 3) > separation_decay(dk, 1, 3)
+    end
+
+    # `dmax` is the budget in scope and only `LinearDecay` reads it -- the other members are
+    # pinned at `f(0) = 1` and ignore it, which is what decouples contrast from reach.
+    @test separation_decay(LinearDecay(), 0, 3) == 4
+    @test separation_decay(LinearDecay(), 0, 7) == 8
+    for dk in (ExponentialDecay(; rate = 2.0), ReciprocalDecay(; power = 2.0))
+        @test separation_decay(dk, 0, 3) == 1
+        @test separation_decay(dk, 2, 3) == separation_decay(dk, 2, 99)
+    end
+
+    # The closed forms, stated rather than paraphrased.
+    @test separation_decay(LinearDecay(), 2, 5) == 5 + 1 - 2
+    @test separation_decay(ExponentialDecay(; rate = 0.7), 3, 5) == exp(-0.7 * 3)
+    @test separation_decay(ReciprocalDecay(; power = 1.5), 3, 5) == inv((1 + 3)^1.5)
+    # Rate, not ratio: `ratio^d` is available as `rate = -log(ratio)`.
+    @test separation_decay(ExponentialDecay(; rate = -log(0.6)), 4, 9) ≈ 0.6^4
+    # The exponential falls off by a constant factor per unit of separation; the reciprocal
+    # does not, which is the point of shipping both.
+    ed, rd_ = ExponentialDecay(; rate = 0.8), ReciprocalDecay(; power = 0.8)
+    es = [separation_decay(ed, d, 5) for d in 0:5]
+    rs = [separation_decay(rd_, d, 5) for d in 0:5]
+    @test all(≈(exp(-0.8)), es[2:end] ./ es[1:(end - 1)])
+    @test !all(≈(rs[2] / rs[1]), rs[2:end] ./ rs[1:(end - 1)])
+    @test rs[end] > es[end]                       # heavier tail
+
+    # Field validation, on the members that carry a parameter.
+    @test_throws DomainError ExponentialDecay(; rate = 0)
+    @test_throws DomainError ExponentialDecay(; rate = -1.0)
+    @test_throws DomainError ReciprocalDecay(; power = 0)
+    @test_throws DomainError ReciprocalDecay(; power = -0.5)
+    @test ExponentialDecay().rate == 1.0
+    @test ReciprocalDecay().power == 1.0
+end
+
+# A decay defined outside the library. `assert_separation_decay` is opt-out: the fallback on
+# the abstract type probes, and only the shipped members turn it off.
+struct DecayNoTop <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayNoTop, d, dmax) = d + 1
+struct DecayZeroAtZero <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayZeroAtZero, d, dmax) = -float(d)
+struct DecayNonMonotone <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayNonMonotone, d, dmax) = d == 1 ? 0.1 : 1.0
+struct DecayInfinite <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayInfinite, d, dmax) = iszero(d) ? Inf : 1.0
+struct DecayFine <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayFine, d, dmax) = inv(2.0^d)
+
+@testset "The contract is enforced on extensions, not merely documented" begin
+    # `GradedNeighbourhood`'s diagonal comes out of the decay itself, so a member that is not
+    # maximal at `d = 0` silently produces the structural-equivalence matrix the diagonal
+    # exists to prevent -- see the diagonal testset above. Hence a *probing* fallback.
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNoTop(), 0:3,
+                                                                         3)
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayZeroAtZero(),
+                                                                         0:3, 3)
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNonMonotone(),
+                                                                         0:3, 3)
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayInfinite(),
+                                                                         0:3, 3)
+    @test isnothing(PortfolioOptimisers.assert_separation_decay(DecayFine(), 0:3, 3))
+    # The probe does not depend on the caller handing it sorted separations.
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNonMonotone(),
+                                                                         [3, 0, 2, 1], 3)
+    @test isnothing(PortfolioOptimisers.assert_separation_decay(DecayFine(), [3, 0, 2, 1],
+                                                                3))
+    # The shipped members opt out, so the check costs nothing for what ships.
+    for dk in (LinearDecay(), ExponentialDecay(), ReciprocalDecay())
+        @test isnothing(PortfolioOptimisers.assert_separation_decay(dk, 0:3, 3))
+    end
+
+    # It fires from the kernel too, before the `assets^2` loop rather than inside it.
+    @test_throws DomainError phylogeny_features(GradedNeighbourhood(; decay = DecayNoTop()),
+                                                NTE, rd.X)
+    # And a well-behaved outside member just works -- the family is open.
+    Zx = phylogeny_features(GradedNeighbourhood(; decay = DecayFine()), NTE, rd.X)
+    @test all(==(1.0), diag(Zx))
+    @test sort(unique(Zx)) == [0.0, 0.25, 0.5, 1.0]
+end
+
+@testset "GradedNeighbourhood carries the decay, and linear is unchanged" begin
+    @test GradedNeighbourhood().decay == LinearDecay()
+    @test GradedNeighbourhood(; decay = ExponentialDecay()).decay == ExponentialDecay()
+    # The field is bound by type rather than checked at runtime, so a non-decay is refused
+    # at construction.
+    @test_throws TypeError GradedNeighbourhood(; decay = 2.0)
+
+    # Linear reproduces the hardcoded fall-off `GradedNeighbourhood` shipped before the decay
+    # family existed, re-derived here from the graph rather than paraphrased. Verified
+    # bit-for-bit against the pre-change output over 17 matrices -- four graph algorithms,
+    # budgets 1 to 8, full universe and a slice -- on issue #197.
+    G = PortfolioOptimisers.Graphs
+    for n in (1, 2, 3, 5)
+        pl = NetworkEstimator(; n = n)
+        g = G.SimpleGraph(PortfolioOptimisers.calc_adjacency(pl, rd.X; dims = 1))
+        ref = zeros(Float64, NA, NA)
+        for v in 1:NA
+            h = G.gdistances(g, v)
+            for u in 1:NA
+                ref[u, v] = ifelse(h[u] <= n, Float64(n + 1 - h[u]), 0.0)
+            end
+        end
+        @test phylogeny_features(GradedNeighbourhood(), pl, rd.X) == ref
+        @test phylogeny_features(GradedNeighbourhood(; decay = LinearDecay()), pl, rd.X) ==
+              ref
+    end
+
+    # A different decay changes the values, not which pairs are inside the budget: the
+    # support is the binary variant's, whatever the fall-off.
+    Zb = phylogeny_features(BinaryNeighbourhood(), NTE, rd.X)
+    for dk in
+        (LinearDecay(), ExponentialDecay(; rate = 0.5), ExponentialDecay(; rate = 3.0),
+         ReciprocalDecay(), ReciprocalDecay(; power = 2.0))
+        Z = phylogeny_features(GradedNeighbourhood(; decay = dk), NTE, rd.X)
+        @test isa(Z, Matrix{Float64})             # the gemm path still
+        @test issymmetric(Z)
+        @test (Z .> 0) == (Zb .> 0)
+        @test all(==(separation_decay(dk, 0, NTE.n)), diag(Z))
+        @test maximum(Z) == separation_decay(dk, 0, NTE.n)
+    end
+
+    # The exponential's fall-off, read off the matrix: the score at each hop level is
+    # `exp(-rate * hops)`, and the diagonal is 1 rather than `n + 1`.
+    Zg = phylogeny_features(GradedNeighbourhood(), NTE, rd.X)
+    Ze = phylogeny_features(GradedNeighbourhood(; decay = ExponentialDecay(; rate = 0.9)),
+                            NTE, rd.X)
+    for h in 0:(NTE.n)
+        m = Zg .== NTE.n + 1 - h
+        @test any(m)
+        @test all(≈(exp(-0.9 * h)), Ze[m])
+    end
+    @test all(==(1.0), diag(Ze))
+    # Sharper fall-off really is sharper: the same pairs, further apart in score.
+    Zs = phylogeny_features(GradedNeighbourhood(; decay = ExponentialDecay(; rate = 3.0)),
+                            NTE, rd.X)
+    far = Zg .== 1.0                              # exactly `n` hops away
+    @test all(Zs[far] .< Ze[far])
+end
+
+# A network estimator handing the kernel an adjacency matrix chosen by the test. Every
+# estimator `calc_adjacency` can build is connected -- a spanning tree or a PMFG -- so this
+# is the only way to drive the unreachable branch from the public kernel.
+struct FixedAdjacency <: PortfolioOptimisers.AbstractNetworkEstimator
+    A::Matrix{Int}
+    n::Int
+end
+function PortfolioOptimisers.calc_adjacency(pl::FixedAdjacency, X; kwargs...)
+    return pl.A
+end
+
+@testset "An unreachable pair scores zero without evaluating the decay" begin
+    # Two disjoint edges: 1-2 and 3-4. Every cross-component pair is unreachable, which
+    # `gdistances` reports as `typemax(Int)`.
+    A = [0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
+    X = zeros(Float64, 3, 4)
+    g = PortfolioOptimisers.Graphs.SimpleGraph(A)
+    @test PortfolioOptimisers.Graphs.gdistances(g, 1)[3] == typemax(Int)
+
+    # The budget comparison must *short-circuit*, not merely select: `ifelse` evaluates both
+    # branches, and `ReciprocalDecay` overflows `1 + d` at `typemax(Int)` -- for a fractional
+    # power that is a `DomainError` rather than a discarded number.
+    @test_throws DomainError inv((1 + typemax(Int))^0.5)
+    dk = ReciprocalDecay(; power = 0.5)
+    Zr = phylogeny_features(GradedNeighbourhood(; decay = dk), FixedAdjacency(A, 1), X)
+    @test Zr[1, 3] == 0.0
+    @test Zr[1, 2] == separation_decay(dk, 1, 1) == inv(sqrt(2))
+    @test all(==(1.0), diag(Zr))
+    # And the same for a beyond-budget but reachable pair, which is the other zero.
+    Ap = [0 1 0; 1 0 1; 0 1 0]
+    Zp = phylogeny_features(GradedNeighbourhood(; decay = dk), FixedAdjacency(Ap, 1),
+                            zeros(Float64, 3, 3))
+    @test Zp[1, 3] == 0.0
+    @test Zp[1, 2] == inv(sqrt(2))
+end

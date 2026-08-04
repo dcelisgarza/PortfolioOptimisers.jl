@@ -94,7 +94,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny feature algorithms.
 
-A phylogeny feature algorithm is the rule turning the graph a [`PhylogenyFeatures`](@ref) source describes into an `assets × assets` feature matrix, `Z[i, k] = f(hops(i, k))`. The family is open: a user needing a different decay defines a member and a [`phylogeny_features`](@ref) method for it.
+A phylogeny feature algorithm is the rule turning the graph a [`PhylogenyFeatures`](@ref) source describes into an `assets × assets` feature matrix, `Z[i, k] = f(hops(i, k))`. The family is open: a user needing a different rule defines a member and a [`phylogeny_features`](@ref) method for it.
+
+A different *fall-off* needs neither — that is [`AbstractSeparationDecayAlgorithm`](@ref), which [`GradedNeighbourhood`](@ref) carries as a field.
 
 Every member includes **self**, so `f(0)` is the top of its scale — see [`PhylogenyFeatures`](@ref) for why the diagonal is load-bearing rather than cosmetic.
 
@@ -126,20 +128,63 @@ $(DocStringExtensions.TYPEDEF)
 
 Phylogeny feature algorithm grading each asset's neighbourhood by hop count.
 
-`Z[i, k] = max(0, n + 1 - hops(i, k))`, so a direct neighbour scores `n`, a two-hop neighbour `n - 1`, anything beyond `n` hops scores `0`, and the asset itself scores `n + 1`. It is strictly richer than [`BinaryNeighbourhood`](@ref), which is its `n = 1` special case up to scale: `phylogeny_matrix` accumulates `sum(A^i for i in 0:n)` and then `clamp!(P, 0, 1)` **destroys the step count**, which is the information this algorithm keeps.
+`Z[i, k] = decay(hops(i, k))` inside `n` hops and `0` beyond, so the score falls off with distance instead of flattening to an indicator. It is strictly richer than [`BinaryNeighbourhood`](@ref), which is its `n = 1` special case up to scale: `phylogeny_matrix` accumulates `sum(A^i for i in 0:n)` and then `clamp!(P, 0, 1)` **destroys the step count**, which is the information this algorithm keeps.
 
-The decay is linear in hops rather than the un-clamped walk count `sum(A^i)`. A walk count is degree-biased — a hub accumulates walks combinatorially — so two assets' scores would encode how busy their neighbourhoods are as much as how close they are.
+The score is a function of the hop count rather than of the un-clamped walk count `sum(A^i)`. A walk count is degree-biased — a hub accumulates walks combinatorially — so two assets' scores would encode how busy their neighbourhoods are as much as how close they are.
 
-Unreachable pairs score `0`, which needs no special case: `hops` is `typemax` there and the comparison against `n` runs before the subtraction, so nothing overflows.
+# The two knobs
+
+`decay` shapes the fall-off; `n` on the source [`NetworkEstimator`](@ref) truncates it. They are deliberately separate — an exponential never reaches zero, so a budget cannot be expressed as a fall-off — and `n` is the only place truncation happens. Under the default [`LinearDecay`](@ref) the two coincide in appearance: a direct neighbour scores `n`, a two-hop neighbour `n - 1`, the asset itself `n + 1`, and the score would hit `0` exactly one hop past the budget that already cut it. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1` and the fall-off is set by the member's own parameter, independently of how far `n` looks.
+
+Because no decay emits zero inside the budget, **a zero entry means unreachable-or-beyond-`n` and nothing else**.
+
+# Unreachable pairs
+
+`hops` is `typemax` for an unreachable vertex, so the budget comparison both selects the `0` and **guards the decay call**: `separation_decay` is never evaluated at `typemax`. The guard is load-bearing rather than tidy — `ReciprocalDecay` overflows `1 + d` there, and for a fractional `power` that is a `DomainError` rather than a discarded number.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GradedNeighbourhood(;
+        decay::AbstractSeparationDecayAlgorithm = LinearDecay()
+    ) -> GradedNeighbourhood
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> GradedNeighbourhood(; decay = ExponentialDecay(; rate = 0.5))
+GradedNeighbourhood
+  decay ┼ ExponentialDecay
+        │   rate ┴ Float64: 0.5
+```
 
 # Related
 
   - [`AbstractPhylogenyFeatureAlgorithm`](@ref)
   - [`BinaryNeighbourhood`](@ref)
+  - [`AbstractSeparationDecayAlgorithm`](@ref)
+  - [`LinearDecay`](@ref)
   - [`PhylogenyFeatures`](@ref)
   - [`calc_adjacency`](@ref)
 """
-struct GradedNeighbourhood <: AbstractPhylogenyFeatureAlgorithm end
+@concrete struct GradedNeighbourhood <: AbstractPhylogenyFeatureAlgorithm
+    """
+    $(field_dict[:sdecay])
+    """
+    decay
+    function GradedNeighbourhood(decay::AbstractSeparationDecayAlgorithm)
+        return new{typeof(decay)}(decay)
+    end
+end
+function GradedNeighbourhood(;
+                             decay::AbstractSeparationDecayAlgorithm = LinearDecay())::GradedNeighbourhood
+    return GradedNeighbourhood(decay)
+end
 """
     phylogeny_features(alg::BinaryNeighbourhood, pl::AbstractNetworkEstimator,
                        X::MatNum; kwargs...)
@@ -164,7 +209,7 @@ A **partition** has none: two assets are in the same cluster or they are not, an
 
 # The diagonal
 
-`Z[i, i]` is the top of the scale, never zero: `1` for [`BinaryNeighbourhood`](@ref) and for any clustering source, `n + 1` for [`GradedNeighbourhood`](@ref) over a graph.
+`Z[i, i]` is the top of the scale, never zero: `1` for [`BinaryNeighbourhood`](@ref) and for any clustering source, and `separation_decay(decay, 0, n)` for [`GradedNeighbourhood`](@ref) over a graph — `n + 1` under the default [`LinearDecay`](@ref), `1` for the members that pin `f(0) = 1`. That the diagonal is maximal is a contract on [`AbstractSeparationDecayAlgorithm`](@ref), checked before the loop by [`assert_separation_decay`](@ref).
 
 # Arguments
 
@@ -197,19 +242,24 @@ function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
     return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
            LinearAlgebra.I
 end
-function phylogeny_features(::GradedNeighbourhood, pl::AbstractNetworkEstimator, X::MatNum;
-                            kwargs...)::Matrix
+function phylogeny_features(alg::GradedNeighbourhood, pl::AbstractNetworkEstimator,
+                            X::MatNum; kwargs...)::Matrix
     A = calc_adjacency(pl, X; dims = 1, kwargs...)
     g = Graphs.SimpleGraph(A)
     n = pl.n
     et = eltype(X)
+    dk = alg.decay
+    # A hop count only ever takes values in `0:n` here, so probing that range is exhaustive
+    # rather than a spot check -- `n + 1` evaluations before an `assets^2` loop.
+    assert_separation_decay(dk, 0:n, n)
     Z = zeros(et, Graphs.nv(g), Graphs.nv(g))
     for v in Graphs.vertices(g)
         h = Graphs.gdistances(g, v)
         for u in Graphs.vertices(g)
-            # `gdistances` reports `typemax` for an unreachable vertex, so the comparison
-            # must run before the subtraction or `n + 1 - h[u]` would overflow.
-            @inbounds Z[u, v] = ifelse(h[u] <= n, et(n + 1 - h[u]), 0.0)
+            # `gdistances` reports `typemax` for an unreachable vertex, so the budget
+            # comparison also guards the decay call and must short-circuit -- `ifelse` would
+            # evaluate it, and `ReciprocalDecay` overflows `1 + d` at `typemax`.
+            @inbounds Z[u, v] = h[u] <= n ? et(separation_decay(dk, h[u], n)) : zero(et)
         end
     end
     return Z
