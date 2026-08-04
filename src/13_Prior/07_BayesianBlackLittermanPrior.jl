@@ -42,6 +42,12 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
     The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
 
+## The views are written on the factor axis
+
+`views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because the Bayesian update lands on the factor distribution and reaches the assets through the loadings. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
+
+`sets.dict[sets.fkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
+
 ## Validation
 
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
@@ -52,11 +58,12 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
 ```jldoctest
 julia> BayesianBlackLittermanPrior(;
-                                   sets = UniverseSets(; xkey = \"nx\",
-                                                       dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                   sets = UniverseSets(;
+                                                       dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                                   \"nf\" => [\"F1\", \"F2\"])),
                                    views = LinearConstraintEstimator(;
-                                                                     val = [\"A == 0.03\",
-                                                                            \"B + C == 0.04\"]))
+                                                                     val = [\"F1 == 0.03\",
+                                                                            \"F2 == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
              │    pe ┼ EmpiricalPrior
@@ -133,14 +140,14 @@ BayesianBlackLittermanPrior
              │     alg ┼ nothing
              │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
        views ┼ LinearConstraintEstimator
-             │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+             │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
         sets ┼ UniverseSets
              │    xkey ┼ String: "nx"
              │   uxkey ┼ String: "ux"
              │    fkey ┼ String: "nf"
              │   ufkey ┼ String: "uf"
-             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -174,9 +181,9 @@ BayesianBlackLittermanPrior
     """
     views
     """
-    $(field_dict[:sets])
+    $(field_dict[:sets_f])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:views_conf])
     """
@@ -269,14 +276,14 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.xkey]) == size(F, 2)`.
+  - `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
 
 # Details
 
   - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
   - The factor prior is computed using the embedded prior estimator `pe.pe`.
-  - Views are extracted using [`black_litterman_views`](@ref), which returns the view matrix `P` and view returns vector `Q`.
+  - Views are extracted using [`black_litterman_views`](@ref) **at `pe.sets.fkey`**, which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of factor observations.
   - The view uncertainty matrix `f_omega` is computed using [`calc_omega`](@ref).
   - Bayesian posterior mean and covariance are computed via the model's update equations.
@@ -297,15 +304,18 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(F, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(F, 2) ($(size(F, 2)))"))
+    # The views update the *factor* distribution — the assets are its projection through the
+    # loadings — so they resolve against the declared factor axis, not against `xkey`.
+    factor_universe(pe.sets, size(F, 2),
+                    "BayesianBlackLittermanPrior, whose views are written in factor names",
+                    "F")
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     assert_prior_regression(prior_result, :pe)
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
                                         prior_result.fpr, prior_result.rr
     f_mu, f_sigma = fpr.mu, fpr.sigma
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                 size(F, 1), eltype(posterior_X), strict)
+                                 size(F, 1), eltype(posterior_X), strict, pe.sets.fkey)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))

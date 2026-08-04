@@ -159,7 +159,7 @@ end
 
     # `BayesianBlackLittermanPrior` — forwards the bundle; `chol` is the only drop.
     bbl = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
-                                            sets = fsets, views = f_views), rd)
+                                            sets = xfsets, views = f_views), rd)
     @test bbl.w == f_pooled.w
     @test bbl.ens == f_pooled.ens
     @test isnothing(bbl.chol)
@@ -225,8 +225,8 @@ end
     # factor block by 1.4e-10 and the pre-fix carrier looks consistent by accident. A
     # falsification witness needs a view the prior *disagrees* with.
     contrary_f_views = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.05"])
-    bbl_pe = BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor), sets = fsets,
-                                         views = contrary_f_views)
+    bbl_pe = BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
+                                         sets = xfsets, views = contrary_f_views)
     bbl = prior(bbl_pe, rd)
     @test identity_gap(bbl) < 1e-12
 
@@ -249,7 +249,7 @@ end
     # wired to the factor side rather than ignored.
     bbl_dn = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
                                                f_mp = MatrixProcessing(; dn = Denoise()),
-                                               sets = fsets, views = contrary_f_views), rd)
+                                               sets = xfsets, views = contrary_f_views), rd)
     @test bbl_dn.fpr.sigma != bbl.fpr.sigma
     @test bbl_dn.sigma == bbl.sigma
 

@@ -225,7 +225,7 @@ end
                                                                         "WMT == group2",
                                                                         "RRC-group1 == 0.0005"])),
            BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
-                                       sets = fsets, tau = 1 / size(rd.X, 1),
+                                       sets = xfsets, tau = 1 / size(rd.X, 1),
                                        views = LinearConstraintEstimator(;
                                                                          val = ["MTUM == 0.0001",
                                                                                 "QUAL - USMV == -0.0003"])),
@@ -263,6 +263,86 @@ end
                                                                                                   "RRC-group1 == 0.0005"]),
                                                                  sets)), rd)
     @test isapprox(df[!, 1], [pr.mu; vec(pr.sigma)], rtol = 1e-6)
+end
+
+@testset "Bayesian Black Litterman reads the declared factor axis" begin
+    # The golden test above is the bit-identity proof: entry 2 of `pes` runs on `xfsets`,
+    # whose factors live under `fkey`, and still matches `BlackLitterman.csv.gz` to the same
+    # tolerance it matched under the pre-migration shape. Only the *lookup* changed.
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # The pre-migration shape — factor names under `xkey`, no factor axis at all. The naive
+    # migration failure would be an *asset*-axis complaint about a user who never wrote an
+    # asset name, so the message has to name the factor universe.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by BayesianBlackLittermanPrior", msg)
+    @test occursin("it is not optional here", msg)
+    @test !occursin("asset", msg)
+    @test_throws KeyError prior(BayesianBlackLittermanPrior(; sets = fsets,
+                                                            views = f_views), rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(BayesianBlackLittermanPrior(; sets = shortf,
+                                                                     views = f_views), rd)
+    # …and says which two things disagree, rather than reporting an asset-axis length.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = shortf, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("declared factor axis disagree", msg)
+    # An *asset* name is now the thing that cannot resolve, and the message says so.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = xfsets,
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["$(rd.nx[1]) == 0.0001"])),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in factor universe", msg)
+    @test occursin("$(length(rd.nf)) factors under key `nf`", msg)
+    # The wrapped estimator's own `key` wins over the axis the estimator routes at, the same
+    # precedence `rebase_linear_constraints` uses — the plumbing #230 added applies here
+    # unchanged.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = xfsets,
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["MTUM == 0.0001",
+                                                                                   "QUAL == 0.0001"],
+                                                                            key = "nx")),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in asset universe", msg)
+    @test occursin("$(length(rd.nx)) assets under key `nx`", msg)
+    # A sets carrying both axes, under a view. The factor axis has no meaning for an asset
+    # index, so it must come back untouched; the asset axis must slice. `sets` is `@vprop`
+    # because the object can now carry both — the exemption is a property of the data.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = BayesianBlackLittermanPrior(; sets = both, views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # And the views still resolve after the slice: the axis they are written against did
+    # not move.
+    rdi = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
+    @test isapprox(prior(pev, rdi).mu, prior(pe, rdi).mu)
+    # The consistency identity of ADR 0046 is a property of the update, not of the lookup:
+    # it must survive the migration exactly.
+    pr = prior(BayesianBlackLittermanPrior(; sets = xfsets, views = f_views), rd)
+    @test isapprox(pr.mu, pr.rr.M * pr.fpr.mu + pr.rr.b)
 end
 
 @testset "Factor Black Litterman" begin
@@ -840,7 +920,7 @@ end
     @test occursin("`pe`", hofpe_err.msg)
 
     bbl_err = try
-        prior(BayesianBlackLittermanPrior(; pe = no_rr, sets = fsets,
+        prior(BayesianBlackLittermanPrior(; pe = no_rr, sets = xfsets,
                                           tau = 1 / size(rd.X, 1),
                                           views = LinearConstraintEstimator(;
                                                                             val = ["MTUM == 0.0001"])),
@@ -861,7 +941,7 @@ end
                                                                         val = ["AAPL == 0.001"]))
     @test !isnothing(prior(forwards_rr, rd).rr)
     @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = forwards_rr), rd).rr)
-    @test !isnothing(prior(BayesianBlackLittermanPrior(; pe = forwards_rr, sets = fsets,
+    @test !isnothing(prior(BayesianBlackLittermanPrior(; pe = forwards_rr, sets = xfsets,
                                                        tau = 1 / size(rd.X, 1),
                                                        views = LinearConstraintEstimator(;
                                                                                          val = ["MTUM == 0.0001"])),
@@ -928,7 +1008,7 @@ end
                FactorBlackLittermanPrior(; sets = xfsets, tau = 1 / size(rd.X, 1),
                                          views = LinearConstraintEstimator(;
                                                                            val = ["MTUM == 0.0001"])),
-               BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = fsets,
+               BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = xfsets,
                                            tau = 1 / size(rd.X, 1),
                                            views = LinearConstraintEstimator(;
                                                                              val = ["MTUM == 0.0001"])),

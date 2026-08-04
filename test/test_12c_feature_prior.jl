@@ -108,7 +108,7 @@ end
     @test prior(BlackLittermanPrior(; pe = fpe, sets = sets, views = views), rd).Z == Zlit
     @test prior(BayesianBlackLittermanPrior(;
                                             pe = FeaturePrior(; pe = FactorPrior(),
-                                                              ze = Zlit), sets = fsets,
+                                                              ze = Zlit), sets = xfsets,
                                             views = f_views), rd).Z == Zlit
     @test prior(AugmentedBlackLittermanPrior(; a_pe = fpe, a_sets = sets, a_views = views,
                                              f_sets = fsets, f_views = f_views), rd).Z ==

@@ -70,9 +70,10 @@ rd = prices_to_returns(X, F)
 asset_sets = UniverseSets(;
                           dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
                                       "energy" => ["CVX"]))
+## `AugmentedBlackLittermanPrior` still takes a factors-under-`xkey` sets for its `f_sets`.
 factor_sets = UniverseSets(; dict = Dict("nx" => rd.nf))
-## `FactorBlackLittermanPrior` reads the *declared* factor axis, so its sets names both:
-## assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+## Every other factor-view estimator reads the *declared* factor axis, so its sets names
+## both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
 universe_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
@@ -88,9 +89,10 @@ pretty_table(DataFrame(; factor = rd.nf); title = "Factor names (rd.nf)")
 ## 2. Bayesian Black–Litterman: factor views on a factor prior
 
 [`BayesianBlackLittermanPrior`](@ref) takes a [`FactorPrior`](@ref) as its base estimator and
-accepts views written in **factor space** (so its `sets` are the factor sets). It is the
-Bayesian formulation: the factor prior supplies the structure, the views update the factor
-means, and the result is mapped back to an asset-space posterior.
+accepts views written in **factor space**, resolved against the declared factor axis
+`sets.dict[sets.fkey]` — which is why it takes `universe_sets`. It is the Bayesian
+formulation: the factor prior supplies the structure, the views update the factor means, and
+the result is mapped back to an asset-space posterior.
 
 Our factor views: momentum earns 5 bps/day, and quality underperforms low-volatility by 3
 bps/day.
@@ -100,7 +102,7 @@ factor_views = LinearConstraintEstimator(;
                                          val = ["MTUM == 0.0005", "QUAL - USMV == -0.0003"])
 
 pr_bayes = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior()),
-                                             sets = factor_sets, tau = tau,
+                                             sets = universe_sets, tau = tau,
                                              views = factor_views), rd)
 
 #=

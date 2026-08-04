@@ -135,7 +135,7 @@ end
                                                                         "WMT == group2",
                                                                         "RRC-group1 == 0.0005"])),
            BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
-                                       sets = fsets, tau = 1 / size(rd.X, 1),
+                                       sets = xfsets, tau = 1 / size(rd.X, 1),
                                        views = LinearConstraintEstimator(;
                                                                          val = ["MTUM == 0.0001",
                                                                                 "QUAL - USMV == -0.0003"])),
