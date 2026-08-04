@@ -37,5 +37,6 @@ eval_numeric_functions
 has_invalid_plus
 port_opt_view(sets::UniverseSets, i, args...)
 factor_universe
+feature_universe
 _expr_depth_exceeds
 ```

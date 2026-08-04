@@ -345,10 +345,20 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     AssetSetsFeatures(;
-        vals::AbstractVector{<:AbstractString}
+        vals::Union{<:AbstractVector{<:AbstractString}, <:AbstractVector{<:Pair}},
+        strict::Bool = false
     ) -> AssetSetsFeatures
 
 Keywords correspond to the struct's fields.
+
+# One type, two contracts
+
+`vals` is dispatched on element type, and the two readings are genuinely different animals:
+
+  - `AbstractVector{<:AbstractString}` — **group name keys**. Every key is a partition, so every row has exactly `length(vals)` ones and the equal-row-norm identity `cos = shared / L` holds exactly. The feature axis is *derived* by stacking, names are qualified `\"<key>=<group>\"`, and a view rebuilds it.
+  - `AbstractVector{<:Pair}` — a **graded program**. An ordered, last-wins list of authored edges over the axis *declared* at `sets.dict[sets.zkey]`. Names are bare, the axis is fold-invariant, and the equal-norm identity does not hold — no normalisation could restore it, since it needs `0`/`1` entries and not merely equal norms.
+
+They share a type rather than splitting into two producers because the grammar strictly **subsumes** the key list: `\"nx_sector\" => 2.0` emits the same columns as `\"nx_sector\"`, only scaled. The cost is accepted and stated: one type now carries two contracts, and only one of them has the identity.
 
 # The only exogenous rectangular source
 
@@ -358,21 +368,29 @@ Every other producer in this file derives `Z` from the returns: [`RegressionFeat
 
 Producers run inside `prior(pe::FeaturePrior, …)`, so they can only ever populate the **derived** carrier — and `z_src` defaults to `:data`. [`asset_sets_features`](@ref) is therefore public in its own right, for building an `assets × features` matrix to hand to [`ReturnsResult`](@ref) directly. The two routes give the identical matrix; they differ only in which carrier holds it, and hence in what a fold does to it.
 
-# The feature axis is groups, never assets
+# The feature axis is groups, never assets — on the key path
 
-Even when the group values happen to number as many as the assets. The feature axis indexes *groups*, so a coincidence of counts is not a claim about what the columns mean — and an asset view rebuilds the axis from the viewed taxonomy rather than slicing it, so a group with no members left in the view simply disappears.
+Even when the group values happen to number as many as the assets. There the feature axis indexes *groups*, so a coincidence of counts is not a claim about what the columns mean, and an asset view rebuilds the axis from the viewed taxonomy rather than slicing it, so a group with no members left in the view simply disappears.
+
+A graded program is the other case: its axis is **declared**, part asset node and part taxonomy node, and a view passes it through untouched. `size(Z, 2)` is therefore fold-invariant, and an asset node whose asset the view dropped survives as an all-zero column.
+
+# `strict` is a field, not a keyword
+
+[`feature_matrix`](@ref)'s producer interface is `feature_matrix(ze, pr, X, F, sets)`, so there is nowhere to pass a keyword through. It rides on the estimator instead, and appears as a keyword on the public [`asset_sets_features`](@ref) — which matters because the public function is the only route to the default `z_src = :data` carrier, so a grammar landing on the producer alone would be reachable from one carrier and not the other.
 
 # Validation
 
-  - `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)), at construction.
-  - `FeaturePrior.sets` is not `nothing`, and each key resolves against it, when the producer runs.
+  - On the **key** path: `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)), at construction. Neither carries to the graded path — a one-column matrix is legal there, and repeating a key is the whole point of last-wins.
+  - On the **graded** path: `!isempty(vals)`, at construction.
+  - `FeaturePrior.sets` is not `nothing`, and resolves against it, when the producer runs.
 
 # Examples
 
 ```jldoctest
 julia> AssetSetsFeatures(; vals = [\"nx_sector\", \"nx_country\"])
 AssetSetsFeatures
-  vals ┴ Vector{String}: ["nx_sector", "nx_country"]
+    vals ┼ Vector{String}: ["nx_sector", "nx_country"]
+  strict ┴ Bool: false
 ```
 
 # Related
@@ -380,6 +398,7 @@ AssetSetsFeatures
   - [`AbstractFeatureMatrixEstimator`](@ref)
   - [`asset_sets_features`](@ref)
   - [`assert_feature_keys`](@ref)
+  - [`Scale`](@ref)
   - [`UniverseSets`](@ref)
   - [`feature_matrix`](@ref)
   - [`FeaturePrior`](@ref)
@@ -390,13 +409,27 @@ AssetSetsFeatures
     $(field_dict[:asets_vals])
     """
     vals
-    function AssetSetsFeatures(vals::AbstractVector{<:AbstractString})::AssetSetsFeatures
+    """
+    $(field_dict[:asets_strict])
+    """
+    strict
+    function AssetSetsFeatures(vals::AbstractVector{<:AbstractString},
+                               strict::Bool)::AssetSetsFeatures
         assert_feature_keys(vals)
-        return new{typeof(vals)}(vals)
+        return new{typeof(vals), typeof(strict)}(vals, strict)
+    end
+    function AssetSetsFeatures(vals::AbstractVector{<:Pair},
+                               strict::Bool)::AssetSetsFeatures
+        @argcheck(!isempty(vals),
+                  IsEmptyError("`vals` cannot be empty: a program with no entries can only produce the all-zero matrix, which declares every asset identical"))
+        return new{typeof(vals), typeof(strict)}(vals, strict)
     end
 end
-function AssetSetsFeatures(; vals::AbstractVector{<:AbstractString})::AssetSetsFeatures
-    return AssetSetsFeatures(vals)
+function AssetSetsFeatures(;
+                           vals::Union{<:AbstractVector{<:AbstractString},
+                                       <:AbstractVector{<:Pair}},
+                           strict::Bool = false)::AssetSetsFeatures
+    return AssetSetsFeatures(vals, strict)
 end
 # The taxonomy is the whole input, so an absent `sets` is a missing argument rather than a
 # defaulted one: there is nothing to fall back to, and a returns-derived substitute would be
@@ -405,7 +438,7 @@ function feature_matrix(ze::AssetSetsFeatures, ::AbstractPriorResult, ::Any, ::A
                         sets::Option{<:UniverseSets}; kwargs...)
     @argcheck(!isnothing(sets),
               IsNothingError("AssetSetsFeatures reads its taxonomy from `FeaturePrior.sets`, which is nothing. Pass `FeaturePrior(; ze = AssetSetsFeatures(; vals = $(ze.vals)), sets = UniverseSets(…))`."))
-    return asset_sets_features(ze.vals, sets)
+    return asset_sets_features(ze.vals, sets; strict = ze.strict)
 end
 """
     feature_estimator_view(ze::AbstractFeatureMatrixEstimator, i, args...)

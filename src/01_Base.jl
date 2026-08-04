@@ -588,6 +588,7 @@ const arg_dict = Dict(
                       :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
                       :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
                       :us_ufkey => "`ufkey`: Key prefix for unique-entry factor group variants in `dict`. Validated at construction, never recomputed by a view.",#
+                      :us_zkey => "`zkey`: Key in `dict` identifying the declared feature axis — the node list a graded feature program writes its columns against. Optional, like `fkey`, and it carries no prefix convention: nothing is partitioned over the feature axis, so it has no unique-entry sibling and no length rule beyond `allunique`.",#
                       :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
                       :A_phylo => "`A`: Phylogeny constraint matrix.",#
                       :B_phylo => "`B`: Group sizes or allocations vector.",#
@@ -599,7 +600,8 @@ const arg_dict = Dict(
                       :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
                       :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
                       :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
-                      :asets_vals => "`vals`: Group name keys whose partitions are stacked into the feature axis, at least two. One partition alone is one-hot, which makes the distance two-valued for every metric.",#
+                      :asets_vals => "`vals`: Either group name keys whose partitions are stacked into the feature axis, at least two (one partition alone is one-hot, which makes the distance two-valued for every metric), or an ordered edge-authoring program of `Pair`s over the declared feature axis `sets.dict[sets.zkey]`. The two are dispatched on element type and are different contracts — see [`asset_sets_features`](@ref).",#
+                      :asets_strict => "`strict`: Whether an unresolvable *name* in a graded `vals` program throws instead of warning. Governs names only: nothing structural is refused, so an all-zero row and a one-column matrix are both legal. Ignored on the group-name-key path, where an absent key is an unconditional `KeyError`.",#
                       :thr_val => "`val`: Asset-specific threshold value(s).",#
                       :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
                       # Entropy pooling.
@@ -2441,6 +2443,7 @@ UniverseSets
   uxkey ┼ String: "ux"
    fkey ┼ String: "nf"
   ufkey ┼ String: "uf"
+   zkey ┼ String: "nz"
    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
 
 julia> estimator_to_val(MyIncreasingValue(), sets)

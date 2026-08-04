@@ -507,3 +507,128 @@ Two things this amendment settles that #180 got the other way round.
   the **full** universe and sliced only afterwards, which is the same semantics as a square producer
   one layer down, where a subproblem is measured on its own neighbourhood structure only after the
   structure over everything has been computed.
+
+## Amendment (2026-08-04): the taxonomy producer takes a graded program over a declared axis
+
+`AssetSetsFeatures` produced *membership*: a list of `UniverseSets` keys, each stacked as a one-hot
+block, every written cell at `1.0`. Its `vals` now admits a second reading — an ordered
+**edge-authoring program** of `Pair`s over a feature axis the sets *declares* — with the key list
+surviving as the degenerate case by dispatch on element type. The producer stops being "taxonomy
+memberships, optionally weighted" and becomes "a user-authored biadjacency matrix that resolves
+against a `UniverseSets` and refits under a fold".
+
+The grammar:
+
+```text
+entry  := rowsel => targets                    # row scope, then explicit columns
+        | taxkey [=> group] => value           # diagonal: those rows, their own membership
+rowsel := asset | group | taxkey [=> group]
+target := taxkey [=> group] => value | asset => value | group => value
+value  := Number                               # sets, absolutely
+        | <:AbstractFeatureValue               # Scale(x): x × the key's natural value
+```
+
+Entries apply in order and every write is a pure overwrite, so **last wins**.
+
+### What is new, and why each shape is what it is
+
+- **`UniverseSets` gains `zkey`** (default `"nz"`), the **third** declared axis after ADR 0047's
+  `fkey`. It is the fifth *name* field: the inner constructor goes 5 → 6 positionals, breaking on a
+  documented public type, with one positional call site in the repo — its own keyword constructor.
+  `zkey` joins the mutual-prefix loop, taking it from 12 ordered checks to 20.
+
+  It gets **no** prefix convention and **no** unique-entry sibling, which is the asymmetry worth
+  recording: `xkey` and `fkey` each have one because each names an axis that partitions are written
+  *over*. Nothing is written over the feature axis — the taxonomy keys are `xkey`-prefixed and
+  asset-length, and the columns are named straight out of the flat list. Its only rule is
+  `allunique(dict[zkey])`, so `ReturnsResult`'s own `nz` check cannot be reached with a duplicate.
+  The entry is **optional**, like the factor axis, and diagnosed at the point of need by
+  `feature_universe` — `factor_universe`'s sibling, minus the arity reconciliation, because the
+  feature axis has no matrix to agree with: it *defines* the width.
+
+- **The axis is declared, not derived**, and that buys two things a `Dict` cannot give: a column
+  order, and a node that nothing writes to. It also makes the axis **fold-invariant** —
+  `port_opt_view(::UniverseSets, i, args...)` passes `zkey` through, gaining no branch. That is the
+  *opposite* of what this ADR's original text records for the key path, where the viewed producer
+  rebuilds the axis from the viewed taxonomy and a group with no members left disappears. Both are
+  now true, on different paths, and the docs say which is which.
+
+  The exemption has a different cause from the factor axis's. Factors pass through because an asset
+  index is meaningless on them; the feature axis passes through even though some of its nodes *are*
+  assets, because it is **authored** rather than summarised. The accepted cost: an asset node whose
+  asset a view dropped survives as an all-zero column — benign for every blessed metric (a zero
+  column adds nothing to a dot product or a row norm) except `CorrDist`, which centres each row.
+
+- **A bare number sets; `Scale` scales; the marker is an open family.** Letting *nesting depth*
+  decide instead was rejected by arithmetic: on a one-hot key the natural value is always `1.0`, so
+  the two readings coincide and the divergence appears only once a taxonomy carries numbers — which
+  is exactly the feature being added. Two properties of `Scale` are **forced**, not chosen. It scales
+  the key's own *datum* and never the accumulated cell, because at the top level there is no
+  accumulated value; that is what keeps the program a pure overwrite and lets last-wins survive the
+  marker. And consequently **scaling a cross edge gives zero**, since the natural value of "is C in
+  the US?" is `0` when C is UK. A documented hazard, not a defect.
+
+- **Targets are always fully qualified.** There is no ambient scope and no fallback chain, because
+  the chain would have to be four levels deep and would answer "is `UK` the country or the ticker?"
+  by proximity rather than by what the caller wrote. Uniformity costs two entries in the worked
+  example and gains one: a bare `Number` right-hand side can then always mean the diagonal write, so
+  `"nx_country" => ["UK" => 0.5]` collapses to `"nx_country" => "UK" => 0.5`.
+
+  Row-selector precedence needs no new rule. `UniverseSets` already guarantees every `xkey`-prefixed
+  key is asset-parallel, so the prefix decides, and what is left is `estimator_to_val`'s existing
+  asset-then-group order. A **factor-axis** key is refused by name between the two, rather than
+  falling through to the plain-group branch and failing later on a length mismatch that names neither
+  the axis nor the cause. That refusal comes *before* the grammar check in target position, since a
+  factor key wearing a taxonomy key's two-level shape would otherwise be reported as a syntax error
+  and send the caller hunting for a missing bracket.
+
+- **Node names are bare.** Qualified-first-with-bare-fallback was declined, with the cost stated: a
+  nested taxonomy with a **repeated value** is inexpressible in graded mode, because both levels land
+  on the one node and the later entry overwrites the earlier — harmless under one-hot, where both
+  wrote `1.0`, silently lossy under grading. The key path still qualifies and stays the tool for it.
+
+- **`strict` governs names only, and is a field.** Unknown names warn with a `did_you_mean`
+  suggestion over a pool widened to assets + group keys + taxonomy keys + taxonomy values + declared
+  nodes, and throw under `strict`. Three structural refusals were offered and all declined: an
+  all-zero row is legal, a one-column matrix is legal, and `allunique(vals)` is dropped because
+  repeating a key is the whole point of last-wins. Only non-emptiness is unconditional — and a
+  *malformed entry* throws regardless of `strict`, because a syntax error has no reading to fall back
+  to. It is a field rather than a keyword because the producer interface is
+  `feature_matrix(ze, pr, X, F, sets)`, with nowhere to pass one through; it appears as a keyword on
+  the public `asset_sets_features`, which matters because that function is the only route to the
+  default `z_src = :data` carrier, so a grammar landing on the producer alone would be reachable from
+  one carrier and not the other.
+
+### Consequences
+
+- **One type now carries two contracts**, and the equal-row-norm identity holds on only one of them.
+  Accepted, and chosen over a fifth producer, because the grammar strictly *subsumes* the key list:
+  `"nx_sector" => 2.0` emits the same columns as `"nx_sector"`, only scaled, and an all-`1.0` program
+  is bit-identical to stacking the same keys. The identity is not recoverable on the graded path by
+  any knob — row-normalising is an exact no-op under the cosine family, and the identity needs `0`/`1`
+  entries rather than merely equal norms.
+
+- **The all-zero row becomes reachable for the first time.** Today every key is a partition, so every
+  row has exactly `L` ones; an asset no entry touches is now all-zero, and this ADR's own zero-norm
+  convention declares zero rows *mutually identical* — so forgotten assets cluster together at
+  distance `0`. Opened deliberately, and documented rather than refused.
+
+- **The transform question loses its *reweighting* instance, for this producer only.** Per-key and
+  per-column weighting is now authored in `vals`, so "sector counts double" needs no transform at all.
+  It does not generalise, and says so by its own shape: `Scale` resolves per cell against a natural
+  value, whereas `idf` is data-dependent across a whole column and cannot be an `AbstractFeatureValue`
+  at all, and an intensive/extensive tag is a per-column carrier schema no producer can supply.
+
+- **`nz ⊃ nx` becomes reachable** — a **mixed** axis, part asset node and part taxonomy node, which
+  neither the asset-keyed square producers nor the refitting ones had. `features_are_assets` is strict
+  equality, so a mixed axis takes the *rectangular* path everywhere: a view slices rows only, and
+  `collapse_feature_matrix` applies the one-sided `Wᵀ Z`, making an asset-node column read as "this
+  cluster's weighted-average edge to asset A" while A may itself be in that cluster. Left alone, on
+  the precedent that a synthetic asset's self-reference stays exactly as computed.
+
+- **The pre-prior site is unaffected but asymmetric**: the third amendment's `ClusterGroups` reads
+  `rd.Z` off the data carrier and carries no `z_src`, so a graded program reaches preselection only
+  by way of the public `asset_sets_features` — never by way of the producer.
+
+- Every `UniverseSets` doctest gains exactly one line and nothing re-indents: `zkey` is four
+  characters and `uxkey`/`ufkey` already set the right-alignment width.

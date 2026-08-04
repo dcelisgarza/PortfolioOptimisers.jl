@@ -207,6 +207,118 @@ function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::UniverseSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for markers that reinterpret a value in a graded feature program.
+
+A bare `Number` in [`asset_sets_features`](@ref)' pair grammar **sets** a cell, absolutely. A marker says the number means something else, resolved against the cell's **natural value** by [`resolve_feature_value`](@ref). [`Scale`](@ref) is the sole member; the family is open so a second reading can be added without touching the resolver.
+
+# Why the marker, and not nesting depth
+
+The alternative was to let *position* decide — a top-level number scales, a nested one sets. That is invisible on a one-hot taxonomy, where the natural value is always `1.0` and the two readings coincide, and it diverges silently the moment a taxonomy carries numbers, which is exactly what the graded grammar adds. A marker makes the reading something the caller writes down.
+
+# Related
+
+  - [`Scale`](@ref)
+  - [`resolve_feature_value`](@ref)
+  - [`asset_sets_features`](@ref)
+"""
+abstract type AbstractFeatureValue <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Multiply a cell's **natural value** by `val`, rather than setting the cell to `val`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    Scale(; val::Number = 1.0) -> Scale
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isfinite(val)`.
+
+# The natural value, and the two properties it forces
+
+`Scale` scales the **key's own datum**, never the value already accumulated in the cell. At the top level of a program there is no accumulated value — the matrix starts at zero, and scaling zero is useless — so the only coherent referent is the underlying datum:
+
+  - a **numeric** taxonomy key: the asset's own number (`nx_esg` at `0.30`, `0.80`, `0.50`);
+  - a **one-hot** key, an asset node or a group member: `1.0` when the row belongs, `0.0` when it does not.
+
+Two consequences follow, and neither is a defect:
+
+ 1. The program stays a pure overwrite. Every write is `resolve_feature_value(v, natural)` and never a read-modify-write, so **last-wins** ordering survives the marker.
+ 2. **Scaling a cross edge gives zero.** `\"C\" => [\"nx_country\" => \"US\" => Scale(0.3)]` scales C's *US membership*, and C is UK — so the cell is `0.0`, not `0.3`. Use a bare number to set a cross edge.
+
+# Examples
+
+```jldoctest
+julia> resolve_feature_value(Scale(1.3), 0.5)
+0.65
+
+julia> resolve_feature_value(0.7, 0.5)
+0.7
+```
+
+# Related
+
+  - [`AbstractFeatureValue`](@ref)
+  - [`resolve_feature_value`](@ref)
+  - [`asset_sets_features`](@ref)
+"""
+@concrete struct Scale <: AbstractFeatureValue
+    """
+    `val`: Multiplier applied to the cell's natural value.
+    """
+    val
+    function Scale(val::Number)::Scale
+        @argcheck(isfinite(val), DomainError(val, "`val` must be finite"))
+        return new{typeof(val)}(val)
+    end
+end
+function Scale(; val::Number = 1.0)::Scale
+    return Scale(val)
+end
+"""
+    resolve_feature_value(v::Number, natural::Number) -> Number
+    resolve_feature_value(v::Scale, natural::Number) -> Number
+
+Resolve a graded-feature-program value `v` against the cell's `natural` value.
+
+A bare number is absolute and ignores `natural`; a [`Scale`](@ref) multiplies it. Extending [`AbstractFeatureValue`](@ref) means adding one method here and nothing else.
+
+# Related
+
+  - [`AbstractFeatureValue`](@ref)
+  - [`Scale`](@ref)
+  - [`asset_sets_features`](@ref)
+"""
+function resolve_feature_value(v::Number, ::Number)
+    return v
+end
+function resolve_feature_value(v::Scale, natural::Number)
+    return v.val * natural
+end
+"""
+    const Num_AFeatVal = Union{<:Number, <:AbstractFeatureValue}
+
+Alias for a resolved value in a graded feature program: a bare number, or a marker that reinterprets one.
+
+This is the grammar's `value` production, and it is what distinguishes a *value* from a nested target list when a program entry is parsed.
+
+# Related
+
+  - [`AbstractFeatureValue`](@ref)
+  - [`Scale`](@ref)
+  - [`asset_sets_features`](@ref)
+"""
+const Num_AFeatVal = Union{<:Number, <:AbstractFeatureValue}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a list of taxonomy keys can produce a graded feature matrix.
@@ -257,6 +369,7 @@ This is the **exogenous** feature source: a sector, industry or country classifi
 
   - `vals`: Group name keys in `sets.dict`, at least two (see [`assert_feature_keys`](@ref)).
   - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `strict`: Accepted for a uniform interface with the graded method and **ignored**. `strict` governs name resolution, and on this path every name is a `sets.dict` key whose absence is an unconditional `KeyError` from [`asset_sets_matrix`](@ref) — there is no soft failure for it to govern.
 
 # Returns
 
@@ -325,10 +438,468 @@ ReturnsResult(; nx = nx, X = X, nz = asset_sets_feature_names(vals, sets),
   - [`AssetSetsFeatures`](@ref)
   - [`FeatureDistance`](@ref)
 """
-function asset_sets_features(vals::AbstractVector{<:AbstractString},
-                             sets::UniverseSets)::Matrix{Float64}
+function asset_sets_features(vals::AbstractVector{<:AbstractString}, sets::UniverseSets;
+                             strict::Bool = false)::Matrix{Float64}
     assert_feature_keys(vals)
     return Float64.(reduce(hcat, (transpose(asset_sets_matrix(v, sets)) for v in vals)))
+end
+"""
+    feature_program_candidates(sets::UniverseSets, nz) -> Vector{String}
+
+Build the `did_you_mean` pool for a graded feature program: asset names, every `sets.dict` key, every distinct value of every taxonomy key, and every declared feature node.
+
+A graded program's names live in four namespaces at once, so a pool narrower than their union would answer "did you mean" with silence on the commonest typo.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function feature_program_candidates(sets::UniverseSets, nz)::Vector{String}
+    dict = sets.dict
+    xkey = sets.xkey
+    pool = String[]
+    append!(pool, string.(dict[xkey]))
+    append!(pool, string.(keys(dict)))
+    for (k, v) in dict
+        if k != xkey && startswith(k, xkey)
+            append!(pool, string.(unique(v)))
+        end
+    end
+    append!(pool, string.(nz))
+    return unique!(pool)
+end
+"""
+    is_feature_taxonomy_key(k, sets::UniverseSets) -> Bool
+    is_feature_factor_key(k, sets::UniverseSets) -> Bool
+
+Classify a name in a graded feature program by the axis its prefix declares.
+
+[`UniverseSets`](@ref) guarantees every `sets.xkey`-prefixed dict key is asset-parallel, so the prefix rule alone decides whether a name is a taxonomy key — no new convention is needed, and row-selector precedence reduces to prefix, then asset, then group, exactly as [`estimator_to_val`](@ref) resolves.
+
+A `sets.fkey`/`sets.ufkey`-prefixed name is factor-length, so it can index neither the rows (assets) nor the declared nodes. It is refused **by name** rather than falling through to the plain-group branch, where it would fail later on a length mismatch that names neither the axis nor the cause.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function is_feature_taxonomy_key(k, sets::UniverseSets)::Bool
+    return isa(k, AbstractString) && startswith(k, sets.xkey) && haskey(sets.dict, k)
+end
+function is_feature_factor_key(k, sets::UniverseSets)::Bool
+    return isa(k, AbstractString) && (startswith(k, sets.fkey) || startswith(k, sets.ufkey))
+end
+"""
+    feature_program_diagnostic(msg::AbstractString, strict::Bool) -> Nothing
+
+Report an unresolvable **name** in a graded feature program: throw under `strict`, warn otherwise, and in both cases the offending term is dropped.
+
+`strict` governs names only. Nothing structural is refused — an all-zero row and a one-column matrix are both legal — and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+"""
+function feature_program_diagnostic(msg::AbstractString, strict::Bool)::Nothing
+    if strict
+        throw(ArgumentError(msg))
+    end
+    @warn(msg)
+    return nothing
+end
+"""
+    feature_grammar_msg(term) -> String
+    feature_factor_key_msg(k, sets::UniverseSets) -> String
+    feature_missing_group_value_msg(key, group, col) -> String
+    feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset") -> String
+
+Build the diagnostics a graded feature program raises.
+
+[`feature_grammar_msg`](@ref) prints the grammar itself, because a malformed term is a syntax error and the fastest fix is seeing the production it missed. The rest are name failures routed through [`feature_program_diagnostic`](@ref), and all of them name sizes rather than universes — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref), which `feature_unknown_name_msg` wraps.
+
+`feature_factor_key_msg` carries **no** suggestion: the name resolved perfectly well, on the wrong axis, so there is no typo to propose. The others drop the queried name from their own candidate pool before suggesting, because a graded program's pool is deliberately wide enough — taxonomy *values* and declared nodes included — to contain a name that is nonetheless invalid in the position it was written.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`unknown_variable_msg`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function feature_grammar_msg(term)
+    return "`$(term)` is not a well-formed graded feature program term. The grammar is\n" *
+           "  entry  := rowsel => targets              # row scope, then explicit columns\n" *
+           "          | taxkey [=> group] => value     # diagonal: those rows, their own membership\n" *
+           "  rowsel := asset | group | taxkey [=> group]\n" *
+           "  target := taxkey [=> group] => value | asset => value | group => value\n" *
+           "  value  := Number | <:AbstractFeatureValue\n" *
+           "`targets` is one target or a vector of them, and every target names its column in full: there is no ambient scope."
+end
+function feature_factor_key_msg(k, sets::UniverseSets)
+    return "`$(k)` names the factor axis (prefix `$(sets.fkey)`/`$(sets.ufkey)`), which is neither a row selector nor a column target: a graded feature program indexes assets by row and declared feature nodes by column, and a factor-length list is neither; term dropped"
+end
+function feature_missing_group_value_msg(key, group, col)
+    vals = string.(unique(col))
+    return "group value `$(group)` of taxonomy key `$(key)` matches no asset ($(length(vals)) distinct values under that key); term dropped" *
+           did_you_mean(string(group), filter(!=(string(group)), vals))
+end
+function feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset")
+    return unknown_variable_msg(name, nx, key; candidates = filter(!=(string(name)), pool),
+                                axis = axis)
+end
+"""
+    feature_numeric_column(col) -> Bool
+
+Whether a taxonomy key's data are numbers, which is what decides the **diagonal** form's column and natural value.
+
+A *categorical* key writes each asset into the node its own group value names, at a natural value of `1.0`. A *numeric* key has one node — the key with `sets.xkey * "_"` stripped — and the asset's own number is the natural value. The two are the same production in the grammar and differ only here.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`Scale`](@ref)
+"""
+function feature_numeric_column(col)::Bool
+    return !isempty(col) && all(x -> isa(x, Number), col)
+end
+"""
+    feature_write!(Z::Matrix{Float64}, rows, node, natural, v, sets::UniverseSets, nz, zidx,
+                   pool, strict::Bool) -> Nothing
+
+Write one column of a graded feature program: resolve `node` against the declared axis, then set `Z[i, col] = resolve_feature_value(v, natural(i))` for every `i` in `rows`.
+
+Every write in the program funnels through here, which is what makes **last-wins** a property of the traversal rather than a rule each production has to honour: the assignment is a pure overwrite, never a read-modify-write, so a later entry simply replaces an earlier one.
+
+The column is resolved **before** `natural` is ever called, so an unknown node costs one diagnostic and no work — and `natural` never has to be defined for a node that does not exist.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`resolve_feature_value`](@ref)
+  - [`feature_program_diagnostic`](@ref)
+"""
+function feature_write!(Z::Matrix{Float64}, rows, node, natural, v, sets::UniverseSets, nz,
+                        zidx, pool, strict::Bool)::Nothing
+    col = get(zidx, string(node), nothing)
+    if isnothing(col)
+        return feature_program_diagnostic(feature_unknown_name_msg(node, nz, sets.zkey,
+                                                                   pool; axis = "feature"),
+                                          strict)
+    end
+    for i in rows
+        Z[i, col] = resolve_feature_value(v, natural(i))
+    end
+    return nothing
+end
+"""
+    feature_diagonal!(Z::Matrix{Float64}, key, group, v, sets::UniverseSets, nx, nz, zidx,
+                      pool, strict::Bool) -> Nothing
+
+Apply the grammar's **diagonal** production, `taxkey [=> group] => value`: write each selected asset's own membership, rather than a column named from outside.
+
+This is the production that makes a bare number on the right of a taxonomy key unambiguous, and it is why the uniform "targets are always fully qualified" rule costs nothing — `\"nx_country\" => \"UK\" => 0.5` says what the two-level nested form used to say, one bracket shorter.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`feature_write!`](@ref)
+  - [`feature_numeric_column`](@ref)
+"""
+function feature_diagonal!(Z::Matrix{Float64}, key, group, v, sets::UniverseSets, nx, nz,
+                           zidx, pool, strict::Bool)::Nothing
+    col = sets.dict[key]
+    if feature_numeric_column(col)
+        rows = if isnothing(group)
+            eachindex(nx)
+        else
+            findall(x -> isequal(x, group), col)
+        end
+        if isempty(rows)
+            return feature_program_diagnostic(feature_missing_group_value_msg(key, group,
+                                                                              col), strict)
+        end
+        node = chopprefix(key, sets.xkey * "_")
+        return feature_write!(Z, rows, node, i -> float(col[i]), v, sets, nz, zidx, pool,
+                              strict)
+    end
+    if !isnothing(group)
+        rows = findall(x -> isequal(x, group), col)
+        if isempty(rows)
+            return feature_program_diagnostic(feature_missing_group_value_msg(key, group,
+                                                                              col), strict)
+        end
+        return feature_write!(Z, rows, group, i -> 1.0, v, sets, nz, zidx, pool, strict)
+    end
+    for g in unique(col)
+        rows = findall(x -> isequal(x, g), col)
+        feature_write!(Z, rows, g, i -> 1.0, v, sets, nz, zidx, pool, strict)
+    end
+    return nothing
+end
+"""
+    feature_rows(sel, sets::UniverseSets, nx, pool, strict::Bool) -> Option{Vector{Int}}
+
+Resolve a **non-taxonomy** row selector — an asset or an asset group — to row indices, or `nothing` when the name does not resolve.
+
+Taxonomy keys are handled by the caller, because the `sets.xkey` prefix rule settles them before any lookup. What is left is exactly [`estimator_to_val`](@ref)'s precedence, asset first and then group, with the factor axis refused between them so a factor-length list is diagnosed by name rather than by an eventual length mismatch.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`missing_group_assets_msg`](@ref)
+"""
+function feature_rows(sel, sets::UniverseSets, nx, pool, strict::Bool)
+    if sel in nx
+        return [findfirst(x -> isequal(x, sel), nx)]
+    end
+    if is_feature_factor_key(sel, sets)
+        feature_program_diagnostic(feature_factor_key_msg(sel, sets), strict)
+        return nothing
+    end
+    members = get(sets.dict, sel, nothing)
+    if isnothing(members)
+        feature_program_diagnostic(feature_unknown_name_msg(sel, nx, sets.xkey, pool),
+                                   strict)
+        return nothing
+    end
+    members = unique(members)
+    idx = [findfirst(x -> isequal(x, m), nx) for m in members]
+    missing_assets = members[isnothing.(idx)]
+    filter!(!isnothing, idx)
+    if !isempty(missing_assets)
+        feature_program_diagnostic(missing_group_assets_msg(sel, missing_assets, nx,
+                                                            sets.xkey), strict)
+    end
+    return idx
+end
+"""
+    feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, nx, nz, zidx, pool,
+                    strict::Bool) -> Nothing
+    feature_targets!(Z::Matrix{Float64}, rows, targets, sets::UniverseSets, nx, nz, zidx,
+                     pool, strict::Bool) -> Nothing
+
+Apply the grammar's `target` production inside an already-resolved row scope, singly or over a vector.
+
+Every target names its column in full, so this reads left to right with no ambient state: a taxonomy key with a group value names that value's node, a numeric taxonomy key names its own node, an asset names its own node, and a group expands to one node per member. The natural value is the row's membership of the node the target named — which is why scaling a cross edge gives zero.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`feature_write!`](@ref)
+  - [`Scale`](@ref)
+"""
+function feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, nx, nz, zidx,
+                         pool, strict::Bool)::Nothing
+    if !isa(target, Pair)
+        throw(ArgumentError(feature_grammar_msg(target)))
+    end
+    k, rest = target
+    if is_feature_taxonomy_key(k, sets)
+        col = sets.dict[k]
+        if isa(rest, Pair)
+            g, v = rest
+            if !isa(v, Num_AFeatVal)
+                throw(ArgumentError(feature_grammar_msg(target)))
+            end
+            return feature_write!(Z, rows, g, i -> ifelse(isequal(col[i], g), 1.0, 0.0), v,
+                                  sets, nz, zidx, pool, strict)
+        end
+        if !isa(rest, Num_AFeatVal)
+            throw(ArgumentError(feature_grammar_msg(target)))
+        end
+        @argcheck(feature_numeric_column(col),
+                  ArgumentError("`$(k)` is a categorical taxonomy key, so a target naming it must also name a group value: `\"$(k)\" => <group> => <value>`. The bare form `key => value` names the key's *own* node, which only exists for a numeric key. Got\ntarget => $(target)"))
+        node = chopprefix(k, sets.xkey * "_")
+        return feature_write!(Z, rows, node, i -> float(col[i]), rest, sets, nz, zidx, pool,
+                              strict)
+    end
+    # Before the grammar check, because a factor key wearing a taxonomy key's two-level
+    # shape would otherwise be reported as a syntax error and send the caller looking for a
+    # missing bracket instead of a wrong axis.
+    if is_feature_factor_key(k, sets)
+        return feature_program_diagnostic(feature_factor_key_msg(k, sets), strict)
+    end
+    if !isa(rest, Num_AFeatVal)
+        throw(ArgumentError(feature_grammar_msg(target)))
+    end
+    if k in nx
+        return feature_write!(Z, rows, k, i -> ifelse(isequal(nx[i], k), 1.0, 0.0), rest,
+                              sets, nz, zidx, pool, strict)
+    end
+    members = get(sets.dict, k, nothing)
+    if isnothing(members)
+        return feature_program_diagnostic(feature_unknown_name_msg(k, nx, sets.xkey, pool),
+                                          strict)
+    end
+    for m in unique(members)
+        feature_write!(Z, rows, m, i -> ifelse(isequal(nx[i], m), 1.0, 0.0), rest, sets, nz,
+                       zidx, pool, strict)
+    end
+    return nothing
+end
+function feature_targets!(Z::Matrix{Float64}, rows, targets, sets::UniverseSets, nx, nz,
+                          zidx, pool, strict::Bool)::Nothing
+    if isa(targets, AbstractVector)
+        for t in targets
+            feature_target!(Z, rows, t, sets, nx, nz, zidx, pool, strict)
+        end
+        return nothing
+    end
+    return feature_target!(Z, rows, targets, sets, nx, nz, zidx, pool, strict)
+end
+"""
+    feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx, nz, zidx, pool,
+                   strict::Bool) -> Nothing
+
+Apply one entry of a graded feature program.
+
+# How the two productions are told apart
+
+`entry := rowsel => targets | taxkey [=> group] => value`, and Julia's `=>` is right-associative, so both arrive as a `Pair` whose right side may nest. Three tests separate them, in this order:
+
+ 1. The left side is a taxonomy key and the right side bottoms out in a **value** — `\"nx_sector\" => 2.0`, `\"nx_country\" => \"UK\" => 0.5`. That is the diagonal, by decision: a bare value on the right of a taxonomy key always means "these rows, their own membership".
+ 2. The left side is a taxonomy key, the right side is `g => tail` with `tail` a target list, and `g` is *itself* a taxonomy key. Then `g` starts a target, so the left side is a bare row selector over the whole universe. This is the one genuine ambiguity in the grammar and it is resolved by the same prefix rule everything else uses.
+ 3. Otherwise the left side is a row selector — restricted by `g` when the left side is a taxonomy key, an asset or a group when it is not.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`feature_diagonal!`](@ref)
+  - [`feature_targets!`](@ref)
+  - [`feature_rows`](@ref)
+"""
+function feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx, nz, zidx,
+                        pool, strict::Bool)::Nothing
+    lhs, rhs = entry
+    if is_feature_taxonomy_key(lhs, sets)
+        if isa(rhs, Num_AFeatVal)
+            return feature_diagonal!(Z, lhs, nothing, rhs, sets, nx, nz, zidx, pool, strict)
+        end
+        if isa(rhs, Pair)
+            g, tail = rhs
+            if isa(tail, Num_AFeatVal)
+                return feature_diagonal!(Z, lhs, g, tail, sets, nx, nz, zidx, pool, strict)
+            end
+            if is_feature_taxonomy_key(g, sets)
+                return feature_targets!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool,
+                                        strict)
+            end
+            col = sets.dict[lhs]
+            rows = findall(x -> isequal(x, g), col)
+            if isempty(rows)
+                return feature_program_diagnostic(feature_missing_group_value_msg(lhs, g,
+                                                                                  col),
+                                                  strict)
+            end
+            return feature_targets!(Z, rows, tail, sets, nx, nz, zidx, pool, strict)
+        end
+        return feature_targets!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool, strict)
+    end
+    rows = feature_rows(lhs, sets, nx, pool, strict)
+    if isnothing(rows) || isempty(rows)
+        return nothing
+    end
+    return feature_targets!(Z, rows, rhs, sets, nx, nz, zidx, pool, strict)
+end
+"""
+    asset_sets_features(vals::AbstractVector{<:Pair}, sets::UniverseSets;
+                        strict::Bool = false) -> Matrix{Float64}
+
+Resolve an ordered **edge-authoring program** into an `assets × features` matrix over the declared feature axis `sets.dict[sets.zkey]`.
+
+This is the *graded* contract. The group-name-key method above is the degenerate case of it — a partition stack with every written cell at `1.0` — and the two are separated by dispatch on `vals`' element type, so today's callers, today's matrix and today's `\"<key>=<group>\"` names are untouched.
+
+# The grammar
+
+```
+entry  := rowsel => targets                    # row scope, then explicit columns
+        | taxkey [=> group] => value           # diagonal: those rows, their own membership
+rowsel := asset | group | taxkey [=> group]
+target := taxkey [=> group] => value | asset => value | group => value
+value  := Number                               # sets, absolutely
+        | <:AbstractFeatureValue               # Scale(x): x × the key's natural value
+```
+
+`targets` is one target or a vector of them. Entries are applied **in order** and each write is a pure overwrite, so **last wins** — repeating a key is the point, not a mistake, which is why `allunique` does not carry into this path.
+
+Every target names its column **in full**. There is no ambient scope and no fallback chain: `\"UK\"` inside a `nx_country` entry would otherwise be resolved as a country by proximity rather than by what the caller wrote, and `UK` is also a real ticker.
+
+# Two things the declared axis buys
+
+ 1. **Column order.** A `Dict` has none, so without a declared list the feature axis would be whatever order the taxonomy happened to iterate in.
+ 2. **Fold invariance.** `size(Z, 2)` does not change under an asset view, because [`port_opt_view(::UniverseSets, i, args...)`](@ref) passes `zkey` through — the axis is *authored*, not summarised. This is the exact opposite of the group-name-key path, and both are documented because both are true. The cost is accepted: an asset node whose asset a view dropped survives as an **all-zero column**, benign for every blessed metric except `Distances.CorrDist`, which centres each row.
+
+# Names are bare, and what that forbids
+
+Nodes are named plainly — `\"Tech\"`, `\"US\"`, `\"esg\"` (a numeric key with `sets.xkey * \"_\"` stripped), `\"A\"` for an asset node — because the caller authored the axis and qualifying it would make them write the prefix twice.
+
+The accepted cost: **a nested taxonomy with a repeated value is inexpressible in graded mode.** With `nx_industry` and `nx_subindustry` both containing `IntegratedOil`, both land on the one bare node and the later entry overwrites the earlier — harmless under one-hot, where both wrote `1.0`, silently lossy under grading. The group-name-key path qualifies its names and stays the tool for that case.
+
+# What is refused, and what is not
+
+`strict` governs **names only** — an unknown node, asset or group warns with a [`did_you_mean`](@ref) suggestion, and throws under `strict`. Nothing structural is refused:
+
+  - **An all-zero row is legal**, and is the one genuine silent-wrongness case grading opens: an asset no entry touches has a zero row, and [`FeatureDistance`](@ref)'s zero-norm convention declares zero rows mutually *identical*, so forgotten assets cluster together at distance `0`.
+  - **A one-column matrix is legal**: [`assert_feature_keys`](@ref)' two-key floor is a property of stacking partitions and does not carry here.
+
+Only non-emptiness is unconditional. A **malformed entry** — one that matches no production — throws regardless of `strict`, because there is no reading of it to fall back to.
+
+# Arguments
+
+  - `vals`: The ordered program.
+  - `sets`: A [`UniverseSets`](@ref) whose `dict` declares the feature axis under `sets.zkey`.
+  - `strict`: Whether an unresolvable name throws instead of warning.
+
+# Returns
+
+  - `Z::Matrix{Float64}`: An `assets × length(sets.dict[sets.zkey])` matrix, zero-initialised.
+
+# Validation
+
+  - `!isempty(vals)`.
+  - `haskey(sets.dict, sets.zkey)` (see [`feature_universe`](@ref)).
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; xkey = \"nx\", zkey = \"nz\",
+                           dict = Dict{String, Any}(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                    \"nz\" => [\"Tech\", \"Finance\", \"esg\"],
+                                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"],
+                                                    \"nx_esg\" => [0.30, 0.80, 0.50]));
+
+julia> asset_sets_features([\"nx_sector\" => 2.0, \"nx_esg\" => Scale(1.3),
+                            \"B\" => [\"nx_sector\" => \"Finance\" => 0.2]], sets)
+3×3 Matrix{Float64}:
+ 2.0  0.0  0.39
+ 2.0  0.2  1.04
+ 0.0  2.0  0.65
+```
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`Scale`](@ref)
+  - [`resolve_feature_value`](@ref)
+  - [`asset_sets_feature_names`](@ref)
+  - [`feature_universe`](@ref)
+  - [`AssetSetsFeatures`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function asset_sets_features(vals::AbstractVector{<:Pair}, sets::UniverseSets;
+                             strict::Bool = false)::Matrix{Float64}
+    @argcheck(!isempty(vals),
+              IsEmptyError("`vals` cannot be empty: a program with no entries can only produce the all-zero matrix, which declares every asset identical"))
+    nx = sets.dict[sets.xkey]
+    nz = feature_universe(sets, "a graded `asset_sets_features` program")
+    Z = zeros(Float64, length(nx), length(nz))
+    zidx = Dict(string(n) => k for (k, n) in pairs(nz))
+    pool = feature_program_candidates(sets, nz)
+    for entry in vals
+        feature_entry!(Z, entry, sets, nx, nz, zidx, pool, strict)
+    end
+    return Z
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -378,6 +949,54 @@ function asset_sets_feature_names(vals::AbstractVector{<:AbstractString},
     return [string(v, "=", g) for v in vals for g in unique(sets.dict[v])]
 end
 """
+    asset_sets_feature_names(vals::AbstractVector{<:Pair}, sets::UniverseSets) -> Vector{String}
+
+Name the columns a graded [`asset_sets_features`](@ref) program produces: the **declared** axis itself, `sets.dict[sets.zkey]`.
+
+The pairing with the matrix is trivial here, and deliberately so — the caller authored the axis, so the recipe below keeps the shape it has on the group-name-key path while the program itself carries no naming rule at all.
+
+# Names are bare, not qualified
+
+The exact opposite of the group-name-key method above, and for a stated reason. That path *derives* its axis by stacking partitions, so it must qualify (`\"nx_industry=IntegratedOil\"`) or a nested taxonomy would collide with itself. This path's axis is **authored**, so the names are whatever the caller wrote — `\"Tech\"`, `\"US\"`, `\"esg\"`, `\"A\"` — and qualifying them would mean writing the prefix twice, once in `dict[zkey]` and again in every target.
+
+The cost of bareness is a graded-mode limitation, documented on [`asset_sets_features`](@ref): a nested taxonomy with a repeated value cannot be expressed, because both levels land on the one node.
+
+# Arguments
+
+  - `vals`: The program. Read only for dispatch — the axis does not depend on it.
+  - `sets`: A [`UniverseSets`](@ref) whose `dict` declares the feature axis under `sets.zkey`.
+
+# Returns
+
+  - `nz::Vector{String}`: The declared feature axis, `length(nz) == size(Z, 2)`.
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; xkey = \"nx\", zkey = \"nz\",
+                           dict = Dict{String, Any}(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                    \"nz\" => [\"Tech\", \"Finance\", \"esg\"],
+                                                    \"nx_sector\" => [\"Tech\", \"Tech\", \"Finance\"]));
+
+julia> asset_sets_feature_names([\"nx_sector\" => 2.0], sets)
+3-element Vector{String}:
+ "Tech"
+ "Finance"
+ "esg"
+```
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`feature_universe`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function asset_sets_feature_names(vals::AbstractVector{<:Pair},
+                                  sets::UniverseSets)::Vector{String}
+    return string.(feature_universe(sets, "a graded `asset_sets_feature_names` call"))
+end
+"""
     port_opt_view(smtx, i; kwargs...)
 
 Get a column view or subset of an asset sets membership matrix for asset index `i`.
@@ -411,4 +1030,4 @@ function port_opt_view(smtx::VecMatNum_ASetMatE, i, args...; kwargs...)
 end
 
 export AssetSetsMatrixEstimator, asset_sets_matrix, asset_sets_features,
-       asset_sets_feature_names
+       asset_sets_feature_names, AbstractFeatureValue, Scale, resolve_feature_value

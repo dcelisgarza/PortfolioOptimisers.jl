@@ -107,6 +107,7 @@ BlackLittermanPrior
              │   uxkey ┼ String: "ux"
              │    fkey ┼ String: "nf"
              │   ufkey ┼ String: "uf"
+             │    zkey ┼ String: "nz"
              │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0

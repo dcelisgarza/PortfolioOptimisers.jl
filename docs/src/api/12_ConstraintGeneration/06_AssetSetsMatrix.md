@@ -8,7 +8,21 @@ MatNum_ASetMatE_VecMatNum_ASetMatE
 VecMatNum_ASetMatE
 asset_sets_matrix
 PortfolioOptimisers.assert_feature_keys
+AbstractFeatureValue
+Scale
+resolve_feature_value
+PortfolioOptimisers.Num_AFeatVal
 asset_sets_features
 asset_sets_feature_names
+PortfolioOptimisers.feature_program_candidates
+PortfolioOptimisers.is_feature_taxonomy_key
+PortfolioOptimisers.feature_program_diagnostic
+PortfolioOptimisers.feature_grammar_msg
+PortfolioOptimisers.feature_numeric_column
+PortfolioOptimisers.feature_write!
+PortfolioOptimisers.feature_diagonal!
+PortfolioOptimisers.feature_rows
+PortfolioOptimisers.feature_target!
+PortfolioOptimisers.feature_entry!
 port_opt_view(smtx::MatNum, i, args...)
 ```
