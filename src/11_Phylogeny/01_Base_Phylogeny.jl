@@ -97,8 +97,11 @@ A separation decay turns a **separation** `d >= 0` — how far apart two assets 
   - `f(0) > 0` and maximal. Self-inclusion is load-bearing rather than cosmetic: a decay that does not put an asset at the top of its own scale silently produces a *structural equivalence* matrix instead of a proximity one — see [`PhylogenyFeatures`](@ref)'s "Why the diagonal includes self".
   - Monotone non-increasing in `d`.
   - Never assumed to reach zero. **Truncation is a separate knob**: the consumer applies its own budget — `n` on [`NetworkEstimator`](@ref) — and the decay only shapes the fall-off inside it. An exponential never reaches zero, so budget and fall-off cannot be the same dial.
+  - `f(d) >= 0` for `0 <= d <= dmax`. `0` is the unreachable sentinel, so a negative score *inside* the budget would place a **reachable** pair strictly below an **unreachable** one — an ordering inversion within the producer's own scale. It is not a claim that a signed score is wrong in general: the feature matrix is signed-tolerant by decision, and [`assert_metric_domain`](@ref) checks non-negativity per metric at the consumer rather than blanket. This clause is producer-local, and it is non-negativity rather than strict positivity because a decay that bottoms out at zero says *no relatedness*, which is the same claim an unreachable pair makes.
 
-No shipped member emits zero anywhere inside the budget, so a zero in the resulting feature matrix means **unreachable** and nothing else.
+The clause is **scoped to the budget** because the sign outside it is unobservable — the consumer's `h[u] <= n` test short-circuits before the decay is ever evaluated there — and because the family's own default violates the wider statement: [`LinearDecay`](@ref) crosses zero at `d = dmax + 1` and is negative above it. Binding the clause on all `d >= 0` would need the `max(0, ⋅)` floor the budget knob exists to avoid, a second truncation biting before `n` does.
+
+A zero in the resulting feature matrix therefore means **functionally unreachable**: either the graph is disconnected there, or the decay has fallen to nothing — the same claim about the pair, and nothing downstream can act on the difference. No shipped member emits zero anywhere inside the budget, so for what ships a zero is disconnection and nothing else.
 
 # The budget is an argument, not a field
 
@@ -327,7 +330,7 @@ The whole extension contract of [`AbstractSeparationDecayAlgorithm`](@ref): a ne
 
 # Returns
 
-  - `f::Number`: Score for the separation.
+  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
 
 # Validation
 
@@ -372,15 +375,17 @@ end
 
 Check that a separation decay honours its contract over the separations it will be asked about.
 
-The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and checks the result is finite, that `f(0)` is strictly positive and maximal, and that the values are monotone non-increasing. The three shipped members satisfy the contract by construction and override this to a no-op, so the probe costs nothing for what ships and is fail-safe for extensions.
+The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and checks the result is finite, that `f(0)` is strictly positive and maximal, that the values are monotone non-increasing, and that none of them is negative. The three shipped members satisfy the contract by construction and override this to a no-op, so the probe costs nothing for what ships and is fail-safe for extensions.
 
 Probing is cheap where it is used because `ds` is small and the loop it guards is not: [`GradedNeighbourhood`](@ref) passes `0:n`, which is *exhaustive* for a hop count — every separation the `assets × assets` loop can ever ask about, in `n + 1` evaluations.
+
+Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax` appears in `ds`, mirroring the out-of-loop evaluation of `f(0)`. That endpoint is what closes the clause over a *continuum*: monotonicity is already promised, so `f(dmax) >= 0` implies `f(d) >= 0` for every `d` in `[0, dmax]`, and a `ds` that can only ever be a sample — as it must be once separations are weighted path lengths — costs this clause nothing. Monotonicity itself gains nothing from the endpoint and remains genuinely sampled.
 
 # Arguments
 
   - `dk`: Separation decay algorithm.
-  - `ds`: Separations to probe. Need not be sorted.
-  - `dmax`: Separation budget in scope, forwarded to [`separation_decay`](@ref).
+  - `ds`: Separations to probe. Need not be sorted. Precondition: `ds ⊆ [0, dmax]` — `ds` is what the guarded loop will ask about, and the loop never asks outside the budget.
+  - `dmax`: Separation budget in scope, forwarded to [`separation_decay`](@ref) and probed as an endpoint in its own right.
 
 # Returns
 
@@ -392,6 +397,7 @@ Probing is cheap where it is used because `ds` is small and the loop it guards i
   - `f(0) > 0`.
   - `f(0) >= f(d)` for every probed `d`.
   - The probed values are monotone non-increasing in `d`.
+  - `f(d) >= 0` for every probed `d`, and at `d = dmax` whether or not it was probed.
 
 # Related
 
@@ -415,8 +421,18 @@ function assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds,
         @argcheck(f <= fp,
                   DomainError(f,
                               "a separation decay must be monotone non-increasing, got $(f) at d = $(d) from $(typeof(dk))"))
+        @argcheck(f >= zero(f),
+                  DomainError(f,
+                              "a separation decay must be non-negative inside the budget, got $(f) at d = $(d) against a budget of dmax = $(dmax) from $(typeof(dk))"))
         fp = f
     end
+    # `ds` need not contain `dmax`, and a real separation makes an exhaustive `ds` impossible.
+    # Monotonicity is already promised, so this one endpoint closes non-negativity over the
+    # whole of `0 <= d <= dmax` -- the only clause whose domain closes from a single point.
+    fmax = separation_decay(dk, dmax, dmax)
+    @argcheck(fmax >= zero(fmax),
+              DomainError(fmax,
+                          "a separation decay must be non-negative inside the budget, got $(fmax) at d = $(dmax) against a budget of dmax = $(dmax) from $(typeof(dk))"))
     return nothing
 end
 # The shipped members satisfy the contract by construction, so the probe is turned off for

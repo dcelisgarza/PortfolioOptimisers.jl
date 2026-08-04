@@ -136,7 +136,7 @@ The score is a function of the hop count rather than of the un-clamped walk coun
 
 `decay` shapes the fall-off; `n` on the source [`NetworkEstimator`](@ref) truncates it. They are deliberately separate — an exponential never reaches zero, so a budget cannot be expressed as a fall-off — and `n` is the only place truncation happens. Under the default [`LinearDecay`](@ref) the two coincide in appearance: a direct neighbour scores `n`, a two-hop neighbour `n - 1`, the asset itself `n + 1`, and the score would hit `0` exactly one hop past the budget that already cut it. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1` and the fall-off is set by the member's own parameter, independently of how far `n` looks.
 
-Because no decay emits zero inside the budget, **a zero entry means unreachable-or-beyond-`n` and nothing else**.
+A zero entry means **functionally unreachable**: either the pair is disconnected or beyond `n`, or the decay has fallen to nothing — the same claim about the pair, since [`AbstractSeparationDecayAlgorithm`](@ref) forbids anything below zero inside the budget. No shipped decay emits zero there, so for what ships a zero is unreachable-or-beyond-`n` and nothing else.
 
 # Unreachable pairs
 

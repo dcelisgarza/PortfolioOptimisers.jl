@@ -307,6 +307,12 @@ struct DecayInfinite <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
 PortfolioOptimisers.separation_decay(::DecayInfinite, d, dmax) = iszero(d) ? Inf : 1.0
 struct DecayFine <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
 PortfolioOptimisers.separation_decay(::DecayFine, d, dmax) = inv(2.0^d)
+# Goes negative at `d = 2`, so a probe over `0:3` walks straight into it.
+struct DecayNegativeInLoop <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayNegativeInLoop, d, dmax) = 1.0 - d
+# Non-negative everywhere `0:1` looks, negative by `d = 3`. Only the endpoint catches it.
+struct DecayNegativeAtBudget <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
+PortfolioOptimisers.separation_decay(::DecayNegativeAtBudget, d, dmax) = 1.0 - d / 2
 
 @testset "The contract is enforced on extensions, not merely documented" begin
     # `GradedNeighbourhood`'s diagonal comes out of the decay itself, so a member that is not
@@ -326,9 +332,34 @@ PortfolioOptimisers.separation_decay(::DecayFine, d, dmax) = inv(2.0^d)
                                                                          [3, 0, 2, 1], 3)
     @test isnothing(PortfolioOptimisers.assert_separation_decay(DecayFine(), [3, 0, 2, 1],
                                                                 3))
+    # `0` is the unreachable sentinel, so a negative score inside the budget would put a
+    # *reachable* pair below an *unreachable* one. Caught at a probed `d`...
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNegativeInLoop(),
+                                                                         0:3, 3)
+    # ...and caught at `dmax` when `ds` stops short of it, which is what makes the extra
+    # out-of-loop evaluation load-bearing rather than redundant: every probed value here is
+    # non-negative, and a weighted separation can never hand the probe an exhaustive `ds`.
+    @test all(>=(0),
+              PortfolioOptimisers.separation_decay.(Ref(DecayNegativeAtBudget()), 0:1, 3))
+    @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNegativeAtBudget(),
+                                                                         0:1, 3)
+    # Non-negative, *not* strictly positive: a decay bottoming out at zero inside the budget
+    # says "no relatedness", which is what an unreachable pair says too.
+    @test PortfolioOptimisers.separation_decay(DecayNegativeInLoop(), 1, 1) == 0
+    @test isnothing(PortfolioOptimisers.assert_separation_decay(DecayNegativeInLoop(), 0:1,
+                                                                1))
+
     # The shipped members opt out, so the check costs nothing for what ships.
     for dk in (LinearDecay(), ExponentialDecay(), ReciprocalDecay())
         @test isnothing(PortfolioOptimisers.assert_separation_decay(dk, 0:3, 3))
+    end
+    # And they would pass the probe if they did not: `LinearDecay` is negative above
+    # `dmax + 1`, but the clause is scoped to the budget, so nothing there is violated.
+    @test PortfolioOptimisers.separation_decay(LinearDecay(), 5, 3) == -1
+    for dk in (LinearDecay(), ExponentialDecay(), ReciprocalDecay()), dmax in (1, 3, 8)
+        @test isnothing(invoke(PortfolioOptimisers.assert_separation_decay,
+                               Tuple{PortfolioOptimisers.AbstractSeparationDecayAlgorithm,
+                                     Any, Number}, dk, 0:dmax, dmax))
     end
 
     # It fires from the kernel too, before the `assets^2` loop rather than inside it.
