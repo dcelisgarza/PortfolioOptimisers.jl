@@ -141,10 +141,10 @@ function _dist_from_cor(::SimpleAbsoluteDistance, power::Integer, rho::MatNum)
                         one(eltype(rho))))
 end
 function _dist_from_cor(::LogDistance, ::Nothing, rho::MatNum)
-    return -log.(_absguard(rho))
+    return max.(-log.(_absguard(rho)), zero(eltype(rho)))
 end
 function _dist_from_cor(::LogDistance, power::Integer, rho::MatNum)
-    return -log.(_absguard(rho) .^ power)
+    return max.(-log.(_absguard(rho) .^ power), zero(eltype(rho)))
 end
 function _dist_from_cor(::CorrelationDistance, ::Nothing, rho::MatNum)
     return sqrt.(clamp!(one(eltype(rho)) .- rho, zero(eltype(rho)), one(eltype(rho))))
@@ -245,12 +245,12 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                   X::MatNum; dims::Int = 1, kwargs...)
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return -log.(rho)
+    return max.(-log.(rho), zero(eltype(rho)))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                   X::MatNum; dims::Int = 1, kwargs...)
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return -log.(rho .^ de.power)
+    return max.(-log.(rho .^ de.power), zero(eltype(rho)))
 end
 """
     distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::MatNum;

@@ -810,6 +810,51 @@
             @test isapprox(d6, d1)
         end
     end
+    @testset "Every distance algorithm has an exactly zero diagonal" begin
+        #=
+        A distance matrix with a non-zero diagonal is not a distance matrix: `SimpleWeightedGraph`
+        reads it as a self-loop and `PhylogenyResult` rejects it outright. Two sources were
+        measured, and neither was a rounding speck that could be left alone.
+
+        `variation_info` estimated `VI(X, X)` instead of pinning it. It is zero by definition,
+        but the histogram estimate of `I(X; X)` does not reproduce the estimate of `H(X)` bit
+        for bit, so it left roughly 1e-16 on 7 of 12 assets.
+
+        `ShrunkDenoise` -- the *default* denoise algorithm -- reconstructs from eigen components
+        and, unlike `SpectralDenoise` and `FixedDenoise`, does not route through `cov2cor`, so
+        the correlation diagonal came out at `1 ± 1.5e-15`. That one matters more than it looks:
+        the correlation kernels take `sqrt(1 - rho[i, i])`, which **amplifies** 1.1e-16 into
+        7.45e-9 -- a real self-loop weight, not noise.
+        =#
+        Xd = rd.X
+        for a in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                  CorrelationDistance(), CanonicalDistance(), VariationInfoDistance()),
+            c in (Covariance(),
+                  PortfolioOptimisersCovariance(;
+                                                mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                          dn = Denoise())),
+                  PortfolioOptimisersCovariance(;
+                                                mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                          dt = Detone())))
+
+            @test all(iszero, diag(distance(Distance(; alg = a), c, Xd)))
+        end
+        # The correlation diagonal is one by definition, and `Denoise` now leaves it exact.
+        cdn = PortfolioOptimisersCovariance(;
+                                            mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                      dn = Denoise()))
+        rdn = cor(cdn, Xd)
+        @test all(isone, diag(rdn))
+        @test isposdef(rdn)
+        # `variation_info`'s diagonal is pinned, not estimated -- under both normalisations.
+        @test all(iszero, diag(PortfolioOptimisers.variation_info(Xd)))
+        @test all(iszero, diag(PortfolioOptimisers.variation_info(Xd, Knuth(), false)))
+        # `mutual_variation_info` pins its VI diagonal but keeps its MI one: `I(X; X) = H(X)`
+        # is a real value there, unlike VI's zero.
+        mm, vm = PortfolioOptimisers.mutual_variation_info(Xd)
+        @test all(iszero, diag(vm))
+        @test all(!iszero, diag(mm))
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`

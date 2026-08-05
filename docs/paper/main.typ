@@ -199,7 +199,7 @@ There is a huge variety of constraints. Every optimiser supports weight bounds c
 + Fees: These penalise the return of the portfolio (thus indirectly penalise certain risk measures and objective functions). They include long and short proportional, long and short fixed, and turnover fees.
 + Weight penalties: These apply L-norm penalties to the objective function, or limit the L-norm of the weights of the portfolio. They can be used to regulate the sparsity and robustness of the portfolio.
 + Tracking and turnover: These limit how much a portfolio can deviate from a reference.
-+ Time dependent: Every constraint type can be wrapped in a time-dependent wrapper, which lets the user define constraints which change across cross-validation folds. They can be provided as schedules, or as a function/functor which ingests the fold's context. This can be used to adjust or swap constraints and even optimisers according to the fold's context and previous portfolio's weights. The context is a structure which may be expanded in the future.
++ Time dependent: Every constraint and nonfinite optimiser can be wrapped in a time-dependent wrapper, which lets them vary across cross-validation folds. They can be provided as pre-defined lists, or as a function/functor which ingests the fold's context and returns an optimiser. This can be used to adjust or swap constraints/optimisers according to the fold's context and previous portfolio's weights. When using the functor design, it is possible to keep a cache with past optimisers or configurations. The context may be expanded to include other information if needed in the future.
 
 == Design philosophy
 

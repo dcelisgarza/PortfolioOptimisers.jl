@@ -35,6 +35,7 @@ AbstractTreeType
 calc_mst
 AbstractNetworkEstimator
 AbstractCentralityEstimator
+graph_weight_matrix
 calc_adjacency
 calc_centrality
 Tree_SimMat

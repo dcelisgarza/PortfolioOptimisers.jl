@@ -1214,4 +1214,83 @@
         @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk(nothing)))
         @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk([SemiDefinitePhylogenyEstimator()])))
     end
+    @testset "A zero distance is repaired, not deleted" begin
+        #=
+        A distance matrix and a weighted graph disagree about `0`: the distance codomain
+        means *closest*, `SimpleWeightedGraph` reserves it for *absent* and sparsifies it
+        away. Left alone, the constructor deletes exactly the cheapest edge -- the one the
+        MST most wants -- and the most related pair in the universe comes out non-adjacent
+        with nothing raised. `graph_weight_matrix` moves each zero to the smallest
+        representable positive value instead.
+        =#
+        Dg = PortfolioOptimisers.distance(Distance(), PortfolioOptimisersCovariance(), pr.X)
+        tiny = nextfloat(zero(eltype(Dg)))
+
+        # Nothing to repair: `D` comes back untouched and uncopied, so the copy is only
+        # paid for when it buys something.
+        @test PortfolioOptimisers.graph_weight_matrix(Dg) === Dg
+
+        Dz = copy(Dg)
+        Dz[1, 2] = Dz[2, 1] = zero(eltype(Dz))
+        Wz = PortfolioOptimisers.graph_weight_matrix(Dz)
+        @test Wz !== Dz                       # repaired on a copy...
+        @test Dz[1, 2] === zero(eltype(Dz))   # ...leaving the caller's matrix exact,
+        @test Wz[1, 2] == tiny                # which `clusterise`'s `P` depends on.
+        @test Wz[2, 1] == tiny
+        # Only the zeros move.
+        @test all(Wz[i, j] == Dz[i, j]
+                  for i in axes(Dz, 1), j in axes(Dz, 2) if !iszero(Dz[i, j]))
+        # `-0.0` is a zero too.
+        Dm = copy(Dg)
+        Dm[1, 2] = Dm[2, 1] = -zero(eltype(Dm))
+        @test PortfolioOptimisers.graph_weight_matrix(Dm)[1, 2] == tiny
+
+        #=
+        Negative and NaN have no nearest representable value and are *unsound* rather than
+        merely wrong downstream: Dijkstra returns an answer on a negative edge instead of
+        raising, and NaN silently fails every comparison the tree algorithms make. A NaN
+        arrives from ordinary bad data -- a zero-variance asset gives a NaN correlation.
+        =#
+        Dn = copy(Dg)
+        Dn[1, 2] = -eps(eltype(Dn))
+        @test_throws DomainError PortfolioOptimisers.graph_weight_matrix(Dn)
+        Dnan = copy(Dg)
+        Dnan[2, 3] = NaN
+        @test_throws DomainError PortfolioOptimisers.graph_weight_matrix(Dnan)
+        # Inf is allowed: it is the honest LogDistance between uncorrelated assets, the
+        # graph accepts it, and a spanning tree simply takes those edges last.
+        Di = copy(Dg)
+        Di[1, 2] = Di[2, 1] = Inf
+        @test PortfolioOptimisers.graph_weight_matrix(Di) === Di
+        # The diagonal is exempt -- it is zero by construction.
+        @test all(iszero, LinearAlgebra.diag(PortfolioOptimisers.graph_weight_matrix(Dz)))
+
+        #=
+        The end-to-end failure, with `clusterise` as the oracle. `SimpleAbsoluteDistance`
+        is defined on `abs(rho)`, so an exactly anti-correlated pair -- a long/short leg,
+        an inverse ETF -- sits at distance zero and is genuinely maximally related. Before
+        the repair the two consumers of one estimator contradicted each other about that
+        pair: `clusterise` reads `D` directly and put them in the same cluster, while
+        `phylogeny_matrix` reads only the sparsified graph and declared them unrelated --
+        so the phylogeny constraints left the one pair they exist to separate unbounded.
+        =#
+        Xa = randn(StableRNG(11), 300, 12)
+        Xa[:, 12] .= -Xa[:, 1]
+        ntea = NetworkEstimator(; ce = Covariance(),
+                                de = Distance(; alg = SimpleAbsoluteDistance()),
+                                alg = KruskalTree())
+        Da = PortfolioOptimisers.distance(ntea.de, ntea.ce, Xa)
+        @test Da[1, 12] == zero(eltype(Da))          # the pair really is at the floor,
+        @test Da[1, 12] == minimum(Da)               # and nothing is closer.
+        pma = phylogeny_matrix(ntea, Xa)
+        cla = clusterise(NetworkClustersEstimator(; nte = ntea), Xa)
+        asg = Clustering.cutree(cla.res; k = cla.k)
+        @test size(pma.X) == (12, 12)                # the universe survives...
+        @test isone(pma.X[1, 12])                    # ...and the pair is adjacent,
+        @test asg[1] == asg[12]                      # which is what `clusterise` says too.
+        # The repair is a single-edge swap: 1--12 enters, and the 3--12 edge that stood in
+        # for it while 1--12 was deleted is gone. Every other edge is untouched.
+        @test iszero(pma.X[3, 12])
+        @test count(isone, pma.X) == 2 * (size(Xa, 2) - 1)
+    end
 end

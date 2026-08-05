@@ -483,6 +483,21 @@ function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     X .= corr0 +
          alg.alpha * corr1 +
          (one(alg.alpha) - alg.alpha) * LinearAlgebra.Diagonal(corr1)
+    #=
+    In exact arithmetic the reconstruction already preserves the diagonal: it is
+    `corr0[i, i] + corr1[i, i]`, since the two `alpha` weights sum to one there, and that
+    is `X[i, i]` back again. What is left is eigendecomposition round-off, measured at
+    `1 ± 1.5e-15`. `SpectralDenoise` and `FixedDenoise` shed it by routing their
+    reconstruction through `cov2cor`; this branch reconstructs directly, so it has to pin
+    the diagonal itself. `denoise!` has already converted a covariance to a correlation
+    before calling here, so one is the definitionally correct value.
+
+    It is worth pinning because the correlation distance kernels take `sqrt(1 - rho[i, i])`,
+    which *amplifies*: 1.1e-16 on the correlation diagonal becomes 7.45e-9 on the distance
+    diagonal, which is large enough to be a real self-loop weight in a weighted graph and
+    to fail `PhylogenyResult`'s zero-diagonal check.
+    =#
+    X[LinearAlgebra.diagind(X)] .= one(eltype(X))
     return X
 end
 """

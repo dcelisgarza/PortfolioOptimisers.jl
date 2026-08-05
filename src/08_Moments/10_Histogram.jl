@@ -525,6 +525,7 @@ Where:
   - The mutual information is computed using `intrinsic_mutual_info`.
   - VI is calculated as `H(X) + H(Y) - 2 * LinearAlgebra.I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
   - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
+  - The diagonal is **pinned to exactly zero** rather than estimated. `VI(X, X)` is zero by definition, but the histogram estimate of `I(X; X)` does not reproduce the estimate of `H(X)` bit for bit, so computing it leaves roughly `1e-16` there — enough to stop the result being a valid distance matrix.
 
 # Related
 
@@ -538,7 +539,17 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     var_mtx = Matrix{eltype(X)}(undef, N, N)
     for j in axes(X, 2)
         xj = view(X, :, j)
-        for i in 1:j
+        #=
+        VI(X, X) = H(X) + H(X) - 2*I(X; X) = 0 exactly, by definition, so the self pair is
+        pinned rather than estimated. Estimating it leaves roughly 1e-16 on the diagonal --
+        measured on 7 of 12 assets -- because the histogram estimate of I(X; X) does not
+        reproduce the estimate of H(X) bit for bit. A distance matrix with a non-zero
+        diagonal is not a distance matrix: it fails `PhylogenyResult`'s own zero-diagonal
+        check, and `SimpleWeightedGraph` reads it as a self-loop. Skipping the self pair
+        also saves N histogram computations.
+        =#
+        var_mtx[j, j] = zero(eltype(X))
+        for i in 1:(j - 1)
             xi = view(X, :, i)
             nbins = calc_num_bins(bins, xj, xi, j, i, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
@@ -608,6 +619,10 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
             mut_mtx[j, i] = mut_mtx[i, j] = mut_ixy
             var_mtx[j, i] = var_mtx[i, j] = var_ixy
         end
+        # As in `variation_info`: VI(X, X) is zero by definition, and the estimate only
+        # approximates it. `mut_mtx`'s diagonal is left alone -- I(X; X) = H(X) is a real
+        # value there, unlike VI's zero.
+        var_mtx[j, j] = zero(eltype(X))
     end
 
     return mut_mtx, var_mtx

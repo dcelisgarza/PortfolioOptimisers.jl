@@ -1128,6 +1128,63 @@ function CentralityEstimator(; pl::NwE_ClE = NetworkEstimator(),
     return CentralityEstimator(pl, ct)
 end
 """
+    graph_weight_matrix(D::MatNum)
+
+Return `D` as a matrix whose off-diagonal entries are representable as `SimpleWeightedGraphs` edge weights.
+
+A distance matrix and a weighted graph disagree about what `0` means. In the distance codomain `0` is the *floor* — two assets as close as they can be. In the graph representation `0` is the reserved value meaning *absent*: `SimpleWeightedGraph` sparsifies its input, and `add_edge!` with a zero weight refuses outright. Handing a zero distance straight to the constructor therefore deletes exactly the edge the minimum spanning tree most wants, and the two assets come out non-adjacent — the most related pair in the universe reported as unrelated, with no error raised.
+
+A zero is not a symptom of bad data. `SimpleAbsoluteDistance` and `LogDistance` are defined on `abs(rho)`, so a perfectly *anti*-correlated pair — a long/short leg, an inverse ETF, a pairs trade — is at distance zero and is genuinely maximally related. The square-root algorithms reach zero from the other side, since their `clamp!` maps any `rho >= 1` to exactly zero.
+
+So the zero is *repaired*, not rejected: each off-diagonal zero moves to `nextfloat(zero(eltype(D)))`, the smallest representable positive value. That is the nearest value the representation can carry, it is orders of magnitude below any distance a caller could mean, and it is absorbed exactly by any sum it enters. `D` itself is returned untouched when no entry needs moving, so the copy is only paid for when it buys something.
+
+Negative and `NaN` entries have no such nearest representable value and are rejected. A negative distance inverts the ordering it expresses and is *unsound* rather than merely wrong under the shortest-path routines that consume these weights — they return an answer instead of raising. A `NaN` — which a zero-variance asset produces, via a `NaN` correlation — silently fails every comparison the tree algorithms make.
+
+`Inf` is left alone: it is the honest distance between uncorrelated assets under [`LogDistance`](@ref), the graph accepts it, and a spanning tree simply takes those edges last.
+
+# Arguments
+
+  - `D`: Symmetric distance matrix.
+
+# Returns
+
+  - `W::MatNum`: `D` itself, or a repaired copy of it.
+
+# Validation
+
+  - Throws a `DomainError` if any off-diagonal entry is negative or `NaN`.
+
+# Related
+
+  - [`calc_adjacency`](@ref)
+  - [`clusterise`](@ref)
+"""
+function graph_weight_matrix(D::MatNum)
+    z = zero(eltype(D))
+    repair = false
+    for j in axes(D, 2), i in axes(D, 1)
+        if i == j
+            continue
+        end
+        d = D[i, j]
+        @argcheck(!isnan(d) && d >= z,
+                  DomainError(d,
+                              "off-diagonal distances must be non-negative and not NaN, because a graph edge weight is. Got\nD[$i, $j] => $d"))
+        repair |= iszero(d)
+    end
+    if !repair
+        return D
+    end
+    W = copy(D)
+    tiny = nextfloat(z)
+    for j in axes(W, 2), i in axes(W, 1)
+        if i != j && iszero(W[i, j])
+            W[i, j] = tiny
+        end
+    end
+    return W
+end
+"""
     calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the adjacency matrix for a network estimator.
@@ -1158,7 +1215,7 @@ Compute the adjacency matrix for a network estimator.
 function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType}, X::MatNum;
                         dims::Int = 1, kwargs...)
     D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
-    G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
+    G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
     tree = calc_mst(nte.alg, G)
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end
@@ -1261,7 +1318,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                     dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
-    G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
+    G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
     tree = calc_mst(nte.nte.alg, G)
     A = Graphs.adjacency_matrix(G[tree])
     for i in 0:(nte.nte.n)
