@@ -36,6 +36,8 @@ calc_mst
 AbstractNetworkEstimator
 AbstractCentralityEstimator
 graph_weight_matrix
+calc_weighted_adjacency_graph
+calc_weighted_adjacency
 calc_adjacency
 separation_matrix
 separation_budget

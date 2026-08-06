@@ -1159,7 +1159,7 @@ Negative and `NaN` entries have no such nearest representable value and are reje
 
 # Related
 
-  - [`calc_adjacency`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
   - [`clusterise`](@ref)
 """
 function graph_weight_matrix(D::MatNum)
@@ -1188,47 +1188,125 @@ function graph_weight_matrix(D::MatNum)
     return W
 end
 """
-    calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    calc_weighted_adjacency_graph(nte::NetworkEstimator, X::MatNum; dims::Int = 1,
+                                  kwargs...)
 
-Compute the adjacency matrix for a network estimator.
+Build the weighted graph whose edges are the network structure.
+
+This is the **one construction site** of that structure. [`calc_weighted_adjacency`](@ref) and [`calc_adjacency`](@ref) are each a single operation on the graph returned here, so how the structure is selected is decided in this function and nowhere else.
+
+# Polarity is per branch, and the two branches are not interchangeable
+
+Each branch keeps **the quantity that selected its own edges**, and the two quantities run in opposite directions.
+
+  - `nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: [`calc_mst`](@ref) minimises the distance, so the weights are **distances**. Small means closely related.
+  - `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
+
+Re-weighting either branch with the other quantity would weight a structure by the quantity that did not select it, so neither is converted. The result carries no polarity tag, because the polarity is recoverable by dispatch on `nte.alg`.
+
+A consumer that walks a path must therefore branch on `nte.alg` first. A shortest path over similarities inverts the ordering it is meant to express and **returns an answer instead of raising**, so the two graphs are interchangeable in shape but not in meaning.
+
+# The weights
+
+  - Tree branch: strictly positive, and finite or `Inf`. [`graph_weight_matrix`](@ref) moves every zero distance off the value the representation reserves for *absent*, and rejects a negative or a `NaN`. `Inf` is legal — it is the honest [`LogDistance`](@ref) between two uncorrelated assets.
+  - PMFG branch: non-negative and finite. [`PMFG_T2s`](@ref) checks its input for non-negativity, and declines an edge whose gain is zero, so no stored zero reaches the graph.
 
 # Arguments
 
-  - `nte`: NetworkEstimator estimator.
-
-      + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
-      + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
-
-  - `X`: Data matrix (observations × assets).
-
+  - `nte`: Network estimator.
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `adj::Matrix{Int}`: Adjacency matrix representing the network.
+  - `G::SimpleWeightedGraphs.SimpleWeightedGraph`: The network structure, carrying its branch's own weights.
 
 # Related
 
   - [`NetworkEstimator`](@ref)
+  - [`calc_weighted_adjacency`](@ref)
+  - [`calc_adjacency`](@ref)
+  - [`graph_weight_matrix`](@ref)
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType}, X::MatNum;
-                        dims::Int = 1, kwargs...)
+function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
+                                                             <:AbstractTreeType}, X::MatNum;
+                                       dims::Int = 1, kwargs...)
     D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
-    tree = calc_mst(nte.alg, G)
-    return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
+    return G[calc_mst(nte.alg, G)]
 end
-function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any,
-                                              <:AbstractSimilarityMatrixAlgorithm},
-                        X::MatNum; dims::Int = 1, kwargs...)
+function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
+                                                             <:AbstractSimilarityMatrixAlgorithm},
+                                       X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
     S = distance_to_similarity(nte.alg; S = S, D = D)
-    Rpm = PMFG_T2s(S)[1]
-    return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
+    return SimpleWeightedGraphs.SimpleWeightedGraph(PMFG_T2s(S)[1])
+end
+"""
+    calc_weighted_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Compute the weighted adjacency matrix of the network structure.
+
+`Graphs.adjacency_matrix` of a *weighted* graph returns the **weights**, not `0`/`1`, so this is the matrix form of [`calc_weighted_adjacency_graph`](@ref) and inherits that function's per-branch polarity unchanged: distances on the tree branch, similarities on the PMFG branch. Read the polarity section of [`calc_weighted_adjacency_graph`](@ref) before consuming the values.
+
+The sparsity pattern is the structure itself, so it is identical to [`calc_adjacency`](@ref)'s on the same input. Only the stored values differ.
+
+# Arguments
+
+  - `nte`: Network estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `adj::SparseArrays.SparseMatrixCSC`: Weighted adjacency matrix of the network, in its branch's own polarity.
+
+# Related
+
+  - [`NetworkEstimator`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+  - [`calc_adjacency`](@ref)
+"""
+function calc_weighted_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    return Graphs.adjacency_matrix(calc_weighted_adjacency_graph(nte, X; dims = dims,
+                                                                 kwargs...))
+end
+"""
+    calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Compute the binary adjacency matrix for a network estimator.
+
+The structure comes from [`calc_weighted_adjacency_graph`](@ref); this function is the round trip through `Graphs.SimpleGraph` that discards the weights. Both branches share the one body, because the branch is decided in the tier below.
+
+Consumers that need the weights call [`calc_weighted_adjacency`](@ref) instead. They must then observe the per-branch polarity documented on [`calc_weighted_adjacency_graph`](@ref). The binarisation here is what exempts this function from it.
+
+# Arguments
+
+  - `nte`: Network estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `adj::SparseArrays.SparseMatrixCSC{Int, Int}`: Binary adjacency matrix representing the network.
+
+# Related
+
+  - [`NetworkEstimator`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+  - [`calc_weighted_adjacency`](@ref)
+  - [`calc_mst`](@ref)
+  - [`PMFG_T2s`](@ref)
+"""
+function calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    return Graphs.adjacency_matrix(Graphs.SimpleGraph(calc_weighted_adjacency_graph(nte, X;
+                                                                                    dims = dims,
+                                                                                    kwargs...)))
 end
 """
     separation_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;

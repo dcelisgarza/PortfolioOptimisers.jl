@@ -1293,4 +1293,88 @@
         @test iszero(pma.X[3, 12])
         @test count(isone, pma.X) == 2 * (size(Xa, 2) - 1)
     end
+    @testset "The weighted adjacency tiers" begin
+        #=
+        `calc_adjacency` no longer has a body of its own: the structure is built once by
+        `calc_weighted_adjacency_graph`, and the other two tiers are one operation each.
+        These are regressions of a fact already measured -- the refactor is subtractive, so
+        the binary matrix must come out of the new chain unchanged in value *and* in type.
+        The oracles below are the two branch bodies `calc_adjacency` used to carry.
+        =#
+        Gr = PortfolioOptimisers.Graphs
+        SWG = PortfolioOptimisers.SimpleWeightedGraphs
+        function tree_oracle(nte, X)
+            D = PortfolioOptimisers.distance(nte.de, nte.ce, X; dims = 1)
+            G = SWG.SimpleWeightedGraph(PortfolioOptimisers.graph_weight_matrix(D))
+            tree = PortfolioOptimisers.calc_mst(nte.alg, G)
+            return Gr.adjacency_matrix(Gr.SimpleGraph(G[tree]))
+        end
+        function pmfg_similarity(nte, X)
+            S, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            return PortfolioOptimisers.distance_to_similarity(nte.alg; S = S, D = D)
+        end
+        function pmfg_oracle(nte, X)
+            Rpm = PortfolioOptimisers.PMFG_T2s(pmfg_similarity(nte, X))[1]
+            return Gr.adjacency_matrix(Gr.SimpleGraph(Rpm))
+        end
+        # `AngularSimilarity` is absent because `PMFG_T2s` rejects its negative entries on
+        # ordinary data -- pre-existing, and issue #239's.
+        tree_algs = (KruskalTree(), BoruvkaTree(), PrimTree())
+        pmfg_algs = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                     GeneralExponentialSimilarity(), ComplementSimilarity())
+        for (algs, oracle) in ((tree_algs, tree_oracle), (pmfg_algs, pmfg_oracle))
+            for alg in algs
+                nte = NetworkEstimator(; alg = alg)
+                A = PortfolioOptimisers.calc_adjacency(nte, pr.X)
+                O = oracle(nte, pr.X)
+                @test A == O
+                @test typeof(A) === typeof(O)
+                @test A isa SparseMatrixCSC{Int, Int}
+                # Same structure, different values: the weighted tier keeps the sparsity
+                # pattern exactly and only stops discarding the numbers. `adjacency_matrix`
+                # of a *weighted* graph returns the weights, not 0/1.
+                W = PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+                @test W.colptr == A.colptr
+                @test W.rowval == A.rowval
+                @test eltype(W) === eltype(pr.X)
+                @test !all(isone, W.nzval)
+            end
+        end
+        # Per-branch polarity, recovered by dispatch on `nte.alg` and carried by no tag: the
+        # tree weights are the distances `calc_mst` minimised, strictly positive after the
+        # repair; the PMFG weights are the similarities `PMFG_T2s` maximised.
+        ntet = NetworkEstimator(; alg = KruskalTree())
+        Dt = PortfolioOptimisers.distance(ntet.de, ntet.ce, pr.X)
+        Wt = PortfolioOptimisers.calc_weighted_adjacency(ntet, pr.X)
+        @test all(>(zero(eltype(Wt))), Wt.nzval)
+        @test all(Wt[i, j] == Dt[i, j] for (i, j) in zip(findnz(Wt)[1], findnz(Wt)[2]))
+        # The PMFG's weighted adjacency *is* `PMFG_T2s(S)[1]` verbatim -- the graph round
+        # trip is structurally the identity, because `PMFG_T2s` emits no stored zero.
+        for alg in pmfg_algs
+            nte = NetworkEstimator(; alg = alg)
+            Rpm = PortfolioOptimisers.PMFG_T2s(pmfg_similarity(nte, pr.X))[1]
+            W = PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+            @test count(iszero, Rpm.nzval) == 0
+            @test W.colptr == Rpm.colptr
+            @test W.rowval == Rpm.rowval
+            @test W.nzval == Rpm.nzval
+        end
+        #=
+        The one place the removed `SimpleGraph` round trip could have diverged: an
+        explicitly stored zero. `adjacency_matrix` is `T.(copy(weights))` and the broadcast
+        drops a numerical zero, so a zero-weight edge survives the graph tier but not the
+        matrix tier. Injected by hand, since `PMFG_T2s` never produces one -- and both the
+        old path and the new one drop the edge, keeping every vertex.
+        =#
+        ntep = NetworkEstimator(; alg = ComplementSimilarity())
+        Rz = copy(PortfolioOptimisers.PMFG_T2s(pmfg_similarity(ntep, pr.X))[1])
+        Rz[1, 2] = Rz[2, 1] = zero(eltype(Rz))
+        @test count(iszero, Rz.nzval) == 2          # the zeros really are stored,
+        old_path = Gr.adjacency_matrix(Gr.SimpleGraph(Rz))
+        new_path = Gr.adjacency_matrix(Gr.SimpleGraph(SWG.SimpleWeightedGraph(Rz)))
+        @test old_path == new_path
+        @test iszero(old_path[1, 2])                # ...and both paths drop the edge,
+        @test nnz(old_path) == nnz(Rz) - 2
+        @test Gr.nv(SWG.SimpleWeightedGraph(Rz)) == size(pr.X, 2)  # losing no vertex.
+    end
 end
