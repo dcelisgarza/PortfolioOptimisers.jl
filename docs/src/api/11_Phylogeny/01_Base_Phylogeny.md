@@ -9,6 +9,7 @@ factory(pl::PlE_Pl, args...; kwargs...)
 factory(alg::AbstractPhylogenyAlgorithm, args...; kwargs...)
 AbstractSeparationAlgorithm
 HopCount
+PathLength
 AbstractSeparationDecayAlgorithm
 LinearDecay
 ExponentialDecay

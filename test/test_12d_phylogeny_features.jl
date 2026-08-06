@@ -544,3 +544,190 @@ end
     @test Zp[1, 3] == 0.0
     @test Zp[1, 2] == inv(sqrt(2))
 end
+
+# A network estimator handing the kernels a *weighted* graph chosen by the test. It answers
+# both kernels off the one matrix -- `calc_distance_weighted_graph` keeps the weights,
+# `calc_adjacency` binarises them -- so a single fixture drives both separations over the
+# same structure, which is what lets them be compared at all.
+struct FixedWeights{T} <: PortfolioOptimisers.AbstractNetworkEstimator
+    W::Matrix{Float64}
+    sep::T
+end
+function PortfolioOptimisers.calc_distance_weighted_graph(pl::FixedWeights, X; kwargs...)
+    return PortfolioOptimisers.SimpleWeightedGraphs.SimpleWeightedGraph(pl.W)
+end
+function PortfolioOptimisers.calc_adjacency(pl::FixedWeights, X; kwargs...)
+    return PortfolioOptimisers.SparseArrays.sparse(Int.(pl.W .!= 0))
+end
+# 1 - 2 - 3 - 4 with a long shortcut 1 - 3. Hops call `(1, 3)` adjacent and `(2, 4)` two
+# apart; path lengths call `(2, 4)` the closer of the two. Constructed rather than found:
+# over twenty real assets the two separations strictly invert 0.16% of pairs of pairs on a
+# minimum spanning tree and *none at all* on a PMFG, so sampling would prove nothing.
+const WX = [0.0 1.0 5.0 0.0; 1.0 0.0 1.0 0.0; 5.0 1.0 0.0 0.1; 0.0 0.0 0.1 0.0]
+const X4 = zeros(Float64, 3, 4)
+
+@testset "PathLength measures the structure the hop count counts" begin
+    @test isa(PathLength(), PortfolioOptimisers.AbstractSeparationAlgorithm)
+    @test isnothing(PathLength().dmax)
+    @test PathLength(; dmax = 0.5).dmax == 0.5
+    @test isa(NetworkEstimator(; sep = PathLength()), NetworkEstimator)
+    # A budget of zero keeps nothing but the diagonal, so it is refused as `HopCount`'s is.
+    @test_throws DomainError PathLength(; dmax = 0)
+    @test_throws DomainError PathLength(; dmax = -1.5)
+    @test_throws DomainError PathLength(; dmax = NaN)
+
+    nt = NetworkEstimator(; sep = PathLength())
+    np = NetworkEstimator(; alg = MaximumDistanceSimilarity(), sep = PathLength())
+    dt = separation_matrix(nt.sep, nt, rd.X; dims = 1)
+    @test isa(dt, Matrix{Float64})
+    @test size(dt) == (NA, NA)
+    @test issymmetric(dt)
+    @test all(iszero, diag(dt))                   # the diagonal is zero, not the sentinel
+
+    # The oracle for both branches: the path runs over the *distances* on the structure's
+    # own edge set. On the tree branch the structure already carries them, so the two graph
+    # builders return the same graph.
+    G = PortfolioOptimisers.Graphs
+    gt = PortfolioOptimisers.calc_distance_weighted_graph(nt, rd.X; dims = 1)
+    @test gt == PortfolioOptimisers.calc_weighted_adjacency_graph(nt, rd.X; dims = 1)
+    @test dt == G.floyd_warshall_shortest_paths(gt).dists
+
+    # On the PMFG branch the structure is selected by similarity and then re-weighted: same
+    # edges, different values. Both halves are checked, because either alone would pass on a
+    # graph that had quietly changed shape.
+    gp = PortfolioOptimisers.calc_distance_weighted_graph(np, rd.X; dims = 1)
+    Ap = PortfolioOptimisers.calc_adjacency(np, rd.X; dims = 1)
+    Wp = Matrix(G.adjacency_matrix(gp))
+    @test (Wp .!= 0) == (Matrix(Ap) .!= 0)
+    _, Dp = PortfolioOptimisers.cor_and_dist(np.de, np.ce, rd.X; dims = 1)
+    @test all(Wp[i, k] == Dp[i, k] for i in 1:NA, k in 1:NA if Wp[i, k] != 0)
+
+    # And it is emphatically *not* the PMFG's own weights. A path over similarities
+    # minimises total similarity, so it prefers the route through the weakest links -- yet
+    # it correlates 0.95 to 0.97 with the right answer, which is why the check is an
+    # equality against `D` and not a plausibility test.
+    gs = PortfolioOptimisers.calc_weighted_adjacency_graph(np, rd.X; dims = 1)
+    Ws = Matrix(G.adjacency_matrix(gs))
+    @test maximum(Wp) < minimum(Ws[Ws .!= 0])     # distances below every similarity here
+    @test separation_matrix(np.sep, np, rd.X; dims = 1) !=
+          G.floyd_warshall_shortest_paths(gs).dists
+end
+
+@testset "The two separations order the same graph differently" begin
+    dp = separation_matrix(PathLength(), FixedWeights(WX, PathLength()), X4)
+    dh = separation_matrix(HopCount(), FixedWeights(WX, HopCount()), X4)
+    @test dp == [0.0 1.0 2.0 2.1; 1.0 0.0 1.0 1.1; 2.0 1.0 0.0 0.1; 2.1 1.1 0.1 0.0]
+    @test dh == [0 1 1 2; 1 0 1 2; 1 1 0 1; 2 2 1 0]
+
+    # The inversion, stated as the pair-of-pairs comparison it is: hops rank `(1, 3)` closer
+    # than `(2, 4)`, path lengths rank them the other way round.
+    @test dh[1, 3] < dh[2, 4]
+    @test dp[1, 3] > dp[2, 4]
+    # The shortcut is on the graph and is not the shortest path: 5.0 direct against 2.0
+    # through vertex 2. Weights select the route, they do not merely label it.
+    @test WX[1, 3] == 5.0
+    @test dp[1, 3] == WX[1, 2] + WX[2, 3]
+
+    # And the inversion survives into `Z`, which is the only place a consumer sees it.
+    Zp = phylogeny_features(Proximity(), FixedWeights(WX, PathLength()), X4)
+    Zh = phylogeny_features(Proximity(), FixedWeights(WX, HopCount(; n = 2)), X4)
+    @test Zp[1, 3] < Zp[2, 4]
+    @test Zh[1, 3] > Zh[2, 4]
+    # The scales are not comparable either: the budgets are in different units, so the
+    # diagonal is `delta + 1` on one and `n + 1` on the other.
+    @test all(==(2.1 + 1), diag(Zp))
+    @test all(==(2 + 1), diag(Zh))
+end
+
+@testset "The budget is the observed diameter, and a chosen one is capped by it" begin
+    nte = FixedWeights(WX, PathLength())
+    d = separation_matrix(PathLength(), nte, X4)
+    @test separation_budget(PathLength(), nte, d) == 2.1 == maximum(d)
+    # A number below the diameter is used as given -- that is what buys fold-stability.
+    @test separation_budget(PathLength(; dmax = 1.0), nte, d) == 1.0
+    # Above it, the clamp bites. It truncates nothing, since no pair sits beyond 2.1; it
+    # keeps `LinearDecay`'s scale top off a number the graph never reaches.
+    @test separation_budget(PathLength(; dmax = 100.0), nte, d) == 2.1
+    @test all(==(2.1 + 1),
+              diag(phylogeny_features(Proximity(),
+                                      FixedWeights(WX, PathLength(; dmax = 100.0)), X4)))
+
+    # `HopCount` is handed the same matrix and still pays nothing for it: its budget is
+    # configured, so no reduction over `d` happens on that path at all.
+    @test separation_budget(HopCount(; n = 3), nte, d) == 3
+
+    # An epsilon-ball: the budget cuts, the decay does not fall off. Newly expressible, and
+    # what `NoDecay` was kept for.
+    Zb = phylogeny_features(Proximity(; decay = NoDecay()),
+                            FixedWeights(WX, PathLength(; dmax = 1.2)), X4)
+    @test sort(unique(Zb)) == [0.0, 1.0]
+    @test Zb == Float64[(d[i, k] <= 1.2) for i in 1:4, k in 1:4]
+    @test Zb[1, 3] == 0.0                         # 2.0 away, outside the ball
+    @test Zb[2, 4] == 1.0                         # 1.1 away, inside it
+end
+
+@testset "An unreachable weighted pair is Inf, and the budget still guards the decay" begin
+    # Two components, 1 - 2 and 3 - 4. `floyd_warshall_shortest_paths` reports `typemax(T)`,
+    # which on `Float64` weights is `Inf` -- a sentinel the arithmetic tolerates, unlike the
+    # hop count's `typemax(Int)`.
+    Wd = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 2.0; 0.0 0.0 2.0 0.0]
+    nte = FixedWeights(Wd, PathLength())
+    d = separation_matrix(PathLength(), nte, X4)
+    @test d[1, 3] == Inf
+    @test d[3, 4] == 2.0
+
+    # The sentinel is excluded from the diameter rather than repaired into it. Taking it
+    # would make the budget `Inf`, and `LinearDecay` then scores `Inf` at every separation.
+    @test separation_budget(PathLength(), nte, d) == 2.0
+    @test separation_decay(LinearDecay(), 1.0, Inf) == Inf
+
+    # So the budget comparison is load-bearing under a weighted separation too, for the
+    # opposite reason to the hop count's: `LinearDecay` at the sentinel is `-Inf`, not an
+    # overflow, and `-Inf` would sort every unreachable pair below every reachable one.
+    @test separation_decay(LinearDecay(), Inf, 2.0) == -Inf
+    Z = phylogeny_features(Proximity(), nte, X4)
+    @test Z[1, 3] == 0.0
+    @test Z[1, 2] == 2.0 + 1 - 1.0
+    @test all(==(3.0), diag(Z))
+
+    # A graph with no edges at all is the degenerate end of the same rule: the diameter is
+    # zero, every pair is unreachable, and the honest answer is the identity.
+    Wn = zeros(Float64, 4, 4)
+    nn = FixedWeights(Wn, PathLength())
+    @test separation_budget(PathLength(), nn, separation_matrix(PathLength(), nn, X4)) ==
+          0.0
+    @test phylogeny_features(Proximity(), nn, X4) == Matrix{Float64}(I, 4, 4)
+end
+
+@testset "PathLength drives the whole feature-prior path" begin
+    for (alg, sep) in Iterators.product((Proximity(), Proximity(; decay = NoDecay()),
+                                         Proximity(; decay = ExponentialDecay(; rate = 0.8)),
+                                         Proximity(; decay = ReciprocalDecay())),
+                                        (PathLength(), PathLength(; dmax = 0.5)))
+        pl = NetworkEstimator(; sep = sep)
+        Z = phylogeny_features(alg, pl, rd.X)
+        @test isa(Z, Matrix{Float64})             # the gemm path, as for every other kernel
+        @test size(Z) == (NA, NA)
+        @test issymmetric(Z)
+        @test all(isfinite, Z)
+        @test all(>(0), diag(Z))                  # the diagonal is the top of the scale
+        @test maximum(Z) == first(diag(Z))
+        pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
+        @test pr.Z == Z
+    end
+
+    # `dmax = nothing` reaches the whole connected component, so a flat decay over a graph
+    # that is connected by construction is the matrix of ones -- and a chosen budget is what
+    # makes it selective again.
+    pl = NetworkEstimator(; sep = PathLength())
+    @test phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X) == ones(NA, NA)
+    @test any(iszero,
+              phylogeny_features(Proximity(; decay = NoDecay()),
+                                 NetworkEstimator(; sep = PathLength(; dmax = 0.5)), rd.X))
+
+    # `sep` is the estimator's, not the algorithm's, so a clustering source has no `sep` to
+    # be inert -- swapping the separation cannot change a partition's answer because a
+    # partition never reaches this kernel's separation branch.
+    @test phylogeny_features(Proximity(), CLE, rd.X) ==
+          Matrix{Float64}(phylogeny_matrix(CLE, rd.X).X) + I
+end

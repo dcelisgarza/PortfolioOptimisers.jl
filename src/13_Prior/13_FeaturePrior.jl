@@ -116,7 +116,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Phylogeny feature algorithm scoring each pair by how far apart it sits.
 
-`Z[i, k] = decay(separation(i, k))` inside the budget and `0` beyond, so the score falls off with distance instead of flattening to an indicator. The separation and its budget come from the source [`NetworkEstimator`](@ref)'s `sep` — hops under [`HopCount`](@ref) — and the fall-off from `decay`.
+`Z[i, k] = decay(separation(i, k))` inside the budget and `0` beyond, so the score falls off with distance instead of flattening to an indicator. The separation and its budget come from the source [`NetworkEstimator`](@ref)'s `sep` — hops under [`HopCount`](@ref), a summed shortest path under [`PathLength`](@ref) — and the fall-off from `decay`.
 
 The score is a function of the separation rather than of the un-clamped walk count `sum(A^i)`. A walk count is degree-biased — a hub accumulates walks combinatorially — so two assets' scores would encode how busy their neighbourhoods are as much as how close they are. It is for the same reason strictly richer than [`phylogeny_matrix`](@ref)'s output, which accumulates that walk count and then `clamp!(P, 0, 1)` **destroys the step count**: this is the information this algorithm keeps.
 
@@ -128,9 +128,17 @@ The score is a function of the separation rather than of the un-clamped walk cou
 
 A zero entry means **functionally unreachable**: either the pair is disconnected or outside the budget, or the decay has fallen to nothing — the same claim about the pair, since [`AbstractSeparationDecayAlgorithm`](@ref) forbids anything below zero inside the budget. No shipped decay other than the flat one emits zero there, so for what ships a zero is unreachable-or-out-of-budget and nothing else.
 
+# Two separations, and what may be compared across them
+
+A `Z` graded over hops and a `Z` graded over path lengths are **interchangeable as inputs** — both satisfy the same contract, so every consumer takes either — and are **not comparable as values**. The budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) so do the scales.
+
+On any real universe they will nevertheless *look* interchangeable: measured over twenty assets, `rho = 0.99` on a minimum spanning tree and `0.95` to `0.98` on a PMFG. That is empirical rather than guaranteed — both structures are selected by distance, so their two readings of it rarely disagree — and it is not a licence to compare one run's numbers against another's.
+
+Under [`PathLength`](@ref)'s default `dmax = nothing` the budget is the **observed** diameter, so `f(0)` is data-dependent for [`LinearDecay`](@ref) and a diameter that moves between cross-validation folds *shifts* every entry of `Z` rather than rescaling it. A fixed `dmax` buys back the fold-stability, and the decays that pin `f(0) = 1` never had the exposure.
+
 # Unreachable pairs
 
-An unreachable pair carries [`separation_matrix`](@ref)'s sentinel — `typemax` for a hop count — so the budget comparison both selects the `0` and **guards the decay call**: `separation_decay` is never evaluated at the sentinel. The guard is load-bearing rather than tidy — `ReciprocalDecay` overflows `1 + d` there, and for a fractional `power` that is a `DomainError` rather than a discarded number.
+An unreachable pair carries [`separation_matrix`](@ref)'s sentinel — `typemax`, which is `typemax(Int)` for a hop count and `Inf` for a path length over `Float64` weights — so the budget comparison both selects the `0` and **guards the decay call**: `separation_decay` is never evaluated at the sentinel. The guard is load-bearing rather than tidy — `ReciprocalDecay` overflows `1 + d` there, and for a fractional `power` that is a `DomainError` rather than a discarded number.
 
 # Fields
 
@@ -158,6 +166,7 @@ Proximity
   - [`AbstractPhylogenyFeatureAlgorithm`](@ref)
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
   - [`LinearDecay`](@ref)
   - [`NoDecay`](@ref)
@@ -200,7 +209,7 @@ The inert surface is `alg` alone. `sep` lives on [`NetworkEstimator`](@ref), whi
 
 # The diagonal
 
-`Z[i, i]` is the top of the scale, never zero: `1` for any clustering source, and `separation_decay(decay, 0, dmax)` for [`Proximity`](@ref) over a graph — `n + 1` under the default [`LinearDecay`](@ref) and [`HopCount`](@ref), `1` for the members that pin `f(0) = 1`. That the diagonal is maximal is a contract on [`AbstractSeparationDecayAlgorithm`](@ref), checked before the loop by [`assert_separation_decay`](@ref).
+`Z[i, i]` is the top of the scale, never zero: `1` for any clustering source, and `separation_decay(decay, 0, dmax)` for [`Proximity`](@ref) over a graph — `n + 1` under the default [`LinearDecay`](@ref) and [`HopCount`](@ref), the observed diameter plus one under [`PathLength`](@ref)'s default budget, `1` for the members that pin `f(0) = 1`. That the diagonal is maximal is a contract on [`AbstractSeparationDecayAlgorithm`](@ref), checked before the loop by [`assert_separation_decay`](@ref).
 
 # Arguments
 

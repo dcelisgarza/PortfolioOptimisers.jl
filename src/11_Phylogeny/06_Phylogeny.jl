@@ -874,7 +874,9 @@ Keywords correspond to the struct's fields.
 
 `sep` says which pairs the network relates, and **every** consumer of a network needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
 
-The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops.
+The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
+
+Only [`HopCount`](@ref) is admitted by every consumer. [`phylogeny_matrix`](@ref) and both [`clusterise`](@ref) methods read `sep.n` as a **matrix-power count**, so they refuse a member that has no `n` rather than truncating a power sum. [`Proximity`](@ref) reads the separation through its two kernels and therefore takes either.
 
 # Examples
 
@@ -1309,7 +1311,63 @@ function calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs.
                                                                                     kwargs...)))
 end
 """
+    calc_distance_weighted_graph(nte::NetworkEstimator, X::MatNum; dims::Int = 1,
+                                 kwargs...)
+
+Build the network structure carrying **distances** on its edges, on either branch.
+
+[`calc_weighted_adjacency_graph`](@ref) gives each branch the quantity that *selected* its edges, so its two branches hold opposite polarities. This function gives both branches the same one. The structure is unchanged — it is the same edge set, vertex for vertex — and only the weights differ, on the PMFG branch alone.
+
+# Why the PMFG branch may be re-weighted here, and may not be there
+
+Re-weighting a structure with a quantity that did not select it is what [`calc_weighted_adjacency_graph`](@ref) refuses. This is not that. Every [`AbstractSimilarityMatrixAlgorithm`](@ref) is a strictly decreasing function of the distance, so the similarity that selected the PMFG's edges is a **monotone image of `D`**, not a foreign quantity: `D` is the selecting quantity's preimage, and the same PMFG comes out of it.
+
+What must not happen is a path taken over the similarities themselves. A shortest path *minimises* the sum of its edge weights, so over similarities it seeks the route through the **weakest** links — the ordering it produces is backwards. It is also quiet about it: measured over the four similarity algorithms, the backwards answer correlates `0.95` to `0.97` with the right one, which is close enough to pass a glance and not close enough to be usable.
+
+# Arguments
+
+  - `nte`: Network estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `G::SimpleWeightedGraphs.SimpleWeightedGraph`: The network structure, weighted by distance on both branches.
+
+# Related
+
+  - [`NetworkEstimator`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+  - [`graph_weight_matrix`](@ref)
+  - [`PathLength`](@ref)
+  - [`separation_matrix`](@ref)
+"""
+function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
+                                                            <:AbstractTreeType}, X::MatNum;
+                                      dims::Int = 1, kwargs...)
+    # The tree branch already weights its edges with `D`, so the distance-weighted structure
+    # and the selecting-quantity one are the same graph.
+    return calc_weighted_adjacency_graph(nte, X; dims = dims, kwargs...)
+end
+function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
+                                                            <:AbstractSimilarityMatrixAlgorithm},
+                                      X::MatNum; dims::Int = 1, kwargs...)
+    S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    S = distance_to_similarity(nte.alg; S = S, D = D)
+    # `PMFG_T2s` selects the edges from the similarity; `D` then supplies their lengths. The
+    # repair is `calc_weighted_adjacency_graph`'s tree-branch one, needed here for the same
+    # reason -- a zero distance is the value the representation reserves for *absent*.
+    W = graph_weight_matrix(D)
+    r, c, _ = SparseArrays.findnz(PMFG_T2s(S)[1])
+    v = [W[i, j] for (i, j) in zip(r, c)]
+    return SimpleWeightedGraphs.SimpleWeightedGraph(SparseArrays.sparse(r, c, v,
+                                                                        size(W)...))
+end
+"""
     separation_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                      dims::Int = 1, kwargs...)
+    separation_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
                       dims::Int = 1, kwargs...)
 
 Compute the dense `assets × assets` matrix of separations under a separation algorithm.
@@ -1318,12 +1376,16 @@ Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separ
 
 # The unreachable sentinel
 
-An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref). Callers must compare against the budget before doing anything else with the entry, and that comparison has to **short-circuit** — an `ifelse` evaluates both branches, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref), and `Graphs.floyd_warshall_shortest_paths` reports `typemax(T)` for [`PathLength`](@ref), which on the `Float64` weights it is handed is `Inf`. Callers must compare against the budget before doing anything else with the entry, and that comparison has to **short-circuit** — an `ifelse` evaluates both branches, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+
+# The two shipped members read the same structure differently
+
+[`HopCount`](@ref) counts the edges of [`calc_adjacency`](@ref); [`PathLength`](@ref) sums the distances along them, over [`calc_distance_weighted_graph`](@ref). All-pairs shortest paths come from one `floyd_warshall_shortest_paths` call rather than a Dijkstra per vertex — measured about **7 times faster** on this shape, and within about `1.3` times of the breadth-first loop the hop count uses.
 
 # Arguments
 
   - `sep`: Separation algorithm.
-  - `nte`: Network estimator. The graph is rebuilt from `X` through [`calc_adjacency`](@ref).
+  - `nte`: Network estimator. The graph is rebuilt from `X` on every call, through [`calc_adjacency`](@ref) or [`calc_distance_weighted_graph`](@ref).
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments forwarded to the underlying phylogeny routines.
@@ -1336,8 +1398,10 @@ An unreachable pair carries whatever sentinel the underlying routine uses, **not
 
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
   - [`separation_budget`](@ref)
   - [`calc_adjacency`](@ref)
+  - [`calc_distance_weighted_graph`](@ref)
   - [`Proximity`](@ref)
 """
 function separation_matrix end
@@ -1350,8 +1414,14 @@ function separation_matrix(::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
     end
     return d
 end
+function separation_matrix(::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
+                           dims::Int = 1, kwargs...)
+    g = calc_distance_weighted_graph(nte, X; dims = dims, kwargs...)
+    return Graphs.floyd_warshall_shortest_paths(g).dists
+end
 """
     separation_budget(sep::HopCount, nte::AbstractNetworkEstimator, d::MatNum)
+    separation_budget(sep::PathLength, nte::AbstractNetworkEstimator, d::MatNum)
 
 Resolve the separation budget in scope: the separation beyond which a pair counts as unrelated.
 
@@ -1359,24 +1429,29 @@ Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separ
 
 # The separations are passed in, not recomputed
 
-`d` is the matrix [`separation_matrix`](@ref) produced, so a member whose budget is *observed* rather than configured — the diameter of what the graph actually turned out to be — can read it without a second traversal. [`HopCount`](@ref) ignores it and therefore pays nothing for a reduction it does not need.
+`d` is the matrix [`separation_matrix`](@ref) produced, so a member whose budget is *observed* rather than configured — the diameter of what the graph actually turned out to be — can read it without a second traversal. That is why the argument is the **matrix** and not a diameter: finding the largest finite entry is itself the `assets²` reduction, so passing a diameter would charge [`HopCount`](@ref) for one it ignores. Handing over `d` pushes the reduction into [`PathLength`](@ref), the member that wants it.
 
-`nte` is likewise inert for what ships: it is the channel through which an extension budget can see the estimator that owns it. Inert arguments have precedent here — [`separation_decay`](@ref)'s `dmax` is read by only one of four members.
+`nte` is inert for what ships: it is the channel through which an extension budget can see the estimator that owns it. Inert arguments have precedent here — [`separation_decay`](@ref)'s `dmax` is read by only one of five members.
+
+# The observed diameter is a ceiling, not only a default
+
+[`PathLength`](@ref) clamps a chosen `dmax` to the observed diameter as well as substituting the diameter for `nothing`. The clamp **truncates nothing** — no pair sits beyond the diameter — so it is a scale-top correction and is visible only through [`LinearDecay`](@ref), the one decay reading the budget. Without it, `dmax = 100` on a graph of diameter `3.5` would flatten the scores towards a constant while forbidding no pair at all.
 
 # Arguments
 
   - `sep`: Separation algorithm.
   - `nte`: Network estimator that owns `sep`. **Inert** for the shipped members.
-  - `d`: Separation matrix from [`separation_matrix`](@ref). **Inert** for [`HopCount`](@ref), whose budget is configured rather than observed.
+  - `d`: Separation matrix from [`separation_matrix`](@ref). **Inert** for [`HopCount`](@ref), whose budget is configured rather than observed; read by [`PathLength`](@ref), whose budget is capped by what the graph turned out to be.
 
 # Returns
 
-  - `dmax::Number`: Separation budget. Stated in the units `sep` measures in — hops for [`HopCount`](@ref) — so it is only ever compared against entries of `d`.
+  - `dmax::Number`: Separation budget. Stated in the units `sep` measures in — hops for [`HopCount`](@ref), the distance estimator's units for [`PathLength`](@ref) — so it is only ever compared against entries of `d`.
 
 # Related
 
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_decay`](@ref)
   - [`Proximity`](@ref)
@@ -1384,6 +1459,18 @@ Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separ
 function separation_budget end
 function separation_budget(sep::HopCount, ::AbstractNetworkEstimator, ::MatNum)::Number
     return sep.n
+end
+function separation_budget(sep::PathLength, ::AbstractNetworkEstimator, d::MatNum)::Number
+    # The diameter of what the graph turned out to be. The sentinel is excluded rather than
+    # repaired: an unreachable pair is not a long one, and taking it as the diameter would
+    # make the budget `Inf`, which `LinearDecay` scores `Inf` at every separation.
+    delta = zero(eltype(d))
+    for dij in d
+        if isfinite(dij) && dij > delta
+            delta = dij
+        end
+    end
+    return isnothing(sep.dmax) ? delta : min(sep.dmax, delta)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

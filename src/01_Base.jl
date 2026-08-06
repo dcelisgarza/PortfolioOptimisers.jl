@@ -115,6 +115,7 @@ const arg_dict = Dict(
                       :ntalg => "`alg`: Tree or similarity matrix algorithm.",#
                       :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
                       :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
+                      :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure.",#
                       :clres => "`res`: Clustering result.",#
                       :S => "`S`: Similarity matrix",#
                       :D => "`D`: Distance matrix",#
@@ -710,6 +711,7 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                       :sdpower => "`power > 0`.",#
                       :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
                       :ntn => "`n >= 1`.",#
+                      :sepdmax => "If `dmax` is not `nothing`, `dmax > 0`.",#
                       :A => "`!isempty(A)`.",#
                       :B => "`!isempty(B)`.",#
                       :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",

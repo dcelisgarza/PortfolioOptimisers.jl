@@ -454,7 +454,9 @@ const CATALOGUE = [Section("Core abstractions",
                                                                   :AbstractSeparationAlgorithm;
                                                                   label = "Separations: the open [`AbstractSeparationAlgorithm`](@ref) family, applied by [`separation_matrix`](@ref) and [`separation_budget`](@ref)"),
                                                               [Prose("Carried by [`NetworkEstimator`](@ref) as `sep`. Says how far apart two assets sit *and* how far is too far, because the two share a unit. It sits on the network estimator rather than on the feature producer: every consumer of a network needs to know which pairs it relates, and the constraint path never sees the producer at all."),
-                                                               Cap(:HopCount)]),
+                                                               Cap(:HopCount),
+                                                               Cap(:PathLength;
+                                                                   label = "[`PathLength`](@ref) sums the distances along the shortest path instead of counting its edges, and budgets in the distance estimator's units -- `dmax = nothing` means the observed diameter")]),
                                                         Group(Cap(:separation_decay,
                                                                   :AbstractSeparationDecayAlgorithm;
                                                                   label = "Separation decays: the open [`AbstractSeparationDecayAlgorithm`](@ref) family, applied by [`separation_decay`](@ref)"),

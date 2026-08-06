@@ -102,6 +102,7 @@ The name says nothing about graphs. A taxonomy depth is a separation too, so the
 # Related
 
   - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
@@ -116,7 +117,7 @@ Separation measured as the number of graph edges between two assets.
 
 The separation between two assets is the length of the shortest path between them counted in **edges**, ignoring the weights those edges carry, and the budget is `n` of them. It is the separation the network family has always used: [`phylogeny_matrix`](@ref)'s `sum(A^i for i in 0:n)` and both [`clusterise`](@ref) methods' power sums are hop budgets, and this member is where that `n` now lives.
 
-The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. A member measuring something continuous carries a budget in its own units instead, and no caller has to know which unit is in play.
+The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. [`PathLength`](@ref) measures the same structure in the distance estimator's units and carries its own budget in those, so no caller has to know which unit is in play.
 
 # Fields
 
@@ -147,6 +148,7 @@ HopCount
 # Related
 
   - [`AbstractSeparationAlgorithm`](@ref)
+  - [`PathLength`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
   - [`NetworkEstimator`](@ref)
@@ -164,6 +166,84 @@ HopCount
 end
 function HopCount(; n::Integer = 1)::HopCount
     return HopCount(n)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Separation measured as the length of the shortest weighted path between two assets.
+
+The separation between two assets is the sum of the **distances** along the shortest path joining them in the network, and the budget is `dmax` of the same units. It is the graded counterpart of [`HopCount`](@ref): both measure how far apart two assets sit in the same structure, but one counts the edges and the other adds up how long they are.
+
+# The path runs over distances on both branches
+
+The path is taken over the distance matrix **restricted to the structure's edge set** — [`calc_distance_weighted_graph`](@ref) — whichever branch built the structure. On the tree branch that is the graph's own weights; on the PMFG branch the structure is selected by similarity and then re-weighted by the distance that the similarity is a strictly decreasing function of.
+
+Pathing over the PMFG's similarities instead is not a second convention, it is backwards: a shortest path over similarities *minimises total similarity*, so it prefers the route through the weakest links. It fails quietly — measured over the four similarity algorithms, the backwards answer correlates `0.95` to `0.97` with the right one, which is far too close to catch by looking.
+
+# It is not comparable with a hop count, only interchangeable with one
+
+`PathLength` and [`HopCount`](@ref) satisfy the same contract, so any consumer takes either. Their outputs are **not comparable as values**: the budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ.
+
+On a real universe the two agree far more than that suggests — measured over twenty assets, `rho = 0.99` on a minimum spanning tree and `0.95` to `0.98` on a PMFG, with `0.16%` of pairs of pairs strictly inverted on the tree and **none at all** on the PMFG — because both structures are selected by distance to begin with. That agreement is **empirical, not guaranteed**: it is a fact about the graphs an [`AbstractDistanceEstimator`](@ref) tends to produce, not a property of either separation.
+
+# The budget
+
+`dmax = nothing` is the default and means **the whole connected component**, implemented as the observed diameter: the largest finite entry of the separation matrix. It is the default because nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits — `dmax = 0.37` is not a number a caller can reason about, whereas "look at the whole component and let the decay do the falling off" is. Choosing a number is how a caller buys fold-stability.
+
+[`separation_budget`](@ref) clamps a chosen `dmax` to the observed diameter. The clamp cuts nothing — no pair sits beyond the diameter — so it is a **scale-top correction** and bites only [`LinearDecay`](@ref), the one decay that reads the budget: without it, a `dmax` far above the diameter would flatten `Z` towards a constant while forbidding no pair at all.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PathLength(;
+        dmax::Union{Nothing, <:Number} = nothing
+    ) -> PathLength
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:sepdmax])
+
+# Examples
+
+```jldoctest
+julia> PathLength()
+PathLength
+  dmax ┴ nothing
+
+julia> PathLength(; dmax = 0.5)
+PathLength
+  dmax ┴ Float64: 0.5
+```
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
+  - [`calc_distance_weighted_graph`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`Proximity`](@ref)
+"""
+@concrete struct PathLength <: AbstractSeparationAlgorithm
+    """
+    $(field_dict[:sepdmax])
+    """
+    dmax
+    function PathLength(dmax::Union{Nothing, <:Number})
+        if !isnothing(dmax)
+            @argcheck(dmax > zero(dmax), DomainError(dmax, "dmax must be > 0"))
+        end
+        return new{typeof(dmax)}(dmax)
+    end
+end
+function PathLength(; dmax::Union{Nothing, <:Number} = nothing)::PathLength
+    return PathLength(dmax)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -417,7 +497,7 @@ Where:
 
 The name is about the *fall-off* and nothing else. The budget still cuts: a pair outside it scores `0`, because truncation was never the decay's job — see [`AbstractSeparationDecayAlgorithm`](@ref)'s "The budget is an argument, not a field". What comes out is therefore an **indicator** of the neighbourhood the budget selects, not a matrix of ones.
 
-That is exactly what makes it useful. Under [`HopCount`](@ref) it turns [`Proximity`](@ref) into the `n`-hop neighbourhood indicator, which is what the retired `BinaryNeighbourhood` produced; under a separation with a continuous budget it is an ε-ball, and neither needs a type of its own once the fall-off is a knob.
+That is exactly what makes it useful. Under [`HopCount`](@ref) it turns [`Proximity`](@ref) into the `n`-hop neighbourhood indicator, which is what the retired `BinaryNeighbourhood` produced; under [`PathLength`](@ref) it is an ε-ball, and neither needs a type of its own once the fall-off is a knob.
 
 It is the flat end of the family, so it is the only member that is not strictly decreasing. The contract asks for monotone **non**-increasing, which a constant satisfies.
 
@@ -579,5 +659,5 @@ function assert_separation_decay(::Union{<:LinearDecay, <:ExponentialDecay,
     return nothing
 end
 
-export AbstractSeparationAlgorithm, HopCount, AbstractSeparationDecayAlgorithm, LinearDecay,
-       ExponentialDecay, ReciprocalDecay, NoDecay, separation_decay
+export AbstractSeparationAlgorithm, HopCount, PathLength, AbstractSeparationDecayAlgorithm,
+       LinearDecay, ExponentialDecay, ReciprocalDecay, NoDecay, separation_decay
