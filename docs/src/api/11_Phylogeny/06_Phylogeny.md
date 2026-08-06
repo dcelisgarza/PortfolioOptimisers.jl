@@ -43,6 +43,12 @@ calc_adjacency
 calc_distance_weighted_graph
 separation_matrix
 separation_budget
+AbstractCentralityPolarity
+DistancePolarity
+SimilarityPolarity
+centrality_polarity
+centrality_graph
+assert_centrality_args
 calc_centrality
 Tree_SimMat
 NwE_ClE

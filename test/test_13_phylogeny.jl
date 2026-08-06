@@ -1646,3 +1646,229 @@ end
         @test de.n_cor_and_dist + de.n_distance == 2
     end
 end
+
+#=
+Weighted centrality (#205). `centrality_polarity` declares which quantity an algorithm's
+weights must be, and `centrality_graph` supplies it. Nothing in the path raises: an
+algorithm that declares no polarity, and a source that carries no weights, run on the plain
+graph instead.
+=#
+using PortfolioOptimisers, Test
+
+# An algorithm that says nothing about itself, for the fallback. Defined at top level
+# because a `@testset` body becomes a function, which cannot host a struct.
+struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+
+@testset "Weighted centrality" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, StatsBase, SparseArrays,
+          LinearAlgebra
+    PO = PortfolioOptimisers
+    G = PortfolioOptimisers.Graphs
+    SWG = PortfolioOptimisers.SimpleWeightedGraphs
+
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    X = prior(EmpiricalPrior(), rd).X
+    nte_t = NetworkEstimator()                                       # tree branch
+    nte_p = NetworkEstimator(; alg = MaximumDistanceSimilarity())    # similarity branch
+    ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),
+           EigenvectorCentrality(), KatzCentrality(), Pagerank(), RadialityCentrality(),
+           StressCentrality()]
+
+    @testset "The declared polarity" begin
+        # The fallback declares nothing, so an algorithm is unweightable until it opts in.
+        struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+        @test PO.centrality_polarity(UndeclaredCentrality()) === nothing
+        # Every shipped member, one assertion each.
+        for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
+                   StressCentrality())
+            @test PO.centrality_polarity(ct) === PO.DistancePolarity()
+        end
+        @test PO.centrality_polarity(EigenvectorCentrality()) === PO.SimilarityPolarity()
+        for ct in (DegreeCentrality(), KatzCentrality(), Pagerank())
+            @test PO.centrality_polarity(ct) === nothing
+        end
+    end
+
+    @testset "The routing table" begin
+        #=
+        Which graph each pair gets. The distance route is available on both branches; the
+        similarity route only on the branch a similarity actually selected.
+        =#
+        want_t = [SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph, G.SimpleGraph,
+                  G.SimpleGraph, G.SimpleGraph, G.SimpleGraph, SWG.SimpleWeightedGraph,
+                  SWG.SimpleWeightedGraph]
+        want_p = [SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph, G.SimpleGraph,
+                  SWG.SimpleWeightedGraph, G.SimpleGraph, G.SimpleGraph,
+                  SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph]
+        for (i, ct) in pairs(ces)
+            @test isa(PO.centrality_graph(nte_t, ct, X), want_t[i])
+            @test isa(PO.centrality_graph(nte_p, ct, X), want_p[i])
+            # A clustering source is weightless whatever the algorithm declares.
+            @test isa(PO.centrality_graph(ClustersEstimator(), ct, X), G.SimpleGraph)
+        end
+    end
+
+    @testset "Weights re-rank, and equal weights do not" begin
+        #=
+        Both halves of the claim, on a graph constructed so the first one must hold. The
+        cycle 1-2-3-4-5-1 has a heavy shortcut on (1,5): unweighted, vertices 1 and 5 are
+        adjacent and tie with 3 on closeness; weighted, the shortcut is not worth taking
+        and 3 wins outright. `FixedDistanceGraph` supplies the graph directly, because
+        every structure `calc_adjacency` builds from data is a spanning tree or a PMFG.
+        =#
+        W = zeros(5, 5)
+        for (i, j, w) in ((1, 2, 1.0), (2, 3, 1.0), (3, 4, 1.0), (4, 5, 1.0), (1, 5, 10.0))
+            W[i, j] = W[j, i] = w
+        end
+        Xd = zeros(3, 5)
+        nte = FixedDistanceGraph(W, HopCount(; n = 1))
+        unw = PO.calc_centrality(ClosenessCentrality(),
+                                 G.SimpleGraph(phylogeny_matrix(nte, Xd).X))
+        wtd = centrality_vector(nte, ClosenessCentrality(), Xd).X
+        @test wtd != unw
+        # The re-ranking, not merely a rescale: 1 ties with 3 unweighted and loses weighted.
+        @test unw[1] == unw[3]
+        @test wtd[3] > wtd[1]
+
+        # Equal weights reproduce the unweighted answer exactly, on the same structure.
+        We = Float64.(W .!= 0)
+        nte_e = FixedDistanceGraph(We, HopCount(; n = 1))
+        for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
+                   StressCentrality())
+            @test centrality_vector(nte_e, ct, Xd).X ==
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte_e, Xd).X))
+        end
+    end
+
+    @testset "A tree's shortest paths are weight-independent" begin
+        #=
+        Exact `==`, because it is a theorem rather than a numerical coincidence: a tree has
+        exactly one path between any two vertices, so the shortest-path set does not depend
+        on the weights. Betweenness and stress count paths, so both are invariant. Closeness
+        and radiality read the path *lengths* and are not -- which is what makes the pair of
+        assertions evidence that the weights really did arrive.
+        =#
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            unw(ct) = PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte, X).X))
+            for ct in (BetweennessCentrality(), StressCentrality())
+                @test centrality_vector(nte, ct, X).X == unw(ct)
+            end
+            for ct in (ClosenessCentrality(), RadialityCentrality())
+                @test centrality_vector(nte, ct, X).X != unw(ct)
+            end
+        end
+        # It is a fact about the tree, not about the algorithms: on a PMFG, where a pair has
+        # many paths, both of them do move.
+        for ct in (BetweennessCentrality(), StressCentrality())
+            @test centrality_vector(nte_p, ct, X).X !=
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte_p, X).X))
+        end
+    end
+
+    @testset "The similarity branch is re-weighted with D, not with S" begin
+        #=
+        The PMFG's own weights are the similarities that selected its edges, and a shortest
+        path over those seeks the route through the weakest links. `calc_distance_weighted_graph`
+        supplies the distances on the same structure instead. Asserting the S-weighted answer
+        is *not* what ships: it correlates about 0.95 with the right one, so a correlation
+        test would pass the bug.
+        =#
+        gD = PO.centrality_graph(PO.DistancePolarity(), nte_p, X)
+        gS = PO.centrality_graph(PO.SimilarityPolarity(), nte_p, X)
+        # Same structure, different weights.
+        @test G.adjacency_matrix(G.SimpleGraph(gD)) == G.adjacency_matrix(G.SimpleGraph(gS))
+        @test G.weights(gD) != G.weights(gS)
+        for ct in (ClosenessCentrality(), RadialityCentrality())
+            shipped = centrality_vector(nte_p, ct, X).X
+            @test shipped == PO.calc_centrality(ct, gD)
+            @test shipped != PO.calc_centrality(ct, gS)
+        end
+        # Eigenvector is the one algorithm that wants the similarities, and gets them.
+        @test PO.centrality_graph(nte_p, EigenvectorCentrality(), X) === nothing ||
+              G.weights(PO.centrality_graph(nte_p, EigenvectorCentrality(), X)) ==
+              G.weights(gS)
+    end
+
+    @testset "The five unweightable cases return the unweighted answer" begin
+        #=
+        #240: weightedness is a property of the source, not of the request. There is no
+        flag, so a caller never asks for weights, and an unweightable pair has not been
+        handed a request it cannot serve. Exact `==` against the plain-graph result --
+        except for eigenvector, whose `Graphs.eigenvector_centrality` seeds its Arnoldi
+        iteration randomly and differs from itself at about `6e-16` between two runs on one
+        and the same graph.
+        =#
+        eig_noise(ct) = isa(ct, EigenvectorCentrality)
+        same(ct, a, b) = eig_noise(ct) ? isapprox(a, b) : a == b
+
+        # 1. Weightless sources: a clustering estimator, a precomputed `Clusters`, and a
+        #    precomputed `PhylogenyResult`.
+        clr = clusterise(ClustersEstimator(), X)
+        for pl in (ClustersEstimator(), clr)
+            for ct in ces
+                @test same(ct, centrality_vector(pl, ct, X).X,
+                           PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(pl, X).X)))
+            end
+        end
+        plr = phylogeny_matrix(nte_p, X)
+        for ct in ces
+            @test same(ct, centrality_vector(plr, ct).X,
+                       PO.calc_centrality(ct, G.SimpleGraph(plr.X)))
+        end
+
+        # 2--4. Degree, pagerank and Katz declare no polarity, on either branch.
+        for nte in (nte_t, nte_p), ct in (DegreeCentrality(), Pagerank(), KatzCentrality())
+            @test centrality_vector(nte, ct, X).X ==
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte, X).X))
+        end
+        # Katz needs the route rather than merely the absence of a check: it does not ignore
+        # the weights, it fails on them.
+        @test_throws InexactError PO.calc_centrality(KatzCentrality(),
+                                                     PO.calc_distance_weighted_graph(nte_t,
+                                                                                     X))
+
+        # 5. Eigenvector on a tree branch, where no similarity exists.
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            @test isapprox(centrality_vector(nte, EigenvectorCentrality(), X).X,
+                           PO.calc_centrality(EigenvectorCentrality(),
+                                              G.SimpleGraph(phylogeny_matrix(nte, X).X)))
+        end
+    end
+
+    @testset "The separation is read on the unweighted route only" begin
+        #=
+        The weighted routes read the structure, not the separation closure, because a power
+        of a weighted matrix sums products of distances rather than counting edges. So `sep`
+        is inert there and live on the unweighted route. At the default `n = 1` the two
+        agree, since the closure of a graph at one hop is the graph.
+        =#
+        base_w = centrality_vector(nte_t, ClosenessCentrality(), X).X
+        base_u = centrality_vector(nte_t, DegreeCentrality(), X).X
+        @test centrality_vector(NetworkEstimator(; sep = HopCount(; n = 1)),
+                                DegreeCentrality(), X).X == base_u
+        for n in 2:3
+            nte = NetworkEstimator(; sep = HopCount(; n = n))
+            @test centrality_vector(nte, ClosenessCentrality(), X).X == base_w
+            @test centrality_vector(nte, DegreeCentrality(), X).X != base_u
+        end
+    end
+
+    @testset "A matrix in args is refused" begin
+        #=
+        `args` was already a half-working weighted channel and is now a second one. The
+        working half silently overrode the declared polarity; the other half bound the
+        matrix to `betweenness_centrality`'s `vs` and overflowed the stack -- so this check
+        also closes a crash. Non-matrix positional arguments are untouched.
+        =#
+        D = zeros(3, 3)
+        for T in (BetweennessCentrality, ClosenessCentrality, StressCentrality)
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (D,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (1:3, D))
+            @test isa(T(; args = (1:3,)), T)
+            @test isa(T(), T)
+        end
+    end
+end

@@ -371,6 +371,14 @@ const CATALOGUE = [Section("Core abstractions",
                                                          label = "Radiality"),
                                                      Cap(:StressCentrality;
                                                          label = "Stress")]),
+                                              Group(Cap(:AbstractCentralityPolarity,
+                                                        :centrality_polarity;
+                                                        label = "The network is weighted where it can be, in the polarity [`centrality_polarity`](@ref) declares for the algorithm"),
+                                                    [Cap(:DistancePolarity;
+                                                         label = "[`DistancePolarity`](@ref) for the shortest-path algorithms -- betweenness, closeness, radiality and stress"),
+                                                     Cap(:SimilarityPolarity;
+                                                         label = "[`SimilarityPolarity`](@ref) for eigenvector centrality, which reads the weighted adjacency matrix itself"),
+                                                     Prose("Five cases run on the plain unweighted graph and none of them raises: a weightless source (a [`ClustersEstimator`](@ref), a precomputed [`Clusters`](@ref), a precomputed [`PhylogenyResult`](@ref)), [`DegreeCentrality`](@ref), [`Pagerank`](@ref), [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. Polarity says *which* weights an algorithm receives, never *whether* the call succeeds. Note that the `sep` of a [`NetworkEstimator`](@ref) is inert on the weighted routes, which read the structure rather than the separation closure -- at the default `HopCount(; n = 1)` the two agree.")]),
                                               Cap(:centrality_vector),
                                               Cap(:average_centrality),
                                               Cap(:asset_phylogeny)]),

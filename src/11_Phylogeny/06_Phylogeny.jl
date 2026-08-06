@@ -146,7 +146,45 @@ All concrete and/or abstract types implementing specific centrality algorithms (
   - [`StressCentrality`](@ref)
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
+"""
+    assert_centrality_args(::Type{T}, args::Tuple) where {T}
 
+Refuse a matrix inside a centrality algorithm's `args`.
+
+`args` is splatted straight into the `Graphs.jl` centrality function, so a matrix in it is a `distmx` — a second, undeclared way to weight the graph. [`centrality_polarity`](@ref) is the declared one, and it picks the weights the algorithm's own mathematics needs, from the structure that was actually built. Two channels answering the same question is one too many, and this one was never safe:
+
+  - `Graphs.betweenness_centrality`'s `distmx` is its **third** positional argument, so a matrix in `args` binds to `vs` instead and the call **overflows the stack** inside `Graphs.degree`. That takes the session with it, not merely the call.
+  - `Graphs.closeness_centrality`'s is its second, so that one worked — silently overriding the polarity, and reporting a wrong-sized matrix as a `BoundsError` rather than a `DimensionMismatch`.
+  - `Graphs.stress_centrality` has no `distmx` at all.
+
+Non-matrix entries are untouched: a vertex list or a sample count is a genuine positional argument of those functions and says nothing about weights.
+
+# Arguments
+
+  - `T`: Centrality algorithm type, named in the error message.
+  - `args`: Positional arguments destined for the `Graphs.jl` centrality function.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `AbstractMatrix`.
+
+# Related
+
+  - [`centrality_polarity`](@ref)
+  - [`BetweennessCentrality`](@ref)
+  - [`ClosenessCentrality`](@ref)
+  - [`StressCentrality`](@ref)
+"""
+function assert_centrality_args(::Type{T}, args::Tuple) where {T}
+    idx = findfirst(a -> isa(a, AbstractMatrix), args)
+    @argcheck(isnothing(idx),
+              ConflictingArgumentError("`args` of a $(T) must not contain a matrix: a weight matrix reaches the centrality algorithm through `centrality_polarity`, not through `args`. Got\nargs[$(idx)] => $(isnothing(idx) ? nothing : typeof(args[idx]))"))
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -154,11 +192,14 @@ Compute the centrality vector from a matrix [`PhylogenyResult`](@ref) using the 
 
 Builds a graph from the phylogeny matrix and applies `ct` to compute node centrality scores.
 
+The graph is **always unweighted**, whatever polarity `ct` declares. A precomputed [`PhylogenyResult`](@ref) is a matrix of `0`s and `1`s, so it is one of the weightless sources listed on [`centrality_vector`](@ref)'s warning, and the weights it does not carry cannot be recovered from it. Pass the estimator instead of its result to get the weighted answer.
+
 # Related
 
   - [`PhylogenyResult`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`calc_centrality`](@ref)
+  - [`centrality_graph`](@ref)
 """
 function centrality_vector(plr::PhylogenyResult{<:MatNum}, ct::AbstractCentralityAlgorithm,
                            args...; kwargs...)
@@ -209,6 +250,7 @@ BetweennessCentrality
     """
     kwargs
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
+        assert_centrality_args(BetweennessCentrality, args)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -260,6 +302,7 @@ ClosenessCentrality
     """
     kwargs
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
+        assert_centrality_args(ClosenessCentrality, args)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -507,6 +550,7 @@ StressCentrality
     """
     kwargs
     function StressCentrality(args::Tuple, kwargs::NamedTuple)
+        assert_centrality_args(StressCentrality, args)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -514,11 +558,116 @@ function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))::StressC
     return StressCentrality(args, kwargs)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the polarity of the edge weights a centrality algorithm reads.
+
+A weighted network carries one of two opposite quantities on its edges. A **distance** runs small-is-close; a **similarity** runs large-is-close. Which one an algorithm needs is a fact about its own mathematics and not about the graph it is handed: on one and the same triangulated maximally filtered graph, closeness wants the distances and eigenvector centrality wants the similarities. So the polarity is declared per algorithm, by [`centrality_polarity`](@ref), and the builder supplies the matching quantity.
+
+# Polarity never decides whether the call succeeds
+
+It selects **which** weights an algorithm receives, and nothing else. An algorithm that declares no polarity, and a source that carries no weights, both run on the plain unweighted graph rather than raising — see the warning on [`centrality_vector`](@ref) for the full list. Weightedness is a property of the source, not of the request: there is no flag, so a caller names an algorithm and never asks for weights in the first place.
+
+# Related
+
+  - [`DistancePolarity`](@ref)
+  - [`SimilarityPolarity`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_graph`](@ref)
+"""
+abstract type AbstractCentralityPolarity <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Declares that an algorithm's edge weights must be **distances**: small means closely related.
+
+Every algorithm that walks a shortest path needs this polarity, because a shortest path minimises the sum of the weights along it. Over similarities the same routine seeks the route through the *weakest* links and returns a backwards answer without raising.
+
+Supplied by [`calc_distance_weighted_graph`](@ref), which carries distances on both branches.
+
+# Related
+
+  - [`AbstractCentralityPolarity`](@ref)
+  - [`SimilarityPolarity`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`calc_distance_weighted_graph`](@ref)
+"""
+struct DistancePolarity <: AbstractCentralityPolarity end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Declares that an algorithm's edge weights must be **similarities**: large means closely related.
+
+An algorithm that reads the weighted adjacency matrix directly, rather than walking a path, needs the entry to grow with relatedness — a stronger link must contribute more.
+
+Supplied by [`calc_weighted_adjacency_graph`](@ref), and only on its similarity branch. The tree branch is selected by [`calc_mst`](@ref) minimising a distance and holds no similarity, so an algorithm declaring this polarity runs unweighted there.
+
+# Related
+
+  - [`AbstractCentralityPolarity`](@ref)
+  - [`DistancePolarity`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+"""
+struct SimilarityPolarity <: AbstractCentralityPolarity end
+"""
+    centrality_polarity(ct::AbstractCentralityAlgorithm)
+    centrality_polarity(ct::Union{<:BetweennessCentrality, <:ClosenessCentrality,
+                                  <:RadialityCentrality, <:StressCentrality})
+    centrality_polarity(ct::EigenvectorCentrality)
+
+Declare which quantity a centrality algorithm's edge weights must be.
+
+The extension contract of [`AbstractCentralityPolarity`](@ref). [`centrality_graph`](@ref) reads it to decide what to weight the network with.
+
+# The fallback declares nothing, so opting in is explicit
+
+The method on [`AbstractCentralityAlgorithm`](@ref) returns `nothing`, which routes to the plain unweighted graph. A new algorithm therefore runs unweighted until it says otherwise, which is the safe default: a wrong polarity does not raise, it silently reverses the ordering the algorithm is reading.
+
+# What the shipped members declare, and why
+
+  - [`DistancePolarity`](@ref) — [`BetweennessCentrality`](@ref), [`ClosenessCentrality`](@ref), [`RadialityCentrality`](@ref), [`StressCentrality`](@ref). All four are defined over shortest paths.
+  - [`SimilarityPolarity`](@ref) — [`EigenvectorCentrality`](@ref). It is the leading eigenvector of the adjacency matrix itself, so a larger entry must mean a stronger link.
+  - `nothing` — [`DegreeCentrality`](@ref), [`Pagerank`](@ref), [`KatzCentrality`](@ref). `Graphs.jl` cannot use weights in any of the three: the first two ignore them, and `Graphs.katz_centrality` binarises through `adjacency_matrix(g, Bool)` and throws an `InexactError` when handed a weighted graph.
+
+The line between the first two groups and the third is `Graphs.jl`'s own. The declaration is about correctness — which weights — and the absence of one is about capability.
+
+# Arguments
+
+  - $(field_dict[:cta])
+
+# Returns
+
+  - `polarity::Option{<:AbstractCentralityPolarity}`: The declared polarity, or `nothing` for an algorithm that cannot read weights.
+
+# Related
+
+  - [`AbstractCentralityPolarity`](@ref)
+  - [`DistancePolarity`](@ref)
+  - [`SimilarityPolarity`](@ref)
+  - [`centrality_graph`](@ref)
+  - [`calc_centrality`](@ref)
+"""
+function centrality_polarity end
+function centrality_polarity(::AbstractCentralityAlgorithm)::Option{<:AbstractCentralityPolarity}
+    return nothing
+end
+function centrality_polarity(::Union{<:BetweennessCentrality, <:ClosenessCentrality,
+                                     <:RadialityCentrality, <:StressCentrality})::Option{<:AbstractCentralityPolarity}
+    return DistancePolarity()
+end
+function centrality_polarity(::EigenvectorCentrality)::Option{<:AbstractCentralityPolarity}
+    return SimilarityPolarity()
+end
+"""
     calc_centrality(ct::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
 
 Compute node centrality scores for a graph using the specified centrality algorithm.
 
 This function dispatches to the appropriate centrality computation from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/) based on the type of `ct`. Supported algorithms include betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, and stress centrality.
+
+`g` may be weighted or unweighted, and nothing here inspects which. `Graphs.jl` weights implicitly — the `distmx` of every routine that takes one defaults to `weights(g)` — so the choice is made once, by [`centrality_graph`](@ref), and this function only forwards. Handing a weighted graph to an algorithm that declares no polarity is what [`centrality_graph`](@ref) exists to prevent: `Graphs.katz_centrality` throws an `InexactError` on one.
 
 # Arguments
 
@@ -1061,6 +1210,22 @@ $(DocStringExtensions.TYPEDEF)
 Estimator type for centrality-based analysis.
 
 `CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
+
+The network is weighted where it can be. [`centrality_polarity`](@ref) declares which quantity `ct` needs — distances for the shortest-path algorithms, similarities for [`EigenvectorCentrality`](@ref) — and [`centrality_graph`](@ref) supplies it from `pl`.
+
+!!! warning
+
+    Five cases run on the **unweighted** graph, and none of them raises. A caller names an algorithm and never asks for weights, so an unweightable pairing has not been handed a request it cannot serve.
+
+     1. A clustering estimator or a precomputed [`Clusters`](@ref) as `pl`, or a precomputed [`PhylogenyResult`](@ref) passed to [`centrality_vector`](@ref) directly. A partition has no edge weights, and does not borrow any.
+     2. [`DegreeCentrality`](@ref). `Graphs.jl` ignores weights.
+     3. [`Pagerank`](@ref). `Graphs.jl` ignores weights.
+     4. [`KatzCentrality`](@ref). `Graphs.katz_centrality` binarises through `adjacency_matrix(g, Bool)`.
+     5. [`EigenvectorCentrality`](@ref) on a tree branch. The branch carries no similarity for it to read.
+
+    On the weighted routes the `sep` field of a [`NetworkEstimator`](@ref) is **inert**: they read the structure itself rather than the separation closure [`phylogeny_matrix`](@ref) builds. At the default `HopCount(; n = 1)` the two agree, because the closure of a graph at one hop is the graph.
+
+[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) do read the weights, and are nonetheless unchanged by them on a tree: a tree has exactly one path between any two vertices, so the shortest-path set is the same at any weights. That is a theorem about the graph rather than a limitation of the algorithm, and it does not hold on the similarity branch.
 
 # Fields
 
@@ -1838,12 +2003,112 @@ function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal
     return PhylogenyResult(; X = P * transpose(P) - LinearAlgebra.I)
 end
 """
+    centrality_graph(pl::ClE_Cl, ct::AbstractCentralityAlgorithm, X::MatNum;
+                     dims::Int = 1, kwargs...)
+    centrality_graph(nte::AbstractNetworkEstimator, ct::AbstractCentralityAlgorithm,
+                     X::MatNum; dims::Int = 1, kwargs...)
+    centrality_graph(polarity::Option{<:AbstractCentralityPolarity},
+                     nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+
+Build the graph [`calc_centrality`](@ref) runs on, weighted in the polarity `ct` declares.
+
+The one place where the source and the algorithm are both in scope, so it is the one place the pairing can be resolved. [`centrality_polarity`](@ref) says which quantity `ct` needs; the source says which quantities it has.
+
+# The routing
+
+| source                                              | polarity                     | graph                                                                              |
+|:--------------------------------------------------- |:---------------------------- |:---------------------------------------------------------------------------------- |
+| [`AbstractNetworkEstimator`](@ref)                  | [`DistancePolarity`](@ref)   | [`calc_distance_weighted_graph`](@ref) — distances, on either branch               |
+| [`NetworkEstimator`](@ref) on the similarity branch | [`SimilarityPolarity`](@ref) | [`calc_weighted_adjacency_graph`](@ref) — the similarities that selected the edges |
+| any source                                          | `nothing`                    | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                           |
+| a clustering estimator or [`Clusters`](@ref)        | any                          | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                           |
+| [`AbstractNetworkEstimator`](@ref) on a tree branch | [`SimilarityPolarity`](@ref) | plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref)                           |
+
+The similarity route is narrower than the distance route on purpose. [`calc_distance_weighted_graph`](@ref) carries distances on both branches, but only the similarity branch is *selected* by a similarity — a tree is selected by [`calc_mst`](@ref) minimising a distance, and manufacturing a similarity from it would weight the structure with a quantity that did not choose it.
+
+# A partition carries no weights, and does not borrow any
+
+A clustering source could reach a distance estimator through its own `de`, and does not. The triangulated maximally filtered graph selects each edge by a *pairwise* quantity, so a distance orders that selection; a partition selects by a dendrogram and a cut, and two assets in the same cluster may sit far apart in the distance. Co-membership is not ordered by the distance, so there is no quantity to borrow.
+
+# The separation is read on the unweighted route only
+
+The unweighted route goes through [`phylogeny_matrix`](@ref), so it sees the [`AbstractSeparationAlgorithm`](@ref) on the estimator — a [`HopCount`](@ref) of `n = 2` gives centrality on the two-hop closure. The weighted routes bypass it and read the structure itself, because a closure is built by summing matrix powers and a power of a weighted matrix sums *products* of distances, which is not a separation. So the `sep` field is **inert on the weighted routes**. At the default `HopCount(; n = 1)` there is nothing to notice: the closure of a graph at one hop is the graph.
+
+# Two entry points, because the polarity is resolved once
+
+The three-argument methods taking `ct` resolve [`centrality_polarity`](@ref) and forward to the methods taking the polarity itself, which is the same shape [`separation_matrix`](@ref) uses: the deciding algorithm comes first, and the estimator only supplies the graph.
+
+# Arguments
+
+  - $(field_dict[:pler])
+  - $(field_dict[:cta])
+  - `polarity`: Declared polarity of `ct`, from [`centrality_polarity`](@ref).
+  - `nte`: Network estimator.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `g::Graphs.AbstractGraph`: A `SimpleWeightedGraphs.SimpleWeightedGraph` on a weighted route, a `Graphs.SimpleGraph` otherwise.
+
+# Related
+
+  - [`centrality_polarity`](@ref)
+  - [`AbstractCentralityPolarity`](@ref)
+  - [`calc_centrality`](@ref)
+  - [`centrality_vector`](@ref)
+  - [`calc_distance_weighted_graph`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+  - [`phylogeny_matrix`](@ref)
+"""
+function centrality_graph end
+function centrality_graph(pl::ClE_Cl, ::AbstractCentralityAlgorithm, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    return Graphs.SimpleGraph(phylogeny_matrix(pl, X; dims = dims, kwargs...).X)
+end
+function centrality_graph(nte::AbstractNetworkEstimator, ct::AbstractCentralityAlgorithm,
+                          X::MatNum; dims::Int = 1, kwargs...)
+    return centrality_graph(centrality_polarity(ct), nte, X; dims = dims, kwargs...)
+end
+function centrality_graph(::Nothing, nte::AbstractNetworkEstimator, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    return Graphs.SimpleGraph(phylogeny_matrix(nte, X; dims = dims, kwargs...).X)
+end
+function centrality_graph(::DistancePolarity, nte::AbstractNetworkEstimator, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    return calc_distance_weighted_graph(nte, X; dims = dims, kwargs...)
+end
+function centrality_graph(::SimilarityPolarity,
+                          nte::NetworkEstimator{<:Any, <:Any,
+                                                <:AbstractSimilarityMatrixAlgorithm},
+                          X::MatNum; dims::Int = 1, kwargs...)
+    return calc_weighted_adjacency_graph(nte, X; dims = dims, kwargs...)
+end
+function centrality_graph(::SimilarityPolarity, nte::AbstractNetworkEstimator, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    # A tree is selected by minimising a distance, so it carries no similarity to read.
+    return Graphs.SimpleGraph(phylogeny_matrix(nte, X; dims = dims, kwargs...).X)
+end
+"""
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
 
-This function constructs the phylogeny matrix for the network, builds a graph, and computes node centrality scores using the specified centrality algorithm.
+This function builds the graph with [`centrality_graph`](@ref) — weighted in the polarity `ct` declares, where the source can supply it — and computes node centrality scores with [`calc_centrality`](@ref).
+
+!!! warning
+
+    Five cases run on the **unweighted** graph, and none of them raises. A caller names an algorithm and never asks for weights, so an unweightable pairing has not been handed a request it cannot serve.
+
+     1. A clustering estimator, a precomputed [`Clusters`](@ref), or a precomputed [`PhylogenyResult`](@ref) as the source. A partition has no edge weights, and does not borrow any.
+     2. [`DegreeCentrality`](@ref). `Graphs.jl` ignores weights.
+     3. [`Pagerank`](@ref). `Graphs.jl` ignores weights.
+     4. [`KatzCentrality`](@ref). `Graphs.katz_centrality` binarises through `adjacency_matrix(g, Bool)`.
+     5. [`EigenvectorCentrality`](@ref) on a tree branch. The branch carries no similarity for it to read.
+
+    On the weighted routes the estimator's `sep` field is **inert**: they read the structure itself rather than the separation closure [`phylogeny_matrix`](@ref) builds. At the default `HopCount(; n = 1)` the two agree, because the closure of a graph at one hop is the graph.
 
 # Arguments
 
@@ -1861,12 +2126,16 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 
   - [`NetworkEstimator`](@ref)
   - [`CentralityEstimator`](@ref)
+  - [`centrality_graph`](@ref)
+  - [`centrality_polarity`](@ref)
   - [`calc_centrality`](@ref)
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, X::MatNum;
                            dims::Int = 1, kwargs...)
-    return centrality_vector(phylogeny_matrix(pl, X; dims = dims, kwargs...), ct;
-                             dims = dims, kwargs...)
+    return PhylogenyResult(;
+                           X = calc_centrality(ct,
+                                               centrality_graph(pl, ct, X; dims = dims,
+                                                                kwargs...)))
 end
 """
     centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
@@ -2043,4 +2312,5 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
        CentralityEstimator, centrality_vector, NetworkClustersEstimator, separation_matrix,
-       separation_budget
+       separation_budget, AbstractCentralityPolarity, DistancePolarity, SimilarityPolarity,
+       centrality_polarity

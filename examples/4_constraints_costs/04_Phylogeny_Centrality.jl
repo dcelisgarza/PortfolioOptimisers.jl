@@ -121,6 +121,15 @@ the periphery tilt drops it to its ceiling. Centrality is not one number: a
 betweenness, …), each emphasising a different notion of "central", so the right one depends on
 what kind of connectedness you care about.
 
+The algorithm also decides whether the network's *edge weights* are read. Each one declares the
+polarity its weights must have through [`centrality_polarity`](@ref) — distances for the
+shortest-path measures, similarities for [`EigenvectorCentrality`](@ref) — and the graph is built
+to match. Five cases run on the plain unweighted graph and none of them raises: a clustering
+source, [`DegreeCentrality`](@ref) (the default used above), [`Pagerank`](@ref),
+[`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. The warning on
+[`CentralityEstimator`](@ref) has the details, including the one caveat worth knowing up front:
+on a weighted route the network estimator's `sep` is inert.
+
 ## 5. Comparing the structural constraints
 =#
 
