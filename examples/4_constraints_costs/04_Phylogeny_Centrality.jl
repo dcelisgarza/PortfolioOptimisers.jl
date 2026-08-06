@@ -23,6 +23,11 @@ estimator) and then exposes two families:
     or you want to deliberately tilt toward stable hubs or peripheral diversifiers. They need no
     hand-built groups — the structure comes from the covariance. The semidefinite phylogeny and
     centrality forms are convex; the integer phylogeny form needs a MIP solver.
+
+Both families are driven by one dial you have to set deliberately: how far apart two assets may
+sit in the network and still count as related. That is the `sep` field of a
+[`NetworkEstimator`](@ref), covered in §2.1, and one of its settings quietly collapses the
+portfolio onto a single name — see the warning there.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -59,6 +64,109 @@ assets whose returns are connected after filtering out the noisy links (a minimu
 or similar backbone). Both constraint families below read this graph. You do not have to build it
 by hand — the estimators take a `NetworkEstimator()` and construct it from the prior internally.
 
+### 2.1 How far apart still counts as related
+
+The graph only says which assets are *directly* linked. Every constraint below needs a second
+answer: how far apart two assets may sit and still count as related. That is the `sep` field of
+the [`NetworkEstimator`](@ref), and it is the single dial controlling how much of the universe
+each constraint sees as one bet.
+
+Two separations ship, and they measure the same structure in different units:
+
+  - [`HopCount`](@ref) counts **edges**, ignoring their lengths, with a budget of `n` of them.
+    `HopCount(; n = 1)` is the default and means "directly linked only".
+  - [`PathLength`](@ref) adds up the **distances** along the shortest path, with a budget `dmax`
+    in those same units.
+
+The two are interchangeable — every consumer takes either — but their numbers are *not*
+comparable, because the budgets are in different units. Choose whichever unit you can reason
+about, then read the cardinality it produces rather than trusting the budget to feel tight.
+=#
+
+n_assets = size(pr.X, 2)
+n_pairs = n_assets * (n_assets - 1)
+related_pairs(sep) = count(!iszero, phylogeny_matrix(NetworkEstimator(; sep = sep), pr).X)
+
+hop_budgets = 1:8
+dmax_budgets = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5]
+hop_pairs = [related_pairs(HopCount(; n = n)) for n in hop_budgets]
+dmax_pairs = [related_pairs(PathLength(; dmax = d)) for d in dmax_budgets]
+
+ladder = DataFrame("Separation" => [["HopCount" for _ in hop_budgets];
+                                    ["PathLength" for _ in dmax_budgets]],
+                   "Budget" => [string.(hop_budgets); string.(dmax_budgets)],
+                   "Related pairs" => [hop_pairs; dmax_pairs],
+                   "Share of pairs" => [hop_pairs; dmax_pairs] ./ n_pairs)
+sort!(ladder, "Related pairs")
+pretty_table(ladder; formatters = [(v, i, j) -> j == 4 ? "$(round(v*100, digits=1)) %" : v],
+             title = "Pairs the network calls related, by separation and budget")
+
+#=
+### 2.2 Hop shells are coarse; a radius ball fills in between them
+
+Read the table by its ordering rather than row by row. The hop budgets give a ladder of eight
+rungs and nothing between them — on this universe `38`, `96`, `168` pairs and so on, because a
+whole shell of neighbours joins at once. The `PathLength` rows slot into the gaps: `50` pairs sits
+between the first and second hop shells, `132` and `178` straddle the third, and `4` pairs is
+tighter than the tightest hop budget can express.
+
+That is the whole of what the radius buys. It is the **same** notion of neighbourhood at a finer
+granularity, not a different one — the two ladders agree closely on which pairs are related, they
+just cannot stop at the same places. Reach for `PathLength` when a hop shell overshoots the
+concentration you are willing to allow.
+=#
+
+plot(dmax_budgets, dmax_pairs; label = "PathLength (radius ball)", marker = :circle,
+     xlabel = "Budget: dmax, in distance units", ylabel = "Pairs called related",
+     title = "A continuous radius against eight discrete hop shells", legend = :bottomright)
+hline!(hop_pairs; label = "HopCount shells (n = 1…8)", linestyle = :dash, color = :grey,
+       linealpha = 0.7)
+
+#=
+The largest budget either family can usefully take is the **diameter** of the graph — the longest
+shortest path in it. [`separation_matrix`](@ref) and [`separation_budget`](@ref) expose both
+halves of that, and are what a consumer calls internally:
+=#
+
+sep_matrix = separation_matrix(PathLength(), NetworkEstimator(), pr.X)
+finite_seps = filter(isfinite, sep_matrix)
+pretty_table(DataFrame("Quantity" => ["Observed diameter (distance units)",
+                                      "Closest linked pair (distance units)", "Diameter in hops",
+                                      "Budget resolved from PathLength()",
+                                      "Budget resolved from PathLength(; dmax = 100)"],
+                       "Value" => [string(round(maximum(finite_seps); digits = 4)),
+                                   string(round(minimum(filter(>(0), finite_seps)); digits = 4)),
+                                   string(maximum(separation_matrix(HopCount(), NetworkEstimator(),
+                                                                    pr.X))),
+                                   string(round(separation_budget(PathLength(), NetworkEstimator(),
+                                                                  sep_matrix); digits = 4)),
+                                   string(round(separation_budget(PathLength(; dmax = 100),
+                                                                  NetworkEstimator(), sep_matrix);
+                                                digits = 4))]);
+             title = "The budgets this graph admits")
+
+#=
+A `dmax` above the diameter is clamped to it, so an over-large budget cannot select more than the
+whole component — which is exactly the hazard below.
+
+!!! warning "`PathLength()` with no `dmax` relates everything"
+
+    `dmax = nothing` is [`PathLength`](@ref)'s default and means *the whole connected component*,
+    implemented as the observed diameter above. Read by a constraint, "the whole component" means
+    **every reachable pair is related**, so `NetworkEstimator(; sep = PathLength())` yields a
+    phylogeny matrix of ones off the diagonal — the last row of the ladder table, at 100 % of
+    pairs. It is the opposite end of the dial from `HopCount()`'s default `n = 1`, reached by
+    swapping the separation and changing nothing else, and it is deliberately unguarded: it
+    optimises successfully and returns a single-asset portfolio (§3.1). State a numeric `dmax` to
+    select anything narrower.
+
+The same `sep` is also read by [`PhylogenyFeatures`](@ref), which builds a feature matrix rather
+than a constraint. There the budget *shapes* a fall-off instead of selecting pairs — a second knob,
+[`Proximity`](@ref)'s `decay`, says how strongly — so the bare default is the natural choice on
+that path and the trap above on this one. The two knobs live on two different objects and neither
+follows the other: setting `sep` does not imply a `decay`, and setting `decay` does not imply a
+`sep`.
+
 ## 3. Phylogeny constraints
 
 A [`SemiDefinitePhylogenyEstimator`](@ref) adds a semidefinite constraint that discourages
@@ -82,6 +190,55 @@ diversification, not a cosmetic tweak. For a *hard* limit on the number of names
 network cluster, [`IntegerPhylogenyEstimator`](@ref) imposes an integer (cardinality-style)
 version; being combinatorial it needs a MIP solver (see
 [Budget Constraints](01_Budget_Constraints.md) for the Pajarito/HiGHS setup).
+
+### 3.1 The separation is the strength dial
+
+`ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator())` above took the default
+`sep = HopCount(; n = 1)`. Widening the separation widens what the constraint treats as one bet,
+and the ladder of §2.1 becomes a ladder of portfolios:
+=#
+
+sep_sweep = ["HopCount(; n = 1)" => HopCount(; n = 1),
+             "HopCount(; n = 3)" => HopCount(; n = 3),
+             "PathLength(; dmax = 0.5)" => PathLength(; dmax = 0.5),
+             "PathLength(; dmax = 1.5)" => PathLength(; dmax = 1.5),
+             "PathLength()" => PathLength()]
+res_sweep = [optimise(MeanRisk(; obj = MinimumRisk(),
+                               opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                   ple = SemiDefinitePhylogenyEstimator(;
+                                                                                        pl = NetworkEstimator(;
+                                                                                                              sep = sep)))))
+             for (_, sep) in sep_sweep]
+
+pretty_table(DataFrame("Separation" => ["none (baseline)"; first.(sep_sweep)],
+                       "Related pairs" => ["—"; string.(related_pairs.(last.(sep_sweep)))],
+                       "Largest weight" =>
+                           [maximum(res_base.w); [maximum(r.w) for r in res_sweep]],
+                       "Names held" => [count(>(1e-4), res_base.w);
+                                        [count(>(1e-4), r.w) for r in res_sweep]],
+                       "Turnover vs baseline" =>
+                           [0.0; [sum(abs, r.w .- res_base.w) for r in res_sweep]]);
+             formatters = [(v, i, j) -> begin
+                               return if j in (1, 2, 4)
+                                   v
+                               else
+                                   "$(round(v*100, digits=2)) %"
+                               end
+                           end],
+             title = "Minimum risk under a widening phylogeny separation")
+
+#=
+Two things are worth reading off that table before you tune `sep`.
+
+**Structural diversification is not weight diversification.** A wider separation forbids more
+joint holdings, so the optimiser is pushed out of clusters and into fewer, unrelated names — the
+largest weight *rises* as the constraint tightens. If you want both, pair `ple` with a weight
+upper bound or a [regularisation](07_Regularisation.md) term.
+
+**The bare `PathLength()` row is the trap of §2.2, priced.** Every reachable pair is forbidden
+from being held jointly, so the only feasible book is a single asset, at 100 % weight. It reports
+`OptimisationSuccess` — nothing raises, and nothing warns. When a phylogeny-constrained portfolio
+collapses onto one name, check `sep` first.
 
 ## 4. Centrality constraints
 
@@ -127,16 +284,81 @@ shortest-path measures, similarities for [`EigenvectorCentrality`](@ref) — and
 to match. Five cases run on the plain unweighted graph and none of them raises: a clustering
 source, [`DegreeCentrality`](@ref) (the default used above), [`Pagerank`](@ref),
 [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. The warning on
-[`CentralityEstimator`](@ref) has the details, including the one caveat worth knowing up front:
-on a weighted route the network estimator's `sep` is inert.
+[`CentralityEstimator`](@ref) has the details.
+
+### 4.1 Where `sep` bites, and where it is inert
+
+Reading the weights has a consequence that is easy to trip over. A weighted route reads the
+*structure* of the graph, not the separation closure the phylogeny constraints build, so on a
+weighted route the network estimator's `sep` is **inert** — you can widen it and the scores will
+not move at all. On an unweighted route `sep` is live. Which of the two you are on is decided by
+the algorithm, not by anything you write next to it:
+=#
+
+cts = ["BetweennessCentrality" => BetweennessCentrality(),
+       "ClosenessCentrality" => ClosenessCentrality(),
+       "DegreeCentrality" => DegreeCentrality(),
+       "EigenvectorCentrality" => EigenvectorCentrality(),
+       "KatzCentrality" => KatzCentrality(), "Pagerank" => Pagerank(),
+       "RadialityCentrality" => RadialityCentrality(),
+       "StressCentrality" => StressCentrality()]
+function polarity_name(ct)
+    p = centrality_polarity(ct)
+    return isnothing(p) ? "none (unweighted)" : string(nameof(typeof(p)))
+end
+function sep_moves(ct)
+    c1 = centrality_vector(CentralityEstimator(;
+                                               pl = NetworkEstimator(;
+                                                                     sep = HopCount(;
+                                                                                    n = 1)),
+                                               ct = ct), pr).X
+    c3 = centrality_vector(CentralityEstimator(;
+                                               pl = NetworkEstimator(;
+                                                                     sep = HopCount(;
+                                                                                    n = 3)),
+                                               ct = ct), pr).X
+    return maximum(abs, c3 .- c1) > 1e-8
+end
+
+pretty_table(DataFrame("Algorithm" => first.(cts),
+                       "Declared polarity" => polarity_name.(last.(cts)),
+                       "n = 1 → n = 3 moves the score" =>
+                           [sep_moves(ct) ? "yes" : "no" for (_, ct) in cts]);
+             title = "Which centralities read the weights, and which read sep")
+
+#=
+On this minimum-spanning-tree source the split is four and four: the four distance-polarity
+algorithms get a weighted graph and ignore `sep`, and the other four run unweighted and respond to
+it. So raising `n` moves a degree centrality and leaves a closeness one exactly where it was.
+
+The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) *declares* a
+similarity polarity and still lands on the unweighted side here, because a tree carries no
+similarity for it to read — so the declaration alone does not tell you which side you are on. The
+source decides that jointly with the algorithm.
+
+Two further subtleties are worth stating rather than demonstrating.
+
+  - [`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) do read the weights, and are
+    nonetheless unchanged by them *on a tree*: a tree has exactly one path between any two
+    vertices, so no weighting can change the shortest-path set. That is a theorem about the graph,
+    not a limitation of the algorithm, and it does not hold on a similarity branch.
+  - Reading the weights at all is recent, and it moved the default answer for **four of the
+    eight** algorithms. A centrality number carried over from an older run will not always
+    reproduce, so re-measure rather than reusing a bound you calibrated earlier.
 
 ## 5. Comparing the structural constraints
 =#
 
-results = [res_base, res_phylo, res_hub, res_periph]
-labels = ["Baseline", "Phylogeny", "Hub", "Periphery"]
+results = [res_base, res_phylo, res_sweep[2], res_sweep[5], res_hub, res_periph]
+labels = ["Baseline", "Phylo n=1", "Phylo n=3", "Phylo bare\nPathLength", "Hub",
+          "Periphery"]
 
 plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
+
+#=
+The two phylogeny bars and the bare-`PathLength` bar are the same constraint at three settings of
+one dial. The last one is a single block: that is what "relate everything" looks like as a book.
+=#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - New deep dive (4_constraints_costs). Verified on kaimon (f102cae9), MinimumRisk base:
@@ -145,6 +367,30 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   - CentralityConstraint via `cte`: binds both ways — base avg centrality 0.143; `>=0.20`
 #src     lifts it to 0.20, `<=0.08` drops it to 0.08. centrality_vector(CentralityEstimator(),pr).X
 #src     range 0.053..0.263 on this slice.
+#src - §2.1/2.2/3.1/4.1 added 2026-08-06 for the separation dial (issue #246, map #195). Measured
+#src   on this slice (20 assets, last 253 rows), session b0a0d44c:
+#src   - phylogeny_matrix related-pair counts out of 380 off-diagonal entries. HopCount n=1..8:
+#src     38, 96, 168, 230, 288, 340, 370, 380. PathLength dmax=0.25..3.5: 4, 34, 50, 94, 132,
+#src     178, 248, 314, 362, 380. The radius genuinely interleaves (50 between 38 and 96; 132
+#src     and 178 straddle 168) and reaches BELOW the tightest hop shell (4 < 38) — that is the
+#src     concrete answer to "what does the radius ball buy".
+#src   - Observed diameter 3.4743 distance units / 8 hops; closest linked pair 0.2253.
+#src     separation_budget(PathLength(; dmax = 100), ...) clamps to 3.4743.
+#src   - THE TRAP, PRICED: ple with sep=PathLength() bare → maxw 100 %, ONE name held, Δw=1.2604,
+#src     and retcode is OptimisationSuccess. Compare HopCount(n=1) 53 %/10 names,
+#src     HopCount(n=3) 74 %/5, PathLength(dmax=1.5) 75 %/6.
+#src   - COUNTER-INTUITIVE and now documented: tightening `ple` CONCENTRATES the book (maxw
+#src     37 %→53 %→74 %→100 %). Structural diversification ≠ weight diversification.
+#src   - sep-inertness table: 4 distance-polarity algs (Betweenness, Closeness, Radiality,
+#src     Stress) do NOT move n=1→n=3; the other 4 (Degree, Eigenvector, Katz, Pagerank) DO.
+#src     Eigenvector declares SimilarityPolarity yet sits on the unweighted side on a tree — so
+#src     the polarity column does NOT predict the inertness column. Said so explicitly.
+#src   - NOT reproducible from the public API: the "weighted moves 4 of 8 defaults" claim needs
+#src     the pre-weighting answer, and there is no user switch for an unweighted graph. Stated in
+#src     prose as a re-measure warning instead of faked with an internal call.
+#src - SCOPE: the two knobs (sep vs Proximity.decay) and the data-dependent dmax hazard on `Z` are
+#src   named here in one paragraph but NOT worked — PhylogenyFeatures has no page, and its page is
+#src   #185's (map #160, all four feature-matrix producers). Requirement recorded on #185.
 #src - FINDING (→ group issue): SemiDefinitePhylogenyEstimator `p` is INERT for MinimumRisk here —
 #src   p=0.0 and p=5.0 give byte-identical weights; the SDP coupling drives the result, not the
 #src   penalty p. Did NOT author a p-sweep (would be a flat, misleading table). Worth checking

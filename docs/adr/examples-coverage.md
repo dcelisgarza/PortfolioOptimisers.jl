@@ -72,7 +72,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Budget constraints | `examples/4_constraints_costs/01_Budget_Constraints.jl` |
 | ✅ | Linear and group constraints | `examples/4_constraints_costs/02_Linear_Group_Constraints.jl` |
 | ✅ | Cardinality and threshold constraints (`card`, `gcarde`, `scard`/`slt`/`sst`, `sgcarde`/`sglt`/`sgst`; needs a MIP solver) | `examples/4_constraints_costs/03_Cardinality_and_Threshold.jl` |
-| ✅ | Phylogeny and centrality constraints | `examples/4_constraints_costs/04_Phylogeny_Centrality.jl` |
+| ✅ | Phylogeny and centrality constraints — `ple`/`cte`, the `sep` separation dial (`HopCount` hop shells vs `PathLength` radius balls, the related-pair ladder, `separation_budget` and the diameter clamp), the unguarded bare-`PathLength()` collapse onto one name, and where `sep` is inert on a weighted centrality route | `examples/4_constraints_costs/04_Phylogeny_Centrality.jl` |
 | ✅ | Turnover and tracking | `examples/4_constraints_costs/05_Turnover_and_Tracking.jl` |
 | ✅ | Fees and net returns | `examples/4_constraints_costs/06_Fees_and_Net_Returns.jl` |
 | ✅ | Regularisation and effective assets | `examples/4_constraints_costs/07_Regularisation.jl` |
