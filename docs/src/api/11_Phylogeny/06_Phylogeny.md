@@ -19,13 +19,14 @@ _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
                     S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
 clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractTreeType,
-                                                                     <:Any}}, X::MatNum;
+                                                                     <:HopCount}}, X::MatNum;
                     dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractSimilarityMatrixAlgorithm,
-                                                                     <:Any}}, X::MatNum;
-                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                                                                     <:HopCount}},
+                    X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 CentralityEstimator
+_phylogeny_matrix
 phylogeny_matrix
 centrality_vector
 average_centrality

@@ -711,6 +711,127 @@
                              pr).X
         @test isapprox(vec(A), df[!, 1])
     end
+    @testset "The radius ball selects; the hop ball is untouched" begin
+        NAS = size(pr.X, 2)
+        NPAIRS = (NAS * (NAS - 1)) ÷ 2
+        algs = (KruskalTree(), BoruvkaTree(), PrimTree(), MaximumDistanceSimilarity(),
+                ExponentialSimilarity(), GeneralExponentialSimilarity(),
+                ComplementSimilarity())
+        # The hop branch moved behind `_phylogeny_matrix`, so the honest regression is its
+        # own body reproduced verbatim as an oracle -- values *and* type.
+        function hop_oracle(nte, X)
+            A = PortfolioOptimisers.calc_adjacency(nte, X; dims = 1)
+            P = zeros(Int, size(A))
+            for i in 0:(nte.sep.n)
+                P .+= A^i
+            end
+            return clamp!(P, 0, 1) - I
+        end
+        for alg in algs, n in 1:5
+            nte = NetworkEstimator(; alg = alg, sep = HopCount(; n = n))
+            A = phylogeny_matrix(nte, pr.X).X
+            want = hop_oracle(nte, pr.X)
+            @test A == want
+            @test typeof(A) === typeof(want)
+        end
+
+        # The radius ball is `Int`-valued. #204 decided values do not widen, only selection
+        # does, so this is the decision itself and not an implementation detail.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity()), dmax in (1.0, 1.5, 2.0)
+            nte = NetworkEstimator(; alg = alg, sep = PathLength(; dmax = dmax))
+            A = phylogeny_matrix(nte, pr.X).X
+            @test isa(A, Matrix{Int})
+            @test issymmetric(A)
+            @test all(iszero, diag(A))
+            # It *is* the thresholded separation matrix, reusing the one traversal rather
+            # than a second all-pairs routine of its own.
+            d = separation_matrix(nte.sep, nte, pr.X; dims = 1)
+            @test A == Int.(d .<= separation_budget(nte.sep, nte, d)) - I
+        end
+
+        # A larger budget relates a superset. The radius knob is a dial, not a reshuffle.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            prev = nothing
+            for dmax in (0.75, 1.0, 1.5, 2.0, 2.5)
+                A = phylogeny_matrix(NetworkEstimator(; alg = alg,
+                                                      sep = PathLength(; dmax = dmax)),
+                                     pr.X).X
+                if !isnothing(prev)
+                    @test all(prev .<= A)
+                end
+                prev = A
+            end
+        end
+
+        # `PathLength()` bare resolves to the observed diameter, so it relates *every*
+        # reachable pair -- the opposite end of the dial from `HopCount()`'s default `n = 1`.
+        # Documented rather than guarded: it is the honest reading of an unstated budget.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            A = phylogeny_matrix(NetworkEstimator(; alg = alg, sep = PathLength()), pr.X).X
+            @test count(isone, A) == 2 * NPAIRS
+            @test all(iszero, diag(A))
+        end
+
+        # The gain is intermediate cardinalities *between* the hop shells, not a different
+        # neighbourhood. The hop knob cannot express a count the radius knob reaches.
+        npmfg = NetworkEstimator(; alg = MaximumDistanceSimilarity(),
+                                 sep = HopCount(; n = 1))
+        shells = [count(isone,
+                        phylogeny_matrix(NetworkEstimator(;
+                                                          alg = MaximumDistanceSimilarity(),
+                                                          sep = HopCount(; n = n)), pr.X).X) ÷
+                  2 for n in 1:2]
+        @test shells == [54, 121]
+        between = count(isone,
+                        phylogeny_matrix(NetworkEstimator(;
+                                                          alg = MaximumDistanceSimilarity(),
+                                                          sep = PathLength(; dmax = 0.9768)),
+                                         pr.X).X) ÷ 2
+        @test shells[1] < between < shells[2]
+
+        # And it does not re-rank: a hop shell is the equal-cardinality prefix of the
+        # path-length ordering. Exactly so on the PMFG, near enough on the tree.
+        dh = separation_matrix(HopCount(), npmfg, pr.X; dims = 1)
+        dp = separation_matrix(PathLength(), npmfg, pr.X; dims = 1)
+        pairs = [(i, k) for i in 1:NAS for k in (i + 1):NAS]
+        ord = sortperm([dp[i, k] for (i, k) in pairs])
+        for n in 1:4
+            shell = Set(p for p in pairs if dh[p...] <= n)
+            @test shell == Set(pairs[ord[1:length(shell)]])
+        end
+
+        # The radius ball is reachable from both constraint families for free -- they call
+        # `phylogeny_matrix(plc.pl, X)` and dispatch does the rest. That reachability is the
+        # entire reason the radius ball exists.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            nte = NetworkEstimator(; alg = alg, sep = PathLength(; dmax = 1.5))
+            sdp = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pl = nte), pr.X)
+            ip = phylogeny_constraints(IntegerPhylogenyEstimator(; pl = nte), pr.X)
+            @test isa(sdp, SemiDefinitePhylogeny)
+            @test isa(ip, IntegerPhylogeny)
+            @test eltype(sdp.A) === Int
+            @test eltype(ip.A) === Int
+            @test sdp.A == phylogeny_matrix(nte, pr.X).X
+        end
+
+        # `clusterise` refuses a `PathLength` at *dispatch*. Its `D^i - A^i` is a power sum
+        # indexed by hops, and a radius has no analogue of a matrix power -- so the fourth
+        # type parameter is narrowed rather than the field access left to fail.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            @test_throws MethodError clusterise(NetworkClustersEstimator(;
+                                                                         nte = NetworkEstimator(;
+                                                                                                alg = alg,
+                                                                                                sep = PathLength())),
+                                                pr.X)
+            # The hop path is unaffected.
+            @test isa(clusterise(NetworkClustersEstimator(;
+                                                          nte = NetworkEstimator(;
+                                                                                 alg = alg,
+                                                                                 sep = HopCount(;
+                                                                                                n = 2))),
+                                 pr.X), PortfolioOptimisers.Clusters)
+        end
+    end
     #=
     @testset "DBHT Clustering tests" begin
         X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
@@ -1377,4 +1498,44 @@
         @test nnz(old_path) == nnz(Rz) - 2
         @test Gr.nv(SWG.SimpleWeightedGraph(Rz)) == size(pr.X, 2)  # losing no vertex.
     end
+end
+
+using PortfolioOptimisers, Test, SparseArrays, LinearAlgebra
+
+# A network estimator handing the kernels a *weighted* graph chosen by the test. Every
+# estimator `calc_adjacency` can build is connected -- a spanning tree or a PMFG -- so this
+# is the only way to drive the unreachable branch. It is an `AbstractNetworkEstimator` and
+# not a `NetworkEstimator`, which is also what makes it evidence that `phylogeny_matrix`
+# splits on the *separation* rather than on the estimator's own type. Defined at top level
+# because a `@testset` body becomes a function, which cannot host a struct.
+struct FixedDistanceGraph{T} <: PortfolioOptimisers.AbstractNetworkEstimator
+    W::Matrix{Float64}
+    sep::T
+end
+function PortfolioOptimisers.calc_distance_weighted_graph(pl::FixedDistanceGraph, X;
+                                                          kwargs...)
+    return PortfolioOptimisers.SimpleWeightedGraphs.SimpleWeightedGraph(pl.W)
+end
+function PortfolioOptimisers.calc_adjacency(pl::FixedDistanceGraph, X; kwargs...)
+    return SparseArrays.sparse(Int.(pl.W .!= 0))
+end
+
+@testset "An unreachable pair is outside every budget" begin
+    # Two disjoint edges, 1-2 and 3-4. `floyd_warshall_shortest_paths` reports `Inf` across
+    # the components, and the budget comparison rejects it without a repair.
+    W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+    X4 = zeros(Float64, 3, 4)
+    want = [0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
+
+    d = separation_matrix(PathLength(), FixedDistanceGraph(W, PathLength()), X4)
+    @test d[1, 3] == Inf
+    @test separation_budget(PathLength(), FixedDistanceGraph(W, PathLength()), d) == 1.0
+
+    @test phylogeny_matrix(FixedDistanceGraph(W, PathLength()), X4).X == want
+    # The clamp to the observed diameter excludes the sentinel, so even a budget far above
+    # the diameter cannot reach across a component.
+    @test phylogeny_matrix(FixedDistanceGraph(W, PathLength(; dmax = 100.0)), X4).X == want
+    # A hop count agrees on this graph, which is what makes the comparison meaningful: the
+    # two separations differ on the budget, not on reachability.
+    @test phylogeny_matrix(FixedDistanceGraph(W, HopCount(; n = 3)), X4).X == want
 end

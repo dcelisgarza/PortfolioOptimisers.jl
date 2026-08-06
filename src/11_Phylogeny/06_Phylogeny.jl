@@ -876,7 +876,7 @@ Keywords correspond to the struct's fields.
 
 The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
 
-Only [`HopCount`](@ref) is admitted by every consumer. [`phylogeny_matrix`](@ref) and both [`clusterise`](@ref) methods read `sep.n` as a **matrix-power count**, so they refuse a member that has no `n` rather than truncating a power sum. [`Proximity`](@ref) reads the separation through its two kernels and therefore takes either.
+Only [`HopCount`](@ref) is admitted by every consumer, and the split falls on whether the consumer walks a **matrix power**. Both [`clusterise`](@ref) methods accumulate ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, so they read `sep.n` as a power count and refuse [`PathLength`](@ref) at dispatch: a radius has no analogue of a matrix power. [`phylogeny_matrix`](@ref) and [`Proximity`](@ref) take either, each through a method of its own — a hop ball is a clamped power sum, a radius ball is a threshold on [`separation_matrix`](@ref).
 
 # Examples
 
@@ -967,7 +967,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.sep.n`, so the separation budget reaches this estimator through its network estimator rather than being restated here.
+The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.sep.n`, so the separation budget reaches this estimator through its network estimator rather than being restated here. That also fixes which separations this estimator accepts: `nte.sep` must be a [`HopCount`](@ref), since a power count is what the sums are indexed by. A [`PathLength`](@ref) is constructible here but has no [`clusterise`](@ref) method.
 
 # Examples
 
@@ -1530,12 +1530,17 @@ function _clusterise(alg::AbstractNonHierarchicalClusteringAlgorithm,
 end
 """
     clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
-                                                                <:AbstractTreeType, <:Any}},
+                                                                <:AbstractTreeType,
+                                                                <:HopCount}},
                X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 
 Cluster assets using a minimum spanning tree (MST) network structure and return a [`Clusters`](@ref) result.
 
 Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+
+# Only a hop count is admitted
+
+The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. The power sum is indexed by `nte.nte.sep.n`, and a matrix power counts edges: there is no radius analogue of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is the honest answer rather than a gap. [`phylogeny_matrix`](@ref) does have a radius method, so the two consumers of a network differ here on purpose.
 
 # Arguments
 
@@ -1556,11 +1561,12 @@ Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance
   - [`Clusters`](@ref)
   - [`_clusterise`](@ref)
   - [`calc_mst`](@ref)
+  - [`HopCount`](@ref)
 """
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractTreeType,
-                                                                     <:Any}}, X::MatNum;
-                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                                                                     <:HopCount}},
+                    X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
     G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
@@ -1579,12 +1585,16 @@ end
 """
     clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                 <:AbstractSimilarityMatrixAlgorithm,
-                                                                <:Any}},
+                                                                <:HopCount}},
                X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 
 Cluster assets using a Planar Maximally Filtered Graph (PMFG) network structure and return a [`Clusters`](@ref) result.
 
 Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+
+# Only a hop count is admitted
+
+The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. See the tree method: a matrix power counts edges, and there is no radius analogue of the power sum.
 
 # Arguments
 
@@ -1606,11 +1616,12 @@ Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a
   - [`_clusterise`](@ref)
   - [`PMFG_T2s`](@ref)
   - [`distance_to_similarity`](@ref)
+  - [`HopCount`](@ref)
 """
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:AbstractSimilarityMatrixAlgorithm,
-                                                                     <:Any}}, X::MatNum;
-                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+                                                                     <:HopCount}},
+                    X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
@@ -1649,11 +1660,83 @@ const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                        <:NetworkClustersEstimator{<:Any,
                                                   <:AbstractHierarchicalClusteringAlgorithm}}
 """
+    _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                      dims::Int = 1, kwargs...)
+    _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
+                      dims::Int = 1, kwargs...)
+
+Internal dispatch helper carrying [`phylogeny_matrix`](@ref)'s per-separation body.
+
+The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the separation, not about the estimator, so the split lives here rather than on the public method's argument. Dispatching on the estimator instead would pin the choice to `NetworkEstimator` and leave every other [`AbstractNetworkEstimator`](@ref) on one branch — and this family's other kernels, [`separation_matrix`](@ref) and [`separation_budget`](@ref), already take the separation first for the same reason.
+
+# The two balls
+
+  - [`HopCount`](@ref): the **hop ball**, `sum(A^i for i in 0:n)` clamped to `0` or `1`. `sep.n` is read directly as a **matrix-power count** rather than through [`separation_budget`](@ref), which is what makes it a power count and not a budget.
+  - [`PathLength`](@ref): the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref). No second traversal.
+
+# Arguments
+
+  - `sep`: Separation algorithm, taken from `nte.sep` by the public method.
+  - `nte`: Network estimator.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `P::Matrix{Int}`: Phylogeny matrix. `1` for a related pair, `0` otherwise, `0` on the diagonal.
+
+# Related
+
+  - [`phylogeny_matrix`](@ref)
+  - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
+  - [`calc_adjacency`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
+"""
+function _phylogeny_matrix end
+function _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                           dims::Int = 1, kwargs...)
+    A = calc_adjacency(nte, X; dims = dims, kwargs...)
+    P = zeros(Int, size(A))
+    # A matrix-power count, hence `sep.n` directly rather than `separation_budget`: this is
+    # the hop branch, and a separation measuring anything else needs its own method.
+    for i in 0:(sep.n)
+        P .+= A^i
+    end
+    P .= clamp!(P, 0, 1) - LinearAlgebra.I
+    return P
+end
+function _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
+                           dims::Int = 1, kwargs...)
+    d = separation_matrix(sep, nte, X; dims = dims, kwargs...)
+    dmax = separation_budget(sep, nte, d)
+    # An unreachable pair carries `separation_matrix`'s `Inf` sentinel, so the same
+    # comparison that applies the budget also rejects it. The diagonal is zero and therefore
+    # always inside the budget, which `- I` then clears, matching the hop branch exactly.
+    return Int.(d .<= dmax) - LinearAlgebra.I
+end
+"""
     phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix for a network estimator.
 
-This function constructs the adjacency matrix for the network, then computes the phylogeny matrix by summing powers of the adjacency matrix up to the network depth parameter `n`, clamping values to 0 or 1, and removing self-loops.
+Builds the network from `X` and returns the binary matrix of the pairs `nte.sep` counts as related, with self-loops removed. Which neighbourhood that is comes from the separation, through [`_phylogeny_matrix`](@ref): [`HopCount`](@ref) gives the **hop ball**, the clamped power sum `sum(A^i for i in 0:n)` the network family has always used; [`PathLength`](@ref) gives the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref).
+
+# The result is `Int` under either separation
+
+Selection changes; the values do not. [`PhylogenyResult`](@ref)'s matrix is `Int` here as everywhere else, because no consumer of one wants a number: [`SemiDefinitePhylogeny`](@ref) is weight-inert (`A ⊙ W == 0` is the same constraint at any magnitude), [`IntegerPhylogeny`](@ref) counts an integer cardinality, and [`centrality_vector`](@ref) binarises before any centrality algorithm runs. The graded reading of a separation lives on [`Proximity`](@ref) instead.
+
+# What the radius ball buys, measured
+
+**It barely re-ranks, and on the PMFG not at all.** Compare a hop shell against the equal-cardinality prefix of the path-length ordering: on a 20-asset PMFG the two sets are **identical** at every shell — `0` pairs differ out of `54`, `121`, `165` and `186`. On the minimum spanning tree they are identical at the shells of `19` and `48`, and differ by `1`, `1`, `3` and `2` pairs at the shells of `84`, `115`, `144` and `170`. Both structures are selected by distance in the first place, so a path length **refines** a hop count rather than rivalling it. A reader who takes the radius ball for a conceptually different neighbourhood will be wrong.
+
+What it buys is **intermediate cardinalities between the shells**. Over the same PMFG the hop knob relates `54`, then `121`, then `165` of the `190` pairs; a caller wanting about `100` cannot ask for it. Sweeping `dmax` across the same graph reaches `36`, `55`, `100`, `122`, `151` and `179`. That is the whole gain, and it is real for [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), whose constraint strength is that cardinality.
+
+# `PathLength`'s default budget relates everything reachable
+
+`PathLength()` leaves `dmax = nothing`, which [`separation_budget`](@ref) resolves to the **observed diameter** — so no reachable pair sits outside it and the matrix is all ones off the diagonal. Measured: `190` of `190` pairs on both branches. This is the honest reading of an unstated budget rather than a fall-back, but it is the *opposite* end of the dial from [`HopCount`](@ref)'s default `n = 1`: a caller who swaps one separation for the other and changes nothing else gets the maximal ball where they had the minimal one. State a numeric `dmax` to select anything narrower.
 
 # Arguments
 
@@ -1664,24 +1747,21 @@ This function constructs the adjacency matrix for the network, then computes the
 
 # Returns
 
-  - `P::Matrix{Int}`: Phylogeny matrix representing asset relationships.
+  - `plr::PhylogenyResult{<:Matrix{Int}}`: Phylogeny matrix representing asset relationships. `1` for a related pair, `0` otherwise, `0` on the diagonal.
 
 # Related
 
   - [`NetworkEstimator`](@ref)
+  - [`_phylogeny_matrix`](@ref)
+  - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
   - [`calc_adjacency`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
 """
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
-    A = calc_adjacency(nte, X; dims = dims, kwargs...)
-    P = zeros(Int, size(A))
-    # A matrix-power count, hence `sep.n` directly rather than `separation_budget`: this is
-    # the hop branch, and a separation measuring anything else needs its own method.
-    for i in 0:(nte.sep.n)
-        P .+= A^i
-    end
-    P .= clamp!(P, 0, 1) - LinearAlgebra.I
-    return PhylogenyResult(; X = P)
+    return PhylogenyResult(; X = _phylogeny_matrix(nte.sep, nte, X; dims = dims, kwargs...))
 end
 """
     phylogeny_matrix(cle::ClE_Cl,

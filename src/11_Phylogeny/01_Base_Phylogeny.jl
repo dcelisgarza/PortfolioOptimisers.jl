@@ -182,7 +182,9 @@ Pathing over the PMFG's similarities instead is not a second convention, it is b
 
 # It is not comparable with a hop count, only interchangeable with one
 
-`PathLength` and [`HopCount`](@ref) satisfy the same contract, so any consumer takes either. Their outputs are **not comparable as values**: the budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ.
+`PathLength` and [`HopCount`](@ref) satisfy the same contract, so any consumer reading a separation *through that contract* takes either — [`Proximity`](@ref) and [`phylogeny_matrix`](@ref) both do. Their outputs are **not comparable as values**: the budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ.
+
+Both [`clusterise`](@ref) methods are the exception, and refuse `PathLength` at dispatch. They do not read the separation through the contract at all: they index a matrix power by `sep.n`, and a radius has no analogue of one.
 
 On a real universe the two agree far more than that suggests — measured over twenty assets, `rho = 0.99` on a minimum spanning tree and `0.95` to `0.98` on a PMFG, with `0.16%` of pairs of pairs strictly inverted on the tree and **none at all** on the PMFG — because both structures are selected by distance to begin with. That agreement is **empirical, not guaranteed**: it is a fact about the graphs an [`AbstractDistanceEstimator`](@ref) tends to produce, not a property of either separation.
 
@@ -191,6 +193,8 @@ On a real universe the two agree far more than that suggests — measured over t
 `dmax = nothing` is the default and means **the whole connected component**, implemented as the observed diameter: the largest finite entry of the separation matrix. It is the default because nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits — `dmax = 0.37` is not a number a caller can reason about, whereas "look at the whole component and let the decay do the falling off" is. Choosing a number is how a caller buys fold-stability.
 
 [`separation_budget`](@ref) clamps a chosen `dmax` to the observed diameter. The clamp cuts nothing — no pair sits beyond the diameter — so it is a **scale-top correction** and bites only [`LinearDecay`](@ref), the one decay that reads the budget: without it, a `dmax` far above the diameter would flatten `Z` towards a constant while forbidding no pair at all.
+
+The default reads very differently through [`phylogeny_matrix`](@ref), which **selects** on the budget instead of shaping a fall-off inside it. "The whole connected component" there means every reachable pair is related, so `NetworkEstimator(; sep = PathLength())` yields a matrix of ones off the diagonal — the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
 
 # Fields
 

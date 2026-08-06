@@ -730,4 +730,16 @@ end
     # partition never reaches this kernel's separation branch.
     @test phylogeny_features(Proximity(), CLE, rd.X) ==
           Matrix{Float64}(phylogeny_matrix(CLE, rd.X).X) + I
+
+    # `NoDecay` is the neighbourhood indicator, so it must equal the phylogeny matrix with
+    # the diagonal restored -- on *both* separations. #238 established the equality for a
+    # hop count; the radius ball now has to satisfy it too, and it is not a coincidence:
+    # both sides threshold the same separations at the same budget.
+    for alg in (KruskalTree(), MaximumDistanceSimilarity()),
+        sep in (HopCount(; n = 2), PathLength(), PathLength(; dmax = 0.5))
+
+        pl = NetworkEstimator(; alg = alg, sep = sep)
+        @test phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X) ==
+              Matrix{Float64}(phylogeny_matrix(pl, rd.X).X) + I
+    end
 end
