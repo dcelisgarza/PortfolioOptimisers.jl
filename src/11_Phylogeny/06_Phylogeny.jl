@@ -1190,6 +1190,8 @@ function graph_weight_matrix(D::MatNum)
     return W
 end
 """
+    calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
+    calc_weighted_adjacency_graph(alg::AbstractSimilarityMatrixAlgorithm, S::MatNum)
     calc_weighted_adjacency_graph(nte::NetworkEstimator, X::MatNum; dims::Int = 1,
                                   kwargs...)
 
@@ -1201,12 +1203,18 @@ This is the **one construction site** of that structure. [`calc_weighted_adjacen
 
 Each branch keeps **the quantity that selected its own edges**, and the two quantities run in opposite directions.
 
-  - `nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: [`calc_mst`](@ref) minimises the distance, so the weights are **distances**. Small means closely related.
-  - `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
+  - `alg::AbstractTreeType`: [`calc_mst`](@ref) minimises the distance, so the weights are **distances**. Small means closely related.
+  - `alg::AbstractSimilarityMatrixAlgorithm`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
 
-Re-weighting either branch with the other quantity would weight a structure by the quantity that did not select it, so neither is converted. The result carries no polarity tag, because the polarity is recoverable by dispatch on `nte.alg`.
+Re-weighting either branch with the other quantity would weight a structure by the quantity that did not select it, so neither is converted. The result carries no polarity tag, because the polarity is recoverable by dispatch on the algorithm.
 
 A consumer that walks a path must therefore branch on `nte.alg` first. A shortest path over similarities inverts the ordering it is meant to express and **returns an answer instead of raising**, so the two graphs are interchangeable in shape but not in meaning.
+
+# Two entry points, because the selecting quantity is not always cheap
+
+The two-argument methods take **the selecting quantity itself** — the distance on the tree branch, the similarity on the PMFG branch — and the three-argument method derives it from `X` and forwards. Which branch is which is decided by the same dispatch either way, so the polarity above is a property of the algorithm and not of the entry point.
+
+The two-argument form exists for a caller that already holds that matrix. [`clusterise`](@ref) is one: it needs `D` and `S` for its own power sum and for the [`Clusters`](@ref) it returns, so re-deriving them here would compute the same correlation twice. That is not a rounding error — under [`VariationInfoDistance`](@ref) the derivation is `98%` of `clusterise`'s runtime, so the second one would almost double it.
 
 # The weights
 
@@ -1215,6 +1223,9 @@ A consumer that walks a path must therefore branch on `nte.alg` first. A shortes
 
 # Arguments
 
+  - `alg`: Tree or similarity matrix algorithm.
+  - $(arg_dict[:D])
+  - $(arg_dict[:S])
   - `nte`: Network estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -1232,22 +1243,31 @@ A consumer that walks a path must therefore branch on `nte.alg` first. A shortes
   - [`graph_weight_matrix`](@ref)
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
+  - [`clusterise`](@ref)
 """
+function calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
+    G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
+    return G[calc_mst(alg, G)]
+end
+function calc_weighted_adjacency_graph(alg::AbstractSimilarityMatrixAlgorithm, S::MatNum)
+    return SimpleWeightedGraphs.SimpleWeightedGraph(PMFG_T2s(S)[1])
+end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                              <:AbstractTreeType}, X::MatNum;
                                        dims::Int = 1, kwargs...)
-    D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
-    G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
-    return G[calc_mst(nte.alg, G)]
+    return calc_weighted_adjacency_graph(nte.alg,
+                                         distance(nte.de, nte.ce, X; dims = dims,
+                                                  kwargs...))
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                              <:AbstractSimilarityMatrixAlgorithm},
                                        X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
-    S = distance_to_similarity(nte.alg; S = S, D = D)
-    return SimpleWeightedGraphs.SimpleWeightedGraph(PMFG_T2s(S)[1])
+    return calc_weighted_adjacency_graph(nte.alg,
+                                         distance_to_similarity(nte.alg; S = S, D = D))
 end
 """
+    calc_weighted_adjacency(alg::Tree_SimMat, W::MatNum)
     calc_weighted_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the weighted adjacency matrix of the network structure.
@@ -1256,8 +1276,12 @@ Compute the weighted adjacency matrix of the network structure.
 
 The sparsity pattern is the structure itself, so it is identical to [`calc_adjacency`](@ref)'s on the same input. Only the stored values differ.
 
+The two entry points are [`calc_weighted_adjacency_graph`](@ref)'s two entry points, one `Graphs.adjacency_matrix` call further on. `W` is the selecting quantity — the distance on the tree branch, the similarity on the PMFG branch — and [`clusterise`](@ref) supplies it directly, having already paid for it.
+
 # Arguments
 
+  - `alg`: Tree or similarity matrix algorithm.
+  - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractSimilarityMatrixAlgorithm`](@ref).
   - `nte`: Network estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -1272,7 +1296,12 @@ The sparsity pattern is the structure itself, so it is identical to [`calc_adjac
   - [`NetworkEstimator`](@ref)
   - [`calc_weighted_adjacency_graph`](@ref)
   - [`calc_adjacency`](@ref)
+  - [`Tree_SimMat`](@ref)
+  - [`clusterise`](@ref)
 """
+function calc_weighted_adjacency(alg::Tree_SimMat, W::MatNum)
+    return Graphs.adjacency_matrix(calc_weighted_adjacency_graph(alg, W))
+end
 function calc_weighted_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
     return Graphs.adjacency_matrix(calc_weighted_adjacency_graph(nte, X; dims = dims,
                                                                  kwargs...))
@@ -1538,6 +1567,8 @@ Cluster assets using a minimum spanning tree (MST) network structure and return 
 
 Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
 
+``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s, so this method reads the same structure as every other consumer of a network and carries **weights**, not `0`/`1` — the tree branch's polarity is the distance, which is what ``\\mathbf{D}^i - \\mathbf{A}^i`` subtracts a like quantity from. The two-argument entry point is the one used, because `D` is already in hand.
+
 # Only a hop count is admitted
 
 The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. The power sum is indexed by `nte.nte.sep.n`, and a matrix power counts edges: there is no radius analogue of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is the honest answer rather than a gap. [`phylogeny_matrix`](@ref) does have a radius method, so the two consumers of a network differ here on purpose.
@@ -1560,6 +1591,7 @@ The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`]
   - [`AbstractTreeType`](@ref)
   - [`Clusters`](@ref)
   - [`_clusterise`](@ref)
+  - [`calc_weighted_adjacency`](@ref)
   - [`calc_mst`](@ref)
   - [`HopCount`](@ref)
 """
@@ -1569,9 +1601,9 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                     X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
-    G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
-    tree = calc_mst(nte.nte.alg, G)
-    A = Graphs.adjacency_matrix(G[tree])
+    # The distance is the tree branch's selecting quantity, and it is in hand already for
+    # the power sum below, so the shared routine is entered at its two-argument form.
+    A = calc_weighted_adjacency(nte.nte.alg, D)
     # `nte.nte.sep.n` is read as a matrix-power count rather than as a budget: a separation
     # member that measures something other than hops has no `n`, and fails here rather than
     # silently truncating a power sum it cannot index.
@@ -1591,6 +1623,8 @@ end
 Cluster assets using a Planar Maximally Filtered Graph (PMFG) network structure and return a [`Clusters`](@ref) result.
 
 Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+
+``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s, as on the tree method, and this branch's polarity is the **similarity** — so ``\\mathbf{S}^i - \\mathbf{A}^i`` again subtracts a like quantity. The two-argument entry point is the one used, because `S` is already in hand.
 
 # Only a hop count is admitted
 
@@ -1614,6 +1648,7 @@ The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`]
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`Clusters`](@ref)
   - [`_clusterise`](@ref)
+  - [`calc_weighted_adjacency`](@ref)
   - [`PMFG_T2s`](@ref)
   - [`distance_to_similarity`](@ref)
   - [`HopCount`](@ref)
@@ -1625,7 +1660,8 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
-    Rpm = PMFG_T2s(S)[1]
+    # The similarity is the PMFG branch's selecting quantity. See the tree method.
+    Rpm = calc_weighted_adjacency(nte.nte.alg, S)
     # See the tree method: a matrix-power count, not a budget.
     for i in 0:(nte.nte.sep.n)
         P .+= S^i - Rpm^i

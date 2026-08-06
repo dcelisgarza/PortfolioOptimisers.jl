@@ -1498,6 +1498,72 @@
         @test nnz(old_path) == nnz(Rz) - 2
         @test Gr.nv(SWG.SimpleWeightedGraph(Rz)) == size(pr.X, 2)  # losing no vertex.
     end
+    @testset "clusterise reads the shared adjacency routine" begin
+        #=
+        Both `clusterise` methods used to re-derive the structure inline -- the tree one
+        rebuilt the graph, the tree and the adjacency, the PMFG one called `PMFG_T2s`
+        itself. They now enter `calc_weighted_adjacency` at its two-argument form, which
+        takes the *selecting quantity*: the distance on the tree branch, the similarity on
+        the PMFG branch. `clusterise` has already paid for that matrix -- it needs it for
+        its own power sum -- so the two-argument form is what keeps the fold free.
+
+        The oracles below are the two inline bodies, reproduced verbatim. `P` is the
+        quantity that changed hands, so `P` is what is compared, and bit-for-bit rather
+        than approximately: the fold is meant to be a substitution, not an improvement.
+        =#
+        Gr = PortfolioOptimisers.Graphs
+        SWG = PortfolioOptimisers.SimpleWeightedGraphs
+        function tree_P_oracle(nte, X, n)
+            _, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            P = zeros(eltype(D), size(D))
+            G = SWG.SimpleWeightedGraph(PortfolioOptimisers.graph_weight_matrix(D))
+            A = Gr.adjacency_matrix(G[PortfolioOptimisers.calc_mst(nte.alg, G)])
+            for i in 0:n
+                P .+= D^i - A^i
+            end
+            P .-= Diagonal(P)
+            return P, A
+        end
+        function pmfg_P_oracle(nte, X, n)
+            S, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            P = zeros(eltype(D), size(D))
+            S = PortfolioOptimisers.distance_to_similarity(nte.alg; S = S, D = D)
+            Rpm = PortfolioOptimisers.PMFG_T2s(S)[1]
+            for i in 0:n
+                P .+= S^i - Rpm^i
+            end
+            P .-= Diagonal(P)
+            return P, Rpm
+        end
+        # `AngularSimilarity` is absent for the same reason as above: issue #239.
+        tree_algs = (KruskalTree(), BoruvkaTree(), PrimTree())
+        pmfg_algs = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                     GeneralExponentialSimilarity(), ComplementSimilarity())
+        for (algs, oracle) in ((tree_algs, tree_P_oracle), (pmfg_algs, pmfg_P_oracle))
+            for alg in algs, n in 1:4
+                nte = NetworkEstimator(; alg = alg, sep = HopCount(; n = n))
+                Po, Ao = oracle(nte, pr.X, n)
+                clr = clusterise(NetworkClustersEstimator(; nte = nte), pr.X)
+                @test clr.P == Symmetric(Po)
+                @test typeof(clr.P) === typeof(Symmetric(Po))
+                # The substitution's premise, stated separately from its consequence: the
+                # matrix the shared routine returns *is* the one the inline body built,
+                # values and type, on both branches. `W` is the selecting quantity, which
+                # is where the two branches differ.
+                Sw, Dw = cor_and_dist(nte.de, nte.ce, pr.X; dims = 1)
+                W = if alg isa PortfolioOptimisers.AbstractTreeType
+                    Dw
+                else
+                    PortfolioOptimisers.distance_to_similarity(alg; S = Sw, D = Dw)
+                end
+                An = PortfolioOptimisers.calc_weighted_adjacency(alg, W)
+                @test An == Ao
+                @test typeof(An) === typeof(Ao)
+                # The middle tier's two entry points differ only in who derives `W`.
+                @test An == PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+            end
+        end
+    end
 end
 
 using PortfolioOptimisers, Test, SparseArrays, LinearAlgebra
@@ -1538,4 +1604,45 @@ end
     # A hop count agrees on this graph, which is what makes the comparison meaningful: the
     # two separations differ on the budget, not on reachability.
     @test phylogeny_matrix(FixedDistanceGraph(W, HopCount(; n = 3)), X4).X == want
+end
+
+# A distance estimator that counts how often the correlation is derived from `X`. It only
+# forwards; the counters are the whole point. Defined at top level because a `@testset`
+# body becomes a function, which cannot host a struct.
+mutable struct CountingDistance{T} <: PortfolioOptimisers.AbstractDistanceEstimator
+    const de::T
+    n_cor_and_dist::Int
+    n_distance::Int
+end
+CountingDistance(de) = CountingDistance(de, 0, 0)
+function PortfolioOptimisers.cor_and_dist(de::CountingDistance, ce, X; kwargs...)
+    de.n_cor_and_dist += 1
+    return PortfolioOptimisers.cor_and_dist(de.de, ce, X; kwargs...)
+end
+function PortfolioOptimisers.distance(de::CountingDistance, ce, X; kwargs...)
+    de.n_distance += 1
+    return PortfolioOptimisers.distance(de.de, ce, X; kwargs...)
+end
+
+@testset "clusterise derives the correlation once" begin
+    #=
+    Why `calc_weighted_adjacency` has a two-argument form at all. `clusterise` holds the
+    selecting quantity already -- it needs `D` and `S` for its own power sum and for the
+    `Clusters` it returns -- so entering the shared routine at its `(nte, X)` form would
+    derive the same correlation a second time. That is not a rounding error: under
+    `VariationInfoDistance` the derivation is `98%` of `clusterise`'s runtime, so the
+    second one would almost double it. This test is the guard on that, and it fails for
+    the naive substitution rather than merely running slower.
+    =#
+    Xc = randn(StableRNG(987654321), 200, 10)
+    for alg in (KruskalTree(), ComplementSimilarity())
+        de = CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg)
+        clusterise(NetworkClustersEstimator(; nte = nte), Xc)
+        @test de.n_cor_and_dist == 1
+        @test de.n_distance == 0
+        # The naive substitution, for contrast: it re-enters the derivation on its own.
+        PortfolioOptimisers.calc_weighted_adjacency(nte, Xc)
+        @test de.n_cor_and_dist + de.n_distance == 2
+    end
 end
