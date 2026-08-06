@@ -80,7 +80,7 @@ leaf ordering.
 
     @testset "a square carrier selects on its own neighbourhood structure" begin
         # `PhylogenyFeatures`-shaped: `nz == nx`, so an asset view slices *both* axes
-        Zsq = phylogeny_features(GradedNeighbourhood(), NetworkEstimator(), X)
+        Zsq = phylogeny_features(Proximity(), NetworkEstimator(), X)
         @test size(Zsq) == (N, N)
 
         rd_sq = ReturnsResult(; nx = nx, X = X, nz = nx, Z = Zsq)
@@ -113,7 +113,7 @@ leaf ordering.
         @test fit_preprocessing(sel_feat, rdv).nx ⊆ res.nx
 
         # square: both axes slice, and `nz` slices with them
-        Zsq = phylogeny_features(GradedNeighbourhood(), NetworkEstimator(), X)
+        Zsq = phylogeny_features(Proximity(), NetworkEstimator(), X)
         rd_sq = ReturnsResult(; nx = nx, X = X, nz = nx, Z = Zsq)
         res_sq = fit_preprocessing(sel_feat, rd_sq)
         rdv_sq = apply_preprocessing(res_sq, rd_sq)

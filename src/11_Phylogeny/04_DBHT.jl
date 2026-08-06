@@ -100,7 +100,7 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # Arguments
 
-  - `W`: `N × N` matrix of non-negative weights (e.g., similarity or correlation matrix).
+  - `W`: `N × N` matrix of non-negative weights (e.g., similarity or absolute correlation matrix).
   - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
 
 # Validation
@@ -189,18 +189,18 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
         A[ve, tri[agm, :]] .= 1
 
         # Update 3-clique list
-        clique3[k - 4, :] = tri[agm, :]
+        clique3[k-4, :] = tri[agm, :]
 
         # Update triangle list replacing 1 and adding 2 triangles
-        tri[kk + 1, :] = vcat(tri[agm, [1, 3]], ve) # add
-        tri[kk + 2, :] = vcat(tri[agm, [2, 3]], ve) # add
+        tri[kk+1, :] = vcat(tri[agm, [1, 3]], ve) # add
+        tri[kk+2, :] = vcat(tri[agm, [2, 3]], ve) # add
         tri[agm, :] = vcat(tri[agm, [1, 2]], ve)     # replace
 
         # # Update gain table
         gain[ve, :] .= 0
         gain[ou_v, agm] = sum(W[ou_v, tri[agm, :]]; dims = 2)
-        gain[ou_v, kk + 1] = sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
-        gain[ou_v, kk + 2] = sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
+        gain[ou_v, kk+1] = sum(W[ou_v, tri[kk+1, :]]; dims = 2)
+        gain[ou_v, kk+2] = sum(W[ou_v, tri[kk+2, :]]; dims = 2)
 
         # # Update number of triangles
         kk += 2
@@ -933,7 +933,7 @@ function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::Mat
     end
 
     Sep = vec(Int.(iszero.(sum(Hc; dims = 2))))
-    Sep[vec(iszero.(sum(Hc; dims = 1))) .&& kb .> 1] .= 2
+    Sep[vec(iszero.(sum(Hc; dims = 1))).&&kb .> 1] .= 2
 
     return Hc, Sep
 end
@@ -1214,8 +1214,8 @@ function build_link_and_dendro(rg::AbstractRange, dpm::MatNum, LabelVec::VecNum,
                                Z::MatNum)
     for _ in rg
         PairLink, dvu = LinkageFunction(dpm, LabelVec)  # Look for the pair of clusters which produces the best linkage
-        LabelVec[LabelVec .== PairLink[1] .|| LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
-                                                                           1  # Merge the cluster pair by updating the label vector with a same label.
+        LabelVec[LabelVec .== PairLink[1].||LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                         1  # Merge the cluster pair by updating the label vector with a same label.
         LabelVec2[V] = LabelVec
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, 1 / nc)
         nc -= 1
@@ -1302,11 +1302,11 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
     dcl = ones(Int, length(LabelVec1))
     for _ in 1:(length(kvec) - 1)
         PairLink, dvu = LinkageFunction(Dpm, LabelVec1)
-        LabelVec2[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
-                                                                              1
+        LabelVec2[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                            1
         dvu = unique(dcl[LabelVec1 .== PairLink[1]]) +
               unique(dcl[LabelVec1 .== PairLink[2]])
-        dcl[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= dvu
+        dcl[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= dvu
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, dvu)
         LabelVec1 = copy(LabelVec2)
     end

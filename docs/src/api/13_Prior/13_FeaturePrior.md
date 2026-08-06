@@ -7,8 +7,7 @@ AbstractFeatureMatrixEstimator
 feature_matrix
 RegressionFeatures
 AbstractPhylogenyFeatureAlgorithm
-BinaryNeighbourhood
-GradedNeighbourhood
+Proximity
 phylogeny_features
 PhylogenyFeatures
 AssetSetsFeatures

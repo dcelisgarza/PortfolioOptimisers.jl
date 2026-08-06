@@ -85,6 +85,89 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for all separation algorithms.
+
+A separation algorithm is the rule saying **how far apart** two assets sit in a network, and **how far is too far**. It answers two questions with one object, through two kernels: [`separation_matrix`](@ref) produces the dense `assets × assets` separations, and [`separation_budget`](@ref) resolves the budget beyond which a pair counts as unrelated. The family is open: a new member is a struct and one method of each.
+
+The two questions travel together because they share a unit. A hop count is budgeted in hops and a weighted path length in the distance estimator's units, so a budget stated apart from the rule that measures it would be a number nobody could interpret — which is why the budget lives on the member rather than on [`NetworkEstimator`](@ref).
+
+# Separation is not decay
+
+[`AbstractSeparationDecayAlgorithm`](@ref) turns a separation into a *score*; this family produces the separation and says where it runs out. The seam is that `sep` decides **which pairs are related** — every consumer of a network needs that — while `decay` decides **how strongly, as a number**, which only the feature producer wants. That is why `sep` sits on [`NetworkEstimator`](@ref) and `decay` sits on [`Proximity`](@ref).
+
+# The family is unqualified on purpose
+
+The name says nothing about graphs. A taxonomy depth is a separation too, so the room is left for a member that measures one, rather than being closed off by an `AbstractGraphSeparationAlgorithm`.
+
+# Related
+
+  - [`HopCount`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
+  - [`AbstractSeparationDecayAlgorithm`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`Proximity`](@ref)
+"""
+abstract type AbstractSeparationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Separation measured as the number of graph edges between two assets.
+
+The separation between two assets is the length of the shortest path between them counted in **edges**, ignoring the weights those edges carry, and the budget is `n` of them. It is the separation the network family has always used: [`phylogeny_matrix`](@ref)'s `sum(A^i for i in 0:n)` and both [`clusterise`](@ref) methods' power sums are hop budgets, and this member is where that `n` now lives.
+
+The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. A member measuring something continuous carries a budget in its own units instead, and no caller has to know which unit is in play.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HopCount(;
+        n::Integer = 1
+    ) -> HopCount
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ntn])
+
+`n` stays an `Integer` rather than widening to a `Real`. Three readers use `0:(nte.sep.n)` as a **matrix-power count**, and `0:1.5` silently drops a power instead of failing.
+
+# Examples
+
+```jldoctest
+julia> HopCount()
+HopCount
+  n ┴ Int64: 1
+```
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`Proximity`](@ref)
+"""
+@concrete struct HopCount <: AbstractSeparationAlgorithm
+    """
+    $(field_dict[:ntn])
+    """
+    n
+    function HopCount(n::Integer)
+        @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
+        return new{typeof(n)}(n)
+    end
+end
+function HopCount(; n::Integer = 1)::HopCount
+    return HopCount(n)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all separation decay algorithms.
 
 A separation decay turns a **separation** `d >= 0` — how far apart two assets sit in whatever structure the caller is reading — into a score, and is applied by [`separation_decay`](@ref). The family is open: a caller wanting a different fall-off defines a member and a [`separation_decay`](@ref) method for it, exactly as [`AbstractSimilarityMatrixAlgorithm`](@ref) is extended through [`distance_to_similarity`](@ref).
@@ -96,7 +179,7 @@ A separation decay turns a **separation** `d >= 0` — how far apart two assets 
   - Defined for every `d >= 0`.
   - `f(0) > 0` and maximal. Self-inclusion is load-bearing rather than cosmetic: a decay that does not put an asset at the top of its own scale silently produces a *structural equivalence* matrix instead of a proximity one — see [`PhylogenyFeatures`](@ref)'s "Why the diagonal includes self".
   - Monotone non-increasing in `d`.
-  - Never assumed to reach zero. **Truncation is a separate knob**: the consumer applies its own budget — `n` on [`NetworkEstimator`](@ref) — and the decay only shapes the fall-off inside it. An exponential never reaches zero, so budget and fall-off cannot be the same dial.
+  - Never assumed to reach zero. **Truncation is a separate knob**: the consumer applies its own budget — [`separation_budget`](@ref) of the [`AbstractSeparationAlgorithm`](@ref) in scope — and the decay only shapes the fall-off inside it. An exponential never reaches zero, so budget and fall-off cannot be the same dial.
   - `f(d) >= 0` for `0 <= d <= dmax`. `0` is the unreachable sentinel, so a negative score *inside* the budget would place a **reachable** pair strictly below an **unreachable** one — an ordering inversion within the producer's own scale. It is not a claim that a signed score is wrong in general: the feature matrix is signed-tolerant by decision, and [`assert_metric_domain`](@ref) checks non-negativity per metric at the consumer rather than blanket. This clause is producer-local, and it is non-negativity rather than strict positivity because a decay that bottoms out at zero says *no relatedness*, which is the same claim an unreachable pair makes.
 
 The clause is **scoped to the budget** because the sign outside it is unobservable — the consumer's `h[u] <= n` test short-circuits before the decay is ever evaluated there — and because the family's own default violates the wider statement: [`LinearDecay`](@ref) crosses zero at `d = dmax + 1` and is negative above it. Binding the clause on all `d >= 0` would need the `max(0, ⋅)` floor the budget knob exists to avoid, a second truncation biting before `n` does.
@@ -105,7 +188,7 @@ A zero in the resulting feature matrix therefore means **functionally unreachabl
 
 # The budget is an argument, not a field
 
-[`separation_decay`](@ref) takes the budget in scope as its third argument, `dmax`, and members may ignore it — only [`LinearDecay`](@ref) reads it, to set `f(0)`. Keeping it off the member is what makes the two knobs impossible to desync: `n` stays the single source of truth on [`NetworkEstimator`](@ref), rather than being mirrored on an algorithm that cannot see it at construction. [`ExponentialDecay`](@ref) provides the self-versus-neighbour contrast a free top-of-scale would have bought, without the hazard of a second truncation hiding inside the decay.
+[`separation_decay`](@ref) takes the budget in scope as its third argument, `dmax`, and members may ignore it — only [`LinearDecay`](@ref) reads it, to set `f(0)`. Keeping it off the member is what makes the two knobs impossible to desync: the [`AbstractSeparationAlgorithm`](@ref) stays the single source of truth for the budget, rather than mirroring it on an algorithm that cannot see it at construction. [`ExponentialDecay`](@ref) provides the self-versus-neighbour contrast a free top-of-scale would have bought, without the hazard of a second truncation hiding inside the decay.
 
 # Enforcement
 
@@ -118,7 +201,7 @@ The contract is enforced rather than merely documented, by a probing [`assert_se
   - [`ReciprocalDecay`](@ref)
   - [`separation_decay`](@ref)
   - [`assert_separation_decay`](@ref)
-  - [`GradedNeighbourhood`](@ref)
+  - [`Proximity`](@ref)
   - [`PhylogenyFeatures`](@ref)
 """
 abstract type AbstractSeparationDecayAlgorithm <: AbstractAlgorithm end
@@ -140,7 +223,7 @@ Where:
   - ``d``: Separation between two assets.
   - ``d_{\\mathrm{max}}``: Separation budget in scope.
 
-The default, and the only member that reads the budget. It is the fall-off [`GradedNeighbourhood`](@ref) hardcoded before the family existed, so it reproduces those values exactly: a direct neighbour scores ``d_{\\mathrm{max}}``, the asset itself ``d_{\\mathrm{max}} + 1``.
+The default, and the only member that reads the budget. It is the fall-off the graded neighbourhood hardcoded before the family existed, so it reproduces those values exactly: a direct neighbour scores ``d_{\\mathrm{max}}``, the asset itself ``d_{\\mathrm{max}} + 1``.
 
 Because truncation lives with the budget rather than in the decay, no `max(0, ⋅)` floor is needed — on the kept range `0 <= d <= dmax` the expression is strictly positive, bottoming out at `1`.
 
@@ -161,7 +244,7 @@ julia> separation_decay.(Ref(LinearDecay()), 0:3, 3)
   - [`ExponentialDecay`](@ref)
   - [`ReciprocalDecay`](@ref)
   - [`separation_decay`](@ref)
-  - [`GradedNeighbourhood`](@ref)
+  - [`Proximity`](@ref)
 """
 struct LinearDecay <: AbstractSeparationDecayAlgorithm end
 """
@@ -314,9 +397,55 @@ function ReciprocalDecay(; power::Number = 1.0)::ReciprocalDecay
     return ReciprocalDecay(power)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Separation decay that does not fall off at all.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+f(d) &= 1\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``d``: Separation between two assets.
+
+# No decay is not no truncation
+
+The name is about the *fall-off* and nothing else. The budget still cuts: a pair outside it scores `0`, because truncation was never the decay's job — see [`AbstractSeparationDecayAlgorithm`](@ref)'s "The budget is an argument, not a field". What comes out is therefore an **indicator** of the neighbourhood the budget selects, not a matrix of ones.
+
+That is exactly what makes it useful. Under [`HopCount`](@ref) it turns [`Proximity`](@ref) into the `n`-hop neighbourhood indicator, which is what the retired `BinaryNeighbourhood` produced; under a separation with a continuous budget it is an ε-ball, and neither needs a type of its own once the fall-off is a knob.
+
+It is the flat end of the family, so it is the only member that is not strictly decreasing. The contract asks for monotone **non**-increasing, which a constant satisfies.
+
+# Examples
+
+```jldoctest
+julia> separation_decay.(Ref(NoDecay()), 0:3, 3)
+4-element Vector{Int64}:
+ 1
+ 1
+ 1
+ 1
+```
+
+# Related
+
+  - [`AbstractSeparationDecayAlgorithm`](@ref)
+  - [`LinearDecay`](@ref)
+  - [`separation_decay`](@ref)
+  - [`Proximity`](@ref)
+  - [`HopCount`](@ref)
+"""
+struct NoDecay <: AbstractSeparationDecayAlgorithm end
+"""
     separation_decay(dk::LinearDecay, d::Number, dmax::Number)
     separation_decay(dk::ExponentialDecay, d::Number, dmax::Number)
     separation_decay(dk::ReciprocalDecay, d::Number, dmax::Number)
+    separation_decay(dk::NoDecay, d::Number, dmax::Number)
 
 Score a separation under a decay algorithm.
 
@@ -347,6 +476,9 @@ julia> separation_decay(ExponentialDecay(; rate = 2.0), 2, 3)
 
 julia> separation_decay(ReciprocalDecay(; power = 2.0), 2, 3)
 0.1111111111111111
+
+julia> separation_decay(NoDecay(), 2, 3)
+1
 ```
 
 # Related
@@ -355,8 +487,9 @@ julia> separation_decay(ReciprocalDecay(; power = 2.0), 2, 3)
   - [`LinearDecay`](@ref)
   - [`ExponentialDecay`](@ref)
   - [`ReciprocalDecay`](@ref)
+  - [`NoDecay`](@ref)
   - [`assert_separation_decay`](@ref)
-  - [`GradedNeighbourhood`](@ref)
+  - [`Proximity`](@ref)
 """
 function separation_decay end
 function separation_decay(::LinearDecay, d::Number, dmax::Number)::Number
@@ -368,16 +501,19 @@ end
 function separation_decay(dk::ReciprocalDecay, d::Number, ::Number)::Number
     return inv((one(d) + d)^dk.power)
 end
+function separation_decay(::NoDecay, d::Number, ::Number)::Number
+    return one(d)
+end
 """
     assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds, dmax::Number)
-    assert_separation_decay(dk::Union{<:LinearDecay, <:ExponentialDecay, <:ReciprocalDecay},
-                            ds, dmax::Number)
+    assert_separation_decay(dk::Union{<:LinearDecay, <:ExponentialDecay, <:ReciprocalDecay,
+                                      <:NoDecay}, ds, dmax::Number)
 
 Check that a separation decay honours its contract over the separations it will be asked about.
 
-The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and checks the result is finite, that `f(0)` is strictly positive and maximal, that the values are monotone non-increasing, and that none of them is negative. The three shipped members satisfy the contract by construction and override this to a no-op, so the probe costs nothing for what ships and is fail-safe for extensions.
+The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and checks the result is finite, that `f(0)` is strictly positive and maximal, that the values are monotone non-increasing, and that none of them is negative. The four shipped members satisfy the contract by construction and override this to a no-op, so the probe costs nothing for what ships and is fail-safe for extensions.
 
-Probing is cheap where it is used because `ds` is small and the loop it guards is not: [`GradedNeighbourhood`](@ref) passes `0:n`, which is *exhaustive* for a hop count — every separation the `assets × assets` loop can ever ask about, in `n + 1` evaluations.
+Probing is cheap where it is used because `ds` is small and the loop it guards is not: [`Proximity`](@ref) passes `0:dmax`, which under [`HopCount`](@ref) is *exhaustive* — every separation the `assets × assets` loop can ever ask about, in `dmax + 1` evaluations. Under a separation whose budget is not an integer the same range is a unit-spaced *sample*, which is all a continuum admits and all the clauses below need.
 
 Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax` appears in `ds`, mirroring the out-of-loop evaluation of `f(0)`. That endpoint is what closes the clause over a *continuum*: monotonicity is already promised, so `f(dmax) >= 0` implies `f(d) >= 0` for every `d` in `[0, dmax]`, and a `ds` that can only ever be a sample — as it must be once separations are weighted path lengths — costs this clause nothing. Monotonicity itself gains nothing from the endpoint and remains genuinely sampled.
 
@@ -403,7 +539,7 @@ Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax
 
   - [`AbstractSeparationDecayAlgorithm`](@ref)
   - [`separation_decay`](@ref)
-  - [`GradedNeighbourhood`](@ref)
+  - [`Proximity`](@ref)
 """
 function assert_separation_decay(dk::AbstractSeparationDecayAlgorithm, ds,
                                  dmax::Number)::Nothing
@@ -438,9 +574,10 @@ end
 # The shipped members satisfy the contract by construction, so the probe is turned off for
 # them and left on for anything an extension defines -- opt-out, not opt-in.
 function assert_separation_decay(::Union{<:LinearDecay, <:ExponentialDecay,
-                                         <:ReciprocalDecay}, ::Any, ::Number)::Nothing
+                                         <:ReciprocalDecay, <:NoDecay}, ::Any,
+                                 ::Number)::Nothing
     return nothing
 end
 
-export AbstractSeparationDecayAlgorithm, LinearDecay, ExponentialDecay, ReciprocalDecay,
-       separation_decay
+export AbstractSeparationAlgorithm, HopCount, AbstractSeparationDecayAlgorithm, LinearDecay,
+       ExponentialDecay, ReciprocalDecay, NoDecay, separation_decay

@@ -113,6 +113,7 @@ const arg_dict = Dict(
                       :treeargs => "`args`: Positional arguments for the centrality function.",#
                       :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                       :ntalg => "`alg`: Tree or similarity matrix algorithm.",#
+                      :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
                       :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
                       :clres => "`res`: Clustering result.",#
                       :S => "`S`: Similarity matrix",#
@@ -127,7 +128,7 @@ const arg_dict = Dict(
                       :phX => "`X`: Phylogeny matrix.",#
                       :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                       :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
-                      ## Separation decay
+                      ## Separation and separation decay
                       :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
                       :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. Larger values decay faster. The per-step retention form, `ratio^d`, is `rate = -log(ratio)`.",#
                       :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. Larger values decay faster.",#
@@ -187,8 +188,8 @@ const arg_dict = Dict(
                       :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
                       :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from a `UniverseSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
                       :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
-                      :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, where `alg` selects the hop decay) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
-                      :plfalg => "`alg`: Phylogeny feature algorithm: the decay turning hop counts into feature values. Inert for a precomputed phylogeny result, which is used as given.",#
+                      :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
+                      :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",
                       :stdvec => "`sd`: Vector of standard deviations for each asset.",#

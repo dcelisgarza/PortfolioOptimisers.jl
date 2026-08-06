@@ -145,7 +145,8 @@ SemiDefinitePhylogenyEstimator
      │   alg ┼ KruskalTree
      │       │     args ┼ Tuple{}: ()
      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │     n ┴ Int64: 1
+     │   sep ┼ HopCount
+     │       │   n ┴ Int64: 1
    p ┴ Float64: 0.05
 ```
 
@@ -396,7 +397,8 @@ IntegerPhylogenyEstimator
         │   alg ┼ KruskalTree
         │       │     args ┼ Tuple{}: ()
         │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │     n ┴ Int64: 1
+        │   sep ┼ HopCount
+        │       │   n ┴ Int64: 1
       B ┼ Int64: 1
   scale ┴ Float64: 100000.0
 ```
@@ -627,7 +629,8 @@ CentralityConstraint
        │      │   alg ┼ KruskalTree
        │      │       │     args ┼ Tuple{}: ()
        │      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │      │     n ┴ Int64: 1
+       │      │   sep ┼ HopCount
+       │      │       │   n ┴ Int64: 1
        │   ct ┼ DegreeCentrality
        │      │     kind ┼ Int64: 0
        │      │   kwargs ┴ @NamedTuple{}: NamedTuple()

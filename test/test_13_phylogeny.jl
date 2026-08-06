@@ -663,7 +663,7 @@
     @testset "Phylogeny matrix" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
         for i in 1:8
-            A = phylogeny_matrix(NetworkEstimator(; n = i), pr)
+            A = phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = i)), pr)
             @test A === phylogeny_matrix(A)
             A = A.X
             res = isapprox(vec(A), df[!, i])
@@ -676,7 +676,7 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
-            A = phylogeny_matrix(NetworkEstimator(; n = i,
+            A = phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = i),
                                                   alg = MaximumDistanceSimilarity()), pr).X
             res = isapprox(vec(A), df[!, i])
             if !res

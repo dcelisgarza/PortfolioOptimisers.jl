@@ -853,7 +853,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimator type for network-based phylogeny analysis.
 
-`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
+`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the separation algorithm that says how far apart two assets sit in the resulting graph.
 
 # Fields
 
@@ -865,14 +865,16 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
         alg::Tree_SimMat = KruskalTree(),
-        n::Integer = 1
+        sep::AbstractSeparationAlgorithm = HopCount()
     ) -> NetworkEstimator
 
 Keywords correspond to the struct's fields.
 
-## Validation
+# The separation lives here, not on the consumer
 
-  - $(val_dict[:ntn])
+`sep` says which pairs the network relates, and **every** consumer of a network needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
+
+The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops.
 
 # Examples
 
@@ -901,7 +903,8 @@ NetworkEstimator
   alg ┼ KruskalTree
       │     args ┼ Tuple{}: ()
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-    n ┴ Int64: 1
+  sep ┼ HopCount
+      │   n ┴ Int64: 1
 ```
 
 # Related
@@ -924,28 +927,29 @@ NetworkEstimator
     """
     alg
     """
-    $(field_dict[:ntn])
+    $(field_dict[:ntsep])
     """
-    n
+    sep
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
-                              de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
-        @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
-        return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
+                              de::AbstractDistanceEstimator, alg::Tree_SimMat,
+                              sep::AbstractSeparationAlgorithm)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(sep)}(ce, de, alg, sep)
     end
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                           de::AbstractDistanceEstimator = Distance(;
                                                                    alg = CanonicalDistance()),
-                          alg::Tree_SimMat = KruskalTree(), n::Integer = 1)
-    return NetworkEstimator(ce, de, alg, n)
+                          alg::Tree_SimMat = KruskalTree(),
+                          sep::AbstractSeparationAlgorithm = HopCount())
+    return NetworkEstimator(ce, de, alg, sep)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for network-based phylogeny analysis.
+Estimator type for network-based clustering.
 
-`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
+`NetworkClustersEstimator` encapsulates the configuration for clustering assets from a network, pairing the [`NetworkEstimator`](@ref) that builds the graph with the clustering algorithm and the optimal-number-of-clusters estimator applied to the pseudo-distance matrix it induces.
 
 # Fields
 
@@ -953,18 +957,15 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    NetworkEstimator(;
-        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-        alg::Tree_SimMat = KruskalTree(),
-        n::Integer = 1
-    ) -> NetworkEstimator
+    NetworkClustersEstimator(;
+        nte::AbstractNetworkEstimator = NetworkEstimator(),
+        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
+        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters()
+    ) -> NetworkClustersEstimator
 
 Keywords correspond to the struct's fields.
 
-## Validation
-
-  - $(val_dict[:ntn])
+The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.sep.n`, so the separation budget reaches this estimator through its network estimator rather than being restated here.
 
 # Examples
 
@@ -994,7 +995,8 @@ NetworkClustersEstimator
       │   alg ┼ KruskalTree
       │       │     args ┼ Tuple{}: ()
       │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │     n ┴ Int64: 1
+      │   sep ┼ HopCount
+      │       │   n ┴ Int64: 1
   alg ┼ HClustAlgorithm
       │   linkage ┴ Symbol: :ward
   onc ┼ OptimalNumberClusters
@@ -1099,7 +1101,8 @@ CentralityEstimator
      │   alg ┼ KruskalTree
      │       │     args ┼ Tuple{}: ()
      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │     n ┴ Int64: 1
+     │   sep ┼ HopCount
+     │       │   n ┴ Int64: 1
   ct ┼ DegreeCentrality
      │     kind ┼ Int64: 0
      │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -1228,6 +1231,83 @@ function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any,
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
 """
+    separation_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                      dims::Int = 1, kwargs...)
+
+Compute the dense `assets × assets` matrix of separations under a separation algorithm.
+
+Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_budget`](@ref) is the other half.
+
+# The unreachable sentinel
+
+An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref). Callers must compare against the budget before doing anything else with the entry, and that comparison has to **short-circuit** — an `ifelse` evaluates both branches, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+
+# Arguments
+
+  - `sep`: Separation algorithm.
+  - `nte`: Network estimator. The graph is rebuilt from `X` through [`calc_adjacency`](@ref).
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments forwarded to the underlying phylogeny routines.
+
+# Returns
+
+  - `d::Matrix`: Square matrix of separations. `d[i, k]` is the separation between assets `i` and `k`, `d[i, i]` is zero, and an unreachable pair carries the sentinel above.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`separation_budget`](@ref)
+  - [`calc_adjacency`](@ref)
+  - [`Proximity`](@ref)
+"""
+function separation_matrix end
+function separation_matrix(::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                           dims::Int = 1, kwargs...)
+    g = Graphs.SimpleGraph(calc_adjacency(nte, X; dims = dims, kwargs...))
+    d = Matrix{Int}(undef, Graphs.nv(g), Graphs.nv(g))
+    for v in Graphs.vertices(g)
+        @inbounds d[:, v] = Graphs.gdistances(g, v)
+    end
+    return d
+end
+"""
+    separation_budget(sep::HopCount, nte::AbstractNetworkEstimator, d::MatNum)
+
+Resolve the separation budget in scope: the separation beyond which a pair counts as unrelated.
+
+Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_matrix`](@ref) is the other half. Split from `separation_matrix` because a consumer needs the budget on its own — to probe a decay before entering the `assets × assets` loop, or to threshold a matrix it already holds.
+
+# The separations are passed in, not recomputed
+
+`d` is the matrix [`separation_matrix`](@ref) produced, so a member whose budget is *observed* rather than configured — the diameter of what the graph actually turned out to be — can read it without a second traversal. [`HopCount`](@ref) ignores it and therefore pays nothing for a reduction it does not need.
+
+`nte` is likewise inert for what ships: it is the channel through which an extension budget can see the estimator that owns it. Inert arguments have precedent here — [`separation_decay`](@ref)'s `dmax` is read by only one of four members.
+
+# Arguments
+
+  - `sep`: Separation algorithm.
+  - `nte`: Network estimator that owns `sep`. **Inert** for the shipped members.
+  - `d`: Separation matrix from [`separation_matrix`](@ref). **Inert** for [`HopCount`](@ref), whose budget is configured rather than observed.
+
+# Returns
+
+  - `dmax::Number`: Separation budget. Stated in the units `sep` measures in — hops for [`HopCount`](@ref) — so it is only ever compared against entries of `d`.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_decay`](@ref)
+  - [`Proximity`](@ref)
+"""
+function separation_budget end
+function separation_budget(sep::HopCount, ::AbstractNetworkEstimator, ::MatNum)::Number
+    return sep.n
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Internal dispatch helper for constructing a [`Clusters`](@ref) result within a network-based clustering workflow.
@@ -1321,7 +1401,10 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
     tree = calc_mst(nte.nte.alg, G)
     A = Graphs.adjacency_matrix(G[tree])
-    for i in 0:(nte.nte.n)
+    # `nte.nte.sep.n` is read as a matrix-power count rather than as a budget: a separation
+    # member that measures something other than hops has no `n`, and fails here rather than
+    # silently truncating a power sum it cannot index.
+    for i in 0:(nte.nte.sep.n)
         P .+= D^i - A^i
     end
     P .-= LinearAlgebra.Diagonal(P)
@@ -1367,7 +1450,8 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
-    for i in 0:(nte.nte.n)
+    # See the tree method: a matrix-power count, not a budget.
+    for i in 0:(nte.nte.sep.n)
         P .+= S^i - Rpm^i
     end
     P .-= LinearAlgebra.Diagonal(P)
@@ -1426,7 +1510,9 @@ function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 
                           kwargs...)
     A = calc_adjacency(nte, X; dims = dims, kwargs...)
     P = zeros(Int, size(A))
-    for i in 0:(nte.n)
+    # A matrix-power count, hence `sep.n` directly rather than `separation_budget`: this is
+    # the hop branch, and a separation measuring anything else needs its own method.
+    for i in 0:(nte.sep.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - LinearAlgebra.I
@@ -1675,4 +1761,5 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
-       CentralityEstimator, centrality_vector, NetworkClustersEstimator
+       CentralityEstimator, centrality_vector, NetworkClustersEstimator, separation_matrix,
+       separation_budget

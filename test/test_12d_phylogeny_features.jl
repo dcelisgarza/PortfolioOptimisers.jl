@@ -4,15 +4,15 @@ using Clustering, StableRNGs, LinearAlgebra
 # The two source kinds. Both are *estimators* -- `PhylogenyFeatures` holds no Result -- so
 # both refit from whatever `X` they are handed. `PEX` is `NTE`'s graph materialised once, as
 # the reference the kernels are checked against.
-const NTE = NetworkEstimator(; n = 2)
+const NTE = NetworkEstimator(; sep = HopCount(; n = 2))
 const CLE = ClustersEstimator()
 const PEX = Matrix{Float64}(phylogeny_matrix(NTE, rd.X).X)
 const NA = size(rd.X, 2)
 
-@testset "phylogeny_features: the three kernels" begin
-    Zb = phylogeny_features(BinaryNeighbourhood(), NTE, rd.X)
-    Zg = phylogeny_features(GradedNeighbourhood(), NTE, rd.X)
-    Zc = phylogeny_features(GradedNeighbourhood(), CLE, rd.X)
+@testset "phylogeny_features: the two kernels" begin
+    Zb = phylogeny_features(Proximity(; decay = NoDecay()), NTE, rd.X)
+    Zg = phylogeny_features(Proximity(), NTE, rd.X)
+    Zc = phylogeny_features(Proximity(), CLE, rd.X)
 
     for Z in (Zb, Zg, Zc)
         @test isa(Z, Matrix{Float64})       # never Int or BitMatrix: the gemm path needs it
@@ -21,13 +21,20 @@ const NA = size(rd.X, 2)
         @test all(isfinite, Z)
     end
 
-    # Binary is exactly `phylogeny_matrix` with the diagonal restored.
+    # The retirement gate. `BinaryNeighbourhood` *was* `phylogeny_matrix` with the diagonal
+    # restored, so checking `NoDecay` against that expression is the retired type's own
+    # implementation, not a paraphrase of it -- a flat decay under a budget that still cuts
+    # is an indicator, which is exactly what the deleted member produced.
     @test Zb == Matrix{Float64}(phylogeny_matrix(NTE, rd.X).X) + I
     @test all(z -> z in (0.0, 1.0), Zb)
+    # And it is the budget doing the cutting, not the decay: no decay emits a zero, yet the
+    # matrix is full of them.
+    @test any(iszero, Zb)
+    @test all(==(1), separation_decay.(Ref(NoDecay()), 0:10, 2))
 
     # Graded keeps the step count `clamp!(P, 0, 1)` destroys: a direct neighbour scores `n`,
     # the asset itself `n + 1`, anything past `n` hops zero.
-    @test all(==(NTE.n + 1), diag(Zg))
+    @test all(==(NTE.sep.n + 1), diag(Zg))
     @test sort(unique(Zg)) == [0.0, 1.0, 2.0, 3.0]
     @test Zg != Zb
     # Their supports agree: grading changes the values, not which pairs are within `n` hops.
@@ -40,7 +47,7 @@ const NA = size(rd.X, 2)
     @test all(isone, diag(Zc))
     # A partition has no hop structure to decay, so `alg` is inert rather than an error --
     # the same treatment a static feature matrix gets from `FeatureDistance`'s collapse alg.
-    @test phylogeny_features(BinaryNeighbourhood(), CLE, rd.X) == Zc
+    @test phylogeny_features(Proximity(; decay = NoDecay()), CLE, rd.X) == Zc
 end
 
 @testset "The diagonal picks between two different algorithms" begin
@@ -64,7 +71,8 @@ end
     # The fold argument: an asset view of a spanning tree routinely isolates the selected
     # vertices from each other. A zero diagonal makes those rows zero rows, and
     # `AngularDist`'s zero-vector convention then declares all of them identical.
-    A1 = Matrix{Float64}(phylogeny_matrix(NetworkEstimator(; n = 1), rd.X).X)
+    A1 = Matrix{Float64}(phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = 1)),
+                                          rd.X).X)
     j = first(k
               for k in Iterators.product(1:NA, 1:NA, 1:NA)
               if k[1] < k[2] < k[3] && all(iszero, A1[collect(k), collect(k)]))
@@ -99,13 +107,14 @@ end
     ze = PhylogenyFeatures()
     @test isa(ze, PortfolioOptimisers.AbstractFeatureMatrixEstimator)
     @test isa(ze.pl, NetworkEstimator)
-    @test ze.alg == GradedNeighbourhood()
-    @test isa(GradedNeighbourhood(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
-    @test isa(BinaryNeighbourhood(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
+    @test ze.alg == Proximity()
+    @test isa(Proximity(), PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
+    @test isa(Proximity(; decay = NoDecay()),
+              PortfolioOptimisers.AbstractPhylogenyFeatureAlgorithm)
 
     # Both sources refit, so the universe always matches by construction -- there is no
     # stored matrix left that could describe a different one.
-    for alg in (BinaryNeighbourhood(), GradedNeighbourhood()), pl in (NTE, CLE)
+    for alg in (Proximity(; decay = NoDecay()), Proximity()), pl in (NTE, CLE)
         pr = prior(FeaturePrior(; ze = PhylogenyFeatures(; pl = pl, alg = alg)), rd)
         @test size(pr.Z) == (NA, NA)              # the only producer whose axes coincide
         @test pr.Z == phylogeny_features(alg, pl, rd.X)
@@ -170,7 +179,7 @@ end
     pen = FeaturePrior(; ze = PhylogenyFeatures(; pl = NTE))
     Zv = prior(PortfolioOptimisers.port_opt_view(pen, i), rdv).Z
     @test size(Zv) == (length(i), length(i))
-    @test Zv == phylogeny_features(GradedNeighbourhood(), NTE, rd.X[:, i])
+    @test Zv == phylogeny_features(Proximity(), NTE, rd.X[:, i])
 end
 
 @testset "A square feature matrix drives an optimisation end to end" begin
@@ -181,8 +190,9 @@ end
                                                                 cle = ClustersEstimator(;
                                                                                         de = FeatureDistance()),
                                                                 z_src = :prior))
-    wb = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = BinaryNeighbourhood())), rd).w
-    wg = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = GradedNeighbourhood())), rd).w
+    wb = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = Proximity(; decay = NoDecay()))),
+                  rd).w
+    wg = optimise(mk(PhylogenyFeatures(; pl = NTE, alg = Proximity())), rd).w
     wc = optimise(mk(PhylogenyFeatures(; pl = CLE)), rd).w
 
     for w in (wb, wg, wc)
@@ -227,15 +237,51 @@ end
     # before `pr.Z` exists, so there is no feature matrix to find and none to recurse into.
     ze = PhylogenyFeatures(; pl = NetworkEstimator(; de = FeatureDistance()))
     @test_throws PortfolioOptimisers.IsNothingError prior(FeaturePrior(; ze = ze), rd)
-    res = @test_throws PortfolioOptimisers.IsNothingError phylogeny_features(BinaryNeighbourhood(),
+    res = @test_throws PortfolioOptimisers.IsNothingError phylogeny_features(Proximity(;
+                                                                                       decay = NoDecay()),
                                                                              NetworkEstimator(;
                                                                                               de = FeatureDistance()),
                                                                              rd.X)
     @test occursin("FeatureDistance requires a feature matrix", res.value.msg)
 end
 
+# The separation family. Like the decay family it lives in `11_Phylogeny/01_Base_Phylogeny.jl`
+# for include order -- `NetworkEstimator` carries it as a field -- so its tests live beside
+# the consumer that grades what it measures.
+@testset "HopCount carries the budget the network estimator used to" begin
+    @test isa(HopCount(), PortfolioOptimisers.AbstractSeparationAlgorithm)
+    @test HopCount().n == 1
+    @test HopCount(; n = 4).n == 4
+    # The budget moved off `NetworkEstimator` onto the member that states its unit, so the
+    # old spelling is gone rather than deprecated.
+    @test NetworkEstimator().sep == HopCount()
+    @test !hasproperty(NetworkEstimator(), :n)
+    # `n >= 1` came with it: the validation is on the member, not on the estimator.
+    @test_throws DomainError HopCount(; n = 0)
+    @test_throws DomainError HopCount(; n = -2)
+    @test isa(NetworkEstimator(; sep = HopCount(; n = 3)), NetworkEstimator)
+    @test_throws TypeError NetworkEstimator(; sep = 3)
+
+    # `separation_matrix` is the hop matrix `phylogeny_features` used to build inline, one
+    # `gdistances` per vertex, and the sentinel it reports is passed through unrepaired.
+    G = PortfolioOptimisers.Graphs
+    g = G.SimpleGraph(PortfolioOptimisers.calc_adjacency(NTE, rd.X; dims = 1))
+    d = separation_matrix(NTE.sep, NTE, rd.X; dims = 1)
+    @test isa(d, Matrix{Int})
+    @test size(d) == (NA, NA)
+    @test issymmetric(d)
+    @test all(iszero, diag(d))
+    @test d == reduce(hcat, G.gdistances(g, v) for v in 1:NA)
+
+    # `separation_budget` is configured rather than observed for a hop count, so neither the
+    # estimator nor the separations it produced can move it.
+    @test separation_budget(NTE.sep, NTE, d) == NTE.sep.n == 2
+    @test separation_budget(HopCount(; n = 7), NTE, d) == 7
+    @test separation_budget(HopCount(; n = 7), NTE, zeros(Int, 2, 2)) == 7
+end
+
 # The separation decay family. It lives in `11_Phylogeny/01_Base_Phylogeny.jl` for include
-# order rather than for ownership -- `GradedNeighbourhood` is its only consumer -- so its
+# order rather than for ownership -- `Proximity` is its only consumer -- so its
 # tests live beside that consumer.
 @testset "The decay members honour the contract they are held to" begin
     dks = (LinearDecay(), ExponentialDecay(), ExponentialDecay(; rate = 0.25),
@@ -295,6 +341,36 @@ end
     @test ReciprocalDecay().power == 1.0
 end
 
+@testset "NoDecay is the flat end of the family, and does not mean no truncation" begin
+    @test isa(NoDecay(), PortfolioOptimisers.AbstractSeparationDecayAlgorithm)
+    # Constant, so it is the one member that is not strictly decreasing -- which is why it
+    # sits outside the loop above and why the contract asks for monotone *non*-increasing.
+    for dmax in (1, 2, 5, 8), d in 0:dmax
+        @test separation_decay(NoDecay(), d, dmax) == 1
+    end
+    @test separation_decay(NoDecay(), 0.5, 3) == separation_decay(NoDecay(), 0, 3)
+    @test separation_decay(NoDecay(), 2, 3) == separation_decay(NoDecay(), 2, 99)
+    # It satisfies the contract by construction, so it opts out of the probe with the other
+    # shipped members -- and would pass it if it did not.
+    @test isnothing(PortfolioOptimisers.assert_separation_decay(NoDecay(), 0:3, 3))
+    @test isnothing(invoke(PortfolioOptimisers.assert_separation_decay,
+                           Tuple{PortfolioOptimisers.AbstractSeparationDecayAlgorithm, Any,
+                                 Number}, NoDecay(), 0:3, 3))
+
+    # The name is about the fall-off alone: the budget still cuts, so what comes out is an
+    # indicator of the neighbourhood the budget selects and not a matrix of ones.
+    for n in (1, 2, 3)
+        pl = NetworkEstimator(; sep = HopCount(; n = n))
+        Z = phylogeny_features(Proximity(; decay = NoDecay()), pl, rd.X)
+        @test sort(unique(Z)) == [0.0, 1.0]
+        @test Z != ones(NA, NA)
+        @test Z == Matrix{Float64}(phylogeny_matrix(pl, rd.X).X) + I
+        # The support is the graded variant's, whatever the fall-off -- the budget is the
+        # only thing that selects.
+        @test (Z .> 0) == (phylogeny_features(Proximity(), pl, rd.X) .> 0)
+    end
+end
+
 # A decay defined outside the library. `assert_separation_decay` is opt-out: the fallback on
 # the abstract type probes, and only the shipped members turn it off.
 struct DecayNoTop <: PortfolioOptimisers.AbstractSeparationDecayAlgorithm end
@@ -315,7 +391,7 @@ struct DecayNegativeAtBudget <: PortfolioOptimisers.AbstractSeparationDecayAlgor
 PortfolioOptimisers.separation_decay(::DecayNegativeAtBudget, d, dmax) = 1.0 - d / 2
 
 @testset "The contract is enforced on extensions, not merely documented" begin
-    # `GradedNeighbourhood`'s diagonal comes out of the decay itself, so a member that is not
+    # `Proximity`'s diagonal comes out of the decay itself, so a member that is not
     # maximal at `d = 0` silently produces the structural-equivalence matrix the diagonal
     # exists to prevent -- see the diagonal testset above. Hence a *probing* fallback.
     @test_throws DomainError PortfolioOptimisers.assert_separation_decay(DecayNoTop(), 0:3,
@@ -363,28 +439,28 @@ PortfolioOptimisers.separation_decay(::DecayNegativeAtBudget, d, dmax) = 1.0 - d
     end
 
     # It fires from the kernel too, before the `assets^2` loop rather than inside it.
-    @test_throws DomainError phylogeny_features(GradedNeighbourhood(; decay = DecayNoTop()),
-                                                NTE, rd.X)
+    @test_throws DomainError phylogeny_features(Proximity(; decay = DecayNoTop()), NTE,
+                                                rd.X)
     # And a well-behaved outside member just works -- the family is open.
-    Zx = phylogeny_features(GradedNeighbourhood(; decay = DecayFine()), NTE, rd.X)
+    Zx = phylogeny_features(Proximity(; decay = DecayFine()), NTE, rd.X)
     @test all(==(1.0), diag(Zx))
     @test sort(unique(Zx)) == [0.0, 0.25, 0.5, 1.0]
 end
 
-@testset "GradedNeighbourhood carries the decay, and linear is unchanged" begin
-    @test GradedNeighbourhood().decay == LinearDecay()
-    @test GradedNeighbourhood(; decay = ExponentialDecay()).decay == ExponentialDecay()
+@testset "Proximity carries the decay, and linear is unchanged" begin
+    @test Proximity().decay == LinearDecay()
+    @test Proximity(; decay = ExponentialDecay()).decay == ExponentialDecay()
     # The field is bound by type rather than checked at runtime, so a non-decay is refused
     # at construction.
-    @test_throws TypeError GradedNeighbourhood(; decay = 2.0)
+    @test_throws TypeError Proximity(; decay = 2.0)
 
-    # Linear reproduces the hardcoded fall-off `GradedNeighbourhood` shipped before the decay
+    # Linear reproduces the hardcoded fall-off `Proximity` shipped before the decay
     # family existed, re-derived here from the graph rather than paraphrased. Verified
     # bit-for-bit against the pre-change output over 17 matrices -- four graph algorithms,
     # budgets 1 to 8, full universe and a slice -- on issue #197.
     G = PortfolioOptimisers.Graphs
     for n in (1, 2, 3, 5)
-        pl = NetworkEstimator(; n = n)
+        pl = NetworkEstimator(; sep = HopCount(; n = n))
         g = G.SimpleGraph(PortfolioOptimisers.calc_adjacency(pl, rd.X; dims = 1))
         ref = zeros(Float64, NA, NA)
         for v in 1:NA
@@ -393,39 +469,36 @@ end
                 ref[u, v] = ifelse(h[u] <= n, Float64(n + 1 - h[u]), 0.0)
             end
         end
-        @test phylogeny_features(GradedNeighbourhood(), pl, rd.X) == ref
-        @test phylogeny_features(GradedNeighbourhood(; decay = LinearDecay()), pl, rd.X) ==
-              ref
+        @test phylogeny_features(Proximity(), pl, rd.X) == ref
+        @test phylogeny_features(Proximity(; decay = LinearDecay()), pl, rd.X) == ref
     end
 
     # A different decay changes the values, not which pairs are inside the budget: the
     # support is the binary variant's, whatever the fall-off.
-    Zb = phylogeny_features(BinaryNeighbourhood(), NTE, rd.X)
+    Zb = phylogeny_features(Proximity(; decay = NoDecay()), NTE, rd.X)
     for dk in
         (LinearDecay(), ExponentialDecay(; rate = 0.5), ExponentialDecay(; rate = 3.0),
          ReciprocalDecay(), ReciprocalDecay(; power = 2.0))
-        Z = phylogeny_features(GradedNeighbourhood(; decay = dk), NTE, rd.X)
+        Z = phylogeny_features(Proximity(; decay = dk), NTE, rd.X)
         @test isa(Z, Matrix{Float64})             # the gemm path still
         @test issymmetric(Z)
         @test (Z .> 0) == (Zb .> 0)
-        @test all(==(separation_decay(dk, 0, NTE.n)), diag(Z))
-        @test maximum(Z) == separation_decay(dk, 0, NTE.n)
+        @test all(==(separation_decay(dk, 0, NTE.sep.n)), diag(Z))
+        @test maximum(Z) == separation_decay(dk, 0, NTE.sep.n)
     end
 
     # The exponential's fall-off, read off the matrix: the score at each hop level is
     # `exp(-rate * hops)`, and the diagonal is 1 rather than `n + 1`.
-    Zg = phylogeny_features(GradedNeighbourhood(), NTE, rd.X)
-    Ze = phylogeny_features(GradedNeighbourhood(; decay = ExponentialDecay(; rate = 0.9)),
-                            NTE, rd.X)
-    for h in 0:(NTE.n)
-        m = Zg .== NTE.n + 1 - h
+    Zg = phylogeny_features(Proximity(), NTE, rd.X)
+    Ze = phylogeny_features(Proximity(; decay = ExponentialDecay(; rate = 0.9)), NTE, rd.X)
+    for h in 0:(NTE.sep.n)
+        m = Zg .== NTE.sep.n + 1 - h
         @test any(m)
         @test all(≈(exp(-0.9 * h)), Ze[m])
     end
     @test all(==(1.0), diag(Ze))
     # Sharper fall-off really is sharper: the same pairs, further apart in score.
-    Zs = phylogeny_features(GradedNeighbourhood(; decay = ExponentialDecay(; rate = 3.0)),
-                            NTE, rd.X)
+    Zs = phylogeny_features(Proximity(; decay = ExponentialDecay(; rate = 3.0)), NTE, rd.X)
     far = Zg .== 1.0                              # exactly `n` hops away
     @test all(Zs[far] .< Ze[far])
 end
@@ -435,8 +508,9 @@ end
 # is the only way to drive the unreachable branch from the public kernel.
 struct FixedAdjacency <: PortfolioOptimisers.AbstractNetworkEstimator
     A::Matrix{Int}
-    n::Int
+    sep::HopCount{Int}
 end
+FixedAdjacency(A::Matrix{Int}, n::Int) = FixedAdjacency(A, HopCount(; n = n))
 function PortfolioOptimisers.calc_adjacency(pl::FixedAdjacency, X; kwargs...)
     return pl.A
 end
@@ -448,19 +522,24 @@ end
     X = zeros(Float64, 3, 4)
     g = PortfolioOptimisers.Graphs.SimpleGraph(A)
     @test PortfolioOptimisers.Graphs.gdistances(g, 1)[3] == typemax(Int)
+    # `separation_matrix` passes the sentinel through unrepaired, which is what makes the
+    # budget comparison the guard rather than a tidy-up.
+    dd = separation_matrix(HopCount(), FixedAdjacency(A, 1), X)
+    @test dd[1, 3] == typemax(Int)
+    @test dd[1, 2] == 1
 
     # The budget comparison must *short-circuit*, not merely select: `ifelse` evaluates both
     # branches, and `ReciprocalDecay` overflows `1 + d` at `typemax(Int)` -- for a fractional
     # power that is a `DomainError` rather than a discarded number.
     @test_throws DomainError inv((1 + typemax(Int))^0.5)
     dk = ReciprocalDecay(; power = 0.5)
-    Zr = phylogeny_features(GradedNeighbourhood(; decay = dk), FixedAdjacency(A, 1), X)
+    Zr = phylogeny_features(Proximity(; decay = dk), FixedAdjacency(A, 1), X)
     @test Zr[1, 3] == 0.0
     @test Zr[1, 2] == separation_decay(dk, 1, 1) == inv(sqrt(2))
     @test all(==(1.0), diag(Zr))
     # And the same for a beyond-budget but reachable pair, which is the other zero.
     Ap = [0 1 0; 1 0 1; 0 1 0]
-    Zp = phylogeny_features(GradedNeighbourhood(; decay = dk), FixedAdjacency(Ap, 1),
+    Zp = phylogeny_features(Proximity(; decay = dk), FixedAdjacency(Ap, 1),
                             zeros(Float64, 3, 3))
     @test Zp[1, 3] == 0.0
     @test Zp[1, 2] == inv(sqrt(2))

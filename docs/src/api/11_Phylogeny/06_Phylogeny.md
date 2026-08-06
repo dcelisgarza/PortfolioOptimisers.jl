@@ -37,6 +37,8 @@ AbstractNetworkEstimator
 AbstractCentralityEstimator
 graph_weight_matrix
 calc_adjacency
+separation_matrix
+separation_budget
 calc_centrality
 Tree_SimMat
 NwE_ClE
