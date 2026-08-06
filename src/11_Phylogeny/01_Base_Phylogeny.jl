@@ -283,8 +283,10 @@ The contract is enforced rather than merely documented, by a probing [`assert_se
   - [`LinearDecay`](@ref)
   - [`ExponentialDecay`](@ref)
   - [`ReciprocalDecay`](@ref)
+  - [`NoDecay`](@ref)
   - [`separation_decay`](@ref)
   - [`assert_separation_decay`](@ref)
+  - [`AbstractSeparationAlgorithm`](@ref)
   - [`Proximity`](@ref)
   - [`PhylogenyFeatures`](@ref)
 """

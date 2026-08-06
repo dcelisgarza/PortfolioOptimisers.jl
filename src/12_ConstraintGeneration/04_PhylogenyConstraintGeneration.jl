@@ -101,6 +101,12 @@ Estimator for generating semi-definite phylogeny-based constraints.
 
 `SemiDefinitePhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using a semi-definite matrix representation. The estimator wraps a phylogeny or clustering estimator and a non-negative penalty parameter `p`, which controls the strength of the constraint.
 
+Which pairs a network source relates — and therefore how strong the constraint is — comes from its [`AbstractSeparationAlgorithm`](@ref), not from anything set here. The constraint is **weight-inert**: `A ⊙ W == 0` is the same constraint at any magnitude, so the separation changes the *cardinality* of the forbidden set and nothing else.
+
+!!! warning
+
+    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs — and this estimator then forbids all pairwise co-movement. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -348,6 +354,12 @@ $(DocStringExtensions.TYPEDEF)
 Estimator for generating integer phylogeny-based constraints.
 
 `IntegerPhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using integer or discrete representations. The estimator wraps a phylogeny or clustering estimator, a non-negative integer or vector of integers `B` specifying group sizes or allocations, and a big-M parameter `scale` used for formulating the MIP constraints.
+
+Which pairs a network source relates comes from its [`AbstractSeparationAlgorithm`](@ref), and `B` is an integer cardinality counted over them. The relatedness itself stays binary under either separation: [`PhylogenyResult`](@ref)'s matrix is `Int`, and a graded one would not be countable here.
+
+!!! warning
+
+    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
 
 # Fields
 

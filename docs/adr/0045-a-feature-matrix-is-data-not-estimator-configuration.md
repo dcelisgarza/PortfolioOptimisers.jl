@@ -727,3 +727,44 @@ verified fact: `z_src = :prior` on the outer optimiser refits `PhylogenyFeatures
 returns and yields a genuine `k × k` needing no carrier, so the only thing actually lost was the
 *exogenous* square data carrier. That narrowness is why it was a fair candidate — but it answers "is
 anything unreachable", not "does an execution knob change the data", and the latter is the criterion.
+
+## Amendment (2026-08-06): the transform question gains three instances, and one of them is a shift
+
+The *Left open* paragraph above named three costumes of one question — where a `Z` transform lives —
+and treated them as a set that probably wants one answer. Map
+[#195](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/195), which replaced producer
+four's hardcoded fall-off with a **separation** family and a **separation decay** family (ADR
+[0048](0048-a-network-relates-by-its-separation-and-weights-by-what-selected-it.md)), adds three more
+instances. They are recorded here rather than solved, and the third is not the same kind of thing as
+the other two.
+
+**Five: a weighted path length inherits the distance estimator's scale.** `PathLength` sums entries of
+`D` along a path, so a `Z` graded over path lengths is denominated in whatever units the
+`AbstractDistanceEstimator` emits. Nothing about the producer normalises them.
+
+**Six: the top of the scale is a member-level choice.** `LinearDecay` puts `f(0)` at `dmax + 1`;
+`ExponentialDecay` and `ReciprocalDecay` both pin `f(0) = 1`. So swapping the decay changes the scale
+of the whole matrix as well as the shape of its fall-off.
+
+Both are **uniform across the matrix**, which is the benign costume: `AngularDist` is invariant to a
+row rescale, so neither reaches the distance the producer exists to feed.
+
+**Seven is not benign, and it arrives through a default.** Under `PathLength`'s default
+`dmax = nothing` the budget is the *observed* diameter, so `LinearDecay`'s `f(d) = dmax + 1 - d` makes
+the whole scale data-dependent. The dependence is **additive**: a diameter that moves by `δ` between
+cross-validation folds adds `δ` to every entry inside the budget while leaving the out-of-budget
+zeros where they are. That is neither a rescale nor a global translation, so `AngularDist`'s
+row-rescale invariance does not cover it, and two folds' `Z` are not comparable as values.
+
+It is reachable from `PathLength()` bare rather than from an exotic configuration: measured on the
+default distance estimator over the twenty-asset test universe, `delta = 3.286`, so `f(0) = 4.286`.
+Stating a numeric `dmax` buys the fold-stability back, and the two decays that pin `f(0) = 1` never
+had the exposure. The caveat is carried by `Proximity`'s docstring; the *transform* question it
+belongs to stays open here.
+
+One nominal correction to decision 8. Producer four's sources are unchanged — a network estimator (a
+graph) or a clustering estimator (a partition, for which the algorithm is inert) — but the two
+algorithm names it cites are retired. `GradedNeighbourhood` is now `Proximity`, carrying a decay
+member, and `BinaryNeighbourhood` is `Proximity(; decay = NoDecay())`. The neighbourhood's *reach*
+moved further still: it is `NetworkEstimator.sep`, on the source rather than on the producer, because
+the phylogeny constraint path receives nothing but the estimator.

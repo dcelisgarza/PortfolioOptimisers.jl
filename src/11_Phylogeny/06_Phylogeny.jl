@@ -134,8 +134,14 @@ Abstract supertype for all centrality algorithm types in `PortfolioOptimisers.jl
 
 All concrete and/or abstract types implementing specific centrality algorithms (e.g., betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, stress) should be subtypes of `AbstractCentralityAlgorithm`.
 
+# Each member declares the weights it needs
+
+A member says which quantity its edge weights must be, through [`centrality_polarity`](@ref), and [`centrality_graph`](@ref) supplies it. The declaration is about **correctness** — a shortest path over similarities is backwards — and never about capability: a member that declares nothing, and a source that carries no weights, both run on the plain graph rather than raising. The fallback declares `nothing`, so a new member is unweighted until it opts in.
+
 # Related
 
+  - [`centrality_polarity`](@ref)
+  - [`centrality_graph`](@ref)
   - [`BetweennessCentrality`](@ref)
   - [`ClosenessCentrality`](@ref)
   - [`DegreeCentrality`](@ref)
@@ -213,6 +219,8 @@ Centrality algorithm type for betweenness centrality.
 
 `BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
+Declares [`DistancePolarity`](@ref): it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -238,6 +246,8 @@ BetweennessCentrality
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`DistancePolarity`](@ref)
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
@@ -265,6 +275,8 @@ Centrality algorithm type for closeness centrality.
 
 `ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
+Declares [`DistancePolarity`](@ref): it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -290,6 +302,8 @@ ClosenessCentrality
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`DistancePolarity`](@ref)
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
@@ -316,6 +330,8 @@ $(DocStringExtensions.TYPEDEF)
 Centrality algorithm type for degree centrality.
 
 `DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
+
+Declares no polarity and runs on the plain graph: `Graphs.degree_centrality` counts edges and ignores what they weigh. It is therefore one of the algorithms for which the estimator's `sep` stays **live** — the unweighted route reads the separation closure [`phylogeny_matrix`](@ref) builds, so `HopCount(; n = 2)` does change this answer.
 
 # Fields
 
@@ -346,6 +362,7 @@ DegreeCentrality
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
@@ -372,9 +389,13 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
 
 `EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
 
+Declares [`SimilarityPolarity`](@ref), the only member that does: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity.
+
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`SimilarityPolarity`](@ref)
   - [`Graphs.eigenvector_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
@@ -384,6 +405,8 @@ $(DocStringExtensions.TYPEDEF)
 Centrality algorithm type for Katz centrality.
 
 `KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
+
+Declares no polarity and runs on the plain graph: `Graphs.katz_centrality` binarises its input through `adjacency_matrix(g, Bool)`, and throws an `InexactError` when the graph is weighted. The unweighted route is real code here rather than an absent check.
 
 # Fields
 
@@ -412,6 +435,7 @@ KatzCentrality
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
@@ -433,6 +457,8 @@ $(DocStringExtensions.TYPEDEF)
 Centrality algorithm type for PageRank.
 
 `Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
+
+Declares no polarity and runs on the plain graph: `Graphs.pagerank` ignores edge weights. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
 
 # Fields
 
@@ -467,6 +493,7 @@ Pagerank
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
@@ -500,9 +527,13 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
+Declares [`DistancePolarity`](@ref): it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree.
+
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`DistancePolarity`](@ref)
   - [`Graphs.radiality_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
@@ -512,6 +543,8 @@ $(DocStringExtensions.TYPEDEF)
 Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality).
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
+
+Declares [`DistancePolarity`](@ref): it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch.
 
 # Fields
 
@@ -538,6 +571,8 @@ StressCentrality
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`centrality_polarity`](@ref)
+  - [`DistancePolarity`](@ref)
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
@@ -1021,7 +1056,9 @@ Keywords correspond to the struct's fields.
 
 # The separation lives here, not on the consumer
 
-`sep` says which pairs the network relates, and **every** consumer of a network needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
+`sep` says which pairs the network relates, and every consumer that reads a *closure* of this graph needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
+
+The one exception is a consumer that reads the **structure** rather than a closure of it, and `sep` is **inert** there: the weighted routes of [`centrality_graph`](@ref) take the weighted graph itself, because a closure is a sum of matrix powers and a power of a weighted matrix sums *products* of distances. So a [`HopCount`](@ref) of `n = 2` moves a [`DegreeCentrality`](@ref) and leaves a [`ClosenessCentrality`](@ref) where it was. At the default `HopCount(; n = 1)` nothing is visible, since the closure of a graph at one hop is the graph.
 
 The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
 
