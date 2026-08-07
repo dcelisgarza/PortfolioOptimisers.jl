@@ -674,10 +674,8 @@ function feature_rows(sel, sets::UniverseSets, nx, pool, strict::Bool)
     return idx
 end
 """
-    feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, nx, nz, zidx, pool,
+    feature_target!(Z::Matrix{Float64}, rows, target::Union{<:Pair, <:AbstractVector{<:Pair}}, sets::UniverseSets, nx, nz, zidx, pool,
                     strict::Bool) -> Nothing
-    feature_targets!(Z::Matrix{Float64}, rows, targets, sets::UniverseSets, nx, nz, zidx,
-                     pool, strict::Bool) -> Nothing
 
 Apply the grammar's `target` production inside an already-resolved row scope, singly or over a vector.
 
@@ -689,11 +687,8 @@ Every target names its column in full, so this reads left to right with no ambie
   - [`feature_write!`](@ref)
   - [`Scale`](@ref)
 """
-function feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, nx, nz, zidx,
-                         pool, strict::Bool)::Nothing
-    if !isa(target, Pair)
-        throw(ArgumentError(feature_grammar_msg(target)))
-    end
+function feature_target!(Z::Matrix{Float64}, rows, target::Pair, sets::UniverseSets, nx, nz,
+                         zidx, pool, strict::Bool)::Nothing
     k, rest = target
     if is_feature_taxonomy_key(k, sets)
         col = sets.dict[k]
@@ -738,15 +733,12 @@ function feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, n
     end
     return nothing
 end
-function feature_targets!(Z::Matrix{Float64}, rows, targets, sets::UniverseSets, nx, nz,
-                          zidx, pool, strict::Bool)::Nothing
-    if isa(targets, AbstractVector)
-        for t in targets
-            feature_target!(Z, rows, t, sets, nx, nz, zidx, pool, strict)
-        end
-        return nothing
+function feature_target!(Z::Matrix{Float64}, rows, targets::AbstractVector{<:Pair},
+                         sets::UniverseSets, nx, nz, zidx, pool, strict::Bool)::Nothing
+    for t in targets
+        feature_target!(Z, rows, t, sets, nx, nz, zidx, pool, strict)
     end
-    return feature_target!(Z, rows, targets, sets, nx, nz, zidx, pool, strict)
+    return nothing
 end
 """
     feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx, nz, zidx, pool,
@@ -766,7 +758,7 @@ Apply one entry of a graded feature program.
 
   - [`asset_sets_features`](@ref)
   - [`feature_diagonal!`](@ref)
-  - [`feature_targets!`](@ref)
+  - [`feature_target!`](@ref)
   - [`feature_rows`](@ref)
 """
 function feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx, nz, zidx,
@@ -782,8 +774,8 @@ function feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx,
                 return feature_diagonal!(Z, lhs, g, tail, sets, nx, nz, zidx, pool, strict)
             end
             if is_feature_taxonomy_key(g, sets)
-                return feature_targets!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool,
-                                        strict)
+                return feature_target!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool,
+                                       strict)
             end
             col = sets.dict[lhs]
             rows = findall(x -> isequal(x, g), col)
@@ -792,15 +784,15 @@ function feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx,
                                                                                   col),
                                                   strict)
             end
-            return feature_targets!(Z, rows, tail, sets, nx, nz, zidx, pool, strict)
+            return feature_target!(Z, rows, tail, sets, nx, nz, zidx, pool, strict)
         end
-        return feature_targets!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool, strict)
+        return feature_target!(Z, eachindex(nx), rhs, sets, nx, nz, zidx, pool, strict)
     end
     rows = feature_rows(lhs, sets, nx, pool, strict)
     if isnothing(rows) || isempty(rows)
         return nothing
     end
-    return feature_targets!(Z, rows, rhs, sets, nx, nz, zidx, pool, strict)
+    return feature_target!(Z, rows, rhs, sets, nx, nz, zidx, pool, strict)
 end
 """
     asset_sets_features(vals::AbstractVector{<:Pair}, sets::UniverseSets;
