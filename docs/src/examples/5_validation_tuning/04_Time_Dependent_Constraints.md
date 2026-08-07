@@ -429,7 +429,7 @@ The size-4 schedule that failed at the *outer* split in §7.3 now succeeds, beca
 An input that already accepts a vector of constraints varies over folds by holding a per-fold *vector of vectors* — entry `i` is fold `i`'s whole constraint vector. Here the linear-constraint input `lcse` tightens from one cap in early folds to two in later ones:
 
 ````@example 04_Time_Dependent_Constraints
-sets = AssetSets(; dict = Dict("nx" => rd.nx))
+sets = UniverseSets(; dict = Dict("nx" => rd.nx))
 cap_a = LinearConstraintEstimator(; val = "$(rd.nx[1]) <= 0.5")
 cap_b = LinearConstraintEstimator(; val = "$(rd.nx[2]) <= 0.5")
 lcse_sched = TimeDependent([i <= n_wf ÷ 2 ? [cap_a] : [cap_a, cap_b] for i in 1:n_wf])

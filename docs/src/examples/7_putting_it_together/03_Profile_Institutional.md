@@ -54,10 +54,10 @@ N = length(rd.nx)
 prices = vec(values(X)[end, :])
 benchmark = fill(1 / N, N)
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX", "XOM", "RRC"],
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX", "XOM", "RRC"],
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),

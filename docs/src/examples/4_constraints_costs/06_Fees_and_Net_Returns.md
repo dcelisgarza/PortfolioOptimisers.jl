@@ -89,13 +89,13 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 Costs are rarely uniform — some instruments are expensive to hold. A [`FeesEstimator`](@ref)
 (the estimator counterpart of [`Fees`](@ref)) accepts per-asset or per-group rates over an
-[`AssetSets`](@ref), exactly like the linear constraints. Charging a punitive fee on the sector
+[`UniverseSets`](@ref), exactly like the linear constraints. Charging a punitive fee on the sector
 the baseline loved makes the optimiser walk away from it.
 
 ````@example 06_Fees_and_Net_Returns
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx,
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx,
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 res_diff = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                              opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                  fees = FeesEstimator(;

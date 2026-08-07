@@ -283,8 +283,12 @@ Adjacency matrices encode asset relationships either with clustering or graph th
 
     Any member of the similarity matrix family: [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref), [`ComplementSimilarity`](@ref) or [`AngularSimilarity`](@ref).
 
+  - ::: details Which pairs count as related: the `sep` separation
+
+    [`HopCount`](@ref) gives the **hop ball**, every pair within `n` edges. [`PathLength`](@ref) gives the **radius ball**, every pair whose shortest path is no longer than `dmax` -- which buys the cardinalities *between* the hop shells, since a hop knob can only step whole neighbourhoods at a time. It does not re-rank: both are selected by distance to begin with, so a path length refines a hop count rather than rivalling it. Note that `PathLength()` with no `dmax` means the observed diameter and therefore relates every reachable pair, the opposite end of the dial from `HopCount()`'s default. Both reach [`SemiDefinitePhylogenyEstimator`](@ref) and [`IntegerPhylogenyEstimator`](@ref); [`NetworkClustersEstimator`](@ref) takes only the hop count, because its power sum is indexed by edges.
+
 - Estimator type for clustering. [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
-- Estimator type for network-based phylogeny analysis. [`NetworkClustersEstimator`](@ref)
+- Estimator type for network-based clustering. [`NetworkClustersEstimator`](@ref)
 - Group assets by clustering them, and keep the best-scoring member of each cluster. [`ClusterGroups`](@ref)
 
 #### Centrality and phylogeny measures
@@ -298,6 +302,12 @@ Adjacency matrices encode asset relationships either with clustering or graph th
   - Pagerank [`Pagerank`](@ref)
   - Radiality [`RadialityCentrality`](@ref)
   - Stress [`StressCentrality`](@ref)
+- ::: details The network is weighted where it can be, in the polarity [`centrality_polarity`](@ref) declares for the algorithm
+  - [`DistancePolarity`](@ref) for the shortest-path algorithms -- betweenness, closeness, radiality and stress
+  - [`SimilarityPolarity`](@ref) for eigenvector centrality, which reads the weighted adjacency matrix itself
+
+  Five cases run on the plain unweighted graph and none of them raises: a weightless source (a [`ClustersEstimator`](@ref), a precomputed [`Clusters`](@ref), a precomputed [`PhylogenyResult`](@ref)), [`DegreeCentrality`](@ref), [`Pagerank`](@ref), [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. Polarity says *which* weights an algorithm receives, never *whether* the call succeeds. Note that the `sep` of a [`NetworkEstimator`](@ref) is inert on the weighted routes, which read the structure rather than the separation closure -- at the default `HopCount(; n = 1)` the two agree.
+
 - Fallback no-op for returning a validated centrality vector result as-is. [`centrality_vector`](@ref)
 - Compute the weighted average centrality for a network and centrality algorithm. [`average_centrality`](@ref)
 - Compute the asset phylogeny score for a set of weights and a phylogeny matrix. [`asset_phylogeny`](@ref)
@@ -312,14 +322,19 @@ Hierarchical clustering produces a tree of [`ClusterNode`](@ref)s, walked by [`t
 
 Non clustering optimisers support a wide range of constraints, while naive and clustering optimisers only support weight bounds. Furthermore, entropy pooling prior supports a variety of views constraints. It is therefore important to provide users with the ability to generate constraints manually and/or programmatically. We therefore provide a wide, robust, and extensible range of types such as [`AbstractEstimatorValueAlgorithm`](@ref) and [`UniformValues`](@ref), and functions that make this easy, fast, and safe.
 
-Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`AssetSets`](@ref). Internally, `PortfolioOptimisers.jl` uses all the information and calls [`group_to_val!`](@ref), and [`replace_group_by_assets`](@ref) to produce the appropriate arrays.
+Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`UniverseSets`](@ref). Internally, `PortfolioOptimisers.jl` uses all the information and calls [`group_to_val!`](@ref), and [`replace_group_by_assets`](@ref) to produce the appropriate arrays.
 
 - Equation parsing [`parse_equation`](@ref) and [`ParsingResult`](@ref)
-- No-op fallback for returning an existing `LinearConstraint` object or `nothing`. [`linear_constraints`](@ref), [`LinearConstraintEstimator`](@ref), [`PartialLinearConstraint`](@ref), and [`LinearConstraint`](@ref)
+- No-op fallback for returning an existing `LinearConstraint` object, `nothing`, or a vector of them. [`linear_constraints`](@ref), [`LinearConstraintEstimator`](@ref), [`PartialLinearConstraint`](@ref), and [`LinearConstraint`](@ref)
+- ::: details Factor exposure constraints [`ExposureConstraintEstimator`](@ref)
+
+  Wraps whatever `lcse` already accepts and declares the [`AbstractConstraintSpace`](@ref) its rows are written in, so a mandate can be stated in factor names -- "at most 30% momentum" -- and re-based through the prior's loadings. The projection happens during constraint generation, so what reaches the optimiser is an ordinary asset-space [`LinearConstraint`](@ref) and every optimiser sharing [`JuMPOptimiser`](@ref) supports one. The names resolve against the factor axis a [`UniverseSets`](@ref) declares.
+
+  - The factor basis: a constraint written in factor names, re-based through a regression's loadings. [`FactorSpace`](@ref)
 - No-op fallback for risk budget constraint generation. [`risk_budget_constraints`](@ref), [`RiskBudgetEstimator`](@ref), and [`RiskBudget`](@ref)
 - Generate phylogeny-based portfolio constraints from an estimator or result. [`phylogeny_constraints`](@ref), [`centrality_constraints`](@ref), [`SemiDefinitePhylogenyEstimator`](@ref), [`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogenyEstimator`](@ref), [`IntegerPhylogeny`](@ref), and [`CentralityConstraint`](@ref)
 - Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and asset set. [`weight_bounds_constraints`](@ref), [`WeightBoundsEstimator`](@ref), and [`WeightBounds`](@ref)
-- Container for asset set and group information used in constraint generation. [`AssetSets`](@ref)
+- Container for the universe axes and group information used in constraint generation. [`UniverseSets`](@ref)
 - ::: details Budget constraints [`BudgetEstimator`](@ref) and [`BudgetRange`](@ref)
   - Budget constraint that accounts for linear transaction costs. [`BudgetCosts`](@ref)
   - Budget constraint that accounts for non-linear (power-law) market impact costs. [`BudgetMarketImpact`](@ref)
@@ -393,12 +408,33 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
       Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer whose feature axis *is* the asset axis; its source is always an estimator, so every fold and subproblem refits the graph on its own universe. Exogenous square structure travels on [`ReturnsResult`](@ref) instead.
 
-      - Phylogeny feature algorithm giving each asset its `n`-hop neighbourhood indicator. [`BinaryNeighbourhood`](@ref)
-      - Phylogeny feature algorithm grading each asset's neighbourhood by hop count. [`GradedNeighbourhood`](@ref)
-    - ::: details Feature matrix producer reading exogenous taxonomy memberships off an [`AssetSets`](@ref). [`AssetSetsFeatures`](@ref), [`asset_sets_features`](@ref), and [`asset_sets_feature_names`](@ref)
+      - ::: details Phylogeny feature algorithm scoring each pair by how far apart it sits. [`Proximity`](@ref)
 
-      Stacks taxonomy memberships -- sector, industry, country -- from an [`AssetSets`](@ref) into the feature axis. The only *exogenous* rectangular source: a classification is structure return correlations do not contain, which is what a feature distance exists to bring in. Because every key is a partition, the rows have equal norms and the cosine similarity is exactly the fraction of classification levels two assets agree on. [`asset_sets_features`](@ref) is also public on its own, for building the matrix straight onto a [`ReturnsResult`](@ref).
+        Keeps the step count `phylogeny_matrix`'s clamp throws away, scoring each pair by how far apart it sits. `decay` shapes the fall-off and the source's `sep` truncates it -- two knobs, deliberately separate, because an exponential never reaches zero. Apart from [`NoDecay`](@ref) no decay emits zero inside the budget, so a zero entry means unreachable and nothing else.
 
+        - ::: details Separations: the open [`AbstractSeparationAlgorithm`](@ref) family, applied by [`separation_matrix`](@ref) and [`separation_budget`](@ref)
+
+          Carried by [`NetworkEstimator`](@ref) as `sep`. Says how far apart two assets sit *and* how far is too far, because the two share a unit. It sits on the network estimator rather than on the feature producer: every consumer of a network needs to know which pairs it relates, and the constraint path never sees the producer at all.
+
+          - Separation measured as the number of graph edges between two assets. [`HopCount`](@ref)
+          - [`PathLength`](@ref) sums the distances along the shortest path instead of counting its edges, and budgets in the distance estimator's units -- `dmax = nothing` means the observed diameter
+        - ::: details Separation decays: the open [`AbstractSeparationDecayAlgorithm`](@ref) family, applied by [`separation_decay`](@ref)
+
+          The argument is a *real* separation, so one family serves a hop count and any continuous separation alike. The contract -- `f(0) > 0` and maximal, monotone non-increasing, non-negative inside the budget, never assumed to reach zero -- is probed by a fail-safe fallback that the shipped members opt out of.
+
+          - Separation decay falling off linearly to the edge of the budget. [`LinearDecay`](@ref)
+          - Separation decay falling off exponentially. [`ExponentialDecay`](@ref)
+          - Separation decay falling off as a power of the separation. [`ReciprocalDecay`](@ref)
+          - [`NoDecay`](@ref) is the flat end of the dial, and *not* no truncation: the budget still cuts, so it yields the neighbourhood indicator
+    - ::: details Feature matrix producer reading exogenous taxonomy memberships off a [`UniverseSets`](@ref). [`AssetSetsFeatures`](@ref), [`asset_sets_features`](@ref), and [`asset_sets_feature_names`](@ref)
+
+      Stacks taxonomy memberships -- sector, industry, country -- from a [`UniverseSets`](@ref) into the feature axis. The only *exogenous* rectangular source: a classification is structure return correlations do not contain, which is what a feature distance exists to bring in. Because every key is a partition, the rows have equal norms and the cosine similarity is exactly the fraction of classification levels two assets agree on. [`asset_sets_features`](@ref) is also public on its own, for building the matrix straight onto a [`ReturnsResult`](@ref).
+
+      - ::: details Graded programs: `vals` as an ordered edge-authoring program over the axis declared at `sets.zkey`, resolved through [`resolve_feature_value`](@ref) on the open [`AbstractFeatureValue`](@ref) family
+
+        The same type's second contract, dispatched on `vals`' element type, and it strictly subsumes the key list -- an all-`1.0` program is bit-identical to stacking the same keys. Entries apply in order and every write is an overwrite, so **last wins**; targets are always fully qualified, node names are bare, and the declared axis makes `size(Z, 2)` fold-invariant. `strict` governs names only: an all-zero row and a one-column matrix are both legal.
+
+        - [`Scale`](@ref) multiplies the cell's *natural value* -- the key's own datum for a numeric key, membership otherwise -- where a bare `Number` sets it absolutely
 - ::: details Container type for high order prior results. [`HighOrderPrior`](@ref)
   - High order prior estimator for asset returns. [`HighOrderPriorEstimator`](@ref)
   - Represents the High Order Factor Prior Estimator. [`HighOrderFactorPriorEstimator`](@ref)
@@ -1004,8 +1040,8 @@ Visualising the results is quite a useful way of summarising the portfolio chara
   - Bar chart of eigenvalues of the covariance/correlation matrix, sorted in descending order. [`plot_eigenspectrum`](@ref)
   - Three-panel composite plot summarising a prior result: [`plot_prior`](@ref)
 - ::: details Factor models
-  - Bar chart of per-factor expected returns (the `f_mu` vector from a factor model prior). [`plot_factor_mu`](@ref)
-  - Correlation/covariance heatmap of the factor covariance matrix (`pr.f_sigma`). [`plot_factor_sigma`](@ref)
+  - Bar chart of per-factor expected returns (`pr.fpr.mu`, from a factor model prior). [`plot_factor_mu`](@ref)
+  - Correlation/covariance heatmap of the factor covariance matrix (`pr.fpr.sigma`). [`plot_factor_sigma`](@ref)
   - Heatmap of the factor loadings matrix B (assets × factors) from a prior with a regression model. [`plot_factor_loadings`](@ref)
 - ::: details Phylogeny
   - Plot the asset network (MST, PMFG, TMFG, or adjacency) as a graph using `GraphRecipes.graphplot`. [`plot_network`](@ref)

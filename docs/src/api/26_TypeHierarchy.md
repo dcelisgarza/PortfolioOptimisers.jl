@@ -375,6 +375,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AssetSetsMatrixEstimator](@ref)
 
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ExposureConstraintEstimator](@ref)
+
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[JuMPConstraintEstimator](@ref)
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[BudgetConstraintEstimator](@ref)
@@ -667,8 +669,6 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[NormalUncertaintySet](@ref)
 
-├──&nbsp;[AssetSets](@ref)
-
 ├──&nbsp;[CokurtosisEstimator](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[Cokurtosis](@ref)
@@ -805,6 +805,8 @@ its docstring.
 
 ├──&nbsp;[TurnoverEstimator](@ref)
 
+├──&nbsp;[UniverseSets](@ref)
+
 └──&nbsp;[WindowSizeEstimator](@ref)
 
 ```@raw html
@@ -839,11 +841,21 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[HacineGharbiRavier](@ref)
 
+├──&nbsp;[AbstractCentralityPolarity](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[DistancePolarity](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[SimilarityPolarity](@ref)
+
 ├──&nbsp;[AbstractCollapseAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[MeanCollapse](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[MedianCollapse](@ref)
+
+├──&nbsp;[AbstractConstraintSpace](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[FactorSpace](@ref)
 
 ├──&nbsp;[AbstractDenoiseAlgorithm](@ref)
 
@@ -912,6 +924,10 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[LastObservation](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[StackObservations](@ref)
+
+├──&nbsp;[AbstractFeatureValue](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[Scale](@ref)
 
 ├──&nbsp;[AbstractMatrixProcessingAlgorithm](@ref)
 
@@ -1019,9 +1035,7 @@ its docstring.
 
 ├──&nbsp;[AbstractPhylogenyFeatureAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[BinaryNeighbourhood](@ref)
-
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[GradedNeighbourhood](@ref)
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[Proximity](@ref)
 
 ├──&nbsp;[AbstractPreorderBy](@ref)
 
@@ -1084,6 +1098,22 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[RankRule](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[ThresholdRule](@ref)
+
+├──&nbsp;[AbstractSeparationAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[HopCount](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PathLength](@ref)
+
+├──&nbsp;[AbstractSeparationDecayAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ExponentialDecay](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LinearDecay](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[NoDecay](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ReciprocalDecay](@ref)
 
 ├──&nbsp;[AbstractSimilarityMatrixAlgorithm](@ref)
 

@@ -51,9 +51,9 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 rd = prices_to_returns(X)
 prices = vec(values(X)[end, :])
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "energy" => ["CVX", "XOM", "RRC"],
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "energy" => ["CVX", "XOM", "RRC"],
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 view_prior = EntropyPoolingPrior(; sets = sets,
                                  mu_views = LinearConstraintEstimator(;
                                                                       val = ["healthcare >= energy"]))

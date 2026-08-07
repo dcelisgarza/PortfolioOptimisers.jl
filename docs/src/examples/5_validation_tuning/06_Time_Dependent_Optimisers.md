@@ -347,12 +347,12 @@ the number of clusters, and the outer optimiser's `WeightBoundsEstimator` will u
 algorithm to cap the weights dynamically to the number of clusters.
 
 ````@example 06_Time_Dependent_Optimisers
-inner_sets = AssetSets(; dict = Dict("nx" => rd.nx))
+inner_sets = UniverseSets(; dict = Dict("nx" => rd.nx))
 inner_minvar = MeanRisk(; obj = MinimumRisk(),
                         opt = JuMPOptimiser(; slv = slv, sets = inner_sets,
                                             wb = WeightBoundsEstimator(; lb = 0,
                                                                        ub = UniformValues())))
-outer_sets = AssetSets(; dict = Dict("nx" => ["placeholder"]))
+outer_sets = UniverseSets(; dict = Dict("nx" => ["placeholder"]))
 outer_minvar = MeanRisk(; obj = MinimumRisk(),
                         opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
                                             wb = WeightBoundsEstimator(; lb = 0,
@@ -374,11 +374,11 @@ served.
 schedule goes on an **element** of `opti`, not the field (a field-level schedule would change
 the number of candidates per fold, and the outer optimiser's inputs would stop lining up). For
 this optimiser, we always know how many inner folds there will be so it is the user's responsibility
-to provide the correct number of entries in the [`AssetSets`](@ref) instance, here we use two inner
+to provide the correct number of entries in the [`UniverseSets`](@ref) instance, here we use two inner
 optimisers, so the synthetic asset names are `_1` and `_2`.
 
 ````@example 06_Time_Dependent_Optimisers
-outer_sets = AssetSets(; dict = Dict("nx" => ["_1", "_2"]))
+outer_sets = UniverseSets(; dict = Dict("nx" => ["_1", "_2"]))
 outer_minvar = MeanRisk(; obj = MinimumRisk(),
                         opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
                                             wb = WeightBoundsEstimator(; lb = 0,

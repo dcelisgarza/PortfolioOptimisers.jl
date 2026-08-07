@@ -23,7 +23,7 @@ In `PortfolioOptimisers`, [`EntropyPoolingPrior`](@ref) accepts a separate
 `sigma_views` is the **variance**, `var_views` is the **Value at Risk** and `cvar_views` the
 **Conditional VaR** (tail-risk views), `sk_views`/`kt_views` are skewness/kurtosis, and
 `cov_views`/`rho_views` target covariances/correlations. Each is a list of string constraints
-over the [`AssetSets`](@ref) names.
+over the [`UniverseSets`](@ref) names.
 
 !!! tip "When to reach for this"
     Reach for entropy pooling when your views are richer than "the mean will be x": views on
@@ -67,12 +67,12 @@ rd = prices_to_returns(X)
 ## 2. Naming assets and groups
 
 As with Black–Litterman, views reference assets and groups by name through an
-[`AssetSets`](@ref).
+[`UniverseSets`](@ref).
 
 ````@example 07_Entropy_Pooling
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX"]))
 ````
 
 ## 3. Views on several moments
