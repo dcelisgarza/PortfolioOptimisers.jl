@@ -687,6 +687,11 @@ Every target names its column in full, so this reads left to right with no ambie
   - [`feature_write!`](@ref)
   - [`Scale`](@ref)
 """
+function feature_target!(Z::Matrix{Float64}, rows, target, sets::UniverseSets, nx, nz, zidx,
+                         pool, strict::Bool)::Nothing
+    throw(ArgumentError(feature_grammar_msg(target)))
+    return nothing
+end
 function feature_target!(Z::Matrix{Float64}, rows, target::Pair, sets::UniverseSets, nx, nz,
                          zidx, pool, strict::Bool)::Nothing
     k, rest = target
@@ -733,7 +738,7 @@ function feature_target!(Z::Matrix{Float64}, rows, target::Pair, sets::UniverseS
     end
     return nothing
 end
-function feature_target!(Z::Matrix{Float64}, rows, targets::AbstractVector{<:Pair},
+function feature_target!(Z::Matrix{Float64}, rows, targets::AbstractVector,
                          sets::UniverseSets, nx, nz, zidx, pool, strict::Bool)::Nothing
     for t in targets
         feature_target!(Z, rows, t, sets, nx, nz, zidx, pool, strict)
