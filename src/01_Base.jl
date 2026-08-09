@@ -92,8 +92,8 @@ const arg_dict = Dict(
                       :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
                       :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
                       # Priors.
-                      :pe  => "`pe`: Prior estimator.",#
-                      :pr  => "`pr`: Prior result.",#
+                      :pe => "`pe`: Prior estimator.",#
+                      :pr => "`pr`: Prior result.",#
                       :per => "`pr`: Prior estimator or result.",#
                       # Phylogeny.
                       :cle => "`cle`: Clusters estimator.",#
@@ -2265,6 +2265,20 @@ Alias for a union of a function type or a numeric type or an abstract vector of 
   - [`Func_VecNum`](@ref)
 """
 const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for custom value algorithms. These are user defined algorithms that return a custom value for an estimator.
+
+The interfaces users must implement depend on the estimator type.
+"""
+abstract type AbstractCustomValue <: AbstractAlgorithm end
+"""
+    const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
+
+Alias for the union of `AbstractCustomValue` and `Func_Num_VecNum`. This is used to define the type of the `val` field in [`CustomValueExpectedReturns`](@ref).
+"""
+const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
 """
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 

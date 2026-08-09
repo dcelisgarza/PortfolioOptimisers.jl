@@ -144,21 +144,11 @@ The library is configured to allow for different workflows. There is no rigid st
 
 It is worth noting that the preprocessing and processing steps can be bundled into a single pipeline step, which can also be used standalone or in a cross-validation framework, which can be used to tune the hyperparameters of the entire preprocessing and processing stacks together.
 
-== Phylogeny statistics
-
-These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and derive insights from it which can be used . Clustering and network analysis, though different tackle similar issues from different, complementary angles. The same analysis techniques can be used to exploit the structure each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include first and second order distances as defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl] API. The clustering and network analysis methods include:
-
-- Hierarchical agglomerative clustering.
-- Direct bubble hierarchy trees.
-- K-mean clustering.
-- Minimum spanning trees.
-- Planar maximally filtered graphs.
-
 == Constraint generation
 
 The library provides a large number of constraint generation methods. It makes it possible to use the type system to define dynamic constraints as well as letting the user write equations in natural language.
 
-== Moments and prior statistics
+== Moments
 
 #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] comes with a large number of moment estimation and prior statistics methods. It leverages #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]'s covariance estimator defintions and API to allow interoperability with the Julia ecosystem, for example by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They include a large number of methods, which can be combined in many ways. It's possible to compute the expected returns using a specific covariance method and vice-versa.
 
@@ -172,11 +162,33 @@ The library provides a large number of constraint generation methods. It makes i
 - Rank based.
 - Coskewness and cokurtosis.
 
+== Distance and phylogeny statistics
+
+These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and derive insights from it which can be used . Clustering and network analysis, though different tackle similar issues from different, complementary angles. The same analysis techniques can be used to exploit the structure each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include first and second order distances as defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl] API. The clustering and network analysis methods include:
+
+- Distance, distance-of-distance and similarity matrices.
+- Hierarchical agglomerative clustering.
+- Direct bubble hierarchy trees.
+- K-means clustering.
+- Minimum spanning trees.
+- Planar maximally filtered graphs.
+- Centrality and community detection.
+
+== Prior statistics
+
 The prior statistics fall under three categories:
 
 - Frequentist: Empirical and timeseries factor models for low and high moments.
 - Bayesian: Black-Litterman, vanilla, factor, Bayesian and Augmented.
 - Information-theoretic: Entropy pooling, opinion pooling.
+
+== Uncertainty sets
+
+Uncertainty sets are used for robust optimisation. They ameliorate the sensitivity to estimation errors. They only cover expected returns and covariance. The library provides three types of uncertainty sets:
+
+- Box: This is the simplest uncertainty set, it is defined by a lower and upper bound for each parameter.
+- Ellipsoidal: This is a more complex uncertainty set, it is defined by a radius and a covariance matrix, forming an ellipsoid in the parameter space.
+- Characteristic: Applies an L1 uncertainty set to the expected returns. This will eventually be generalised to any characteristic vector.
 
 == Optimisers
 
@@ -188,18 +200,31 @@ The prior statistics fall under three categories:
 + Meta-optimisers: These consume other optimisers and combine their results in order to produce a better result. They are typically slower than other optimisers, but can be very effective in finding good solutions.
 + Finite optimisers: These do not optimise portfolios in the traditional sense, but rather let the user specify a finite cash amount, as well as the asset prices and other options, and compute the best portfolio that can be constructed with the given cash amount. They are used after the others have produced a result.
 
-== Constraints and penalties
+== Constraints, objectives, and penalties
 
-There is a huge variety of constraints. Every optimiser supports weight bounds constraints, all but the naïve ones also support fees. However, the richness of the constraints is in the #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators. They can be divided into a few categories:
+There is a huge variety of constraints. Every optimiser supports weight bounds constraints, but most of the richness of the constraints is exclusive to #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators. They can be divided into a few categories:
 
-+ Upper/lower bounds: These limit the maximum and minimum weights of the assets in the portfolio. Their implementation differs depending on the optimiser, but in #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators they are implemented as linear constraints.
++ Weight upper/lower bounds: These limit the maximum and minimum weights of the assets in the portfolio. Their implementation differs depending on the optimiser, but in #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators they are implemented as linear constraints.
 + Budget: These limit the total value of the weights of the portfolio. They integrate seamlessly with the finite optimisers in that they adjust the available cash based on the portfolio's budget. Together with bounds and linear constraints, they can be used to implement leveraged, dollar-neutral, and other types of portfolios.
 + Linear constraints: These are used in a variety of contexts, as risk contribution constraints, weight bounds, and relational structure constraints.
 + Cardinality constraints: These these can enforce sparsity, buy-in thresholds, inclusion/exclusion constraints. They can operate at the level of assets, or sets of assets. They are implemented as linear mixed integer constraints.
-+ Fees: These penalise the return of the portfolio (thus indirectly penalise certain risk measures and objective functions). They include long and short proportional, long and short fixed, and turnover fees.
++ Fees: These penalise the returns of the portfolio (thus indirectly penalise certain risk measures and objective functions). They include long and short proportional, long and short fixed, and turnover fees.
 + Weight penalties: These apply L-norm penalties to the objective function, or limit the L-norm of the weights of the portfolio. They can be used to regulate the sparsity and robustness of the portfolio.
 + Tracking and turnover: These limit how much a portfolio can deviate from a reference.
-+ Time dependent: Every constraint and nonfinite optimiser can be wrapped in a time-dependent wrapper, which lets them vary across cross-validation folds. They can be provided as pre-defined lists, or as a function/functor which ingests the fold's context and returns an optimiser. This can be used to adjust or swap constraints/optimisers according to the fold's context and previous portfolio's weights. When using the functor design, it is possible to keep a cache with past optimisers or configurations. The context may be expanded to include other information if needed in the future.
++ Objectives: Some optimisers support different objective functions:
+  + Minimum risk: This minimises a risk expression, which can be a risk measure or a scalarisation of a vector of risk measures.
+  + Maximum returns: This maximises the return expression, which can be in the form of arithmetic or logarithmic returns.
+  + Maximum risk-adjusted returns: This maximises the ratio between the return expression minus the risk free rate and risk expression.
+  + Maximum utility: This maximises the difference between the return expressiion minus a scaled risk expression.
++ Risk upper and return lower bounds: These can be used to limit the risk(s) (for all compatible risk measures) and/or return of the portfolio and can be applied simultaneously. Can be bounded by a scalar, precomputed vector/range, or a frontier object which lets the optimiser compute the bounds on the fly depending on the model's other constraints. When bounding more than one quantity with arrays/ranges or frontiers, the library will compute a grid of bounds representing a pareto (hyper-)surface and will return a vector of results corresponding to the flattened grid.
++ Custom constraint and objective: User defined constraints and objective penalties that take in the optimiser's context.
++ Time dependent: Every constraint and nonfinite optimiser can be wrapped in a time-dependent wrapper, which lets them vary across cross-validation folds. They can be provided as pre-defined lists, or as a function/functor which ingests the fold's context and returns an optimiser. This can be used to adjust or swap constraints/optimisers according to the fold's context and previous portfolio's weights. When using the functor design, it is possible to keep a cache with past optimisers or configurations. The context may be expanded in the future to include more information.
+
+== Cross-validation, hyperparameter tuning, and pipelines
+
+The library comes equipped with a pipeline framework that can run an entire strategy end to end. It also comes equipped with a cross-validation prediction framework that can be used to evaluate the out of sample performance of an optimisation or pipeline. Cross validation can also be used in the nested clusters and stacking meta-optimisers to compute the predicted results on which the outer optimisation.
+
+The hyperparameter tuning framework is built on top of the cross-validation framework, and can be used to tune the hyperparameters of an optimiser or pipeline intuitively. Users can use indexes or names to specify which steps, and name the fields of the hyperparameters to be tuned. It is possible to use a grid search by providing grids of values, or random search which can take grids and/or distributions (#link("https://github.com/JuliaStats/Distributions.jl")[Distributions.jl]) from which to sample.
 
 == Design philosophy
 
@@ -220,81 +245,10 @@ The strict adherence to a well-defined type hierarchy lets developers and users 
 
 The code is available under an MIT license via the Julia General registry. It follows common software development best practices:
 
-+ An extensive and high coverage test suite.
-+ Automated documentation builds with an introductory user guide and deep examples, as well as a completely documented public and private API.
++ An extensive and high #link("https://app.codecov.io/gh/dcelisgarza/PortfolioOptimisers.jl")[coverage] test suite.
++ Automated documentation builds with an programatically generated #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue")[capability catalogue], introductory #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/00_User_Guide")[user guide], #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples")[deep examples], and fully documented public and private #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API")[APIs].
 + Miscelaneous code quality checks.
 
 All as part of a GitHub continuous integration pipeline. It is under active development, and receives regular updates and improvements.
 
-= Equations
-
-The template uses #link("https://typst.app/universe/package/i-figured/")[`i-figured`] for labeling equations. Equations will be numbered only if they are labelled. Here is an equation with a label:
-
-$
-  sum_(k=1)^n k = (n(n+1)) / 2
-$<equation>
-
-We can reference it by `@eq:label` like this: @eq:equation, i.e., we need to prepend the label with `eq:`. The number of an equation is determined by the section it is in, i.e. the first digit is the section number and the second digit is the equation number within that section.
-
-Here is an equation without a label:
-
-$
-  exp(x) = sum_(n=0)^oo (x^n) / n!
-$
-
-As we can see, it is not numbered.
-
-= Theorems
-
-The template uses #link("https://typst.app/universe/package/great-theorems/")[`great-theorems`] for theorems. Here is an example of a theorem:
-
-#theorem(title: "Example Theorem")[
-  This is an example theorem.
-]<th:example>
-#proof[
-  This is the proof of the example theorem.
-]
-
-
-We also provide `definition`, `lemma`, `remark`, `example`, and `question`s among others. Here is an example of a definition:
-
-#definition(title: "Example Definition")[
-  This is an example definition.
-]
-
-#question(title: "Custom mathblock?")[
-  How do you define a custom mathblock?
-]
-
-#let answer = my-mathblock(
-  blocktitle: "Answer",
-  bodyfmt: text.with(style: "italic"),
-)
-
-#answer[
-  You can define a custom mathblock like this:
-  ```typst
-  #let answer = my-mathblock(
-    blocktitle: "Answer",
-    bodyfmt: text.with(style: "italic"),
-  )
-  ```
-]
-
-Similar as for the equations, the numbering of the theorems is determined by the section they are in. We can reference theorems by `@label` like this: @th:example.
-
-To get a bibliography, we also add a citation.
-
-#lorem(50)
-
 #bibliography("refs.bib")
-
-// Create appendix section
-#show: appendices
-=
-
-If you have appendices, you can add them after `#show: appendices`. The appendices are started with an empty heading `=` and will be numbered alphabetically. Any appendix can also have different subsections.
-
-== Appendix section
-
-#lorem(100)

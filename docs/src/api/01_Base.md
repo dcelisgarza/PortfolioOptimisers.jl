@@ -14,7 +14,6 @@ PortfolioOptimisers
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
-DynamicAbstractWeights
 ```
 
 ## Configuration
@@ -58,6 +57,8 @@ pretty_show_vector_body
 Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types and utilities are non-specific and used throughout the library.
 
 ```@docs
+DynamicAbstractWeights
+AbstractCustomValue
 VecScalar
 AbstractEstimatorValueAlgorithm
 get_observation_weights
@@ -144,6 +145,7 @@ VecNum_MatNum
 MatNum_Arr3Num
 Num_VecNum
 Func_Num_VecNum
+CVal_Func_Num_VecNum
 Num_ArrNum
 PairStrNum
 DictStrNum

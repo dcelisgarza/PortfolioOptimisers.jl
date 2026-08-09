@@ -31,6 +31,10 @@ The map is exact, but **only for the bare problem** the closed forms assume: the
   - [`AbstractUncertaintyEpsAlgorithm`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct ActiveAssetsUncertaintyAlgorithm <: AbstractUncertaintyEpsAlgorithm
     """
@@ -105,6 +109,10 @@ This set bounds a *mean/characteristic* vector. It has no covariance analogue, s
   - [`CharacteristicUncertaintySet`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct L1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -180,6 +188,10 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares
   - [`L1UncertaintySet`](@ref)
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct SignedL1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -251,6 +263,10 @@ Using the wrong one mis-calibrates the radius; it does not make the optimisation
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct L1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -311,6 +327,10 @@ Keywords correspond to the struct's fields.
   - [`SignedL1UncertaintySet`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct SignedL1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -390,6 +410,10 @@ This estimator is **mean-only**. [`ucs`](@ref) and [`sigma_ucs`](@ref) are defin
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`mu_ucs`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct CharacteristicUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -424,6 +448,10 @@ Return the vector `g` whose `k`-th entry is the radius at which the `k`-th asset
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_activation_ladder(mu::VecNum, sd::Option{<:VecNum})
     N = length(mu)
@@ -438,6 +466,10 @@ Convert an `active` target — a count or a fraction of the universe — into an
 # Related
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
     q = isa(active, Integer) ? Int(active) : round(Int, active * N)
@@ -456,6 +488,10 @@ Throws when the target interval is empty, which happens when the characteristic 
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
   - [`l1_activation_ladder`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_eps_from_ladder(method::Number, args...)
     return method
@@ -466,14 +502,14 @@ function l1_eps_from_ladder(method::ActiveAssetsUncertaintyAlgorithm, ladder::Ve
     @argcheck(L >= 1, IsEmptyError("activation ladder cannot be empty"))
     q = clamp(q, 1, L)
     if q < L
-        lo, hi = ladder[q], ladder[q + 1]
+        lo, hi = ladder[q], ladder[q+1]
         @argcheck(hi > lo,
                   DomainError(method.active,
                               "cannot calibrate a radius for $(q) active entries: the characteristic has ties across the cut, so the interval ($(lo), $(hi)) required by the closed form is empty. Break the tie, or pass an explicit radius."))
         return (lo + hi) / 2
     end
     # Top of the ladder: any radius above ladder[end] activates everything.
-    return L == 1 ? one(eltype(ladder)) : ladder[L] + (ladder[L] - ladder[L - 1]) / 2
+    return L == 1 ? one(eltype(ladder)) : ladder[L] + (ladder[L] - ladder[L-1]) / 2
 end
 """
     l1_resolve_eps(method, mus::VecNum, sds::Option{<:VecNum}, paired::Bool)
@@ -487,6 +523,10 @@ Resolve a radius from a [`Num_UcSEps`](@ref) against the characteristic vector.
   - [`l1_activation_ladder`](@ref)
   - [`l1_eps_from_ladder`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_resolve_eps(method::Number, args...)
     return method
@@ -501,12 +541,12 @@ function l1_resolve_eps(method::ActiveAssetsUncertaintyAlgorithm, mus::VecNum,
     half = N ÷ 2
     @argcheck(half >= 1,
               ArgumentError("a paired radius calibration needs at least 2 assets, got $N"))
-    ladder = (l1_activation_ladder(mus, sds) + l1_activation_ladder(reverse(-mus),
-                                                                    if isnothing(sds)
-                                                                        nothing
-                                                                    else
-                                                                        reverse(sds)
-                                                                    end))[1:half]
+    ladder = (l1_activation_ladder(mus, sds)+l1_activation_ladder(reverse(-mus),
+                                                                  if isnothing(sds)
+                                                                      nothing
+                                                                  else
+                                                                      reverse(sds)
+                                                                  end))[1:half]
     # `active` counts assets, but each paired ladder entry activates a long/short pair.
     q = if isa(method.active, Integer)
         max(Int(method.active) ÷ 2, 1)
@@ -547,8 +587,7 @@ function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:L1UncertaintySetAlgori
     alg = ue.alg
     sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
     idx = sortperm(pr.mu; rev = true)
-    eps = l1_resolve_eps(alg.method, pr.mu[idx], isnothing(sd) ? nothing : sd[idx],
-                         alg.paired)
+    eps = l1_resolve_eps(alg.method, pr.mu[idx], alg.scaled ? sd[idx] : nothing, alg.paired)
     return L1UncertaintySet(; eps = eps, sd = sd)
 end
 function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySetAlgorithm},
@@ -563,8 +602,7 @@ function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySet
     # short leg, calibrated against the bottom — i.e. the top of the reversed, negated
     # ranking, which is the same ladder read from the other end (Corollary 13).
     en = l1_resolve_eps(alg.mm, mus, sds, false)
-    ep = l1_resolve_eps(alg.mp, reverse(-mus), isnothing(sds) ? nothing : reverse(sds),
-                        false)
+    ep = l1_resolve_eps(alg.mp, reverse(-mus), alg.scaled ? reverse(sds) : nothing, false)
     return SignedL1UncertaintySet(; ep = ep, en = en, sd = sd)
 end
 """
