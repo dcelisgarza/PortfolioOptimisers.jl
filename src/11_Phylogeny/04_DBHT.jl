@@ -48,7 +48,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DBHT(;
-        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
         root::DBHTRootMethod = UniqueRoot()
     ) -> DBHT
 
@@ -66,6 +66,7 @@ DBHT
 # Related
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
@@ -78,16 +79,17 @@ DBHT
     """
     $(field_dict[:sim])
     """
-    sim
+    sim <: AbstractNonNegativeSimilarityMatrixAlgorithm
     """
     $(field_dict[:root])
     """
     root
-    function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
+    function DBHT(sim::AbstractNonNegativeSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
     end
 end
-function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+function DBHT(;
+              sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               root::DBHTRootMethod = UniqueRoot())::DBHT
     return DBHT(sim, root)
 end
@@ -100,13 +102,20 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # Arguments
 
-  - `W`: `N × N` matrix of non-negative weights (e.g., similarity or absolute correlation matrix).
+  - `W`: `N × N` matrix of non-negative, finite weights (e.g. a similarity matrix from an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), or an absolute correlation matrix).
   - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
 
 # Validation
 
   - `N >= 9` is required for a meaningful PMFG.
-  - All entries in `W` must be non-negative.
+  - No entry in `W` is `NaN`.
+  - All entries in `W` are non-negative.
+
+# The checks are a backstop, not the enforcement
+
+Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or at the seam, with a message that names the configuration rather than `W`.
+
+These two checks are kept for the case those cannot cover: that family is open **by declaration**, so an extension can subtype it and return a negative anyway. The failure downstream is silent — `DirectHb` sums signed mass and a cancelling row manufactures a separating bubble — so a wrong clustering would come back with no error at all.
 
 # Details
 
@@ -132,8 +141,12 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     N = size(W, 1)
     @argcheck(9 <= N, DimensionMismatch("9 <= size(W, 1) must hold. Got\nsize(W, 1) => $N"))
+    # Split in two, because `0 <= NaN` is `false`: one check would report a `NaN` as a
+    # negative weight and send the caller looking for the wrong thing.
+    @argcheck(!any(isnan, W),
+              DomainError("!any(isnan, W) must hold. Got\ncount(isnan, W) => $(count(isnan, W))."))
     @argcheck(all(x -> zero(x) <= x, W),
-              DomainError("all(x -> x >= 0, W) must hold. Got\nall(x -> x >= 0, W) => $(all(x -> zero(x) <= x, W))."))
+              DomainError("all(x -> x >= 0, W) must hold. Got\nminimum(W) => $(minimum(W))."))
     A = SparseArrays.spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -1606,6 +1619,7 @@ This method computes the similarity and distance matrices from the input data ma
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                     branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
+    assert_similarity_domain(cle.alg.sim, cle.de, D)
     S = distance_to_similarity(cle.alg.sim; S = S, D = D)
     res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, res, D)
@@ -1650,7 +1664,7 @@ $(DocStringExtensions.FIELDS)
 
     LoGo(;
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
         pdm::Option{<:Posdef} = Posdef()
     ) -> LoGo
 
@@ -1674,6 +1688,7 @@ LoGo
 
   - [`InverseMatrixSparsificationAlgorithm`](@ref)
   - [`AbstractDistanceEstimator`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
   - [`ExponentialSimilarity`](@ref)
@@ -1687,18 +1702,19 @@ LoGo
     """
     $(field_dict[:sim])
     """
-    sim
+    sim <: AbstractNonNegativeSimilarityMatrixAlgorithm
     """
     $(field_dict[:pdm])
     """
     pdm
-    function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
+    function LoGo(de::AbstractDistanceEstimator,
+                  sim::AbstractNonNegativeSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())
         return new{typeof(de), typeof(sim), typeof(pdm)}(de, sim, pdm)
     end
 end
 function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+              sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               pdm::Option{<:Posdef} = Posdef())
     return LoGo(de, sim, pdm)
 end
@@ -1816,6 +1832,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
         sigma
     end
     D = distance(je.de, S, X; dims = dims, kwargs...)
+    assert_similarity_domain(je.sim, je.de, D)
     S = distance_to_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I

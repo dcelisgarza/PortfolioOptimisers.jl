@@ -774,19 +774,24 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 """
-    const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
+    const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
+                              <:AbstractTreeType}
 
 Alias for a tree or similarity matrix algorithm.
 
-Matches either an [`AbstractSimilarityMatrixAlgorithm`](@ref) or an [`AbstractTreeType`](@ref). Used for dispatch in phylogeny estimation where either a spanning tree or a similarity matrix approach may be used.
+Matches either an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) or an [`AbstractTreeType`](@ref). Used for dispatch in phylogeny estimation where either a spanning tree or a similarity matrix approach may be used.
+
+The similarity half is the **narrow** family, not [`AbstractSimilarityMatrixAlgorithm`](@ref): the similarity branch builds a PMFG, whose consumers cannot take a negative weight. So [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) and [`ComplementSimilarity`](@ref) match, and [`AngularSimilarity`](@ref) does not.
 
 # Related
 
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractTreeType`](@ref)
   - [`NetworkEstimator`](@ref)
 """
-const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
+const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
+                          <:AbstractTreeType}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1099,7 +1104,8 @@ NetworkEstimator
 
   - [`AbstractNetworkEstimator`](@ref)
   - [`AbstractTreeType`](@ref)
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
+  - [`Tree_SimMat`](@ref)
 """
 @propagatable @concrete struct NetworkEstimator <: AbstractNetworkEstimator
     """
@@ -1113,7 +1119,7 @@ NetworkEstimator
     """
     $(field_dict[:ntalg])
     """
-    alg
+    alg <: Tree_SimMat
     """
     $(field_dict[:ntsep])
     """
@@ -1202,7 +1208,8 @@ NetworkClustersEstimator
 
   - [`AbstractNetworkEstimator`](@ref)
   - [`AbstractTreeType`](@ref)
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
+  - [`Tree_SimMat`](@ref)
 """
 @propagatable @concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
     """
@@ -1393,7 +1400,8 @@ function graph_weight_matrix(D::MatNum)
 end
 """
     calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
-    calc_weighted_adjacency_graph(alg::AbstractSimilarityMatrixAlgorithm, S::MatNum)
+    calc_weighted_adjacency_graph(alg::AbstractNonNegativeSimilarityMatrixAlgorithm,
+                                  S::MatNum)
     calc_weighted_adjacency_graph(nte::NetworkEstimator, X::MatNum; dims::Int = 1,
                                   kwargs...)
 
@@ -1406,7 +1414,7 @@ This is the **one construction site** of that structure. [`calc_weighted_adjacen
 Each branch keeps **the quantity that selected its own edges**, and the two quantities run in opposite directions.
 
   - `alg::AbstractTreeType`: [`calc_mst`](@ref) minimises the distance, so the weights are **distances**. Small means closely related.
-  - `alg::AbstractSimilarityMatrixAlgorithm`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
+  - `alg::AbstractNonNegativeSimilarityMatrixAlgorithm`: [`PMFG_T2s`](@ref) maximises the gain over the similarity, so the weights are **similarities**. Large means closely related.
 
 Re-weighting either branch with the other quantity would weight a structure by the quantity that did not select it, so neither is converted. The result carries no polarity tag, because the polarity is recoverable by dispatch on the algorithm.
 
@@ -1451,7 +1459,8 @@ function calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
     return G[calc_mst(alg, G)]
 end
-function calc_weighted_adjacency_graph(alg::AbstractSimilarityMatrixAlgorithm, S::MatNum)
+function calc_weighted_adjacency_graph(::AbstractNonNegativeSimilarityMatrixAlgorithm,
+                                       S::MatNum)
     return SimpleWeightedGraphs.SimpleWeightedGraph(PMFG_T2s(S)[1])
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
@@ -1462,9 +1471,10 @@ function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                   kwargs...))
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
-                                                             <:AbstractSimilarityMatrixAlgorithm},
+                                                             <:AbstractNonNegativeSimilarityMatrixAlgorithm},
                                        X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    assert_similarity_domain(nte.alg, nte.de, D)
     return calc_weighted_adjacency_graph(nte.alg,
                                          distance_to_similarity(nte.alg; S = S, D = D))
 end
@@ -1483,7 +1493,7 @@ The two entry points are [`calc_weighted_adjacency_graph`](@ref)'s two entry poi
 # Arguments
 
   - `alg`: Tree or similarity matrix algorithm.
-  - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractSimilarityMatrixAlgorithm`](@ref).
+  - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
   - `nte`: Network estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -1582,9 +1592,10 @@ function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
     return calc_weighted_adjacency_graph(nte, X; dims = dims, kwargs...)
 end
 function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
-                                                            <:AbstractSimilarityMatrixAlgorithm},
+                                                            <:AbstractNonNegativeSimilarityMatrixAlgorithm},
                                       X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    assert_similarity_domain(nte.alg, nte.de, D)
     S = distance_to_similarity(nte.alg; S = S, D = D)
     # `PMFG_T2s` selects the edges from the similarity; `D` then supplies their lengths. The
     # repair is `calc_weighted_adjacency_graph`'s tree-branch one, needed here for the same
@@ -1818,7 +1829,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
 end
 """
     clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
-                                                                <:AbstractSimilarityMatrixAlgorithm,
+                                                                <:AbstractNonNegativeSimilarityMatrixAlgorithm,
                                                                 <:HopCount}},
                X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 
@@ -1847,7 +1858,7 @@ The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`]
 # Related
 
   - [`NetworkClustersEstimator`](@ref)
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`Clusters`](@ref)
   - [`_clusterise`](@ref)
   - [`calc_weighted_adjacency`](@ref)
@@ -1856,10 +1867,11 @@ The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`]
   - [`HopCount`](@ref)
 """
 function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
-                                                                     <:AbstractSimilarityMatrixAlgorithm,
+                                                                     <:AbstractNonNegativeSimilarityMatrixAlgorithm,
                                                                      <:HopCount}},
                     X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
+    assert_similarity_domain(nte.nte.alg, nte.nte.de, D)
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
     # The similarity is the PMFG branch's selecting quantity. See the tree method.
@@ -2118,7 +2130,7 @@ function centrality_graph(::DistancePolarity, nte::AbstractNetworkEstimator, X::
 end
 function centrality_graph(::SimilarityPolarity,
                           nte::NetworkEstimator{<:Any, <:Any,
-                                                <:AbstractSimilarityMatrixAlgorithm},
+                                                <:AbstractNonNegativeSimilarityMatrixAlgorithm},
                           X::MatNum; dims::Int = 1, kwargs...)
     return calc_weighted_adjacency_graph(nte, X; dims = dims, kwargs...)
 end

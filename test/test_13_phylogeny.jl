@@ -46,6 +46,206 @@
               PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
         @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
     end
+    @testset "Non-negative similarity interface (#239)" begin
+        nonneg = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                  GeneralExponentialSimilarity(), ComplementSimilarity())
+        # Four of the five members are in the interface; `AngularSimilarity` is out, and
+        # stays in the wider family it was always in.
+        for sim in nonneg
+            @test sim isa AbstractNonNegativeSimilarityMatrixAlgorithm
+            @test sim isa AbstractSimilarityMatrixAlgorithm
+            @test sim isa PortfolioOptimisers.Tree_SimMat
+        end
+        @test !isa(AngularSimilarity(), AbstractNonNegativeSimilarityMatrixAlgorithm)
+        @test AngularSimilarity() isa AbstractSimilarityMatrixAlgorithm
+        @test !isa(AngularSimilarity(), PortfolioOptimisers.Tree_SimMat)
+        @test AbstractNonNegativeSimilarityMatrixAlgorithm <:
+              AbstractSimilarityMatrixAlgorithm
+        # Both abstract types are exported, so an extension can subtype the interface
+        # without reaching through the module prefix.
+        for T in (:AbstractSimilarityMatrixAlgorithm,
+                  :AbstractNonNegativeSimilarityMatrixAlgorithm)
+            @test T in names(PortfolioOptimisers)
+        end
+        #=
+        Issue #239's own reproduction. It reported `NetworkEstimator`, but the blast radius
+        is three estimators: `DBHT` and `LoGo` reach `PMFG_T2s` by their own routes. All
+        three now fail at *construction*, naming the caller's keyword, rather than inside
+        `PMFG_T2s` naming `W`.
+        =#
+        @test_throws TypeError NetworkEstimator(; alg = AngularSimilarity())
+        @test_throws TypeError DBHT(; sim = AngularSimilarity())
+        @test_throws TypeError LoGo(; sim = AngularSimilarity())
+        #=
+        The *positional* constructors refuse too. That needs saying, because it does not
+        come for free: `@concrete` generates its own constructor per struct, and a field
+        written bare gets an unbounded type parameter, so the generated method is the only
+        one matching a refused argument and it accepts. Declaring the bound on the field
+        itself -- `sim <: AbstractNonNegativeSimilarityMatrixAlgorithm` -- puts it on the
+        generated type parameter, so there is no method left to match and the refusal is a
+        `MethodError`. Every other field on these three structs is still bare.
+        =#
+        @test_throws MethodError DBHT(AngularSimilarity(), UniqueRoot())
+        @test_throws MethodError LoGo(Distance(), AngularSimilarity(), Posdef())
+        @test_throws MethodError NetworkEstimator(PortfolioOptimisersCovariance(),
+                                                  Distance(), AngularSimilarity(),
+                                                  HopCount())
+        # The admitted members build by either route.
+        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot()) isa DBHT
+        @test LoGo(Distance(), ComplementSimilarity(), Posdef()) isa LoGo
+        @test NetworkEstimator(PortfolioOptimisersCovariance(), Distance(), KruskalTree(),
+                               HopCount()) isa NetworkEstimator
+        # Every surviving member still constructs on all three.
+        for sim in nonneg
+            @test NetworkEstimator(; alg = sim).alg === sim
+            @test DBHT(; sim = sim).sim === sim
+            @test LoGo(; sim = sim).sim === sim
+        end
+        # `FeatureDistance.sim` is untouched: its similarity never reaches `PMFG_T2s`,
+        # because every PMFG entry point recomputes one from its own algorithm.
+        @test FeatureDistance(; sim = AngularSimilarity()).sim === AngularSimilarity()
+        @testset "The domain precondition" begin
+            de = Distance()
+            Dok = [0.0 0.5 0.25; 0.5 0.0 0.75; 0.25 0.75 0.0]
+            Dbig = [0.0 7.0 0.25; 7.0 0.0 0.75; 0.25 0.75 0.0]
+            Dinf = [0.0 Inf 0.25; Inf 0.0 0.75; 0.25 0.75 0.0]
+            # A bounded, finite `D` is in every member's domain.
+            for sim in nonneg
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dok))
+            end
+            # The two members that declare nothing take the no-op fallback, so an
+            # unbounded or infinite `D` is theirs to transform. `exp(-Inf)` is 0 exactly.
+            for sim in (ExponentialSimilarity(), GeneralExponentialSimilarity())
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dbig))
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dinf))
+            end
+            # `ComplementSimilarity` declares `D <= 1`, `MaximumDistanceSimilarity`
+            # declares finiteness, and `D <= 1` implies finiteness.
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                                                  de, Dbig)
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                                                  de, Dinf)
+            @test isnothing(PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                                         de, Dbig))
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                                                  de, Dinf)
+            # The message names *both* halves -- the distance estimator that produced the
+            # offending value, and the similarity that refused it. That is the whole point
+            # of the check: `PMFG_T2s` could only ever name `W`.
+            msg = try
+                PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                             Distance(;
+                                                                      alg = LogDistance()),
+                                                             Dbig)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("ComplementSimilarity", msg)
+            @test occursin("LogDistance", msg)
+            @test occursin("7.0", msg)
+            msg = try
+                PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                             DistanceDistance(), Dinf)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("MaximumDistanceSimilarity", msg)
+            @test occursin("DistanceDistance", msg)
+            # The check is *interface-scoped*, not member-wide: `distance_to_similarity`
+            # stays a pure transformation with no domain of its own, so the shipped
+            # `FeatureDistance` promise that every `SemiMetric` yields a similarity and
+            # nothing throws is untouched.
+            @test isapprox(PortfolioOptimisers.distance_to_similarity(ComplementSimilarity();
+                                                                      D = Dbig),
+                           one(eltype(Dbig)) .- Dbig)
+        end
+        @testset "The precondition at the PMFG entry points" begin
+            #=
+            The oracle is that every pairing the precondition refuses already throws today,
+            only with a worse message. `LogDistance` and `DistanceDistance` both exceed 1;
+            `SimpleDistance` does not. `LogDistance` with `ExponentialSimilarity` works and
+            must keep working -- a blanket finiteness rule on the branch would break it.
+            =#
+            for (de, sim, throws) in
+                ((Distance(; alg = SimpleDistance()), ComplementSimilarity(), false),
+                 (Distance(; alg = LogDistance()), ExponentialSimilarity(), false),
+                 (Distance(; alg = LogDistance()), ComplementSimilarity(), true),
+                 (DistanceDistance(), ComplementSimilarity(), true))
+                nte = NetworkEstimator(; de = de, alg = sim)
+                cle = ClustersEstimator(; de = de, alg = DBHT(; sim = sim))
+                je = LoGo(; de = de, sim = sim)
+                sigma = cov(PortfolioOptimisersCovariance(), pr.X)
+                if throws
+                    @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, pr.X)
+                    @test_throws DomainError PortfolioOptimisers.calc_distance_weighted_graph(nte,
+                                                                                              pr.X)
+                    @test_throws DomainError clusterise(cle, pr.X)
+                    @test_throws DomainError PortfolioOptimisers.logo!(je, copy(sigma),
+                                                                       pr.X)
+                    @test_throws DomainError clusterise(NetworkClustersEstimator(;
+                                                                                 nte = nte),
+                                                        pr.X)
+                else
+                    @test PortfolioOptimisers.calc_adjacency(nte, pr.X) isa
+                          SparseMatrixCSC{Int, Int}
+                    @test clusterise(cle, pr.X) isa PortfolioOptimisers.Clusters
+                    @test isnothing(PortfolioOptimisers.logo!(je, copy(sigma), pr.X))
+                    @test clusterise(NetworkClustersEstimator(; nte = nte), pr.X) isa
+                          PortfolioOptimisers.Clusters
+                end
+            end
+            #=
+            The one live route to a non-finite distance: #237 established that `Denoise()`
+            makes exactly zero correlations, which `LogDistance` correctly maps to `Inf`.
+            `MaximumDistanceSimilarity` is the default of both `DBHT` and `LoGo`, so this
+            reached `PMFG_T2s` as a matrix of `NaN`s and was reported as a *negative*
+            weight. It is now named as what it is, at the configuration that caused it.
+            =#
+            ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
+            de = Distance(; alg = LogDistance())
+            # `pr.X` is too correlated to denoise to an exact zero, so this needs noise.
+            Xn = randn(StableRNG(987654321), 500, 20)
+            @test any(isinf, PortfolioOptimisers.distance(de, ce, Xn))
+            nte = NetworkEstimator(; ce = ce, de = de, alg = MaximumDistanceSimilarity())
+            @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)
+            # `ExponentialSimilarity` declares no domain and is right not to: `exp(-Inf)`
+            # is `0` exactly, so an infinite distance is a legal zero similarity.
+            nte = NetworkEstimator(; ce = ce, de = de, alg = ExponentialSimilarity())
+            @test PortfolioOptimisers.calc_adjacency(nte, Xn) isa SparseMatrixCSC{Int, Int}
+        end
+        @testset "`PMFG_T2s`' backstop" begin
+            #=
+            Kept, because the interface is open by *declaration*: an extension can subtype
+            it and return a negative anyway, and the DBHT failure below is silent. The two
+            checks are split because `0 <= NaN` is `false`, so one check reported a `NaN` as
+            a negative weight and sent the caller looking for the wrong thing.
+            =#
+            W = ones(9, 9)
+            @test PortfolioOptimisers.PMFG_T2s(W)[1] isa SparseMatrixCSC
+            Wn = copy(W)
+            Wn[1, 2] = Wn[2, 1] = NaN
+            msg = try
+                PortfolioOptimisers.PMFG_T2s(Wn)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("isnan", msg)
+            @test !occursin(">= 0", msg)
+            Wm = copy(W)
+            Wm[1, 2] = Wm[2, 1] = -1.0
+            msg = try
+                PortfolioOptimisers.PMFG_T2s(Wm)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin(">= 0", msg)
+            @test occursin("-1.0", msg)
+        end
+    end
     @testset "Feature distance tests" begin
         DS = PortfolioOptimisers.Distances
         rng = StableRNG(987654321)
@@ -1438,8 +1638,9 @@
             Rpm = PortfolioOptimisers.PMFG_T2s(pmfg_similarity(nte, X))[1]
             return Gr.adjacency_matrix(Gr.SimpleGraph(Rpm))
         end
-        # `AngularSimilarity` is absent because `PMFG_T2s` rejects its negative entries on
-        # ordinary data -- pre-existing, and issue #239's.
+        # `AngularSimilarity` is absent because `NetworkEstimator.alg` now refuses it at
+        # construction: it is outside `AbstractNonNegativeSimilarityMatrixAlgorithm`, and
+        # `PMFG_T2s` cannot take its negative entries. Issue #239.
         tree_algs = (KruskalTree(), BoruvkaTree(), PrimTree())
         pmfg_algs = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
                      GeneralExponentialSimilarity(), ComplementSimilarity())

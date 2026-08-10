@@ -112,7 +112,7 @@ const arg_dict = Dict(
                       :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                       :treeargs => "`args`: Positional arguments for the centrality function.",#
                       :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
-                      :ntalg => "`alg`: Tree or similarity matrix algorithm.",#
+                      :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
                       :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
                       :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
                       :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure.",#
@@ -136,7 +136,7 @@ const arg_dict = Dict(
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
                       :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
-                      :sim => "`sim`: Similarity matrix algorithm.",#
+                      :sim => "`sim`: Similarity matrix algorithm. The PMFG cannot take a negative weight, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
                       :root => "`root`: Root selection method.",#
                       # Estimators
                       :sets => "`sets`: Sets used to map estimator values to assets.",#

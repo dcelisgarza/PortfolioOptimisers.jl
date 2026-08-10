@@ -22,7 +22,7 @@ clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
                                                                      <:HopCount}}, X::MatNum;
                     dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
-                                                                     <:AbstractSimilarityMatrixAlgorithm,
+                                                                     <:AbstractNonNegativeSimilarityMatrixAlgorithm,
                                                                      <:HopCount}},
                     X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 CentralityEstimator
