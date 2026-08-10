@@ -471,22 +471,35 @@ function feature_program_candidates(sets::UniverseSets, nz)::Vector{String}
 end
 """
     is_feature_taxonomy_key(k, sets::UniverseSets) -> Bool
-    is_feature_factor_key(k, sets::UniverseSets) -> Bool
 
-Classify a name in a graded feature program by the axis its prefix declares.
+Whether a name in a graded feature program is a **taxonomy key**: a `sets.xkey`-prefixed key of `sets.dict`.
 
-[`UniverseSets`](@ref) guarantees every `sets.xkey`-prefixed dict key is asset-parallel, so the prefix rule alone decides whether a name is a taxonomy key — no new convention is needed, and row-selector precedence reduces to prefix, then asset, then group, exactly as [`estimator_to_val`](@ref) resolves.
-
-A `sets.fkey`/`sets.ufkey`-prefixed name is factor-length, so it can index neither the rows (assets) nor the declared nodes. It is refused **by name** rather than falling through to the plain-group branch, where it would fail later on a length mismatch that names neither the axis nor the cause.
+[`UniverseSets`](@ref) guarantees every `sets.xkey`-prefixed dict key is asset-parallel, so the prefix rule alone decides the question — no new convention is needed, and row-selector precedence reduces to prefix, then asset, then group, exactly as [`estimator_to_val`](@ref) resolves.
 
 # Related
 
   - [`asset_sets_features`](@ref)
+  - [`is_feature_factor_key`](@ref)
   - [`UniverseSets`](@ref)
 """
 function is_feature_taxonomy_key(k, sets::UniverseSets)::Bool
     return isa(k, AbstractString) && startswith(k, sets.xkey) && haskey(sets.dict, k)
 end
+"""
+    is_feature_factor_key(k, sets::UniverseSets) -> Bool
+
+Whether a name in a graded feature program declares the **factor axis**, by carrying the `sets.fkey` or `sets.ufkey` prefix.
+
+Such a name is factor-length, so it can index neither the rows (assets) nor the declared nodes. It is refused **by name** rather than falling through to the plain-group branch, where it would fail later on a length mismatch that names neither the axis nor the cause. [`feature_rows`](@ref) puts the test between the asset branch and the group branch, and [`feature_factor_key_msg`](@ref) writes the diagnostic.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`is_feature_taxonomy_key`](@ref)
+  - [`feature_factor_key_msg`](@ref)
+  - [`feature_rows`](@ref)
+  - [`UniverseSets`](@ref)
+"""
 function is_feature_factor_key(k, sets::UniverseSets)::Bool
     return isa(k, AbstractString) && (startswith(k, sets.fkey) || startswith(k, sets.ufkey))
 end
@@ -510,21 +523,17 @@ function feature_program_diagnostic(msg::AbstractString, strict::Bool)::Nothing
 end
 """
     feature_grammar_msg(term) -> String
-    feature_factor_key_msg(k, sets::UniverseSets) -> String
-    feature_missing_group_value_msg(key, group, col) -> String
-    feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset") -> String
 
-Build the diagnostics a graded feature program raises.
+Build the error text for a malformed **term** of a graded feature program — an entry or a target — and print the grammar itself.
 
-[`feature_grammar_msg`](@ref) prints the grammar itself, because a malformed term is a syntax error and the fastest fix is seeing the production it missed. The rest are name failures routed through [`feature_program_diagnostic`](@ref), and all of them name sizes rather than universes — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref), which `feature_unknown_name_msg` wraps.
-
-`feature_factor_key_msg` carries **no** suggestion: the name resolved perfectly well, on the wrong axis, so there is no typo to propose. The others drop the queried name from their own candidate pool before suggesting, because a graded program's pool is deliberately wide enough — taxonomy *values* and declared nodes included — to contain a name that is nonetheless invalid in the position it was written.
+A malformed term is a syntax error, so the fastest fix is seeing the production it missed. Unlike the name diagnostics, this one never routes through [`feature_program_diagnostic`](@ref): its callers throw an `ArgumentError` whatever `strict` says, because there is no reading of the term to fall back to.
 
 # Related
 
   - [`asset_sets_features`](@ref)
-  - [`unknown_variable_msg`](@ref)
-  - [`did_you_mean`](@ref)
+  - [`feature_entry!`](@ref)
+  - [`feature_target!`](@ref)
+  - [`feature_program_diagnostic`](@ref)
 """
 function feature_grammar_msg(term)
     return "`$(term)` is not a well-formed graded feature program term. The grammar is\n" *
@@ -535,14 +544,56 @@ function feature_grammar_msg(term)
            "  value  := Number | <:AbstractFeatureValue\n" *
            "`targets` is one target or a vector of them, and every target names its column in full: there is no ambient scope."
 end
+"""
+    feature_factor_key_msg(k, sets::UniverseSets) -> String
+
+Build the warning/error text for a name `k` that a graded feature program wrote in a row-selector or column-target position, but that declares the **factor axis** (see [`is_feature_factor_key`](@ref)).
+
+The message names the two prefixes and the reason, and names sizes rather than universes — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref). It carries **no** [`did_you_mean`](@ref) suggestion: the name resolved perfectly well, on the wrong axis, so there is no typo to propose.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`is_feature_factor_key`](@ref)
+  - [`feature_program_diagnostic`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
 function feature_factor_key_msg(k, sets::UniverseSets)
     return "`$(k)` names the factor axis (prefix `$(sets.fkey)`/`$(sets.ufkey)`), which is neither a row selector nor a column target: a graded feature program indexes assets by row and declared feature nodes by column, and a factor-length list is neither; term dropped"
 end
+"""
+    feature_missing_group_value_msg(key, group, col) -> String
+
+Build the warning/error text for a group value `group` of the taxonomy key `key` that matches no asset, where `col` is that key's column of `sets.dict`.
+
+The message names the *count* of distinct values under the key, never the values themselves — the info-leak-safe discipline of [`unknown_variable_msg`](@ref) — and appends a [`did_you_mean`](@ref) suggestion drawn from those values. It drops `group` from its own candidate pool first, because the pool of a graded program is deliberately wide enough to contain a name that is nonetheless invalid in the position it was written.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`feature_diagonal!`](@ref)
+  - [`feature_program_diagnostic`](@ref)
+  - [`did_you_mean`](@ref)
+"""
 function feature_missing_group_value_msg(key, group, col)
     vals = string.(unique(col))
     return "group value `$(group)` of taxonomy key `$(key)` matches no asset ($(length(vals)) distinct values under that key); term dropped" *
            did_you_mean(string(group), filter(!=(string(group)), vals))
 end
+"""
+    feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset") -> String
+
+Build the warning/error text for a `name` of a graded feature program that resolves in no namespace of the axis it was written on.
+
+The function wraps [`unknown_variable_msg`](@ref), so it inherits that message's shape and names the size of `nx` rather than its members. `axis` is `"asset"` for a row selector and `"feature"` for a column target, and `key` is `sets.xkey` or `sets.zkey` to match. `pool` is the wide candidate pool of [`feature_program_candidates`](@ref); the function drops `name` from it before suggesting, because that pool is deliberately wide enough — taxonomy *values* and declared nodes included — to contain a name that is nonetheless invalid in the position it was written.
+
+# Related
+
+  - [`asset_sets_features`](@ref)
+  - [`feature_program_candidates`](@ref)
+  - [`feature_program_diagnostic`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
 function feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset")
     return unknown_variable_msg(name, nx, key; candidates = filter(!=(string(name)), pool),
                                 axis = axis)
