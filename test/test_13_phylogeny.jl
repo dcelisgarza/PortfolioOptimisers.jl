@@ -2073,3 +2073,175 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
         end
     end
 end
+
+#=
+The polarity override (#258). `TopologyOnly` in an algorithm's `ov` field withdraws the
+declared polarity, so `centrality_polarity` answers `nothing` and `centrality_graph` routes
+to the plain graph. It runs one way only -- away from weights -- so every request is served
+on every source, and nothing warns and nothing goes inert.
+=#
+@testset "Polarity override" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, StatsBase, SparseArrays,
+          LinearAlgebra
+    PO = PortfolioOptimisers
+    G = PortfolioOptimisers.Graphs
+
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    X = prior(EmpiricalPrior(), rd).X
+    nte_t = NetworkEstimator()                                       # tree branch
+    nte_p = NetworkEstimator(; alg = MaximumDistanceSimilarity())    # similarity branch
+
+    # The five that declare a polarity, plain and overridden. Kept as pairs so every test
+    # below compares like with like.
+    pairs_ov = ((BetweennessCentrality(), BetweennessCentrality(; ov = TopologyOnly())),
+                (ClosenessCentrality(), ClosenessCentrality(; ov = TopologyOnly())),
+                (StressCentrality(), StressCentrality(; ov = TopologyOnly())),
+                (RadialityCentrality(), RadialityCentrality(; ov = TopologyOnly())),
+                (EigenvectorCentrality(), EigenvectorCentrality(; ov = TopologyOnly())))
+    # `Graphs.eigenvector_centrality` seeds its Arnoldi iteration randomly and differs from
+    # itself at about `6e-16` between two runs on one and the same graph.
+    eq(ct, a, b) = isa(ct, EigenvectorCentrality) ? isapprox(a, b) : a == b
+
+    @testset "The effective polarity" begin
+        #=
+        `centrality_polarity` answers the *effective* polarity, not the declared one, and
+        each method returns one concrete type. A `Union` return would put a dynamic
+        dispatch on the one call site in `src/`.
+        =#
+        for (plain, ov) in pairs_ov
+            @test PO.centrality_polarity(plain) !== nothing
+            @test PO.centrality_polarity(ov) === nothing
+            @test only(Base.return_types(PO.centrality_polarity, (typeof(ov),))) === Nothing
+            @test isconcretetype(only(Base.return_types(PO.centrality_polarity,
+                                                        (typeof(plain),))))
+        end
+        # The override is `nothing` by default, so the declaration stands untouched.
+        for (plain, _) in pairs_ov
+            @test plain.ov === nothing
+        end
+    end
+
+    @testset "The three without the field refuse the keyword" begin
+        #=
+        Capability is type-level, so the refusal costs no check: only the five that declare
+        a polarity carry `ov`. Julia's own message reads `got unsupported keyword argument
+        "ov"` and lists the supported ones, so the throw is asserted and not the text.
+        =#
+        @test_throws MethodError DegreeCentrality(; ov = TopologyOnly())
+        @test_throws MethodError KatzCentrality(; ov = TopologyOnly())
+        @test_throws MethodError Pagerank(; ov = TopologyOnly())
+        for T in (DegreeCentrality, KatzCentrality, Pagerank)
+            @test !hasfield(T, :ov)
+        end
+        for (plain, _) in pairs_ov
+            @test hasfield(typeof(plain), :ov)
+        end
+    end
+
+    @testset "The override gives the plain-graph answer" begin
+        #=
+        The oracle, on both branches. #257 measured the gap as 2 of 8 on a tree and 5 of 8
+        on a graph, so a test that only exercises a tree passes vacuously for three of the
+        five -- hence both branches, and hence the second assertion, which pins where the
+        override actually moves the answer.
+        =#
+        moves_t = (false, true, false, true, false)   # tree: closeness and radiality
+        moves_p = (true, true, true, true, true)      # graph: all five
+        for (nte, moves) in ((nte_t, moves_t), (nte_p, moves_p))
+            plain_g = PO.centrality_graph(nothing, nte, X)
+            for (i, (plain, ov)) in pairs(pairs_ov)
+                got = centrality_vector(nte, ov, X).X
+                @test eq(ov, got, PO.calc_centrality(ov, plain_g))
+                # The routing, not merely the number: an overridden call builds a plain
+                # graph rather than a weighted one.
+                @test isa(PO.centrality_graph(nte, ov, X), G.SimpleGraph)
+                # And it is not a no-op wherever the weights were reaching the answer.
+                was = centrality_vector(nte, plain, X).X
+                @test eq(ov, was, got) == !moves[i]
+            end
+        end
+    end
+
+    @testset "Trivially satisfied on the weightless sources" begin
+        #=
+        #253 and #254: the override runs one way, away from weights, so a source that
+        carries none already returns the requested answer. Nothing warns and nothing
+        throws, and the equality is trivial by construction.
+        =#
+        clr = clusterise(ClustersEstimator(), X)
+        for pl in (ClustersEstimator(), clr)
+            for (plain, ov) in pairs_ov
+                got = @test_logs centrality_vector(pl, ov, X).X
+                @test eq(ov, got,
+                         PO.calc_centrality(ov, G.SimpleGraph(phylogeny_matrix(pl, X).X)))
+            end
+        end
+        # A precomputed `PhylogenyResult` builds its own plain graph and never passes the
+        # polarity seam at all.
+        plr = phylogeny_matrix(nte_p, X)
+        for (plain, ov) in pairs_ov
+            got = @test_logs centrality_vector(plr, ov).X
+            @test eq(ov, got, PO.calc_centrality(ov, G.SimpleGraph(plr.X)))
+        end
+        # Eigenvector on a tree branch: `SimilarityPolarity` already routes to the plain
+        # graph there, because a tree carries no similarity to read.
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            plain, ov = pairs_ov[5]
+            @test isapprox(centrality_vector(nte, ov, X).X,
+                           centrality_vector(nte, plain, X).X)
+        end
+    end
+
+    @testset "The separation goes live again" begin
+        #=
+        `sep` is inert on a weighted route, because a power of a weighted matrix sums
+        products of distances rather than counting edges. The override moves the call off
+        that route, so the separation closure is read once more.
+        =#
+        ov = ClosenessCentrality(; ov = TopologyOnly())
+        base = centrality_vector(NetworkEstimator(; sep = HopCount(; n = 1)), ov, X).X
+        for n in 2:3
+            nte = NetworkEstimator(; sep = HopCount(; n = n))
+            @test centrality_vector(nte, ov, X).X != base
+            # The declared route stays inert, which is what makes the contrast evidence.
+            @test centrality_vector(nte, ClosenessCentrality(), X).X ==
+                  centrality_vector(nte_t, ClosenessCentrality(), X).X
+        end
+    end
+
+    @testset "The seams take the override positionally, and only positionally" begin
+        #=
+        The carrier is the algorithm, and `ct` is positional on every public surface, so
+        the override reaches all of them with no signature change. The trap this avoids:
+        an undeclared keyword is swallowed in silence at every seam, so a documented `ov =`
+        beside an undeclared one would have shipped a request that does nothing.
+        =#
+        ov = ClosenessCentrality(; ov = TopologyOnly())
+        want = centrality_vector(nte_p, ov, X).X
+        w = fill(inv(size(X, 2)), size(X, 2))
+
+        # The estimator bundle carries it through, and the bundle identity still holds.
+        cte = CentralityEstimator(; pl = nte_p, ct = ov)
+        @test centrality_vector(cte, X).X == want
+        @test average_centrality(cte, w, X) == average_centrality(cte.pl, cte.ct, w, X)
+        @test average_centrality(cte, w, X) ≈ LinearAlgebra.dot(want, w)
+
+        # No seam accepts an `ov` keyword: the keyword form is swallowed and returns the
+        # plain answer, so the request must be made by configuring the algorithm.
+        @test centrality_vector(nte_p, ClosenessCentrality(), X; ov = TopologyOnly()).X ==
+              centrality_vector(nte_p, ClosenessCentrality(), X).X
+        @test centrality_vector(nte_p, ClosenessCentrality(), X; ov = TopologyOnly()).X !=
+              want
+
+        # The constraint generator reads `cc.A.ct`, so it gets the override for free.
+        cte_pl = CentralityEstimator(; pl = nte_p, ct = ClosenessCentrality())
+        lc_ov = centrality_constraints(CentralityConstraint(; A = cte, B = 0.5, comp = <=),
+                                       X)
+        lc_pl = centrality_constraints(CentralityConstraint(; A = cte_pl, B = 0.5,
+                                                            comp = <=), X)
+        @test vec(lc_ov.ineq.A) == want
+        @test vec(lc_ov.ineq.A) != vec(lc_pl.ineq.A)
+    end
+end

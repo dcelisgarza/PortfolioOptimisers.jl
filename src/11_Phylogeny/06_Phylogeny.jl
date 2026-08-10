@@ -153,6 +153,51 @@ A member says which quantity its edge weights must be, through [`centrality_pola
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Ask for the centrality over the network's **topology alone**.
+
+An algorithm that declares a polarity is handed weights wherever the source carries them. `TopologyOnly` in its `ov` field withdraws that request: [`centrality_polarity`](@ref) then answers `nothing`, and [`centrality_graph`](@ref) routes to the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). The computation is the one that already runs for [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref), so this is a redirect and never a new estimator.
+
+# The override runs one way only
+
+It removes weights and never supplies them. There is no value that forces a polarity onto an algorithm, and the field is deliberately **not** typed over [`AbstractCentralityPolarity`](@ref). A forced polarity would succeed rather than raise — [`calc_distance_weighted_graph`](@ref) carries distances on both branches — and the algorithm would read a distance where it needs a similarity, reversing its own ordering in silence. Polarity correctness is not a runtime property, so nothing could catch it.
+
+# Every request is honoured, on every source
+
+The answer over the topology alone is available from every source, so the override never warns and never goes inert. On a partition source, on a precomputed [`PhylogenyResult`](@ref), and on the tree branch under [`SimilarityPolarity`](@ref), the plain graph is what those routes already build, so the request is satisfied before it is made.
+
+Only the five algorithms that declare a polarity carry an `ov` field. [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref) already return the topology-only answer, so there is nothing for them to override and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`.
+
+# Examples
+
+```jldoctest
+julia> ClosenessCentrality(; ov = TopologyOnly())
+ClosenessCentrality
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+      ov ┴ TopologyOnly()
+
+julia> isnothing(centrality_polarity(ClosenessCentrality(; ov = TopologyOnly())))
+true
+
+julia> centrality_polarity(ClosenessCentrality())
+DistancePolarity()
+```
+
+# Related
+
+  - [`centrality_polarity`](@ref)
+  - [`centrality_graph`](@ref)
+  - [`AbstractCentralityPolarity`](@ref)
+  - [`BetweennessCentrality`](@ref)
+  - [`ClosenessCentrality`](@ref)
+  - [`EigenvectorCentrality`](@ref)
+  - [`RadialityCentrality`](@ref)
+  - [`StressCentrality`](@ref)
+"""
+struct TopologyOnly <: AbstractAlgorithm end
+"""
     assert_centrality_args(::Type{T}, args::Tuple) where {T}
 
 Refuse a matrix inside a centrality algorithm's `args`.
@@ -219,7 +264,7 @@ Centrality algorithm type for betweenness centrality.
 
 `BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
-Declares [`DistancePolarity`](@ref): it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch.
+Declares [`DistancePolarity`](@ref): it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -229,7 +274,8 @@ $(DocStringExtensions.FIELDS)
 
     BetweennessCentrality(;
         args::Tuple = (),
-        kwargs::NamedTuple = (;)
+        kwargs::NamedTuple = (;),
+        ov::Option{TopologyOnly} = nothing
     ) -> BetweennessCentrality
 
 Keywords correspond to the struct's fields.
@@ -240,7 +286,8 @@ Keywords correspond to the struct's fields.
 julia> BetweennessCentrality()
 BetweennessCentrality
     args ┼ Tuple{}: ()
-  kwargs ┴ @NamedTuple{}: NamedTuple()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+      ov ┴ nothing
 ```
 
 # Related
@@ -248,6 +295,7 @@ BetweennessCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
   - [`DistancePolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
@@ -259,14 +307,19 @@ BetweennessCentrality
     $(field_dict[:ctkwargs])
     """
     kwargs
-    function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
+    """
+    $(field_dict[:ctov])
+    """
+    ov <: Option{TopologyOnly}
+    function BetweennessCentrality(args::Tuple, kwargs::NamedTuple,
+                                   ov::Option{TopologyOnly} = nothing)
         assert_centrality_args(BetweennessCentrality, args)
-        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+        return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
 end
-function BetweennessCentrality(; args::Tuple = (),
-                               kwargs::NamedTuple = (;))::BetweennessCentrality
-    return BetweennessCentrality(args, kwargs)
+function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;),
+                               ov::Option{TopologyOnly} = nothing)::BetweennessCentrality
+    return BetweennessCentrality(args, kwargs, ov)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -275,7 +328,7 @@ Centrality algorithm type for closeness centrality.
 
 `ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
-Declares [`DistancePolarity`](@ref): it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree.
+Declares [`DistancePolarity`](@ref): it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -285,7 +338,8 @@ $(DocStringExtensions.FIELDS)
 
     ClosenessCentrality(;
         args::Tuple = (),
-        kwargs::NamedTuple = (;)
+        kwargs::NamedTuple = (;),
+        ov::Option{TopologyOnly} = nothing
     ) -> ClosenessCentrality
 
 Keywords correspond to the struct's fields.
@@ -296,7 +350,8 @@ Keywords correspond to the struct's fields.
 julia> ClosenessCentrality()
 ClosenessCentrality
     args ┼ Tuple{}: ()
-  kwargs ┴ @NamedTuple{}: NamedTuple()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+      ov ┴ nothing
 ```
 
 # Related
@@ -304,6 +359,7 @@ ClosenessCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
   - [`DistancePolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
@@ -315,14 +371,19 @@ ClosenessCentrality
     $(field_dict[:ctkwargs])
     """
     kwargs
-    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
+    """
+    $(field_dict[:ctov])
+    """
+    ov <: Option{TopologyOnly}
+    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple,
+                                 ov::Option{TopologyOnly} = nothing)
         assert_centrality_args(ClosenessCentrality, args)
-        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+        return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
 end
-function ClosenessCentrality(; args::Tuple = (),
-                             kwargs::NamedTuple = (;))::ClosenessCentrality
-    return ClosenessCentrality(args, kwargs)
+function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;),
+                             ov::Option{TopologyOnly} = nothing)::ClosenessCentrality
+    return ClosenessCentrality(args, kwargs, ov)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -389,16 +450,48 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
 
 `EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
 
-Declares [`SimilarityPolarity`](@ref), the only member that does: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity.
+Declares [`SimilarityPolarity`](@ref), the only member that does: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EigenvectorCentrality(;
+        ov::Option{TopologyOnly} = nothing
+    ) -> EigenvectorCentrality
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> EigenvectorCentrality()
+EigenvectorCentrality
+  ov ┴ nothing
+```
 
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
   - [`SimilarityPolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.eigenvector_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D)
 """
-struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
+@concrete struct EigenvectorCentrality <: AbstractCentralityAlgorithm
+    """
+    $(field_dict[:ctov])
+    """
+    ov <: Option{TopologyOnly}
+    function EigenvectorCentrality(ov::Option{TopologyOnly})
+        return new{typeof(ov)}(ov)
+    end
+end
+function EigenvectorCentrality(; ov::Option{TopologyOnly} = nothing)::EigenvectorCentrality
+    return EigenvectorCentrality(ov)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -527,16 +620,48 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
-Declares [`DistancePolarity`](@ref): it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree.
+Declares [`DistancePolarity`](@ref): it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RadialityCentrality(;
+        ov::Option{TopologyOnly} = nothing
+    ) -> RadialityCentrality
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> RadialityCentrality()
+RadialityCentrality
+  ov ┴ nothing
+```
 
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
   - [`DistancePolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.radiality_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D)
 """
-struct RadialityCentrality <: AbstractCentralityAlgorithm end
+@concrete struct RadialityCentrality <: AbstractCentralityAlgorithm
+    """
+    $(field_dict[:ctov])
+    """
+    ov <: Option{TopologyOnly}
+    function RadialityCentrality(ov::Option{TopologyOnly})
+        return new{typeof(ov)}(ov)
+    end
+end
+function RadialityCentrality(; ov::Option{TopologyOnly} = nothing)::RadialityCentrality
+    return RadialityCentrality(ov)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -544,7 +669,7 @@ Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
 
-Declares [`DistancePolarity`](@ref): it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch.
+Declares [`DistancePolarity`](@ref): it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -554,7 +679,8 @@ $(DocStringExtensions.FIELDS)
 
     StressCentrality(;
         args::Tuple = (),
-        kwargs::NamedTuple = (;)
+        kwargs::NamedTuple = (;),
+        ov::Option{TopologyOnly} = nothing
     ) -> StressCentrality
 
 Keywords correspond to the struct's fields.
@@ -565,7 +691,8 @@ Keywords correspond to the struct's fields.
 julia> StressCentrality()
 StressCentrality
     args ┼ Tuple{}: ()
-  kwargs ┴ @NamedTuple{}: NamedTuple()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+      ov ┴ nothing
 ```
 
 # Related
@@ -573,6 +700,7 @@ StressCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
   - [`DistancePolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
@@ -584,13 +712,19 @@ StressCentrality
     $(field_dict[:ctkwargs])
     """
     kwargs
-    function StressCentrality(args::Tuple, kwargs::NamedTuple)
+    """
+    $(field_dict[:ctov])
+    """
+    ov <: Option{TopologyOnly}
+    function StressCentrality(args::Tuple, kwargs::NamedTuple,
+                              ov::Option{TopologyOnly} = nothing)
         assert_centrality_args(StressCentrality, args)
-        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+        return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
 end
-function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))::StressCentrality
-    return StressCentrality(args, kwargs)
+function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;),
+                          ov::Option{TopologyOnly} = nothing)::StressCentrality
+    return StressCentrality(args, kwargs, ov)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -648,13 +782,24 @@ Supplied by [`calc_weighted_adjacency_graph`](@ref), and only on its similarity 
 struct SimilarityPolarity <: AbstractCentralityPolarity end
 """
     centrality_polarity(ct::AbstractCentralityAlgorithm)
-    centrality_polarity(ct::Union{<:BetweennessCentrality, <:ClosenessCentrality,
-                                  <:RadialityCentrality, <:StressCentrality})
-    centrality_polarity(ct::EigenvectorCentrality)
+    centrality_polarity(ct::Union{<:BetweennessCentrality{<:Any, <:Any, Nothing},
+                                  <:ClosenessCentrality{<:Any, <:Any, Nothing},
+                                  <:StressCentrality{<:Any, <:Any, Nothing},
+                                  <:RadialityCentrality{Nothing}})
+    centrality_polarity(ct::Union{<:BetweennessCentrality{<:Any, <:Any, TopologyOnly},
+                                  <:ClosenessCentrality{<:Any, <:Any, TopologyOnly},
+                                  <:StressCentrality{<:Any, <:Any, TopologyOnly},
+                                  <:RadialityCentrality{TopologyOnly}})
+    centrality_polarity(ct::EigenvectorCentrality{Nothing})
+    centrality_polarity(ct::EigenvectorCentrality{TopologyOnly})
 
-Declare which quantity a centrality algorithm's edge weights must be.
+Answer which quantity a centrality algorithm's edge weights must be.
 
 The extension contract of [`AbstractCentralityPolarity`](@ref). [`centrality_graph`](@ref) reads it to decide what to weight the network with.
+
+# The answer is the effective polarity, not the declared one
+
+A [`TopologyOnly`](@ref) in the algorithm's `ov` field withdraws the declaration, so this function answers `nothing` and the caller gets the plain graph. The override is resolved here rather than at the call site, because three algorithms carry no `ov` field at all and an inline read of `ct.ov` cannot be written for them. So this function keeps predicting the graph that [`centrality_graph`](@ref) builds, which is the property that makes it worth exporting.
 
 # The fallback declares nothing, so opting in is explicit
 
@@ -665,6 +810,7 @@ The method on [`AbstractCentralityAlgorithm`](@ref) returns `nothing`, which rou
   - [`DistancePolarity`](@ref) — [`BetweennessCentrality`](@ref), [`ClosenessCentrality`](@ref), [`RadialityCentrality`](@ref), [`StressCentrality`](@ref). All four are defined over shortest paths.
   - [`SimilarityPolarity`](@ref) — [`EigenvectorCentrality`](@ref). It is the leading eigenvector of the adjacency matrix itself, so a larger entry must mean a stronger link.
   - `nothing` — [`DegreeCentrality`](@ref), [`Pagerank`](@ref), [`KatzCentrality`](@ref). `Graphs.jl` cannot use weights in any of the three: the first two ignore them, and `Graphs.katz_centrality` binarises through `adjacency_matrix(g, Bool)` and throws an `InexactError` when handed a weighted graph.
+  - `nothing` — any of the first five carrying `ov = TopologyOnly()`. Those five are the only ones that carry the field, because the other three already answer `nothing` and have nothing to withdraw.
 
 The line between the first two groups and the third is `Graphs.jl`'s own. The declaration is about correctness — which weights — and the absence of one is about capability.
 
@@ -674,26 +820,38 @@ The line between the first two groups and the third is `Graphs.jl`'s own. The de
 
 # Returns
 
-  - `polarity::Option{<:AbstractCentralityPolarity}`: The declared polarity, or `nothing` for an algorithm that cannot read weights.
+  - `polarity::Option{<:AbstractCentralityPolarity}`: The effective polarity, or `nothing` for an algorithm that cannot read weights or has withdrawn its declaration. Each method returns one concrete type, never a `Union`.
 
 # Related
 
   - [`AbstractCentralityPolarity`](@ref)
   - [`DistancePolarity`](@ref)
   - [`SimilarityPolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`centrality_graph`](@ref)
   - [`calc_centrality`](@ref)
 """
 function centrality_polarity end
-function centrality_polarity(::AbstractCentralityAlgorithm)::Option{<:AbstractCentralityPolarity}
+function centrality_polarity(::AbstractCentralityAlgorithm)::Nothing
     return nothing
 end
-function centrality_polarity(::Union{<:BetweennessCentrality, <:ClosenessCentrality,
-                                     <:RadialityCentrality, <:StressCentrality})::Option{<:AbstractCentralityPolarity}
+function centrality_polarity(::Union{<:BetweennessCentrality{<:Any, <:Any, Nothing},
+                                     <:ClosenessCentrality{<:Any, <:Any, Nothing},
+                                     <:StressCentrality{<:Any, <:Any, Nothing},
+                                     <:RadialityCentrality{Nothing}})::DistancePolarity
     return DistancePolarity()
 end
-function centrality_polarity(::EigenvectorCentrality)::Option{<:AbstractCentralityPolarity}
+function centrality_polarity(::Union{<:BetweennessCentrality{<:Any, <:Any, TopologyOnly},
+                                     <:ClosenessCentrality{<:Any, <:Any, TopologyOnly},
+                                     <:StressCentrality{<:Any, <:Any, TopologyOnly},
+                                     <:RadialityCentrality{TopologyOnly}})::Nothing
+    return nothing
+end
+function centrality_polarity(::EigenvectorCentrality{Nothing})::SimilarityPolarity
     return SimilarityPolarity()
+end
+function centrality_polarity(::EigenvectorCentrality{TopologyOnly})::Nothing
+    return nothing
 end
 """
     calc_centrality(ct::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
@@ -2361,4 +2519,5 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
        CentralityEstimator, centrality_vector, NetworkClustersEstimator, separation_matrix,
-       separation_budget, DistancePolarity, SimilarityPolarity, centrality_polarity
+       separation_budget, DistancePolarity, SimilarityPolarity, centrality_polarity,
+       TopologyOnly

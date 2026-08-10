@@ -110,6 +110,7 @@ const arg_dict = Dict(
                       :cter => "`ct`: Centrality estimator or result.",#
                       :ctargs => "`args`: Positional arguments for the centrality function.",#
                       :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                      :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
                       :treeargs => "`args`: Positional arguments for the centrality function.",#
                       :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                       :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
