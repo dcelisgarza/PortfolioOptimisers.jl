@@ -350,3 +350,39 @@ part of that argument — it consumes a weighted matrix and always has.
 Found by [#209](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/209), the final
 verification of map [#195](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/195), and
 filed as [#262](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/262).
+
+## Amendment (2026-08-10): the tree-branch eigenvector item names a refusal that no longer exists
+
+The "Left open" list says that a similarity-polarity separation member "is what would **un-refuse**
+`EigenvectorCentrality` on the tree branch". Two words there are stale, and one is wrong.
+
+**There is no refusal to undo.** The polarity bullet three items above already records the settled
+position: five cases run on the plain graph and none of them raises, and
+`EigenvectorCentrality` on a tree branch is the fifth. The refusal was withdrawn before this ADR
+shipped, on the ground that weightedness is a property of the source rather than of the request, so
+a caller who names an algorithm has not asked for weights and cannot be told no. What the open item
+is really about is **weighting** that pairing, not permitting it.
+
+**A separation member is the wrong mechanism for it.** `sep` selects which pairs count as related,
+and this ADR records that it is **inert** on every weighted centrality route, because those routes
+read the structure rather than the separation closure. A widest-path or max-product separation would
+change which pairs `phylogeny_matrix` relates; it would not put a similarity on a tree's edges.
+
+**What weighting that pairing actually needs is a similarity for the tree branch**, and the tree
+branch names no similarity algorithm at all — `nte.alg` is an `AbstractTreeType` there. ADR
+[0049](0049-a-similarity-reaches-the-pmfg-only-if-it-cannot-go-negative.md) does not supply one: it
+narrows three existing similarity fields and adds none. It does remove the obstacle that the
+original refusal cited, `AngularSimilarity` throwing inside `PMFG_T2s`, and it removes it by
+**excluding** that member, which is not a route to a tree-branch similarity either.
+
+The item stays open, restated: **whether the tree branch should name a similarity, and which one.**
+The arithmetic permits it. The argument this ADR uses to legitimise `calc_distance_weighted_graph`
+— re-weighting a PMFG with `D` is legitimate because every similarity algorithm is a strictly
+decreasing function of `D`, so `D` is the selecting quantity's monotone preimage — is **symmetric**.
+A tree re-weighted with `S = f(D)` is the selecting quantity's monotone image by the same reasoning.
+So this is a design decision about which member a tree would name and where that field lives, not an
+arithmetic obstacle and not something an interface unblocks.
+
+Found by [#245](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/245) while discharging
+map [#241](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/241)'s report to map
+[#195](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/195).

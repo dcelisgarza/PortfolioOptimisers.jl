@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all similarity matrix algorithms.
 
-Every subtype defines a pure transformation of a distance matrix into a similarity matrix, applied by [`distance_to_similarity`](@ref). The family is consumed in three places: the Planar Maximally Filtered Graph (PMFG) construction used by [`DBHT`](@ref) and [`LoGo`](@ref), the similarity-based [`NetworkEstimator`](@ref) adjacency and clustering routines, and the similarity slot returned by [`cor_and_dist`](@ref).
+Every subtype defines a pure transformation of a distance matrix into a similarity matrix, applied by [`distance_to_similarity`](@ref). The family is consumed in two places: the Planar Maximally Filtered Graph (PMFG) construction, which the similarity branch of [`NetworkEstimator`](@ref) and both [`DBHT`](@ref) and [`LoGo`](@ref) all reach, and the similarity slot returned by [`cor_and_dist`](@ref).
 
 The family is **open**: an extension defines a member and a [`distance_to_similarity`](@ref) method for it.
 
-The first of those three consumers needs a similarity that cannot go below zero, so it takes the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) rather than this type. The other two take any member.
+The first consumer needs a similarity that cannot go below zero, so **all three** of the fields feeding it — [`NetworkEstimator`](@ref)'s `alg`, [`DBHT`](@ref)'s `sim` and [`LoGo`](@ref)'s `sim` — take the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) rather than this type. The second takes any member: [`FeatureDistance`](@ref)'s `sim` keeps all five, and never reaches a PMFG, because every PMFG entry point recomputes the similarity from its own field and discards the one [`cor_and_dist`](@ref) returned.
 
 # Related
 
