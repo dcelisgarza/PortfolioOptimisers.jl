@@ -181,15 +181,15 @@ disconnection route it would have guarded — a check that provably cannot fire 
 
 ### 5. Every consumer answered, and the noes are the load-bearing half
 
-| consumer                           | reads the weights? | resolution                                                             |
-|:---------------------------------- |:------------------ |:---------------------------------------------------------------------- |
-| `phylogeny_matrix` — **values**    | no                 | `PhylogenyResult` stays `Int`                                          |
-| `phylogeny_matrix` — **selection** | yes                | new radius ball, `weighted_dist <= dmax`, still binary                 |
-| `SemiDefinitePhylogeny`            | no                 | weight-inert: `A ⊙ W == 0` is the same constraint at any magnitude     |
-| `IntegerPhylogeny`                 | no                 | *broken* by a number — `B` is an integer cardinality                   |
-| both `clusterise` methods          | no                 | matrix-power consumer; folded onto the shared routine, `HopCount` only |
-| `Proximity`                        | yes                | takes either separation through the same contract                      |
-| centrality                         | yes                | by **declared polarity**, per algorithm                                |
+| consumer                           | reads the weights? | resolution                                                                            |
+|:---------------------------------- |:------------------ |:------------------------------------------------------------------------------------- |
+| `phylogeny_matrix` — **values**    | no                 | `PhylogenyResult` stays `Int`                                                         |
+| `phylogeny_matrix` — **selection** | yes                | new radius ball, `weighted_dist <= dmax`, still binary                                |
+| `SemiDefinitePhylogeny`            | no                 | weight-inert: `A ⊙ W == 0` is the same constraint at any magnitude                    |
+| `IntegerPhylogeny`                 | no                 | *broken* by a number — `B` is an integer cardinality                                  |
+| both `clusterise` methods          | yes                | read them before this map too; folded onto `calc_weighted_adjacency`, `HopCount` only |
+| `Proximity`                        | yes                | takes either separation through the same contract                                     |
+| centrality                         | yes                | by **declared polarity**, per algorithm                                               |
 
 Three of these deserve their reasoning recorded.
 
@@ -288,3 +288,65 @@ consumers of five; leaving `sep` on the producer would hide it from the constrai
   [#241](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/241). Adopting
   `Graphs.planar_maximally_filtered_graph` (new in Graphs 1.14) is a separate effort: `PMFG_T2s` also
   returns the triangle and clique structure DBHT consumes.
+
+## Amendment (2026-08-10): the `clusterise` row said "no", and both methods read the weights
+
+Section 5's table shipped with a wrong cell. The row for `clusterise` answered **no** to "reads the
+weights?". Both methods read them, and did so before this map as well.
+
+The cell is corrected in place rather than by a note here, because it was never true. The
+amend-never-rewrite convention protects *superseded decisions* — an ADR describing behaviour that
+has since changed is correct history. This was a transcription slip about code that never behaved
+the way the cell claimed, and the table is where a reader looks first.
+
+### What the code does
+
+Both methods enter the weighted chain at its middle tier, `calc_weighted_adjacency`, and accumulate
+against it. The tree method:
+
+```julia
+A = calc_weighted_adjacency(nte.nte.alg, D)
+for i in 0:(nte.nte.sep.n)
+    P .+= D^i - A^i
+end
+```
+
+The triangulated method is the same shape with the branch's own selecting quantity:
+
+```julia
+Rpm = calc_weighted_adjacency(nte.nte.alg, S)
+for i in 0:(nte.nte.sep.n)
+    P .+= S^i - Rpm^i
+end
+```
+
+`calc_weighted_adjacency` carries the branch's selecting quantity as edge values, so both sums are
+weighted minus weighted. Nothing binarises.
+
+### Why the cell was wrong rather than stale
+
+Three records in place when this ADR was written say the opposite:
+
+ 1. Section 3 of this ADR, on the chain: "a caller may already hold that matrix: `clusterise` does,
+    and re-deriving it there costs **98% of `clusterise`'s runtime** under `VariationInfoDistance`."
+    That two-argument entry point exists *for* `clusterise`.
+ 2. [#199](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/199) corrected the map's
+    charting-time ground truth to "neither `clusterise` method binarises", measured. The pre-map
+    belief that weights were discarded in two places was already retired.
+ 3. [#207](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/207) shipped both methods
+    onto the two-argument entry point and verified `P` bit-for-bit against the deleted bodies.
+
+The cell's own justification argues the fold and the `HopCount` narrowing. Those are the answers to
+"what changed here?" and "which separations are admitted?", not to "does it read the weights?" —
+which is how a right answer to one question came to sit in the column for another.
+
+### Consequence
+
+The load-bearing noes are three, not four: `phylogeny_matrix`'s **values**,
+`SemiDefinitePhylogeny`, and `IntegerPhylogeny`. All three refuse a *number*, which is the argument
+against a weighted `PhylogenyResult` and is untouched by this correction. `clusterise` was never
+part of that argument — it consumes a weighted matrix and always has.
+
+Found by [#209](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/209), the final
+verification of map [#195](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/195), and
+filed as [#262](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/262).

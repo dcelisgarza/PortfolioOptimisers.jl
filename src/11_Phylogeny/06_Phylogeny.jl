@@ -2361,5 +2361,4 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
        CentralityEstimator, centrality_vector, NetworkClustersEstimator, separation_matrix,
-       separation_budget, AbstractCentralityPolarity, DistancePolarity, SimilarityPolarity,
-       centrality_polarity
+       separation_budget, DistancePolarity, SimilarityPolarity, centrality_polarity

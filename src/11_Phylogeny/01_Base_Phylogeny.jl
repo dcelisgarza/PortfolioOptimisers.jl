@@ -665,5 +665,5 @@ function assert_separation_decay(::Union{<:LinearDecay, <:ExponentialDecay,
     return nothing
 end
 
-export AbstractSeparationAlgorithm, HopCount, PathLength, AbstractSeparationDecayAlgorithm,
-       LinearDecay, ExponentialDecay, ReciprocalDecay, NoDecay, separation_decay
+export HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay, NoDecay,
+       separation_decay

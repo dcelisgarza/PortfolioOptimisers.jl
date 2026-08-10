@@ -71,6 +71,10 @@ julia --project=docs -e '
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`. Add an entry
   there rather than inlining prose, and delete entries that lose their last user.
+- **Never export an abstract type unless explicitly told to.** 221 of 226 abstract types in `src/`
+  are unexported, so unexported is the convention. An open family, a sibling family that exports its
+  supertype, and an existing API-page entry are none of them a reason to add one in passing — an
+  export is public API, and widening it is the maintainer's call. Ask instead.
 
 ## Repo etiquette
 
