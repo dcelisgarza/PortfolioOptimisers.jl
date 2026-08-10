@@ -284,7 +284,8 @@ shortest-path measures, similarities for [`EigenvectorCentrality`](@ref) — and
 to match. Five cases run on the plain unweighted graph and none of them raises: a clustering
 source, [`DegreeCentrality`](@ref) (the default used above), [`Pagerank`](@ref),
 [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. The warning on
-[`CentralityEstimator`](@ref) has the details.
+[`CentralityEstimator`](@ref) has the details. §4.2 covers the one thing you can say back to it:
+[`TopologyOnly`](@ref), which withdraws a declaration and asks for the topology alone.
 
 ### 4.1 Where `sep` bites, and where it is inert
 
@@ -320,8 +321,7 @@ function sep_moves(ct)
     return maximum(abs, c3 .- c1) > 1e-8
 end
 
-pretty_table(DataFrame("Algorithm" => first.(cts),
-                       "Declared polarity" => polarity_name.(last.(cts)),
+pretty_table(DataFrame("Algorithm" => first.(cts), "Polarity" => polarity_name.(last.(cts)),
                        "n = 1 → n = 3 moves the score" =>
                            [sep_moves(ct) ? "yes" : "no" for (_, ct) in cts]);
              title = "Which centralities read the weights, and which read sep")
@@ -331,20 +331,80 @@ On this minimum-spanning-tree source the split is four and four: the four distan
 algorithms get a weighted graph and ignore `sep`, and the other four run unweighted and respond to
 it. So raising `n` moves a degree centrality and leaves a closeness one exactly where it was.
 
-The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) *declares* a
+The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) declares a
 similarity polarity and still lands on the unweighted side here, because a tree carries no
 similarity for it to read — so the declaration alone does not tell you which side you are on. The
 source decides that jointly with the algorithm.
 
-Two further subtleties are worth stating rather than demonstrating.
+[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) are a second reason not to read the
+polarity column as the answer. They do read the weights, and are nonetheless unchanged by them *on
+a tree*: a tree has exactly one path between any two vertices, so no weighting can change the
+shortest-path set. That is a theorem about the graph, not a limitation of the algorithm, and it
+does not hold on a similarity branch.
 
-  - [`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) do read the weights, and are
-    nonetheless unchanged by them *on a tree*: a tree has exactly one path between any two
-    vertices, so no weighting can change the shortest-path set. That is a theorem about the graph,
-    not a limitation of the algorithm, and it does not hold on a similarity branch.
-  - Reading the weights at all is recent, and it moved the default answer for **four of the
-    eight** algorithms. A centrality number carried over from an older run will not always
-    reproduce, so re-measure rather than reusing a bound you calibrated earlier.
+### 4.2 Asking for the topology alone
+
+Everything above is decided *for* you, by the algorithm's mathematics and by the branch the source
+builds. There is one thing you can say back. A [`TopologyOnly`](@ref) in an algorithm's `ov` field
+withdraws its declaration, so [`centrality_polarity`](@ref) answers `nothing` and the graph is
+built plain — the same computation the three unweighted algorithms already run:
+=#
+
+(centrality_polarity(ClosenessCentrality()),
+ centrality_polarity(ClosenessCentrality(; ov = TopologyOnly())))
+
+#=
+Only the five algorithms that declare a polarity carry the field. [`DegreeCentrality`](@ref),
+[`Pagerank`](@ref) and [`KatzCentrality`](@ref) already read the topology alone, so they have
+nothing to withdraw and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`. How much the
+request changes depends on the source it is made against:
+=#
+
+ovs = Dict("BetweennessCentrality" => BetweennessCentrality(; ov = TopologyOnly()),
+           "ClosenessCentrality" => ClosenessCentrality(; ov = TopologyOnly()),
+           "EigenvectorCentrality" => EigenvectorCentrality(; ov = TopologyOnly()),
+           "RadialityCentrality" => RadialityCentrality(; ov = TopologyOnly()),
+           "StressCentrality" => StressCentrality(; ov = TopologyOnly()))
+function ov_moves(nte, name, ct)
+    if !(haskey(ovs, name))
+        return "no `ov` field"
+    end
+    declared = centrality_vector(CentralityEstimator(; pl = nte, ct = ct), pr).X
+    topology = centrality_vector(CentralityEstimator(; pl = nte, ct = ovs[name]), pr).X
+    return maximum(abs, topology .- declared) > 1e-8 ? "yes" : "no"
+end
+tree_src = NetworkEstimator()
+graph_src = NetworkEstimator(; alg = MaximumDistanceSimilarity())
+
+pretty_table(DataFrame("Algorithm" => first.(cts),
+                       "Tree source" => [ov_moves(tree_src, n, ct) for (n, ct) in cts],
+                       "Graph source" => [ov_moves(graph_src, n, ct) for (n, ct) in cts]);
+             title = "Does asking for the topology alone move the score?")
+
+#=
+Two of the eight move on the tree, five of the eight on the triangulated maximally filtered graph.
+That gap is the whole difference between the weighted and the unweighted answer, and it is
+remarkably stable — measured across seven windows, nine universes, seven distance estimators and
+seven network algorithms, it is two on every tree and five on every graph. **Four** is a different
+quantity: it is the split in the first table, and it counts the algorithms that take a weighted
+*route*, not the ones whose answer *moves*. The two coincide only on a graph.
+
+The request runs one way only. It removes the weights and never supplies them, and there is no
+value that forces a polarity onto an algorithm. Forcing one would succeed rather than raise — the
+distance-weighted graph is available on both branches — and the algorithm would read a distance
+where it needs a similarity, reversing its own ordering in silence.
+
+The override also puts `sep` back in play. All five of these algorithms respond to `n = 1` versus
+`n = 3` once they carry `ov = TopologyOnly()`, including the four that were `sep`-inert in the
+first table, because the unweighted route is the one that reads the separation closure.
+
+That is worth knowing before you reach for it as a stabiliser. A topology-only centrality is
+sometimes argued to be the more fold-stable of the two, since it does not move when the estimated
+weights do. It trades them for a second knob rather than removing one, and under a bare
+[`PathLength`](@ref) that knob is the observed diameter — the data-dependent quantity the argument
+set out to avoid. Nothing here defaults to it: [`CentralityEstimator`](@ref)'s `ct` is a
+[`DegreeCentrality`](@ref), which reads the topology already, and the five that declare a polarity
+keep reading the weights their source carries unless you say otherwise.
 
 ## 5. Comparing the structural constraints
 =#
@@ -388,6 +448,21 @@ one dial. The last one is a single block: that is what "relate everything" looks
 #src   - NOT reproducible from the public API: the "weighted moves 4 of 8 defaults" claim needs
 #src     the pre-weighting answer, and there is no user switch for an unweighted graph. Stated in
 #src     prose as a re-measure warning instead of faked with an internal call.
+#src - §4.2 added 2026-08-10 for the polarity override (issue #259, map #252). THE 4-OF-8 CLAIM
+#src   ABOVE WAS WRONG and is now deleted. #257 re-measured over 7 windows x 9 universes x 7
+#src   distance estimators x 7 network algorithms (2608 cells): the count of centralities whose
+#src   answer changes between the weighted and unweighted graph is 2 on EVERY tree cell and 5 on
+#src   EVERY graph cell. Four NEVER occurs. The four is the sep split in §4.1's table — algorithms
+#src   taking a weighted ROUTE, of which only two ANSWER differently on a tree, because betweenness
+#src   and stress are invariant there by theorem. Taking a weighted route != the answer moving.
+#src   §4.2's table is the public-API demonstration that #246 could not write: TopologyOnly shipped
+#src   in #258, so `ov` makes the unweighted answer reachable without an internal calc_centrality
+#src   call. Measured on this slice: tree yes = Closeness, Radiality; graph yes = all five.
+#src   ALSO MEASURED, and stated in prose: all five become sep-LIVE under ov = TopologyOnly(),
+#src   because the override routes them through phylogeny_matrix.
+#src   The ADR 0048 Consequences bullet carried the same wrong four and its enumeration also
+#src   missed EigenvectorCentrality on the similarity branch — corrected in an appended amendment,
+#src   not rewritten.
 #src - SCOPE: the two knobs (sep vs Proximity.decay) and the data-dependent dmax hazard on `Z` are
 #src   named here in one paragraph but NOT worked — PhylogenyFeatures has no page, and its page is
 #src   #185's (map #160, all four feature-matrix producers). Requirement recorded on #185.

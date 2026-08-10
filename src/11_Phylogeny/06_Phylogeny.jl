@@ -138,10 +138,13 @@ All concrete and/or abstract types implementing specific centrality algorithms (
 
 A member says which quantity its edge weights must be, through [`centrality_polarity`](@ref), and [`centrality_graph`](@ref) supplies it. The declaration is about **correctness** — a shortest path over similarities is backwards — and never about capability: a member that declares nothing, and a source that carries no weights, both run on the plain graph rather than raising. The fallback declares `nothing`, so a new member is unweighted until it opts in.
 
+The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@ref) in it withdraws the declaration for that instance. [`centrality_polarity`](@ref) therefore answers the **effective** polarity, not the declared one.
+
 # Related
 
   - [`centrality_polarity`](@ref)
   - [`centrality_graph`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`BetweennessCentrality`](@ref)
   - [`ClosenessCentrality`](@ref)
   - [`DegreeCentrality`](@ref)
@@ -168,6 +171,14 @@ It removes weights and never supplies them. There is no value that forces a pola
 The answer over the topology alone is available from every source, so the override never warns and never goes inert. On a partition source, on a precomputed [`PhylogenyResult`](@ref), and on the tree branch under [`SimilarityPolarity`](@ref), the plain graph is what those routes already build, so the request is satisfied before it is made.
 
 Only the five algorithms that declare a polarity carry an `ov` field. [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref) already return the topology-only answer, so there is nothing for them to override and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`.
+
+# It is a choice, not a simplification, and it moves no default
+
+A topology-only centrality is often argued to be the more **fold-stable** of the two, by the same reasoning that makes a fixed `dmax` fold-stable under [`PathLength`](@ref). That is not a reason to default to it.
+
+**The shipped default is already unweighted.** [`CentralityEstimator`](@ref)'s `ct` defaults to [`DegreeCentrality`](@ref), which declares no polarity, so a caller who names no algorithm gets this answer already. Defaulting `ov` to `TopologyOnly` would change the answer only for a caller who named one of the five deliberately — and for those five, reading the weights the source carries is the correct answer, which is what [`AbstractCentralityPolarity`](@ref) exists to say.
+
+**The override re-arms `sep`.** The plain-graph route reads the separation closure [`phylogeny_matrix`](@ref) builds, and the weighted routes bypass it. So the override trades the edge weights for a second knob rather than removing one: measured over twenty assets, all five algorithms answer differently at `HopCount(; n = 1)` and at `n = 3` once they carry it, including the four that are inert to `sep` without it. Under a bare [`PathLength`](@ref) that knob is the **observed diameter**, which is the data-dependent quantity the fold-stability argument set out to avoid.
 
 # Examples
 
@@ -264,7 +275,7 @@ Centrality algorithm type for betweenness centrality.
 
 `BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
-Declares [`DistancePolarity`](@ref): it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -310,9 +321,9 @@ BetweennessCentrality
     """
     $(field_dict[:ctov])
     """
-    ov <: Option{TopologyOnly}
+    ov
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple,
-                                   ov::Option{TopologyOnly} = nothing)
+                                   ov::Option{TopologyOnly})
         assert_centrality_args(BetweennessCentrality, args)
         return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
@@ -328,7 +339,7 @@ Centrality algorithm type for closeness centrality.
 
 `ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
-Declares [`DistancePolarity`](@ref): it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -374,9 +385,8 @@ ClosenessCentrality
     """
     $(field_dict[:ctov])
     """
-    ov <: Option{TopologyOnly}
-    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple,
-                                 ov::Option{TopologyOnly} = nothing)
+    ov
+    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple, ov::Option{TopologyOnly})
         assert_centrality_args(ClosenessCentrality, args)
         return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
@@ -393,6 +403,8 @@ Centrality algorithm type for degree centrality.
 `DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
 
 Declares no polarity and runs on the plain graph: `Graphs.degree_centrality` counts edges and ignores what they weigh. It is therefore one of the algorithms for which the estimator's `sep` stays **live** — the unweighted route reads the separation closure [`phylogeny_matrix`](@ref) builds, so `HopCount(; n = 2)` does change this answer.
+
+It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`.
 
 # Fields
 
@@ -424,6 +436,7 @@ DegreeCentrality
 
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
@@ -450,7 +463,7 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
 
 `EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
 
-Declares [`SimilarityPolarity`](@ref), the only member that does: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -484,7 +497,7 @@ EigenvectorCentrality
     """
     $(field_dict[:ctov])
     """
-    ov <: Option{TopologyOnly}
+    ov
     function EigenvectorCentrality(ov::Option{TopologyOnly})
         return new{typeof(ov)}(ov)
     end
@@ -500,6 +513,8 @@ Centrality algorithm type for Katz centrality.
 `KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
 
 Declares no polarity and runs on the plain graph: `Graphs.katz_centrality` binarises its input through `adjacency_matrix(g, Bool)`, and throws an `InexactError` when the graph is weighted. The unweighted route is real code here rather than an absent check.
+
+It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `KatzCentrality(; ov = TopologyOnly())` is a `MethodError`.
 
 # Fields
 
@@ -529,6 +544,7 @@ KatzCentrality
 
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
@@ -552,6 +568,8 @@ Centrality algorithm type for PageRank.
 `Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
 
 Declares no polarity and runs on the plain graph: `Graphs.pagerank` ignores edge weights. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
+
+It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` is a `MethodError`.
 
 # Fields
 
@@ -587,6 +605,7 @@ Pagerank
 
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_polarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
@@ -620,7 +639,7 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
-Declares [`DistancePolarity`](@ref): it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -654,7 +673,7 @@ RadialityCentrality
     """
     $(field_dict[:ctov])
     """
-    ov <: Option{TopologyOnly}
+    ov
     function RadialityCentrality(ov::Option{TopologyOnly})
         return new{typeof(ov)}(ov)
     end
@@ -669,7 +688,7 @@ Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
 
-Declares [`DistancePolarity`](@ref): it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Fields
 
@@ -715,9 +734,8 @@ StressCentrality
     """
     $(field_dict[:ctov])
     """
-    ov <: Option{TopologyOnly}
-    function StressCentrality(args::Tuple, kwargs::NamedTuple,
-                              ov::Option{TopologyOnly} = nothing)
+    ov
+    function StressCentrality(args::Tuple, kwargs::NamedTuple, ov::Option{TopologyOnly})
         assert_centrality_args(StressCentrality, args)
         return new{typeof(args), typeof(kwargs), typeof(ov)}(args, kwargs, ov)
     end
@@ -735,12 +753,13 @@ A weighted network carries one of two opposite quantities on its edges. A **dist
 
 # Polarity never decides whether the call succeeds
 
-It selects **which** weights an algorithm receives, and nothing else. An algorithm that declares no polarity, and a source that carries no weights, both run on the plain unweighted graph rather than raising — see the warning on [`centrality_vector`](@ref) for the full list. Weightedness is a property of the source, not of the request: there is no flag, so a caller names an algorithm and never asks for weights in the first place.
+It selects **which** weights an algorithm receives, and nothing else. An algorithm that declares no polarity, and a source that carries no weights, both run on the plain unweighted graph rather than raising — see the warning on [`centrality_vector`](@ref) for the full list. Weightedness is a property of the source, not of the request: there is no flag, so a caller names a configured algorithm and never asks *for* weights. The one request there is, [`TopologyOnly`](@ref) in the algorithm's `ov` field, asks *away* from them, and every source can serve it.
 
 # Related
 
   - [`DistancePolarity`](@ref)
   - [`SimilarityPolarity`](@ref)
+  - [`TopologyOnly`](@ref)
   - [`centrality_polarity`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`centrality_graph`](@ref)
@@ -1413,11 +1432,13 @@ Estimator type for centrality-based analysis.
 
 `CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
 
-The network is weighted where it can be. [`centrality_polarity`](@ref) declares which quantity `ct` needs — distances for the shortest-path algorithms, similarities for [`EigenvectorCentrality`](@ref) — and [`centrality_graph`](@ref) supplies it from `pl`.
+The network is weighted where it can be. [`centrality_polarity`](@ref) answers which quantity `ct` needs — distances for the shortest-path algorithms, similarities for [`EigenvectorCentrality`](@ref) — and [`centrality_graph`](@ref) supplies it from `pl`.
+
+The estimator carries no override of its own. A caller who wants the centrality over the network's topology alone configures `ct` itself, with [`TopologyOnly`](@ref) in its `ov` field, and this estimator is a pure bundle of `pl` and `ct` either way.
 
 !!! warning
 
-    Five cases run on the **unweighted** graph, and none of them raises. A caller names an algorithm and never asks for weights, so an unweightable pairing has not been handed a request it cannot serve.
+    Five cases run on the **unweighted** graph, and none of them raises. A caller names a configured algorithm and never asks *for* weights, so an unweightable pairing has not been handed a request it cannot serve. [`TopologyOnly`](@ref) asks *away* from them, which every source can serve, so it adds no case to this list and is not one of the five.
 
      1. A clustering estimator or a precomputed [`Clusters`](@ref) as `pl`, or a precomputed [`PhylogenyResult`](@ref) passed to [`centrality_vector`](@ref) directly. A partition has no edge weights, and does not borrow any.
      2. [`DegreeCentrality`](@ref). `Graphs.jl` ignores weights.
@@ -2217,7 +2238,7 @@ end
     centrality_graph(polarity::Option{<:AbstractCentralityPolarity},
                      nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Build the graph [`calc_centrality`](@ref) runs on, weighted in the polarity `ct` declares.
+Build the graph [`calc_centrality`](@ref) runs on, weighted in the polarity [`centrality_polarity`](@ref) answers for `ct`.
 
 The one place where the source and the algorithm are both in scope, so it is the one place the pairing can be resolved. [`centrality_polarity`](@ref) says which quantity `ct` needs; the source says which quantities it has.
 
@@ -2249,7 +2270,7 @@ The three-argument methods taking `ct` resolve [`centrality_polarity`](@ref) and
 
   - $(field_dict[:pler])
   - $(field_dict[:cta])
-  - `polarity`: Declared polarity of `ct`, from [`centrality_polarity`](@ref).
+  - `polarity`: Effective polarity of `ct`, from [`centrality_polarity`](@ref).
   - `nte`: Network estimator.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
@@ -2303,11 +2324,11 @@ end
 
 Compute the centrality vector for a network and centrality algorithm.
 
-This function builds the graph with [`centrality_graph`](@ref) — weighted in the polarity `ct` declares, where the source can supply it — and computes node centrality scores with [`calc_centrality`](@ref).
+This function builds the graph with [`centrality_graph`](@ref) — weighted in the polarity [`centrality_polarity`](@ref) answers for `ct`, where the source can supply it — and computes node centrality scores with [`calc_centrality`](@ref).
 
 !!! warning
 
-    Five cases run on the **unweighted** graph, and none of them raises. A caller names an algorithm and never asks for weights, so an unweightable pairing has not been handed a request it cannot serve.
+    Five cases run on the **unweighted** graph, and none of them raises. A caller names a configured algorithm and never asks *for* weights, so an unweightable pairing has not been handed a request it cannot serve. [`TopologyOnly`](@ref) asks *away* from them, which every source can serve, so it adds no case to this list and is not one of the five.
 
      1. A clustering estimator, a precomputed [`Clusters`](@ref), or a precomputed [`PhylogenyResult`](@ref) as the source. A partition has no edge weights, and does not borrow any.
      2. [`DegreeCentrality`](@ref). `Graphs.jl` ignores weights.

@@ -386,3 +386,69 @@ arithmetic obstacle and not something an interface unblocks.
 Found by [#245](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/245) while discharging
 map [#241](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/241)'s report to map
 [#195](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/195).
+
+## Amendment (2026-08-10): a caller may decline the weights, and the moved-answer figure was wrong
+
+Map [#252](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/252) asked whether a caller
+may override an algorithm's declared polarity to get the centrality over the network's topology
+alone. The answer is yes, and it ships as `TopologyOnly` in an `ov` field on the five algorithms
+that declare a polarity. This amendment records what that does to two claims of this ADR: one is
+**limited**, and one was **wrong when written**.
+
+### The rule is limited, not contradicted
+
+"A network relates by its separation, and weights by what selected it" is untouched. The override
+never supplies weights and never names a quantity. It withdraws the declaration, so
+`centrality_polarity` answers `nothing` and `centrality_graph` takes the plain-graph route it
+already builds for `DegreeCentrality`, `Pagerank` and `KatzCentrality`. Nothing new is weighted by
+anything, so the selecting-quantity rule has no new case to serve.
+
+What is limited is the sentence in section 5 that reads: *there is no flag, so a caller names an
+algorithm and never asks for weights*. A caller now names a **configured** algorithm, and there is
+exactly one request to make. Its codomain is closed at two states and it runs **one way**:
+
+- **Away from weights is a request, and every source honours it.** The topology-only answer is what
+  a partition source, a precomputed `PhylogenyResult` and the tree branch under `SimilarityPolarity`
+  already compute, so the request is satisfied before it is made. It adds no case to the five that
+  run on the plain graph, and no warning.
+- **Toward weights is not offered at all.** Forcing a polarity onto an algorithm would **succeed**
+  rather than raise — `calc_distance_weighted_graph` carries distances on both branches — and the
+  algorithm would read a distance where it needs a similarity, reversing its own ordering in
+  silence. Polarity correctness is not a runtime property, so nothing could catch it. The field is
+  therefore not typed over `AbstractCentralityPolarity`, not even bounded to one member of it.
+
+So this ADR's *reason* stands and its *scope* narrows: weightedness is still not the caller's to
+assert, because the one thing a caller may say is "do not weight it", and that is a request no
+source can fail. The rejected spelling is a `Bool`. `unweighted::Bool` makes a claim about the
+graph, which this ADR says is not the caller's to make; a named request asks what to read, which
+is. Same two states, different referent.
+
+The five that carry `ov` are `BetweennessCentrality`, `ClosenessCentrality`, `StressCentrality`,
+`RadialityCentrality` and `EigenvectorCentrality`. The other three carry no field, so
+`DegreeCentrality(; ov = TopologyOnly())` is a `MethodError` with no check written. Capability is
+type-level, which is why the refusal is free. `CentralityEstimator` gains nothing and stays a pure
+bundle: `ct` is positional on every public surface, so the override reaches all of them with zero
+signature changes.
+
+### The moved-answer figure was wrong, and it counted a different thing
+
+The Consequences say that the default centrality answer **moves for four of eight algorithms** —
+"closeness and radiality on both branches, betweenness and stress on the similarity branch". That
+enumeration is missing `EigenvectorCentrality`, which also moves on the similarity branch, and the
+count is not four on either branch.
+
+[#257](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/257) re-measured it over 7
+windows, 9 universes, 7 distance estimators and 7 network algorithms — 2608 measured cells. The
+count of algorithms whose answer changes between the weighted and the unweighted graph is **2 on
+every tree cell and 5 on every graph cell**. Not one cut moves it, and **four never occurs**.
+
+The four is real and counts the **`sep` split**: four algorithms take a weighted route on a tree
+(betweenness, closeness, radiality, stress) and are therefore `sep`-inert. Only two of them answer
+differently for it, because betweenness and stress are invariant on a tree by the theorem this ADR
+already asserts. **Taking a weighted route is not the same as the answer moving**, and the two
+coincide only on a graph, where both are five. The golden columns this ADR regenerated are
+unaffected: they record values, not a count.
+
+Found by [#257](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/257) and
+[#259](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/259) while working map
+[#252](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/252).

@@ -46,6 +46,7 @@ separation_budget
 AbstractCentralityPolarity
 DistancePolarity
 SimilarityPolarity
+TopologyOnly
 centrality_polarity
 centrality_graph
 assert_centrality_args
