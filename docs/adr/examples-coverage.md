@@ -64,6 +64,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Meta-optimisers overview — `NestedClustered`, `Stacking`, `SubsetResampling` | `examples/3_optimisers/13_Meta_Optimisers.jl` |
 | ✅ | Subset resampling and cross-validation — `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser | `examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl` |
 | ✅ | Near optimal centering | `examples/3_optimisers/15_Near_Optimal_Centering.jl` |
+| ✅ | Feature matrices as a distance source — `FeatureDistance` driving `ClustersEstimator`, all four producers (literal matrix, `AssetSetsFeatures` and its graded edge-authoring grammar, `RegressionFeatures`, `PhylogenyFeatures`), `Proximity`'s `decay` crossed against `HopCount`/`PathLength` separations, metric domains and the `sim` slot, static vs time-varying shapes and the four collapse rules, the `z_src` carrier selector (`:data` slices, `:prior` refits), the square-`Z` non-commutation with an asset view, the meta-optimiser collapse onto synthetic assets, and what cross-validation exposes (a time-varying literal `ze` fails an observation fold; a bare `PathLength()` makes `Z`'s scale sample-dependent, additively) | `examples/3_optimisers/16_Feature_Distance_Clustering.jl` |
 
 ## 4. Constraints and costs
 

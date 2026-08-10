@@ -490,6 +490,14 @@ function feature_matrix(ze::AssetSetsFeatures, ::AbstractPriorResult, ::Any, ::A
               IsNothingError("AssetSetsFeatures reads its taxonomy from `FeaturePrior.sets`, which is nothing. Pass `FeaturePrior(; ze = AssetSetsFeatures(; vals = $(ze.vals)), sets = UniverseSets(…))`."))
     return asset_sets_features(ze.vals, sets; strict = ze.strict)
 end
+# A literal is the one feature source that cannot follow an observation fold, because it is the
+# one that cannot recompute. The shared `LowOrderPrior` message can only name the axis convention
+# — the carried matrix raises it too — so the remedies are named here, where the carrier is known.
+function feature_matrix(ze::Arr3Num, ::AbstractPriorResult, X::MatNum, args...; kwargs...)
+    @argcheck(size(ze, 1) == size(X, 1),
+              DimensionMismatch("a literal time-varying feature matrix on `FeaturePrior.ze` cannot follow an observation fold. The view layer hands an estimator asset indices only, so its observation axis stays at its original length while the returns are cut to the fold, and nothing can recover which rows to keep. Got size(ze, 1) = $(size(ze, 1)) and $(size(X, 1)) observations. Three ways forward, best first:\n  1. Compute the features with a producer (an `AbstractFeatureMatrixEstimator` with a `feature_matrix` method). A producer is handed the fold's own `X`, so a time-varying `Z` tracks the fold with no extra plumbing — the derived carrier supports the shape, nothing shipped emits it yet.\n  2. Carry the matrix on the `ReturnsResult` as `Z` and read it with `z_src = :data`. There it is data, so the fold slices its observation axis alongside `X`.\n  3. Pass a static assets × features matrix, which has no observation axis to fall out of step."))
+    return ze
+end
 """
     feature_estimator_view(ze::AbstractFeatureMatrixEstimator, i, args...)
     feature_estimator_view(ze::MatNum_Arr3Num, i, args...)

@@ -3,6 +3,24 @@ using Clustering, StableRNGs, LinearAlgebra
 
 # Every field of a `LowOrderPrior` except the two feature fields. A `FeaturePrior` is a
 # provably pure addition only if all of these come back identical.
+# A producer emitting a time-varying `Z`. Nothing in the library ships one, but the derived
+# carrier accepts the shape and a producer is handed the fold's own `X`, so it tracks the fold
+# with no extra plumbing. Defined here to pin that claim rather than assert it.
+struct TrailingDispersionFeatures <: PortfolioOptimisers.AbstractFeatureMatrixEstimator
+    windows::Vector{Int}
+end
+function PortfolioOptimisers.feature_matrix(ze::TrailingDispersionFeatures,
+                                            ::PortfolioOptimisers.AbstractPriorResult,
+                                            X::PortfolioOptimisers.MatNum, args...;
+                                            kwargs...)
+    T, N = size(X)
+    Z = zeros(T, N, length(ze.windows))
+    for (k, w) in pairs(ze.windows), t in 1:T, i in 1:N
+        Z[t, i, k] = std(view(X, max(1, t - w + 1):t, i))
+    end
+    Z[1, :, :] .= Z[2, :, :]
+    return Z
+end
 const MOMENT_FIELDS = (:X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr)
 # Result structs are immutable, so `==` falls back to `===`, which compares the arrays they
 # hold by identity — two separately computed `Regression`s never match. Recurse instead.
@@ -259,4 +277,46 @@ end
     # A cluster subset of the prior yields the distance over exactly that subset.
     i = [1, 4, 7, 11]
     @test distance(de, PortfolioOptimisers.port_opt_view(pr, i).Z) == D[i, i]
+end
+
+@testset "A time-varying literal cannot follow an observation fold, and says so" begin
+    rng = StableRNG(987654321)
+    na = length(rd.nx)
+    nobs = size(rd.X, 1)
+    Zlit = rand(rng, nobs, na, 2)
+
+    # It is only a *changed* observation count that fails. Construction, an asset view and a
+    # fit on the full sample all succeed, which is why cross-validation is where it surfaces.
+    pe = FeaturePrior(; pe = EmpiricalPrior(), ze = Zlit)
+    @test size(prior(pe, rd).Z) == (nobs, na, 2)
+    @test size(PortfolioOptimisers.port_opt_view(pe, [1, 2, 3]).ze) == (nobs, 3, 2)
+
+    # The estimator-side view leaves the observation axis alone — that is what creates the
+    # mismatch, since the returns lose every row outside the fold.
+    err = try
+        prior(pe, rd.X[1:(nobs - 10), :])
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DimensionMismatch)
+    msg = sprint(showerror, err)
+    # The message must name the carrier and all three remedies, producer first: the shared
+    # `LowOrderPrior` message can only name the axis convention.
+    @test occursin("FeaturePrior.ze", msg)
+    @test occursin("producer", msg)
+    @test occursin("z_src = :data", msg)
+    @test occursin("static", msg)
+
+    # A producer has no such problem: it is handed the fold's own `X`, so a time-varying `Z`
+    # tracks the fold. The derived carrier supports the shape; nothing shipped emits it.
+    pe_prod = FeaturePrior(; pe = EmpiricalPrior(),
+                           ze = TrailingDispersionFeatures([5, 21]))
+    @test size(prior(pe_prod, rd).Z) == (nobs, na, 2)
+    @test size(prior(pe_prod, rd.X[1:(nobs - 10), :]).Z) == (nobs - 10, na, 2)
+
+    # And the same matrix on the data carrier is sliced with the returns rather than refused.
+    rdz = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nz = ["a", "b"], Z = Zlit)
+    v = PortfolioOptimisers.port_opt_view(rdz, 1:(nobs - 10), [1, 2, 3])
+    @test size(v.Z) == (nobs - 10, 3, 2)
 end
