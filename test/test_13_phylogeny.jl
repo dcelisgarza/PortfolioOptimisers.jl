@@ -2245,3 +2245,218 @@ on every source, and nothing warns and nothing goes inert.
         @test vec(lc_ov.ineq.A) != vec(lc_pl.ineq.A)
     end
 end
+
+# Rules for a separation budget. Defined at top level because a `@testset` body becomes a
+# function, which cannot host a struct.
+struct ConstantHops{T} <: PortfolioOptimisers.HopCountAlgorithm
+    n::T
+end
+function (r::ConstantHops)(nte, X; dims::Int = 1, kwargs...)
+    return r.n
+end
+struct ConstantRadius{T} <: PortfolioOptimisers.PathLengthAlgorithm
+    dmax::T
+end
+function (r::ConstantRadius)(nte, X; dims::Int = 1, kwargs...)
+    return r.dmax
+end
+# Records what it was handed, so the argument contract is asserted rather than assumed.
+mutable struct RecordingHops <: PortfolioOptimisers.HopCountAlgorithm
+    calls::Int
+    nte::Any
+    size::Any
+    dims::Int
+end
+RecordingHops() = RecordingHops(0, nothing, nothing, 0)
+function (r::RecordingHops)(nte, X; dims::Int = 1, kwargs...)
+    r.calls += 1
+    r.nte = nte
+    r.size = size(X)
+    r.dims = dims
+    return 2
+end
+
+@testset "A separation budget may be a rule" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, LinearAlgebra
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    pr = prior(EmpiricalPrior(), rd)
+    X = pr.X
+    nte = NetworkEstimator()
+    n_assets = size(X, 2)
+    n_pairs = n_assets * (n_assets - 1)
+    related(sep, Xs = X) = count(!iszero,
+                                 phylogeny_matrix(NetworkEstimator(; sep = sep), Xs).X)
+
+    @testset "A stated budget passes through untouched" begin
+        # The fallback on the abstract type is an identity, so an extension inherits the
+        # kernel and a stated budget costs nothing.
+        for sep in (HopCount(), HopCount(; n = 4), PathLength(), PathLength(; dmax = 1.5))
+            @test resolve_separation(sep, nte, X) === sep
+        end
+    end
+
+    @testset "A rule is stored uncalled and resolved at the point of use" begin
+        rec = RecordingHops()
+        sep = HopCount(; n = rec)
+        # Construction does not run it.
+        @test rec.calls == 0
+        @test sep.n === rec
+
+        resolved = resolve_separation(sep, nte, X)
+        @test rec.calls == 1
+        @test resolved == HopCount(; n = 2)
+        # The rule is handed the estimator that owns it and the data the network is about
+        # to be built from, which is what lets it build the structure itself.
+        @test rec.nte === nte
+        @test rec.size == size(X)
+        @test rec.dims == 1
+    end
+
+    @testset "A rule answers exactly as the value it returns" begin
+        # The point of the widening: a rule is a deferred way of writing the same budget,
+        # not a second notion of one.
+        @test related(HopCount(; n = ConstantHops(3))) == related(HopCount(; n = 3))
+        @test related(PathLength(; dmax = ConstantRadius(1.5))) ==
+              related(PathLength(; dmax = 1.5))
+        # A bare `Function` is admitted in the same field.
+        @test related(HopCount(; n = (nte, X; kwargs...) -> 3)) ==
+              related(HopCount(; n = 3))
+        @test related(PathLength(; dmax = (nte, X; kwargs...) -> 1.5)) ==
+              related(PathLength(; dmax = 1.5))
+    end
+
+    @testset "The return value is checked, and then validated" begin
+        # A functor's return type is not part of its signature, so the `Integer` obligation
+        # is a run-time check. It is not cosmetic: three readers use `0:n` as a
+        # matrix-power count, where `0:1.5` drops a power silently.
+        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(1.5)),
+                                                      nte, X)
+        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(nothing)),
+                                                      nte, X)
+        # `nothing` is a stated budget rather than a computed one, so a path length rule
+        # may not answer with it.
+        @test_throws ArgumentError resolve_separation(PathLength(;
+                                                                 dmax = ConstantRadius(nothing)),
+                                                      nte, X)
+        @test_throws ArgumentError resolve_separation(PathLength(;
+                                                                 dmax = ConstantRadius("1")),
+                                                      nte, X)
+        # Resolution goes back through the ordinary constructor, so a rule's answer meets
+        # exactly the validation a stated budget meets.
+        @test_throws DomainError resolve_separation(HopCount(; n = ConstantHops(0)), nte, X)
+        @test_throws DomainError resolve_separation(PathLength(;
+                                                               dmax = ConstantRadius(-1.0)),
+                                                    nte, X)
+        # Storing those same rules is fine. The check belongs where the value exists.
+        @test HopCount(; n = ConstantHops(0)) isa HopCount
+        @test PathLength(; dmax = ConstantRadius(-1.0)) isa PathLength
+    end
+
+    @testset "separation_budget refuses an unresolved separation" begin
+        # It takes the separation matrix rather than the data, deliberately, so it is the
+        # one kernel that cannot resolve a rule. Returning the rule would put a function
+        # where every caller expects a number.
+        d = separation_matrix(HopCount(), nte, X)
+        @test_throws ArgumentError separation_budget(HopCount(; n = ConstantHops(2)), nte,
+                                                     d)
+        @test_throws ArgumentError separation_budget(PathLength(;
+                                                                dmax = ConstantRadius(1.5)),
+                                                     nte, d)
+        # A resolved one answers as before.
+        @test separation_budget(resolve_separation(HopCount(; n = ConstantHops(2)), nte, X),
+                                nte, d) == 2
+    end
+
+    @testset "Every consumer of a network resolves" begin
+        rule = HopCount(; n = ConstantHops(3))
+        stated = HopCount(; n = 3)
+
+        @test phylogeny_matrix(NetworkEstimator(; sep = rule), X).X ==
+              phylogeny_matrix(NetworkEstimator(; sep = stated), X).X
+
+        # Both `clusterise` branches read `n` as a matrix-power count.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            r = clusterise(NetworkClustersEstimator(;
+                                                    nte = NetworkEstimator(; alg = alg,
+                                                                           sep = rule)), X)
+            s = clusterise(NetworkClustersEstimator(;
+                                                    nte = NetworkEstimator(; alg = alg,
+                                                                           sep = stated)),
+                           X)
+            @test r.k == s.k
+            @test PortfolioOptimisers.assignments(r) == PortfolioOptimisers.assignments(s)
+        end
+
+        # The graded feature producer reads the budget through `separation_budget`.
+        prule = PathLength(; dmax = ConstantRadius(1.5))
+        @test PortfolioOptimisers.phylogeny_features(Proximity(),
+                                                     NetworkEstimator(; sep = prule), X) ==
+              PortfolioOptimisers.phylogeny_features(Proximity(),
+                                                     NetworkEstimator(;
+                                                                      sep = PathLength(;
+                                                                                       dmax = 1.5)),
+                                                     X)
+
+        # Centrality reaches the separation through the unweighted route's phylogeny matrix.
+        @test centrality_vector(CentralityEstimator(; pl = NetworkEstimator(; sep = rule)),
+                                X).X == centrality_vector(CentralityEstimator(;
+                                                pl = NetworkEstimator(; sep = stated)),
+                            X).X
+    end
+
+    @testset "The quantile rules place the budget by cardinality" begin
+        # `q` is the share of the reachable off-diagonal pairs the budget relates, so a
+        # continuous budget lands on it and a discrete one cannot.
+        for q in (0.1, 0.25, 0.5)
+            share = related(PathLength(; dmax = PathLengthQuantile(; q = q))) / n_pairs
+            @test isapprox(share, q; atol = 0.01)
+        end
+        # The hop rule rounds to a shell, and three values of `q` collapse onto one budget
+        # here. That is the unit, not a defect.
+        ns = [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)), nte, X).n
+              for q in (0.1, 0.2, 0.25)]
+        @test all(isa.(ns, Integer))
+        @test allequal(ns)
+        # Wider quantiles are never narrower budgets.
+        dmaxs = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = q)), nte,
+                                    X).dmax for q in 0.1:0.1:0.9]
+        @test issorted(dmaxs)
+        @test_throws DomainError PathLengthQuantile(; q = 1.5)
+        @test_throws DomainError HopCountQuantile(; q = -0.1)
+    end
+
+    @testset "A quantile rule holds the pair count still across folds" begin
+        # The motivating case. A `dmax` tuned on the whole sample is a different constraint
+        # strength on every fold; the rule fixes the strength and moves the radius instead.
+        folds = [1:63, 64:126, 127:189, 190:252]
+        fixed = [related(PathLength(; dmax = 1.0107), X[f, :]) for f in folds]
+        ruled = [related(PathLength(; dmax = PathLengthQuantile(; q = 0.25)), X[f, :])
+                 for f in folds]
+        radii = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = 0.25)),
+                                    nte, X[f, :]).dmax for f in folds]
+        @test !allequal(fixed)
+        @test allequal(ruled)
+        @test !allequal(radii)
+    end
+
+    @testset "The quantile population excludes the diagonal and the sentinel" begin
+        # Two disjoint edges. Every reachable off-diagonal separation is one hop, so any
+        # quantile of them is `1`. Admitting `typemax(Int)` would blow the budget up, and
+        # admitting the zero diagonal would drag it down.
+        W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+        X4 = zeros(Float64, 3, 4)
+        pl = FixedDistanceGraph(W, HopCount())
+        d = separation_matrix(HopCount(), pl, X4)
+        @test maximum(d) == typemax(Int)
+        for q in (0.0, 0.5, 1.0)
+            @test PortfolioOptimisers.separation_quantile(d, q) == 1
+        end
+        dp = separation_matrix(PathLength(), pl, X4)
+        @test maximum(dp) == Inf
+        @test PortfolioOptimisers.separation_quantile(dp, 1.0) == 1.0
+        # A structure with no reachable pair of distinct assets has no population.
+        @test_throws ArgumentError PortfolioOptimisers.separation_quantile(zeros(Int, 1, 1),
+                                                                           0.5)
+    end
+end

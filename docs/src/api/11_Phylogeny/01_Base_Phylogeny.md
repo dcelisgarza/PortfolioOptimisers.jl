@@ -8,6 +8,12 @@ PlE_Pl
 factory(pl::PlE_Pl, args...; kwargs...)
 factory(alg::AbstractPhylogenyAlgorithm, args...; kwargs...)
 AbstractSeparationAlgorithm
+HopCountAlgorithm
+PathLengthAlgorithm
+HopCountRule
+HopCountValue
+PathLengthRule
+PathLengthValue
 HopCount
 PathLength
 AbstractSeparationDecayAlgorithm

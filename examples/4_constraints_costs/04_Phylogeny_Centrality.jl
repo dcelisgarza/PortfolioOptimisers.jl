@@ -167,6 +167,93 @@ that path and the trap above on this one. The two knobs live on two different ob
 follows the other: setting `sep` does not imply a `decay`, and setting `decay` does not imply a
 `sep`.
 
+### 2.3 When you cannot state the budget in advance
+
+Everything above assumes you can name the budget. Sometimes you cannot. A cross-validation fold
+refits the graph on a different slice, and a meta optimiser such as [`NestedClustered`](@ref) or
+[`SubsetResampling`](@ref) refits it on a different *universe* — so a `dmax` you tuned once is
+being applied to graphs it was never tuned for.
+
+Both budget fields therefore also take a **rule**: a callable that is handed the estimator and the
+data and returns the budget. `n` takes a [`HopCountAlgorithm`](@ref), `dmax` takes a
+[`PathLengthAlgorithm`](@ref), and either takes a bare function of the same shape.
+[`resolve_separation`](@ref) calls it at the point of use, and one rule of each ships:
+[`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref), which place the budget at a quantile
+of the observed separations.
+
+That changes *which* quantity stays put. A fixed `dmax` holds the **radius** still and lets the
+related-pair count move with the graph; a quantile rule holds the **count** still and lets the
+radius move. Since the count is what a constraint's strength is made of, the second is usually
+what you meant:
+=#
+
+folds = [1:63, 64:126, 127:189, 190:252]
+function fold_sep(sep, f)
+    return count(!iszero, phylogeny_matrix(NetworkEstimator(; sep = sep), pr.X[f, :]).X)
+end
+q_rule = PathLengthQuantile(; q = 0.25)
+function resolved_dmax(f)
+    return resolve_separation(PathLength(; dmax = q_rule), NetworkEstimator(), pr.X[f, :]).dmax
+end
+
+pretty_table(DataFrame("Fold" => ["$(first(f))–$(last(f))" for f in folds],
+                       "Fixed dmax = 1.0107" =>
+                           [fold_sep(PathLength(; dmax = 1.0107), f) for f in folds],
+                       "Rule: resolved dmax" =>
+                           [round(resolved_dmax(f); digits = 4) for f in folds],
+                       "Rule: related pairs" =>
+                           [fold_sep(PathLength(; dmax = q_rule), f) for f in folds]);
+             title = "A fixed radius against a quantile rule, over four folds of the same year")
+
+#=
+`dmax = 1.0107` is the quarter-quantile of the whole year, where it relates `94` of the `380`
+pairs. Applied fold by fold it relates `84`, `110`, `96` and `110` — the constraint is a different
+strength in each fold, and nothing says so. The rule relates `96` in **every** fold, and pays for
+it by moving the radius between `1.2055` and `0.8574`. Neither column is stable in both senses,
+because the graph is refitted either way; the rule just lets you choose which sense you care
+about.
+
+The two quantile rules are not equally good at this, and the reason is the unit. `q` is
+continuous, but a hop count is an integer, so [`HopCountQuantile`](@ref) has to round — and the
+hop shells of §2.2 are coarse enough that the rounding dominates:
+=#
+
+q_grid = [0.1, 0.2, 0.25, 0.3, 0.5, 0.75]
+pretty_table(DataFrame("q" => q_grid,
+                       "HopCountQuantile: n" =>
+                           [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)),
+                                               NetworkEstimator(), pr.X).n for q in q_grid],
+                       "HopCountQuantile: share" =>
+                           [related_pairs(HopCount(; n = HopCountQuantile(; q = q))) /
+                            n_pairs for q in q_grid],
+                       "PathLengthQuantile: share" =>
+                           [related_pairs(PathLength(; dmax = PathLengthQuantile(; q = q))) /
+                            n_pairs for q in q_grid]);
+             formatters = [(v, i, j) -> j in (3, 4) ? "$(round(v*100, digits=1)) %" : v],
+             title = "Asking for a share of the pairs, in two units")
+
+#=
+[`PathLengthQuantile`](@ref) delivers what you asked for to within a rounding of the pair count.
+[`HopCountQuantile`](@ref) cannot: three different values of `q` all land on `n = 2`, because
+there is no hop budget between `2` and `3`. Ask in hops when you think in hops, and ask in
+quantiles through `PathLength` when you think in cardinality.
+
+!!! tip "A rule is checked when it runs, not when it is stored"
+    A [`HopCountAlgorithm`](@ref) must return an `Integer` — three readers use `0:n` as a
+    matrix-power count — and a [`PathLengthAlgorithm`](@ref) must return a `Number`.
+    A functor's return type is not part of its signature, so the check happens in
+    [`resolve_separation`](@ref), the first time the rule is actually asked. Writing your own is
+    two definitions:
+
+    ```julia
+    struct AssetScaledHops <: PortfolioOptimisers.HopCountAlgorithm
+        frac::Float64
+    end
+    function (r::AssetScaledHops)(nte, X; dims::Int = 1, kwargs...)
+        return max(1, round(Int, r.frac * size(X, dims == 1 ? 2 : 1)))
+    end
+    ```
+
 ## 3. Phylogeny constraints
 
 A [`SemiDefinitePhylogenyEstimator`](@ref) adds a semidefinite constraint that discourages
@@ -202,6 +289,7 @@ sep_sweep = ["HopCount(; n = 1)" => HopCount(; n = 1),
              "HopCount(; n = 3)" => HopCount(; n = 3),
              "PathLength(; dmax = 0.5)" => PathLength(; dmax = 0.5),
              "PathLength(; dmax = 1.5)" => PathLength(; dmax = 1.5),
+             "PathLengthQuantile(; q = 0.25)" => PathLength(; dmax = q_rule),
              "PathLength()" => PathLength()]
 res_sweep = [optimise(MeanRisk(; obj = MinimumRisk(),
                                opt = JuMPOptimiser(; pe = pr, slv = slv,

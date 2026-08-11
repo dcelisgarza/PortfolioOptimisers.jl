@@ -241,7 +241,9 @@ function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
 end
 function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::MatNum;
                             kwargs...)::Matrix
-    sep = pl.sep
+    # A rule in the budget field is answered here, where the data is in hand.
+    # `separation_budget` below cannot do it: it takes `d` rather than `X` by design.
+    sep = resolve_separation(pl.sep, pl, X; dims = 1, kwargs...)
     d = separation_matrix(sep, pl, X; dims = 1, kwargs...)
     dmax = separation_budget(sep, pl, d)
     et = eltype(X)

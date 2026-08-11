@@ -91,6 +91,12 @@ A separation algorithm is the rule saying **how far apart** two assets sit in a 
 
 The two questions travel together because they share a unit. A hop count is budgeted in hops and a weighted path length in the distance estimator's units, so a budget stated apart from the rule that measures it would be a number nobody could interpret — which is why the budget lives on the member rather than on [`NetworkEstimator`](@ref).
 
+# A third kernel, and why it is not a third question
+
+[`resolve_separation`](@ref) turns a member whose budget is a **rule** into one whose budget is a value, and is called by every consumer before the other two kernels. It is not a third question about the network: a member whose budget is already a number is returned unchanged by the fallback on this type, so an extension inherits the kernel and never writes one.
+
+The two shipped members widen their budget field to admit a rule — [`HopCountValue`](@ref) and [`PathLengthValue`](@ref) — so a caller who cannot state the budget in advance states what would produce it instead. The resolution happens where the data is in hand, which is the only place a rule can be answered, and it is why [`separation_budget`](@ref) refuses an unresolved member rather than returning a function.
+
 # Separation is not decay
 
 [`AbstractSeparationDecayAlgorithm`](@ref) turns a separation into a *score*; this family produces the separation and says where it runs out. The seam is that `sep` decides **which pairs are related** — every consumer of a network needs that — while `decay` decides **how strongly, as a number**, which only the feature producer wants. That is why `sep` sits on [`NetworkEstimator`](@ref) and `decay` sits on [`Proximity`](@ref).
@@ -105,11 +111,135 @@ The name says nothing about graphs. A taxonomy depth is a separation too, so the
   - [`PathLength`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
+  - [`resolve_separation`](@ref)
+  - [`HopCountAlgorithm`](@ref)
+  - [`PathLengthAlgorithm`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
   - [`NetworkEstimator`](@ref)
   - [`Proximity`](@ref)
 """
 abstract type AbstractSeparationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all rules computing a hop count from the network and the data.
+
+A [`HopCount`](@ref) budget is usually a number the caller states. It does not have to be. A subtype of `HopCountAlgorithm` is a **callable struct** standing in the `n` field, and [`resolve_separation`](@ref) calls it with the network estimator and the data matrix in hand. That is what lets a budget follow a universe whose size the caller cannot know in advance — a cross-validation fold, or a subproblem of a meta optimiser such as [`NestedClustered`](@ref).
+
+# The extension contract
+
+A subtype defines one method, the functor:
+
+    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                      kwargs...) -> Integer
+
+`nte` owns the separation and `X` is the data the network is about to be built from, so a rule may build the structure itself — through [`calc_adjacency`](@ref) or [`separation_matrix`](@ref) — and read whatever it needs off it. It pays for that traversal; see [`resolve_separation`](@ref).
+
+**The return value must be an `Integer`, and this is checked rather than bounded.** A functor's return type is not part of its signature, so the family cannot state the requirement in the type system. [`resolve_separation`](@ref) checks it instead, and the check is not a formality: three readers use `0:n` as a **matrix-power count**, where `0:1.5` silently drops a power rather than failing.
+
+A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction. Subtype this instead when the rule has parameters — the struct holds them, prints them, and is comparable.
+
+# Related
+
+  - [`HopCount`](@ref)
+  - [`HopCountQuantile`](@ref)
+  - [`HopCountRule`](@ref)
+  - [`HopCountValue`](@ref)
+  - [`PathLengthAlgorithm`](@ref)
+  - [`resolve_separation`](@ref)
+"""
+abstract type HopCountAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all rules computing a path-length budget from the network and the data.
+
+The [`PathLength`](@ref) counterpart of [`HopCountAlgorithm`](@ref): a **callable struct** standing in the `dmax` field, called by [`resolve_separation`](@ref) with the network estimator and the data matrix in hand.
+
+The two families are separate because their return obligations differ, and the split is what lets one of them be checked. A hop count must be an `Integer`; a path-length budget is stated in the distance estimator's units, so it is any `Number` — or `nothing`, which resolves to the observed diameter exactly as a stated `nothing` does.
+
+# The extension contract
+
+A subtype defines one method, the functor:
+
+    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                      kwargs...) -> Number
+
+A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction.
+
+**A rule must return a `Number`, and `nothing` is not one.** `nothing` in the `dmax` field means the observed diameter, which is a statement the caller makes *instead of* stating a rule. A rule that meant to ask for the diameter is asking for something the field already spells, and a rule that returned `nothing` by accident would silently get the maximal ball. So [`PathLengthValue`](@ref) covers the rules and the numbers, and the field is an `Option` of it.
+
+# Related
+
+  - [`PathLength`](@ref)
+  - [`PathLengthQuantile`](@ref)
+  - [`PathLengthRule`](@ref)
+  - [`PathLengthValue`](@ref)
+  - [`HopCountAlgorithm`](@ref)
+  - [`resolve_separation`](@ref)
+"""
+abstract type PathLengthAlgorithm <: AbstractAlgorithm end
+"""
+    const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
+
+Alias for the **dynamic** forms of a hop count.
+
+Matches the two things [`resolve_separation`](@ref) *calls* rather than reads: a [`HopCountAlgorithm`](@ref) and a bare `Function`. Used for dispatch, so that `HopCount{<:HopCountRule}` names an unresolved separation and `HopCount{<:Integer}` a resolved one.
+
+# Related
+
+  - [`HopCountAlgorithm`](@ref)
+  - [`HopCountValue`](@ref)
+  - [`HopCount`](@ref)
+  - [`resolve_separation`](@ref)
+"""
+const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
+"""
+    const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
+
+Alias for everything [`HopCount`](@ref)'s `n` field accepts.
+
+Widens the field from the stated `Integer` to the rules of [`HopCountRule`](@ref) as well. The `Integer` case is the resolved one and every reader takes it directly; a rule is resolved by [`resolve_separation`](@ref) before any reader sees it.
+
+# Related
+
+  - [`HopCount`](@ref)
+  - [`HopCountRule`](@ref)
+  - [`HopCountAlgorithm`](@ref)
+  - [`PathLengthValue`](@ref)
+"""
+const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
+"""
+    const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
+
+Alias for the **dynamic** forms of a path-length budget.
+
+The [`PathLength`](@ref) counterpart of [`HopCountRule`](@ref).
+
+# Related
+
+  - [`PathLengthAlgorithm`](@ref)
+  - [`PathLengthValue`](@ref)
+  - [`PathLength`](@ref)
+  - [`resolve_separation`](@ref)
+"""
+const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
+"""
+    const PathLengthValue = Union{<:Number, <:PathLengthAlgorithm, <:Function}
+
+Alias for everything [`PathLength`](@ref)'s `dmax` field accepts, apart from `nothing`.
+
+The [`PathLength`](@ref) counterpart of [`HopCountValue`](@ref), and the field is `Option{PathLengthValue}` rather than this alias alone. The asymmetry is deliberate: `nothing` in that field means the observed diameter, which is one of the *stated* budgets and not something a rule may answer with. Keeping it outside the alias is what makes [`resolve_separation`](@ref)'s check a plain `isa(dmax, Number)`.
+
+# Related
+
+  - [`PathLength`](@ref)
+  - [`PathLengthRule`](@ref)
+  - [`PathLengthAlgorithm`](@ref)
+  - [`HopCountValue`](@ref)
+  - [`Option`](@ref)
+"""
+const PathLengthValue = Union{<:Number, <:PathLengthAlgorithm, <:Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -119,6 +249,12 @@ The separation between two assets is the length of the shortest path between the
 
 The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. [`PathLength`](@ref) measures the same structure in the distance estimator's units and carries its own budget in those, so no caller has to know which unit is in play.
 
+# The budget may be a rule instead of a number
+
+`n` also takes a [`HopCountAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `n(nte, X; dims = dims, kwargs...)` at the point of use. A caller who cannot state the budget in advance — because the universe is a cross-validation fold or a subproblem of a meta optimiser — states the *rule* that produces it instead of a number that was right for one universe. [`HopCountQuantile`](@ref) is the shipped rule.
+
+`n` is still an `Integer` **once resolved**, and never a `Real`. Three readers use `0:(nte.sep.n)` as a **matrix-power count**, where `0:1.5` silently drops a power instead of failing, so [`resolve_separation`](@ref) checks the rule's return value rather than trusting it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -126,7 +262,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HopCount(;
-        n::Integer = 1
+        n::HopCountValue = 1
     ) -> HopCount
 
 Keywords correspond to the struct's fields.
@@ -135,20 +271,27 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:ntn])
 
-`n` stays an `Integer` rather than widening to a `Real`. Three readers use `0:(nte.sep.n)` as a **matrix-power count**, and `0:1.5` silently drops a power instead of failing.
-
 # Examples
 
 ```jldoctest
 julia> HopCount()
 HopCount
   n ┴ Int64: 1
+
+julia> HopCount(; n = HopCountQuantile())
+HopCount
+  n ┼ HopCountQuantile
+    │   q ┴ Float64: 0.25
 ```
 
 # Related
 
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`PathLength`](@ref)
+  - [`HopCountValue`](@ref)
+  - [`HopCountAlgorithm`](@ref)
+  - [`HopCountQuantile`](@ref)
+  - [`resolve_separation`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
   - [`NetworkEstimator`](@ref)
@@ -159,12 +302,16 @@ HopCount
     $(field_dict[:ntn])
     """
     n
-    function HopCount(n::Integer)
-        @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
+    function HopCount(n::HopCountValue)
+        # A rule is a promise about a value that does not exist yet, so there is nothing to
+        # check here. `resolve_separation` checks what it returns.
+        if isa(n, Integer)
+            @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
+        end
         return new{typeof(n)}(n)
     end
 end
-function HopCount(; n::Integer = 1)::HopCount
+function HopCount(; n::HopCountValue = 1)::HopCount
     return HopCount(n)
 end
 """
@@ -196,6 +343,12 @@ On a real universe the two agree far more than that suggests — measured over t
 
 The default reads very differently through [`phylogeny_matrix`](@ref), which **selects** on the budget instead of shaping a fall-off inside it. "The whole connected component" there means every reachable pair is related, so `NetworkEstimator(; sep = PathLength())` yields a matrix of ones off the diagonal — the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
 
+# The budget may be a rule instead of a number
+
+`dmax` also takes a [`PathLengthAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `dmax(nte, X; dims = dims, kwargs...)` at the point of use. This is the answer to the paragraph above for a caller who *cannot* state a number: [`PathLengthQuantile`](@ref) asks for the budget that relates a stated **fraction of the reachable pairs**, which is a quantity a caller does have an intuition for, and which means the same thing on every fold of a cross-validation and in every subproblem of a meta optimiser.
+
+A fixed `dmax` and a rule buy different things, and the difference is the whole point. A fixed `dmax` holds the **radius** still and lets the related-pair count move with the graph. A quantile rule holds the **count** still and lets the radius move. Neither is fold-stable in both senses at once, because the graph is refitted either way.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -203,7 +356,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PathLength(;
-        dmax::Union{Nothing, <:Number} = nothing
+        dmax::Option{PathLengthValue} = nothing
     ) -> PathLength
 
 Keywords correspond to the struct's fields.
@@ -222,12 +375,21 @@ PathLength
 julia> PathLength(; dmax = 0.5)
 PathLength
   dmax ┴ Float64: 0.5
+
+julia> PathLength(; dmax = PathLengthQuantile(; q = 0.3))
+PathLength
+  dmax ┼ PathLengthQuantile
+       │   q ┴ Float64: 0.3
 ```
 
 # Related
 
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`HopCount`](@ref)
+  - [`PathLengthValue`](@ref)
+  - [`PathLengthAlgorithm`](@ref)
+  - [`PathLengthQuantile`](@ref)
+  - [`resolve_separation`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
   - [`calc_distance_weighted_graph`](@ref)
@@ -239,14 +401,16 @@ PathLength
     $(field_dict[:sepdmax])
     """
     dmax
-    function PathLength(dmax::Union{Nothing, <:Number})
-        if !isnothing(dmax)
+    function PathLength(dmax::Option{PathLengthValue})
+        # A rule is a promise about a value that does not exist yet, so there is nothing to
+        # check here. `resolve_separation` checks what it returns.
+        if isa(dmax, Number)
             @argcheck(dmax > zero(dmax), DomainError(dmax, "dmax must be > 0"))
         end
         return new{typeof(dmax)}(dmax)
     end
 end
-function PathLength(; dmax::Union{Nothing, <:Number} = nothing)::PathLength
+function PathLength(; dmax::Option{PathLengthValue} = nothing)::PathLength
     return PathLength(dmax)
 end
 """

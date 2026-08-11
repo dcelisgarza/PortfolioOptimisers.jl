@@ -1893,6 +1893,265 @@ function separation_budget(sep::PathLength, ::AbstractNetworkEstimator, d::MatNu
     end
     return isnothing(sep.dmax) ? delta : min(sep.dmax, delta)
 end
+# An unresolved budget is a rule, and a rule cannot be compared against an entry of `d`.
+# Returning it would put a function where every caller expects a number, so it is refused
+# here rather than three frames later inside `d .<= dmax`.
+function separation_budget(sep::HopCount{<:HopCountRule}, ::AbstractNetworkEstimator,
+                           ::MatNum)
+    return throw(ArgumentError("separation_budget needs a resolved separation, and this HopCount carries the rule $(typeof(sep.n)) in `n`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
+end
+function separation_budget(sep::PathLength{<:PathLengthRule}, ::AbstractNetworkEstimator,
+                           ::MatNum)
+    return throw(ArgumentError("separation_budget needs a resolved separation, and this PathLength carries the rule $(typeof(sep.dmax)) in `dmax`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Quantile of the reachable off-diagonal entries of a separation matrix.
+
+The population is the pairs a budget can be *about*: the diagonal is zero by construction and an unreachable pair carries [`separation_matrix`](@ref)'s sentinel, so neither is a separation. It is also the population [`phylogeny_matrix`](@ref) selects from, which is what makes `q` read as the fraction of pairs the resulting budget relates.
+
+# The sentinel test is not `isfinite` alone
+
+`isfinite` is `true` for every `Integer`, so it does not exclude [`HopCount`](@ref)'s `typemax(Int)`. The test is against `typemax` of the element type, which excludes both sentinels; `isfinite` stays to reject a `NaN` that no shipped path produces.
+
+# Arguments
+
+  - `d`: Separation matrix from [`separation_matrix`](@ref).
+  - `q`: Quantile in `[0, 1]`.
+
+# Returns
+
+  - `dmax::Number`: The `q`-quantile of the reachable off-diagonal separations.
+
+# Related
+
+  - [`HopCountQuantile`](@ref)
+  - [`PathLengthQuantile`](@ref)
+  - [`separation_matrix`](@ref)
+"""
+function separation_quantile(d::MatNum, q::Number)::Number
+    T = eltype(d)
+    v = [d[i, j] for j in axes(d, 2)
+         for i in axes(d, 1) if i != j && isfinite(d[i, j]) && d[i, j] != typemax(T)]
+    @argcheck(!isempty(v),
+              ArgumentError("a separation quantile needs at least one reachable pair of distinct assets, and this $(size(d, 1))-asset structure has none."))
+    return Statistics.quantile(v, q)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Hop budget placed at a quantile of the observed hop separations.
+
+The shipped [`HopCountAlgorithm`](@ref). `HopCount(; n = HopCountQuantile(; q = 0.25))` asks for the hop budget that relates about a quarter of the reachable pairs, instead of naming a number of hops that was right for one universe.
+
+# What it holds still
+
+A stated `n` holds the **number of hops** still and lets the related-pair count move with the graph. This rule holds the **count** still — about `q` of the reachable pairs — and lets the number of hops move. On a cross-validation fold or a subproblem of a meta optimiser the second is usually what the caller meant, because the constraint strength a downstream consumer feels is the cardinality, not the hop number.
+
+# The rounding is where the two stop matching
+
+A hop count is an `Integer` and the quantile is not, so the budget is rounded to the nearest hop. The related-pair count therefore lands *near* `q` rather than on it, and on a small graph the shells are coarse enough that it can miss by a lot — a hop budget can only ever select one of a handful of cardinalities. [`PathLengthQuantile`](@ref) has no such step and hits `q` closely; that is the sharpest practical difference between the two separations.
+
+# It pays for a traversal
+
+Resolving this rule runs [`separation_matrix`](@ref) once, which the hop-ball branch of [`_phylogeny_matrix`](@ref) does not otherwise do — it walks matrix powers instead. A dynamic budget costs one all-pairs traversal that a stated one does not.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HopCountQuantile(;
+        q::Number = 0.25
+    ) -> HopCountQuantile
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:sepq])
+
+# Examples
+
+```jldoctest
+julia> HopCountQuantile()
+HopCountQuantile
+  q ┴ Float64: 0.25
+```
+
+# Related
+
+  - [`HopCountAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`PathLengthQuantile`](@ref)
+  - [`resolve_separation`](@ref)
+  - [`separation_quantile`](@ref)
+"""
+@concrete struct HopCountQuantile <: HopCountAlgorithm
+    """
+    $(field_dict[:sepq])
+    """
+    q
+    function HopCountQuantile(q::Number)
+        @argcheck(zero(q) <= q <= one(q), DomainError(q, "q must be in [0, 1]"))
+        return new{typeof(q)}(q)
+    end
+end
+function HopCountQuantile(; q::Number = 0.25)::HopCountQuantile
+    return HopCountQuantile(q)
+end
+function (alg::HopCountQuantile)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                                 kwargs...)::Integer
+    # `separation_matrix` dispatches on the separation's *type* and reads no field of it, so
+    # a bare `HopCount()` here is a probe saying "measure in hops" rather than a budget.
+    d = separation_matrix(HopCount(), nte, X; dims = dims, kwargs...)
+    # The smallest off-diagonal hop separation is `1`, so the quantile never falls below one
+    # and the round never has to be clamped up to `HopCount`'s floor.
+    return round(Int, separation_quantile(d, alg.q))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Path-length budget placed at a quantile of the observed path separations.
+
+The shipped [`PathLengthAlgorithm`](@ref), and the direct answer to [`PathLength`](@ref)'s own complaint that nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits. `dmax = 0.37` is not a number a caller can reason about; "the budget that relates a quarter of the reachable pairs" is.
+
+# What it holds still
+
+A stated `dmax` holds the **radius** still and lets the related-pair count move with the graph. This rule holds the **count** still and lets the radius move. Both are refitted per fold, so neither is stable in both senses at once — the choice is which of the two a downstream consumer is sensitive to, and for [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref) the constraint strength *is* the cardinality.
+
+# It reaches the cardinalities a hop count cannot
+
+This is where the radius ball's one real gain becomes reachable by name. A hop budget steps through a handful of shell cardinalities and cannot stop between them; `q` is continuous, so `PathLengthQuantile(; q = 0.3)` asks for a cardinality directly and lands on it closely.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PathLengthQuantile(;
+        q::Number = 0.25
+    ) -> PathLengthQuantile
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:sepq])
+
+# Examples
+
+```jldoctest
+julia> PathLengthQuantile()
+PathLengthQuantile
+  q ┴ Float64: 0.25
+```
+
+# Related
+
+  - [`PathLengthAlgorithm`](@ref)
+  - [`PathLength`](@ref)
+  - [`HopCountQuantile`](@ref)
+  - [`resolve_separation`](@ref)
+  - [`separation_quantile`](@ref)
+"""
+@concrete struct PathLengthQuantile <: PathLengthAlgorithm
+    """
+    $(field_dict[:sepq])
+    """
+    q
+    function PathLengthQuantile(q::Number)
+        @argcheck(zero(q) <= q <= one(q), DomainError(q, "q must be in [0, 1]"))
+        return new{typeof(q)}(q)
+    end
+end
+function PathLengthQuantile(; q::Number = 0.25)::PathLengthQuantile
+    return PathLengthQuantile(q)
+end
+function (alg::PathLengthQuantile)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                                   kwargs...)::Number
+    # A bare `PathLength()` is the probe here, for the same reason as on the hop rule.
+    d = separation_matrix(PathLength(), nte, X; dims = dims, kwargs...)
+    return separation_quantile(d, alg.q)
+end
+"""
+    resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
+                       X::MatNum; dims::Int = 1, kwargs...)
+    resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
+                       X::MatNum; dims::Int = 1, kwargs...)
+    resolve_separation(sep::PathLength{<:PathLengthRule}, nte::AbstractNetworkEstimator,
+                       X::MatNum; dims::Int = 1, kwargs...)
+
+Replace a separation whose budget is a **rule** by one whose budget is a value.
+
+The third kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one an extension does not have to write: the fallback on the abstract type returns `sep` unchanged, so a member whose budget is already a number passes through at no cost and gains nothing to maintain.
+
+# It is called by the consumer, not by the other kernels
+
+Every shipped consumer of a network resolves `nte.sep` **first** and passes the resolved separation to [`separation_matrix`](@ref) and [`separation_budget`](@ref) — [`phylogeny_matrix`](@ref), both [`clusterise`](@ref) methods, and [`phylogeny_features`](@ref) for [`Proximity`](@ref).
+
+The alternative was to resolve inside [`separation_budget`](@ref), and it does not work: that kernel takes the separation **matrix** rather than the data, deliberately, so that [`HopCount`](@ref) never pays for a diameter reduction it ignores. A rule needs `X`, which is the one thing the budget kernel does not have. So `separation_budget` refuses an unresolved separation instead, and this kernel is where `X` is still in hand.
+
+# The return check is a run-time one, and it has to be
+
+A functor's return type is not part of its signature, so a [`HopCountAlgorithm`](@ref) cannot promise an `Integer` in the type system. This kernel checks the value and throws otherwise. The check earns its place: three readers use `0:n` as a **matrix-power count**, where `0:1.5` drops a power silently.
+
+Resolution goes back through the ordinary constructor, so the rule's answer meets exactly the validation a stated budget meets — `n >= 1` and `dmax > 0`.
+
+# Arguments
+
+  - `sep`: Separation algorithm, resolved or not.
+  - `nte`: Network estimator that owns `sep`, handed to the rule so it can build the structure itself.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments, forwarded to the rule.
+
+# Returns
+
+  - `sep::AbstractSeparationAlgorithm`: The same member with a resolved budget. `sep` itself when the budget was already a value.
+
+# Validation
+
+  - A [`HopCountAlgorithm`](@ref) or `Function` in `HopCount`'s `n` must return an `Integer`.
+  - A [`PathLengthAlgorithm`](@ref) or `Function` in `PathLength`'s `dmax` must return a `Number`. `nothing` is a stated budget, not a computed one.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
+  - [`HopCountAlgorithm`](@ref)
+  - [`PathLengthAlgorithm`](@ref)
+  - [`HopCountQuantile`](@ref)
+  - [`PathLengthQuantile`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_budget`](@ref)
+"""
+function resolve_separation end
+function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkEstimator,
+                            ::MatNum; kwargs...)::AbstractSeparationAlgorithm
+    return sep
+end
+function resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
+                            X::MatNum; dims::Int = 1, kwargs...)::HopCount
+    n = sep.n(nte, X; dims = dims, kwargs...)
+    @argcheck(isa(n, Integer),
+              ArgumentError("a hop count rule must return an Integer, because three readers use `0:n` as a matrix-power count.\nGot $(n)::$(typeof(n)) from $(typeof(sep.n))."))
+    return HopCount(n)
+end
+function resolve_separation(sep::PathLength{<:PathLengthRule},
+                            nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                            kwargs...)::PathLength
+    dmax = sep.dmax(nte, X; dims = dims, kwargs...)
+    # `nothing` is a stated budget rather than a computed one, so it is not an admissible
+    # answer here -- see `PathLengthValue`.
+    @argcheck(isa(dmax, Number),
+              ArgumentError("a path length rule must return a Number.\nGot $(dmax)::$(typeof(dmax)) from $(typeof(sep.dmax))."))
+    return PathLength(dmax)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1996,10 +2255,12 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     # The distance is the tree branch's selecting quantity, and it is in hand already for
     # the power sum below, so the shared routine is entered at its two-argument form.
     A = calc_weighted_adjacency(nte.nte.alg, D)
-    # `nte.nte.sep.n` is read as a matrix-power count rather than as a budget: a separation
-    # member that measures something other than hops has no `n`, and fails here rather than
-    # silently truncating a power sum it cannot index.
-    for i in 0:(nte.nte.sep.n)
+    # `n` is read as a matrix-power count rather than as a budget: a separation member that
+    # measures something other than hops has no `n`, and fails here rather than silently
+    # truncating a power sum it cannot index. `resolve_separation` is what makes a rule in
+    # that field safe to index by -- it checks that the rule answered with an `Integer`.
+    n = resolve_separation(nte.nte.sep, nte.nte, X; dims = dims, kwargs...).n
+    for i in 0:n
         P .+= D^i - A^i
     end
     P .-= LinearAlgebra.Diagonal(P)
@@ -2055,8 +2316,10 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
     # The similarity is the PMFG branch's selecting quantity. See the tree method.
     Rpm = calc_weighted_adjacency(nte.nte.alg, S)
-    # See the tree method: a matrix-power count, not a budget.
-    for i in 0:(nte.nte.sep.n)
+    # See the tree method: a matrix-power count, not a budget, and resolved before it is
+    # indexed by.
+    n = resolve_separation(nte.nte.sep, nte.nte, X; dims = dims, kwargs...).n
+    for i in 0:n
         P .+= S^i - Rpm^i
     end
     P .-= LinearAlgebra.Diagonal(P)
@@ -2190,7 +2453,10 @@ What it buys is **intermediate cardinalities between the shells**. Over the same
 """
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
-    return PhylogenyResult(; X = _phylogeny_matrix(nte.sep, nte, X; dims = dims, kwargs...))
+    # The data is in hand here and nowhere below, so a rule in the separation's budget field
+    # is answered here. A member whose budget is already a value passes through untouched.
+    sep = resolve_separation(nte.sep, nte, X; dims = dims, kwargs...)
+    return PhylogenyResult(; X = _phylogeny_matrix(sep, nte, X; dims = dims, kwargs...))
 end
 """
     phylogeny_matrix(cle::ClE_Cl,
@@ -2541,4 +2807,4 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
        CentralityEstimator, centrality_vector, NetworkClustersEstimator, separation_matrix,
        separation_budget, DistancePolarity, SimilarityPolarity, centrality_polarity,
-       TopologyOnly
+       TopologyOnly, resolve_separation, HopCountQuantile, PathLengthQuantile

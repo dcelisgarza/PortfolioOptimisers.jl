@@ -452,3 +452,65 @@ unaffected: they record values, not a count.
 Found by [#257](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/257) and
 [#259](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/259) while working map
 [#252](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/252).
+
+## Amendment (2026-08-11): a budget may be a rule, resolved by a third kernel
+
+Decision 2 gives the separation **two** kernels, and says the budget lives on the member because it
+is the only place that has a unit to state it in. Both still hold. What was missing is that a
+caller sometimes has the unit and still cannot state the number: a cross-validation fold and a
+subproblem of a meta optimiser each refit the graph, so a `dmax` tuned once is applied to graphs it
+was never tuned for. That is a real cost of this ADR's own design — the budget is configuration,
+and configuration is fixed before the data arrives.
+
+[#248](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/248) widens both budget fields
+to admit a **rule** in place of a number, and adds `resolve_separation` as a third kernel.
+
+### The rule is a deferred number, not a second notion of a budget
+
+`HopCount.n` takes a `HopCountAlgorithm` and `PathLength.dmax` takes a `PathLengthAlgorithm`, each
+a callable struct invoked as `rule(nte, X; dims, kwargs...)`; a bare `Function` is admitted in
+either field under the same obligation. `resolve_separation(sep, nte, X)` calls it and rebuilds the
+member around the answer, so everything downstream sees an ordinary `HopCount{<:Integer}` or
+`PathLength{<:Number}` and no reader changed.
+
+Two families rather than one, because the return obligations differ and the split is what lets one
+of them be enforced. A hop count must be an `Integer` — this ADR's own reason, that three readers
+index a matrix power by it — and a path length may be any `Number`. `nothing` is deliberately
+outside `PathLengthValue` and reached only through the `Option`: it means the observed diameter,
+which is a budget the caller *states*, not one a rule computes.
+
+**The check is at run time and cannot be anywhere else.** A functor's return type is not part of
+its signature, so the `Integer` obligation is unstatable in the type system. `resolve_separation`
+checks the value and then feeds it back through the ordinary constructor, so a rule's answer meets
+exactly the validation a stated budget meets.
+
+### Why the kernel is third rather than folded into `separation_budget`
+
+Decision 2 makes `separation_budget`'s third argument the separation **matrix**, so that `HopCount`
+never pays for a diameter reduction it ignores. That choice is what forbids resolving there: a rule
+needs `X`, and `X` is the one thing that kernel does not have. So `separation_budget` **refuses** an
+unresolved member rather than returning a function, and the consumer resolves first —
+`phylogeny_matrix`, both `clusterise` methods, and `phylogeny_features` for `Proximity`.
+
+The fallback on `AbstractSeparationAlgorithm` is an identity, so an extension inherits the kernel
+and a stated budget costs nothing. The family's extension contract is still two methods, not three.
+
+### What a rule buys, and what it does not
+
+It changes **which quantity stays put**, and nothing more. A stated `dmax` holds the *radius* still
+and lets the related-pair count move with the graph; `PathLengthQuantile(; q)` holds the *count*
+still and lets the radius move. Neither is fold-stable in both senses, because the graph is
+refitted either way — the same shape as the amendment above, where an override trades one exposure
+for another rather than removing one.
+
+Measured over four 63-day folds of one year on twenty assets: a `dmax` fixed at the whole-sample
+quarter-quantile relates `84`, `110`, `96` and `110` of the `380` pairs, while
+`PathLengthQuantile(; q = 0.25)` relates `96` in every fold and moves the radius between `1.2055`
+and `0.8574`.
+
+**The two quantile rules are not equally good at it, and the unit is why.** `q` is continuous and a
+hop count is an integer, so `HopCountQuantile` rounds to a shell: on the same graph `q = 0.1`,
+`0.2` and `0.25` all resolve to `n = 2`. `PathLengthQuantile` lands on `q` to within a pair. This is
+the one place where Decision 2's "not comparable as values, only interchangeable" has a practical
+consequence a caller can act on — the radius ball's intermediate cardinalities, which the
+Consequences record as its whole gain, become reachable **by name**.

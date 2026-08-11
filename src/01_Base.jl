@@ -115,8 +115,9 @@ const arg_dict = Dict(
                       :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                       :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
                       :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
-                      :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
-                      :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure.",#
+                      :ntn => "`n`: Number of steps to take in the network for deciding adjacency. An `Integer` is used as it stands. A [`HopCountAlgorithm`](@ref) or a `Function` is a **rule**, called as `n(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return an `Integer`.",#
+                      :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a **rule**, called as `dmax(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return a `Number`.",#
+                      :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
                       :clres => "`res`: Clustering result.",#
                       :S => "`S`: Similarity matrix",#
                       :D => "`D`: Distance matrix",#
@@ -711,8 +712,9 @@ const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                       :sdrate => "`rate > 0`.",#
                       :sdpower => "`power > 0`.",#
                       :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                      :ntn => "`n >= 1`.",#
-                      :sepdmax => "If `dmax` is not `nothing`, `dmax > 0`.",#
+                      :ntn => "If `n` is an `Integer`, `n >= 1`. A rule is checked when it is resolved, not when it is stored.",#
+                      :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. A rule is checked when it is resolved, not when it is stored.",#
+                      :sepq => "`0 <= q <= 1`.",#
                       :A => "`!isempty(A)`.",#
                       :B => "`!isempty(B)`.",#
                       :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
