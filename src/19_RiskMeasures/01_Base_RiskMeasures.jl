@@ -1269,13 +1269,16 @@ The estimator sees `pr.original_X` — the returns the **caller** supplied, slic
 
 `pr.original_X` rather than `pr.X`, because the two differ on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, which spans only the factors: it has rank `size(F, 2)`, and it carries no residual. Fitting a covariance estimator on it returns a **singular** matrix whenever there are more assets than factors, and a prior estimator in a slot could not regress it against those same factors. Off a factor route `original_X === X`, so nothing moves.
 
-There is no method for a [`CoskewnessEstimator`](@ref) or a [`CokurtosisEstimator`](@ref) yet — a coskewness estimator returns the pair `(sk, V)`, whose second half needs a matrix-processing estimator to name. Those two families arrive with the high-order measures.
+A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` together with the matrix-processing estimator that built `V`, as a named tuple — `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref).
+
+`mean` is the centre the higher moment is taken about. [`deferred_centre`](@ref) supplies it, so that the resolved `mu` and the resolved `kt` or `sk` describe one distribution. `nothing` leaves the estimator to centre on its own `me`.
 
 # Related
 
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
   - [`deferred_factors`](@ref)
+  - [`deferred_centre`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`_wprop`](@ref)
 """
@@ -1289,12 +1292,120 @@ end
 function fit_deferred_quantity(dq::AbstractPriorEstimator, pr::AbstractPriorResult)
     return prior(factory(dq, pr.w), pr.original_X, deferred_factors(pr))
 end
+function fit_deferred_quantity(dq::CokurtosisEstimator, pr::AbstractPriorResult;
+                               mean = nothing)
+    kte = factory(dq, pr.w)
+    return cokurtosis(kte, pr.original_X; mean = mean)
+end
+function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult;
+                               mean = nothing)
+    ske = factory(dq, pr.w)
+    sk, V = coskewness(ske, pr.original_X; mean = mean)
+    return (; sk = sk, V = V, skmp = coskewness_processor(ske))
+end
+"""
+    coskewness_processor(ske::CoskewnessEstimator)
+
+Return the matrix-processing estimator that a [`CoskewnessEstimator`](@ref) uses to build `V`, or `nothing` when the estimator names none.
+
+`V = negative_spectral_coskewness(sk, X, mp)`, so building `V` always names a processor. When a coskewness estimator stands in a [`NegativeSkewness`](@ref) `sk` slot, **that** estimator's processor is the one that built the `V` it hands back, and the measure records it in place of its own `mp` so that a later rebuild uses the same one. This mirrors [`HighOrderPrior`](@ref)'s `skmp`.
+
+The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one.
+
+# Related
+
+  - [`CoskewnessEstimator`](@ref)
+  - [`Coskewness`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
+"""
+function coskewness_processor(::CoskewnessEstimator)
+    return nothing
+end
+function coskewness_processor(ske::Coskewness)
+    return ske.mp
+end
+"""
+    deferred_centre(dq, pr::AbstractPriorResult)
+
+Return the centre that a **Deferred Quantity** in a `kt` or `sk` slot takes its moment about, or `nothing` when the estimator names none.
+
+A higher moment is a moment **about a centre**, so the tensor and the centre are one pair of quantities out of one object. When the measure leaves `mu` unstated, the centre comes from the co-moment estimator's own `me` run on `pr.original_X`, is threaded back into the fit as `mean =`, and becomes the resolved `mu`. The measure then centres on exactly the vector its tensor was built about.
+
+A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the answer is `nothing` and the centre is read off the prior result it produced instead.
+
+The [`CokurtosisEstimator`](@ref) and [`CoskewnessEstimator`](@ref) interfaces do not require an `me` field, so the default answers `nothing`. Declare a method for an estimator that names one.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`centring_target`](@ref)
+  - [`Kurtosis`](@ref)
+  - [`Skewness`](@ref)
+"""
+function deferred_centre(::Any, ::AbstractPriorResult)
+    return nothing
+end
+function deferred_centre(dq::Cokurtosis, pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
+end
+function deferred_centre(dq::Coskewness, pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
+end
+"""
+    centring_target(mu)
+
+Turn a resolved `mu` into the per-asset centre that [`cokurtosis`](@ref) and [`coskewness`](@ref) take as `mean =`.
+
+Those two subtract the centre from the `T × N` returns matrix before they build the tensor, so the centre is a row rather than a column. A `VecScalar` contributes its scalar to every asset, which is the per-asset image of the portfolio-level target `dot(w, mu.v) + mu.s`. `nothing` leaves the estimator to centre on its own `me`.
+
+# Related
+
+  - [`deferred_centre`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
+function centring_target(::Nothing)
+    return nothing
+end
+function centring_target(mu::Number)
+    return mu
+end
+function centring_target(mu::VecNum)
+    return transpose(mu)
+end
+function centring_target(mu::VecScalar)
+    return transpose(mu.v) .+ mu.s
+end
+"""
+    fit_deferred_moment(dq, pr::AbstractPriorResult, centre)
+
+Run a **Deferred Quantity** that stands in a `kt` or `sk` slot, about the centre `centre`.
+
+A co-moment estimator takes the centre as `mean =` ([`centring_target`](@ref) puts it in the shape the estimator wants), so the tensor is built about exactly the vector the measure will resolve `mu` to.
+
+Every other occupant centres itself and has no channel to take one, so `centre` is dropped. That is the case of an [`AbstractPriorEstimator`](@ref) in the slot: it computes its own `mu` and its own tensor about that `mu`, and the centre is read **back** off the result it produced rather than pushed into it. A `mu` the caller stated alongside such a slot still wins as the measure's centring target, and the docstring's consistency warning is what covers the gap.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_centre`](@ref)
+  - [`centring_target`](@ref)
+"""
+function fit_deferred_moment(dq, pr::AbstractPriorResult, ::Any)
+    return fit_deferred_quantity(dq, pr)
+end
+function fit_deferred_moment(dq::Union{<:CokurtosisEstimator, <:CoskewnessEstimator},
+                             pr::AbstractPriorResult, centre)
+    return fit_deferred_quantity(dq, pr; mean = centring_target(centre))
+end
 """
     deferred_quantity(fitted, key::Symbol)
 
 Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
 
-A moment estimator produced the quantity itself, so it is returned and `key` is inert. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a named tuple, because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
 
 # Related
 
@@ -1304,6 +1415,11 @@ A moment estimator produced the quantity itself, so it is returned and `key` is 
 """
 function deferred_quantity(fitted, ::Symbol)
     return fitted
+end
+function deferred_quantity(fitted::NamedTuple, key::Symbol)
+    @argcheck(haskey(fitted, key),
+              ArgumentError("The fit in this slot produced no `$key`, so it cannot supply it. Name an estimator that computes `$key`."))
+    return fitted[key]
 end
 function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
     @argcheck(hasproperty(fitted, key),
@@ -1333,21 +1449,25 @@ end
 """
     deferred_derived_quantity(fitted, key::Symbol)
 
-Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`.
+Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`; `V`, the negative spectral part that travels with `sk`; `mu`, the centre a higher moment was taken about; `skmp`, the processor that built `V`.
 
-A prior result carries one. A moment estimator produces only its own quantity and no factorisation, so the answer is `nothing` and the consumer derives it from the resolved `sigma`. This is the difference from [`deferred_quantity`](@ref), which would hand back the covariance matrix itself.
+A prior result carries all four. A coskewness estimator produced a named tuple carrying `V` and `skmp` but no centre. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
 
 # Related
 
   - [`fit_deferred_quantity`](@ref)
   - [`deferred_quantity`](@ref)
   - [`sigma_chol_selector`](@ref)
+  - [`deferred_centre`](@ref)
 """
 function deferred_derived_quantity(::Any, ::Symbol)
     return nothing
 end
+function deferred_derived_quantity(fitted::NamedTuple, key::Symbol)
+    return haskey(fitted, key) ? fitted[key] : nothing
+end
 function deferred_derived_quantity(fitted::AbstractPriorResult, key::Symbol)
-    return getproperty(fitted, key)
+    return hasproperty(fitted, key) ? getproperty(fitted, key) : nothing
 end
 """
     resolve_slot(slot, key::Symbol, pr::AbstractPriorResult)

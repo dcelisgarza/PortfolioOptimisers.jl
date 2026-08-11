@@ -45,7 +45,7 @@ $(DocStringExtensions.FIELDS)
     NegativeSkewness(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        sk::Option{<:MatNum} = nothing,
+        sk::Option{<:SkSlot} = nothing,
         V::Option{<:MatNum} = nothing,
         alg::NSkeFormulations = SOCRiskExpr(),
         window::Option{<:Int_VecInt} = nothing
@@ -55,8 +55,13 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `sk` or `V` is provided, both must be provided, non-empty, with `size(sk, 1)^2 == size(sk, 2)` and `V` square.
+  - If `sk` is a matrix, `V` must be given as well, and the reverse. Both must be non-empty, with `size(sk, 1)^2 == size(sk, 2)` and `V` square.
+  - If `sk` holds a **Deferred Quantity**, `V` must be `nothing`. The fit supplies the pair.
   - `window` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+
+!!! info
+
+    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). `V` never defers: it is derived from `sk`, so it travels out of that same fit. The processor that built it travels with it and **replaces** `mp`, so a later rebuild uses the same one. The measure carries one deferrable slot, so it takes no `pe`.
 
 # Functor
 
@@ -126,20 +131,26 @@ NegativeSkewness
     """
     window
     function NegativeSkewness(settings::RiskMeasureSettings,
-                              mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},
+                              mp::AbstractMatrixProcessingEstimator, sk::Option{<:SkSlot},
                               V::Option{<:MatNum}, alg::NSkeFormulations,
                               window::Option{<:Int_VecInt})
-        sk_flag = isnothing(sk)
-        V_flag = isnothing(V)
-        if sk_flag || V_flag
-            @argcheck(sk_flag, IsNothingError("sk cannot be nothing when V is provided"))
-            @argcheck(V_flag, IsNothingError("V cannot be nothing when sk is provided"))
+        if isa(sk, DeferredQuantity)
+            @argcheck(isnothing(V),
+                      ArgumentError("`V` is derived from `sk`, so it cannot be given when `sk` holds a Deferred Quantity. That fit supplies the pair, and a stated `V` would factor a coskewness matrix the caller never saw."))
         else
-            @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
-            @argcheck(!isempty(V), IsEmptyError("V cannot be empty"))
-            @argcheck(size(sk, 1)^2 == size(sk, 2),
-                      DimensionMismatch("size(sk, 1)^2 = $(size(sk, 1)^2) must equal size(sk, 2) = $(size(sk, 2))"))
-            assert_matrix_issquare(V, :V)
+            sk_flag = isnothing(sk)
+            V_flag = isnothing(V)
+            if sk_flag || V_flag
+                @argcheck(sk_flag,
+                          IsNothingError("sk cannot be nothing when V is provided"))
+                @argcheck(V_flag, IsNothingError("V cannot be nothing when sk is provided"))
+            else
+                @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
+                @argcheck(!isempty(V), IsEmptyError("V cannot be empty"))
+                @argcheck(size(sk, 1)^2 == size(sk, 2),
+                          DimensionMismatch("size(sk, 1)^2 = $(size(sk, 1)^2) must equal size(sk, 2) = $(size(sk, 2))"))
+                assert_matrix_issquare(V, :V)
+            end
         end
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(settings), typeof(mp), typeof(sk), typeof(V), typeof(alg),
@@ -148,7 +159,7 @@ NegativeSkewness
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                          sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
+                          sk::Option{<:SkSlot} = nothing, V::Option{<:MatNum} = nothing,
                           alg::NSkeFormulations = SOCRiskExpr(),
                           window::Option{<:Int_VecInt} = nothing)::NegativeSkewness
     return NegativeSkewness(settings, mp, sk, V, alg, window)
@@ -162,17 +173,52 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`NegativeSkewness`](@ref) by selecting the coskewness matrix and spectral decomposition matrix from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+Resolve a **Deferred Quantity** in [`NegativeSkewness`](@ref)'s `sk` slot against prior result `pr`.
+
+`sk` and `V` travel together, so both come from the same fit. `V = negative_spectral_coskewness(sk, X, mp)` is never a function of `sk` alone, so **the fit's own processor** builds it and is recorded in `mp` in place of the one the measure held. A [`CoskewnessEstimator`](@ref) supplies it through [`coskewness_processor`](@ref); an [`AbstractPriorEstimator`](@ref) supplies it as the prior result's `skmp`, which is the field [`HighOrderPrior`](@ref) already carries for exactly this reason.
+
+Recording it keeps the windowed rebuild in [`port_opt_view`](@ref) on the same processor that built the `V` it replaces. `V` is never rebuilt from a resolved `sk`: under a factor prior the negative spectral part is special, and a rebuild would throw that structure away. This is the `sigma`/`chol` rule on the `sk`/`V` pair.
+
+The measure carries one deferrable slot, so there is no fan-out to make and it takes no `pe`. A coskewness estimator needs only a returns matrix, so `sk` resolves against a [`LowOrderPrior`](@ref) as readily as against a [`HighOrderPrior`](@ref).
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
+function resolve_deferred_quantities(r::NegativeSkewness,
+                                     pr::AbstractPriorResult)::NegativeSkewness
+    if !isa(r.sk, DeferredQuantity)
+        return r
+    end
+    fitted = fit_deferred_quantity(r.sk, pr)
+    skmp = deferred_derived_quantity(fitted, :skmp)
+    return NegativeSkewness(; settings = r.settings, mp = isnothing(skmp) ? r.mp : skmp,
+                            sk = deferred_quantity(fitted, :sk),
+                            V = deferred_derived_quantity(fitted, :V), alg = r.alg,
+                            window = r.window)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`NegativeSkewness`](@ref) by resolving a **Deferred Quantity** in `sk`, then falling back to a [`HighOrderPrior`](@ref) result for the coskewness matrix and its spectral decomposition.
+
+The two are selected field by field rather than as a pair, because the constructor already refuses every mixed state: a stated `sk` always carries its own `V`, and a deferred `sk` always resolves to both at once. So the fallback is reached only when the measure names neither.
 
 # Related
 
   - [`NegativeSkewness`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`factory`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
                  kwargs...)::NegativeSkewness
+    r = resolve_deferred_quantities(r, pr)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
     V = nothing_scalar_array_selector(r.V, pr.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg,
@@ -181,18 +227,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the [`NegativeSkewness`](@ref) risk measure `r` unchanged.
+Resolve a **Deferred Quantity** in [`NegativeSkewness`](@ref)'s `sk` slot against a [`LowOrderPrior`](@ref) result, and otherwise return `r` unchanged.
 
-Coskewness is not available in [`LowOrderPrior`](@ref) results; the existing risk measure is used as-is.
+Coskewness is not available on a [`LowOrderPrior`](@ref), so there is no fallback to make. A coskewness estimator in `sk` needs only the returns matrix the result carries, so it resolves here all the same.
 
 # Related
 
   - [`NegativeSkewness`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`factory`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
 """
-function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)::NegativeSkewness
-    return r
+function factory(r::NegativeSkewness, pr::LowOrderPrior, args...;
+                 kwargs...)::NegativeSkewness
+    return resolve_deferred_quantities(r, pr)
 end
 function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any}, ::Any,
                        args...)::NegativeSkewness

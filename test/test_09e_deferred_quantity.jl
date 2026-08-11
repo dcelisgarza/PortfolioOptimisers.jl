@@ -88,10 +88,21 @@ end
     @test PO.resolve_slot(pr.mu, :mu, pr) === pr.mu
     @test PO.resolve_slot(MedianCentering(), :mu, pr) === MedianCentering()
 
-    # The two families that need a matrix-processing estimator to name their second half
-    # arrive with the high-order measures; until then the kernel refuses them loudly.
-    @test_throws MethodError PO.fit_deferred_quantity(Coskewness(), pr)
-    @test_throws MethodError PO.fit_deferred_quantity(Cokurtosis(), pr)
+    # The two high-order families. A cokurtosis estimator gives its tensor. A coskewness
+    # estimator gives the pair `(sk, V)` plus the processor that built `V`, because `V` is
+    # derived from `sk` and never travels on its own.
+    @test PO.fit_deferred_quantity(Cokurtosis(), pr) ≈ cokurtosis(Cokurtosis(), pr.X)
+    fitted = PO.fit_deferred_quantity(Coskewness(), pr)
+    sk, V = coskewness(Coskewness(), pr.X)
+    @test PO.deferred_quantity(fitted, :sk) ≈ sk
+    @test PO.deferred_derived_quantity(fitted, :V) ≈ V
+    @test PO.deferred_derived_quantity(fitted, :skmp) === Coskewness().mp
+    @test PO.resolve_slot(Coskewness(), :sk, pr) ≈ sk
+
+    # A key the fit does not carry is refused by name rather than several frames down.
+    @test_throws ArgumentError PO.deferred_quantity(fitted, :kt)
+    # A *derived* key it does not carry is `nothing`, so the consumer keeps its fallback.
+    @test isnothing(PO.deferred_derived_quantity(fitted, :mu))
 end
 
 @testset "Deferred Quantity: observation weights are threaded, not invented" begin
@@ -625,4 +636,251 @@ end
     k = factory(PO.port_opt_view(Kurtosis(; pe = HighOrderPriorEstimator()), i), subh)
     @test size(k.kt) == (9, 9)
     @test k.kt ≈ subh.kt
+end
+
+@testset "Deferred Quantity: a higher moment carries the centre it was taken about" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    me = MedianExpectedReturns()
+    centre = vec(mean(me, X))
+
+    # A higher moment is a moment *about* a centre, so the tensor and the centre are one
+    # pair of quantities out of one object: `mu` comes from the co-moment estimator's own
+    # `me`, and the tensor is built about exactly that vector.
+    k = factory(Kurtosis(; kt = Cokurtosis(; me = me)), lop)
+    @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
+    @test k.mu ≈ centre
+
+    s = factory(Skewness(; sk = Coskewness(; me = me)), lop)
+    @test s.sk ≈ first(coskewness(Coskewness(; me = me), X))
+    @test s.mu ≈ centre
+
+    # Neither silently took the prior's own field instead.
+    @test !isapprox(centre, lop.mu)
+
+    # A stated `mu` wins, and is threaded as `mean =` all the same, so the tensor is
+    # centred on it rather than on the estimator's own choice.
+    mu = fill(0.05, 5)
+    k = factory(Kurtosis(; kt = Cokurtosis(), mu = mu), lop)
+    @test k.mu === mu
+    @test k.kt ≈ cokurtosis(Cokurtosis(), X; mean = transpose(mu))
+    @test !isapprox(k.kt, cokurtosis(Cokurtosis(), X))
+
+    s = factory(Skewness(; sk = Coskewness(), mu = mu), lop)
+    @test s.mu === mu
+    @test s.sk ≈ first(coskewness(Coskewness(), X; mean = transpose(mu)))
+
+    # A scalar and a `VecScalar` centre reach the fit in the shape the estimator wants.
+    @test PO.centring_target(0.05) === 0.05
+    @test PO.centring_target(VecScalar(; v = mu, s = 0.01)) ≈ transpose(mu .+ 0.01)
+    @test isnothing(PO.centring_target(nothing))
+    @test factory(Kurtosis(; kt = Cokurtosis(), mu = 0.05), lop).kt ≈
+          cokurtosis(Cokurtosis(), X; mean = 0.05)
+
+    # An estimator that names no `me` centres itself, and the slot stays on its fallback.
+    @test isnothing(PO.deferred_centre(SimpleExpectedReturns(), lop))
+end
+
+@testset "Deferred Quantity: a prior estimator in `kt`/`sk` centres itself" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+
+    # A prior estimator computes its own `mu` and its own tensor about that `mu`, so the
+    # centre is read *back* off the result rather than pushed into it.
+    k = factory(Kurtosis(; kt = HighOrderPriorEstimator()), lop)
+    @test k.kt ≈ hop.kt
+    @test k.mu ≈ hop.mu
+
+    s = factory(Skewness(; sk = HighOrderPriorEstimator()), lop)
+    @test s.sk ≈ hop.sk
+    @test s.mu ≈ hop.mu
+
+    # It has no channel to take a centre, so a stated `mu` still wins as the measure's
+    # centring target and the tensor keeps the prior's own.
+    mu = fill(0.05, 5)
+    k = factory(Kurtosis(; kt = HighOrderPriorEstimator(), mu = mu), lop)
+    @test k.mu === mu
+    @test k.kt ≈ hop.kt
+
+    # A low-order prior estimator computes no `kt`, and says so by name.
+    err = try
+        factory(Kurtosis(; kt = EmpiricalPrior()), lop)
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("kt", sprint(showerror, err))
+end
+
+@testset "Deferred Quantity: a deferred high-order slot wins over `pe`" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    hop = prior(HighOrderPriorEstimator(), X)
+    me = MedianExpectedReturns()
+    centre = vec(mean(me, X))
+
+    # The map's precedence rule one level down: a stated slot wins over the fan-out, and a
+    # deferred slot is stated. It brings its centre with it, so `pe` fills neither.
+    k = factory(Kurtosis(; kt = Cokurtosis(; me = me), pe = HighOrderPriorEstimator()), hop)
+    @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
+    @test k.mu ≈ centre
+    @test !isapprox(k.mu, hop.mu)
+    @test isnothing(k.pe)
+
+    s = factory(Skewness(; sk = Coskewness(; me = me), pe = HighOrderPriorEstimator()), hop)
+    @test s.sk ≈ first(coskewness(Coskewness(; me = me), X))
+    @test s.mu ≈ centre
+
+    # `pe` still fills the half the caller left unstated.
+    k = factory(Kurtosis(; mu = MedianExpectedReturns(), pe = HighOrderPriorEstimator()),
+                hop)
+    @test k.mu ≈ centre
+    @test k.kt ≈ hop.kt
+
+    # Nothing deferred leaves the measure untouched, so every existing fallback stands.
+    for r in (Kurtosis(), Skewness(), NegativeSkewness())
+        @test PO.resolve_deferred_quantities(r, hop) === r
+    end
+end
+
+@testset "Deferred Quantity: `sk` binds `V`, and the fit's own `mp` builds it" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+    me = MedianExpectedReturns()
+    sk, V = coskewness(Coskewness(; me = me), X)
+
+    # `V = negative_spectral_coskewness(sk, X, mp)` is never a function of `sk` alone, so
+    # building it always names a processor. The one that built the `V` the fit hands back
+    # is the one recorded, and the measure's own is discarded.
+    mp = MatrixProcessing(; dn = Denoise())
+    @test !isapprox(PO.negative_spectral_coskewness(sk, X, mp), V)
+
+    r = factory(NegativeSkewness(; sk = Coskewness(; me = me), mp = mp), lop)
+    @test r.sk ≈ sk
+    @test r.V ≈ V
+    @test r.mp == Coskewness().mp
+    @test r.mp !== mp
+
+    r = factory(NegativeSkewness(; sk = Coskewness(; me = me, mp = mp)), lop)
+    @test r.V ≈ PO.negative_spectral_coskewness(sk, X, mp)
+    @test r.mp === mp
+
+    # A prior estimator supplies the same triple, and `HighOrderPrior` already carries the
+    # processor as `skmp` for exactly this reason.
+    r = factory(NegativeSkewness(; sk = HighOrderPriorEstimator(), mp = mp), hop)
+    @test r.sk ≈ hop.sk
+    @test r.V ≈ hop.V
+    @test r.mp === hop.skmp
+
+    # The processor is read off the estimator by a per-type method, because the
+    # `CoskewnessEstimator` interface does not require an `mp` field.
+    @test PO.coskewness_processor(Coskewness(; mp = mp)) === mp
+
+    # Coskewness needs only a returns matrix, so it resolves against a low-order prior,
+    # where the measure had no fallback at all.
+    @test factory(NegativeSkewness(; sk = Coskewness()), lop).V ≈
+          last(coskewness(Coskewness(), X))
+end
+
+@testset "Deferred Quantity: `V` never defers and never travels alone" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    sk, V = coskewness(Coskewness(), X)
+
+    # `V` is derived from `sk`, so the fit supplies the pair and a stated `V` beside a
+    # deferred `sk` would factor a coskewness matrix the caller never saw.
+    @test_throws ArgumentError NegativeSkewness(; sk = Coskewness(), V = V)
+
+    # The existing both-or-neither rule on the stated pair is untouched, error type and all.
+    @test_throws PO.IsNothingError NegativeSkewness(; V = V)
+    @test_throws PO.IsNothingError NegativeSkewness(; sk = sk)
+    @test NegativeSkewness(; sk = sk, V = V).V === V
+    @test isnothing(NegativeSkewness().V)
+end
+
+@testset "Deferred Quantity: the high-order measures reach the `JuMP` resolution point" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    me = MedianExpectedReturns()
+    centre = vec(mean(me, X))
+
+    # The `JuMP` builders never call `factory`, so `set_risk_constraints!` resolves. Each
+    # of the three is reached directly rather than through a wrapper.
+    k = PO.resolve_deferred_quantities(Kurtosis(; kt = Cokurtosis(; me = me)), lop)
+    @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X)
+    @test k.mu ≈ centre
+
+    s = PO.resolve_deferred_quantities(Skewness(; sk = Coskewness(; me = me)), lop)
+    @test s.mu ≈ centre
+
+    n = PO.resolve_deferred_quantities(NegativeSkewness(; sk = Coskewness(; me = me)), lop)
+    @test n.V ≈ last(coskewness(Coskewness(; me = me), X))
+end
+
+@testset "Deferred Quantity: a high-order slot crosses a view and fits the subset" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    i = [1, 3, 5]
+    me = MedianExpectedReturns()
+
+    # `port_opt_view` runs before `factory`, so the estimator crosses unresolved and
+    # computes on the subset rather than being the whole universe's answer sliced.
+    @test isa(PO.port_opt_view(Kurtosis(; kt = Cokurtosis()), i, X).kt, Cokurtosis)
+    @test isa(PO.port_opt_view(Skewness(; sk = Coskewness()), i, X).sk, Coskewness)
+    @test isa(PO.port_opt_view(NegativeSkewness(; sk = Coskewness()), i, X).sk, Coskewness)
+
+    sub = prior(EmpiricalPrior(), view(X, :, i))
+    k = factory(PO.port_opt_view(Kurtosis(; kt = Cokurtosis(; me = me)), i, X), sub)
+    @test size(k.kt) == (9, 9)
+    @test k.kt ≈ cokurtosis(Cokurtosis(; me = me), X[:, i])
+    @test k.mu ≈ vec(mean(me, X[:, i]))
+
+    sk_sub, V_sub = coskewness(Coskewness(; me = me), X[:, i])
+    n = factory(PO.port_opt_view(NegativeSkewness(; sk = Coskewness(; me = me)), i, X), sub)
+    @test size(n.sk) == (3, 9)
+    @test n.sk ≈ sk_sub
+    @test n.V ≈ V_sub
+
+    # A view keeps the measure's settings, so a `VarianceSkewKurtosis` child that was
+    # silenced stays silent across a subset.
+    s = PO.port_opt_view(Skewness(;
+                                  settings = MaxRiskMeasureSettings(; scale = 3.0, lb = 0.1,
+                                                                    rke = false)), i, X)
+    @test s.settings.scale == 3.0
+    @test s.settings.lb == 0.1
+    @test s.settings.rke === false
+end
+
+@testset "Deferred Quantity: a `VarianceSkewKurtosis` child defers one level down" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    hop = prior(HighOrderPriorEstimator(), X)
+    me = MedianExpectedReturns()
+
+    # A deferred child slot resolves first and wins over the container's `pe`, which then
+    # fills only what is left. One container, two fits, five slots.
+    r = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
+                                                            sk = Skewness(;
+                                                                          sk = Coskewness(;
+                                                                                          me = me)),
+                                                            pe = HighOrderPriorEstimator()),
+                                       hop)
+    @test r.sk.sk ≈ first(coskewness(Coskewness(; me = me), X))
+    @test r.sk.mu ≈ vec(mean(me, X))
+    @test !isapprox(r.sk.mu, hop.mu)
+    @test r.kt.kt ≈ hop.kt
+    @test r.kt.mu ≈ hop.mu
+    @test r.vr.sigma ≈ hop.sigma
+    @test isnothing(r.pe)
+
+    # The children keep the `rke = false` the container forced on them.
+    @test r.vr.settings.rke === false
+    @test r.sk.settings.rke === false
+    @test r.kt.settings.rke === false
 end

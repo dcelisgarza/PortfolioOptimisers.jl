@@ -98,9 +98,9 @@ $(DocStringExtensions.FIELDS)
     Skewness(;
         settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
-        sk::Option{<:MatNum} = nothing,
+        sk::Option{<:SkSlot} = nothing,
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        mu::Option{<:MuSlot} = nothing,
         pe::Option{<:AbstractPriorEstimator} = nothing
     ) -> Skewness
 
@@ -115,6 +115,10 @@ Keywords correspond to the struct's fields.
 !!! warning
 
     `mu` and `sk` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
+
+!!! info
+
+    `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A coskewness estimator in `sk` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
 
 # Functor
 
@@ -183,10 +187,9 @@ Skewness
     """
     pe
     function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
-                      sk::Option{<:MatNum}, w::Option{<:ObsWeights},
-                      mu::Option{<:Num_VecNum_VecScalar},
+                      sk::Option{<:SkSlot}, w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
                       pe::Option{<:AbstractPriorEstimator})
-        if !isnothing(sk)
+        if isa(sk, MatNum)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
                       DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
@@ -201,33 +204,51 @@ Skewness
 end
 function Skewness(; settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
                   ve::AbstractVarianceEstimator = SimpleVariance(),
-                  sk::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing,
+                  sk::Option{<:SkSlot} = nothing, w::Option{<:ObsWeights} = nothing,
+                  mu::Option{<:MuSlot} = nothing,
                   pe::Option{<:AbstractPriorEstimator} = nothing)::Skewness
     return Skewness(settings, ve, sk, w, mu, pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the **Deferred Quantity** fan-out held by [`Skewness`](@ref) `r` against prior result `pr`.
+Resolve every **Deferred Quantity** held by [`Skewness`](@ref) `r` against prior result `pr`.
 
-`mu` and `sk` are independent quantities, so the measure takes a `pe` rather than widening each slot. One fit fills both, and a slot the caller stated keeps what it holds. `sk` lives on a [`HighOrderPrior`](@ref), so the estimator named here must compute one.
+Three passes, in order.
+
+ 1. A deferred `mu` resolves on its own.
+ 2. A deferred `sk` resolves next, and it carries the centre with it. `sk` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the coskewness estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
+ 3. `pe` fans out into whatever both passes left `nothing`.
+
+A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. The measure reads no `V`, so only the `sk` half of the coskewness pair is kept — see [`NegativeSkewness`](@ref) for the half that needs both.
 
 # Related
 
   - [`Skewness`](@ref)
   - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_centre`](@ref)
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
 function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skewness
-    if isnothing(r.pe)
+    if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.sk, DeferredQuantity)
         return r
     end
+    mu = resolve_slot(r.mu, :mu, pr)
+    sk = r.sk
+    if isa(sk, DeferredQuantity)
+        centre = isnothing(mu) ? deferred_centre(sk, pr) : mu
+        fitted = fit_deferred_moment(sk, pr, centre)
+        sk = deferred_quantity(fitted, :sk)
+        mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
+    end
+    if isnothing(r.pe)
+        return Skewness(; settings = r.settings, ve = r.ve, sk = sk, w = r.w, mu = mu,
+                        pe = nothing)
+    end
     fitted = fit_deferred_quantity(r.pe, pr)
-    return Skewness(; settings = r.settings, ve = r.ve,
-                    sk = fan_out_slot(fitted, r.sk, :sk), w = r.w,
-                    mu = fan_out_slot(fitted, r.mu, :mu), pe = nothing)
+    return Skewness(; settings = r.settings, ve = r.ve, sk = fan_out_slot(fitted, sk, :sk),
+                    w = r.w, mu = fan_out_slot(fitted, mu, :mu), pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -284,7 +305,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`.
 
-Slices the expected returns `mu` for cluster-based optimisation.
+Slices the expected returns `mu` for cluster-based optimisation. `sk` passes through: it is `nothing`, or it holds a **Deferred Quantity**, which crosses the view unresolved and then fits on the subset.
 
 # Related
 
@@ -292,9 +313,10 @@ Slices the expected returns `mu` for cluster-based optimisation.
   - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(r::Skewness{<:Any, <:Any, <:Nothing}, i, args...)
+function port_opt_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
-    return Skewness(; ve = r.ve, sk = r.sk, w = r.w, mu = mu, pe = r.pe)
+    return Skewness(; settings = r.settings, ve = r.ve, sk = r.sk, w = r.w, mu = mu,
+                    pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -313,7 +335,8 @@ function port_opt_view(r::Skewness{<:Any, <:Any, <:MatNum}, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     idx = fourth_moment_index_generator(size(r.sk, 1), i)
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
-    return Skewness(; ve = r.ve, sk = sk, w = r.w, mu = mu, pe = r.pe)
+    return Skewness(; settings = r.settings, ve = r.ve, sk = sk, w = r.w, mu = mu,
+                    pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

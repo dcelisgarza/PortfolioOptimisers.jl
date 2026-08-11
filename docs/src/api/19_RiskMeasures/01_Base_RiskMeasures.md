@@ -145,7 +145,12 @@ KtSlot
 SkSlot
 deferred_factors
 fit_deferred_quantity
+coskewness_processor
+deferred_centre
+centring_target
+fit_deferred_moment
 deferred_quantity
+fan_out_slot
 deferred_derived_quantity
 resolve_slot
 sigma_chol_selector

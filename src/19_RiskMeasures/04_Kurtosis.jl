@@ -55,8 +55,8 @@ $(DocStringExtensions.FIELDS)
     Kurtosis(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing,
-        kt::Option{<:MatNum} = nothing,
+        mu::Option{<:MuSlot} = nothing,
+        kt::Option{<:KtSlot} = nothing,
         N::Option{<:Integer} = nothing,
         alg1::AbstractMomentAlgorithm = FullMoment(),
         alg2::VarianceFormulation = SOCRiskExpr(),
@@ -88,6 +88,10 @@ Keywords correspond to the struct's fields.
 !!! warning
 
     `mu` and `kt` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
+
+!!! info
+
+    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
 
 # `JuMP` Formulations
 
@@ -161,9 +165,9 @@ Kurtosis
     """
     pe
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                      mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
-                      N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
-                      alg2::SecondMomentFormulation, pe::Option{<:AbstractPriorEstimator})
+                      mu::Option{<:MuSlot}, kt::Option{<:KtSlot}, N::Option{<:Integer},
+                      alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation,
+                      pe::Option{<:AbstractPriorEstimator})
         mu_flag = isa(mu, VecNum)
         kt_flag = isa(kt, MatNum)
         if mu_flag
@@ -193,9 +197,8 @@ Kurtosis
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                  kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
+                  w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
+                  kt::Option{<:KtSlot} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = FullMoment(),
                   alg2::SecondMomentFormulation = SOCRiskExpr(),
                   pe::Option{<:AbstractPriorEstimator} = nothing)::Kurtosis
@@ -204,24 +207,43 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the **Deferred Quantity** fan-out held by [`Kurtosis`](@ref) `r` against prior result `pr`.
+Resolve every **Deferred Quantity** held by [`Kurtosis`](@ref) `r` against prior result `pr`.
 
-`mu` and `kt` are independent quantities, so the measure takes a `pe` rather than widening each slot. One fit fills both, and a slot the caller stated keeps what it holds. `kt` lives on a [`HighOrderPrior`](@ref), so the estimator named here must compute one.
+Three passes, in order.
+
+ 1. A deferred `mu` resolves on its own.
+ 2. A deferred `kt` resolves next, and it carries the centre with it. `kt` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the cokurtosis estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
+ 3. `pe` fans out into whatever both passes left `nothing`.
+
+A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. `kt` lives on a [`HighOrderPrior`](@ref), so a prior estimator named in `kt` or `pe` must compute one.
 
 # Related
 
   - [`Kurtosis`](@ref)
   - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_centre`](@ref)
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
 function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurtosis
-    if isnothing(r.pe)
+    if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.kt, DeferredQuantity)
         return r
     end
+    mu = resolve_slot(r.mu, :mu, pr)
+    kt = r.kt
+    if isa(kt, DeferredQuantity)
+        centre = isnothing(mu) ? deferred_centre(kt, pr) : mu
+        fitted = fit_deferred_moment(kt, pr, centre)
+        kt = deferred_quantity(fitted, :kt)
+        mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
+    end
+    if isnothing(r.pe)
+        return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
+                        alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
+    end
     fitted = fit_deferred_quantity(r.pe, pr)
-    return Kurtosis(; settings = r.settings, w = r.w, mu = fan_out_slot(fitted, r.mu, :mu),
-                    kt = fan_out_slot(fitted, r.kt, :kt), N = r.N, alg1 = r.alg1,
+    return Kurtosis(; settings = r.settings, w = r.w, mu = fan_out_slot(fitted, mu, :mu),
+                    kt = fan_out_slot(fitted, kt, :kt), N = r.N, alg1 = r.alg1,
                     alg2 = r.alg2, pe = nothing)
 end
 """
