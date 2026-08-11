@@ -621,11 +621,11 @@ Where:
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `ucs`: Uncertainty set ([`BoxUncertaintySet`](@ref) or [`EllipsoidalUncertaintySet`](@ref)).
-  - `mu`: Expected return vector.
+  - `mu`: Fallback characteristic vector, used when the set carries none of its own.
 
 # Returns
 
-  - `nothing`.
+  - `mu`: The characteristic vector the set is centred on. The set's own field wins over the fallback (ADR 0050). The caller needs it, because [`set_max_ratio_return_constraints!`](@ref) reads it as a value.
 
 # Related
 
@@ -637,6 +637,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     sc = get_constraint_scale(model)
     w = get_w(model)
     N = length(w)
+    mu = something(ucs.val, mu)
     d_mu = (ucs.ub - ucs.lb) * 0.5
     JuMP.@variable(model, bucs_w[1:N])
     JuMP.@constraint(model, bucs_ret[i = 1:N],
@@ -644,7 +645,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     JuMP.@expression(model, ret, dot_scalar(mu, w) - LinearAlgebra.dot(d_mu, bucs_w))
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    return nothing
+    return mu
 end
 """
     set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet, mu::Num_VecNum)
@@ -657,11 +658,11 @@ Introduces a second-order cone constraint to model the worst-case expected retur
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set with covariance `sigma` and radius `k`.
-  - `mu::Num_VecNum`: Expected return vector.
+  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
 
 # Returns
 
-  - `nothing`.
+  - `mu`: The characteristic vector the set is centred on. The set's own `val` field wins over the fallback (ADR 0050).
 
 # Related
 
@@ -673,6 +674,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertai
                                      mu::Num_VecNum)
     sc = get_constraint_scale(model)
     w = get_w(model)
+    mu = something(ucs.val, mu)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     k = ucs.k
     JuMP.@expression(model, x_eucs_w, G * w)
@@ -682,7 +684,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertai
     JuMP.@expression(model, ret, dot_scalar(mu, w) - k * t_eucs_gw)
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    return nothing
+    return mu
 end
 """
     set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet, mu::Num_VecNum)
@@ -711,11 +713,11 @@ Where:
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `ucs::L1UncertaintySet`: ``\\ell_1`` uncertainty set with radius `eps` and scaling `sd`.
-  - `mu::Num_VecNum`: Expected return vector.
+  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
 
 # Returns
 
-  - `nothing`.
+  - `mu`: The characteristic vector the set is centred on. The set's own `mu` field wins over the fallback (ADR 0050).
 
 # Related
 
@@ -727,6 +729,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet,
                                      mu::Num_VecNum)
     sc = get_constraint_scale(model)
     w = get_w(model)
+    mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
     JuMP.@variable(model, t_l1ucs)
@@ -736,7 +739,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet,
     JuMP.@expression(model, ret, dot_scalar(mu, w) - ucs.eps * t_l1ucs)
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    return nothing
+    return mu
 end
 """
     set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet, mu::Num_VecNum)
@@ -767,11 +770,11 @@ Modelling this worst case directly keeps the long-short problem *coupled*, so it
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `ucs::SignedL1UncertaintySet`: Signed ``\\ell_1`` uncertainty set with radii `ep`, `en` and scaling `sd`.
-  - `mu::Num_VecNum`: Expected return vector.
+  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
 
 # Returns
 
-  - `nothing`.
+  - `mu`: The characteristic vector the set is centred on. The set's own `mu` field wins over the fallback (ADR 0050).
 
 # Related
 
@@ -783,6 +786,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1Uncertainty
                                      mu::Num_VecNum)
     sc = get_constraint_scale(model)
     w = get_w(model)
+    mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
     JuMP.@variables(model, begin
@@ -797,7 +801,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1Uncertainty
                      dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p - ucs.en * t_sl1ucs_m)
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    return nothing
+    return mu
 end
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:UcSE_UcS, <:Any, <:Any},
@@ -805,8 +809,10 @@ function set_return_constraints!(model::JuMP.Model,
                                  rd::ReturnsResult, kwargs...)
     lb = pret.lb
     ucs = pret.ucs
-    mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    set_ucs_return_constraints!(model, mu_ucs(ucs, rd; kwargs...), mu)
+    # The set is a neighbourhood of the quantity it was calibrated on, so it names the
+    # centre. The estimator's own field and then the prior are the fallbacks (ADR 0050).
+    fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
+    mu = set_ucs_return_constraints!(model, mu_ucs(ucs, rd; kwargs...), fb)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing

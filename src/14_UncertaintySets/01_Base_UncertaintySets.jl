@@ -396,7 +396,8 @@ $(DocStringExtensions.FIELDS)
 
     BoxUncertaintySet(;
         lb::ArrNum,
-        ub::ArrNum
+        ub::ArrNum,
+        val::Option{<:ArrNum} = nothing
     ) -> BoxUncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -406,14 +407,22 @@ Keywords correspond to the struct's fields.
   - `!isempty(lb)`.
   - `!isempty(ub)`.
   - `size(lb) == size(ub)`.
+  - If `val` is provided: `size(val) == size(lb)`.
+
+# Details
+
+`val` is the quantity the set is a neighbourhood of. A set produced by [`ucs`](@ref), [`mu_ucs`](@ref) or [`sigma_ucs`](@ref) carries the fit its bounds were calibrated on, so the consumer bounds that quantity rather than an unrelated one. See ADR 0050.
+
+The mean route uses `val` as the centre of the worst-case return. The covariance route does not read it: the worst-case variance over a box is `tr(A_u \\mathbf{\\Sigma}_u) - tr(A_l \\mathbf{\\Sigma}_l)`, which names no centre.
 
 # Examples
 
 ```jldoctest
 julia> BoxUncertaintySet(; lb = [0.1, 0.2], ub = [0.3, 0.4])
 BoxUncertaintySet
-  lb ┼ Vector{Float64}: [0.1, 0.2]
-  ub ┴ Vector{Float64}: [0.3, 0.4]
+   lb ┼ Vector{Float64}: [0.1, 0.2]
+   ub ┼ Vector{Float64}: [0.3, 0.4]
+  val ┴ nothing
 ```
 
 # Related
@@ -431,16 +440,28 @@ BoxUncertaintySet
     $(field_dict[:ub])
     """
     ub
-    function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
+    """
+    $(field_dict[:val_ucs])
+    """
+    val
+    function BoxUncertaintySet(lb::ArrNum, ub::ArrNum, val::Option{<:ArrNum})
         @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
         @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
         @argcheck(size(lb) == size(ub),
                   DimensionMismatch("lb ($(size(lb))) must match ub ($(size(ub)))"))
-        return new{typeof(lb), typeof(ub)}(lb, ub)
+        if isa(val, ArrNum)
+            @argcheck(size(val) == size(lb),
+                      DimensionMismatch("val ($(size(val))) must match lb ($(size(lb)))"))
+        end
+        return new{typeof(lb), typeof(ub), typeof(val)}(lb, ub, val)
     end
 end
-function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)::BoxUncertaintySet
-    return BoxUncertaintySet(lb, ub)
+function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)::BoxUncertaintySet
+    return BoxUncertaintySet(lb, ub, nothing)
+end
+function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum,
+                           val::Option{<:ArrNum} = nothing)::BoxUncertaintySet
+    return BoxUncertaintySet(lb, ub, val)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -454,7 +475,8 @@ Return a view of a vector [`BoxUncertaintySet`](@ref) restricted to the asset in
 """
 function port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i,
                        args...)::BoxUncertaintySet
-    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i),
+                             val = nothing_scalar_array_view(risk_ucs.val, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -468,7 +490,8 @@ Return a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset in
 """
 function port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i,
                        args...)::BoxUncertaintySet
-    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i),
+                             val = nothing_scalar_array_view(risk_ucs.val, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -726,7 +749,8 @@ $(DocStringExtensions.FIELDS)
     EllipsoidalUncertaintySet(;
         sigma::MatNum,
         k::Number,
-        class::AbstractEllipsoidalUncertaintySetResultClass
+        class::AbstractEllipsoidalUncertaintySetResultClass,
+        val::Option{<:ArrNum} = nothing
     ) -> EllipsoidalUncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -736,6 +760,13 @@ Keywords correspond to the struct's fields.
   - `!isempty(sigma)`.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `k > 0`.
+  - If `val` is provided: `length(val) == size(sigma, 1)`.
+
+# Details
+
+`val` is the quantity the set is a neighbourhood of. A set produced by [`ucs`](@ref), [`mu_ucs`](@ref) or [`sigma_ucs`](@ref) carries the fit its shape matrix was calibrated on, so the consumer bounds that quantity rather than an unrelated one. See ADR 0050.
+
+It is a characteristic vector of length ``N`` on the mean axis, and an ``N \\times N`` covariance matrix on the covariance axis, where the shape matrix is ``N^2 \\times N^2``. Both cases satisfy the length check.
 
 # Examples
 
@@ -744,7 +775,8 @@ julia> EllipsoidalUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaEllipsoidalUncert
 EllipsoidalUncertaintySet
   sigma ┼ 2×2 Matrix{Float64}
       k ┼ Float64: 2.5
-  class ┴ SigmaEllipsoidalUncertaintySet()
+  class ┼ SigmaEllipsoidalUncertaintySet()
+    val ┴ nothing
 ```
 
 # Related
@@ -767,17 +799,32 @@ EllipsoidalUncertaintySet
     $(field_dict[:class_ucs])
     """
     class
+    """
+    $(field_dict[:val_ucs])
+    """
+    val
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
-                                       class::AbstractEllipsoidalUncertaintySetResultClass)
+                                       class::AbstractEllipsoidalUncertaintySetResultClass,
+                                       val::Option{<:ArrNum})
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(k > zero(k), DomainError(k, "k must be positive"))
-        return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
+        if isa(val, ArrNum)
+            @argcheck(length(val) == size(sigma, 1),
+                      DimensionMismatch("val ($(length(val))) must match sigma ($(size(sigma, 1)))"))
+        end
+        return new{typeof(sigma), typeof(k), typeof(class), typeof(val)}(sigma, k, class,
+                                                                         val)
     end
 end
-function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
+function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                    class::AbstractEllipsoidalUncertaintySetResultClass)::EllipsoidalUncertaintySet
-    return EllipsoidalUncertaintySet(sigma, k, class)
+    return EllipsoidalUncertaintySet(sigma, k, class, nothing)
+end
+function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
+                                   class::AbstractEllipsoidalUncertaintySetResultClass,
+                                   val::Option{<:ArrNum} = nothing)::EllipsoidalUncertaintySet
+    return EllipsoidalUncertaintySet(sigma, k, class, val)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -792,9 +839,12 @@ Return a view of a covariance [`EllipsoidalUncertaintySet`](@ref) restricted to 
 function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                                                            <:SigmaEllipsoidalUncertaintySet},
                        i, args...)::EllipsoidalUncertaintySet
+    # `val` is the N x N covariance the set is a neighbourhood of, so it takes the asset
+    # index, whereas the N^2 x N^2 shape matrix takes the fourth-moment index.
+    val = nothing_scalar_array_view(risk_ucs.val, i)
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                     class = risk_ucs.class)
+                                     class = risk_ucs.class, val = val)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -810,7 +860,8 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                                                            <:MuEllipsoidalUncertaintySet},
                        i, args...)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                     class = risk_ucs.class)
+                                     class = risk_ucs.class,
+                                     val = nothing_scalar_array_view(risk_ucs.val, i))
 end
 """
     box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}
@@ -865,7 +916,8 @@ function vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
 end
 """
     ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                    class::AbstractEllipsoidalUncertaintySetResultClass)
+                    class::AbstractEllipsoidalUncertaintySetResultClass,
+                    val::Option{<:ArrNum} = nothing)
 
 Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic
 covariance `cov`. Optionally restricts `cov` to its diagonal, fits the scaling `k` via
@@ -874,6 +926,10 @@ matrix, a `1:n_sim` range, or `nothing` depending on `method`), and tags the res
 `class`. Shared by every ellipsoidal [`ucs`](@ref)/[`mu_ucs`](@ref)/[`sigma_ucs`](@ref)
 construction across estimator families.
 
+`val` is the quantity the set is a neighbourhood of — the fitted characteristic vector on
+the mean axis, the fitted covariance on the covariance axis. Every caller has it in hand,
+because every one of them fits a prior before it calls here.
+
 # Related
 
   - [`EllipsoidalUncertaintySet`](@ref)
@@ -881,12 +937,13 @@ construction across estimator families.
   - [`ucs`](@ref)
 """
 function ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                         class::AbstractEllipsoidalUncertaintySetResultClass)
+                         class::AbstractEllipsoidalUncertaintySetResultClass,
+                         val::Option{<:ArrNum} = nothing)
     if diagonal
         cov = LinearAlgebra.Diagonal(cov)
     end
     k = k_ucs(method, q, samples, cov)
-    return EllipsoidalUncertaintySet(; sigma = cov, k = k, class = class)
+    return EllipsoidalUncertaintySet(; sigma = cov, k = k, class = class, val = val)
 end
 
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,

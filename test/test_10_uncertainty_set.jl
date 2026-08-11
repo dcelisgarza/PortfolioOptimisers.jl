@@ -302,4 +302,150 @@
             end
         end
     end
+    @testset "A set carries the quantity it bounds (ADR 0050)" begin
+        pr_ref = prior(EmpiricalPrior(), rd.X)
+        @testset "The field is optional and validated" begin
+            @test isnothing(BoxUncertaintySet(; lb = [0.1, 0.2], ub = [0.3, 0.4]).val)
+            @test BoxUncertaintySet(; lb = [0.1, 0.2], ub = [0.3, 0.4], val = [1.0, 2.0]).val ==
+                  [1.0, 2.0]
+            @test_throws DimensionMismatch BoxUncertaintySet(; lb = [0.1, 0.2],
+                                                             ub = [0.3, 0.4],
+                                                             val = [1.0, 2.0, 3.0])
+            @test isnothing(EllipsoidalUncertaintySet(; sigma = [1.0 0.0; 0.0 1.0], k = 2.0,
+                                                      class = MuEllipsoidalUncertaintySet()).val)
+            @test_throws DimensionMismatch EllipsoidalUncertaintySet(;
+                                                                     sigma = [1.0 0.0;
+                                                                              0.0 1.0],
+                                                                     k = 2.0,
+                                                                     class = MuEllipsoidalUncertaintySet(),
+                                                                     val = [1.0, 2.0, 3.0])
+            @test isnothing(L1UncertaintySet(; eps = 0.1).mu)
+            @test L1UncertaintySet(; eps = 0.1, mu = [1.0, 2.0]).mu == [1.0, 2.0]
+            @test_throws DimensionMismatch L1UncertaintySet(; eps = 0.1, sd = [1.0, 2.0],
+                                                            mu = [1.0, 2.0, 3.0])
+            @test_throws Exception L1UncertaintySet(; eps = 0.1, mu = [1.0, Inf])
+            @test isnothing(SignedL1UncertaintySet(; ep = 0.1, en = 0.2).mu)
+            @test_throws DimensionMismatch SignedL1UncertaintySet(; ep = 0.1, en = 0.2,
+                                                                  sd = [1.0, 2.0],
+                                                                  mu = [1.0, 2.0, 3.0])
+            # The pre-fix positional arities still construct, and carry nothing.
+            @test isnothing(BoxUncertaintySet([0.1, 0.2], [0.3, 0.4]).val)
+            @test isnothing(EllipsoidalUncertaintySet([1.0 0.0; 0.0 1.0], 2.0,
+                                                      MuEllipsoidalUncertaintySet()).val)
+            @test isnothing(L1UncertaintySet(0.1, nothing).mu)
+            @test isnothing(SignedL1UncertaintySet(0.1, 0.2, nothing).mu)
+        end
+        @testset "Every producer populates it" begin
+            rng = StableRNG(123456789)
+            ues = [DeltaUncertaintySet(;),
+                   NormalUncertaintySet(; rng = rng, alg = BoxUncertaintySetAlgorithm(),
+                                        seed = 987654321),
+                   NormalUncertaintySet(; rng = rng, seed = 987654321,
+                                        alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                 method = ChiSqKUncertaintyAlgorithm())),
+                   ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), rng = rng,
+                                      bootstrap = StationaryBootstrap(), seed = 987654321),
+                   ARCHUncertaintySet(;
+                                      alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                               method = ChiSqKUncertaintyAlgorithm()),
+                                      rng = rng, bootstrap = CircularBootstrap(),
+                                      seed = 987654321)]
+            for ue in ues
+                mu_set, sigma_set = ucs(ue, rd.X)
+                @test mu_set.val == pr_ref.mu
+                @test sigma_set.val == pr_ref.sigma
+                @test mu_ucs(ue, rd.X).val == pr_ref.mu
+                @test sigma_ucs(ue, rd.X).val == pr_ref.sigma
+            end
+            # The l1 family is mean-only, so the field is the characteristic vector itself.
+            for alg in (L1UncertaintySetAlgorithm(), SignedL1UncertaintySetAlgorithm())
+                @test mu_ucs(CharacteristicUncertaintySet(; alg = alg), rd.X).mu ==
+                      pr_ref.mu
+            end
+        end
+        @testset "The carried quantity wins over the fallback" begin
+            # The value-level twin of the JuMP worst-case variance. It is the same
+            # resolution, so a scalar evaluation cannot disagree with the model.
+            w = fill(1 / size(rd.X, 2), size(rd.X, 2))
+            A = pr_ref.sigma
+            B = A * 2
+            shape = LinearAlgebra.Diagonal(ones(size(A, 1)^2))
+            carried = UncertaintySetVariance(;
+                                             ucs = EllipsoidalUncertaintySet(;
+                                                                             sigma = shape,
+                                                                             k = 1.5,
+                                                                             class = SigmaEllipsoidalUncertaintySet(),
+                                                                             val = A),
+                                             sigma = B)
+            bare_a = UncertaintySetVariance(;
+                                            ucs = EllipsoidalUncertaintySet(; sigma = shape,
+                                                                            k = 1.5,
+                                                                            class = SigmaEllipsoidalUncertaintySet()),
+                                            sigma = A)
+            bare_b = UncertaintySetVariance(;
+                                            ucs = EllipsoidalUncertaintySet(; sigma = shape,
+                                                                            k = 1.5,
+                                                                            class = SigmaEllipsoidalUncertaintySet()),
+                                            sigma = B)
+            @test carried(w) == bare_a(w)
+            @test carried(w) != bare_b(w)
+            # A box covariance set names no centre: its worst case is built from the
+            # bounds alone, so the field is inert on that route.
+            box_carried = UncertaintySetVariance(;
+                                                 ucs = BoxUncertaintySet(; lb = A - abs.(A),
+                                                                         ub = A + abs.(A),
+                                                                         val = A),
+                                                 sigma = B)
+            box_bare = UncertaintySetVariance(;
+                                              ucs = BoxUncertaintySet(; lb = A - abs.(A),
+                                                                      ub = A + abs.(A)),
+                                              sigma = B)
+            @test box_carried(w) == box_bare(w)
+        end
+        @testset "A view carries the field" begin
+            i = [1, 3, 5]
+            lbv, ubv, valv = pr_ref.mu .- 0.1, pr_ref.mu .+ 0.1, pr_ref.mu
+            bv = PortfolioOptimisers.port_opt_view(BoxUncertaintySet(; lb = lbv, ub = ubv,
+                                                                     val = valv), i)
+            @test bv.val == valv[i]
+            bm = PortfolioOptimisers.port_opt_view(BoxUncertaintySet(;
+                                                                     lb = pr_ref.sigma .-
+                                                                          0.1,
+                                                                     ub = pr_ref.sigma .+
+                                                                          0.1,
+                                                                     val = pr_ref.sigma), i)
+            @test bm.val == pr_ref.sigma[i, i]
+            ev = PortfolioOptimisers.port_opt_view(EllipsoidalUncertaintySet(;
+                                                                             sigma = pr_ref.sigma,
+                                                                             k = 1.5,
+                                                                             class = MuEllipsoidalUncertaintySet(),
+                                                                             val = pr_ref.mu),
+                                                   i)
+            @test ev.val == pr_ref.mu[i]
+            # On the covariance ellipsoid the carried value takes the asset index, while
+            # the shape matrix takes the fourth-moment index.
+            N = size(pr_ref.sigma, 1)
+            em = PortfolioOptimisers.port_opt_view(EllipsoidalUncertaintySet(;
+                                                                             sigma = LinearAlgebra.Diagonal(ones(N^2)),
+                                                                             k = 1.5,
+                                                                             class = SigmaEllipsoidalUncertaintySet(),
+                                                                             val = pr_ref.sigma),
+                                                   i)
+            @test em.val == pr_ref.sigma[i, i]
+            @test size(em.sigma, 1) == length(i)^2
+            l1v = PortfolioOptimisers.port_opt_view(L1UncertaintySet(; eps = 0.1,
+                                                                     sd = sqrt.(LinearAlgebra.diag(pr_ref.sigma)),
+                                                                     mu = pr_ref.mu), i)
+            @test l1v.eps == 0.1
+            @test l1v.mu == pr_ref.mu[i]
+            @test l1v.sd == sqrt.(LinearAlgebra.diag(pr_ref.sigma))[i]
+            sl1v = PortfolioOptimisers.port_opt_view(SignedL1UncertaintySet(; ep = 0.1,
+                                                                            en = 0.2,
+                                                                            mu = pr_ref.mu),
+                                                     i)
+            @test sl1v.ep == 0.1
+            @test sl1v.en == 0.2
+            @test sl1v.mu == pr_ref.mu[i]
+        end
+    end
 end

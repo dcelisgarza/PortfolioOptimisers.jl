@@ -495,8 +495,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgo
     mu_l, mu_u = vec_quantile_bounds(mus, q, ue.kwargs)
     sigma_l, sigma_u = box_quantile_bounds(eltype(X), (i, j) -> sigmas[i, j, :], N, q,
                                            ue.kwargs)
-    return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
-           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u, val = pr.mu),
+           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = pr.sigma)
 end
 """
     mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
@@ -556,7 +556,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetA
     mus = mu_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
     mu_l, mu_u = vec_quantile_bounds(mus, q, ue.kwargs)
-    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u, val = pr.mu)
 end
 """
     sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
@@ -618,7 +618,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintyS
     q = ue.q * 0.5
     sigma_l, sigma_u = box_quantile_bounds(eltype(X), (i, j) -> sigmas[i, j, :], N, q,
                                            ue.kwargs)
-    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
+    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = pr.sigma)
 end
 """
     ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
@@ -710,9 +710,9 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuEllipsoidalUncertaintySet()),
+                           MuEllipsoidalUncertaintySet(), pr.mu),
            ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet())
+                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
 end
 """
     mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
@@ -780,7 +780,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     X_mu = transpose(X_mu)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                           MuEllipsoidalUncertaintySet())
+                           MuEllipsoidalUncertaintySet(), pr.mu)
 end
 """
     sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
@@ -848,7 +848,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
     X_sigma = transpose(X_sigma)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                           SigmaEllipsoidalUncertaintySet())
+                           SigmaEllipsoidalUncertaintySet(), pr.sigma)
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet

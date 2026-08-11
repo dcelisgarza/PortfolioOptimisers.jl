@@ -279,13 +279,16 @@ Polarity selects **which** weights an algorithm receives and never gates **wheth
 ### 3.9 Uncertainty Sets
 
 **Uncertainty Set**
-A robust optimisation construct that sits alongside a Prior in JuMP-based optimisers: the Prior gives the central estimate (mean, covariance) and the Uncertainty Set bounds how far off it might be; the optimiser then protects against the worst case within the set. Always a robust-optimisation concept. Shapes and constructors:
+A robust optimisation construct used by JuMP-based optimisers: it is a **neighbourhood of a specific quantity** — a mean vector or a covariance matrix — and the optimiser protects against the worst case within it. Always a robust-optimisation concept. Shapes and constructors:
 
 - **Box** (`BoxUncertaintySet`): independent per-parameter bounds.
 - **Ellipsoidal** (`EllipsoidalUncertaintySet`, `Mu…`/`Sigma…` classes): joint confidence region; scaling parameter `k` from `NormalKUncertaintyAlgorithm`, `GeneralKUncertaintyAlgorithm`, or `ChiSqKUncertaintyAlgorithm`.
 - **ℓ1 / cross-polytope** (`L1UncertaintySet`): one error budget `eps` shared across all assets and both signs, optionally scaled per asset by `sd`; worst case `mu'w − eps·‖sd ⊙ w‖∞`. **Mean-only** — it bounds a *characteristic* vector and has no covariance analogue.
 - **Signed ℓ1** (`SignedL1UncertaintySet`): a budget per error sign (`ep`, `em`); worst case `mu'w − ep·[maxᵢ(−sdᵢwᵢ)]₊ − em·[maxᵢ(sdᵢwᵢ)]₊`. Not the joint set with `ep == em` — the joint set shares one budget across signs (`max(t₊,t₋)`), this one spends a budget per sign (`ep·t₊ + em·t₋`); they agree only when `w` is single-signed.
 - **Estimators**: `DeltaUncertaintySet` (delta bounds), `NormalUncertaintySet` (normality assumption), `ARCHUncertaintySet` (bootstrap for time series — `StationaryBootstrap`, `CircularBootstrap`, `MovingBootstrap`), `CharacteristicUncertaintySet` (the ℓ1 family; shape via `L1UncertaintySetAlgorithm`/`SignedL1UncertaintySetAlgorithm`, whose `scaled` flag selects equal-weight vs inverse-volatility behaviour).
+
+**A set carries the quantity it is a neighbourhood of** — `mu` on the ℓ1 pair, `val` on the two that serve both axes. A fitted set records the fit its radius or shape matrix was calibrated on, and **that quantity is the central estimate** the optimiser is centred on. The Prior is only the fallback, used when the set names nothing, which is how a hand-built set behaves. Precedence is the carried quantity, then the returns estimator's own field, then the Prior (ADR 0050). The box covariance route is the one exception, and it names no centre at all: its worst case `tr(A_u Σ_u) − tr(A_l Σ_l)` is built from the bounds alone.
+*Avoid*: describing the Prior as the central estimate on a set-bearing route, or fitting the centre at the call site. A call-site fit cannot survive a **pre-built** set crossing the boundary, because by then the fit is gone — which is why the quantity rides on the set.
 
 **ucs Triple** (`ucs` / `mu_ucs` / `sigma_ucs`)
 The three ways to ask an Uncertainty Set estimator for its sets: `ucs` returns the mean and covariance sets as a pair, `mu_ucs` returns the mean half, `sigma_ucs` the covariance half. Conceptually `ucs` *is* the mean half alongside the covariance half — but for sampling-based estimators the pair shares one random draw threaded through both halves, so `ucs`'s covariance half can differ numerically from a standalone `sigma_ucs` call that re-seeds (deliberate; not a drift). ℓ1 sets are mean-only: their `ucs`/`sigma_ucs` throw (ADR 0035).

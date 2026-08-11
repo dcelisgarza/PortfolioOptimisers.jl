@@ -619,7 +619,7 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
   - `ucs`: Uncertainty set instance (`BoxUncertaintySet` or `EllipsoidalUncertaintySet`).
-  - `sigma::MatNum`: Covariance matrix (used by `EllipsoidalUncertaintySet`).
+  - `sigma::MatNum`: Fallback covariance matrix (used by `EllipsoidalUncertaintySet`). The set's own `val` field wins over it (ADR 0050). The box overload names no centre at all, so it ignores both.
 
 # Returns
 
@@ -665,6 +665,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     end
     key = Symbol(:eucs_variance_risk_, i)
     WpE = state_get(model, prefix, :WpE)
+    # The set is a neighbourhood of the covariance it was calibrated on, so it names the
+    # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
+    sigma = something(ucs.val, sigma)
     k = ucs.k
     G = LinearAlgebra.cholesky(ucs.sigma).U
     t_eucs = model[Symbol(:t_eucs, i)] = JuMP.@variable(model)

@@ -687,7 +687,7 @@ optimiser sees.
 # Arguments
 
   - `ucs`: Fitted uncertainty set result.
-  - `sigma::MatNum`: Nominal covariance matrix.
+  - `sigma::MatNum`: Fallback covariance matrix. The set's own `val` field wins over it (ADR 0050).
   - `w::VecNum`: Vector of portfolio weights.
 
 # Returns
@@ -707,6 +707,8 @@ function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
 end
 function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
     W = w * transpose(w)
+    # The set names its own centre; `sigma` is the fallback (ADR 0050).
+    sigma = something(ucs.val, sigma)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
