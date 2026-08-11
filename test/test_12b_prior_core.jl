@@ -1254,3 +1254,85 @@ end
     @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; views = wide), rd)
     @test_throws DimensionMismatch prior(BlackLittermanPrior(; views = wide), rd)
 end
+
+@testset "The carrier records the original returns matrix" begin
+    #=
+    Three estimators overwrite `X` with the reconstruction `F * transpose(M) .+
+    transpose(b)`, so on their carriers `X` is a posterior matrix rather than the returns
+    the caller supplied. `o_X` holds the returns the caller supplied, and `original_X` is
+    the read that is always a matrix. See ADR 0046's 2026-08-11 amendment.
+    =#
+    X, F = rd.X, rd.F
+    a_view = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.002")
+    f_view = LinearConstraintEstimator(; val = "$(rd.nf[1]) == 0.001")
+
+    # The three producers set it, and every other route leaves it `nothing`.
+    fp = prior(FactorPrior(), X, F)
+    fbl = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_view), X, F)
+    abl = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_view,
+                                             f_views = f_view), X, F)
+    for pr in (fp, fbl, abl)
+        @test pr.o_X === X
+        @test pr.original_X === X
+        @test pr.X !== X
+        @test size(pr.o_X) == size(pr.X)
+    end
+    bl = prior(BlackLittermanPrior(; sets = sets, views = a_view), X, F)
+    for pr in (prior(EmpiricalPrior(), X), bl)
+        @test isnothing(pr.o_X)
+        @test pr.original_X === pr.X
+    end
+
+    # The nested factor block is fit on factors, so it has no original of its own.
+    @test isnothing(fp.fpr.o_X)
+
+    # `HighOrderPrior` declares neither name and reads both through its `forward(pr)`
+    # block, so one declaration covers both carriers.
+    @test !hasfield(HighOrderPrior, :o_X)
+    hop = HighOrderPrior(; pr = fp)
+    @test hop.o_X === X
+    @test hop.original_X === X
+
+    #=
+    The two pooling estimators rebuild their carrier by explicit destructure rather than
+    through `forward_prior`, so they are the sites that would drop the field silently.
+    =#
+    epe = EntropyPoolingPrior(; pe = FactorPrior(), sets = xfsets, mu_views = a_view)
+    epp = prior(epe, X, F)
+    @test epp.o_X === X
+    @test epp.X !== X
+    opp = prior(OpinionPoolingPrior(; pes = [epe, epe], pe2 = FactorPrior()), X, F)
+    @test opp.o_X === X
+    @test opp.X !== X
+
+    # `forward_prior` needs no plumbing: it enumerates `fieldnames`, so the field travels
+    # unchanged, and it gains no binding to `X`.
+    @test PortfolioOptimisers.forward_prior(fp; mu = fp.mu .+ 0.001).o_X === X
+    @test haskey(PortfolioOptimisers.prior_field_values(fp), :o_X)
+
+    # A view slices it on the asset axis, exactly as it slices `X`.
+    i = [1, 3, 5, 7]
+    v = PortfolioOptimisers.port_opt_view(fp, i)
+    @test v.o_X == X[:, i]
+    @test v.original_X == X[:, i]
+    @test size(v.o_X) == size(v.X)
+
+    #=
+    Three guards, all O(1): no matrix is ever compared by value.
+    =#
+    base = (mu = fp.mu, sigma = fp.sigma, rr = fp.rr, fpr = fp.fpr)
+    # `o_X === X` says nothing, and would be a second encoding of "no reconstruction".
+    @test_throws ArgumentError LowOrderPrior(; X = fp.X, o_X = fp.X, base...)
+    # The original describes the same observations and the same assets.
+    @test_throws DimensionMismatch LowOrderPrior(; X = fp.X, o_X = X[1:(end - 1), :],
+                                                 base...)
+    #=
+    `rr` is required whenever `o_X` is set. This is a present-tense constraint rather than
+    a law of the domain: a future prior that transforms `X` without a regression is the
+    case that relaxes it. ADR 0046's amendment carries the reasoning.
+    =#
+    @test_throws IsNothingError LowOrderPrior(; X = fp.X, o_X = X, mu = fp.mu,
+                                              sigma = fp.sigma)
+    # The legal shape passes all three.
+    @test isa(LowOrderPrior(; X = fp.X, o_X = X, base...), LowOrderPrior)
+end

@@ -1,7 +1,7 @@
 #=
 Unit tests for `forward_prior` and the `reconstruct_prior` it is built on
 (ADR 0046). These pin the composition rule's mechanics — forwarding is the
-default, drops are explicit, the two field bindings are enforced, and the
+default, drops are explicit, the three field bindings are enforced, and the
 carrier's own validation runs on every reconstruction — without going through any
 estimator. What the construction sites actually forward is pinned separately, in
 `test_12g_forwarding_rule.jl`.
@@ -54,7 +54,7 @@ end
     @test fpr isa LowOrderPrior
     @test fpr.mu == [0.05, 0.06]
     # Every other field is the very same object, not a copy or a recomputation.
-    for sym in (:X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :Z)
+    for sym in (:X, :o_X, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :Z)
         @test getfield(fpr, sym) === getfield(pr, sym)
     end
     # In particular, the three fields whose silent loss motivated ADR 0046.
@@ -162,14 +162,48 @@ end
     pr = factor_prior()
     @test !isnothing(pr.rr)
 
+    #=
+    A fitted factor prior carries an original, so `rr` binds `o_X` on it and that binding
+    is reported before the carrier is rebuilt. A carrier may hold `rr` *without* an
+    original — the requirement runs one way only — and that is the shape that still pins
+    the all-or-none factor block. Both are worth keeping: the first is the new rule, the
+    second is the constructor's, and the one must not hide the other.
+    =#
+    bare = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, chol = pr.chol,
+                         rr = pr.rr, fpr = pr.fpr)
+    @test isnothing(bare.o_X)
+
     # The factor block is all-or-none, so dropping one half of it throws — the
     # point of routing through the carrier's own constructor.
-    @test_throws ArgumentError PO.forward_prior(pr; rr = nothing)
+    @test_throws ArgumentError PO.forward_prior(bare; rr = nothing)
+    @test_throws ArgumentError PO.forward_prior(bare; fpr = nothing)
     @test_throws ArgumentError PO.forward_prior(pr; fpr = nothing)
-    # Dropping the whole block at once is valid.
-    dropped = PO.forward_prior(pr; rr = nothing, fpr = nothing)
+
+    #=
+    `rr` binds `o_X`. The block records the projection that produced the reconstruction, so
+    a carrier cannot keep the original after dropping what explains it. Dropping the block
+    therefore drops the original with it, and saying so is the caller's job.
+    =#
+    @test !isnothing(pr.o_X)
+    for patch in ((; rr = nothing), (; rr = nothing, fpr = nothing))
+        @test_throws PO.ConflictingArgumentError PO.forward_prior(pr; patch...)
+        err = try
+            PO.forward_prior(pr; patch...)
+        catch e
+            e
+        end
+        @test occursin("o_X", sprint(showerror, err))
+        @test occursin("rr", sprint(showerror, err))
+    end
+
+    # Dropping the whole block at once is valid, and the original goes with it.
+    dropped = PO.forward_prior(pr; rr = nothing, fpr = nothing, o_X = nothing)
     @test isnothing(dropped.rr)
     @test isnothing(dropped.fpr)
+    @test isnothing(dropped.o_X)
+    @test dropped.original_X === dropped.X
+    # The binding is inert on a carrier with no original to orphan.
+    @test isnothing(PO.forward_prior(bare; rr = nothing, fpr = nothing).rr)
 
     # The flat `f_*` names read the nested block but are not fields of the carrier, so
     # they cannot be patched — the same refusal `mu` gets on a `HighOrderPrior`.
@@ -272,7 +306,7 @@ end
     @test a.X === b.X === pr.X
 
     # It runs the carrier's validation, but it is not the rule-bearing entry point:
-    # only `forward_prior` enforces the two bindings.
+    # only `forward_prior` enforces the three bindings.
     @test_throws DimensionMismatch PO.reconstruct_prior(pr, (; mu = [0.7, 0.8, 0.9]))
     @test PO.reconstruct_prior(pr, (; w = StatsBase.pweights([0.5, 0.5]))).ens === pr.ens
 end

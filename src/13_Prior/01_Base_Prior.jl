@@ -311,12 +311,13 @@ Forwarding is the default and costs nothing to write, so a wrapper cannot accide
 
 Reconstruction goes through the carrier's ordinary keyword constructor (see [`reconstruct_prior`](@ref)), so **every `@argcheck` runs**: a forward that leaves the carrier internally inconsistent throws exactly as a hand-written constructor call would. Only the carrier's own **fields** may be named — a forwarded or computed property is a view of a nested value, so setting it could only ever mean setting the field that value came from.
 
-## The two enforced bindings
+## The three enforced bindings
 
-Two fields are *bound* to another field's value rather than being independent, so forwarding them past a change to the field they describe is what the rule calls stating something false. Because the binding is mechanical, the helper enforces it rather than leaving it to reviewer memory — naming the field on the left obliges the caller to name the fields on the right, either with a rebuilt value or with `nothing`:
+Three fields are *bound* to another field's value rather than being independent, so forwarding them past a change to the field they describe is what the rule calls stating something false. Because the binding is mechanical, the helper enforces it rather than leaving it to reviewer memory — naming the field on the left obliges the caller to name the fields on the right, either with a rebuilt value or with `nothing`:
 
   - **`sigma` binds `chol`.** `chol` *takes precedence over* `sigma` at every consumer, so a stale `chol` makes the optimisation silently ignore the posterior covariance.
   - **`w` binds `ens`, `kld` and `ow`.** Those are diagnostics *of* `w`; weights carrying another weighting's provenance cannot be interrogated.
+  - **`rr` binds `o_X`.** `o_X` says `X` is a reconstruction, and `rr` is what records the projection that produced it, so the carrier refuses one without the other. Dropping the factor block therefore drops the original with it.
 
 A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from the carrier.
 
@@ -339,6 +340,7 @@ The estimators that *lift* a factor-axis prior into an asset-axis result ([`Fact
 
   - Naming `sigma` requires naming `chol`, unless `pr.chol` is already `nothing`.
   - Naming `w` requires naming each of `ens`, `kld` and `ow` that is not already `nothing`.
+  - Naming `rr` requires naming `o_X`, unless `pr.o_X` is already `nothing`.
   - Every name in `overrides` is a field of `typeof(pr)`.
   - Every `@argcheck` of the constructor of `typeof(pr)`.
 
@@ -381,6 +383,9 @@ function forward_prior(pr::AbstractPriorResult; overrides...)::AbstractPriorResu
               ArgumentError("$(extra) cannot be forwarded onto a $(nameof(typeof(pr))), whose fields are $(fnames). A forwarded or computed property is a view of a nested value; name the field holding that value instead."))
     if haskey(patch, :sigma) && !haskey(patch, :chol) && bound_field_is_stale(pr, :chol)
         throw(ConflictingArgumentError("forwarding `chol` past a change to `sigma` would state something false: `chol` takes precedence over `sigma` at every consumer, so a stale factor makes the optimisation silently ignore the updated covariance. Pass `chol = nothing` to drop it, or a factor rebuilt from the new `sigma`."))
+    end
+    if haskey(patch, :rr) && !haskey(patch, :o_X) && bound_field_is_stale(pr, :o_X)
+        throw(ConflictingArgumentError("forwarding `o_X` past a change to `rr` would state something false: `o_X` says `X` is a reconstruction, and `rr` is what records the projection that produced it. Dropping the factor block drops the original with it. Pass `o_X` explicitly — `nothing` to drop it, or the matrix it should now name"))
     end
     if haskey(patch, :w)
         stale = filter(sym -> !haskey(patch, sym) && bound_field_is_stale(pr, sym),
@@ -842,6 +847,7 @@ $(DocStringExtensions.FIELDS)
 
     LowOrderPrior(;
         X::MatNum,
+        o_X::Option{<:MatNum} = nothing,
         mu::VecNum,
         sigma::MatNum,
         chol::Option{<:MatNum} = nothing,
@@ -868,7 +874,7 @@ The flat names are **virtual reads** of the nested block, so code written agains
 
 **`pr.fpr.mu` is the public read**; the flat `f_`-prefixed names are a **compatibility surface**, kept so that code written against the pre-nesting shape keeps working, and useful where a value-or-`nothing` read without branching is wanted.
 
-The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over eleven fields, so `fpr.X` — the factor returns matrix — and `fpr.Z`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
+The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over twelve fields, so `fpr.X` — the factor returns matrix — and `fpr.Z`, `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
 
 The two reads also differ where the block is absent, which is the one case worth checking before choosing: `pr.f_mu` returns `nothing`, while `pr.fpr.mu` throws, because `fpr` is `nothing`. Guard with [`assert_prior_regression`](@ref) — `rr` and `fpr` are supplied together or not at all, so checking `rr` establishes the whole block — and then read through `fpr`.
 
@@ -890,6 +896,16 @@ Every prior estimator that wraps another **forwards it**, so nesting order does 
 
 `FactorPrior`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` *reconstruct* `X` as `F * transpose(M) .+ transpose(b)`, so a `Z` forwarded through them is dimension-correct but was derived from the pre-reconstruction returns.
 
+## The original returns matrix
+
+Those same three estimators are the reason `o_X` exists. They overwrite `X`, so on their carriers `X` is a **posterior** matrix — the asset distribution this prior asserts — and not the returns the caller supplied. `o_X` holds the returns the caller supplied. It is `nothing` everywhere else, where `X` already is them.
+
+The two matrices are not interchangeable. The reconstruction spans only the factors: it has rank `size(F, 2)`, and the residual is absent. A consumer that refits a moment on the sample must therefore read the original, or it gets a singular matrix whenever there are more assets than factors.
+
+**Read it as `original_X`, never as `o_X`.** The property is always a matrix — the field where there is one, `X` where there is not — so a consumer needs no fallback and cannot forget one. The field is storage, and it answers a different question: `isnothing(pr.o_X)` is how to ask whether this carrier reconstructed `X`. The field carries the state rather than the property carrying it, because [`forward_prior`](@ref) rebuilds through the keyword constructor with every field named, and a `nothing` is inert there where an always-populated matrix would go stale past a change to `X`.
+
+`o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a carrier claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain: see the amendment to ADR 0046.
+
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
@@ -900,6 +916,7 @@ Every prior estimator that wraps another **forwards it**, so nesting order does 
   - If `ow` is not `nothing`, `!isempty(ow)`.
   - `rr` and `fpr` must be provided together or not at all.
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
+  - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
   - If `Z` is not `nothing`, it is non-empty, all-finite, and assets-major against `X`: `size(Z, 1) == size(X, 2)` when static, `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)` when time-varying (see [`check_feature_matrix`](@ref)).
 
@@ -910,6 +927,7 @@ julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                      sigma = [0.0001 0.0002; 0.0002 0.0003])
 LowOrderPrior
       X ┼ 2×2 Matrix{Float64}
+    o_X ┼ nothing
      mu ┼ Vector{Float64}: [0.02, 0.03]
   sigma ┼ 2×2 Matrix{Float64}
    chol ┼ nothing
@@ -937,6 +955,10 @@ LowOrderPrior
     $(field_dict[:X])
     """
     X
+    """
+    $(field_dict[:o_X])
+    """
+    o_X
     """
     $(field_dict[:mu])
     """
@@ -977,11 +999,11 @@ LowOrderPrior
     $(field_dict[:Z_prior])
     """
     Z
-    function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
-                           w::Option{<:ObsWeights}, ens::Option{<:Number},
-                           kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
-                           rr::Option{<:Regression}, fpr::Option{<:LowOrderPrior},
-                           Z::Option{<:MatNum_Arr3Num})
+    function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
+                           chol::Option{<:MatNum}, w::Option{<:ObsWeights},
+                           ens::Option{<:Number}, kld::Option{<:Num_VecNum},
+                           ow::Option{<:VecNum}, rr::Option{<:Regression},
+                           fpr::Option{<:LowOrderPrior}, Z::Option{<:MatNum_Arr3Num})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -1014,30 +1036,56 @@ LowOrderPrior
             @argcheck(size(fpr.X, 1) == size(X, 1),
                       DimensionMismatch("size(fpr.X, 1) ($(size(fpr.X, 1))) must match size(X, 1) ($(size(X, 1))): the asset and factor blocks describe the same observations"))
         end
+        # `o_X` records that `X` is not the matrix the caller handed in. Three checks, all
+        # O(1): no matrix is ever compared by value.
+        #
+        # The `rr` requirement is a *present-tense* constraint, not a law of the domain.
+        # Every estimator that overwrites `X` today does so by projecting a factor prior
+        # through regression loadings, so the loadings are always in hand and a carrier
+        # claiming a reconstruction it cannot explain is a bug. A future estimator that
+        # transforms `X` without a regression — a bootstrap or a simulation prior — is the
+        # case that relaxes this, and it must relax it deliberately. See ADR 0046.
+        if !isnothing(o_X)
+            @argcheck(o_X !== X,
+                      ArgumentError("o_X is X itself, so this carrier has no original distinct from the one it asserts. Pass o_X = nothing, which is what every consumer reads as \"X is the original\""))
+            @argcheck(size(o_X) == size(X),
+                      DimensionMismatch("size(o_X) ($(size(o_X))) must match size(X) ($(size(X))): the original and the matrix this carrier asserts describe the same observations and the same assets"))
+            @argcheck(!rr_is_nothing,
+                      IsNothingError("o_X says X is not the caller's matrix, but rr === nothing, so this carrier does not record what produced X. Every estimator that overwrites X projects a factor prior through regression loadings and carries them in rr"))
+        end
         if !isnothing(chol)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
         check_feature_matrix(Z, size(X, 2), size(X, 1), "size(X, 2)")
-        return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
-                   typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
-                   typeof(Z)}(X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+        return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
+                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
+                   typeof(Z)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
     end
 end
-function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
-                       chol::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
-                       ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
-                       ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
+function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
+                       sigma::MatNum, chol::Option{<:MatNum} = nothing,
+                       w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
+                       kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
+                       rr::Option{<:Regression} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
                        Z::Option{<:MatNum_Arr3Num} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
 # `compute` with a lambda rather than `alias(f_mu, fpr.mu)`: a dotted locator guards each
 # intermediate and throws a [`PropertyPathError`](@ref) when a node is `nothing`, where these
 # must return `nothing` — that is what the old flat fields did when there was no factor block.
+#
+# `original_X` is the read for `o_X`, and it is always a matrix. The field is the storage
+# and answers `nothing` where `X` is already the original. The property answers the
+# question every consumer asks, which is what returns the caller supplied.
+#
+# Two names, because one always-populated field cannot express both. `forward_prior`
+# rebuilds through the keyword constructor with every field named, so a stated matrix would
+# be carried past a change to `X` and would then name the wrong one. A `nothing` is inert.
 @forward_properties LowOrderPrior begin
     compute(f_mu, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.mu)
     compute(f_sigma, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.sigma)
@@ -1045,6 +1093,7 @@ end
     compute(f_ens, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.ens)
     compute(f_kld, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.kld)
     compute(f_ow, obj -> isnothing(obj.fpr) ? nothing : obj.fpr.ow)
+    compute(original_X, obj -> isnothing(obj.o_X) ? obj.X : obj.o_X)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1063,7 +1112,10 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 """
 function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
-    return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
+    # `o_X` is assets-major over the same observations as `X`, so it takes the same cut. A
+    # subproblem's original returns are the caller's returns for that subproblem's assets.
+    o_X = isnothing(pr.o_X) ? nothing : view(pr.o_X, :, i)
+    return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
                          fpr = pr.fpr, Z = feature_matrix_view(pr.Z, false, :, i))
@@ -1130,6 +1182,7 @@ julia> HighOrderPrior(;
 HighOrderPrior
     pr ┼ LowOrderPrior
        │       X ┼ 2×2 Matrix{Float64}
+       │     o_X ┼ nothing
        │      mu ┼ Vector{Float64}: [0.02, 0.03]
        │   sigma ┼ 2×2 Matrix{Float64}
        │    chol ┼ nothing

@@ -404,3 +404,91 @@ Refitting the same fixture on an exact factor model closes the gap to `3.6e-14`.
 block that is structurally true while distributionally inconsistent. It has nothing better to report,
 and each estimator's docstring now names where it sits in that table rather than stating the
 inconsistency as though it were uniform across the family.
+
+## Amendment (2026-08-11)
+
+`LowOrderPrior` gains a twelfth field, `o_X`, and a computed read, `original_X`. Issue #288 raised
+it: three estimators overwrite `X`, and nothing on the carrier said so.
+
+### What the field records
+
+`FactorPrior`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` each set
+`X = F * transpose(M) .+ transpose(b)`. Their `X` is therefore a **posterior** matrix — the return
+distribution the prior asserts — and not the returns the caller supplied. `o_X` holds the returns the
+caller supplied. It is `nothing` on every other route, where `X` already is them.
+
+The two are not interchangeable. Measured on an 8-asset, 3-factor fixture:
+
+| covariance fit on | `rank` | distance from `pr.sigma` |
+| --- | --- | --- |
+| `pr.X`, the reconstruction | 3 | 7.0e-5 |
+| the caller's `X` | 8 | 1.0e-5 |
+
+The reconstruction spans only the factors and carries no residual, so it is singular whenever there
+are more assets than factors, and it is *further* from the covariance the carrier reports than the
+honest fit is. The Deferred Quantity kernel (#280) was fitting on it. That is now corrected: all
+three `fit_deferred_quantity` methods read `original_X`.
+
+### Why two names
+
+`o_X` is the storage and `original_X` is the read. The read is always a matrix — the field where
+there is one, `X` where there is not — so no consumer writes a fallback and no consumer can forget
+one. The field carries the `nothing`, and not the property, because `forward_prior` rebuilds through
+the keyword constructor with **every field named**. A `nothing` is inert under that rebuild. An
+always-populated field would be carried past a change to `X` and would then name a matrix that is no
+longer the original.
+
+`isnothing(getfield(pr, :o_X))` is the test for whether a carrier reconstructed `X`. The constructor
+refuses `o_X === X` so that this state has exactly one encoding.
+
+### The forwarding rule
+
+`o_X` travels **on its own**, and not with the factor block. It needs no plumbing:
+`prior_field_values` and `forward_prior` both enumerate `fieldnames`, so a new field forwards
+automatically. Two producers rebuild their carrier by explicit destructure rather than through
+`forward_prior` — `EntropyPoolingPrior` at two sites and `OpinionPoolingPrior` at one — and those
+three were edited by hand. Without that edit, entropy pooling over a factor prior would drop the
+original silently.
+
+`o_X` gains **no binding to `X`**, unlike `sigma`-binds-`chol` and `w`-binds-the-diagnostics. The two
+existing bindings guard a *stated value* going stale. Here the staleness would be inverted: it is the
+**absence** of `o_X` that would become false if a wrapper replaced `X` on a non-factor route. No site
+in `src` forwards `X` today, so the case is hypothetical, and a binding whose helper cannot be
+`bound_field_is_stale` — which answers `false` for a `nothing` field — is not worth inventing for it.
+Add the guard when the first such wrapper arrives.
+
+It does gain a **third binding**, `rr` binds `o_X`, which the existing test suite found rather than
+review did. `test_12f_forward_prior.jl` asserts that dropping the whole factor block at once is
+valid, and on a factor carrier that now leaves `o_X` standing with nothing to explain it — the
+constructor's `rr` requirement refuses it. The refusal is correct, and it belongs at the rule rather
+than surfacing from the constructor, so `forward_prior` raises it with the other two:
+
+> Naming `rr` requires naming `o_X`, unless `pr.o_X` is already `nothing`.
+
+Dropping the factor block therefore drops the original with it. The binding is inert on every
+carrier that has no `o_X`, which includes each of the factor priors the Black-Litterman estimators
+forward — they call `forward_prior` on the *factor* block, which is fit on factors and has no
+original of its own.
+
+### The `rr` requirement, and what would relax it
+
+The constructor requires `rr` whenever `o_X` is set. Every estimator that overwrites `X` today does
+so by projecting a factor prior through regression loadings, so the loadings are always in hand and a
+carrier claiming a reconstruction it cannot explain is a bug.
+
+**This is a present-tense constraint, not a law of the domain.** A future prior that transforms `X`
+without a regression — a bootstrap prior, a simulation prior — is the case that relaxes it, and it
+must relax it deliberately rather than by discovering the `@argcheck` in the way. This paragraph is
+the record that the coupling was chosen with that future in view.
+
+The requirement runs **one way only**. A carrier may hold `rr` with no original, which is the shape
+every hand-built factor-block test fixture takes, and `test_12f_forward_prior.jl` pins it. The
+biconditional was rejected for exactly that reason: it would refuse every such fixture, and the two
+fields answer different questions — `rr` records a projection, `o_X` records what was projected.
+
+### Scope
+
+The factor-risk-contribution path is **not** changed here. It reads its returns from the caller's
+`ReturnsResult` rather than from the carrier, so `o_X` simplifies nothing there. It does have a
+defect of the same family — `factor_risk_contribution` handed a factor prior reduces `pr.X`, which
+has no residual, and reports a **negative** idiosyncratic share — and that has its own ticket.

@@ -1265,11 +1265,9 @@ end
 
 Run a **Deferred Quantity** against the optimisation's own prior result and return what it produces: a moment estimator gives its quantity, an [`AbstractPriorEstimator`](@ref) gives a whole [`AbstractPriorResult`](@ref).
 
-The estimator sees `pr.X` — the returns the prior itself carries, sliced by any [`port_opt_view`](@ref) the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
+The estimator sees `pr.original_X` — the returns the **caller** supplied, sliced by any [`port_opt_view`](@ref) the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
 
-!!! warning
-
-    `pr.X` is **not** the caller's returns matrix on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reconstruct it as `F * transpose(M) .+ transpose(b)`, so a Deferred Quantity is fit on the reconstruction there rather than on the asset returns. The carrier has no field for the original matrix yet; adding one is tracked separately.
+`pr.original_X` rather than `pr.X`, because the two differ on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, which spans only the factors: it has rank `size(F, 2)`, and it carries no residual. Fitting a covariance estimator on it returns a **singular** matrix whenever there are more assets than factors, and a prior estimator in a slot could not regress it against those same factors. Off a factor route `original_X === X`, so nothing moves.
 
 There is no method for a [`CoskewnessEstimator`](@ref) or a [`CokurtosisEstimator`](@ref) yet — a coskewness estimator returns the pair `(sk, V)`, whose second half needs a matrix-processing estimator to name. Those two families arrive with the high-order measures.
 
@@ -1278,17 +1276,18 @@ There is no method for a [`CoskewnessEstimator`](@ref) or a [`CokurtosisEstimato
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
   - [`deferred_factors`](@ref)
+  - [`LowOrderPrior`](@ref)
   - [`_wprop`](@ref)
 """
 function fit_deferred_quantity(dq::AbstractExpectedReturnsEstimator,
                                pr::AbstractPriorResult)
-    return vec(Statistics.mean(factory(dq, pr.w), pr.X))
+    return vec(Statistics.mean(factory(dq, pr.w), pr.original_X))
 end
 function fit_deferred_quantity(dq::StatsBase.CovarianceEstimator, pr::AbstractPriorResult)
-    return Statistics.cov(factory(dq, pr.w), pr.X)
+    return Statistics.cov(factory(dq, pr.w), pr.original_X)
 end
 function fit_deferred_quantity(dq::AbstractPriorEstimator, pr::AbstractPriorResult)
-    return prior(factory(dq, pr.w), pr.X, deferred_factors(pr))
+    return prior(factory(dq, pr.w), pr.original_X, deferred_factors(pr))
 end
 """
     deferred_quantity(fitted, key::Symbol)

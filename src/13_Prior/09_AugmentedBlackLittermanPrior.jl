@@ -464,9 +464,10 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
     # two priors rather than forwarding one along its own axis, so it builds the carrier
     # directly instead of going through [`forward_prior`](@ref).
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         w = a_prior.w, ens = a_prior.ens, kld = a_prior.kld,
-                         ow = a_prior.ow, rr = rr, fpr = fpr, Z = a_prior.Z)
+    return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
+                         sigma = posterior_sigma, w = a_prior.w, ens = a_prior.ens,
+                         kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr,
+                         Z = a_prior.Z)
 end
 
 export AugmentedBlackLittermanPrior

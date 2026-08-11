@@ -208,19 +208,76 @@ end
     @test PO.deferred_factors(pr) === pr.fpr.X
     @test isnothing(PO.deferred_factors(prior(EmpiricalPrior(), X)))
 
-    # A prior estimator in the slot is refit on the carrier's own returns and factors, and
-    # supplies the sparse factorisation that belongs with the covariance it produced.
-    #
-    # NOTE: `pr.X` is the *reconstruction* `F * transpose(M) .+ transpose(b)`, not the `X`
-    # the caller passed — `FactorPrior` overwrites it. So the refit below runs on the
-    # reconstruction. That is a defect in the carrier, not in the kernel, and it is tracked
-    # separately: when the carrier gains a field for the original matrix, the reference
-    # below becomes `prior(FactorPrior(), <original X>, pr.fpr.X)` and nothing else changes.
-    ref = prior(FactorPrior(), pr.X, pr.fpr.X)
+    # A prior estimator in the slot is refit on the caller's own returns and factors, and
+    # supplies the sparse factorisation that belongs with the covariance it produced. The
+    # returns are `pr.original_X`, not `pr.X`: `FactorPrior` overwrote `X` with the
+    # reconstruction, and a factor prior cannot regress that against the same factors.
+    ref = prior(FactorPrior(), pr.original_X, pr.fpr.X)
     f = factory(Variance(; sigma = FactorPrior()), pr)
     @test f.sigma ≈ ref.sigma
     @test f.chol ≈ ref.chol
     @test !isnothing(f.chol)
+
+    # The reconstruction is a different matrix, so the refusal to use it is observable.
+    @test !isapprox(f.sigma, prior(FactorPrior(), pr.X, pr.fpr.X).sigma)
+end
+
+@testset "Deferred Quantity: the fit is on the caller's returns" begin
+    rng = StableRNG(987654321)
+    T, N, Nf = 200, 8, 3
+    F = randn(rng, T, Nf) .* 0.01
+    X = F * transpose(randn(rng, N, Nf) .* 0.5) .+ randn(rng, T, N) .* 0.008
+    pr = prior(FactorPrior(), X, F)
+    ce = SimpleCovariance(; corrected = false)
+
+    # The carrier says which of the two matrices it holds.
+    @test pr.X !== X
+    @test pr.o_X === X
+    @test pr.original_X === X
+
+    # The kernel fits on the caller's matrix. The reconstruction spans only the factors, so
+    # a fit there is singular whenever there are more assets than factors — this is the
+    # whole reason the field exists, and it is a rank difference rather than a small one.
+    fitted = PO.fit_deferred_quantity(ce, pr)
+    @test fitted ≈ cov(ce, X)
+    @test rank(fitted) == N
+    @test rank(cov(ce, pr.X)) == Nf
+    @test !isapprox(fitted, cov(ce, pr.X))
+
+    # The mean method reads the same matrix.
+    @test PO.fit_deferred_quantity(SimpleExpectedReturns(), pr) ≈
+          vec(mean(SimpleExpectedReturns(), X))
+
+    # A resolved slot therefore carries the honest covariance, through both entry points.
+    @test factory(Variance(; sigma = ce), pr).sigma ≈ cov(ce, X)
+
+    # Off a factor route the read is the identity, so nothing moved for anyone else.
+    ep = prior(EmpiricalPrior(), X)
+    @test isnothing(ep.o_X)
+    @test ep.original_X === ep.X
+    @test PO.fit_deferred_quantity(ce, ep) ≈ cov(ce, X)
+end
+
+@testset "Deferred Quantity: the original crosses a view sliced" begin
+    rng = StableRNG(987654321)
+    T, N, Nf = 200, 8, 3
+    F = randn(rng, T, Nf) .* 0.01
+    X = F * transpose(randn(rng, N, Nf) .* 0.5) .+ randn(rng, T, N) .* 0.008
+    pr = prior(FactorPrior(), X, F)
+    i = [1, 3, 5, 7]
+    v = PO.port_opt_view(pr, i)
+    ce = SimpleCovariance(; corrected = false)
+
+    # `o_X` is assets-major over the same observations as `X`, so it takes the same cut.
+    @test v.o_X == X[:, i]
+    @test v.original_X == X[:, i]
+    @test v.o_X !== v.X
+
+    # And the subset refit is full rank, where a refit on the sliced reconstruction would
+    # still be rank `Nf`.
+    @test PO.fit_deferred_quantity(ce, v) ≈ cov(ce, X[:, i])
+    @test rank(PO.fit_deferred_quantity(ce, v)) == length(i)
+    @test rank(cov(ce, v.X)) == Nf
 end
 
 @testset "Deferred Quantity: a view is crossed unresolved and refits on the subset" begin

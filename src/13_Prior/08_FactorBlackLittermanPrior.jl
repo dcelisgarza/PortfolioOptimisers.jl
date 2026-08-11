@@ -374,7 +374,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046).
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
+    return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
+                         sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
                                                   :)), w = f_prior.w, ens = f_prior.ens,
                          kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)

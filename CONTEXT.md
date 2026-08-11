@@ -207,6 +207,17 @@ Concrete estimators:
 - **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy. Stepwise schemes `H0/H1/H2_EntropyPooling` (bias vs speed trade-off); optimisers `LogEntropyPooling`, `ExpEntropyPooling`, `CVaREntropyPooling`, backed by `OptimEntropyPooling` or `JuMPEntropyPooling`.
 - **OpinionPoolingPrior**: consensus across multiple priors — `LinearOpinionPooling`, `LogarithmicOpinionPooling`.
 
+**Original Returns Matrix**
+The returns matrix the caller supplied, as distinct from the one a Prior Result asserts. They differ on exactly three routes: `FactorPrior`, `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` each overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, so their `X` is a *posterior* matrix. Everywhere else `X` already is the caller's returns.
+
+Stored as `LowOrderPrior.o_X`: the original when `X` is not it, and `nothing` otherwise. `HighOrderPrior` reads it through its `forward(pr)` block and declares nothing of its own. `EntropyPoolingPrior` and `OpinionPoolingPrior` forward it, so it survives a pooling wrapper over a factor prior.
+
+*Read it as `pr.original_X`*, a computed property that is always a matrix — `o_X` when there is one, `X` when there is not. The field is storage and answers a different question: `isnothing(pr.o_X)` is how to ask whether this carrier reconstructed `X`. Two names rather than one always-populated field, because `forward_prior` rebuilds through the keyword constructor with every field named, where a `nothing` is inert and a matrix would go stale.
+
+The two are not interchangeable. The reconstruction spans only the factors, so it has rank `size(F, 2)` and carries no residual. A **Deferred Quantity** (§1) refits a moment on the sample and therefore reads `original_X`: fitting a covariance estimator on the reconstruction returns a singular matrix whenever there are more assets than factors. Consumers that evaluate portfolio returns keep reading `X`, because the reconstruction *is* the return distribution a factor prior asserts.
+
+`o_X` requires `rr`, so `forward_prior` binds the two: naming `rr` obliges the caller to name `o_X`, and dropping the factor block drops the original with it. Every estimator that overwrites `X` today projects a factor prior through regression loadings, so the loadings are always in hand. This is a present-tense constraint rather than a law of the domain, and ADR 0046's amendment records what would relax it.
+
 ### 3.7 Distance
 
 **Distance Matrix**
