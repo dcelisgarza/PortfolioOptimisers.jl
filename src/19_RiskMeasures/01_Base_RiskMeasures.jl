@@ -1185,6 +1185,213 @@ function solver_selector(::Nothing, ::Nothing)
     return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
 end
 """
+    const DeferredQuantity = Union{...}
+
+The dynamic half of a **Deferred Quantity**: an Estimator standing in a risk-measure slot where a prior-derived value goes. `isa(x, DeferredQuantity)` answers "is this slot deferred?" — the four moment-estimator families that compute one of the four deferrable quantities, plus [`AbstractPriorEstimator`](@ref), which computes all of them at once.
+
+The union exists because no supertype already answers the question: [`AbstractCovarianceEstimator`](@ref) is a `StatsBase.CovarianceEstimator` and not an [`AbstractEstimator`](@ref).
+
+# Related
+
+  - [`MuSlot`](@ref)
+  - [`SigmaSlot`](@ref)
+  - [`KtSlot`](@ref)
+  - [`SkSlot`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const DeferredQuantity = Union{<:AbstractExpectedReturnsEstimator,
+                               <:StatsBase.CovarianceEstimator, <:CoskewnessEstimator,
+                               <:CokurtosisEstimator, <:AbstractPriorEstimator}
+"""
+    const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+
+Field bound for an expected-returns slot: the value itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator,
+                     <:AbstractPriorEstimator}
+"""
+    const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+
+Field bound for a covariance slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+"""
+    const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+
+Field bound for a cokurtosis slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+"""
+    const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+
+Field bound for a coskewness slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+"""
+    deferred_factors(pr::AbstractPriorResult)
+
+Return the factor returns matrix carried by prior result `pr`, or `nothing` when `pr` has no factor block. This is the only channel through which factors reach a risk-measure slot: no moment estimator takes an `F`, so a slot that must see factors has to hold an [`AbstractPriorEstimator`](@ref).
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function deferred_factors(pr::AbstractPriorResult)
+    return isnothing(pr.fpr) ? nothing : pr.fpr.X
+end
+"""
+    fit_deferred_quantity(dq::DeferredQuantity, pr::AbstractPriorResult)
+
+Run a **Deferred Quantity** against the optimisation's own prior result and return what it produces: a moment estimator gives its quantity, an [`AbstractPriorEstimator`](@ref) gives a whole [`AbstractPriorResult`](@ref).
+
+The estimator sees `pr.X` — the returns the prior itself carries, sliced by any [`port_opt_view`](@ref) the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
+
+!!! warning
+
+    `pr.X` is **not** the caller's returns matrix on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reconstruct it as `F * transpose(M) .+ transpose(b)`, so a Deferred Quantity is fit on the reconstruction there rather than on the asset returns. The carrier has no field for the original matrix yet; adding one is tracked separately.
+
+There is no method for a [`CoskewnessEstimator`](@ref) or a [`CokurtosisEstimator`](@ref) yet — a coskewness estimator returns the pair `(sk, V)`, whose second half needs a matrix-processing estimator to name. Those two families arrive with the high-order measures.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+  - [`deferred_factors`](@ref)
+  - [`_wprop`](@ref)
+"""
+function fit_deferred_quantity(dq::AbstractExpectedReturnsEstimator,
+                               pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w), pr.X))
+end
+function fit_deferred_quantity(dq::StatsBase.CovarianceEstimator, pr::AbstractPriorResult)
+    return Statistics.cov(factory(dq, pr.w), pr.X)
+end
+function fit_deferred_quantity(dq::AbstractPriorEstimator, pr::AbstractPriorResult)
+    return prior(factory(dq, pr.w), pr.X, deferred_factors(pr))
+end
+"""
+    deferred_quantity(fitted, key::Symbol)
+
+Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
+
+A moment estimator produced the quantity itself, so it is returned and `key` is inert. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_derived_quantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function deferred_quantity(fitted, ::Symbol)
+    return fitted
+end
+function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
+    return getproperty(fitted, key)
+end
+"""
+    deferred_derived_quantity(fitted, key::Symbol)
+
+Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`.
+
+A prior result carries one. A moment estimator produces only its own quantity and no factorisation, so the answer is `nothing` and the consumer derives it from the resolved `sigma`. This is the difference from [`deferred_quantity`](@ref), which would hand back the covariance matrix itself.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`sigma_chol_selector`](@ref)
+"""
+function deferred_derived_quantity(::Any, ::Symbol)
+    return nothing
+end
+function deferred_derived_quantity(fitted::AbstractPriorResult, key::Symbol)
+    return getproperty(fitted, key)
+end
+"""
+    resolve_slot(slot, key::Symbol, pr::AbstractPriorResult)
+
+Resolve one risk-measure slot against prior result `pr` and return a plain value.
+
+A slot that holds a **Deferred Quantity** is run against `pr` and the quantity named by `key` is read back. Anything else — a stated value, `nothing`, a centring strategy — is returned unchanged, so the caller can apply the ordinary prior fallback ([`sel`](@ref)) on top.
+
+This is the whole of the third state. The other two are unchanged: `nothing` still falls back to the prior's own field, and a stated value still wins.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`sel`](@ref)
+"""
+function resolve_slot(slot, ::Symbol, ::AbstractPriorResult)
+    return slot
+end
+function resolve_slot(dq::DeferredQuantity, key::Symbol, pr::AbstractPriorResult)
+    return deferred_quantity(fit_deferred_quantity(dq, pr), key)
+end
+"""
+    sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
+
+Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
+
+`chol` is a factorisation of `sigma`. Pairing a factor with a covariance matrix it does not factorise would let the model optimise one quantity while the functor evaluates another. So the pair falls back to the prior only when the measure names neither; a stated `sigma` with no factor keeps no factor, and the consumer derives the right one.
+
+The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` with no `sigma` — [`assert_derived_slot_has_source`](@ref) refuses that at construction.
+
+A stated `chol` is never rebuilt from `sigma`. Under a factor prior the factorisation is sparse and special, and a rebuild would throw that structure away.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`chol_sigma_selector`](@ref)
+"""
+function sigma_chol_selector(sigma, chol, ::AbstractPriorResult)
+    return sigma, chol
+end
+function sigma_chol_selector(::Nothing, ::Nothing, pr::AbstractPriorResult)
+    return pr.sigma, pr.chol
+end
+"""
+    assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
+
+Refuse a derived slot that was stated without the slot it is derived from.
+
+`chol` is a factorisation of `sigma`. Stating `chol` alone would pair the caller's factor with a covariance matrix the caller never saw, because the prior supplies `sigma` whenever the measure does not. The two are given together, or neither is given.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+"""
+function assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
+    @argcheck(isnothing(derived) || !isnothing(source),
+              ArgumentError("`$dname` is derived from `$sname`, so it cannot be given on its own. Give `$sname` as well, or give neither and let the prior supply the pair."))
+    return nothing
+end
+"""
     sel(risk_variable, source_variable)
 
 Unified risk-measure selector emitted by the [`@pprop`](@ref)/[`@cprop`](@ref) tags. Prefers

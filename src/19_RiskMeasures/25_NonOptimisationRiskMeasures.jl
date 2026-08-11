@@ -228,7 +228,7 @@ $(DocStringExtensions.FIELDS)
 
     ThirdCentralMoment(;
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing
+        mu::Option{<:MuSlot} = nothing
     ) -> ThirdCentralMoment
 
 Keywords correspond to the struct's fields.
@@ -279,7 +279,7 @@ ThirdCentralMoment
     $(field_dict[:mu_rm])
     """
     @pprop @vprop mu
-    function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
+    function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -288,8 +288,25 @@ ThirdCentralMoment
     end
 end
 function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
-                            mu::Option{<:Num_VecNum_VecScalar} = nothing)::ThirdCentralMoment
+                            mu::Option{<:MuSlot} = nothing)::ThirdCentralMoment
     return ThirdCentralMoment(w, mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`ThirdCentralMoment`](@ref)'s `mu` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult)
+    if !isa(r.mu, DeferredQuantity)
+        return r
+    end
+    return ThirdCentralMoment(; w = r.w, mu = resolve_slot(r.mu, :mu, pr))
 end
 """
     const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, <:Any, T1, T2}}

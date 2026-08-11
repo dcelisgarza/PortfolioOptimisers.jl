@@ -492,6 +492,22 @@ function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} 
     return r.vr(w) * r.vr.settings.scale - r.sk(w, X, fees) * r.sk.settings.scale +
            r.kt(w, X, fees) * r.kt.settings.scale
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve every **Deferred Quantity** held by the three children of [`VarianceSkewKurtosis`](@ref) against prior result `pr`. The container states no quantity of its own, so it recurses.
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
+    return VarianceSkewKurtosis(; settings = r.settings,
+                                vr = resolve_deferred_quantities(r.vr, pr),
+                                sk = resolve_deferred_quantities(r.sk, pr),
+                                kt = resolve_deferred_quantities(r.kt, pr))
+end
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::Skewness) = WeightsReturnsFeesInput()

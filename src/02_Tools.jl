@@ -311,7 +311,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
 function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
                                             <:AbstractEstimatorValueAlgorithm,
                                             <:DynamicAbstractWeights, <:AbstractEstimator,
-                                            <:AbstractAlgorithm}, ::Any)
+                                            <:AbstractAlgorithm,
+                                            <:StatsBase.CovarianceEstimator}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
@@ -788,6 +789,34 @@ must not be confused with an optional sub-estimator that happens to be `nothing`
 """
 _wprop(field, args...; kwargs...) = field
 _wprop(::Any, w::ObsWeights, args...; kwargs...) = w
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve every **Deferred Quantity** held by `x` against prior result `pr`, returning a
+struct of the same type whose deferred slots hold plain values.
+
+This resolves the deferred state and **nothing else**. A slot left unstated stays `nothing`,
+so whichever fallback the consumer already applies — `sel` on the factory path,
+[`chol_sigma_selector`](@ref) and its siblings on the `JuMP` path — keeps working unchanged.
+The two paths are separate: a `JuMP` model builder reads the risk measure's slots directly
+and never calls [`factory`](@ref), so both entry points resolve.
+
+The default is the identity: a type with no deferrable slot needs no method, and the call
+inlines away.
+
+A type defines a method when one of its slots may hold an estimator. Writing it per type —
+rather than per field — is what lets slots that travel together be resolved together: a
+deferred `sigma` supplies `chol` from the same fit, so the pair is never mixed across two
+sources.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`resolve_slot`](@ref)
+  - [`factory`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+resolve_deferred_quantities(x, ::Any) = x
 # ---------------------------------------------------------------------------
 # @propagatable — struct-definition macro for factory propagation
 # ---------------------------------------------------------------------------
@@ -1318,8 +1347,11 @@ orthogonal, stackable field tags:
     threaded optimiser value (a solver) found by type via `sel(getfield(x, :f), _ctx(args...))`.
 
 When at least one field is tagged `@pprop` or `@cprop`, a second method
-`factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
-fields as above and threads `@fprop`-only fields with `pr` (`factory_child(getfield(x, :f), pr, args...)`);
+`factory(x, pr::AbstractPriorResult, args...)` is generated. It first calls
+[`resolve_deferred_quantities`](@ref) on `x` — the identity unless the type declares a
+method — so every slot holding a **Deferred Quantity** becomes a plain value before
+selection runs. It then selects `@pprop`/`@cprop` fields as above and threads
+`@fprop`-only fields with `pr` (`factory_child(getfield(x, :f), pr, args...)`);
 a field tagged both `@pprop` and `@fprop` is prior-selected in this method (`@pprop` wins).
 Because this method is more specific than the general `factory(x, args...)`, it is chosen
 whenever a prior is passed.
@@ -1412,7 +1444,8 @@ macro propagatable(expr)
     if !isempty(pprop_fields) || !isempty(cprop_fields)
         sel_pairs = Any[]
         for f in all_fields
-            xf = Expr(:., :x, QuoteNode(f))
+            # Read every field off the Deferred-Quantity-resolved struct, not the argument.
+            xf = Expr(:., :xr, QuoteNode(f))
             if f in pprop_fields            # @pprop wins over @fprop in the prior method
                 push!(sel_pairs,
                       Expr(:kw, f, :(sel($xf, getproperty(pr, $(QuoteNode(f)))))))
@@ -1430,6 +1463,7 @@ macro propagatable(expr)
         prior_body = Expr(:call, struct_name, Expr(:parameters, sel_pairs...))
         prior_def = quote
             function factory(x::$struct_name, pr::AbstractPriorResult, args...; kwargs...)
+                xr = resolve_deferred_quantities(x, pr)
                 return $prior_body
             end
         end

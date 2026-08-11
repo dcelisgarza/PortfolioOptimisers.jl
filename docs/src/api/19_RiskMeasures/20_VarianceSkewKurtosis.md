@@ -12,6 +12,7 @@ no_risk_expr_risk_measure(r::Skewness)
 no_bounds_no_risk_expr_risk_measure(r::Skewness)
 bounds_risk_measure(r::Skewness, ub::Number)
 VarianceSkewKurtosis
+resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
 supports_precomputed_returns(r::Skewness)
 supports_precomputed_returns(::VarianceSkewKurtosis)
 ```

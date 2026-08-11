@@ -143,7 +143,7 @@ $(DocStringExtensions.FIELDS)
 
     Variance(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        sigma::Option{<:MatNum} = nothing,
+        sigma::Option{<:SigmaSlot} = nothing,
         rc::Option{<:LcE_Lc} = nothing,
         alg::VarianceFormulation = SquaredSOCRiskExpr(),
     ) -> Variance
@@ -257,11 +257,11 @@ julia> r(w)
     """
     $(field_dict[:sigma])
     """
-    @pprop sigma
+    sigma
     """
     $(field_dict[:chol])
     """
-    @pprop chol
+    chol
     """
     $(field_dict[:rc])
     """
@@ -270,7 +270,7 @@ julia> r(w)
     $(field_dict[:alg])
     """
     alg
-    function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
+    function Variance(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
                       alg::VarianceFormulation)::Variance
         if isa(sigma, MatNum)
@@ -280,6 +280,7 @@ julia> r(w)
         if isa(chol, MatNum)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
+        assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
         return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
                                                                                            sigma,
                                                                                            chol,
@@ -288,13 +289,53 @@ julia> r(w)
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:MatNum} = nothing, chol::Option{<:MatNum} = nothing,
+                  sigma::Option{<:SigmaSlot} = nothing, chol::Option{<:MatNum} = nothing,
                   rc::Option{<:LcE_Lc} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())::Variance
     return Variance(settings, sigma, chol, rc, alg)
 end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`Variance`](@ref)'s `sigma` slot against prior result `pr`.
+
+`sigma` and `chol` travel together, so both come from the same fit and a stated `chol` is discarded. A covariance estimator produces no factorisation, so `chol` becomes `nothing` and the consumer derives it from the resolved `sigma`. A prior estimator produces both, which is how a factor prior's sparse factorisation reaches the slot intact.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+"""
+function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
+    if !isa(r.sigma, DeferredQuantity)
+        return r
+    end
+    fitted = fit_deferred_quantity(r.sigma, pr)
+    return Variance(; settings = r.settings, sigma = deferred_quantity(fitted, :sigma),
+                    chol = deferred_derived_quantity(fitted, :chol), rc = r.rc, alg = r.alg)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`Variance`](@ref) by resolving a **Deferred Quantity** in `sigma`, then falling back to the prior result for the covariance matrix and its factorisation.
+
+The two are selected **as a pair** ([`sigma_chol_selector`](@ref)), not field by field: a stated `sigma` with no factor must not be paired with the prior's, which factorises a different matrix.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`sigma_chol_selector`](@ref)
+"""
+function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
+    sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
+                    alg = r.alg)
 end
 function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -317,7 +358,7 @@ $(DocStringExtensions.FIELDS)
 
     StandardDeviation(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        sigma::Option{<:MatNum} = nothing,
+        sigma::Option{<:SigmaSlot} = nothing,
     ) -> StandardDeviation
 
 Keywords correspond to the struct's fields.
@@ -398,12 +439,12 @@ julia> r(w)
     """
     $(field_dict[:sigma])
     """
-    @pprop sigma
+    sigma
     """
     $(field_dict[:chol])
     """
-    @pprop chol
-    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
+    chol
+    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                                chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -412,16 +453,53 @@ julia> r(w)
         if isa(chol, MatNum)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
+        assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
         return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Option{<:MatNum} = nothing,
+                           sigma::Option{<:SigmaSlot} = nothing,
                            chol::Option{<:MatNum} = nothing)::StandardDeviation
     return StandardDeviation(settings, sigma, chol)
 end
 function (r::StandardDeviation)(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.sigma, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`StandardDeviation`](@ref)'s `sigma` slot against prior result `pr`. `sigma` and `chol` come from the same fit — see [`resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)`](@ref).
+
+# Related
+
+  - [`StandardDeviation`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+"""
+function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult)
+    if !isa(r.sigma, DeferredQuantity)
+        return r
+    end
+    fitted = fit_deferred_quantity(r.sigma, pr)
+    return StandardDeviation(; settings = r.settings,
+                             sigma = deferred_quantity(fitted, :sigma),
+                             chol = deferred_derived_quantity(fitted, :chol))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`StandardDeviation`](@ref) by resolving a **Deferred Quantity** in `sigma`, then falling back to the prior result for the covariance matrix and its factorisation as a pair. See [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref).
+
+# Related
+
+  - [`StandardDeviation`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`sigma_chol_selector`](@ref)
+"""
+function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
+    sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 function port_opt_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -442,7 +520,7 @@ $(DocStringExtensions.FIELDS)
     UncertaintySetVariance(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
-        sigma::Option{<:MatNum} = nothing,
+        sigma::Option{<:SigmaSlot} = nothing,
     ) -> UncertaintySetVariance
 
 Keywords correspond to the struct's fields.
@@ -635,7 +713,7 @@ julia> r(w)
     """
     sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
-                                    sigma::Option{<:MatNum})
+                                    sigma::Option{<:SigmaSlot})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         end
@@ -644,8 +722,26 @@ julia> r(w)
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
-                                sigma::Option{<:MatNum} = nothing)
+                                sigma::Option{<:SigmaSlot} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`UncertaintySetVariance`](@ref)'s `sigma` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult)
+    if !isa(r.sigma, DeferredQuantity)
+        return r
+    end
+    return UncertaintySetVariance(; settings = r.settings, ucs = r.ucs,
+                                  sigma = resolve_slot(r.sigma, :sigma, pr))
 end
 """
     (r::UncertaintySetVariance)(w::VecNum)
@@ -822,6 +918,7 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
 """
 function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
@@ -840,6 +937,7 @@ Create an instance of [`UncertaintySetVariance`](@ref) without a placeholder pos
 """
 function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
@@ -862,7 +960,7 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
     sigma = if isnothing(pr)
         r.sigma
     else
-        nothing_scalar_array_selector(r.sigma, pr.sigma)
+        nothing_scalar_array_selector(resolve_deferred_quantities(r, pr).sigma, pr.sigma)
     end
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end

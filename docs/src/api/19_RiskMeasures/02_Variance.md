@@ -10,6 +10,11 @@ QuadSecondMomentFormulations
 Variance
 StandardDeviation
 UncertaintySetVariance
+resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
+resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult)
+resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult)
+factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...;
                  kwargs...)

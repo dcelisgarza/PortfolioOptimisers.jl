@@ -30,8 +30,10 @@ calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::Any, ::A
 calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 calc_deviations_vec(r::LoHiOrderMoment, x::VecNum)
 factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult)
 port_opt_view(r::LowOrderMoment, i, args...)
 factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult)
 port_opt_view(r::HighOrderMoment, i, args...)
 supports_precomputed_returns(r::LoHiOrderMoment)
 moment_risk

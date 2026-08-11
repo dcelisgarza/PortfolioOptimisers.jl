@@ -27,6 +27,7 @@ is_cprop_macro
 is_doc_macro
 _ctx
 _wprop
+resolve_deferred_quantities
 sel
 extract_field_name
 propagatable_find_struct
