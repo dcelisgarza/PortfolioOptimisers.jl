@@ -100,7 +100,8 @@ $(DocStringExtensions.FIELDS)
         ve::AbstractVarianceEstimator = SimpleVariance(),
         sk::Option{<:MatNum} = nothing,
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        pe::Option{<:AbstractPriorEstimator} = nothing
     ) -> Skewness
 
 Keywords correspond to the struct's fields.
@@ -110,6 +111,10 @@ Keywords correspond to the struct's fields.
   - If `sk` is not `nothing`: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
   - If `mu` is a `VecNum`: `!isempty(mu)`.
   - If `w` is not `nothing`: `!isempty(w)`.
+
+!!! warning
+
+    `mu` and `sk` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
 
 # Functor
 
@@ -139,7 +144,8 @@ Skewness
            │   corrected ┴ Bool: true
         sk ┼ nothing
          w ┼ nothing
-        mu ┴ nothing
+        mu ┼ nothing
+        pe ┴ nothing
 ```
 
 # Related
@@ -149,6 +155,7 @@ Skewness
   - [`ThirdCentralMoment`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`bigger_is_better`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
 """
 @concrete struct Skewness <: NonOptimisationRiskMeasure
     """
@@ -171,9 +178,14 @@ Skewness
     $(field_dict[:mu_rm])
     """
     mu
+    """
+    $(field_dict[:pe_rm])
+    """
+    pe
     function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
                       sk::Option{<:MatNum}, w::Option{<:ObsWeights},
-                      mu::Option{<:Num_VecNum_VecScalar})
+                      mu::Option{<:Num_VecNum_VecScalar},
+                      pe::Option{<:AbstractPriorEstimator})
         if !isnothing(sk)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
@@ -183,16 +195,39 @@ Skewness
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
-        return new{typeof(settings), typeof(ve), typeof(sk), typeof(w), typeof(mu)}(settings,
-                                                                                    ve, sk,
-                                                                                    w, mu)
+        return new{typeof(settings), typeof(ve), typeof(sk), typeof(w), typeof(mu),
+                   typeof(pe)}(settings, ve, sk, w, mu, pe)
     end
 end
 function Skewness(; settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
                   ve::AbstractVarianceEstimator = SimpleVariance(),
                   sk::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing)::Skewness
-    return Skewness(settings, ve, sk, w, mu)
+                  mu::Option{<:Num_VecNum_VecScalar} = nothing,
+                  pe::Option{<:AbstractPriorEstimator} = nothing)::Skewness
+    return Skewness(settings, ve, sk, w, mu, pe)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the **Deferred Quantity** fan-out held by [`Skewness`](@ref) `r` against prior result `pr`.
+
+`mu` and `sk` are independent quantities, so the measure takes a `pe` rather than widening each slot. One fit fills both, and a slot the caller stated keeps what it holds. `sk` lives on a [`HighOrderPrior`](@ref), so the estimator named here must compute one.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+"""
+function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skewness
+    if isnothing(r.pe)
+        return r
+    end
+    fitted = fit_deferred_quantity(r.pe, pr)
+    return Skewness(; settings = r.settings, ve = r.ve,
+                    sk = fan_out_slot(fitted, r.sk, :sk), w = r.w,
+                    mu = fan_out_slot(fitted, r.mu, :mu), pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -220,10 +255,11 @@ Create an instance of [`Skewness`](@ref) by selecting observation weights and ex
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::Skewness, pr::HighOrderPrior, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
-    return Skewness(; ve = factory(r.ve, w), sk = sk, w = w, mu = mu)
+    return Skewness(; ve = factory(r.ve, w), sk = sk, w = w, mu = mu, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -238,9 +274,10 @@ Create an instance of [`Skewness`](@ref) from a [`LowOrderPrior`](@ref) result, 
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::Skewness
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return Skewness(; ve = factory(r.ve, w), sk = r.sk, w = w, mu = mu)
+    return Skewness(; ve = factory(r.ve, w), sk = r.sk, w = w, mu = mu, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -257,7 +294,7 @@ Slices the expected returns `mu` for cluster-based optimisation.
 """
 function port_opt_view(r::Skewness{<:Any, <:Any, <:Nothing}, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
-    return Skewness(; ve = r.ve, sk = r.sk, w = r.w, mu = mu)
+    return Skewness(; ve = r.ve, sk = r.sk, w = r.w, mu = mu, pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -276,7 +313,7 @@ function port_opt_view(r::Skewness{<:Any, <:Any, <:MatNum}, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     idx = fourth_moment_index_generator(size(r.sk, 1), i)
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
-    return Skewness(; ve = r.ve, sk = sk, w = r.w, mu = mu)
+    return Skewness(; ve = r.ve, sk = sk, w = r.w, mu = mu, pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -293,7 +330,7 @@ function no_risk_expr_risk_measure(r::Skewness)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = r.settings.lb,
                                                       scale = r.settings.scale), ve = r.ve,
-                    sk = r.sk, w = r.w, mu = r.mu)
+                    sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -310,7 +347,7 @@ function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
                                                       scale = 1), ve = r.ve, sk = r.sk,
-                    w = r.w, mu = r.mu)
+                    w = r.w, mu = r.mu, pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -327,7 +364,7 @@ function bounds_risk_measure(r::Skewness, ub::Number)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = ub,
                                                       scale = r.settings.scale), ve = r.ve,
-                    sk = r.sk, w = r.w, mu = r.mu)
+                    sk = r.sk, w = r.w, mu = r.mu, pe = r.pe)
 end
 function moment_risk(r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights},
                                  <:Any}, val::VecNum)
@@ -347,12 +384,12 @@ end
 function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(w::VecNum,
                                                                              X::MatNum,
                                                                              fees::Option{<:Fees} = nothing)
-    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, X), mu = r.mu)(w,
-                                                                                            X,
-                                                                                            fees)
+    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, X), mu = r.mu,
+                    pe = r.pe)(w, X, fees)
 end
 function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(x::VecNum)
-    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, x), mu = r.mu)(x)
+    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, x), mu = r.mu,
+                    pe = r.pe)(x)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -388,10 +425,15 @@ $(DocStringExtensions.FIELDS)
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         vr::Variance = Variance(),
         sk::Skewness = Skewness(),
-        kt::Kurtosis = Kurtosis()
+        kt::Kurtosis = Kurtosis(),
+        pe::Option{<:AbstractPriorEstimator} = nothing
     ) -> VarianceSkewKurtosis
 
 Keywords correspond to the struct's fields.
+
+!!! warning
+
+    The three children each state their quantities independently, so nothing makes `sigma`, `sk` and `kt` agree with each other. A caller who wants one consistent set names `pe` on the container alone and lets it fill all three from a single fit. A child that names its own quantity keeps it, and the `pe` fills only what is left.
 
 # Examples
 
@@ -423,7 +465,8 @@ VarianceSkewKurtosis
            │            │   corrected ┴ Bool: true
            │         sk ┼ nothing
            │          w ┼ nothing
-           │         mu ┴ nothing
+           │         mu ┼ nothing
+           │         pe ┴ nothing
         kt ┼ Kurtosis
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -434,7 +477,9 @@ VarianceSkewKurtosis
            │         kt ┼ nothing
            │          N ┼ nothing
            │       alg1 ┼ FullMoment()
-           │       alg2 ┴ SOCRiskExpr()
+           │       alg2 ┼ SOCRiskExpr()
+           │         pe ┴ nothing
+        pe ┴ nothing
 ```
 
 # Functor
@@ -474,19 +519,25 @@ Computes the variance skewness kurtosis composite risk measure of the portfolio 
     $(field_dict[:kt_rm])
     """
     @fprop @vprop kt
+    """
+    $(field_dict[:pe_rm])
+    """
+    pe
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
-                                  kt::Kurtosis)
+                                  kt::Kurtosis, pe::Option{<:AbstractPriorEstimator})
         vr = no_risk_expr_risk_measure(vr)
         sk = no_risk_expr_risk_measure(sk)
         kt = no_risk_expr_risk_measure(kt)
-        return new{typeof(settings), typeof(vr), typeof(sk), typeof(kt)}(settings, vr, sk,
-                                                                         kt)
+        return new{typeof(settings), typeof(vr), typeof(sk), typeof(kt), typeof(pe)}(settings,
+                                                                                     vr, sk,
+                                                                                     kt, pe)
     end
 end
 function VarianceSkewKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                               vr::Variance = Variance(), sk::Skewness = Skewness(),
-                              kt::Kurtosis = Kurtosis())
-    return VarianceSkewKurtosis(settings, vr, sk, kt)
+                              kt::Kurtosis = Kurtosis(),
+                              pe::Option{<:AbstractPriorEstimator} = nothing)
+    return VarianceSkewKurtosis(settings, vr, sk, kt, pe)
 end
 function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} = nothing)
     return r.vr(w) * r.vr.settings.scale - r.sk(w, X, fees) * r.sk.settings.scale +
@@ -495,18 +546,44 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve every **Deferred Quantity** held by the three children of [`VarianceSkewKurtosis`](@ref) against prior result `pr`. The container states no quantity of its own, so it recurses.
+Resolve every **Deferred Quantity** held by [`VarianceSkewKurtosis`](@ref) `r` against prior result `pr`.
+
+Two levels, in order. Each child resolves whatever it holds of its own, then the container's `pe` fans out into every child slot still unstated — `sigma` and its `chol` on `vr`, `sk` and `mu` on `sk`, `kt` and `mu` on `kt` — all from **one** fit.
+
+A child that names its own quantity keeps it. This is the map's precedence rule applied one level down, and it treats a deferred child slot exactly as it already treats a stated one.
+
+The composed measure adds a variance, a skewness and a kurtosis term, so a caller who wants the three to describe one distribution names `pe` on the container and states nothing on the children.
 
 # Related
 
   - [`VarianceSkewKurtosis`](@ref)
   - [`resolve_deferred_quantities`](@ref)
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
 """
 function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
-    return VarianceSkewKurtosis(; settings = r.settings,
-                                vr = resolve_deferred_quantities(r.vr, pr),
-                                sk = resolve_deferred_quantities(r.sk, pr),
-                                kt = resolve_deferred_quantities(r.kt, pr))
+    vr = resolve_deferred_quantities(r.vr, pr)
+    sk = resolve_deferred_quantities(r.sk, pr)
+    kt = resolve_deferred_quantities(r.kt, pr)
+    if isnothing(r.pe)
+        return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
+                                    pe = nothing)
+    end
+    fitted = fit_deferred_quantity(r.pe, pr)
+    # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
+    # also supplies the `sigma` it factorises.
+    sigma_flag = isnothing(vr.sigma)
+    vr = Variance(; settings = vr.settings, sigma = fan_out_slot(fitted, vr.sigma, :sigma),
+                  chol = sigma_flag ? deferred_derived_quantity(fitted, :chol) : vr.chol,
+                  rc = vr.rc, alg = vr.alg)
+    sk = Skewness(; settings = sk.settings, ve = sk.ve,
+                  sk = fan_out_slot(fitted, sk.sk, :sk), w = sk.w,
+                  mu = fan_out_slot(fitted, sk.mu, :mu), pe = nothing)
+    kt = Kurtosis(; settings = kt.settings, w = kt.w, mu = fan_out_slot(fitted, kt.mu, :mu),
+                  kt = fan_out_slot(fitted, kt.kt, :kt), N = kt.N, alg1 = kt.alg1,
+                  alg2 = kt.alg2, pe = nothing)
+    return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
+                                pe = nothing)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

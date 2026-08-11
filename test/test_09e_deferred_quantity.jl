@@ -9,6 +9,16 @@ Quantity crosses unresolved and computes on the subset.
 =#
 const PO = PortfolioOptimisers
 
+# Counts the fits, so "one estimator, one fit" is asserted rather than assumed.
+mutable struct CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
+    pe::T
+    n::Int
+end
+function PortfolioOptimisers.prior(c::CountingPriorEstimator, X, F = nothing; kwargs...)
+    c.n += 1
+    return prior(c.pe, X, F; kwargs...)
+end
+
 @testset "Deferred Quantity: the slot aliases" begin
     # The dynamic half answers "is this slot deferred?" for all four quantity families and
     # for a prior estimator, which computes every quantity at once.
@@ -377,4 +387,242 @@ end
     @test isapprox(sum(deferred.w), 1)
     @test isapprox(sum(stated.w), 1)
     @test !isapprox(deferred.w, stated.w)
+end
+
+#=
+The fan-out. A measure with **two or more independently deferrable slots** takes a `pe`
+instead of widening each slot: one prior estimator, one fit, every unstated slot filled.
+
+A measure with exactly one deferrable slot takes no `pe`. It widens that slot, and a derived
+companion — `chol` with `sigma` — travels with it out of the same fit. Counting *slots*
+rather than *deferrable* slots would have given `Variance` a `pe` that says what
+`sigma = <prior estimator>` already says.
+=#
+@testset "Deferred Quantity: only two independent slots earn a `pe`" begin
+    # Four take the fan-out.
+    for T in (DistributionValueatRisk, Kurtosis, Skewness, VarianceSkewKurtosis)
+        @test :pe in fieldnames(T)
+    end
+
+    # Three do not: their second slot is derived, so it can never hold an estimator, and it
+    # is already supplied by the fit that resolves its source.
+    for T in (Variance, StandardDeviation, NegativeSkewness)
+        @test :pe ∉ fieldnames(T)
+    end
+    @test_throws MethodError Variance(; pe = EmpiricalPrior())
+    @test_throws MethodError StandardDeviation(; pe = EmpiricalPrior())
+end
+
+@testset "Deferred Quantity: the fan-out fills every unstated slot from one fit" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+
+    # `mu` and `sigma` are independent quantities, so one fit supplies both.
+    d = factory(DistributionValueatRisk(; pe = EmpiricalPrior()), lop)
+    @test d.mu ≈ lop.mu
+    @test d.sigma ≈ lop.sigma
+    @test isnothing(d.pe)
+
+    # `mu` and `kt` likewise, off one high-order result.
+    k = factory(Kurtosis(; pe = HighOrderPriorEstimator()), hop)
+    @test k.mu ≈ hop.mu
+    @test k.kt ≈ hop.kt
+    @test isnothing(k.pe)
+
+    # And `mu` with `sk`.
+    s = factory(Skewness(; pe = HighOrderPriorEstimator()), hop)
+    @test s.mu ≈ hop.mu
+    @test s.sk ≈ hop.sk
+    @test isnothing(s.pe)
+
+    # The container fans out into all three children, five slots in total.
+    v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
+                                                            pe = HighOrderPriorEstimator()),
+                                       hop)
+    @test v.vr.sigma ≈ hop.sigma
+    @test v.sk.sk ≈ hop.sk
+    @test v.sk.mu ≈ hop.mu
+    @test v.kt.kt ≈ hop.kt
+    @test v.kt.mu ≈ hop.mu
+    @test isnothing(v.pe)
+    @test isnothing(v.sk.pe) && isnothing(v.kt.pe)
+end
+
+@testset "Deferred Quantity: a stated slot wins over the fan-out" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+    mu = fill(0.5, 5)
+    ce = SimpleCovariance(; corrected = false)
+
+    # A stated value keeps its place, and the `pe` fills only what is left.
+    d = factory(DistributionValueatRisk(; mu = mu, pe = EmpiricalPrior()), lop)
+    @test d.mu === mu
+    @test d.sigma ≈ lop.sigma
+
+    k = factory(Kurtosis(; mu = mu, pe = HighOrderPriorEstimator()), hop)
+    @test k.mu === mu
+    @test k.kt ≈ hop.kt
+
+    s = factory(Skewness(; mu = mu, pe = HighOrderPriorEstimator()), hop)
+    @test s.mu === mu
+    @test s.sk ≈ hop.sk
+
+    # A child of the container is no different: a Deferred Quantity on a child resolves
+    # first and keeps its answer, and the container's `pe` fills the rest. The deferred
+    # spelling and the stated one are treated alike — neither is refused.
+    v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
+                                                            pe = HighOrderPriorEstimator(),
+                                                            vr = Variance(; sigma = ce)),
+                                       hop)
+    @test v.vr.sigma ≈ cov(ce, X)
+    @test !isapprox(v.vr.sigma, hop.sigma)
+    @test v.kt.kt ≈ hop.kt
+    @test v.sk.sk ≈ hop.sk
+
+    v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(;
+                                                            pe = HighOrderPriorEstimator(),
+                                                            vr = Variance(;
+                                                                          sigma = cov(ce,
+                                                                                      X))),
+                                       hop)
+    @test v.vr.sigma ≈ cov(ce, X)
+    @test v.kt.kt ≈ hop.kt
+end
+
+@testset "Deferred Quantity: the fan-out runs the estimator once per measure" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    hop = prior(HighOrderPriorEstimator(), X)
+
+    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    k = factory(Kurtosis(; pe = c), hop)
+    @test k.mu ≈ hop.mu && k.kt ≈ hop.kt
+    @test c.n == 1
+
+    # Five slots across three children, still one fit. The container resolves the whole
+    # measure, not one field at a time, which is what makes this expressible.
+    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(; pe = c), hop)
+    @test v.kt.kt ≈ hop.kt && v.sk.sk ≈ hop.sk && v.vr.sigma ≈ hop.sigma
+    @test c.n == 1
+
+    # Resolution clears `pe`, so a second pass over an already-resolved measure refits
+    # nothing. Both entry points may run on the same measure.
+    @test PO.resolve_deferred_quantities(v, hop) == v
+    @test c.n == 1
+end
+
+@testset "Deferred Quantity: the fan-out must be able to supply the quantity" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    hop = prior(HighOrderPriorEstimator(), X)
+
+    # A low-order prior estimator computes no `kt`, and says so by name rather than
+    # surfacing a bare `getproperty` failure several frames down.
+    err = try
+        factory(Kurtosis(; pe = EmpiricalPrior()), hop)
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("kt", sprint(showerror, err))
+    @test_throws ArgumentError factory(Skewness(; pe = EmpiricalPrior()), hop)
+
+    # `mu` and `sigma` live on a low-order result, so `DistributionValueatRisk` is content.
+    @test factory(DistributionValueatRisk(; pe = EmpiricalPrior()), hop).mu ≈ hop.mu
+end
+
+@testset "Deferred Quantity: `DistributionValueatRisk` binds `chol` to `sigma`" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    base = prior(EmpiricalPrior(), X)
+    pr = PO.LowOrderPrior(; X = X, mu = base.mu, sigma = base.sigma,
+                          chol = Matrix(LinearAlgebra.cholesky(base.sigma).U))
+    sigma = base.sigma .* 2
+    chol = Matrix(LinearAlgebra.cholesky(sigma).U)
+    ce = SimpleCovariance(; corrected = false)
+
+    # The same six rows `Variance` and `StandardDeviation` already answer. `chol` used to be
+    # `@pprop`-tagged here, so a stated `sigma` was paired with the prior's factorisation —
+    # a factor of a matrix the caller never saw.
+    f = factory(DistributionValueatRisk(; sigma = sigma, chol = chol), pr)
+    @test f.sigma === sigma
+    @test f.chol === chol
+
+    f = factory(DistributionValueatRisk(; sigma = sigma), pr)
+    @test f.sigma === sigma
+    @test isnothing(f.chol)
+
+    f = factory(DistributionValueatRisk(; sigma = ce, chol = chol), pr)
+    @test f.sigma ≈ cov(ce, X)
+    @test isnothing(f.chol)
+
+    f = factory(DistributionValueatRisk(), pr)
+    @test f.sigma === pr.sigma
+    @test f.chol === pr.chol
+
+    @test_throws ArgumentError DistributionValueatRisk(; chol = chol)
+
+    # The fan-out supplies the pair, and a stated `sigma` beside it keeps no factor.
+    f = factory(DistributionValueatRisk(; pe = EmpiricalPrior()), pr)
+    @test f.sigma ≈ base.sigma
+    f = factory(DistributionValueatRisk(; sigma = sigma, pe = EmpiricalPrior()), pr)
+    @test f.sigma === sigma
+    @test isnothing(f.chol)
+end
+
+@testset "Deferred Quantity: the fan-out reaches the `JuMP` resolution point" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+
+    # The `JuMP` builders never call `factory`, so `set_risk_constraints!` resolves. The
+    # quantities live one level below the wrapper, on `alg`.
+    r = PO.resolve_deferred_quantities(ValueatRisk(;
+                                                   alg = DistributionValueatRisk(;
+                                                                                 pe = EmpiricalPrior())),
+                                       lop)
+    @test r.alg.mu ≈ lop.mu
+    @test r.alg.sigma ≈ lop.sigma
+    @test isnothing(r.alg.pe)
+
+    r = PO.resolve_deferred_quantities(ValueatRiskRange(;
+                                                        alg = DistributionValueatRisk(;
+                                                                                      pe = EmpiricalPrior())),
+                                       lop)
+    @test r.alg.mu ≈ lop.mu
+    @test r.alg.sigma ≈ lop.sigma
+
+    # `MIPValueatRisk` defers nothing, so the recursion is inert for it.
+    @test PO.resolve_deferred_quantities(ValueatRisk(), lop).alg === MIPValueatRisk()
+end
+
+@testset "Deferred Quantity: the fan-out crosses a view and fits the subset" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    i = [1, 3, 5]
+
+    # `port_opt_view` runs before `factory`, so the estimator crosses unsliced and computes
+    # on the subset — the whole point of the feature, now on the fan-out slot.
+    for r in (DistributionValueatRisk(; pe = EmpiricalPrior()),
+              Kurtosis(; pe = HighOrderPriorEstimator()),
+              Skewness(; pe = HighOrderPriorEstimator()),
+              VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()))
+        @test PO.port_opt_view(r, i).pe === r.pe
+    end
+
+    sub = prior(EmpiricalPrior(), X[:, i])
+    d = factory(PO.port_opt_view(DistributionValueatRisk(; pe = EmpiricalPrior()), i), sub)
+    @test size(d.sigma) == (3, 3)
+    @test d.sigma ≈ sub.sigma
+    @test d.mu ≈ sub.mu
+
+    subh = prior(HighOrderPriorEstimator(), X[:, i])
+    k = factory(PO.port_opt_view(Kurtosis(; pe = HighOrderPriorEstimator()), i), subh)
+    @test size(k.kt) == (9, 9)
+    @test k.kt ≈ subh.kt
 end

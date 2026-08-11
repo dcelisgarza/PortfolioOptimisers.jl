@@ -1306,7 +1306,29 @@ function deferred_quantity(fitted, ::Symbol)
     return fitted
 end
 function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
+    @argcheck(hasproperty(fitted, key),
+              ArgumentError("A `$(typeof(fitted))` carries no `$key`, so the prior estimator in this slot cannot supply it. Name a prior estimator that computes `$key`."))
     return getproperty(fitted, key)
+end
+"""
+    fan_out_slot(fitted, slot, key::Symbol)
+
+Fill one slot from a fan-out fit, unless the caller stated it.
+
+A measure that carries **two or more independently deferrable slots** takes a `pe` instead of widening each slot. [`fit_deferred_quantity`](@ref) runs that estimator **once**, and this reads one quantity per slot off the single result it produced.
+
+The precedence is the map's: a stated slot wins, `pe` fills the rest, and a slot that neither names is left `nothing` so the consumer's own prior fallback still applies.
+
+A measure with exactly one deferrable slot takes no `pe`. It widens that slot instead, and a derived companion — `chol` with `sigma`, `V` with `sk` — travels with it out of the same fit rather than being fanned out separately.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function fan_out_slot(fitted, slot, key::Symbol)
+    return isnothing(slot) ? deferred_quantity(fitted, key) : slot
 end
 """
     deferred_derived_quantity(fitted, key::Symbol)

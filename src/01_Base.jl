@@ -360,6 +360,7 @@ const arg_dict = Dict(
                       :slv => "`slv`: Solver or vector of solvers.",#
                       :p_rm => "`p`: Power or order parameter.",#
                       :mu_rm => "`mu`: Optional mean for centering.",#
+                      :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
                       :w_rm => "`w`: Optional portfolio weights.",#
                       :ddof => "`ddof`: Degrees-of-freedom correction.",#
                       :flag => "`flag`: Algorithm selection flag.",#
