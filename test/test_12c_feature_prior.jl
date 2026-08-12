@@ -6,10 +6,11 @@ using Clustering, StableRNGs, LinearAlgebra
 # A producer emitting a time-varying `Z`. Nothing in the library ships one, but the derived
 # carrier accepts the shape and a producer is handed the fold's own `X`, so it tracks the fold
 # with no extra plumbing. Defined here to pin that claim rather than assert it.
-struct TrailingDispersionFeatures <: PortfolioOptimisers.AbstractFeatureMatrixEstimator
+struct _test_TrailingDispersionFeatures <:
+       PortfolioOptimisers.AbstractFeatureMatrixEstimator
     windows::Vector{Int}
 end
-function PortfolioOptimisers.feature_matrix(ze::TrailingDispersionFeatures,
+function PortfolioOptimisers.feature_matrix(ze::_test_TrailingDispersionFeatures,
                                             ::PortfolioOptimisers.AbstractPriorResult,
                                             X::PortfolioOptimisers.MatNum, args...;
                                             kwargs...)
@@ -311,7 +312,7 @@ end
     # A producer has no such problem: it is handed the fold's own `X`, so a time-varying `Z`
     # tracks the fold. The derived carrier supports the shape; nothing shipped emits it.
     pe_prod = FeaturePrior(; pe = EmpiricalPrior(),
-                           ze = TrailingDispersionFeatures([5, 21]))
+                           ze = _test_TrailingDispersionFeatures([5, 21]))
     @test size(prior(pe_prod, rd).Z) == (nobs, na, 2)
     @test size(prior(pe_prod, rd.X[1:(nobs - 10), :]).Z) == (nobs - 10, na, 2)
 
