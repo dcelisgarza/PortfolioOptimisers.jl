@@ -150,6 +150,74 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
     return nothing
 end
 """
+    prior_high_order_quantity(pr::AbstractPriorResult, key::Symbol)
+
+Read the high-order quantity named by `key` off prior result `pr`, or `nothing` when it carries none.
+
+A [`HighOrderPrior`](@ref) carries `kt`, `sk`, `V` and the three vectorisation matrices. A [`LowOrderPrior`](@ref) carries none of them, and a [`HighOrderPrior`](@ref) fitted with only one of the two tensors leaves the other `nothing`, so the answer is a value or `nothing` rather than an error either way.
+
+# Related
+
+  - [`assert_high_order_quantity`](@ref)
+  - [`dup_elim_sum_selector`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function prior_high_order_quantity(pr::AbstractPriorResult, key::Symbol)
+    return hasproperty(pr, key) ? getproperty(pr, key) : nothing
+end
+"""
+    assert_high_order_quantity(q, pr::AbstractPriorResult, rm::Symbol, key::Symbol,
+                               est::Symbol)
+
+Refuse a high-order risk measure whose tensor resolves neither on the measure nor on the prior.
+
+`q` is what the measure holds in the slot named `key`, after [`resolve_deferred_quantities`](@ref) has run. The measure is buildable when either side supplies the quantity, so the gate is on the pair rather than on the type of `pr`: a caller who has told the measure how to build its own cokurtosis has already met the requirement, and a [`HighOrderPrior`](@ref) that computed neither tensor does not meet it.
+
+The message names the three ways out: state the quantity, name a `est` or an [`AbstractPriorEstimator`](@ref) in the slot, or give the optimiser a prior estimator that computes one.
+
+# Related
+
+  - [`prior_high_order_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`Kurtosis`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`VarianceSkewKurtosis`](@ref)
+"""
+function assert_high_order_quantity(q, pr::AbstractPriorResult, rm::Symbol, key::Symbol,
+                                    est::Symbol)
+    @argcheck(!isnothing(q) || !isnothing(prior_high_order_quantity(pr, key)),
+              ArgumentError("`$rm` needs a `$key`, and neither the measure nor the `$(typeof(pr).name.name)` it was given carries one. State `$key` on the measure, or name a `$est` or an `AbstractPriorEstimator` in it, or give the optimiser a prior estimator that computes a `$key`."))
+    return nothing
+end
+"""
+    dup_elim_sum_selector(pr::AbstractPriorResult, N::Integer)
+
+Select the duplication, elimination and summation matrices for `N` assets from prior result `pr`, rebuilding whichever of the three it does not carry.
+
+[`dup_elim_sum_matrices`](@ref) is a pure function of the asset count, with no data in it, so the three matrices a [`HighOrderPrior`](@ref) carries are exactly the ones this rebuilds. That is what lets a measure holding its own tensor be built against a [`LowOrderPrior`](@ref): the vectorisation matrices were the only other thing the kernel took from the prior.
+
+One call builds all three, so the rebuild costs the same whether one of them is missing or all three are.
+
+# Related
+
+  - [`dup_elim_sum_matrices`](@ref)
+  - [`prior_high_order_quantity`](@ref)
+  - [`assert_high_order_quantity`](@ref)
+"""
+function dup_elim_sum_selector(pr::AbstractPriorResult, N::Integer)
+    D2 = prior_high_order_quantity(pr, :D2)
+    L2 = prior_high_order_quantity(pr, :L2)
+    S2 = prior_high_order_quantity(pr, :S2)
+    if isnothing(D2) || isnothing(L2) || isnothing(S2)
+        rD2, rL2, rS2 = dup_elim_sum_matrices(N)
+        D2 = nothing_scalar_array_selector(D2, rD2)
+        L2 = nothing_scalar_array_selector(L2, rL2)
+        S2 = nothing_scalar_array_selector(S2, rS2)
+    end
+    return D2, L2, S2
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add an upper-bound constraint on a risk expression to `model`.

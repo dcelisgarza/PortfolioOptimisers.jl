@@ -884,3 +884,90 @@ end
     @test r.sk.settings.rke === false
     @test r.kt.settings.rke === false
 end
+
+@testset "Deferred Quantity: a resolved quantity lifts the `HighOrderPrior` gate" begin
+    using Clarabel, JuMP
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    rd = ReturnsResult(; X = X, nx = string.(1:5))
+    lop = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+
+    # The vectorisation matrices were the only other thing the kurtosis kernel took from
+    # the prior, and they are a pure function of the asset count. So the rebuild is not an
+    # approximation of the prior's: it is the same three matrices.
+    D2, L2, S2 = PO.dup_elim_sum_selector(lop, 5)
+    @test D2 == hop.D2
+    @test L2 == hop.L2
+    @test S2 == hop.S2
+    @test PO.dup_elim_sum_selector(hop, 5) === (hop.D2, hop.L2, hop.S2)
+
+    # A `HighOrderPrior` carries the high-order quantities and a `LowOrderPrior` none, and
+    # the read answers `nothing` rather than throwing either way.
+    @test PO.prior_high_order_quantity(hop, :kt) === hop.kt
+    @test isnothing(PO.prior_high_order_quantity(lop, :kt))
+    @test isnothing(PO.prior_high_order_quantity(lop, :V))
+
+    # A caller who has told the measure how to build its own tensor has met the
+    # requirement, so the same problem solves under either prior and gives one answer.
+    low(r) = optimise(MeanRisk(; r = r,
+                               opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)), rd)
+    high(r) = optimise(MeanRisk(; r = r,
+                                opt = JuMPOptimiser(; pe = HighOrderPriorEstimator(),
+                                                    slv = slv)), rd)
+    for (deferred, bare) in ((Kurtosis(; kt = Cokurtosis()), Kurtosis()),
+                             (Kurtosis(; kt = Cokurtosis(), N = 3), Kurtosis(; N = 3)),
+                             (Kurtosis(; pe = HighOrderPriorEstimator()), Kurtosis()),
+                             (NegativeSkewness(; sk = Coskewness()), NegativeSkewness()),
+                             (NegativeSkewness(; sk = HighOrderPriorEstimator()), NegativeSkewness()),
+                             (VarianceSkewKurtosis(; sk = Skewness(; sk = Coskewness()),
+                                                   kt = Kurtosis(; kt = Cokurtosis())), VarianceSkewKurtosis()),
+                             (VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), VarianceSkewKurtosis()))
+        a = low(deferred)
+        b = high(bare)
+        @test isa(a.retcode, OptimisationSuccess)
+        @test isa(b.retcode, OptimisationSuccess)
+        @test isapprox(a.w, b.w; rtol = 5e-6)
+    end
+
+    # The bare measure under a low-order prior still refuses, and the message names the
+    # three ways out rather than only the prior it wanted.
+    for (r, quantity, est) in ((Kurtosis(), "kt", "CokurtosisEstimator"),
+                               (NegativeSkewness(), "sk", "CoskewnessEstimator"),
+                               (VarianceSkewKurtosis(), "sk", "CoskewnessEstimator"))
+        err = try
+            low(r)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        msg = sprint(showerror, err)
+        @test occursin("needs a `$quantity`", msg)
+        @test occursin("LowOrderPrior", msg)
+        @test occursin(est, msg)
+        @test occursin("AbstractPriorEstimator", msg)
+    end
+
+    # A container refuses on whichever tensor is missing, so a `kt` stated alone is not
+    # enough and the message says which one it still needs.
+    err = try
+        low(VarianceSkewKurtosis(; kt = Kurtosis(; kt = Cokurtosis())))
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("needs a `sk`", sprint(showerror, err))
+
+    # A `HighOrderPrior` fitted with only one of the two tensors leaves the vectorisation
+    # matrices `nothing`, so the rebuild is what makes the other measure buildable there.
+    part = optimise(MeanRisk(; r = Kurtosis(; kt = Cokurtosis()),
+                             opt = JuMPOptimiser(;
+                                                 pe = HighOrderPriorEstimator(;
+                                                                              kte = nothing),
+                                                 slv = slv)), rd)
+    @test isa(part.retcode, OptimisationSuccess)
+    @test isapprox(part.w, low(Kurtosis(; kt = Cokurtosis())).w; rtol = 5e-6)
+end

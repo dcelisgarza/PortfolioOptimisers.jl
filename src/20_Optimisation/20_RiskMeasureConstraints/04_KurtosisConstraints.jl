@@ -163,8 +163,9 @@ Add kurtosis risk constraints to `model`.
 The `Integer N` overload uses an approximate spectral decomposition of the co-kurtosis tensor
 to build `N` eigen-directions and encodes kurtosis via SOC and equality constraints. The
 `Nothing N` overload uses the full Cholesky-based formulation with the duplication matrix.
-The `LowOrderPrior` overload unconditionally throws an `ArgumentError` since kurtosis
-estimation requires a high-order prior.
+
+Both accept any prior result. The cokurtosis matrix must resolve on one side or the other,
+and [`assert_high_order_quantity`](@ref) refuses the measure when it resolves on neither.
 
 # Mathematical definition
 
@@ -192,7 +193,7 @@ where ``\\mathbf{K}`` is the co-kurtosis matrix and ``\\mathbf{S}_2`` is the dup
   - $(arg_dict[:ci])
   - `r::Kurtosis`: Kurtosis risk measure instance.
   - $(arg_dict[:opt_rjumpe])
-  - `pr::HighOrderPrior`: High-order prior containing `kt`, `S2`, and `L2`.
+  - `pr::AbstractPriorResult`: Prior result. It supplies `kt` when the measure states none.
 
 # Returns
 
@@ -203,12 +204,14 @@ where ``\\mathbf{K}`` is the co-kurtosis matrix and ``\\mathbf{S}_2`` is the dup
   - [`get_chol_or_Gkt_pm`](@ref)
   - [`get_kt_Akt_pm`](@ref)
   - [`set_kurtosis_risk!`](@ref)
+  - [`assert_high_order_quantity`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
-                               pr::HighOrderPrior, args...; prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     key = Symbol(:kurtosis_risk_, i)
     sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model; prefix = prefix)
@@ -261,6 +264,11 @@ Uses the full Cholesky-based SDP formulation to compute the portfolio kurtosis r
 second-order cone constraint over the vectorised weight matrix `W`. This overload applies
 when the kurtosis truncation rank is `Nothing` (no truncation).
 
+The elimination and summation matrices come from [`dup_elim_sum_selector`](@ref), so this
+formulation is reachable under a [`LowOrderPrior`](@ref) whenever the measure holds its own
+cokurtosis matrix: those two were the only other thing the kernel took from the prior, and
+they are a pure function of the asset count.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -268,7 +276,7 @@ when the kurtosis truncation rank is `Nothing` (no truncation).
   - `r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any, <:Any}`: The kurtosis risk
     measure with no truncation.
   - $(arg_dict[:opt_rjumpe])
-  - `pr::HighOrderPrior`: High-order prior containing the kurtosis matrix `kt`.
+  - `pr::AbstractPriorResult`: Prior result. It supplies `kt` when the measure states none.
 
 # Returns
 
@@ -279,23 +287,26 @@ when the kurtosis truncation rank is `Nothing` (no truncation).
   - [`Kurtosis`](@ref)
   - [`set_risk_constraints!`](@ref)
   - [`set_kurtosis_risk!`](@ref)
+  - [`assert_high_order_quantity`](@ref)
+  - [`dup_elim_sum_selector`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
-                               pr::HighOrderPrior, args...; prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    assert_high_order_quantity(r.kt, pr, :Kurtosis, :kt, :CokurtosisEstimator)
     key = Symbol(:kurtosis_risk_, i)
     sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model; prefix = prefix)
+    L2, S2 = dup_elim_sum_selector(pr, size(W, 1))[2:3]
     G = if isnothing(r.kt)
         get_chol_or_Gkt_pm(model, pr)
     else
-        LinearAlgebra.cholesky(pr.S2 * r.kt * transpose(pr.S2)).U
+        LinearAlgebra.cholesky(S2 * r.kt * transpose(S2)).U
     end
     sqrt_kurtosis_risk = model[key] = JuMP.@variable(model)
     L2W = state_build!(model, prefix, :L2W) do
-        L2 = pr.L2
         JuMP.@expression(model, L2 * vec(W))
     end
     x_kurt = model[Symbol(:x_kurt_, i)] = JuMP.@expression(model, G * L2W)
@@ -304,31 +315,4 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       sc * x_kurt] in
                                                      JuMP.SecondOrderCone())
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, key, i)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Throw an `ArgumentError` indicating that `Kurtosis` requires a `HighOrderPrior`.
-
-This fall-through overload is triggered when a `LowOrderPrior` is passed and always
-raises an error.
-
-# Arguments
-
-  - `r::Kurtosis`: The kurtosis risk measure (unused).
-  - `pr::LowOrderPrior`: A low-order prior (not compatible with kurtosis).
-
-# Returns
-
-  - Does not return; always throws `ArgumentError`.
-
-# Related
-
-  - [`Kurtosis`](@ref)
-  - [`set_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis,
-                               ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
-                               kwargs...)
-    return throw(ArgumentError("Kurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
 end

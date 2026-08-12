@@ -102,10 +102,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add negative-skewness risk constraints to `model`.
 
-The `HighOrderPrior` overload selects the co-skewness matrix (from `r.V` or `pr.V`),
-creates a scalar variable, adds the SOC constraint `[sc * nskew_risk; sc * G * w] in SOC`,
-and dispatches to [`set_negative_skewness_risk!`](@ref) for bounding. The `LowOrderPrior`
-overload unconditionally throws an `ArgumentError`.
+Selects the co-skewness matrix (from `r.V` or `pr.V`), creates a scalar variable, adds the
+SOC constraint `[sc * nskew_risk; sc * G * w] in SOC`, and dispatches to
+[`set_negative_skewness_risk!`](@ref) for bounding.
+
+Any prior result is accepted. `V` must resolve on one side or the other, and
+[`assert_high_order_quantity`](@ref) refuses the measure when it resolves on neither. `V`
+travels with `sk` out of one fit, so a measure that holds its own pair takes nothing else
+from the prior.
 
 # Mathematical definition
 
@@ -130,7 +134,7 @@ where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
   - $(arg_dict[:ci])
   - `r::NegativeSkewness`: Negative-skewness risk measure instance.
   - $(arg_dict[:opt_rjumpe])
-  - `pr::HighOrderPrior`: High-order prior containing `V`.
+  - `pr::AbstractPriorResult`: Prior result. It supplies `V` when the measure states none.
 
 # Returns
 
@@ -140,10 +144,14 @@ where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
 
   - [`get_chol_or_V_pm`](@ref)
   - [`set_negative_skewness_risk!`](@ref)
+  - [`assert_high_order_quantity`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
-                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
+    # `sk` and `V` are both-or-neither on either side, so the gate reads the pair through
+    # `sk` and the kernel below can take `pr.V` whenever it takes `pr.sk`.
+    assert_high_order_quantity(r.sk, pr, :NegativeSkewness, :sk, :CoskewnessEstimator)
     key = Symbol(:nskew_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
@@ -157,31 +165,4 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                                       [sc * nskew_risk; sc * G * w] in
                                                       JuMP.SecondOrderCone())
     return set_negative_skewness_risk!(model, r, opt, nskew_risk, key, V; prefix = prefix)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Throw an `ArgumentError` indicating that `NegativeSkewness` requires a `HighOrderPrior`.
-
-This fall-through overload is triggered when a `LowOrderPrior` is passed and always
-raises an error.
-
-# Arguments
-
-  - `r::NegativeSkewness`: The negative skewness risk measure (unused).
-  - `pr::LowOrderPrior`: A low-order prior (not compatible with negative skewness).
-
-# Returns
-
-  - Does not return; always throws `ArgumentError`.
-
-# Related
-
-  - [`NegativeSkewness`](@ref)
-  - [`set_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
-                               ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
-                               kwargs...)
-    return throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
 end
