@@ -145,8 +145,8 @@ NegativeSkewness
             V_flag = isnothing(V)
             if sk_flag || V_flag
                 @argcheck(sk_flag,
-                          IsNothingError("sk cannot be nothing when V is provided"))
-                @argcheck(V_flag, IsNothingError("V cannot be nothing when sk is provided"))
+                          IsNothingError("V cannot be nothing when sk is provided"))
+                @argcheck(V_flag, IsNothingError("sk cannot be nothing when V is provided"))
             else
                 @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
                 @argcheck(!isempty(V), IsEmptyError("V cannot be empty"))
