@@ -263,6 +263,10 @@ function resolve_deferred_quantities(alg::DistributionValueatRisk,
                                    sigma = fan_out_slot(fitted, sigma, :sigma), chol = chol,
                                    pe = nothing, dist = alg.dist)
 end
+# Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
+function deferred_slots(alg::DistributionValueatRisk)
+    return (; mu = alg.mu, sigma = alg.sigma, pe = alg.pe)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -553,6 +557,9 @@ function resolve_deferred_quantities(r::ValueatRisk, pr::AbstractPriorResult)::V
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w,
                        alg = resolve_deferred_quantities(r.alg, pr))
 end
+# Deferrable slots — see `deferred_slots`. The formulation carries them, so the check
+# recurses into it.
+deferred_slots(r::ValueatRisk) = (; alg = r.alg)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -569,6 +576,8 @@ function resolve_deferred_quantities(r::ValueatRiskRange,
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
                             w = r.w, alg = resolve_deferred_quantities(r.alg, pr))
 end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::ValueatRiskRange) = (; alg = r.alg)
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     x = copy(x)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))

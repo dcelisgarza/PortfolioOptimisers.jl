@@ -250,6 +250,9 @@ function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skew
     return Skewness(; settings = r.settings, ve = r.ve, sk = fan_out_slot(fitted, sk, :sk),
                     w = r.w, mu = fan_out_slot(fitted, mu, :mu), pe = nothing)
 end
+# Deferrable slots — see `deferred_slots`. `ve` holds a variance estimator by design, not a
+# Deferred Quantity, so it is not declared here.
+deferred_slots(r::Skewness) = (; mu = r.mu, sk = r.sk, pe = r.pe)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -607,6 +610,29 @@ function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorR
                   alg2 = kt.alg2, pe = nothing)
     return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
                                 pe = nothing)
+end
+# Deferrable slots — see `deferred_slots`. The three children carry their own, so the check
+# recurses into them.
+deferred_slots(r::VarianceSkewKurtosis) = (; vr = r.vr, sk = r.sk, kt = r.kt, pe = r.pe)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`VarianceSkewKurtosis`](@ref) by fanning `pe` out over its three children, then threading `pr` into each of them.
+
+The container holds no quantity of its own, so [`@fprop`](@ref) alone would reach the children and leave `pe` standing — the measure would say one thing and compute another. This method resolves first, which is the same order the [`JuMP`](https://github.com/jump-dev/JuMP.jl) path already uses in [`set_risk_constraints!`](@ref).
+
+# Related
+
+  - [`VarianceSkewKurtosis`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
+    return VarianceSkewKurtosis(; settings = r.settings,
+                                vr = factory(r.vr, pr, args...; kwargs...),
+                                sk = factory(r.sk, pr, args...; kwargs...),
+                                kt = factory(r.kt, pr, args...; kwargs...), pe = nothing)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

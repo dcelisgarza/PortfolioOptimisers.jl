@@ -246,6 +246,8 @@ function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurt
                     kt = fan_out_slot(fitted, kt, :kt), N = r.N, alg1 = r.alg1,
                     alg2 = r.alg2, pe = nothing)
 end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)
 """
     calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, ...}, ::Any, x::VecNum)
     calc_moment_target(r::Kurtosis{<:Any, <:ObsWeights, Nothing, ...}, ::Any, x::VecNum)

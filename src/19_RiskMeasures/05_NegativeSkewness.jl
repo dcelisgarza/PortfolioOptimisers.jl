@@ -201,6 +201,9 @@ function resolve_deferred_quantities(r::NegativeSkewness,
                             V = deferred_derived_quantity(fitted, :V), alg = r.alg,
                             window = r.window)
 end
+# Deferrable slots — see `deferred_slots`. `V` is derived and never defers on its own, and
+# `mp` holds a processor by design.
+deferred_slots(r::NegativeSkewness) = (; sk = r.sk)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

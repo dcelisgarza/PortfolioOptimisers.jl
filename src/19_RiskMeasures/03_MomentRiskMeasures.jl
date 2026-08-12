@@ -1437,6 +1437,9 @@ function resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult)
     return LowOrderMoment(; settings = r.settings, w = r.w,
                           mu = resolve_slot(r.mu, :mu, pr), alg = r.alg)
 end
+# Deferrable slots — see `deferred_slots`. `alg` holds a variance estimator by design, not a
+# Deferred Quantity, so it is not declared here.
+deferred_slots(r::LowOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1491,6 +1494,8 @@ function resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult
     return HighOrderMoment(; settings = r.settings, w = r.w,
                            mu = resolve_slot(r.mu, :mu, pr), alg = r.alg)
 end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::HighOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

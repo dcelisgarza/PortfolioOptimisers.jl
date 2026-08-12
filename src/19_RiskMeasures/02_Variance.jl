@@ -318,6 +318,8 @@ function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
     return Variance(; settings = r.settings, sigma = deferred_quantity(fitted, :sigma),
                     chol = deferred_derived_quantity(fitted, :chol), rc = r.rc, alg = r.alg)
 end
+# Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
+deferred_slots(r::Variance) = (; sigma = r.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -485,6 +487,8 @@ function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResu
                              sigma = deferred_quantity(fitted, :sigma),
                              chol = deferred_derived_quantity(fitted, :chol))
 end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::StandardDeviation) = (; sigma = r.sigma)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -743,6 +747,9 @@ function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPrio
     return UncertaintySetVariance(; settings = r.settings, ucs = r.ucs,
                                   sigma = resolve_slot(r.sigma, :sigma, pr))
 end
+# Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a
+# Deferred Quantity, so it is not declared here.
+deferred_slots(r::UncertaintySetVariance) = (; sigma = r.sigma)
 """
     (r::UncertaintySetVariance)(w::VecNum)
 

@@ -29,6 +29,7 @@ const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
     expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
     expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, pr::Pr_RR, args...; kwargs...)
 
 Compute the expected value of a risk measure for a portfolio.
 
@@ -42,8 +43,14 @@ Composite and container forms keep explicit methods:
 
   - [`RkRatioRM`](@ref): computes `expected_risk(r.r1, ...) / expected_risk(r.r2, ...)`.
   - [`MeanReturnRiskRatio`](@ref): `(expected_risk(r.rt, ...) - r.rf) / expected_risk(r.rk, ...)`.
-  - `AbstractBaseRiskMeasure` with [`Pr_RR`](@ref): extracts `X` from the prior result and recurses.
-  - `AbstractBaseRiskMeasure` with `VecVecNum`: maps over each weight vector in `w`.
+  - `AbstractBaseRiskMeasure` with [`Pr_RR`](@ref): unwraps the returns matrix and recurses ([`resolve_risk_inputs`](@ref)).
+  - `AbstractBaseRiskMeasure` with `VecVecNum`: maps over each weight vector in `w`, resolving a [`Pr_RR`](@ref) once for the whole vector.
+
+## The prior and the matrix are not interchangeable
+
+Given a prior result the measure is put through [`factory`](@ref) first, so the number reported here is the one the optimiser optimises: a **Deferred Quantity** resolves against that prior, and a slot the measure leaves unstated falls back to the prior's own field.
+
+Given a bare returns matrix neither can happen. That call has no `pr.w` to thread and no factor returns to reach, so an unresolved slot is refused by name rather than several frames down ([`assert_resolved_slots`](@ref)), and an unstated slot keeps whatever the measure holds.
 
 # Related
 
@@ -52,8 +59,11 @@ Composite and container forms keep explicit methods:
   - [`RkRatioRM`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`resolve_risk_inputs`](@ref)
+  - [`assert_resolved_slots`](@ref)
 """
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
+    assert_resolved_slots(r)
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
 function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
@@ -120,11 +130,42 @@ end
 function (r::MeanReturnRiskRatio)(x::VecNum)
     return (r.rt(x) - r.rf) / r.rk(x)
 end
+"""
+    resolve_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum_Pr)
+
+Turn a value-level data argument into the pair a kernel takes: the measure to evaluate, and the returns matrix to evaluate it on.
+
+A prior result resolves the measure through [`factory`](@ref) — a **Deferred Quantity** becomes a value, an unstated slot takes the prior's field — and hands back `pr.X`. A [`ReturnsResult`](@ref) carries no moments, so it only unwraps its `X`. A matrix is already the pair.
+
+Resolution happens **once** per entry point rather than once per evaluation, which is what keeps [`risk_contribution`](@ref) from refitting a deferred covariance `2N` times.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`factory`](@ref)
+"""
+function resolve_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum)
+    return r, X
+end
+function resolve_risk_inputs(r::AbstractBaseRiskMeasure, pr::AbstractPriorResult)
+    return factory(r, pr), pr.X
+end
+function resolve_risk_inputs(r::AbstractBaseRiskMeasure, rd::ReturnsResult)
+    return r, rd.X
+end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
-    return expected_risk(r, w, pr.X, args...; kwargs...)
+    r, X = resolve_risk_inputs(r, pr)
+    return expected_risk(r, w, X, args...; kwargs...)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
+end
+function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, pr::Pr_RR, args...;
+                       kwargs...)
+    r, X = resolve_risk_inputs(r, pr)
+    return [expected_risk(r, wi, X, args...; kwargs...) for wi in w]
 end
 """
     expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...) -> Number
@@ -251,14 +292,20 @@ The partial derivative is approximated using a two-sided finite difference with 
 
   - `Vector`: Risk contributions (or marginal risks) for each asset.
 
+# Details
+
+  - A prior result resolves the measure **once**, before the loop ([`resolve_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
+
 # Related
 
   - [`expected_risk`](@ref)
   - [`factor_risk_contribution`](@ref)
+  - [`resolve_risk_inputs`](@ref)
 """
 function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
+    r, X = resolve_risk_inputs(r, X)
     N = length(w)
     rc = Vector{eltype(w)}(undef, N)
     ws = Matrix{eltype(w)}(undef, N, 2)

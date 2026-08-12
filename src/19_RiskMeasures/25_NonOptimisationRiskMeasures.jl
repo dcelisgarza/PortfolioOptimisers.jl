@@ -308,6 +308,8 @@ function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorRes
     end
     return ThirdCentralMoment(; w = r.w, mu = resolve_slot(r.mu, :mu, pr))
 end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)
 """
     const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, <:Any, T1, T2}}
 

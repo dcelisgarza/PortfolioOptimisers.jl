@@ -1117,3 +1117,217 @@ end
     @test !isnothing(box.val)
     @test PO.ucs_variance(box, r.sigma, w) == PO.ucs_variance(box, lop.sigma .* 3, w)
 end
+
+#=
+The value-level seam. `expected_risk` takes either a prior result or a bare returns matrix,
+and the two are not interchangeable. Given the prior it resolves the measure through
+`factory`, so the number it reports is the one the optimiser optimises. Given the matrix it
+cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there
+would use a different rule than the settled one. It refuses instead — #248's shape, the
+consumer resolves and the kernel refuses.
+=#
+@testset "Deferred Quantity: the value-level seam resolves with a prior" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    w = fill(0.2, 5)
+    pr = prior(EmpiricalPrior(), X)
+    hop = prior(HighOrderPriorEstimator(), X)
+    ce = PortfolioOptimisersCovariance(;
+                                       ce = Covariance(;
+                                                       ce = GeneralCovariance(;
+                                                                              ce = StatsBase.SimpleCovariance(;
+                                                                                                              corrected = false))))
+    me = MedianExpectedReturns()
+
+    # The whole family, one measure per widened slot. Each equals the resolved equivalent,
+    # so the seam resolves rather than falling back to the prior's own field.
+    for (r, p) in ((Variance(; sigma = ce), pr), (StandardDeviation(; sigma = ce), pr),
+                   (UncertaintySetVariance(; sigma = ce), pr), (LowOrderMoment(; mu = me), pr),
+                   (HighOrderMoment(; mu = me), pr), (ThirdCentralMoment(; mu = me), pr),
+                   (MedianAbsoluteDeviation(; mu = me), pr), (Kurtosis(; kt = Cokurtosis()), pr),
+                   (Kurtosis(; mu = me), hop), (Kurtosis(; pe = HighOrderPriorEstimator()), pr),
+                   (Skewness(; sk = Coskewness()), pr), (Skewness(; mu = me), hop),
+                   (Skewness(; pe = HighOrderPriorEstimator()), pr),
+                   (NegativeSkewness(; sk = Coskewness()), pr),
+                   (VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), pr),
+                   (VarianceSkewKurtosis(; vr = Variance(; sigma = ce),
+                                         sk = Skewness(; sk = Coskewness()),
+                                         kt = Kurtosis(; kt = Cokurtosis())), pr),
+                   (ValueatRisk(;
+                                alg = PortfolioOptimisers.DistributionValueatRisk(; mu = me, sigma = ce)), pr),
+                   (ValueatRiskRange(;
+                                     alg = PortfolioOptimisers.DistributionValueatRisk(;
+                                                                                       pe = EmpiricalPrior())),
+                    pr))
+        @test expected_risk(r, w, p) ≈ expected_risk(factory(r, p), w, p.X)
+    end
+
+    # A bare `Variance` reaches the kernel with `sigma === nothing` unless the seam runs
+    # `factory`, so the prior fallback is what makes the unstated state work at all.
+    @test expected_risk(Variance(), w, pr) ≈ dot(w, pr.sigma, w)
+    @test expected_risk(Variance(; sigma = ce), w, pr) ≈ dot(w, cov(ce, X), w)
+    @test !isapprox(expected_risk(Variance(), w, pr),
+                    expected_risk(Variance(; sigma = ce), w, pr))
+
+    # `factory` also fills an unstated slot, so the seam and the optimiser now report one
+    # number where they used to report two. With fees the two centres genuinely differ:
+    # `mu === nothing` centres on the mean of the net portfolio series, and `pr.mu` is
+    # gross. The prior arm follows the optimiser; the matrix arm keeps the old centring,
+    # because there is no prior there to fill from.
+    fees = Fees(; l = 0.01)
+    @test expected_risk(LowOrderMoment(), w, pr, fees) ==
+          expected_risk(factory(LowOrderMoment(), pr), w, X, fees)
+    @test expected_risk(LowOrderMoment(), w, pr, fees) !=
+          expected_risk(LowOrderMoment(), w, X, fees)
+
+    # A `ReturnsResult` carries no moments, so it only unwraps its `X` and the measure is
+    # left as it is.
+    rd = ReturnsResult(; X = X, nx = string.(1:5))
+    @test expected_risk(ConditionalValueatRisk(), w, rd) ==
+          expected_risk(ConditionalValueatRisk(), w, X)
+
+    # A vector of weight vectors resolves once and maps, rather than resolving per vector.
+    ws = [w, reverse(collect(range(0.1, 0.3; length = 5)))]
+    @test expected_risk(Variance(; sigma = ce), ws, pr) ==
+          [expected_risk(Variance(; sigma = ce), wi, pr) for wi in ws]
+end
+
+@testset "Deferred Quantity: the value-level seam refuses without one" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    w = fill(0.2, 5)
+    ce = PortfolioOptimisersCovariance()
+    me = MedianExpectedReturns()
+
+    # Sweep the family: every widened slot has a refusal path, and the message names the
+    # slot that is unresolved rather than the frame that tripped over it.
+    for (r, owner, slot) in ((Variance(; sigma = ce), "Variance", "sigma"),
+                             (StandardDeviation(; sigma = ce), "StandardDeviation", "sigma"),
+                             (UncertaintySetVariance(; sigma = ce), "UncertaintySetVariance", "sigma"),
+                             (LowOrderMoment(; mu = me), "LowOrderMoment", "mu"),
+                             (HighOrderMoment(; mu = me), "HighOrderMoment", "mu"),
+                             (ThirdCentralMoment(; mu = me), "ThirdCentralMoment", "mu"),
+                             (MedianAbsoluteDeviation(; mu = me), "MedianAbsoluteDeviation", "mu"),
+                             (Kurtosis(; kt = Cokurtosis()), "Kurtosis", "kt"),
+                             (Kurtosis(; mu = me), "Kurtosis", "mu"),
+                             (Kurtosis(; pe = HighOrderPriorEstimator()), "Kurtosis", "pe"),
+                             (Skewness(; sk = Coskewness()), "Skewness", "sk"),
+                             (Skewness(; mu = me), "Skewness", "mu"),
+                             (Skewness(; pe = HighOrderPriorEstimator()), "Skewness", "pe"),
+                             (NegativeSkewness(; sk = Coskewness()), "NegativeSkewness", "sk"),
+                             (VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), "VarianceSkewKurtosis", "pe"),
+                             (ValueatRisk(; alg = PortfolioOptimisers.DistributionValueatRisk(; mu = me)),
+                              "DistributionValueatRisk", "mu"),
+                             (ValueatRiskRange(; alg = PortfolioOptimisers.DistributionValueatRisk(; sigma = ce)),
+                              "DistributionValueatRisk", "sigma"),
+                             (ValueatRisk(;
+                                          alg = PortfolioOptimisers.DistributionValueatRisk(;
+                                                                                            pe = EmpiricalPrior())),
+                              "DistributionValueatRisk", "pe"))
+        err = try
+            expected_risk(r, w, X)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        msg = sprint(showerror, err)
+        @test occursin("`$owner.$slot`", msg)
+        @test occursin("Deferred Quantity", msg)
+        @test occursin("factory(r, pr)", msg)
+    end
+
+    # A container is covered by its children's declarations, so a deferred child is named by
+    # the child that holds it.
+    err = try
+        expected_risk(VarianceSkewKurtosis(; vr = Variance(; sigma = ce)), w, X)
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("`Variance.sigma`", sprint(showerror, err))
+
+    # The refusal reaches every value-level consumer, because they all funnel through the
+    # same entry.
+    @test_throws ArgumentError risk_contribution(Variance(; sigma = ce), w, X)
+    @test_throws ArgumentError PortfolioOptimisers.rolling_window_measure(Variance(;
+                                                                                   sigma = ce),
+                                                                          w, X, nothing, 50)
+    @test_throws ArgumentError expected_risk(RiskRatio(; r1 = Variance(; sigma = ce),
+                                                       r2 = ConditionalValueatRisk()), w, X)
+
+    # A slot that holds an Estimator by design is not a Deferred Quantity, so a measure that
+    # carries one is evaluated rather than refused.
+    @test isa(expected_risk(LowOrderMoment(; alg = SecondMoment(; ve = SimpleVariance())),
+                            w, X), Number)
+    @test isa(expected_risk(Skewness(; ve = SimpleVariance()), w, X), Number)
+
+    # `ve` is the falsification case: a variance estimator **is** a Deferred Quantity by
+    # type, so only the per-type declaration keeps it from being refused.
+    @test isa(SimpleVariance(), PortfolioOptimisers.DeferredQuantity)
+    @test !haskey(PortfolioOptimisers.deferred_slots(Skewness()), :ve)
+    @test isa(expected_risk(UncertaintySetVariance(; sigma = cov(X)), w, X), Number)
+    @test isa(expected_risk(MedianAbsoluteDeviation(), w, X), Number)
+    @test isa(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering()), w, X), Number)
+end
+
+@testset "Deferred Quantity: the value-level seam fits once, not once per difference" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    w = fill(0.2, 5)
+    pr = prior(EmpiricalPrior(), X)
+
+    # `risk_contribution` evaluates the measure `2N` times. Resolving inside that loop would
+    # refit the covariance once per finite difference, so the seam resolves before it.
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    rc = risk_contribution(Variance(; sigma = c), w, pr)
+    @test c.n == 1
+    @test rc ≈ risk_contribution(factory(Variance(; sigma = EmpiricalPrior()), pr), w, X)
+
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    expected_risk(Variance(; sigma = c), w, pr)
+    @test c.n == 1
+
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    expected_risk(Variance(; sigma = c), [w, w, w], pr)
+    @test c.n == 1
+
+    # A factor decomposition goes through `risk_contribution`, so it inherits the same rule.
+    rd = ReturnsResult(; X = X, nx = string.(1:5), F = X[:, 1:2], nf = string.(1:2))
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    frc = factor_risk_contribution(Variance(; sigma = c), w, pr; rd = rd)
+    @test c.n == 1
+    @test frc ≈
+          factor_risk_contribution(factory(Variance(; sigma = EmpiricalPrior()), pr), w, X;
+                                   rd = rd)
+end
+
+@testset "Deferred Quantity: a `VarianceSkewKurtosis` `pe` reaches the `factory` path" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    hop = prior(HighOrderPriorEstimator(), X)
+
+    # The container holds no quantity of its own, so `@fprop` alone reached the children and
+    # left `pe` standing — the measure said one thing and computed another. `factory` now
+    # fans it out first, in the same order the `JuMP` path already used.
+    f = factory(VarianceSkewKurtosis(; pe = HighOrderPriorEstimator()), hop)
+    @test isnothing(f.pe)
+    @test f.vr.sigma ≈ hop.sigma
+    @test f.sk.sk ≈ hop.sk
+    @test f.sk.mu ≈ hop.mu
+    @test f.kt.kt ≈ hop.kt
+    @test f.kt.mu ≈ hop.mu
+
+    # The children keep the `rke = false` the container forced on them.
+    @test f.vr.settings.rke === false
+    @test f.sk.settings.rke === false
+    @test f.kt.settings.rke === false
+
+    # It agrees with the `JuMP` path's resolution point, which is the whole point of adding
+    # the second one.
+    g = PortfolioOptimisers.resolve_deferred_quantities(VarianceSkewKurtosis(;
+                                                                             pe = HighOrderPriorEstimator()),
+                                                        hop)
+    @test f.vr.sigma ≈ g.vr.sigma
+    @test f.sk.sk ≈ g.sk.sk
+    @test f.kt.kt ≈ g.kt.kt
+end

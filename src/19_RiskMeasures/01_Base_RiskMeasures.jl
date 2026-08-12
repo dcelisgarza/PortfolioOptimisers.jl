@@ -1492,6 +1492,48 @@ function resolve_slot(dq::DeferredQuantity, key::Symbol, pr::AbstractPriorResult
     return deferred_quantity(fit_deferred_quantity(dq, pr), key)
 end
 """
+    deferred_slots(x)
+
+Declare the slots of `x` that may hold a **Deferred Quantity**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no deferrable slot needs no method.
+
+This is the declaration [`assert_resolved_slots`](@ref) reads, and it is the counterpart of [`resolve_deferred_quantities`](@ref) — the same slots, named rather than resolved. Declare both, or a widened slot resolves where a prior is in hand and passes unnoticed where one is not.
+
+A slot that holds a child measure is declared here too. The check recurses into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. That matters because a risk measure holds Estimators that are **not** deferred slots — a variance estimator in `ve`, an uncertainty-set estimator in `ucs` — and a blind walk would refuse them.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`assert_resolved_slots`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+deferred_slots(::Any) = (;)
+"""
+    assert_resolved_slots(x)
+
+Refuse a **Deferred Quantity** that reached a value-level entry point, which has no prior result to resolve it against.
+
+[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
+
+This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
+
+The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
+
+# Related
+
+  - [`deferred_slots`](@ref)
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function assert_resolved_slots(x)
+    for (key, slot) in pairs(deferred_slots(x))
+        @argcheck(!isa(slot, DeferredQuantity),
+                  ArgumentError("`$(Base.typename(typeof(x)).wrapper).$key` holds a Deferred Quantity, a `$(Base.typename(typeof(slot)).wrapper)`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+        assert_resolved_slots(slot)
+    end
+    return nothing
+end
+"""
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
 
 Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.

@@ -198,6 +198,9 @@ function resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPri
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w,
                                    mu = resolve_slot(r.mu, :mu, pr), flag = r.flag)
 end
+# Deferrable slots — see `deferred_slots`. A centring strategy in `mu` is not deferred: it
+# resolves at the point of use, on the portfolio series.
+deferred_slots(r::MedianAbsoluteDeviation) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
