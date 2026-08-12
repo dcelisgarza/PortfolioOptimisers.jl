@@ -1518,6 +1518,8 @@ This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the c
 
 The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
 
+The message names both types with `nameof`, not by printing the type. A printed type carries a module prefix whenever the name is not visible from `Main`, which is the case inside an isolated test worker and inside any module that imports the package qualified. `Variance.sigma` is the path the caller wrote, and the message must read the same in every process.
+
 # Related
 
   - [`deferred_slots`](@ref)
@@ -1528,7 +1530,7 @@ The slots come from [`deferred_slots`](@ref) and the check recurses into whateve
 function assert_resolved_slots(x)
     for (key, slot) in pairs(deferred_slots(x))
         @argcheck(!isa(slot, DeferredQuantity),
-                  ArgumentError("`$(Base.typename(typeof(x)).wrapper).$key` holds a Deferred Quantity, a `$(Base.typename(typeof(slot)).wrapper)`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
         assert_resolved_slots(slot)
     end
     return nothing

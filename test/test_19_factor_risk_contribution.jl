@@ -84,3 +84,80 @@
                                           opt = JuMPOptimiser(; pe = pr, slv = slv)), rd)
     @test isa(res.retcode, OptimisationSuccess)
 end
+
+@testset "Factor attribution reads the original returns matrix" begin
+    using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel
+
+    rng = StableRNG(987654321)
+    T, N, Nf = 400, 8, 3
+    F = randn(rng, T, Nf) .* 0.02
+    B = randn(rng, N, Nf)
+    X = F * transpose(B) .+ randn(rng, T, N) .* 0.01
+    rd = ReturnsResult(; X = X, nx = string.(1:N), F = F, nf = string.(1:Nf))
+    pr = prior(FactorPrior(), rd)
+    w = fill(inv(N), N)
+    r = ConditionalValueatRisk()
+
+    # `pr.X` is the reconstruction: rank `Nf + 1`, the factors plus the intercept, and no
+    # residual. Reducing it leaves the off-factor term nothing to attribute but the
+    # intercept's share, which came out negative.
+    @test !isnothing(pr.o_X)
+    @test pr.original_X === X
+    @test rank(pr.X) == Nf + 1
+    @test rank(pr.original_X) == N
+
+    # The attribution reads `original_X`, so a prior and the caller's matrix agree.
+    frc_pr = factor_risk_contribution(r, w, pr; rd = rd)
+    frc_X = factor_risk_contribution(r, w, X; rd = rd)
+    @test frc_pr ≈ frc_X
+    @test frc_pr[end] > 0
+    @test sum(frc_pr) ≈ expected_risk(r, w, X)
+
+    # The price: the parts no longer sum to the risk the prior asserts.
+    @test !isapprox(sum(frc_pr), expected_risk(r, w, pr))
+
+    # The case the carrier is needed for: a precomputed `Regression` needs no data, so `rd`
+    # is empty and `pr.original_X` is the only source of the caller's returns.
+    rr = regression(StepwiseRegression(), rd)
+    @test factor_risk_contribution(r, w, pr; re = rr) ≈ frc_X
+
+    # With no `rd` and no precomputed result, the prior's own `rr` supplies the loadings.
+    @test factor_risk_contribution(r, w, pr) ≈ frc_X
+    @test size(pr.rr.M) == size(rr.M) == (N, Nf)
+
+    # None of the three carriers holds loadings, so it refuses.
+    @test_throws IsNothingError factor_risk_contribution(r, w, X)
+
+    # A measure whose kernel reads a moment never touches the returns matrix, so its
+    # attribution was already correct and does not move.
+    v = Variance()
+    @test factor_risk_contribution(v, w, pr; rd = rd) ≈
+          factor_risk_contribution(factory(v, pr), w, X; rd = rd)
+    @test factor_risk_contribution(v, w, pr; rd = rd)[end] > 0
+
+    # Off a factor route `original_X === X`, so nothing moves.
+    prE = prior(EmpiricalPrior(), rd)
+    @test isnothing(prE.o_X)
+    @test isnothing(prE.rr)
+    @test factor_risk_contribution(r, w, prE; rd = rd) ≈
+          factor_risk_contribution(r, w, prE.X; rd = rd)
+
+    # The optimiser follows the same precedence, so a factor prior answers what used to be a
+    # throw: no returns data at all, and a regression estimator.
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    frc = FactorRiskContribution(; r = Variance(), obj = MinimumRisk(),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv),
+                                 sets = UniverseSets(; dict = Dict("nx" => rd.nf)))
+    res_rd = optimise(frc, rd)
+    res_no = optimise(frc, ReturnsResult())
+    @test isa(res_no.retcode, OptimisationSuccess)
+    @test res_rd.w ≈ res_no.w
+
+    # A prior that carries no factor block still needs the data.
+    frc_e = FactorRiskContribution(; r = Variance(), obj = MinimumRisk(),
+                                   opt = JuMPOptimiser(; pe = prE, slv = slv),
+                                   sets = UniverseSets(; dict = Dict("nx" => rd.nf)))
+    @test_throws IsNothingError optimise(frc_e, ReturnsResult())
+end

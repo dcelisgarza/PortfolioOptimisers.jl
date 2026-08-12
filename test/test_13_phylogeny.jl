@@ -1775,15 +1775,15 @@ using PortfolioOptimisers, Test, SparseArrays, LinearAlgebra
 # not a `NetworkEstimator`, which is also what makes it evidence that `phylogeny_matrix`
 # splits on the *separation* rather than on the estimator's own type. Defined at top level
 # because a `@testset` body becomes a function, which cannot host a struct.
-struct FixedDistanceGraph{T} <: PortfolioOptimisers.AbstractNetworkEstimator
+struct _test_FixedDistanceGraph{T} <: PortfolioOptimisers.AbstractNetworkEstimator
     W::Matrix{Float64}
     sep::T
 end
-function PortfolioOptimisers.calc_distance_weighted_graph(pl::FixedDistanceGraph, X;
+function PortfolioOptimisers.calc_distance_weighted_graph(pl::_test_FixedDistanceGraph, X;
                                                           kwargs...)
     return PortfolioOptimisers.SimpleWeightedGraphs.SimpleWeightedGraph(pl.W)
 end
-function PortfolioOptimisers.calc_adjacency(pl::FixedDistanceGraph, X; kwargs...)
+function PortfolioOptimisers.calc_adjacency(pl::_test_FixedDistanceGraph, X; kwargs...)
     return SparseArrays.sparse(Int.(pl.W .!= 0))
 end
 
@@ -1794,33 +1794,35 @@ end
     X4 = zeros(Float64, 3, 4)
     want = [0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
 
-    d = separation_matrix(PathLength(), FixedDistanceGraph(W, PathLength()), X4)
+    d = separation_matrix(PathLength(), _test_FixedDistanceGraph(W, PathLength()), X4)
     @test d[1, 3] == Inf
-    @test separation_budget(PathLength(), FixedDistanceGraph(W, PathLength()), d) == 1.0
+    @test separation_budget(PathLength(), _test_FixedDistanceGraph(W, PathLength()), d) ==
+          1.0
 
-    @test phylogeny_matrix(FixedDistanceGraph(W, PathLength()), X4).X == want
+    @test phylogeny_matrix(_test_FixedDistanceGraph(W, PathLength()), X4).X == want
     # The clamp to the observed diameter excludes the sentinel, so even a budget far above
     # the diameter cannot reach across a component.
-    @test phylogeny_matrix(FixedDistanceGraph(W, PathLength(; dmax = 100.0)), X4).X == want
+    @test phylogeny_matrix(_test_FixedDistanceGraph(W, PathLength(; dmax = 100.0)), X4).X ==
+          want
     # A hop count agrees on this graph, which is what makes the comparison meaningful: the
     # two separations differ on the budget, not on reachability.
-    @test phylogeny_matrix(FixedDistanceGraph(W, HopCount(; n = 3)), X4).X == want
+    @test phylogeny_matrix(_test_FixedDistanceGraph(W, HopCount(; n = 3)), X4).X == want
 end
 
 # A distance estimator that counts how often the correlation is derived from `X`. It only
 # forwards; the counters are the whole point. Defined at top level because a `@testset`
 # body becomes a function, which cannot host a struct.
-mutable struct CountingDistance{T} <: PortfolioOptimisers.AbstractDistanceEstimator
+mutable struct _test_CountingDistance{T} <: PortfolioOptimisers.AbstractDistanceEstimator
     const de::T
     n_cor_and_dist::Int
     n_distance::Int
 end
-CountingDistance(de) = CountingDistance(de, 0, 0)
-function PortfolioOptimisers.cor_and_dist(de::CountingDistance, ce, X; kwargs...)
+_test_CountingDistance(de) = _test_CountingDistance(de, 0, 0)
+function PortfolioOptimisers.cor_and_dist(de::_test_CountingDistance, ce, X; kwargs...)
     de.n_cor_and_dist += 1
     return PortfolioOptimisers.cor_and_dist(de.de, ce, X; kwargs...)
 end
-function PortfolioOptimisers.distance(de::CountingDistance, ce, X; kwargs...)
+function PortfolioOptimisers.distance(de::_test_CountingDistance, ce, X; kwargs...)
     de.n_distance += 1
     return PortfolioOptimisers.distance(de.de, ce, X; kwargs...)
 end
@@ -1837,7 +1839,7 @@ end
     =#
     Xc = randn(StableRNG(987654321), 200, 10)
     for alg in (KruskalTree(), ComplementSimilarity())
-        de = CountingDistance(Distance(; alg = CanonicalDistance()))
+        de = _test_CountingDistance(Distance(; alg = CanonicalDistance()))
         nte = NetworkEstimator(; de = de, alg = alg)
         clusterise(NetworkClustersEstimator(; nte = nte), Xc)
         @test de.n_cor_and_dist == 1
@@ -1858,7 +1860,7 @@ using PortfolioOptimisers, Test
 
 # An algorithm that says nothing about itself, for the fallback. Defined at top level
 # because a `@testset` body becomes a function, which cannot host a struct.
-struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+struct _test_UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
 
 @testset "Weighted centrality" begin
     using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, StatsBase, SparseArrays,
@@ -1878,8 +1880,8 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
 
     @testset "The declared polarity" begin
         # The fallback declares nothing, so an algorithm is unweightable until it opts in.
-        struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
-        @test PO.centrality_polarity(UndeclaredCentrality()) === nothing
+        struct _test_UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+        @test PO.centrality_polarity(_test_UndeclaredCentrality()) === nothing
         # Every shipped member, one assertion each.
         for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
                    StressCentrality())
@@ -1915,7 +1917,7 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
         Both halves of the claim, on a graph constructed so the first one must hold. The
         cycle 1-2-3-4-5-1 has a heavy shortcut on (1,5): unweighted, vertices 1 and 5 are
         adjacent and tie with 3 on closeness; weighted, the shortcut is not worth taking
-        and 3 wins outright. `FixedDistanceGraph` supplies the graph directly, because
+        and 3 wins outright. `_test_FixedDistanceGraph` supplies the graph directly, because
         every structure `calc_adjacency` builds from data is a spanning tree or a PMFG.
         =#
         W = zeros(5, 5)
@@ -1923,7 +1925,7 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
             W[i, j] = W[j, i] = w
         end
         Xd = zeros(3, 5)
-        nte = FixedDistanceGraph(W, HopCount(; n = 1))
+        nte = _test_FixedDistanceGraph(W, HopCount(; n = 1))
         unw = PO.calc_centrality(ClosenessCentrality(),
                                  G.SimpleGraph(phylogeny_matrix(nte, Xd).X))
         wtd = centrality_vector(nte, ClosenessCentrality(), Xd).X
@@ -1934,7 +1936,7 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
 
         # Equal weights reproduce the unweighted answer exactly, on the same structure.
         We = Float64.(W .!= 0)
-        nte_e = FixedDistanceGraph(We, HopCount(; n = 1))
+        nte_e = _test_FixedDistanceGraph(We, HopCount(; n = 1))
         for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
                    StressCentrality())
             @test centrality_vector(nte_e, ct, Xd).X ==
@@ -2248,27 +2250,27 @@ end
 
 # Rules for a separation budget. Defined at top level because a `@testset` body becomes a
 # function, which cannot host a struct.
-struct ConstantHops{T} <: PortfolioOptimisers.HopCountAlgorithm
+struct _test_ConstantHops{T} <: PortfolioOptimisers.HopCountAlgorithm
     n::T
 end
-function (r::ConstantHops)(nte, X; dims::Int = 1, kwargs...)
+function (r::_test_ConstantHops)(nte, X; dims::Int = 1, kwargs...)
     return r.n
 end
-struct ConstantRadius{T} <: PortfolioOptimisers.PathLengthAlgorithm
+struct _test_ConstantRadius{T} <: PortfolioOptimisers.PathLengthAlgorithm
     dmax::T
 end
-function (r::ConstantRadius)(nte, X; dims::Int = 1, kwargs...)
+function (r::_test_ConstantRadius)(nte, X; dims::Int = 1, kwargs...)
     return r.dmax
 end
 # Records what it was handed, so the argument contract is asserted rather than assumed.
-mutable struct RecordingHops <: PortfolioOptimisers.HopCountAlgorithm
+mutable struct _test_RecordingHops <: PortfolioOptimisers.HopCountAlgorithm
     calls::Int
     nte::Any
     size::Any
     dims::Int
 end
-RecordingHops() = RecordingHops(0, nothing, nothing, 0)
-function (r::RecordingHops)(nte, X; dims::Int = 1, kwargs...)
+_test_RecordingHops() = _test_RecordingHops(0, nothing, nothing, 0)
+function (r::_test_RecordingHops)(nte, X; dims::Int = 1, kwargs...)
     r.calls += 1
     r.nte = nte
     r.size = size(X)
@@ -2297,7 +2299,7 @@ end
     end
 
     @testset "A rule is stored uncalled and resolved at the point of use" begin
-        rec = RecordingHops()
+        rec = _test_RecordingHops()
         sep = HopCount(; n = rec)
         # Construction does not run it.
         @test rec.calls == 0
@@ -2316,8 +2318,8 @@ end
     @testset "A rule answers exactly as the value it returns" begin
         # The point of the widening: a rule is a deferred way of writing the same budget,
         # not a second notion of one.
-        @test related(HopCount(; n = ConstantHops(3))) == related(HopCount(; n = 3))
-        @test related(PathLength(; dmax = ConstantRadius(1.5))) ==
+        @test related(HopCount(; n = _test_ConstantHops(3))) == related(HopCount(; n = 3))
+        @test related(PathLength(; dmax = _test_ConstantRadius(1.5))) ==
               related(PathLength(; dmax = 1.5))
         # A bare `Function` is admitted in the same field.
         @test related(HopCount(; n = (nte, X; kwargs...) -> 3)) ==
@@ -2330,27 +2332,30 @@ end
         # A functor's return type is not part of its signature, so the `Integer` obligation
         # is a run-time check. It is not cosmetic: three readers use `0:n` as a
         # matrix-power count, where `0:1.5` drops a power silently.
-        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(1.5)),
+        @test_throws ArgumentError resolve_separation(HopCount(;
+                                                               n = _test_ConstantHops(1.5)),
                                                       nte, X)
-        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(nothing)),
+        @test_throws ArgumentError resolve_separation(HopCount(;
+                                                               n = _test_ConstantHops(nothing)),
                                                       nte, X)
         # `nothing` is a stated budget rather than a computed one, so a path length rule
         # may not answer with it.
         @test_throws ArgumentError resolve_separation(PathLength(;
-                                                                 dmax = ConstantRadius(nothing)),
+                                                                 dmax = _test_ConstantRadius(nothing)),
                                                       nte, X)
         @test_throws ArgumentError resolve_separation(PathLength(;
-                                                                 dmax = ConstantRadius("1")),
+                                                                 dmax = _test_ConstantRadius("1")),
                                                       nte, X)
         # Resolution goes back through the ordinary constructor, so a rule's answer meets
         # exactly the validation a stated budget meets.
-        @test_throws DomainError resolve_separation(HopCount(; n = ConstantHops(0)), nte, X)
+        @test_throws DomainError resolve_separation(HopCount(; n = _test_ConstantHops(0)),
+                                                    nte, X)
         @test_throws DomainError resolve_separation(PathLength(;
-                                                               dmax = ConstantRadius(-1.0)),
+                                                               dmax = _test_ConstantRadius(-1.0)),
                                                     nte, X)
         # Storing those same rules is fine. The check belongs where the value exists.
-        @test HopCount(; n = ConstantHops(0)) isa HopCount
-        @test PathLength(; dmax = ConstantRadius(-1.0)) isa PathLength
+        @test HopCount(; n = _test_ConstantHops(0)) isa HopCount
+        @test PathLength(; dmax = _test_ConstantRadius(-1.0)) isa PathLength
     end
 
     @testset "separation_budget refuses an unresolved separation" begin
@@ -2358,18 +2363,18 @@ end
         # one kernel that cannot resolve a rule. Returning the rule would put a function
         # where every caller expects a number.
         d = separation_matrix(HopCount(), nte, X)
-        @test_throws ArgumentError separation_budget(HopCount(; n = ConstantHops(2)), nte,
-                                                     d)
+        @test_throws ArgumentError separation_budget(HopCount(; n = _test_ConstantHops(2)),
+                                                     nte, d)
         @test_throws ArgumentError separation_budget(PathLength(;
-                                                                dmax = ConstantRadius(1.5)),
+                                                                dmax = _test_ConstantRadius(1.5)),
                                                      nte, d)
         # A resolved one answers as before.
-        @test separation_budget(resolve_separation(HopCount(; n = ConstantHops(2)), nte, X),
-                                nte, d) == 2
+        @test separation_budget(resolve_separation(HopCount(; n = _test_ConstantHops(2)),
+                                                   nte, X), nte, d) == 2
     end
 
     @testset "Every consumer of a network resolves" begin
-        rule = HopCount(; n = ConstantHops(3))
+        rule = HopCount(; n = _test_ConstantHops(3))
         stated = HopCount(; n = 3)
 
         @test phylogeny_matrix(NetworkEstimator(; sep = rule), X).X ==
@@ -2389,7 +2394,7 @@ end
         end
 
         # The graded feature producer reads the budget through `separation_budget`.
-        prule = PathLength(; dmax = ConstantRadius(1.5))
+        prule = PathLength(; dmax = _test_ConstantRadius(1.5))
         @test PortfolioOptimisers.phylogeny_features(Proximity(),
                                                      NetworkEstimator(; sep = prule), X) ==
               PortfolioOptimisers.phylogeny_features(Proximity(),
@@ -2446,7 +2451,7 @@ end
         # admitting the zero diagonal would drag it down.
         W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
         X4 = zeros(Float64, 3, 4)
-        pl = FixedDistanceGraph(W, HopCount())
+        pl = _test_FixedDistanceGraph(W, HopCount())
         d = separation_matrix(HopCount(), pl, X4)
         @test maximum(d) == typemax(Int)
         for q in (0.0, 0.5, 1.0)

@@ -208,6 +208,8 @@ end
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     ## A regression ESTIMATOR must fit the factor model, so it needs the returns data:
     ## omitting `rd` raises a contextual IsNothingError rather than a deep cryptic one.
+    ## `pr` here is an EmpiricalPrior and carries no factor block, so there is no third
+    ## carrier to read the loadings from. A factor prior would answer instead of throwing.
     rb_est = RiskBudgeting(; r = Variance(), opt = opt,
                            rba = FactorRiskBudgeting(; re = StepwiseRegression()))
     @test_throws IsNothingError optimise(rb_est)

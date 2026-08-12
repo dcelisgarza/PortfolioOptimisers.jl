@@ -509,3 +509,96 @@ uses the positional form. The keyword constructor is unchanged.
 
 The position is the right one to keep. `o_X` is meaningless away from the `X` it qualifies, and a
 reader of the field list has to see the pair together.
+
+## Amendment (2026-08-12) — from [#289](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/289)
+
+The Scope section of the 2026-08-11 amendment above is superseded. The factor-risk-contribution
+path **is** changed, and it reads `original_X`. That amendment's claim that it "reads its returns
+from the caller's `ReturnsResult`" is wrong: `factor_risk_contribution` takes the returns from its
+own positional argument, and `rd` supplies only the regression.
+
+### The split is by what the consumer does with the matrix
+
+The 2026-08-11 amendment left one reader of `original_X`, the Deferred Quantity kernel, and one
+rule: everything that evaluates portfolio returns keeps reading `X`. That rule is too coarse. The
+factor attribution evaluates portfolio returns and still needs `original_X`, so the line is drawn
+somewhere else.
+
+> A consumer that **evaluates** the return distribution reads `X`. A consumer that **decomposes**
+> risk into a factor part and a residual part reads `original_X`.
+
+The reconstruction has rank `size(F, 2)` and carries no residual, so the second consumer has
+nothing to attribute to the residual term and reports noise in its place. Measured on a
+`FactorPrior` over 8 assets and 3 factors with a `ConditionalValueatRisk` at equal weights:
+
+| `factor_risk_contribution` handed | idiosyncratic share | total risk |
+| :-- | --: | --: |
+| the `FactorPrior` result | **−0.38 %** | 0.024516 |
+| the caller's `X` | +2.47 % | 0.025480 |
+
+The off-factor term was picking up the **intercept's** share. `rank(pr.X)` is `Nf + 1` — the
+factors plus the intercept — and for a series-reducing measure the intercept shifts the quantile,
+so it lands in the nullspace block. That is why the number is not merely small but signed wrong.
+
+### The price, stated
+
+Under a factor prior the parts now sum to the risk on the caller's returns, and **not** to
+`expected_risk(r, w, pr)`. The two were equal before, exactly, and that identity is what was
+traded away. It was worth trading: `FactorPrior.rsd` defaults to `true`, so `pr.sigma` already
+carries the residual block that `pr.X` cannot. The carrier's own covariance says the idiosyncratic
+risk is real, and the reconstruction contradicted it.
+
+The change reaches **only** measures whose kernel reduces the returns series. `Variance`,
+`StandardDeviation` and `DistributionValueatRisk` read a moment and never touch `X`, so their
+attribution was already correct and is byte-identical either way.
+
+### Two seams, not one argument
+
+`resolve_risk_inputs` keeps returning `pr.X`; `resolve_factor_risk_inputs` returns
+`original_returns(X)` beside it, over a three-method accessor that answers for a matrix, a
+`ReturnsResult` and a Prior Result alike. A source argument on the one seam was rejected: both
+answers are correct, neither is a default of the other, and a new caller picking the wrong arm
+would be silent.
+
+### Loadings follow the returns
+
+`resolve_factor_regression(re, rd, pr)` is one precedence, shared by the value-level function and
+by `set_factor_risk_contribution_constraints!`:
+
+ 1. `re` when it is already a `Regression` result — the caller stating the answer.
+ 2. `pr.rr` when the prior carries a factor block.
+ 3. `regression(re, rd)` otherwise.
+
+The prior outranks a refit because `pr.rr` was fitted on `pr.o_X`, which is the matrix the risk is
+now measured on, so the pair is matched by construction rather than by the caller's care. The cost
+is stated in both docstrings: **a stated regression *estimator* loses to a prior that carries
+loadings**, silently. A precomputed `Regression` is the way to override it. The refusal variant was
+considered and rejected — it needs a way to spell "`re` was not stated", which a defaulted keyword
+does not have.
+
+`pr.rr` and `regression(re, rd)` are dimensionally interchangeable: `M` and `L` are `N × Nf` with
+zeros for dropped factors, so the factor axis and the constraint names stay aligned.
+
+### The optimiser takes the prior
+
+`set_factor_risk_contribution_constraints!` gains a `pr` parameter between `rd` and `flag`, and its
+`IsNothingError` moves into `resolve_factor_regression`, which now names all three carriers rather
+than two. Three call sites — `12_FactorRiskContribution.jl`, `14_RiskBudgeting.jl`,
+`15_RelaxedRiskBudgeting.jl` — and each already held the prior. `set_risk_budgeting_constraints!`'s
+factor method had the prior as an unnamed `::Any`; it is now `pr::AbstractPriorResult`, which is
+what its three sibling methods already declared.
+
+The optimiser is included because the library must say one thing about where the factor model comes
+from, and because the basis the weights are re-based onto should be the one the moments were
+projected through. It also removes a throw the carrier can answer: `optimise(frc, ReturnsResult())`
+under a factor prior now solves, and gives the weights the `rd`-supplied route gives, spread `0.0`.
+
+### What did not change
+
+`plot_factor_risk_contribution` needed no edit. Its value-level arm forwards straight to
+`factor_risk_contribution` and inherits everything; its `(r, res, rd)` arm passes `rd.X`, which is
+already the caller's returns.
+
+No fixture moved. No test or example of the factor-risk-contribution or risk-budgeting families
+uses `FactorPrior`, `FactorBlackLittermanPrior` or `AugmentedBlackLittermanPrior`, so every one has
+`pr.rr === nothing` and `original_X === X`.

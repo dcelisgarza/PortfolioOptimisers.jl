@@ -155,6 +155,103 @@ end
 function resolve_risk_inputs(r::AbstractBaseRiskMeasure, rd::ReturnsResult)
     return r, rd.X
 end
+"""
+    original_returns(X::MatNum_Pr)
+
+Take the returns matrix the **caller** supplied out of whichever carrier holds it.
+
+A prior result answers `pr.original_X`, a [`ReturnsResult`](@ref) answers its `X`, and a matrix answers itself. The three arms agree off a factor route, where `pr.original_X === pr.X`, and differ on one, where `pr.X` is the reconstruction `F * transpose(M) .+ transpose(b)`.
+
+This is the read [`resolve_factor_risk_inputs`](@ref) takes, and it is deliberately **not** the read [`resolve_risk_inputs`](@ref) takes. `expected_risk` evaluates the return distribution the prior asserts, which is `pr.X`. A factor attribution partitions risk into a factor part and a residual part, and the reconstruction has no residual, so it can only attribute noise to the second.
+
+# Arguments
+
+  - `X::MatNum_Pr`: Returns matrix, prior result, or returns result.
+
+# Returns
+
+  - `X::MatNum`: The returns matrix the caller supplied.
+
+# Related
+
+  - [`resolve_factor_risk_inputs`](@ref)
+  - [`factor_risk_contribution`](@ref)
+"""
+function original_returns(X::MatNum)
+    return X
+end
+function original_returns(pr::AbstractPriorResult)
+    return pr.original_X
+end
+function original_returns(rd::ReturnsResult)
+    return rd.X
+end
+"""
+    resolve_factor_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum_Pr)
+
+Turn a value-level data argument into the pair a **factor attribution** takes: the measure to evaluate, and the returns matrix to evaluate it on.
+
+The sibling of [`resolve_risk_inputs`](@ref), and it differs in the second half only. The measure resolves the same way, so a **Deferred Quantity** is still fitted once rather than once per finite difference. The matrix is [`original_returns`](@ref) rather than `pr.X`.
+
+Two seams and not one argument, because the two answers are both correct and neither is a default of the other. Every other caller of [`resolve_risk_inputs`](@ref) wants the distribution the prior asserts.
+
+# Related
+
+  - [`resolve_risk_inputs`](@ref)
+  - [`original_returns`](@ref)
+  - [`factor_risk_contribution`](@ref)
+"""
+function resolve_factor_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum_Pr)
+    return first(resolve_risk_inputs(r, X)), original_returns(X)
+end
+"""
+    resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
+                              pr::Option{<:AbstractPriorResult} = nothing)
+
+Pick the factor loadings a factor attribution decomposes against, from the three carriers that can supply them.
+
+The precedence is fixed, and it is not a source selector:
+
+ 1. `re` when it is already a [`Regression`](@ref) result. A precomputed result is the caller stating the answer, and it needs no data.
+ 2. `pr.rr` when the prior carries a factor block. The loadings are then the ones fitted on `pr.original_X`, which is the matrix the risk is measured on, so the pair is matched by construction.
+ 3. `regression(re, rd)` otherwise, which needs `rd.X` and `rd.F`.
+
+!!! warning
+
+    A stated regression **estimator** loses to a prior that carries loadings. `re` is honoured only when the prior has none. Pass the loadings as a precomputed [`Regression`](@ref) to override a factor prior, or pass the returns matrix rather than the prior to keep the refit.
+
+# Arguments
+
+  - `re::RegE_Reg`: Regression result or estimator.
+  - `rd::ReturnsResult`: Returns result carrying `X` and `F`.
+  - `pr::Option{<:AbstractPriorResult}`: Prior result, or `nothing` when the caller passed a bare matrix.
+
+# Validation
+
+  - When none of the three arms applies, throws an [`IsNothingError`](@ref) naming all three.
+
+# Returns
+
+  - `rr::AbstractRegressionResult`: The factor loadings.
+
+# Related
+
+  - [`factor_risk_contribution`](@ref)
+  - [`set_factor_risk_contribution_constraints!`](@ref)
+  - [`regression`](@ref)
+"""
+function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
+                                   pr::Option{<:AbstractPriorResult} = nothing)
+    if isa(re, AbstractRegressionResult)
+        return re
+    end
+    if !isnothing(pr) && !isnothing(pr.rr)
+        return pr.rr
+    end
+    @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
+              IsNothingError("a factor decomposition needs loadings, and none of the three carriers holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
+    return regression(re, rd)
+end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
     r, X = resolve_risk_inputs(r, pr)
     return expected_risk(r, w, X, args...; kwargs...)
@@ -376,17 +473,28 @@ Where:
 
   - `Vector`: Risk contributions for each factor, with the last element being the idiosyncratic (off-factor) contribution.
 
+# Details
+
+  - The gradient is taken on [`original_returns`](@ref) — the returns the **caller** supplied — and not on `pr.X` ([`resolve_factor_risk_inputs`](@ref)). The two differ under a factor prior, where `pr.X` is the reconstruction `F * transpose(M) .+ transpose(b)`. That matrix has rank `size(F, 2)` and carries **no residual**, so the off-factor term of a series-reducing measure reports the intercept's share rather than idiosyncratic risk, and can come out negative.
+  - A consequence: under a factor prior the parts sum to the risk on the caller's returns, and **not** to `expected_risk(r, w, pr)`. A measure whose kernel reads a moment rather than the series — [`Variance`](@ref), [`StandardDeviation`](@ref), [`DistributionValueatRisk`](@ref) — is unaffected either way, because it never reduces the returns matrix.
+  - The loadings come from [`resolve_factor_regression`](@ref), which prefers the prior's own `rr` over a refit, so the loadings and the returns are the pair the prior was fitted on. A stated regression **estimator** therefore loses to a prior that carries a factor block.
+  - A prior result resolves the measure **once**, before the loop ([`resolve_factor_risk_inputs`](@ref)), so a **Deferred Quantity** is fitted once rather than once per finite difference.
+
 # Related
 
   - [`risk_contribution`](@ref)
   - [`expected_risk`](@ref)
+  - [`resolve_factor_risk_inputs`](@ref)
+  - [`resolve_factor_regression`](@ref)
+  - [`original_returns`](@ref)
 """
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
                                   re::RegE_Reg = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
-    rr = regression(re, rd)
+    rr = resolve_factor_regression(re, rd, isa(X, AbstractPriorResult) ? X : nothing)
+    r, X = resolve_factor_risk_inputs(r, X)
     Bt = transpose(rr.L)
     b2t = transpose(LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt))))
     b3t = transpose(LinearAlgebra.pinv(b2t))

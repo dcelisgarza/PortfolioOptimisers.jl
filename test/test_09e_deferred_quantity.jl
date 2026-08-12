@@ -10,11 +10,12 @@ Quantity crosses unresolved and computes on the subset.
 const PO = PortfolioOptimisers
 
 # Counts the fits, so "one estimator, one fit" is asserted rather than assumed.
-mutable struct CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
+mutable struct _test_CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
     pe::T
     n::Int
 end
-function PortfolioOptimisers.prior(c::CountingPriorEstimator, X, F = nothing; kwargs...)
+function PortfolioOptimisers.prior(c::_test_CountingPriorEstimator, X, F = nothing;
+                                   kwargs...)
     c.n += 1
     return prior(c.pe, X, F; kwargs...)
 end
@@ -559,14 +560,14 @@ end
     X = randn(rng, 200, 5)
     hop = prior(HighOrderPriorEstimator(), X)
 
-    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    c = _test_CountingPriorEstimator(HighOrderPriorEstimator(), 0)
     k = factory(Kurtosis(; pe = c), hop)
     @test k.mu ≈ hop.mu && k.kt ≈ hop.kt
     @test c.n == 1
 
     # Five slots across three children, still one fit. The container resolves the whole
     # measure, not one field at a time, which is what makes this expressible.
-    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    c = _test_CountingPriorEstimator(HighOrderPriorEstimator(), 0)
     v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(; pe = c), hop)
     @test v.kt.kt ≈ hop.kt && v.sk.sk ≈ hop.sk && v.vr.sigma ≈ hop.sigma
     @test c.n == 1
@@ -1284,7 +1285,7 @@ end
         end
         @test isa(err, ArgumentError)
         msg = sprint(showerror, err)
-        @test occursin("`$owner.$slot`", msg)
+        @test occursin("$owner.$slot", msg)
         @test occursin("Deferred Quantity", msg)
         @test occursin("factory(r, pr)", msg)
     end
@@ -1331,22 +1332,22 @@ end
 
     # `risk_contribution` evaluates the measure `2N` times. Resolving inside that loop would
     # refit the covariance once per finite difference, so the seam resolves before it.
-    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
     rc = risk_contribution(Variance(; sigma = c), w, pr)
     @test c.n == 1
     @test rc ≈ risk_contribution(factory(Variance(; sigma = EmpiricalPrior()), pr), w, X)
 
-    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
     expected_risk(Variance(; sigma = c), w, pr)
     @test c.n == 1
 
-    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
     expected_risk(Variance(; sigma = c), [w, w, w], pr)
     @test c.n == 1
 
     # A factor decomposition goes through `risk_contribution`, so it inherits the same rule.
     rd = ReturnsResult(; X = X, nx = string.(1:5), F = X[:, 1:2], nf = string.(1:2))
-    c = CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
     frc = factor_risk_contribution(Variance(; sigma = c), w, pr; rd = rd)
     @test c.n == 1
     @test frc ≈

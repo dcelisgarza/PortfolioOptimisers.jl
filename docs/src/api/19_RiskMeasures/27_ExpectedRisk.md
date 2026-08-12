@@ -4,6 +4,9 @@
 MatNum_Pr
 RkRatioRM
 resolve_risk_inputs
+original_returns
+resolve_factor_risk_inputs
+resolve_factor_regression
 expected_risk
 expected_risk_from_returns
 supports_precomputed_returns(r::RkRatioRM)
