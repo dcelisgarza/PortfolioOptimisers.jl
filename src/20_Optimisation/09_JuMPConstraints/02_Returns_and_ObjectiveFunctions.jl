@@ -1,4 +1,20 @@
 """
+    const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+
+Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot: the expected returns themselves, or the Estimator that computes them (a **Deferred Quantity** — see [`DeferredQuantity`](@ref)).
+
+Narrower than [`MuSlot`](@ref) by a [`VecScalar`](@ref). A `VecScalar` is a centring target for a moment risk measure, and the return expression is `dot_scalar(mu, w)`, which takes a number or a vector. It is also an [`AbstractResult`](@ref), and an Estimator must not hold one.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`MuSlot`](@ref)
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
+                         <:AbstractPriorEstimator}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 JuMP returns estimator that computes portfolio returns as the arithmetic (dot-product)
@@ -17,7 +33,7 @@ $(DocStringExtensions.FIELDS)
     ArithmeticReturn(;
         ucs::Option{<:UcSE_UcS} = nothing,
         lb::Option{<:RkRtBounds} = nothing,
-        mu::Option{<:Num_VecNum} = nothing
+        mu::Option{<:ArithRetMu} = nothing
     ) -> ArithmeticReturn
 
 Keywords correspond to the struct's fields.
@@ -25,6 +41,8 @@ Keywords correspond to the struct's fields.
 ## Details
 
   - `ucs` accepts either a pre-built mean uncertainty set (the result of [`mu_ucs`](@ref), e.g. a `BoxUncertaintySet` or `EllipsoidalUncertaintySet`) or an uncertainty-set *estimator*. A pre-built set is the simplest path — symmetric with how [`UncertaintySetVariance`](@ref) takes a pre-built [`sigma_ucs`](@ref) result. Passing an estimator defers construction to solve time and requires the returns data (`rd`) to be threaded through the optimiser.
+  - `mu` accepts a **Deferred Quantity**: an expected-returns estimator or a prior estimator that computes the vector against the optimisation's own prior at [`factory`](@ref) time. See [`resolve_deferred_quantities`](@ref).
+  - A `ucs` that carries its own centre outranks `mu`, and `mu` outranks `pr.mu` (ADR 0050). A Deferred Quantity is a state of the `mu` rung, not a rung of its own: beside a centre-carrying set it is resolved and then goes unused, exactly as a stated vector does.
 
 ## Validation
 
@@ -54,7 +72,7 @@ Keywords correspond to the struct's fields.
     """
     mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
-                              mu::Option{<:Num_VecNum})
+                              mu::Option{<:ArithRetMu})
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
                           EllipsoidalUncertaintySet{<:Any, <:Any,
@@ -80,28 +98,56 @@ Keywords correspond to the struct's fields.
 end
 function ArithmeticReturn(; ucs::Option{<:UcSE_UcS} = nothing,
                           lb::Option{<:RkRtBounds} = nothing,
-                          mu::Option{<:Num_VecNum} = nothing)
+                          mu::Option{<:ArithRetMu} = nothing)
     return ArithmeticReturn(ucs, lb, mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`ArithmeticReturn`](@ref)'s `mu` slot against prior result `pr`. The estimator carries one prior-derived slot, so the slot itself admits the Estimator and there is no fan-out to make.
+
+Every `JuMP` path reaches this through [`factory`](@ref), which [`processed_jump_optimiser_attributes`](@ref) calls on `opt.ret` before any model is built. A returns estimator needs no second entry point, unlike a risk measure.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`ArithRetMu`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
+    if !isa(rt.mu, DeferredQuantity)
+        return rt
+    end
+    return ArithmeticReturn(; ucs = rt.ucs, lb = rt.lb, mu = resolve_slot(rt.mu, :mu, pr))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
+    rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
+    rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
+    rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
+    # No prior in hand, so a Deferred Quantity cannot resolve here. It travels on unchanged
+    # and the prior-carrying `factory` the sub-problem runs resolves it.
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb, mu = rt.mu)
 end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
+    # A Deferred Quantity crosses the view unsliced: `nothing_scalar_array_view` is the
+    # identity on an Estimator. It then computes on the subset, which is the whole
+    # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
     return ArithmeticReturn(; ucs = uset, lb = r.lb, mu = mu)
 end

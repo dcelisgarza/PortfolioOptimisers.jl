@@ -44,6 +44,9 @@ Compute the expected portfolio return using the specified return estimator.
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
+    # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
+    # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
+    r = resolve_deferred_quantities(r, pr)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end

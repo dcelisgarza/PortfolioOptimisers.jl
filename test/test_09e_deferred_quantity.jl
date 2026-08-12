@@ -971,3 +971,149 @@ end
     @test isa(part.retcode, OptimisationSuccess)
     @test isapprox(part.w, low(Kurtosis(; kt = Cokurtosis())).w; rtol = 5e-6)
 end
+
+#=
+`ArithmeticReturn.mu` is the last widened slot, and it is not a risk-measure slot. It sits
+on the middle rung of the #277 ladder: the set's carried centre wins, then `rt.mu`, then
+`pr.mu` (ADR 0050). A Deferred Quantity adds a **state** to the `rt.mu` rung, not a rung.
+An uncertainty set must bound the quantity it was calibrated on, so letting a Deferred
+Quantity outrank the carried centre would reintroduce the defect ADR 0050 fixed.
+=#
+@testset "Deferred Quantity: `ArithmeticReturn.mu` admits an Estimator, not a Result" begin
+    @test isa(0.1, PO.ArithRetMu) && isa([0.1, 0.2], PO.ArithRetMu)
+    @test isa(SimpleExpectedReturns(), PO.ArithRetMu)
+    @test isa(MedianExpectedReturns(), PO.ArithRetMu)
+    @test isa(EmpiricalPrior(), PO.ArithRetMu)
+    @test !isa(PortfolioOptimisersCovariance(), PO.ArithRetMu)
+
+    # Narrower than `MuSlot` by a `VecScalar`. The return expression is `dot_scalar(mu, w)`,
+    # which takes a number or a vector, and a `VecScalar` is an `AbstractResult`, which an
+    # Estimator must not hold.
+    vs = PO.VecScalar(; v = [0.1, 0.2], s = 0.3)
+    @test isa(vs, PO.MuSlot)
+    @test !isa(vs, PO.ArithRetMu)
+    @test_throws TypeError ArithmeticReturn(; mu = vs)
+end
+
+@testset "Deferred Quantity: `ArithmeticReturn.mu` resolves in `factory`" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    me = MedianExpectedReturns()
+    mu_me = vec(mean(me, X))
+    rt = ArithmeticReturn(; mu = me)
+    slv = Solver(; name = :none, solver = nothing)
+    ucs = L1UncertaintySet(; eps = 0.05)
+
+    # The seam is the identity on a slot that holds no Deferred Quantity.
+    for x in (ArithmeticReturn(), ArithmeticReturn(; mu = lop.mu))
+        @test PO.resolve_deferred_quantities(x, lop) === x
+    end
+    @test PO.resolve_deferred_quantities(rt, lop).mu ≈ mu_me
+    # A prior estimator supplies the vector out of a whole fit.
+    rtp = ArithmeticReturn(; mu = EmpiricalPrior())
+    @test PO.resolve_deferred_quantities(rtp, lop).mu ≈ lop.mu
+
+    # All three prior-carrying `factory` methods resolve; the fourth has no prior in hand,
+    # so the Deferred Quantity travels on unchanged.
+    @test factory(rt, lop).mu ≈ mu_me
+    @test factory(rt, lop, slv).mu ≈ mu_me
+    @test factory(rt, ucs, lop).mu ≈ mu_me
+    @test factory(rt, ucs).mu === me
+
+    # `lb` and `ucs` are untouched by the resolution.
+    rtb = ArithmeticReturn(; mu = me, lb = 0.001, ucs = ucs)
+    @test factory(rtb, lop).lb == 0.001
+    @test factory(rtb, lop).ucs === ucs
+
+    # The value-level twin of the `ret` expression applies the same ladder, and the prior is
+    # in hand there too.
+    w = fill(0.2, 5)
+    @test expected_return(rt, w, lop) ≈
+          expected_return(ArithmeticReturn(; mu = mu_me), w, lop)
+end
+
+@testset "Deferred Quantity: `ArithmeticReturn.mu` crosses a view, drops its bounds" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    i = [1, 3, 5]
+    me = MedianExpectedReturns()
+    rt = ArithmeticReturn(; mu = me, lb = 0.001)
+
+    # `port_opt_view` runs before `factory`, so the Estimator crosses unsliced and then
+    # computes on the subset.
+    @test PO.port_opt_view(rt, i).mu === me
+    sub = prior(EmpiricalPrior(), X[:, i])
+    @test factory(PO.port_opt_view(rt, i), sub).mu ≈ vec(mean(me, X[:, i]))
+
+    # The frontier sub-problem strips the bounds and forwards the slot, which its own
+    # prior-carrying `factory` then resolves.
+    @test PO.no_bounds_returns_estimator(rt).mu === me
+    @test isnothing(PO.no_bounds_returns_estimator(rt).lb)
+    @test isnothing(PO.no_bounds_returns_estimator(rt, false).mu)
+end
+
+@testset "Deferred Quantity: `ArithmeticReturn.mu` keeps the #277 ladder intact" begin
+    using Clarabel, JuMP
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 10) ./ 100
+    rd = ReturnsResult(; X = X, nx = string.(1:10))
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    pr = prior(EmpiricalPrior(), X)
+    me = MedianExpectedReturns()
+    mu_me = vec(mean(me, X))
+    # The median is not linear, so `mu_me` is a different vector from `pr.mu`.
+    function w_of(rt)
+        return optimise(MeanRisk(; r = Variance(), obj = MaximumUtility(),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, ret = rt)), rd).w
+    end
+
+    # With no set, the Deferred Quantity gives what its own vector gives, and it outranks
+    # the prior.
+    w_def = w_of(ArithmeticReturn(; mu = me))
+    @test isapprox(w_def, w_of(ArithmeticReturn(; mu = mu_me)))
+    @test !isapprox(w_def, w_of(ArithmeticReturn()))
+
+    # A set that carries its centre outranks the `rt.mu` rung, whichever state that rung is
+    # in. `pr.mu` is sorted descending, so the reversed vector is a different ranking.
+    carried = L1UncertaintySet(; eps = 1e-4, mu = reverse(pr.mu))
+    bare = L1UncertaintySet(; eps = 1e-4)
+    w_carried = w_of(ArithmeticReturn(; ucs = carried))
+    @test isapprox(w_of(ArithmeticReturn(; ucs = carried, mu = me)), w_carried)
+    @test isapprox(w_of(ArithmeticReturn(; ucs = carried, mu = mu_me)), w_carried)
+    # The carried centre is doing work, so the assertion above is not vacuous.
+    @test !isapprox(w_carried, w_of(ArithmeticReturn(; ucs = bare)))
+
+    # A set that carries none falls back to the `rt.mu` rung, and the Deferred Quantity is
+    # that rung.
+    w_bare_def = w_of(ArithmeticReturn(; ucs = bare, mu = me))
+    @test isapprox(w_bare_def, w_of(ArithmeticReturn(; ucs = bare, mu = mu_me)))
+    @test !isapprox(w_bare_def, w_of(ArithmeticReturn(; ucs = bare)))
+end
+
+@testset "Deferred Quantity: `UncertaintySetVariance` needs no rule of its own" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    rd = ReturnsResult(; X = X, nx = string.(1:5))
+    lop = prior(EmpiricalPrior(), X)
+    ce = PortfolioOptimisersCovariance()
+    w = fill(0.2, 5)
+
+    # The same ladder on the covariance axis. The slot widened with the kernel, and the
+    # set's own centre still wins at the point of use, so no rule is added here.
+    r = PO.resolve_deferred_quantities(UncertaintySetVariance(; sigma = ce), lop)
+    @test r.sigma ≈ cov(ce, X)
+    @test factory(UncertaintySetVariance(; sigma = ce), lop).sigma ≈ cov(ce, X)
+
+    ell = sigma_ucs(NormalUncertaintySet(; alg = EllipsoidalUncertaintySetAlgorithm()), rd)
+    @test !isnothing(ell.val)
+    @test PO.ucs_variance(ell, r.sigma, w) ≈ PO.ucs_variance(ell, lop.sigma .* 3, w)
+
+    # The box covariance route builds its worst case from the bounds alone, so `val` is
+    # populated and never read, and the resolved `sigma` is inert there too.
+    box = sigma_ucs(NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm()), rd)
+    @test !isnothing(box.val)
+    @test PO.ucs_variance(box, r.sigma, w) == PO.ucs_variance(box, lop.sigma .* 3, w)
+end

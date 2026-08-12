@@ -1,7 +1,9 @@
 # Returns and Objective Functions
 
 ```@docs
+ArithRetMu
 ArithmeticReturn
+resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
 LogarithmicReturn
 bounds_returns_estimator
 no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
