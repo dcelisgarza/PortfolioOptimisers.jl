@@ -471,6 +471,30 @@ Union of prior-based return risk measures that are incompatible with [`Predictio
   - [`PerfRM`](@ref)
 """
 const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+"""
+    expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
+                  fees::Option{<:Fees} = nothing; kwargs...)
+
+Evaluate a prior-reading risk measure over a vector of weight vectors, such as the points of a
+[`Frontier`](@ref).
+
+A [`PrRM`](@ref) reads the prior result itself and not a returns matrix — it declares no
+[`risk_input_kind`](@ref) for that reason. The generic `VecVecNum` method resolves the measure and
+then hands the loop `pr.X`, which is right for a measure whose kernel takes the matrix and strips
+what this family needs. So the family resolves once here and maps with the prior still in hand.
+
+# Related
+
+  - [`PrRM`](@ref)
+  - [`expected_risk`](@ref)
+  - [`resolve_risk_inputs`](@ref)
+  - [`factory`](@ref)
+"""
+function expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    r = factory(r, pr)
+    return [expected_risk(r, wi, pr, fees; kwargs...) for wi in w]
+end
 function bigger_is_better(::PerfRM)
     return true
 end

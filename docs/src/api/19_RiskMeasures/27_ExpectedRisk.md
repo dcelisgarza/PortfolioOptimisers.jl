@@ -3,6 +3,7 @@
 ```@docs
 MatNum_Pr
 RkRatioRM
+resolve_risk_inputs
 expected_risk
 expected_risk_from_returns
 supports_precomputed_returns(r::RkRatioRM)

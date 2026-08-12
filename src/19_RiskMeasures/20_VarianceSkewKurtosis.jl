@@ -171,7 +171,7 @@ Skewness
     """
     ve
     """
-    $(field_dict[:sk])
+    $(field_dict[:sk_slot])
     """
     sk
     """
@@ -179,7 +179,7 @@ Skewness
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """

@@ -141,11 +141,11 @@ Kurtosis
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """
-    $(field_dict[:kt])
+    $(field_dict[:kt_slot])
     """
     kt
     """

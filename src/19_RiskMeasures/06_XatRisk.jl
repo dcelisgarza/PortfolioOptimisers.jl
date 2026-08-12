@@ -180,15 +180,15 @@ DistributionValueatRisk
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_dvar_slot])
     """
     mu
     """
-    $(field_dict[:sigma])
+    $(field_dict[:sigma_slot])
     """
     sigma
     """
-    $(field_dict[:chol])
+    $(field_dict[:chol_slot])
     """
     chol
     """

@@ -178,6 +178,93 @@ plot(xs_m, ys_m; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk
 plot!(xs_s, ys_s; seriestype = :scatter, marker = (:diamond, 6), label = "SubsetResampling")
 
 #=
+## 5. A risk-measure slot that follows the refit
+
+Section 3 made the point that cross-validation **disallows** a precomputed prior. It does not,
+and cannot, disallow a precomputed *matrix* pasted into a risk measure: `Variance(; sigma = S)`
+is a legitimate configuration, and nothing distinguishes a matrix the caller measured elsewhere
+from one fitted on the very sample the portfolio is about to be scored on.
+
+So a prior-derived slot takes a second form — the **estimator that computes the value**, rather
+than the value. That is a [`DeferredQuantity`](@ref), and it is resolved against whatever prior
+the optimisation actually runs on: per subset, per fold. The struct that reaches the solver still
+holds a plain matrix. What changed is *when* the matrix is computed.
+
+The difference only shows for an estimator whose answer depends on the universe or the window it
+sees. Denoising is one: it clips the eigenvalue bulk at a threshold derived from the aspect ratio
+`T / N`, so the 14-asset block of a 20-asset fit is not a 14-asset fit.
+=#
+
+ce_dn = PortfolioOptimisersCovariance(;
+                                      mp = MatrixProcessing(;
+                                                            dn = Denoise(;
+                                                                         alg = FixedDenoise())))
+sigma_full = cov(ce_dn, pr.X)
+
+idx = 1:14
+sigma_refit = cov(ce_dn, view(pr.X, :, idx))
+sigma_slice = view(sigma_full, idx, idx)
+
+println("Largest entry of the full-universe covariance   = $(maximum(abs, sigma_full))")
+println("Refit vs sliced, on a 14-asset subset           = $(maximum(abs, sigma_refit .- sigma_slice))")
+
+#=
+### Inside a resample
+
+[`SubsetResampling`](@ref) takes a view of the problem *before* the prior is computed, so a stated
+matrix crosses that boundary sliced, while a Deferred Quantity crosses unresolved and fits on the
+subset it lands in.
+=#
+
+ssr_rm = r -> SubsetResampling(; pe = pr,
+                               opt = MeanRisk(; obj = MinimumRisk(), r = r,
+                                              opt = JuMPOptimiser(; slv = slv)),
+                               subset_size = 0.7, n_subsets = 10, rng = StableRNG(123),
+                               seed = 42)
+
+res_pasted = optimise(ssr_rm(Variance(; sigma = sigma_full)), rd)
+res_deferred = optimise(ssr_rm(Variance(; sigma = ce_dn)), rd)
+
+pretty_table(DataFrame(; :assets => rd.nx, :pasted_matrix => res_pasted.w,
+                       :deferred_estimator => res_deferred.w); formatters = [resfmt])
+
+#=
+### Inside a fold
+
+The same slot under cross-validation. Here the pasted matrix is not merely stale — it was fitted
+on all 252 observations, so every test fold sits inside it. The estimator refits on the training
+fold alone.
+=#
+
+cv_pasted = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
+                                       r = Variance(; sigma = sigma_full),
+                                       opt = JuMPOptimiser(; slv = slv)), rd, kfold)
+cv_deferred = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
+                                         r = Variance(; sigma = ce_dn),
+                                         opt = JuMPOptimiser(; slv = slv)), rd, kfold)
+
+sm = LowOrderMoment(; alg = SecondMoment())
+println("Pasted-matrix cross-val variance      = $(expected_risk(sm, cv_pasted))")
+println("Deferred-estimator cross-val variance = $(expected_risk(sm, cv_deferred))")
+
+#=
+The pasted matrix scores **better**, and that is the warning rather than the result: it saw the
+test folds. The deferred estimator's larger number is the honest one.
+
+Every prior-derived slot on a risk measure behaves this way — `mu`, `sigma`, `kt` and `sk`. A
+measure with two or more deferrable slots takes a prior estimator in `pe` instead, and one fit
+fills every slot the measure leaves unstated:
+
+```julia
+Kurtosis(; pe = EmpiricalPrior())                  # mu and kt from one fit
+DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one fit
+```
+
+Slots stated by hand are left alone, and nothing makes them agree with each other. Each measure's
+docstring carries that warning; ADR 0051 records why the design warns rather than refuses.
+=#
+
+#=
 ## Summary
 
 Meta-optimisers help when a single fit feels too brittle.
@@ -187,6 +274,8 @@ Meta-optimisers help when a single fit feels too brittle.
   - [`SubsetResampling`](@ref) smooths allocations by averaging many subset solves.
   - Frontier sweeps still work on the meta-optimiser, so you can compare its trade-off
     curve against the plain optimiser instead of choosing only one portfolio.
+  - A prior-derived slot can hold the **estimator** rather than the value, so it refits with
+    every subset and every fold instead of pinning one full-sample answer.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
@@ -204,3 +293,9 @@ Meta-optimisers help when a single fit feels too brittle.
 #src   populate `.id` on this path or soften the prose — needs a look at how
 #src   `NearestQuantilePrediction` / `PopulationPredictionResult` carry fold identifiers.
 #src - No solver warnings or plotting deprecations observed.
+#src - Section 5 (Deferred Quantity, added for #286) checked in the test env with `julia -t 1`,
+#src   BLAS 1, one Clarabel solver: refit-vs-sliced covariance difference 9.87e-5 against a
+#src   largest entry of 1.57e-3; SubsetResampling weights differ by at most 1.35 pp between the
+#src   pasted matrix and the deferred estimator; cross-val variance 8.79e-5 (pasted, leaked)
+#src   vs 9.46e-5 (deferred, honest). The leak flatters the pasted score, which is the point.
+#src   Re-check the printed numbers against the docs env, which uses the three-solver `slv`.

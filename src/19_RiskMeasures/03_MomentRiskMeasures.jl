@@ -398,6 +398,10 @@ Keywords correspond to the struct's fields.
 
   - If `w` is not `nothing`, `!isempty(w)`.
 
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+
 # Mathematical definition
 
 Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
@@ -833,7 +837,7 @@ LowOrderMoment
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """
@@ -890,6 +894,10 @@ Keywords correspond to the struct's fields.
       + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
 
   - If `w` is not `nothing`, `!isempty(w)`.
+
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
 
 # Mathematical definition
 
@@ -1014,7 +1022,7 @@ HighOrderMoment
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """

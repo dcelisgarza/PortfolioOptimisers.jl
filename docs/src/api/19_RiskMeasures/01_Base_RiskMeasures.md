@@ -153,6 +153,8 @@ deferred_quantity
 fan_out_slot
 deferred_derived_quantity
 resolve_slot
+deferred_slots
+assert_resolved_slots
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view

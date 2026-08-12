@@ -52,6 +52,10 @@ Keywords correspond to the struct's fields.
   - If `mu` is a number: `isfinite(mu)`.
   - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
 
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+
 # Related
 
   - [`bounds_returns_estimator`](@ref)
@@ -68,7 +72,7 @@ Keywords correspond to the struct's fields.
     """
     lb
     """
-    $(field_dict[:mu])
+    $(field_dict[:mu_ret_slot])
     """
     mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},

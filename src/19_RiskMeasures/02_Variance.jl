@@ -144,6 +144,7 @@ $(DocStringExtensions.FIELDS)
     Variance(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         sigma::Option{<:SigmaSlot} = nothing,
+        chol::Option{<:MatNum} = nothing,
         rc::Option{<:LcE_Lc} = nothing,
         alg::VarianceFormulation = SquaredSOCRiskExpr(),
     ) -> Variance
@@ -153,6 +154,10 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+
+!!! warning
+
+    `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
 
 # `JuMP` Formulations
 
@@ -255,11 +260,11 @@ julia> r(w)
     """
     settings
     """
-    $(field_dict[:sigma])
+    $(field_dict[:sigma_slot])
     """
     sigma
     """
-    $(field_dict[:chol])
+    $(field_dict[:chol_slot])
     """
     chol
     """
@@ -361,6 +366,7 @@ $(DocStringExtensions.FIELDS)
     StandardDeviation(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         sigma::Option{<:SigmaSlot} = nothing,
+        chol::Option{<:MatNum} = nothing,
     ) -> StandardDeviation
 
 Keywords correspond to the struct's fields.
@@ -368,6 +374,10 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+
+!!! warning
+
+    `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
 
 ## `JuMP` Formulation
 
@@ -439,11 +449,11 @@ julia> r(w)
     """
     settings
     """
-    $(field_dict[:sigma])
+    $(field_dict[:sigma_slot])
     """
     sigma
     """
-    $(field_dict[:chol])
+    $(field_dict[:chol_slot])
     """
     chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
@@ -532,6 +542,10 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `sigma` is not `nothing`, `!isempty(sigma)`.
+
+!!! warning
+
+    A stated `sigma` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on, and nothing makes it agree with the uncertainty set beside it. A caller who wants it to follow the fit names a **Deferred Quantity** in `sigma`, or leaves the slot `nothing` and lets the prior supply it.
 
 # `JuMP` Formulations
 
@@ -713,7 +727,7 @@ julia> r(w)
     """
     ucs
     """
-    $(field_dict[:sigma])
+    $(field_dict[:sigma_slot])
     """
     sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},

@@ -238,6 +238,10 @@ Keywords correspond to the struct's fields.
   - If `mu` is a `VecNum`: `!isempty(mu)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+
 # Functor
 
     (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees = nothing)
@@ -254,7 +258,7 @@ Computes the third central moment of the portfolio returns.
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
-  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `mu`: A stated value is sliced to the selected indices via [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
 
 # Examples
 
@@ -276,7 +280,7 @@ ThirdCentralMoment
     """
     @pprop w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     @pprop @vprop mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:MuSlot})

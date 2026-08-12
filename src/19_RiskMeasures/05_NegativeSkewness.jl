@@ -59,6 +59,10 @@ Keywords correspond to the struct's fields.
   - If `sk` holds a **Deferred Quantity**, `V` must be `nothing`. The fit supplies the pair.
   - `window` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+!!! warning
+
+    `sk` and `V` are a pair, and a stated `V` factors the `sk` beside it. A caller who wants one consistent pair names `sk` alone — a **Deferred Quantity** there supplies both from one fit, together with the `mp` that built them. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+
 !!! info
 
     `sk` also admits a [`CoskewnessEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). `V` never defers: it is derived from `sk`, so it travels out of that same fit. The processor that built it travels with it and **replaces** `mp`, so a later rebuild uses the same one. The measure carries one deferrable slot, so it takes no `pe`.
@@ -115,11 +119,11 @@ NegativeSkewness
     """
     mp
     """
-    $(field_dict[:sk])
+    $(field_dict[:sk_slot])
     """
     sk
     """
-    $(field_dict[:V])
+    $(field_dict[:V_slot])
     """
     V
     """

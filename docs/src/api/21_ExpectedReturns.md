@@ -16,6 +16,8 @@ expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
 ```@docs
 PerfRM
 PrRM
+expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
+                       fees::Option{<:Fees} = nothing; kwargs...)
 expected_return
 expected_ratio
 expected_risk_ret_ratio
