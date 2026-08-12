@@ -196,8 +196,14 @@ end
         @test f.sigma === sigma
         @test isnothing(f.chol)
 
-        # A deferred `sigma` supplies the pair, and the stated factor is discarded.
-        f = factory(T(; sigma = ce, chol = chol), pr)
+        # A deferred `sigma` supplies the pair, so a factor stated beside it is refused at
+        # construction rather than silently dropped. Same rule as `NegativeSkewness`'s
+        # `sk`/`V` pair.
+        @test_throws ArgumentError T(; sigma = ce, chol = chol)
+
+        # A deferred `sigma` on its own resolves, and the fit supplies whatever factor it
+        # has. A covariance estimator has none, so the kernel derives it downstream.
+        f = factory(T(; sigma = ce), pr)
         @test f.sigma ≈ cov(ce, X)
         @test isnothing(f.chol)
 
@@ -216,6 +222,50 @@ end
         end
         @test occursin("chol", sprint(showerror, err))
         @test occursin("sigma", sprint(showerror, err))
+    end
+end
+
+@testset "Deferred Quantity: every derived slot follows one rule" begin
+    # `chol` is derived from `sigma`, `V` from `sk`. Both are refused in the same two
+    # states, so a caller learns the rule once. Neither state was constructible before the
+    # source slots widened, so neither refusal breaks an existing caller.
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    base = prior(EmpiricalPrior(), X)
+    chol = Matrix(LinearAlgebra.cholesky(base.sigma).U)
+    sk, V = coskewness(Coskewness(), X)
+
+    # The last entry is the error type for a derived slot stated with no source at all.
+    # `NegativeSkewness` refuses that state through its own both-or-neither rule, which
+    # predates this feature and keeps its own error type.
+    pairs = ((Variance, :sigma, :chol, PortfolioOptimisersCovariance(), base.sigma, chol,
+              ArgumentError),
+             (StandardDeviation, :sigma, :chol, PortfolioOptimisersCovariance(), base.sigma,
+              chol, ArgumentError),
+             (DistributionValueatRisk, :sigma, :chol, PortfolioOptimisersCovariance(),
+              base.sigma, chol, ArgumentError),
+             (NegativeSkewness, :sk, :V, Coskewness(), sk, V, PO.IsNothingError))
+
+    for (T, sname, dname, dq, svalue, dvalue, alone_err) in pairs
+        # 1. The derived slot stated with no source at all.
+        @test_throws alone_err T(; (dname => dvalue,)...)
+
+        # 2. The derived slot stated beside a Deferred Quantity in the source.
+        @test_throws ArgumentError T(; (sname => dq, dname => dvalue)...)
+        err = try
+            T(; (sname => dq, dname => dvalue)...)
+        catch e
+            e
+        end
+        @test occursin("Deferred Quantity", sprint(showerror, err))
+        @test occursin(string(dname), sprint(showerror, err))
+        @test occursin(string(sname), sprint(showerror, err))
+
+        # Both stated as values is the one way to state the derived slot, and it is kept.
+        @test getproperty(T(; (sname => svalue, dname => dvalue)...), dname) === dvalue
+
+        # A deferred source on its own is always fine.
+        @test isa(getproperty(T(; (sname => dq,)...), sname), PO.DeferredQuantity)
     end
 end
 
@@ -568,7 +618,9 @@ end
     @test f.sigma === sigma
     @test isnothing(f.chol)
 
-    f = factory(DistributionValueatRisk(; sigma = ce, chol = chol), pr)
+    @test_throws ArgumentError DistributionValueatRisk(; sigma = ce, chol = chol)
+
+    f = factory(DistributionValueatRisk(; sigma = ce), pr)
     @test f.sigma ≈ cov(ce, X)
     @test isnothing(f.chol)
 
@@ -793,7 +845,8 @@ end
     sk, V = coskewness(Coskewness(), X)
 
     # `V` is derived from `sk`, so the fit supplies the pair and a stated `V` beside a
-    # deferred `sk` would factor a coskewness matrix the caller never saw.
+    # deferred `sk` would describe a coskewness matrix the caller never saw. `sigma`/`chol`
+    # is refused in the same state, by the same helper.
     @test_throws ArgumentError NegativeSkewness(; sk = Coskewness(), V = V)
 
     # The existing both-or-neither rule on the stated pair is untouched, error type and all.

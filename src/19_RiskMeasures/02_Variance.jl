@@ -307,7 +307,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a **Deferred Quantity** in [`Variance`](@ref)'s `sigma` slot against prior result `pr`.
 
-`sigma` and `chol` travel together, so both come from the same fit and a stated `chol` is discarded. A covariance estimator produces no factorisation, so `chol` becomes `nothing` and the consumer derives it from the resolved `sigma`. A prior estimator produces both, which is how a factor prior's sparse factorisation reaches the slot intact.
+`sigma` and `chol` travel together, so both come from the same fit. A stated `chol` never reaches here: [`assert_derived_slot_has_source`](@ref) refuses it beside a deferred `sigma` at construction. A covariance estimator produces no factorisation, so `chol` becomes `nothing` and the consumer derives it from the resolved `sigma`. A prior estimator produces both, which is how a factor prior's sparse factorisation reaches the slot intact.
 
 # Related
 

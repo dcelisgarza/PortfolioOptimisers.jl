@@ -1540,7 +1540,7 @@ Apply the prior fallback to a covariance slot and its factorisation **as a pair*
 
 `chol` is a factorisation of `sigma`. Pairing a factor with a covariance matrix it does not factorise would let the model optimise one quantity while the functor evaluates another. So the pair falls back to the prior only when the measure names neither; a stated `sigma` with no factor keeps no factor, and the consumer derives the right one.
 
-The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` with no `sigma` — [`assert_derived_slot_has_source`](@ref) refuses that at construction.
+The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` without a matrix `sigma` beside it — [`assert_derived_slot_has_source`](@ref) refuses both that and a `chol` stated beside a deferred `sigma` at construction, so the two arms below see only value states.
 
 A stated `chol` is never rebuilt from `sigma`. Under a factor prior the factorisation is sparse and special, and a rebuild would throw that structure away.
 
@@ -1560,18 +1560,31 @@ end
 """
     assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
 
-Refuse a derived slot that was stated without the slot it is derived from.
+Refuse a derived slot that was stated without a source the caller can see.
 
-`chol` is a factorisation of `sigma`. Stating `chol` alone would pair the caller's factor with a covariance matrix the caller never saw, because the prior supplies `sigma` whenever the measure does not. The two are given together, or neither is given.
+A derived slot is a function of its source, so the two are one pair out of one fit. Two states break that, and both are refused at construction:
+
+  - **The source is unstated.** The prior supplies it, so the caller's derived value would pair with a source the caller never saw.
+  - **The source holds a Deferred Quantity.** That fit supplies the pair, so the caller's derived value would be discarded, or worse, kept beside a source it does not describe.
+
+`chol` is a factorisation of `sigma`, and `V` is the negative spectral part of `sk`. Both follow this rule, so a stated derived slot always means a stated source value.
 
 # Related
 
   - [`Variance`](@ref)
   - [`StandardDeviation`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`DeferredQuantity`](@ref)
 """
 function assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
-    @argcheck(isnothing(derived) || !isnothing(source),
-              ArgumentError("`$dname` is derived from `$sname`, so it cannot be given on its own. Give `$sname` as well, or give neither and let the prior supply the pair."))
+    if isa(source, DeferredQuantity)
+        @argcheck(isnothing(derived),
+                  ArgumentError("`$dname` is derived from `$sname`, so it cannot be given when `$sname` holds a Deferred Quantity. That fit supplies the pair, and a stated `$dname` would describe a `$sname` the caller never saw. Give `$sname` alone, or state both as values."))
+    else
+        @argcheck(isnothing(derived) || !isnothing(source),
+                  ArgumentError("`$dname` is derived from `$sname`, so it cannot be given on its own. Give `$sname` as well, or give neither and let the prior supply the pair."))
+    end
     return nothing
 end
 """

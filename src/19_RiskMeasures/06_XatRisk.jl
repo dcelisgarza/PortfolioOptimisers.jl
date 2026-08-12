@@ -150,7 +150,7 @@ Keywords correspond to the struct's fields.
 
   - If `mu` is not `nothing`: `!isempty(mu)`.
   - If `sigma` is not `nothing`: `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
-  - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is not `nothing`.
+  - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a **Deferred Quantity**.
 
 !!! warning
 

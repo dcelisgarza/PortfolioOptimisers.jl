@@ -139,8 +139,7 @@ NegativeSkewness
                               V::Option{<:MatNum}, alg::NSkeFormulations,
                               window::Option{<:Int_VecInt})
         if isa(sk, DeferredQuantity)
-            @argcheck(isnothing(V),
-                      ArgumentError("`V` is derived from `sk`, so it cannot be given when `sk` holds a Deferred Quantity. That fit supplies the pair, and a stated `V` would factor a coskewness matrix the caller never saw."))
+            assert_derived_slot_has_source(V, sk, :V, :sk)
         else
             sk_flag = isnothing(sk)
             V_flag = isnothing(V)

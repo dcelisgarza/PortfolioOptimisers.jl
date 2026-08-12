@@ -188,3 +188,60 @@ avoid.
   `nothing_scalar_array_view`'s identity union covered `<:AbstractEstimator` but not
   `StatsBase.CovarianceEstimator`, which is a `MethodError` on the first covariance estimator to
   cross a view.
+
+## Amendment (2026-08-12) — from [#287](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/287)
+
+Final verification read the shipped API against the map. Two records above are wrong, and one of
+them was a real split in the behaviour.
+
+### The derived-slot rule is one rule, and it now refuses two states
+
+The decision above described a single refusal — a derived slot stated with no source. The shipped
+code had a second, on `NegativeSkewness` alone: a `V` stated beside a **deferred** `sk`. The
+`sigma`/`chol` carriers took the opposite route in that state and **discarded** the stated `chol`
+silently.
+
+Both states are the same mistake, so both are now refused, and by one helper.
+`assert_derived_slot_has_source` takes the deferred case as well:
+
+| Derived slot | Source slot | Result |
+| :-- | :-- | :-- |
+| stated | stated value | both kept. The derived value is never rebuilt |
+| stated | **Deferred Quantity** | **`ArgumentError` at construction** |
+| stated | not given | **`ArgumentError` at construction** |
+| not given | stated value | the kernel derives the derived value |
+| not given | Deferred Quantity | the fit supplies the pair |
+| not given | not given | the prior supplies the pair |
+
+A silent discard is the shape this ADR names as the thing to avoid: the caller states a factor,
+the library keeps a different one, and nothing says so. Refusing costs the caller one keyword and
+tells them the rule once.
+
+**Neither refusal breaks an existing caller.** A source slot could not hold an Estimator before
+this ADR, so `Variance(sigma = <estimator>, chol = C)` was a `MethodError` and not a working
+configuration. The break list above is therefore **one** shape, not three: a derived slot stated
+with no source at all.
+
+### `pe` is not last on `DistributionValueatRisk`
+
+`dist` follows it, so the positional constructor changed from
+`DistributionValueatRisk(mu, sigma, chol, dist)` to
+`DistributionValueatRisk(mu, sigma, chol, pe, dist)`. The claim above holds for `Kurtosis`,
+`Skewness` and `VarianceSkewKurtosis` and not for this one. It breaks loudly rather than silently
+— a `Distribution` is not an `Option{<:AbstractPriorEstimator}`, so the old call is a
+`MethodError` — and no caller in the repo uses the positional form. It is still an API break, and
+it belongs on the list.
+
+### What verification confirmed
+
+- The whole export set is unchanged across the map: 752 names before and after. No abstract type
+  was exported.
+- A Deferred Quantity refits per cross-validation fold. Under a three-fold `KFold` with a
+  denoising covariance estimator, a pasted matrix gives the **same** weights in every fold
+  (spread `0.0`) and the deferred estimator gives different ones (spread `3.1e-2`); the two
+  differ by up to `5.1e-2`. The subset half of the argument is asserted in
+  `test_09e_deferred_quantity.jl`.
+- `ArithmeticReturn` declares `resolve_deferred_quantities` and **no** `deferred_slots`. The rule
+  beside `deferred_slots` says to declare both. It is unreachable today, because `expected_return`
+  has no bare-returns-matrix arm for `assert_resolved_slots` to guard, so this is a latent trap
+  rather than a live defect. Adding such an arm must add the declaration with it.

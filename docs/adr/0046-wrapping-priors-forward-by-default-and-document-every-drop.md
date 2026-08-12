@@ -492,3 +492,20 @@ The factor-risk-contribution path is **not** changed here. It reads its returns 
 `ReturnsResult` rather than from the carrier, so `o_X` simplifies nothing there. It does have a
 defect of the same family — `factor_risk_contribution` handed a factor prior reduces `pr.X`, which
 has no residual, and reports a **negative** idiosyncratic share — and that has its own ticket.
+
+## Amendment (2026-08-12) — from [#287](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/287)
+
+The 2026-08-11 amendment above does not record where the twelfth field sits. `o_X` was inserted at
+**position 2**, next to the `X` it explains, and not appended:
+
+```julia
+LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, Z)
+```
+
+So the positional constructor of an exported Result type shifted by one from `mu` onward. This is
+an API break. It breaks **loudly** — the old call binds a `VecNum` `mu` to `o_X::Option{<:MatNum}`
+and is a `MethodError` — and no call site in the repo, the tests, the examples or the user guide
+uses the positional form. The keyword constructor is unchanged.
+
+The position is the right one to keep. `o_X` is meaningless away from the `X` it qualifies, and a
+reader of the field list has to see the pair together.
