@@ -1,3 +1,10 @@
+# Cited academic hosts are intermittently slow from CI runners — ijcai.org tripped the default
+# timeout twice in one run while answering in under a second from a developer machine. Retry
+# before failing the build, so a slow host cannot turn the branch red on its own.
+timeout = 45
+max_retries = 3
+retry_wait_time = 2
+
 exclude = [
   "@ref",
   "@cite",
