@@ -493,17 +493,12 @@ function mr_block2(idx)
             1e-6
         end
         success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
-        if !success && JULIA_NUMERICS_DRIFT
-            # #333: the reference weights predate Julia 1.12.7.
-            @test_skip success
-        else
-            if !success
-                println("Counter: $i")
-                find_tol(res.w, df[!, "$i"])
-                display([res.w df[!, "$i"]])
-            end
-            @test success
+        if !success
+            println("Counter: $i")
+            find_tol(res.w, df[!, "$i"])
+            display([res.w df[!, "$i"]])
         end
+        @test success
         i += 1
     end
 end
