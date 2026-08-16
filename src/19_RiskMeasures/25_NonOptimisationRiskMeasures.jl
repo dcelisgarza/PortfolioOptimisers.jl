@@ -44,6 +44,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MeanReturn(;
+        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
         flag::Bool = false
     ) -> MeanReturn
@@ -69,8 +70,10 @@ Computes the mean return of a portfolio returns vector `x`.
 ```jldoctest
 julia> MeanReturn()
 MeanReturn
-     w ┼ nothing
-  flag ┴ Bool: false
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
+         w ┼ nothing
+      flag ┴ Bool: false
 ```
 
 # Related
@@ -80,6 +83,10 @@ MeanReturn
 """
 @propagatable @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     """
+    $(field_dict[:settings_rm])
+    """
+    settings
+    """
     $(field_dict[:w_rm])
     """
     @pprop w
@@ -87,13 +94,16 @@ MeanReturn
     $(field_dict[:flag])
     """
     flag
-    function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
+    function MeanReturn(settings::HierarchicalRiskMeasureSettings, w::Option{<:ObsWeights},
+                        flag::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(w), typeof(flag)}(w, flag)
+        return new{typeof(settings), typeof(w), typeof(flag)}(settings, w, flag)
     end
 end
-function MeanReturn(; w::Option{<:ObsWeights} = nothing, flag::Bool = false)::MeanReturn
-    return MeanReturn(w, flag)
+function MeanReturn(;
+                    settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                    w::Option{<:ObsWeights} = nothing, flag::Bool = false)::MeanReturn
+    return MeanReturn(settings, w, flag)
 end
 function (r::MeanReturn)(x::VecNum)
     if r.flag
@@ -131,15 +141,22 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MeanReturnRiskRatio(;
+        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         rt::MeanReturn = MeanReturn(),
-        rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        rk::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+        sca::Scalariser = SumScalariser(),
         rf::Number = 0.0
     ) -> MeanReturnRiskRatio
 
 Keywords correspond to the struct's fields.
 
+## Multiplicity
+
+`rk` takes one risk measure or a vector of them. A vector is scalarised into **one** number by `sca`, each element weighted by its own `settings.scale`. The field beats a caller's `sca` keyword, so a figure reported from this type is always the one the type names.
+
 ## Validation
 
+  - If `rk` is a vector: `!isempty(rk)`.
   - $(val_dict[:rf])
 
 ## Propagated parameters
@@ -157,6 +174,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 """
 @propagatable @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
     """
+    $(field_dict[:settings_rm])
+    """
+    settings
+    """
     $(field_dict[:rt_mean])
     """
     @fprop rt
@@ -165,18 +186,33 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     @fprop rk
     """
+    $(field_dict[:sca_rk])
+    """
+    sca
+    """
     $(field_dict[:rf])
     """
     rf
-    function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
+    function MeanReturnRiskRatio(settings::HierarchicalRiskMeasureSettings, rt::MeanReturn,
+                                 rk::BaseRM_VecBaseRM, sca::Scalariser, rf::Number)
+        if isa(rk, VecBaseRM)
+            @argcheck(!isempty(rk), IsEmptyError("rk cannot be empty"))
+        end
         @argcheck(isfinite(rf), IsNonFiniteError("rf must be finite, got $rf"))
-        return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
+        return new{typeof(settings), typeof(rt), typeof(rk), typeof(sca), typeof(rf)}(settings,
+                                                                                      rt,
+                                                                                      rk,
+                                                                                      sca,
+                                                                                      rf)
     end
 end
-function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
-                             rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+function MeanReturnRiskRatio(;
+                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                             rt::MeanReturn = MeanReturn(),
+                             rk::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+                             sca::Scalariser = SumScalariser(),
                              rf::Number = 0.0)::MeanReturnRiskRatio
-    return MeanReturnRiskRatio(rt, rk, rf)
+    return MeanReturnRiskRatio(settings, rt, rk, sca, rf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -227,6 +263,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ThirdCentralMoment(;
+        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
         mu::Option{<:MuSlot} = nothing
     ) -> ThirdCentralMoment
@@ -265,8 +302,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 ```jldoctest
 julia> ThirdCentralMoment()
 ThirdCentralMoment
-   w ┼ nothing
-  mu ┴ nothing
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
+         w ┼ nothing
+        mu ┴ nothing
 ```
 
 # Related
@@ -276,6 +315,10 @@ ThirdCentralMoment
 """
 @propagatable @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     """
+    $(field_dict[:settings_rm])
+    """
+    settings
+    """
     $(field_dict[:w_rm])
     """
     @pprop w
@@ -283,17 +326,20 @@ ThirdCentralMoment
     $(field_dict[:mu_slot])
     """
     @pprop @vprop mu
-    function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
+    function ThirdCentralMoment(settings::HierarchicalRiskMeasureSettings,
+                                w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
-        return new{typeof(w), typeof(mu)}(w, mu)
+        return new{typeof(settings), typeof(w), typeof(mu)}(settings, w, mu)
     end
 end
-function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
+function ThirdCentralMoment(;
+                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                            w::Option{<:ObsWeights} = nothing,
                             mu::Option{<:MuSlot} = nothing)::ThirdCentralMoment
-    return ThirdCentralMoment(w, mu)
+    return ThirdCentralMoment(settings, w, mu)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -310,12 +356,13 @@ function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorRes
     if !isa(r.mu, DeferredQuantity)
         return r
     end
-    return ThirdCentralMoment(; w = r.w, mu = resolve_slot(r.mu, :mu, pr))
+    return ThirdCentralMoment(; settings = r.settings, w = r.w,
+                              mu = resolve_slot(r.mu, :mu, pr))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ThirdCentralMoment) = (; mu = r.mu)
 """
-    const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, <:Any, T1, T2}}
+    const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2}, <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
 
 Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
 
@@ -327,7 +374,7 @@ Used for unified dispatch on moment-target calculation methods.
   - [`Skewness`](@ref)
   - [`calc_moment_target`](@ref)
 """
-const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2},
+const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{<:Any, T1, T2},
                              <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
 """
     calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
@@ -405,25 +452,27 @@ Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR
 function calc_deviations_vec(r::TCM_Sk, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
-function moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
+function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}},
                      val::VecNum)
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
-                                                                        X::MatNum,
-                                                                        fees::Option{<:Fees} = nothing)
+function (r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
+                                                                               X::MatNum,
+                                                                               fees::Option{<:Fees} = nothing)
     return moment_risk(r, calc_deviations_vec(r, w, X, fees))
 end
-function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
+function (r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
     return moment_risk(r, calc_deviations_vec(r, x))
 end
-function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
-                                                           fees::Option{<:Fees} = nothing)
-    return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
+function (r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                                  fees::Option{<:Fees} = nothing)
+    return ThirdCentralMoment(; settings = r.settings, w = get_observation_weights(r.w, X),
+                              mu = r.mu)(w, X, fees)
 end
-function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(x::VecNum)
-    return ThirdCentralMoment(; w = get_observation_weights(r.w, x), mu = r.mu)(x)
+function (r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return ThirdCentralMoment(; settings = r.settings, w = get_observation_weights(r.w, x),
+                              mu = r.mu)(x)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

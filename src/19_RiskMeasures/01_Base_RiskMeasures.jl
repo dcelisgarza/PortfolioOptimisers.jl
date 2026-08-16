@@ -69,6 +69,64 @@ function needs_previous_weights(r::VecBaseRM)::Bool
     return any(needs_previous_weights.(r))
 end
 """
+    const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+
+Argument bound for every value-level reader of a risk measure: one measure or several.
+
+Mirrors [`JRE_VecJRE`](@ref) on the return side. A method bounded here serves a measure and a vector of them with one body, so the value-level surface needs one method per arity rather than two.
+
+A vector is scalarised into **one** number by the `sca` keyword, which defaults to [`SumScalariser`](@ref) and is silently inert on a single measure.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
+  - [`JRE_VecJRE`](@ref)
+  - [`expected_risk`](@ref)
+  - [`Scalariser`](@ref)
+"""
+const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether every element of `rs` shares the same polarity, and throw when they do not.
+
+The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) and [`QuantileRule`](@ref) take counts from each tail, and the flag decides which tail is best.
+
+# Validation
+
+  - Throws an `ArgumentError` when the elements disagree.
+
+# Related
+
+  - [`bigger_is_better`](@ref)
+  - [`VecBaseRM`](@ref)
+"""
+function bigger_is_better(rs::VecBaseRM)::Bool
+    b = bigger_is_better(first(rs))
+    if !all(r -> bigger_is_better(r) == b, rs)
+        got = join(["  $(nameof(typeof(r))) => $(bigger_is_better(r))" for r in rs], "\n")
+        throw(ArgumentError("a vector of risk measures must agree on its polarity, and this one does not. `bigger_is_better` decides which tail of a ranking is best, so a mixed vector has no defined orientation and either answer would be wrong in silence.\nSplit the vector into one group per polarity, or rank on a single measure.\nGot\n$(got)"))
+    end
+    return b
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether every element of `rs` supports evaluation on a precomputed return series.
+
+Answers by `all`, matching the `&&` the two ratio composites already use. Note the polarity against its neighbour: [`needs_previous_weights`](@ref) on the same alias answers by `any`. Both are correct — "does the vector need it" is not "can the vector do it".
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`VecBaseRM`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
+function supports_precomputed_returns(rs::VecBaseRM)::Bool
+    return all(supports_precomputed_returns, rs)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the input-shape classification of a risk measure, used by [`expected_risk`](@ref) to decide what to feed a measure's functor.
@@ -770,6 +828,15 @@ Abstract supertype for scalarisation strategies used to combine multiple risk me
 
 Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
 
+## Two consumers, and only one of them is restricted
+
+A scalariser is read at two levels, and they are not equally permissive.
+
+  - **The model level.** A `JuMP` optimiser builds the aggregation into the model as an expression, so the strategy must have a convex form. This is what [`NonHierarchicalScalariser`](@ref) and [`HierarchicalScalariser`](@ref) separate: the two subtypes name the **consumers** that can build a given strategy, not a property of the resulting number. `JuMPOptimiser.sca` is bounded `NonHierarchicalScalariser` and refuses the hierarchical half; the clustering optimisers compute each cluster's risk separately and accept either.
+  - **The value level.** [`expected_risk`](@ref) and the readers around it evaluate the measures first and combine the resulting **numbers**, so nothing convex is being built and no strategy can be refused on those grounds. Every `sca` keyword and every `sca` result field at this level is bounded [`Scalariser`](@ref), and **all four scalarisers are admitted**, [`MinScalariser`](@ref) included.
+
+So a `HierarchicalScalariser` on a value-level call is not a misuse, and the word "hierarchical" in the subtype name describes which estimators accept it rather than where the number is meaningful.
+
 # Related
 
   - [`NonHierarchicalScalariser`](@ref)
@@ -779,9 +846,11 @@ abstract type Scalariser <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible with all portfolio optimisation estimators.
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value, and that **every** optimisation estimator can build.
 
-Subtype `NonHierarchicalScalariser` to implement aggregation methods that work with all optimisation estimators.
+Subtype `NonHierarchicalScalariser` when the aggregation has a convex `JuMP` form, so a `JuMP` optimiser can build it into the model as well as a clustering optimiser can compute it per cluster. `JuMPOptimiser.sca` is bounded here.
+
+The split names a **consumer**, not a property of the number. It does not restrict the value-level readers, which admit all four scalarisers — see [`Scalariser`](@ref).
 
 # Related
 
@@ -795,9 +864,11 @@ abstract type NonHierarchicalScalariser <: Scalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible only with hierarchical optimisations.
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value, and that **only the clustering optimisation estimators** can build.
 
-Subtype `HierarchicalScalariser` to implement aggregation methods that only work with hierarchical optimisation estimators.
+Subtype `HierarchicalScalariser` when the aggregation has no convex `JuMP` form. `JuMPOptimiser.sca` is bounded [`NonHierarchicalScalariser`](@ref) and refuses this half; the clustering optimisers compute each cluster's risk separately and accept it.
+
+The split names a **consumer**, not a property of the number. At the value level the measures are evaluated first and the strategy combines plain numbers, so nothing is being built and all four scalarisers are admitted — see [`Scalariser`](@ref).
 
 # Related
 
@@ -869,9 +940,11 @@ struct MaxScalariser <: NonHierarchicalScalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that selects the risk expression whose scaled value is the largest.
+Scalariser that selects the risk expression whose scaled value is the smallest.
 
 `MinScalariser` aggregates a vector of risk measures by selecting the minimum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+
+It is the one [`HierarchicalScalariser`](@ref), because minimising a minimum is not convex and a `JuMP` optimiser cannot build it. That bound is the **model's**: at the value level the measures are already numbers, so `MinScalariser` is admitted by every `sca` keyword and every `sca` result field there, on equal footing with the other three.
 
 ```math
 \\begin{align}

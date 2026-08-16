@@ -416,4 +416,42 @@
             end
         end
     end
+    @testset "Weighted range functors do not mutate their inputs (#330)" begin
+        # The weighted `*Range` functors used to `reverse!` **views** into the caller's
+        # returns vector and into their own stored observation weights, so a measure reused
+        # on a second vector returned a wrong number from the second call onward.
+        xa = rd.X * w
+        xb = rd.X[end:-1:1, :] * w
+        @test xa != xb
+
+        # `alpha`/`beta` are pinned rather than defaulted, and the pair matters. Against the
+        # pre-fix code these assertions were checked at all 49 combinations of
+        # (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)²: 42 return a wrong number and 7 do not,
+        # because the scrambled weight order has to move the cumulative-weight crossing far
+        # enough to land on a different observation. The **default** `0.05, 0.05` is one of
+        # the 7 for `ValueatRiskRange`, so defaulting here would have tested nothing.
+        # `0.01, 0.1` is wrong pre-fix for both types: 1.1% for `ValueatRiskRange`,
+        # 2.4% for `ConditionalValueatRiskRange`.
+        for ctor in (ValueatRiskRange, ConditionalValueatRiskRange)
+            ow = StatsBase.pweights(range(0.5, 1.5; length = length(xa)))
+            ow_before = collect(ow)
+            xa_before = copy(xa)
+
+            # A measure that has already been evaluated must agree with a fresh one.
+            reused = ctor(; alpha = 0.01, beta = 0.1, w = ow)
+            fresh = ctor(; alpha = 0.01, beta = 0.1,
+                         w = StatsBase.pweights(range(0.5, 1.5; length = length(xa))))
+            _ = reused(xa)
+
+            @test xa == xa_before            # the caller's vector survives
+            @test collect(ow) == ow_before   # the measure's own weights survive
+            @test reused.w === ow            # and it really is the stored object
+
+            # The assertion that catches the wrong number rather than only the corruption.
+            @test reused(xb) == fresh(xb)
+            @test reused(xa) == fresh(xa)
+            @test xa == xa_before
+            @test collect(ow) == ow_before
+        end
+    end
 end

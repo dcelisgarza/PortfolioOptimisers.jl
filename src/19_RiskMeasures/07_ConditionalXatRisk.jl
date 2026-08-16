@@ -119,25 +119,44 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Distributionally Robust Conditional Value-at-Risk (DR-CVaR) risk measure.
 
-`DistributionallyRobustConditionalValueatRisk` is a robust variant of CVaR that accounts for distributional uncertainty using Wasserstein ambiguity sets. It provides robustness against model misspecification in the tails of the return distribution.
+`DistributionallyRobustConditionalValueatRisk` is a robust variant of CVaR that accounts for distributional uncertainty using Wasserstein ambiguity sets. It provides robustness against model misspecification in the tails of the return distribution. It is the Esfahani-Kuhn [drcvar](@cite) reformulation of a mean-CVaR loss over a Wasserstein ball, and it is a measure of a *portfolio*: it is defined on the weight vector ``\\boldsymbol{w}`` and the scenario matrix, not on a realised return series.
 
 # Mathematical definition
 
-The DR-CVaR with Wasserstein ambiguity parameter ``l`` and radius ``r`` is a robust upper bound on CVaR under distributional uncertainty within a Wasserstein ball of radius ``r``:
+Let ``\\hat{\\mathbb{P}}`` be the empirical distribution of the ``T`` scenarios ``\\boldsymbol{\\xi}_{t}``, and let ``\\mathcal{B}_{r}(\\hat{\\mathbb{P}})`` be the type-1 Wasserstein ball of radius ``r`` around it, restricted to the support ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``. The measure is the worst-case mean of the mean-CVaR loss ``\\ell_{\\tau}`` over that ball, minimised over the Value-at-Risk level ``\\tau``:
 
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{x}) &= \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w}) &= \\min_{\\tau \\in \\mathbb{R}} \\; \\sup_{\\mathbb{Q} \\in \\mathcal{B}_{r}(\\hat{\\mathbb{P}})} \\; \\mathbb{E}_{\\mathbb{Q}}\\left[\\ell_{\\tau}(\\boldsymbol{\\xi})\\right]\\\\
+\\ell_{\\tau}(\\boldsymbol{\\xi}) &= -\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi} + l \\left(\\tau + \\dfrac{1}{\\alpha} \\left(-\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi} - \\tau\\right)_{+}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{x})``: Distributionally Robust CVaR.
-  - $(math_dict[:xret])
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CVaR.
+  - ``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.
+  - ``\\boldsymbol{\\xi}``: Asset returns scenario vector ``N \\times 1``.
   - $(math_dict[:alpha_rm])
-  - ``l``: Wasserstein ambiguity scale factor.
-  - ``r``: Wasserstein ball radius.
+  - ``l``: Weight of the CVaR term in the loss, ``l > 0``.
+  - ``r``: Wasserstein ball radius, ``r > 0``.
+  - ``(\\cdot)_{+} = \\max(\\cdot, 0)``.
+
+The loss ``\\ell_{\\tau}`` is piecewise linear in ``\\boldsymbol{\\xi}`` with the two pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``, where ``a_{1} = -1``, ``b_{1} = l``, ``a_{2} = -1 - l/\\alpha`` and ``b_{2} = l (1 - 1/\\alpha)``. Taking the dual of the inner supremum gives the conic program that is actually solved:
+
+```math
+\\begin{align}
+\\min_{\\tau,\\, \\lambda,\\, \\boldsymbol{s},\\, \\boldsymbol{u},\\, \\boldsymbol{v}} \\quad & r \\lambda + \\dfrac{1}{T} \\sum_{t=1}^{T} s_{t}\\\\
+\\textrm{s.t.} \\quad & b_{i} \\tau + a_{i} \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t} + \\boldsymbol{u}_{t}^{(i)\\intercal} \\left(\\boldsymbol{\\xi}_{t} + \\boldsymbol{1}\\right) \\leq s_{t}\\\\
+& \\left\\lVert -\\boldsymbol{u}_{t}^{(i)} - a_{i} \\boldsymbol{w} \\right\\rVert_{\\infty} \\leq \\lambda\\\\
+& \\boldsymbol{u}_{t}^{(i)} \\geq \\boldsymbol{0} \\quad \\forall\\, t \\in 1 \\ldots T,\\; i \\in \\{1, 2\\}\\,.
+\\end{align}
+```
+
+The dual variables ``\\boldsymbol{u}_{t}^{(i)}`` price the support constraint ``\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}``, and ``\\lambda`` bounds the dual-norm Lipschitz modulus of the loss. Two consequences follow, and both contradict a reading of the measure as CVaR plus a constant:
+
+  - **The robustness premium ``r \\lambda`` is not a constant.** ``\\lambda`` is a decision variable that depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
+  - **The loss carries a mean term that ``l`` does not scale.** At ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}`` and the measure reduces to ``-\\mathbb{E}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
 
 # Fields
 
@@ -166,7 +185,9 @@ Keywords correspond to the struct's fields.
 
     (r::DistributionallyRobustConditionalValueatRisk)(x::VecNum)
 
-Computes the DR-CVaR of a portfolio returns vector `x`.
+Computes the **plain** CVaR of a portfolio returns vector `x`, at level `alpha`. The functor shares its method with [`ConditionalValueatRisk`](@ref) through the `RMCVaR` union, and it ignores `l` and `r`.
+
+This is not an omission. The robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
 
 ## Arguments
 
@@ -287,13 +308,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Conditional Value-at-Risk Range (CVaR Range) risk measure.
 
-`ConditionalValueatRiskRange` computes the difference between the lower-tail CVaR (at level `alpha`) and the upper-tail CVaR (at level `beta`), measuring the spread between downside and upside expected tail risks.
+`ConditionalValueatRiskRange` evaluates the CVaR at level `alpha` on the portfolio returns and the CVaR at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside expected tail.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})\\,.
+\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})\\,.
 \\end{align}
 ```
 
@@ -329,7 +350,7 @@ Keywords correspond to the struct's fields.
 
     (r::ConditionalValueatRiskRange)(x::VecNum)
 
-Computes the CVaR Range of a portfolio returns vector `x`.
+Computes the CVaR Range of a portfolio returns vector `x`, as the sum of the two tail averages. The functor shares its method with [`DistributionallyRobustConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union. That method holds the upper tail in the negated convention of [`ConditionalValueatRisk`](@ref), so it writes the sum as `loss - gain`.
 
 ## Arguments
 
@@ -394,13 +415,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Distributionally Robust Conditional Value-at-Risk Range (DR-CVaR Range) risk measure.
 
-`DistributionallyRobustConditionalValueatRiskRange` computes the difference between the lower-tail DR-CVaR (at level `alpha`) and the upper-tail DR-CVaR (at level `beta`), with separate Wasserstein ambiguity parameters for each tail.
+`DistributionallyRobustConditionalValueatRiskRange` evaluates the DR-CVaR at level `alpha` on the portfolio returns and the DR-CVaR at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside robust tail. Each tail carries its own Wasserstein ambiguity parameters.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) &= \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) - \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,.
+\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) &= \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) + \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,.
 \\end{align}
 ```
 
@@ -441,7 +462,11 @@ Keywords correspond to the struct's fields.
 
     (r::DistributionallyRobustConditionalValueatRiskRange)(x::VecNum)
 
-Computes the DR-CVaR Range of a portfolio returns vector `x`.
+Computes the **plain** CVaR Range of a portfolio returns vector `x`, at levels `alpha` and `beta`. The functor shares its method with [`ConditionalValueatRiskRange`](@ref) through the `RMCVaRRg` union, and it ignores `l_a`, `r_a`, `l_b` and `r_b`.
+
+This is not an omission. Each robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
+
+The method returns the sum of the two tail averages. It holds the upper tail in the negated convention of [`ConditionalValueatRisk`](@ref), so it writes the sum as `loss - gain`.
 
 ## Arguments
 
@@ -592,8 +617,14 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
-    sorted_x = reverse!(sorted_x)
-    sorted_w = reverse!(sorted_w)
+    # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
+    # `reverse!` on them writes through into the caller's `x` and into `r.w` —
+    # `get_observation_weights` hands back the stored weights object itself, so the measure
+    # would permute its own configuration. `order` was just allocated by `sortperm`, so it is
+    # ours to mutate, and the element sequence read below is identical.
+    reverse!(order)
+    sorted_x = view(x, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     beta = sw * r.beta
     idx = searchsortedfirst(cum_w, beta)
@@ -727,23 +758,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Distributionally Robust Conditional Drawdown-at-Risk (DR-CDaR) risk measure.
 
-`DistributionallyRobustConditionalDrawdownatRisk` is a robust variant of CDaR that accounts for distributional uncertainty using Wasserstein ambiguity sets, applied to drawdown sequences.
+`DistributionallyRobustConditionalDrawdownatRisk` is a robust variant of CDaR that accounts for distributional uncertainty using Wasserstein ambiguity sets, applied to drawdown sequences. It is the drawdown twin of [`DistributionallyRobustConditionalValueatRisk`](@ref): the same Esfahani-Kuhn [drcvar](@cite) reformulation, with the uncompounded portfolio drawdown path in place of the portfolio return.
 
 # Mathematical definition
 
+Let ``d_{t}(\\boldsymbol{w})`` be the uncompounded portfolio drawdown at period ``t``, a non-negative number. The measure is the worst-case mean of the mean-CDaR loss ``\\ell_{\\tau}`` over a type-1 Wasserstein ball of radius ``r`` around the empirical distribution of the drawdown path, minimised over the Drawdown-at-Risk level ``\\tau``:
+
 ```math
 \\begin{align}
-\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x}) &= \\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w}) &= \\min_{\\tau \\in \\mathbb{R}} \\; \\sup_{\\mathbb{Q} \\in \\mathcal{B}_{r}(\\hat{\\mathbb{P}})} \\; \\mathbb{E}_{\\mathbb{Q}}\\left[\\ell_{\\tau}(d)\\right]\\\\
+\\ell_{\\tau}(d) &= d + l \\left(\\tau + \\dfrac{1}{\\alpha} \\left(d - \\tau\\right)_{+}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x})``: Distributionally Robust CDaR.
-  - $(math_dict[:xret])
+  - ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CDaR.
+  - ``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.
+  - ``d``: Uncompounded portfolio drawdown, ``d \\geq 0``.
   - $(math_dict[:alpha_rm])
-  - ``l``: Wasserstein ambiguity scale factor.
-  - ``r``: Wasserstein ball radius.
+  - ``l``: Weight of the CDaR term in the loss, ``l > 0``.
+  - ``r``: Wasserstein ball radius, ``r > 0``.
+  - ``(\\cdot)_{+} = \\max(\\cdot, 0)``.
+
+The two pieces of ``\\ell_{\\tau}`` and the dual conic program are those of [`DistributionallyRobustConditionalValueatRisk`](@ref), with ``-d_{t}`` substituted for ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}`` and the drawdown support constraint ``d \\geq -1`` priced by the same non-negative dual variables. The same two consequences hold: ``r`` multiplies a decision variable and cannot be factored out, and the mean drawdown term is not scaled by ``l``. At ``r \\to 0`` the measure reduces to ``\\mathbb{E}[d] + l \\, \\mathrm{CDaR}_{\\alpha}(d)``, not to ``\\mathrm{CDaR}_{\\alpha}`` alone.
 
 # Fields
 
@@ -772,7 +810,7 @@ Keywords correspond to the struct's fields.
 
     (r::DistributionallyRobustConditionalDrawdownatRisk)(x::VecNum)
 
-Computes the DR-CDaR of a portfolio returns vector `x`.
+Computes the **plain** CDaR of a portfolio returns vector `x`, at level `alpha`, and ignores `l` and `r`. The robust term ``r \\lambda`` is a function of the weight vector and the scenario matrix, and a realised return series carries neither, so it cannot be evaluated here. Use the measure inside a JuMP optimisation to get the robust value.
 
 ## Arguments
 

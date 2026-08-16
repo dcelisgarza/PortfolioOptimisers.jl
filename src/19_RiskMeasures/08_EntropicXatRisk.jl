@@ -186,7 +186,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure.
 
-`EntropicValueatRiskRange` computes the difference between the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
+`EntropicValueatRiskRange` computes the sum of the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
 
 # Mathematical definition
 

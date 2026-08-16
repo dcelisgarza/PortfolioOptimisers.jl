@@ -27,16 +27,21 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:fb])
     """
     fb
-    function MeanRiskResult(jr::JuMPOptimisationResult, fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(fb)}(jr, fb)
+    function MeanRiskResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
+                            fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(r), typeof(fb)}(jr, r, fb)
     end
 end
-function MeanRiskResult(; jr::JuMPOptimisationResult,
+function MeanRiskResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                         fb::Option{<:OptE_Opt})::MeanRiskResult
-    return MeanRiskResult(jr, fb)
+    return MeanRiskResult(jr, r, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -710,7 +715,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                           jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
                                                       sol = sol,
                                                       model = ifelse(save, model, nothing)),
-                          fb = nothing)
+                          r = factory(mr.r, attrs.pr, mr.opt.slv), fb = nothing)
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},

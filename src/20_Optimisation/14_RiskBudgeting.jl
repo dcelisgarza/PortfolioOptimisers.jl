@@ -87,6 +87,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 
     RiskBudgetingResult(;
         jr::JuMPOptimisationResult,
+        r::BaseRM_VecBaseRM,
         prb::Union{ProcessedAssetRiskBudgetingAttributes,
                    ProcessedFactorRiskBudgetingAttributes},
         fb::Option{<:OptE_Opt}
@@ -97,6 +98,7 @@ Keywords correspond to the struct's fields.
 # Related
 
   - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`JuMPOptimisationResult`](@ref)
 """
@@ -106,6 +108,10 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:prb])
     """
     prb
@@ -113,18 +119,18 @@ Keywords correspond to the struct's fields.
     $(field_dict[:fb])
     """
     fb
-    function RiskBudgetingResult(jr::JuMPOptimisationResult,
+    function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                  prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                             ProcessedFactorRiskBudgetingAttributes},
                                  fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
+        return new{typeof(jr), typeof(r), typeof(prb), typeof(fb)}(jr, r, prb, fb)
     end
 end
-function RiskBudgetingResult(; jr::JuMPOptimisationResult,
+function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                              prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                         ProcessedFactorRiskBudgetingAttributes},
                              fb::Option{<:OptE_Opt})::RiskBudgetingResult
-    return RiskBudgetingResult(jr, prb, fb)
+    return RiskBudgetingResult(jr, r, prb, fb)
 end
 # Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
@@ -741,7 +747,8 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                                            sol = sol,
                                                            model = ifelse(save, model,
                                                                           nothing)),
-                               prb = prb, fb = nothing)
+                               r = factory(rb.r, attrs.pr, rb.opt.slv), prb = prb,
+                               fb = nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

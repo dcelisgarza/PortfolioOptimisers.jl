@@ -115,11 +115,25 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NonOptimisationRiskRatio(;
-        r1::AbstractBaseRiskMeasure = Variance(),
-        r2::AbstractBaseRiskMeasure = ConditionalValueatRisk()
+        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+        r1::BaseRM_VecBaseRM = Variance(),
+        sca1::Scalariser = SumScalariser(),
+        r2::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+        sca2::Scalariser = SumScalariser()
     ) -> NonOptimisationRiskRatio
 
 Keywords correspond to the struct's fields.
+
+## Multiplicity
+
+Each axis takes one risk measure or a vector of them, and each carries **its own** scalariser. This is the only type in the family with two independent risk vectors, so `sca1` governs `r1` and `sca2` governs `r2`. A scalariser sits immediately after the field it governs.
+
+Both fields beat a caller's `sca` keyword. A `sca` passed at the call site flows no further than this type, so a figure reported from a `NonOptimisationRiskRatio` is always the pair the type names. The two axes are independent: `sca1` and `sca2` need not agree.
+
+## Validation
+
+  - If `r1` is a vector: `!isempty(r1)`.
+  - If `r2` is a vector: `!isempty(r2)`.
 
 ## Propagated parameters
 
@@ -136,21 +150,48 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 """
 @propagatable @concrete struct NonOptimisationRiskRatio <: NonOptimisationRiskMeasure
     """
-    $(field_dict[:r1])
+    $(field_dict[:settings_rm])
+    """
+    settings
+    """
+    $(field_dict[:r1_vec])
     """
     @fprop r1
     """
-    $(field_dict[:r2])
+    $(field_dict[:sca_r1])
+    """
+    sca1
+    """
+    $(field_dict[:r2_vec])
     """
     @fprop r2
-    function NonOptimisationRiskRatio(r1::AbstractBaseRiskMeasure,
-                                      r2::AbstractBaseRiskMeasure)
-        return new{typeof(r1), typeof(r2)}(r1, r2)
+    """
+    $(field_dict[:sca_r2])
+    """
+    sca2
+    function NonOptimisationRiskRatio(settings::HierarchicalRiskMeasureSettings,
+                                      r1::BaseRM_VecBaseRM, sca1::Scalariser,
+                                      r2::BaseRM_VecBaseRM, sca2::Scalariser)
+        if isa(r1, VecBaseRM)
+            @argcheck(!isempty(r1), IsEmptyError("r1 cannot be empty"))
+        end
+        if isa(r2, VecBaseRM)
+            @argcheck(!isempty(r2), IsEmptyError("r2 cannot be empty"))
+        end
+        return new{typeof(settings), typeof(r1), typeof(sca1), typeof(r2), typeof(sca2)}(settings,
+                                                                                         r1,
+                                                                                         sca1,
+                                                                                         r2,
+                                                                                         sca2)
     end
 end
-function NonOptimisationRiskRatio(; r1::AbstractBaseRiskMeasure = Variance(),
-                                  r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatio
-    return NonOptimisationRiskRatio(r1, r2)
+function NonOptimisationRiskRatio(;
+                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                                  r1::BaseRM_VecBaseRM = Variance(),
+                                  sca1::Scalariser = SumScalariser(),
+                                  r2::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+                                  sca2::Scalariser = SumScalariser())::NonOptimisationRiskRatio
+    return NonOptimisationRiskRatio(settings, r1, sca1, r2, sca2)
 end
 
 export RiskRatio, NonOptimisationRiskRatio

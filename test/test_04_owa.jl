@@ -203,6 +203,28 @@
 
             r = OrderedWeightsArrayRange(; w1 = w, w2 = w, rev = true)
             @test r.w1 == r.w2
+
+            # The constructor must not reverse the caller's vector in place. The two cases
+            # above both pass `w1 === w2`, which was already non-mutating, so the two-vector
+            # call is the one that regressed.
+            w1 = owa_tg(8)
+            w2 = owa_cvar(8, 0.05)
+            w2_before = copy(w2)
+            r1 = OrderedWeightsArrayRange(; w1 = w1, w2 = w2)
+            @test w2 == w2_before
+            @test r1.w2 == reverse(w2_before)
+
+            # Building a second measure from the same vector must give the same measure.
+            r2 = OrderedWeightsArrayRange(; w1 = w1, w2 = w2)
+            @test r1.w2 == r2.w2
+
+            # The builder branch must not reverse a cached vector underneath the caller.
+            cached = owa_cvar(8, 0.05)
+            cached_before = copy(cached)
+            r3 = OrderedWeightsArrayRange(; w1 = owa_tg, w2 = _ -> cached)
+            @test r3.w2(8) == reverse(cached_before)
+            @test cached == cached_before
+            @test r3.w2(8) == reverse(cached_before)
         end
     end
 end

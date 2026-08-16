@@ -30,6 +30,10 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:reg_rr])
     """
     rr
@@ -41,18 +45,21 @@ Keywords correspond to the struct's fields.
     $(field_dict[:fb])
     """
     fb
-    function FactorRiskContributionResult(jr::JuMPOptimisationResult,
+    function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                           rr::AbstractRegressionResult,
                                           frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                           fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, rr, frc_plr, fb)
+        return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
+                                                                                   rr,
+                                                                                   frc_plr,
+                                                                                   fb)
     end
 end
-function FactorRiskContributionResult(; jr::JuMPOptimisationResult,
+function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                       rr::AbstractRegressionResult,
                                       frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
-    return FactorRiskContributionResult(jr, rr, frc_plr, fb)
+    return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
 # embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
@@ -335,7 +342,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                     model = ifelse(save,
                                                                                    model,
                                                                                    nothing)),
-                                        rr = rr, frc_plr = frc_plr, fb = nothing)
+                                        r = factory(frc.r, attrs.pr, frc.opt.slv), rr = rr,
+                                        frc_plr = frc_plr, fb = nothing)
 end
 """
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

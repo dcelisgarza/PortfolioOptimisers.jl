@@ -323,8 +323,11 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
-                              w = w, fb = nothing)
+    return HierarchicalRiskParityResult(;
+                                        hr = HierarchicalResult(; pr = pr, clr = clr,
+                                                                wb = wb, fees = fees,
+                                                                retcode = retcode, w = w),
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 """
     hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
@@ -418,12 +421,15 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
-                              w = w, fb = nothing)
+    return HierarchicalRiskParityResult(;
+                                        hr = HierarchicalResult(; pr = pr, clr = clr,
+                                                                wb = wb, fees = fees,
+                                                                retcode = retcode, w = w),
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
 
 Run the Hierarchical Risk Parity portfolio optimisation.
 
@@ -437,7 +443,7 @@ Run the Hierarchical Risk Parity portfolio optimisation.
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

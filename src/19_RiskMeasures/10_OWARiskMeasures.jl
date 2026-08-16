@@ -1756,6 +1756,8 @@ Ordered Weights Array Range (OWA Range) risk measure.
 
 Computes portfolio risk as the difference between two OWA linear combinations of sorted portfolio returns, providing a range-based risk measure.
 
+The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1764,8 +1766,8 @@ $(DocStringExtensions.FIELDS)
 
     OrderedWeightsArrayRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w1::OWA_Func_VecNum = owa_gmd,
-        w2::OWA_Func_VecNum = owa_gmd,
+        w1::OWA_Func_VecNum = owa_tg,
+        w2::OWA_Func_VecNum = owa_tg,
         alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
         rev::Bool = false
     ) -> OrderedWeightsArrayRange
@@ -1796,7 +1798,7 @@ $(DocStringExtensions.FIELDS)
     """
     alg
     """
-    Whether to reverse the second OWA weight vector before computing the range. If `true`, `w2` is reversed; if `false`, it is used as-is.
+    $(field_dict[:rev_owa])
     """
     rev
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::OWA_Func_VecNum,
@@ -1809,16 +1811,17 @@ $(DocStringExtensions.FIELDS)
         end
         if w2_flag
             @argcheck(!isempty(w2), IsEmptyError("w2 cannot be empty"))
+            # Non-mutating on purpose: `w2` belongs to the caller. An in-place reverse here
+            # corrupts their vector, and building two measures from one vector reverses it
+            # twice. It also makes the `w1 === w2` aliasing case need no special handling.
             if !rev
-                if w1 === w2
-                    w2 = reverse(w2)
-                else
-                    reverse!(w2)
-                end
+                w2 = reverse(w2)
             end
         else
+            # Same rule for the builder branch: the closure is the caller's, so a cached
+            # return value must not be reversed underneath them.
             if !rev
-                w2 = reverse! ∘ w2
+                w2 = reverse ∘ w2
             end
         end
         if w1_flag && w2_flag

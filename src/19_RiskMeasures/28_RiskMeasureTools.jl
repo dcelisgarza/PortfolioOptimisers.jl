@@ -163,5 +163,27 @@ measures are returned unchanged.
 """
 function unit_scale_risk_measure end
 
+"""
+    measure_label(r::AbstractBaseRiskMeasure) -> String
+    measure_label(rs::VecBaseRM) -> String
+
+Name a risk measure for an axis label, a title, or a legend entry.
+
+One measure answers its own type name. A vector answers its elements' names joined by `" + "`.
+
+The vector arm is the reason the helper exists. `string(nameof(typeof(rs)))` on a vector evaluates to `"Vector"` — a wrong label, silently, with no error — and seven plot sites spelled that expression inline. Writing the rule once means a future measure-taking plot inherits it.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
+"""
+function measure_label(r::AbstractBaseRiskMeasure)
+    return string(nameof(typeof(r)))
+end
+function measure_label(rs::VecBaseRM)
+    return join(measure_label.(rs), " + ")
+end
+
 export no_bounds_risk_measure, no_bounds_no_risk_expr_risk_measure,
        no_risk_expr_risk_measure, bounds_risk_measure, unit_scale_risk_measure

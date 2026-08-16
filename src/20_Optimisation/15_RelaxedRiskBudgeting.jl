@@ -211,6 +211,69 @@ function time_dependent_field_defaults(::RelaxedRiskBudgeting)::NamedTuple
     return relaxed_risk_budgeting_td_defaults()
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Relaxed Risk Budgeting portfolio optimisation.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+It carries **no** `r`. A [`RelaxedRiskBudgeting`](@ref) run builds its constraints straight from `pr.sigma` and never resolves a risk measure, so it sits on the [`NonRiskJuMPOptimisationResult`](@ref) half of the split and not beside [`RiskBudgetingResult`](@ref), whose `r` is mandatory.
+
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
+
+# Constructors
+
+    RelaxedRiskBudgetingResult(;
+        jr::JuMPOptimisationResult,
+        prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                   ProcessedFactorRiskBudgetingAttributes},
+        fb::Option{<:OptE_Opt}
+    ) -> RelaxedRiskBudgetingResult
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`RiskBudgetingResult`](@ref)
+  - [`NonRiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+@concrete struct RelaxedRiskBudgetingResult <: NonRiskJuMPOptimisationResult
+    """
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
+    """
+    jr
+    """
+    $(field_dict[:prb])
+    """
+    prb
+    """
+    $(field_dict[:fb])
+    """
+    fb
+    function RelaxedRiskBudgetingResult(jr::JuMPOptimisationResult,
+                                        prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                                   ProcessedFactorRiskBudgetingAttributes},
+                                        fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
+    end
+end
+function RelaxedRiskBudgetingResult(; jr::JuMPOptimisationResult,
+                                    prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                               ProcessedFactorRiskBudgetingAttributes},
+                                    fb::Option{<:OptE_Opt})::RelaxedRiskBudgetingResult
+    return RelaxedRiskBudgetingResult(jr, prb, fb)
+end
+# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+@forward_properties RelaxedRiskBudgetingResult begin
+    forward(prb)
+    forward(jr)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if the JuMP optimiser or fallback requires previous portfolio weights.
@@ -421,17 +484,14 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)
     set_portfolio_objective_function!(model, MinimumRisk(), rrb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(;
-                               jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
-                                                           sol = sol,
-                                                           model = ifelse(save, model,
-                                                                          nothing)),
-                               prb = prb, fb = nothing)
+    jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode, sol = sol,
+                                model = ifelse(save, model, nothing))
+    return RelaxedRiskBudgetingResult(; jr = jr, prb = prb, fb = nothing)
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+             str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
 
 Run the Relaxed Risk Budgeting portfolio optimisation.
 
@@ -447,7 +507,7 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
 # Related
 
   - [`RelaxedRiskBudgeting`](@ref)
-  - [`RiskBudgetingResult`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
 """
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -457,4 +517,5 @@ end
 
 @pipe_delegates RelaxedRiskBudgeting opt
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,
-       RegularisedPenalisedRelaxedRiskBudgeting, RelaxedRiskBudgeting
+       RegularisedPenalisedRelaxedRiskBudgeting, RelaxedRiskBudgeting,
+       RelaxedRiskBudgetingResult

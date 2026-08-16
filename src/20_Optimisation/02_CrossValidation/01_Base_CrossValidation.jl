@@ -463,7 +463,7 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
+function expected_risk(r::BaseRM_VecBaseRM, pred::PredictionResult; kwargs...)
     return expected_risk_from_returns(r, pred.rd.X; kwargs...)
 end
 """
@@ -573,8 +573,7 @@ const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult;
-                       kwargs...)
+function expected_risk(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; kwargs...)
     X = mpred.mrd.X
     return expected_risk_from_returns(r, X; kwargs...)
 end
@@ -636,11 +635,10 @@ function PopulationPredictionResult(;
                                                                                                    0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, preds::VecMPredRes; kwargs...)
+function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
     return [expected_risk(r, pred; kwargs...) for pred in preds]
 end
-function expected_risk(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionResult;
-                       kwargs...)
+function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
     return expected_risk(r, ppred.pred; kwargs...)
 end
 """
@@ -663,22 +661,22 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
   - [`PopulationPredictionResult`](@ref)
   - [`expected_risk`](@ref)
 """
-function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
-                         kwargs...)
+function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
     return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
 end
 """
-    quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure, q::Real;
-                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;))
+    quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
+                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;),
+                        sign::Integer = 1)
 
 Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
 
 # Arguments
 
   - `ppred::PopulationPredictionResult`: Population prediction result.
-  - `r::AbstractBaseRiskMeasure`: Risk measure for computing path risks.
+  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is scalarised by `r_kwargs.sca`, defaulting to [`SumScalariser`](@ref).
   - `q::Real`: Quantile level in `[0, 1]`.
   - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
@@ -687,13 +685,17 @@ Select the successful path in `ppred` whose expected risk under `r` is closest t
 
   - [`MultiPeriodPredictionResult`](@ref): The path closest to the `q`-th quantile.
 
+## A mixed vector is accepted here, and refused by its sibling
+
+[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its `rev` flag, so it **throws** on a vector whose elements disagree on polarity. This function takes an explicit `sign` instead, so the caller has already supplied the one thing `bigger_is_better` cannot infer, and a mixed vector is admitted.
+
 # Related
 
   - [`sort_by_measure`](@ref)
   - [`PopulationPredictionResult`](@ref)
   - [`expected_risk`](@ref)
 """
-function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
+function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;), sign::Integer = 1)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),

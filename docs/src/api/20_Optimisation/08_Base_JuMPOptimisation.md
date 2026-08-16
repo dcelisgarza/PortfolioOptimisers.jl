@@ -22,8 +22,10 @@ VecJuMPOptSol
 JuMPOptSol_VecJuMPOptSol
 BaseJuMPOptimisationResult
 RiskJuMPOptimisationResult
-Base.propertynames(r::RiskJuMPOptimisationResult)
-Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+NonRiskJuMPOptimisationResult
+RJR_NRJR
+Base.propertynames(r::RJR_NRJR)
+Base.getproperty(r::RJR_NRJR, sym::Symbol)
 NonJuMPOptimisationResult
 add_custom_objective_term!
 add_custom_constraint!

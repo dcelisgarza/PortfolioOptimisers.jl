@@ -53,8 +53,8 @@ julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, s
                                         sgcardr = nothing, smtx = nothing, sgmtx = nothing,
                                         slt = nothing, sst = nothing, sglt = nothing,
                                         sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn()) isa
-       ProcessedJuMPOptimiserAttributes
+                                        plr = nothing, ret = ArithmeticReturn(),
+                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
 true
 ```
 
@@ -138,6 +138,10 @@ true
     $(field_dict[:ret_jmp])
     """
     ret
+    """
+    $(field_dict[:sca_res])
+    """
+    sca
     # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
     # this bundle holds the constraint/prior results produced by
     # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
@@ -160,15 +164,27 @@ true
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                               plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JRE_VecJRE)
+                                              ret::JRE_VecJRE, sca::Scalariser)
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(ret)}(pr, wb, lt, st, lcsr,
-                                                                       ctr, gcardr, sgcardr,
-                                                                       smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst, tn,
-                                                                       fees, plr, ret)
+                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca)}(pr, wb,
+                                                                                    lt, st,
+                                                                                    lcsr,
+                                                                                    ctr,
+                                                                                    gcardr,
+                                                                                    sgcardr,
+                                                                                    smtx,
+                                                                                    sgmtx,
+                                                                                    slt,
+                                                                                    sst,
+                                                                                    sglt,
+                                                                                    sgst,
+                                                                                    tn,
+                                                                                    fees,
+                                                                                    plr,
+                                                                                    ret,
+                                                                                    sca)
     end
 end
 function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
@@ -187,10 +203,11 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                           plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JRE_VecJRE)::ProcessedJuMPOptimiserAttributes
+                                          ret::JRE_VecJRE,
+                                          sca::Scalariser)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret)
+                                            plr, ret, sca)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1186,7 +1203,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,
                                             sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
                                             slt = slt, sst = sst, sglt = sglt, sgst = sgst,
-                                            tn = tn, fees = fees, plr = plr, ret = ret)
+                                            tn = tn, fees = fees, plr = plr, ret = ret,
+                                            sca = opt.sca)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
@@ -1414,8 +1432,8 @@ julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, s
                                         sgcardr = nothing, smtx = nothing, sgmtx = nothing,
                                         slt = nothing, sst = nothing, sglt = nothing,
                                         sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn()) isa
-       ProcessedJuMPOptimiserAttributes
+                                        plr = nothing, ret = ArithmeticReturn(),
+                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
 true
 ```
 

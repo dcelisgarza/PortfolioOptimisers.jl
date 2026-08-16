@@ -9,6 +9,8 @@ expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
 expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
+PerformanceSummaryResult
+performance_summary
 ```
 
 ## Private

@@ -107,23 +107,52 @@ abstract type BaseJuMPOptimisationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for JuMP-based continuous optimisation results.
+Abstract supertype for JuMP-based continuous optimisation results that **carry a risk measure**.
 
-The JuMP half of the result split; mirrors [`RiskJuMPOptimisationEstimator`](@ref). Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
+One of the two JuMP result halves; mirrors [`RiskJuMPOptimisationEstimator`](@ref). The sibling half is [`NonRiskJuMPOptimisationResult`](@ref), for the JuMP results that carry no risk measure at all. Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. Every subtype carries a resolved `r`; a JuMP result with no `r` belongs on the sibling branch. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
 
 # Related
 
+  - [`NonRiskJuMPOptimisationResult`](@ref)
+  - [`RJR_NRJR`](@ref)
   - [`NonJuMPOptimisationResult`](@ref)
   - [`JuMPOptimisationResult`](@ref)
   - [`MeanRiskResult`](@ref)
 """
 abstract type RiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based continuous optimisation results that **carry no risk measure**.
+
+The sibling half of [`RiskJuMPOptimisationResult`](@ref). A relaxed risk budgeting run builds its constraints straight from `pr.sigma` and never resolves a measure, so its result has no `r` to carry. Splitting the branch keeps `r` mandatory on the risk half instead of optional on a shared type. Concrete subtypes follow the same shape: an embedded [`JuMPOptimisationResult`](@ref) `jr` first, their unique fields, then the trailing `fb`.
+
+# Related
+
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`RJR_NRJR`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+"""
+abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+    const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+
+Union of both JuMP result halves.
+
+The default `getproperty` and `propertynames` are bound here, not on either half alone. [`MeanRiskResult`](@ref) and [`NearOptimalCenteringResult`](@ref) declare no [`@forward_properties`](@ref) rule and depend on that default for `res.w`, so a half without it would silently cost the next measure-less leaf its property forwarding.
+
+# Related
+
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`NonRiskJuMPOptimisationResult`](@ref)
+"""
+const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Default property access for [`RiskJuMPOptimisationResult`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
+Default property access for [`RJR_NRJR`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
 """
-function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+function Base.getproperty(r::RJR_NRJR, sym::Symbol)
     return if sym in fieldnames(typeof(r))
         getfield(r, sym)
     else
@@ -133,9 +162,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Default property enumeration for [`RiskJuMPOptimisationResult`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
+Default property enumeration for [`RJR_NRJR`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
 """
-function Base.propertynames(r::RiskJuMPOptimisationResult)
+function Base.propertynames(r::RJR_NRJR)
     return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
 end
 """

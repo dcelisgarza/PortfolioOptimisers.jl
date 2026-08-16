@@ -286,7 +286,7 @@ Abstract supertype for continuous (non-integer allocation) optimisation results.
 
   - [`OptimisationResult`](@ref)
   - [`NaiveOptimisationResult`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
   - [`MeanRiskResult`](@ref)
 """
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
@@ -295,16 +295,54 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for non-JuMP continuous optimisation results.
 
-Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side; the JuMP half is [`RiskJuMPOptimisationResult`](@ref).
+Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side. The JuMP side is itself two halves, [`RiskJuMPOptimisationResult`](@ref) for the results that carry a risk measure and [`NonRiskJuMPOptimisationResult`](@ref) for those that carry none.
+
+The hierarchical members are grouped one level further down, under [`HierarchicalOptimisationResult`](@ref).
 
 # Related
 
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`RiskJuMPOptimisationResult`](@ref)
+  - [`NonRiskJuMPOptimisationResult`](@ref)
   - [`NaiveOptimisationResult`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
 """
 abstract type NonJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the **core** field block shared by hierarchical optimisation results.
+
+Sits off the optimisation-result tree on purpose, exactly as [`BaseJuMPOptimisationResult`](@ref) does on the JuMP side. A core is not a thing `optimise` returns, so it must not satisfy methods bounded on the result family — [`factory`](@ref)`(res::NonFiniteAllocationOptimisationResult, fb)` included.
+
+Its one subtype is [`HierarchicalResult`](@ref), embedded as `hr` by each leaf.
+
+# Related
+
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
+  - [`BaseJuMPOptimisationResult`](@ref)
+"""
+abstract type BaseHierarchicalOptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the results of the estimators that embed a [`HierarchicalOptimiser`](@ref).
+
+The membership rule is exact: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold an `opt::HierarchicalOptimiser`. [`NestedClustered`](@ref) does not, and its result is **not** in this family.
+
+The family is deliberately **not** called `ClusteringOptimisationResult`: [`ClusteringOptimisationEstimator`](@ref) has four subtypes and the fourth is [`NestedClustered`](@ref), so that name would claim a set this type does not hold.
+
+Two of the three members embed [`HierarchicalResult`](@ref) as `hr`; [`SchurComplementHierarchicalRiskParityResult`](@ref) keeps a flat field block, which is why the property forwarding lives on the leaves rather than here.
+
+# Related
+
+  - [`BaseHierarchicalOptimisationResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
+"""
+abstract type HierarchicalOptimisationResult <: NonJuMPOptimisationResult end
 """
     const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 
@@ -2626,12 +2664,12 @@ When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or 
   - [`OptimisationResult`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
+function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     fees = extract_fees(res, fees)
     return expected_risk(r, res.w, X, fees; kwargs...)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
                        kwargs...)
     pr = extract_pr(res, pr)

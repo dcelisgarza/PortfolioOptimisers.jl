@@ -58,6 +58,10 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:w_min_retcode])
     """
     w_min_retcode
@@ -77,27 +81,27 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     $(field_dict[:fb])
     """
     fb
-    function NearOptimalCenteringResult(jr::JuMPOptimisationResult,
+    function NearOptimalCenteringResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                         w_min_retcode::OptimisationReturnCode,
                                         w_opt_retcode::OptRetCode_VecOptRetCode,
                                         w_max_retcode::OptimisationReturnCode,
                                         noc_retcode::OptRetCode_VecOptRetCode,
                                         fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(w_min_retcode), typeof(w_opt_retcode),
-                   typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr,
+        return new{typeof(jr), typeof(r), typeof(w_min_retcode), typeof(w_opt_retcode),
+                   typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr, r,
                                                                            w_min_retcode,
                                                                            w_opt_retcode,
                                                                            w_max_retcode,
                                                                            noc_retcode, fb)
     end
 end
-function NearOptimalCenteringResult(; jr::JuMPOptimisationResult,
+function NearOptimalCenteringResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                     w_min_retcode::OptimisationReturnCode,
                                     w_opt_retcode::OptRetCode_VecOptRetCode,
                                     w_max_retcode::OptimisationReturnCode,
                                     noc_retcode::OptRetCode_VecOptRetCode,
                                     fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
-    return NearOptimalCenteringResult(jr, w_min_retcode, w_opt_retcode, w_max_retcode,
+    return NearOptimalCenteringResult(jr, r, w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, fb)
 end
 """
@@ -1160,12 +1164,14 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                                                         tn = opt.tn,
                                                                                                         fees = opt.fees,
                                                                                                         plr = opt.ple,
-                                                                                                        ret = opt.ret),
+                                                                                                        ret = opt.ret,
+                                                                                                        sca = opt.sca),
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,
                                                                                  model,
                                                                                  nothing)),
+                                      r = factory(r, opt.pe, opt.slv),
                                       w_min_retcode = w_min_retcode,
                                       w_opt_retcode = w_opt_retcode,
                                       w_max_retcode = w_max_retcode,
@@ -1200,6 +1206,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                   model = ifelse(save,
                                                                                  model,
                                                                                  nothing)),
+                                      r = factory(r, opt.pe, opt.slv),
                                       w_min_retcode = w_min_retcode,
                                       w_opt_retcode = w_opt_retcode,
                                       w_max_retcode = w_max_retcode,

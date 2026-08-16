@@ -1,6 +1,8 @@
 # Relaxed risk budgeting
 
 ```@docs
+RelaxedRiskBudgetingResult
+Base.getproperty(r::RelaxedRiskBudgetingResult, sym::Symbol)
 RelaxedRiskBudgetingAlgorithm
 BasicRelaxedRiskBudgeting
 RegularisedRelaxedRiskBudgeting

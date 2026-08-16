@@ -195,7 +195,7 @@ function plot_stacked_area_composition end
 ## ──────────────────────────────────────────────────────────────────────────────
 """
     plot_risk_contribution(
-        r::AbstractBaseRiskMeasure,
+        r::BaseRM_VecBaseRM,
         w::VecNum,
         X::MatNum_Pr,
         fees::Option{<:Fees} = nothing;
@@ -204,17 +204,18 @@ function plot_stacked_area_composition end
         marginal::Bool = false,
         percentage::Bool = false,
         N::Option{<:Number} = nothing,
+        sca::Scalariser = SumScalariser(),
         kwargs...
     ) -> Plot
-    plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, N, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, N, kwargs...) -> Plot
-    plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, N, kwargs...) -> Plot
+    plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, N, sca, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, N, sca, kwargs...) -> Plot
 
 Plot per-asset risk contribution as a bar chart.
 
 # Arguments
 
-  - `r`: Risk measure.
+  - `r`: Risk measure, or a vector of them combined by `sca`.
   - `w`: Portfolio weights vector.
   - `X` / `rd` / `pr`: Asset returns or prior result.
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
@@ -223,6 +224,11 @@ Plot per-asset risk contribution as a bar chart.
   - `marginal::Bool = false`: If `true`, compute marginal risk contribution; otherwise component.
   - `percentage::Bool = false`: If `true`, normalise contributions to percentages.
   - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure. Pass `res.sca` to report the figure the optimisation ran under.
+
+## Multiplicity
+
+The bars decompose **one** number, the scalarised aggregate, so the per-asset figures sum to the aggregate rather than to any one element. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) the decomposition is exact only where the argmax is **unique**; at a near-exact tie between two scaled measures the subgradient is a set and the bars are one admissible answer among several. See [`risk_contribution`](@ref).
 
 # Validation
 
@@ -252,15 +258,16 @@ function plot_risk_contribution end
         nf::Option{<:AbstractVector} = nothing,
         delta::Number = 1e-6,
         N::Option{<:Number} = nothing,
+        sca::Scalariser = SumScalariser(),
         kwargs...
     ) -> Plot
-    plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, kwargs...) -> Plot
+    plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, sca, kwargs...) -> Plot
 
 Plot per-factor risk contribution as a bar chart, including the constant (idiosyncratic) term.
 
 # Arguments
 
-  - `r`: Risk measure.
+  - `r`: Risk measure, or a vector of them combined by `sca`.
   - `w`: Portfolio weights vector.
   - `X` / `rd`: Asset returns or returns result.
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
@@ -269,6 +276,7 @@ Plot per-factor risk contribution as a bar chart, including the constant (idiosy
   - `nf::Option{<:AbstractVector} = nothing`: Factor names; overrides `rd.nf` when provided.
   - `delta::Number = 1e-6`: Finite-difference step size. Must be `> 0`.
   - `N::Option{<:Number} = nothing`: Maximum number of factors to display.
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure. Pass `res.sca` to report the figure the optimisation ran under.
 
 # Validation
 
@@ -416,10 +424,10 @@ function plot_drawdowns end
         w::VecNum_VecVecNum,
         pr::Pr_RR,
         fees::Option{<:Fees} = nothing;
-        x::AbstractBaseRiskMeasure = Variance(),
-        y::AbstractBaseRiskMeasure = ExpectedReturn(),
-        z::Option{<:AbstractBaseRiskMeasure} = nothing,
-        c::AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
+        x::BaseRM_VecBaseRM = Variance(),
+        y::BaseRM_VecBaseRM = ExpectedReturn(),
+        z::Option{<:BaseRM_VecBaseRM} = nothing,
+        c::BaseRM_VecBaseRM = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
         slv::Option{<:Slv_VecSlv} = nothing,
         factory::Bool = true,
         kwargs...
@@ -433,18 +441,29 @@ Scatter plot of risk/return measures across a collection of portfolio weight vec
 
   - `w`: Portfolio weights or vector of weight vectors.
   - `pr`: Prior or returns result.
-  - `x`: Risk/return measure for the horizontal axis (default `Variance()`).
-  - `y`: Risk/return measure for the vertical axis (default `ExpectedReturn()`).
-  - `z`: Optional third measure for 3-D scatter.
-  - `c`: Colour-coding measure (default Sharpe ratio derived from `x`).
+  - `x`: Risk/return measure, or a vector of them, for the horizontal axis (default `Variance()`).
+  - `y`: Risk/return measure, or a vector of them, for the vertical axis (default `ExpectedReturn()`).
+  - `z`: Optional third measure, or vector of them, for 3-D scatter.
+  - `c`: Colour-coding measure, or a vector of them (default Sharpe ratio derived from `x`).
   - `slv::Option{<:Slv_VecSlv} = nothing`: Solver passed to `factory`.
   - `factory::Bool = true`: If `true`, call [`factory`](@ref) on measures before evaluating.
+
+## Multiplicity
+
+Each axis takes one measure or a **vector** of them, and a vector is collapsed to the single number the axis plots. There is **no `sca` keyword here**: an axis is evaluated by [`expected_risk`](@ref) with no scalariser named, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`.
+
+A scalariser reaches an axis only through a **wrapper's `sca` field** — [`ExpectedReturnRiskRatio`](@ref), [`MeanReturnRiskRatio`](@ref) or [`NonOptimisationRiskRatio`](@ref) — because a wrapper's field beats any keyword. The four axes are independent, so they may name different scalarisers. Per-axis `x_sca`, `y_sca`, … keywords were deliberately refused.
+
+!!! note
+
+    This is a documented limitation, not an oversight: those wrappers are all **ratios**, so the plotting surface cannot express a [`MaxScalariser`](@ref) over a **plain** vector of risks. Scalarise it yourself with [`expected_risk`](@ref) and plot the numbers if you need that.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`expected_risk`](@ref)
+  - [`Scalariser`](@ref)
 """
 function plot_measures end
 
@@ -757,30 +776,38 @@ function plot_eigenspectrum end
 ## ──────────────────────────────────────────────────────────────────────────────
 """
     plot_rolling_measure(
-        r::AbstractBaseRiskMeasure,
+        r::BaseRM_VecBaseRM,
         w::VecNum,
         X::MatNum,
         fees::Option{<:Fees} = nothing;
         ts::AbstractVector = 1:size(X, 1),
         rolling::Integer = 0,
+        sca::Scalariser = SumScalariser(),
         kwargs...
     ) -> Plot
-    plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, kwargs...) -> Plot
-    plot_rolling_measure(r, res::OptimisationResult, rd; rolling, kwargs...) -> Plot
-    plot_rolling_measure(r, pred; rolling, kwargs...) -> Plot
-    plot_rolling_measure(r, mpred::MultiPeriodPredictionResult; rolling, kwargs...) -> Plot
-    plot_rolling_measure(r, ppred::PopulationPredictionResult; rolling, kwargs...) -> Plot
+    plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, sca, kwargs...) -> Plot
+    plot_rolling_measure(r, res::OptimisationResult, rd; rolling, sca, kwargs...) -> Plot
+    plot_rolling_measure(r, pred; rolling, sca, kwargs...) -> Plot
+    plot_rolling_measure(r, mpred::MultiPeriodPredictionResult; rolling, sca, kwargs...) -> Plot
+    plot_rolling_measure(r, ppred::PopulationPredictionResult; rolling, sca, kwargs...) -> Plot
 
 Line plot of a risk or return measure evaluated over a rolling window of portfolio returns.
 
 # Arguments
 
-  - `r`: Risk or return measure. May embed its own solver (e.g. `EntropicValueatRisk(; slv=...)`).
+  - `r`: Risk or return measure, or a vector of them combined by `sca`. May embed its own solver (e.g. `EntropicValueatRisk(; slv=...)`).
   - `w`: Portfolio weights.
   - `X`: Asset returns matrix (observations × assets).
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
   - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
   - `rolling::Integer = 0`: Rolling window size. `0` auto-detects as `⌈√T⌉`. Must be `>= 0`.
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`. Inert when `r` is a single measure.
+
+## Multiplicity
+
+Each window plots **one** number, the scalarised aggregate. A vector does not become several lines.
+
+A single measure is evaluated through [`expected_risk_from_returns`](@ref) rather than as a functor: a vector is not callable, and defining a call method on `AbstractVector` would be piracy. Both arities take the same route, so the singular figure is unchanged.
 
 # Validation
 
@@ -833,16 +860,25 @@ function plot_weight_stability end
         labels::AbstractVector = 1:length(scores);
         kwargs...
     ) -> Plot
-    plot_cv_scores(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult; kwargs...) -> Plot
-    plot_cv_scores(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionResult; kwargs...) -> Plot
+    plot_cv_scores(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; kwargs...) -> Plot
+    plot_cv_scores(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...) -> Plot
 
 Bar chart of cross-validation scores (one bar per fold or population member).
+
+# Arguments
+
+  - `r`: Risk or return measure, or a vector of them.
+
+Each bar is **one** number, the scalarised aggregate for that fold or member. A vector does not become several bar series.
+
+A `sca` keyword is not declared here; it rides `kwargs...` into [`expected_risk`](@ref), so `plot_cv_scores(r, mpred; sca = MaxScalariser())` works and a vector defaults to [`SumScalariser`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`expected_risk`](@ref)
+  - [`Scalariser`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
@@ -1090,7 +1126,8 @@ not a `PredictionResult`, for the risk contribution panel.
 
   - `res::OptimisationResult`: Optimisation result.
   - `rd::Pr_RR`: Returns result or prior; extracts `nx` and `ts` from `rd` when `ReturnsResult`.
-  - `r`: Risk measure for panels 3 and 4.
+  - `r`: Risk measure for panels 3 and 4, or a vector of them combined by `sca`.
+  - `sca::Scalariser = SumScalariser()`: Scalariser combining the measures in `r`, forwarded to panel 3. Inert when `r` is a single measure. Pass `res.sca` to match the optimisation.
   - `slv`: Solver for EDaR / RLDaR drawdown lines.
   - `compound::Bool = false`: If `true`, compound cumulative returns and drawdowns.
   - `N::Option{<:Number} = nothing`: Forwarded to composition and risk contribution panels.
@@ -1153,9 +1190,9 @@ function plot_cv_dashboard end
     plot_efficient_frontier(
         res_vec::AbstractVector{<:OptimisationResult},
         pr::Pr_RR;
-        x::AbstractBaseRiskMeasure = Variance(),
-        y::AbstractBaseRiskMeasure = ExpectedReturn(),
-        c::AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
+        x::BaseRM_VecBaseRM = Variance(),
+        y::BaseRM_VecBaseRM = ExpectedReturn(),
+        c::BaseRM_VecBaseRM = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
         slv::Option{<:Slv_VecSlv} = nothing,
         fees::Option{<:Fees} = nothing,
         min_risk::Bool = true,
@@ -1175,14 +1212,20 @@ trace the efficient frontier, and optionally annotate the minimum-risk and maxim
 
   - `res_vec` / `w`: Portfolio results or weight vectors.
   - `pr` / `rd`: Prior or returns result for risk evaluation.
-  - `x`: Risk measure for the horizontal axis (default `Variance()`).
-  - `y`: Return measure for the vertical axis (default `ExpectedReturn()`).
-  - `c`: Colour-coding measure (default Sharpe ratio derived from `x`).
+  - `x`: Risk measure, or a vector of them, for the horizontal axis (default `Variance()`).
+  - `y`: Return measure, or a vector of them, for the vertical axis (default `ExpectedReturn()`).
+  - `c`: Colour-coding measure, or a vector of them (default Sharpe ratio derived from `x`).
   - `slv::Option{<:Slv_VecSlv} = nothing`: Solver passed to `factory`.
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
   - `min_risk::Bool = true`: Overlay a star marker at the minimum-risk portfolio.
   - `max_score::Bool = true`: Overlay a star marker at the portfolio that maximises `c`.
   - `factory::Bool = true`: If `true`, call [`factory`](@ref) on measures before evaluating.
+
+## Multiplicity
+
+Each axis takes one measure or a **vector** of them, collapsed to the single number the axis plots. As in [`plot_measures`](@ref) there is **no `sca` keyword**, so a **bare vector on an axis takes [`SumScalariser`](@ref)**, each element weighted by its own `settings.scale`. A scalariser reaches an axis only through a wrapper's own `sca` field, and the same documented limitation applies: those wrappers are ratios, so a [`MaxScalariser`](@ref) over a plain vector of risks cannot be expressed here.
+
+The sort that orders the frontier, and the `min_risk` and `max_score` markers, all read the **scalarised** figure, so a vector `x` orders the frontier by the aggregate rather than by any one measure. The axis label lists the element measures joined by `+`, whichever scalariser produced the number.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -1190,6 +1233,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`plot_measures`](@ref)
   - [`expected_risk`](@ref)
+  - [`Scalariser`](@ref)
 """
 function plot_efficient_frontier end
 
@@ -1197,6 +1241,7 @@ function plot_efficient_frontier end
 ## Performance summary
 ## ──────────────────────────────────────────────────────────────────────────────
 """
+    plot_performance_summary(ps::PerformanceSummaryResult; kwargs...) -> Plot
     plot_performance_summary(
         w::ArrNum,
         X::MatNum,
@@ -1206,6 +1251,7 @@ function plot_efficient_frontier end
         compound::Bool = false,
         kwargs...
     ) -> Plot
+    plot_performance_summary(ret::VecNum; periods_per_year, alpha, compound, kwargs...) -> Plot
     plot_performance_summary(w, rd::ReturnsResult, fees = nothing; alpha, compound, kwargs...) -> Plot
     plot_performance_summary(res::OptimisationResult, rd; alpha, compound, kwargs...) -> Plot
     plot_performance_summary(pred; alpha, compound, kwargs...) -> Plot
@@ -1215,8 +1261,15 @@ Bar chart of annualised portfolio performance metrics:
 annualised return, annualised volatility, Sharpe ratio, Sortino ratio, Calmar ratio,
 maximum drawdown %, and CVaR %.
 
+Every method other than the first computes a [`PerformanceSummaryResult`](@ref) with
+[`performance_summary`](@ref) and renders it. The statistics are defined and validated
+there, not here, so a caller who wants the numbers rather than the bars can call
+[`performance_summary`](@ref) directly and needs no plotting package.
+
 # Arguments
 
+  - `ps`: A [`PerformanceSummaryResult`](@ref) to render.
+  - `ret`: Periodic portfolio returns vector.
   - `w`: Portfolio weights.
   - `X`: Asset returns matrix (observations × assets).
   - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
@@ -1226,12 +1279,17 @@ maximum drawdown %, and CVaR %.
 
 # Validation
 
+Delegated to [`performance_summary`](@ref).
+
   - `0 < alpha < 1`.
+  - `periods_per_year > 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
+  - [`performance_summary`](@ref)
+  - [`PerformanceSummaryResult`](@ref)
   - [`calc_net_returns`](@ref)
 """
 function plot_performance_summary end

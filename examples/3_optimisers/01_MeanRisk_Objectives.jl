@@ -152,7 +152,8 @@ util = [optimise(MeanRisk(; r = r, obj = MaximumUtility(; l = l), opt = opt))
         for l in lambdas]
 
 sweep = map(zip(lambdas, util)) do (l, res)
-    rk, rt, rr = expected_risk_ret_ratio(r, res.ret, res.w, res.pr; rf = rf)
+    rk, rt, rr = expected_risk_ret_ratio(res.r, res.ret, res.w, res.pr; sca = res.sca,
+                                         rf = rf)
     return (l, rk, rt, rr)
 end
 pretty_table(DataFrame(; Symbol("risk aversion l") => [s[1] for s in sweep],
@@ -183,12 +184,31 @@ all three at once, which is what we use here.
 
 Any function that computes the expected portfolio return needs to know *which* return type to use;
 we stay consistent with the return measure used in each optimisation.
+
+A result carries everything needed to answer that question itself. `res.r` is the risk measure the
+optimisation ran under and `res.ret` the return term, both stored **resolved** — a deferred
+estimator has already been fitted, and a slot the caller left unstated has already taken the prior's
+field. `res.sca` is the scalariser. So the whole call can be read off the result:
+
+```julia
+expected_risk_ret_ratio(res.r, res.ret, res.w, res.pr; sca = res.sca, rf = rf)
+```
+
+That is the route to prefer. Naming the measure by hand still works, but the figure then matches the
+optimisation only if we name the *same* measure **and** the same scalariser — and `fees` and `rf`
+carry the same responsibility. The benchmark below is the exception that shows the rule: a naive
+optimisation resolves no measure and no return term, so it has neither `r` nor `ret` to hand back
+and we must name both ourselves.
 =#
 
-rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf);
-rk2, rt2, rr2 = expected_risk_ret_ratio(r, res2.ret, res2.w, res2.pr; rf = rf);
-rk3, rt3, rr3 = expected_risk_ret_ratio(r, res3.ret, res3.w, res3.pr; rf = rf);
-rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf);
+rk1, rt1, rr1 = expected_risk_ret_ratio(res1.r, res1.ret, res1.w, res1.pr; sca = res1.sca,
+                                        rf = rf);
+rk2, rt2, rr2 = expected_risk_ret_ratio(res2.r, res2.ret, res2.w, res2.pr; sca = res2.sca,
+                                        rf = rf);
+rk3, rt3, rr3 = expected_risk_ret_ratio(res3.r, res3.ret, res3.w, res3.pr; sca = res3.sca,
+                                        rf = rf);
+rk4, rt4, rr4 = expected_risk_ret_ratio(res4.r, res4.ret, res4.w, res4.pr; sca = res4.sca,
+                                        rf = rf);
 rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf);
 
 #=

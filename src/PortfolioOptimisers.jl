@@ -26,7 +26,6 @@ using LogExpFunctions: LogExpFunctions
 using MultivariateStats: MultivariateStats
 using NearestCorrelationMatrix: NearestCorrelationMatrix
 using Optim: Optim
-using PrecompileTools: PrecompileTools
 using Preferences: Preferences
 using Random: Random
 using Roots: Roots

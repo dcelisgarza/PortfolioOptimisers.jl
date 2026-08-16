@@ -478,7 +478,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkbo[cl] .= zero(eltype(X))
         end
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
@@ -511,7 +511,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), X, fees)
         end
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:VecOptRM,
                                                           <:Any, <:Any,
@@ -540,7 +540,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
             rkbo[cl] .= zero(eltype(X))
         end
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:VecOptRM,
                                                           <:Any, <:Any,
@@ -570,7 +570,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
                                               view(rkbo, :, i), cl, ro_i, X, fees)
         end
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:VecOptRM, <:Any, <:Any,
@@ -593,7 +593,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, roku, rkbo, cl, ro, X, fees)
         rkbo[cl] .= zero(eltype(X))
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:VecOptRM, <:Any, <:Any,
@@ -617,7 +617,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(roku, :, i),
                                           view(rkbo, :, i), cl, ro, X, fees)
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
                                                           <:OptimisationRiskMeasure, <:Any,
@@ -641,7 +641,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
         rkcl[i] = expected_risk(ro, rkbo, X, fees)
         rkbo[cl] .= zero(eltype(X))
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
                                                           <:OptimisationRiskMeasure, <:Any,
@@ -667,7 +667,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))
         rkcl[i] = expected_risk(ro, view(rkbo, :, i), X, fees)
     end
-    return w, rkcl, fees
+    return w, rkcl, fees, ri, ro
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -693,7 +693,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                      z_src = hec.opt.z_src)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    w, rkcl, fees = herc_risk(hec, pr, cls)
+    w, rkcl, fees, ri, ro = herc_risk(hec, pr, cls)
     nd = to_tree(clr.res)[2]
     hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]
@@ -729,15 +729,22 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
-                              w = w, fb = nothing)
+    return HierarchicalEqualRiskContributionResult(;
+                                                   hr = HierarchicalResult(; pr = pr,
+                                                                           clr = clr,
+                                                                           wb = wb,
+                                                                           fees = fees,
+                                                                           retcode = retcode,
+                                                                           w = w), ri = ri,
+                                                   ro = ro, scai = hec.scai,
+                                                   scao = hec.scao, fb = nothing)
 end
 """
     optimise(hec::HierarchicalEqualRiskContribution{
                      <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  },
             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-            branchorder::Symbol = :optimal, kwargs...) -> HierarchicalResult
+            branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
 
 Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 
@@ -752,7 +759,7 @@ Run the Hierarchical Equal Risk Contribution portfolio optimisation.
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
 """
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing},

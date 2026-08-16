@@ -81,7 +81,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for hierarchical (clustering-based) portfolio optimisation.
+Shared field core for hierarchical (clustering-based) optimisation results.
+
+Holds the fields common to [`HierarchicalRiskParityResult`](@ref) and [`HierarchicalEqualRiskContributionResult`](@ref), and is embedded as the first field (`hr`) of each — analogous to how [`JuMPOptimisationResult`](@ref) is embedded as `jr` on the JuMP side. Each leaf keeps only the measures and scalarisers its own estimator carries, plus the trailing `fb`.
+
+## The core carries no `fb`
+
+ADR 0011 fixes `fb` as the **last** field of each concrete result and keeps it out of the core, because every optimisation result already ends in `fb`. Both leaves end in `fb`, so ADR 0011's one generic `factory(res, fb)` rebuilds them by the same convention and needs no change. The core sits off [`AbstractResult`](@ref)'s optimisation branch, so that generic never reaches it.
 
 # Fields
 
@@ -89,11 +95,11 @@ $(DocStringExtensions.FIELDS)
 
 # Related
 
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
-  - [`HierarchicalRiskParity`](@ref)
-  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`BaseHierarchicalOptimisationResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
 """
-@concrete struct HierarchicalResult <: NonJuMPOptimisationResult
+@concrete struct HierarchicalResult <: BaseHierarchicalOptimisationResult
     """
     $(field_dict[:pr])
     """
@@ -118,25 +124,135 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:pw])
     """
     w
-    """
-    $(field_dict[:fb])
-    """
-    fb
     function HierarchicalResult(pr::Option{<:AbstractPriorResult},
                                 clr::Option{<:AbstractClusteringResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                                retcode::OptimisationReturnCode, w::Option{<:VecNum},
-                                fb::Option{<:OptE_Opt})
+                                retcode::OptimisationReturnCode, w::Option{<:VecNum})
         return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(retcode),
-                   typeof(w), typeof(fb)}(pr, clr, wb, fees, retcode, w, fb)
+                   typeof(w)}(pr, clr, wb, fees, retcode, w)
     end
 end
 function HierarchicalResult(; pr::Option{<:AbstractPriorResult},
                             clr::Option{<:AbstractClusteringResult},
                             wb::Option{<:WeightBounds}, fees::Option{<:Fees},
-                            retcode::OptimisationReturnCode, w::Option{<:VecNum},
-                            fb::Option{<:OptE_Opt})::HierarchicalResult
-    return HierarchicalResult(pr, clr, wb, fees, retcode, w, fb)
+                            retcode::OptimisationReturnCode,
+                            w::Option{<:VecNum})::HierarchicalResult
+    return HierarchicalResult(pr, clr, wb, fees, retcode, w)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for [`HierarchicalRiskParity`](@ref).
+
+Carries the shared core as `hr`, plus the one measure and the one scalariser its estimator holds, both stored **resolved**.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`HierarchicalOptimisationResult`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
+"""
+@concrete struct HierarchicalRiskParityResult <: HierarchicalOptimisationResult
+    """
+    Shared hierarchical result core, see [`HierarchicalResult`](@ref).
+    """
+    hr
+    """
+    $(field_dict[:r_res])
+    """
+    r
+    """
+    $(field_dict[:sca_res])
+    """
+    sca
+    """
+    $(field_dict[:fb])
+    """
+    fb
+    function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
+                                          sca::Scalariser, fb::Option{<:OptE_Opt})
+        return new{typeof(hr), typeof(r), typeof(sca), typeof(fb)}(hr, r, sca, fb)
+    end
+end
+function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
+                                      sca::Scalariser,
+                                      fb::Option{<:OptE_Opt})::HierarchicalRiskParityResult
+    return HierarchicalRiskParityResult(hr, r, sca, fb)
+end
+# Unique fields resolve directly; every other property forwards into the embedded core, so
+# `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` stay source-compatible
+# across the split. The rule is declared per leaf rather than on the abstract type, because
+# `SchurComplementHierarchicalRiskParityResult` joins the family with flat fields and has no `hr`.
+@forward_properties HierarchicalRiskParityResult begin
+    forward(hr)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for [`HierarchicalEqualRiskContribution`](@ref).
+
+Carries the shared core as `hr`, plus the **two** measures and **two** scalarisers its estimator holds — the intra-cluster pair and the inter-cluster pair — all stored **resolved**.
+
+The differing arity against [`HierarchicalRiskParityResult`](@ref) is why the shared `HierarchicalResult` split into two leaves rather than growing `Option` slots or union-typed fields.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`HierarchicalOptimisationResult`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+"""
+@concrete struct HierarchicalEqualRiskContributionResult <: HierarchicalOptimisationResult
+    """
+    Shared hierarchical result core, see [`HierarchicalResult`](@ref).
+    """
+    hr
+    """
+    $(field_dict[:ri_res])
+    """
+    ri
+    """
+    $(field_dict[:ro_res])
+    """
+    ro
+    """
+    $(field_dict[:scai])
+    """
+    scai
+    """
+    $(field_dict[:scao])
+    """
+    scao
+    """
+    $(field_dict[:fb])
+    """
+    fb
+    function HierarchicalEqualRiskContributionResult(hr::HierarchicalResult,
+                                                     ri::BaseRM_VecBaseRM,
+                                                     ro::BaseRM_VecBaseRM, scai::Scalariser,
+                                                     scao::Scalariser,
+                                                     fb::Option{<:OptE_Opt})
+        return new{typeof(hr), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
+                   typeof(fb)}(hr, ri, ro, scai, scao, fb)
+    end
+end
+function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,
+                                                 ri::BaseRM_VecBaseRM, ro::BaseRM_VecBaseRM,
+                                                 scai::Scalariser, scao::Scalariser,
+                                                 fb::Option{<:OptE_Opt})::HierarchicalEqualRiskContributionResult
+    return HierarchicalEqualRiskContributionResult(hr, ri, ro, scai, scao, fb)
+end
+@forward_properties HierarchicalEqualRiskContributionResult begin
+    forward(hr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -441,4 +557,5 @@ function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeas
     return nothing
 end
 
-export HierarchicalResult, HierarchicalOptimiser
+export HierarchicalResult, HierarchicalRiskParityResult,
+       HierarchicalEqualRiskContributionResult, HierarchicalOptimiser

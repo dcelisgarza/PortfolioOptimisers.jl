@@ -425,13 +425,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Value-at-Risk Range risk measure.
 
-`ValueatRiskRange` computes the difference between the lower-tail Value-at-Risk (at level `alpha`) and the upper-tail Value-at-Risk (at level `beta`), measuring the spread between downside and upside tail risks.
+`ValueatRiskRange` evaluates the Value-at-Risk at level `alpha` on the portfolio returns and the Value-at-Risk at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside tail.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,\\,.
+\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,.
 \\end{align}
 ```
 
@@ -470,7 +470,7 @@ Keywords correspond to the struct's fields.
 
     (r::ValueatRiskRange)(x::VecNum)
 
-Computes the VaR Range of a portfolio returns vector `x`.
+Computes the VaR Range of a portfolio returns vector `x`, as the sum of the two tail quantiles. The method holds the upper tail in the negated convention of [`ValueatRisk`](@ref), so it writes the sum as `loss - gain`.
 
 ## Arguments
 
@@ -595,8 +595,14 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights})(x::VecNum)
     idx = ifelse(idx > length(x), idx - 1, idx)
     loss = -sorted_x[idx]
 
-    sorted_x = reverse!(sorted_x)
-    sorted_w = reverse!(sorted_w)
+    # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
+    # `reverse!` on them writes through into the caller's `x` and into `r.w` —
+    # `get_observation_weights` hands back the stored weights object itself, so the measure
+    # would permute its own configuration. `order` was just allocated by `sortperm`, so it is
+    # ours to mutate, and the element sequence read below is identical.
+    reverse!(order)
+    sorted_x = view(x, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, sw * r.beta)
     idx = ifelse(idx > length(x), idx - 1, idx)

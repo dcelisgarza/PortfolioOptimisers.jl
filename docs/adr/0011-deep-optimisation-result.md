@@ -106,3 +106,127 @@ AbstractResult
   every JuMP result, because `:fees` was never in their flat `propertynames` even before the refactor.
 - Verified: full suite green (4544 passing); the only failures pre-fix were 7 plotting errors, all
   routed through `extract_pr`, cleared by the introspection fix.
+
+## Amendment (2026-08-16)
+
+The value-level `expected_*` multiplicity work made a resolved risk measure **fitted state**, so a
+result must be able to name the measure and the scalariser it optimised. Two branches of the tree
+above changed as a consequence. The diagram in the Decision section is **wrong, not superseded** —
+the embedded-core pattern and the `fb`-last rule both survive unchanged, and this amendment redraws
+the tree rather than replacing the decision.
+
+### The redrawn tree
+
+```text
+AbstractResult
+├── BaseJuMPOptimisationResult                    (abstract — off AbstractResult, not in the result hierarchy)
+│    └── JuMPOptimisationResult                   (core: pa, retcode, sol, model)
+├── BaseHierarchicalOptimisationResult            (new abstract — off AbstractResult, not in the result hierarchy)
+│    └── HierarchicalResult                       (now a core: pr, clr, wb, fees, retcode, w)
+└── OptimisationResult
+     ├── NonFiniteAllocationOptimisationResult
+     │    ├── RiskJuMPOptimisationResult          (every subtype now carries a resolved r)
+     │    │    ├── MeanRiskResult                    (jr, r, fb)
+     │    │    ├── RiskBudgetingResult               (jr, r, prb, fb)
+     │    │    ├── NearOptimalCenteringResult        (jr, r, w_min/opt/max/noc_retcode, fb)
+     │    │    └── FactorRiskContributionResult      (jr, r, rr, frc_plr, fb)
+     │    ├── NonRiskJuMPOptimisationResult       (new abstract — the JuMP results that carry no measure)
+     │    │    └── RelaxedRiskBudgetingResult        (jr, prb, fb)
+     │    └── NonJuMPOptimisationResult
+     │         ├── NaiveOptimisationResult           (flat)
+     │         ├── HierarchicalOptimisationResult (new abstract)
+     │         │    ├── HierarchicalRiskParityResult              (hr, r, sca, fb)
+     │         │    ├── HierarchicalEqualRiskContributionResult   (hr, ri, ro, scai, scao, fb)
+     │         │    └── SchurComplementHierarchicalRiskParityResult (flat: pr, wb, clr, r, gamma, retcode, w, fb)
+     │         ├── NestedClusteredResult             (flat)
+     │         ├── StackingResult                    (flat)
+     │         └── SubsetResamplingResult            (flat)
+     └── FiniteAllocationOptimisationResult       (DiscreteAllocationResult, GreedyAllocationResult — unchanged)
+```
+
+One drift predates this amendment and is recorded here rather than silently corrected: the Decision
+section calls `JuMPOptimisationResult` "the five always-present fields (`oe, pa, retcode, sol,
+model`)". `oe` is no longer a field; the core carries four. The diagram above states the measured
+tree.
+
+### The hierarchical core
+
+`HierarchicalResult` was a concrete leaf shared by `HierarchicalRiskParity` and
+`HierarchicalEqualRiskContribution`. The two estimators carry a **different arity** of measures —
+HRP holds one measure and one scalariser, HERC holds an intra-cluster pair and an inter-cluster
+pair — so a shared leaf could only have grown `Option` slots or union-typed fields. It became a
+**core** instead, on the same pattern the Decision section already fixed for `JuMPOptimisationResult`:
+
+- `HierarchicalResult` keeps the six always-present fields (`pr, clr, wb, fees, retcode, w`) and is
+  embedded as the **first** field, named `hr`, of each leaf.
+- It sits on its own `BaseHierarchicalOptimisationResult` branch off `AbstractResult` and **does
+  not** enter the result hierarchy, so the generic
+  `factory(res::NonFiniteAllocationOptimisationResult, fb)` never reaches it.
+- It **lost** its `fb`, exactly as the `fb`-last rule requires: `fb` belongs to the concrete result,
+  not the core. Both leaves end in `fb`, so the one generic `factory` rebuilds them unchanged.
+- Property forwarding is declared **per leaf** with `@forward_properties`, not on the abstract type,
+  because the third family member has no `hr` — see below.
+
+### The two new abstract types
+
+- **`BaseHierarchicalOptimisationResult`** is the core branch, mirroring
+  `BaseJuMPOptimisationResult`. Its one subtype is `HierarchicalResult`.
+- **`HierarchicalOptimisationResult`** groups the results of the estimators that embed a
+  `HierarchicalOptimiser`. The membership rule is exact and is the estimator's, not the field
+  block's. The family is deliberately **not** named `ClusteringOptimisationResult`:
+  `ClusteringOptimisationEstimator` has a fourth subtype, `NestedClustered`, which holds no
+  `HierarchicalOptimiser`, so `NestedClusteredResult` stays flat under `NonJuMPOptimisationResult`.
+
+Both are **unexported**, per the repository convention that abstract types stay unexported unless
+asked for.
+
+### Schur is a member by supertype only
+
+`SchurComplementHierarchicalRiskParityResult` moved from `NonJuMPOptimisationResult` to
+`HierarchicalOptimisationResult`, because its estimator embeds a `HierarchicalOptimiser`. It does
+**not** embed `HierarchicalResult`: its field set genuinely differs — it carries `gamma`, and it has
+no `fees` field. It gained a resolved `r` and **no** scalariser, because `SchurComplementParams.r`
+is bounded `Sd_Var` and it holds one measure per bundle rather than a vector to combine. This
+supertype-only membership is why the `hr` forwarding rule is declared on the two leaves rather than
+on `HierarchicalOptimisationResult`.
+
+### The other four `NonJuMPOptimisationResult` types stay flat
+
+`NaiveOptimisationResult`, `NestedClusteredResult`, `StackingResult` and `SubsetResamplingResult`
+are untouched. None embeds a `HierarchicalOptimiser`, none gained a core, and none gained an `r`.
+The umbrella keeps the role the Decision section gave it: a dispatch marker carrying no shared
+behaviour.
+
+### The JuMP half split in two
+
+`RiskJuMPOptimisationResult` was the only JuMP result branch. Making `r` fitted state made it
+mandatory on that branch — but a `RelaxedRiskBudgeting` run builds its constraints straight from
+`pr.sigma` and never resolves a measure. Rather than make `r` an `Option` slot on a shared type,
+the branch split:
+
+- **`RiskJuMPOptimisationResult`** now means "JuMP result that carries a risk measure". Every
+  subtype carries a mandatory resolved `r` as its second field, straight after `jr`.
+- **`NonRiskJuMPOptimisationResult`** is the sibling half, for JuMP results that carry none.
+  `RelaxedRiskBudgetingResult` is its first member; it previously shared `RiskBudgetingResult`.
+- **`RJR_NRJR`** is the union of the two halves. The default `getproperty` and `propertynames`
+  moved onto the union, **not** onto either half. `MeanRiskResult` and `NearOptimalCenteringResult`
+  declare no `@forward_properties` rule and depend on that default for `res.w`, so binding it to
+  one half alone would silently cost the next measure-less leaf its property forwarding.
+
+The scalariser rides the attributes rather than the result core on this branch:
+`ProcessedJuMPOptimiserAttributes` gained `sca`, so a JuMP result reaches it as `res.sca` through
+the existing `pa` fall-through and no JuMP result type needed a `sca` field.
+
+### Consequences of this amendment
+
+- The `fb`-last convention still holds for **every** optimisation result, so the generic `factory`
+  is unchanged. Two new cores now sit off the result hierarchy instead of one.
+- `propertynames` on a hierarchical result is now `(:hr, …, :fb)`, with the six core names reachable
+  through `getproperty` but no longer listed — the same introspection caveat the Decision section
+  recorded for `:jr`. `SchurComplementHierarchicalRiskParityResult` is unaffected; it is still flat.
+- `HierarchicalResult` remains **exported** and remains constructible, but it is now a core rather
+  than something `optimise` returns. The two names to reach for are `HierarchicalRiskParityResult`
+  and `HierarchicalEqualRiskContributionResult`.
+- Three abstract branches now exist where a caller might have written
+  `res isa RiskJuMPOptimisationResult` to mean "any JuMP result". That predicate must become
+  `res isa RJR_NRJR`.

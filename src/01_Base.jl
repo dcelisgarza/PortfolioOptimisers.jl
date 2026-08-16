@@ -415,9 +415,11 @@ const arg_dict = Dict(
                       # Optimiser fields.
                       :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
                       :r_opt => "`r`: Risk measure or vector of risk measures.",#
+                      :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored **resolved** — a **Deferred Quantity** has already been fitted and an unstated slot has already taken the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
                       :obj => "`obj`: Portfolio objective function.",#
                       :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                       :sca => "`sca`: Scalariser for combining multiple risk measures.",#
+                      :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one.",#
                       :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
                       :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default budgets *bound* the realised exposure rather than pinning it (see `xbgt`). Together with `sbgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
                       :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, a [`BudgetRange`](@ref) bounds it; by default it *bounds*, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. Together with `bgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
@@ -537,17 +539,25 @@ const arg_dict = Dict(
                       :dub => "`dub`: Default upper bound.",#
                       :err => "`err`: Tracking error tolerance.",#
                       :tralg => "`alg`: Tracking formulation algorithm.",#
-                      :rt => "`rt`: Returns estimator.",#
-                      :rk => "`rk`: Risk measure for ratio computation.",#
+                      :rt => "`rt`: Returns estimator, or a vector of them. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`. There is no scalariser on the return axis.",#
+                      :rk => "`rk`: Risk measure for ratio computation, or a vector of them scalarised by `sca`.",#
                       :ohf => "`ohf`: Whether to compute the ratio only for long positions.",#
                       :r1 => "`r1`: First risk measure.",#
                       :r2 => "`r2`: Second risk measure.",#
+                      :r1_vec => "`r1`: First risk measure, or a vector of them scalarised by `sca1`.",#
+                      :r2_vec => "`r2`: Second risk measure, or a vector of them scalarised by `sca2`.",#
+                      :sca_rk => "`sca`: Scalariser combining the risk measures in `rk` into one number. Inert when `rk` holds a single measure. The field beats a `sca` keyword supplied at the call site.",#
+                      :sca_r1 => "`sca1`: Scalariser combining the risk measures in `r1` into one number. Inert when `r1` holds a single measure.",#
+                      :sca_r2 => "`sca2`: Scalariser combining the risk measures in `r2` into one number. Inert when `r2` holds a single measure.",#
                       :ri => "`ri`: Inner risk measure.",#
+                      :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
+                      :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
                       :ro => "`ro`: Outer risk measure.",#
                       :scai => "`scai`: Inner scalariser.",#
                       :scao => "`scao`: Outer scalariser.",#
                       :params => "`params`: Schur complement decomposition parameters.",#
                       :gamma_schur => "`gamma`: Schur complement decomposition parameter.",#
+                      :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
                       :z => "`z`: Regularisation coefficient for log risk budgeting.",#
                       :tol => "`tol`: Convergence tolerance.",#
                       :iter => "`iter`: Maximum number of iterations.",#
@@ -597,12 +607,13 @@ const arg_dict = Dict(
                       :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
                       # Risk budgeting.
                       :prb => "`prb`: Processed risk budgeting configuration.",#
-                      :l_wass => "`l`: Wasserstein ambiguity scale factor.",#
-                      :r_wass => "`r`: Wasserstein radius parameter.",#
+                      :l_wass => "`l`: Weight of the tail term in the Esfahani-Kuhn loss. The mean term is not scaled by it.",#
+                      :r_wass => "`r`: Radius of the type-1 Wasserstein ambiguity ball. It multiplies a decision variable, so it is not a constant offset.",#
                       :g_rm => "`g`: Risk aversion parameter.",#
                       :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
                       :w1_owa => "`w1`: Optional first OWA weight vector.",#
                       :w2_owa => "`w2`: Optional second OWA weight vector.",#
+                      :rev_owa => "`rev`: Whether `w2` is *already* reversed. It is a done-flag, not an instruction: the constructor reverses `w2` when `rev == false`, and leaves it as-is when `rev == true`. The field is stored as `true` whatever the caller passes, because `w2` is reversed by the time the object exists, so rebuilding an instance from its own fields does not reverse twice. A default-constructed instance therefore prints `rev` as `true`.",#
                       :owa_w => "`w`: Optional OWA weight vector.",#
                       :owa_method => "`method`: OWA weight estimation method.",#
                       :lm_k => "`k`: L-moment order.",#
@@ -680,7 +691,19 @@ const arg_dict = Dict(
                       :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
                       :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                       :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
-                      :schalg => "`alg`: Schur complement algorithm variant.")
+                      :schalg => "`alg`: Schur complement algorithm variant.",#
+                      :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
+                      :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
+                      :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
+                      :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
+                      :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
+                      :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
+                      :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. `NaN` if the volatility is zero.",#
+                      :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`, corrected for the skewness and excess kurtosis of the returns.",#
+                      :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
+                      :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
+                      :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
+                      :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.")
 """
     field_dict
 
@@ -2748,6 +2771,14 @@ Get the observation weights for statistical estimation.
 `nothing` is returned only when `w === nothing`, and means *no weights were requested* — every `isnothing` branch downstream reads it that way and computes an unweighted result. It never means *weights were unavailable*: a [`DynamicAbstractWeights`](@ref) with no method for the given input shape throws [`ObservationWeightsError`](@ref) rather than resolving to `nothing`, because returning `nothing` there would silently yield an unweighted answer that looks plausible.
 
 This is why call sites need no strictness check of their own. A `DynamicAbstractWeights` is resolved *before* dispatch (see [`average_drawdown`](@ref) for the pattern), so the estimator downstream only ever sees a concrete weight vector or a deliberate `nothing`.
+
+## The returned vector is borrowed, not owned
+
+For a `StatsBase.AbstractWeights` this returns **the stored object itself**, not a copy — an estimator's `w` field is handed straight back. So the caller may **read** it but must never **mutate** it: writing through it permutes the estimator's own configuration, and every later evaluation of that estimator is then wrong.
+
+This is the same obligation the rest of `src/` already meets: a `reverse!` or a `sort!` is applied only to a vector the surrounding expression has just allocated. Beware the indirect route in particular — `view(w, order)` is a **view**, so `reverse!` on the view writes through into `w` just as surely as `reverse!(w)` would. Reverse the permutation instead, or sort into a fresh vector.
+
+A defensive copy here was considered and rejected: it would cost an allocation on every evaluation of every weighted estimator, and the obligation is cheap to keep.
 
 # Arguments
 

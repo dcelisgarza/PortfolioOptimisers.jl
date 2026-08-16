@@ -160,6 +160,7 @@ assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
 solver_selector
 VecBaseRM
+BaseRM_VecBaseRM
 VecOptRM
 OptRM_VecOptRM
 VecRM
