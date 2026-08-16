@@ -141,3 +141,37 @@ caller wrote, and stating it here is cheaper than a guess at the intent.
 `opt.sca` beside a vector-valued `opt.ret` and looks for its twin finds this document instead
 of an inconsistency, which is the debt [#267](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/267)
 closed owing.
+
+## Amendment (2026-08-16)
+
+**The single-term invariance widens from `scale = 1` to *any* lone `scale`.**
+
+The Consequences section above states `model[:ret] == model[:ret_1]` for one term **at
+`scale = 1`**. That qualifier described the code accurately and hid a defect. The singular
+route,
+[`set_return_constraints!(model, pret::JuMPReturnsEstimator, …)`](../../src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
+carried no step that dropped the weight, so a lone term at `scale = 2` built
+`model[:ret] == 2 * model[:ret_1]`.
+
+That is observable. It moves `MaximumUtility`'s return/risk trade-off and Near Optimal
+Centering's return barrier. It is *not* observable under `MinimumRisk`, `MaximumReturn` or
+`MaximumRatio`, all of which are argmax-invariant under a positive rescale of `:ret`, which is
+why it survived unnoticed. Measured on ten assets, a lone term moved `MaximumUtility`'s weights
+by **0.268** between `scale = 1` and `scale = 50`, while the other three objectives moved by
+about `1e-6`.
+
+The rule is now stated on its own terms in ADR 0053: `scale` is a **Combination Weight**, and
+one element is not a combination. The singular route drops the weight through
+`unit_scale_returns_estimator`, the return-axis twin of `unit_scale_risk_measure`. So the
+invariance above now holds for **every** lone `scale`, not only for `1`.
+
+**The fee multiplier is untouched.** The Consequences section's `Σ_{i: fee} scaleᵢ` statement
+is about *relative* weights among **several** terms, and several terms are a combination. It
+stands exactly as written. Exempting the return axis on the ground that `scale` has an absolute
+meaning there was considered and rejected: with one term, `0.5·(μ'w − fees)` against
+`1·(μ'w − fees)` is a pure rescale of `:ret`, which is the situation the risk axis had already
+resolved. An asymmetry between the two axes had no justification.
+
+**`lb` is unaffected.** It binds on the term's own expression, before `scale` is applied, so
+dropping a lone weight cannot move a bound. `rte`, `fee` and `mic` are not weights either, and
+all four survive the drop.

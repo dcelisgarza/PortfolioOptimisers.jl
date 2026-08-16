@@ -343,6 +343,47 @@ function no_bounds_returns_settings(settings::JuMPReturnsSettings)
                                fee = settings.fee, mic = settings.mic)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of return term `r` with its `scale` set to `one(scale)`. A term that already
+carries a unit scale is returned unchanged, so the common path allocates nothing.
+
+`scale` is a combination weight: it says how much this term contributes to the return
+expression built from several terms. One term is not a combination, so the weight has
+nothing to weigh and the singular route drops it. `lb`, `rte`, `fee` and `mic` are not
+weights, so they survive: the bound still binds on the term's own expression and the term
+still charges the same fees.
+
+This is the return-axis twin of [`unit_scale_risk_measure`](@ref).
+
+# Arguments
+
+  - `r`: A [`JuMPReturnsEstimator`](@ref).
+
+# Returns
+
+  - Return term carrying a unit scale.
+
+# Related
+
+  - [`unit_scale_risk_measure`](@ref)
+  - [`no_bounds_returns_settings`](@ref)
+  - [`set_return_constraints!`](@ref)
+"""
+function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
+    settings = r.settings
+    scale = settings.scale
+    return if isone(scale)
+        r
+    else
+        Accessors.@set r.settings = JuMPReturnsSettings(; scale = one(scale),
+                                                        lb = settings.lb,
+                                                        rte = settings.rte,
+                                                        fee = settings.fee,
+                                                        mic = settings.mic)
+    end
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 JuMP return term that computes portfolio returns as the logarithmic (geometric)
@@ -1207,6 +1248,15 @@ onto `:ret_vec`.
 """
 function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
+    # `scale` is a combination weight, so it is dropped here: one term is not a combination
+    # and the weight has nothing to weigh. The vector method below keeps every element's
+    # weight, because there the terms really do combine.
+    #
+    # `pret` is rebound before *both* uses on purpose. The second use feeds
+    # `aggregate_return_characteristic`, which applies `settings.scale` to `mu_i` in its own
+    # right. Dropping the weight at the first call alone would leave `MaximumRatio`'s
+    # normalisation scaled while `:ret` is not — worse than not dropping it at all.
+    pret = unit_scale_returns_estimator(pret)
     mu, robust = set_return_constraints!(model, 1, pret, pr; kwargs...)
     scalarise_return_expression!(model)
     set_max_ratio_return_constraints!(model, obj, (pret,), [mu], [robust], pr)

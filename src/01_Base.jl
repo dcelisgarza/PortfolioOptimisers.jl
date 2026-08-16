@@ -336,7 +336,7 @@ const arg_dict = Dict(
                       :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
                       # Return term settings.
                       :settings_rt => "`settings`: Return term settings.",#
-                      :scale_rt => "`scale`: Scaling factor applied to the return term in the weighted sum that forms the `JuMP` return expression.",#
+                      :scale_rt => "`scale`: Weight of this return term in the weighted sum that forms the `JuMP` return expression. It is a combination weight, so it is inert on a single term: an optimiser given one term drops it before the return expression is built, and the value-level readers ignore it too. The lower bound in `lb` binds on the term's own expression, before `scale` is applied.",#
                       :lb_rts => "`lb`: Lower bound(s) for the return term. Can be a scalar, vector, or [`Frontier`](@ref). The bound binds on the term's own expression, net of the term's own flagged charges and before `scale` is applied, and it binds whether or not `rte` is `true`.",#
                       :rte => "`rte`: Whether to include the return term in the `JuMP` return expression.",#
                       :fee_rts => "`fee`: Whether to subtract the portfolio fees from this return term. Set it to `false` for a term that is not in return units.",#
