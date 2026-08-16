@@ -305,7 +305,7 @@
 
     @testset "plot_efficient_frontier" begin
         # Frontier result (VecVecNum weights)
-        mr_f  = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 8))))
+        mr_f  = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 8)))))
         res_f = optimise(mr_f, rd)
         @test is_plot(plot_efficient_frontier(res_f, rd))
         @test is_plot(plot_efficient_frontier(res_f, pr))

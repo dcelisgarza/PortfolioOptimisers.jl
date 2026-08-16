@@ -308,35 +308,48 @@ the combination that was previously inexpressible.
 The paper is explicit that "expected return" is incidental: the construction works for *any*
 per-asset characteristic, and its Table III ranks on estimated volatility instead.
 
-This needs no new machinery — just a prior whose mean slot carries standard deviations:
+The characteristic belongs to the **return term**, so that is where it goes.
+[`ArithmeticReturn`](@ref)'s `mu` slot takes the vector itself, or — as here — the estimator
+that computes it, which is resolved against the optimisation's own prior when the model is
+built (ADR 0051). Naming the estimator rather than pasting a vector is what lets the ranking
+refit per cross-validation fold and per meta-optimiser subset:
 =#
 
-pr_vol = prior(EmpiricalPrior(; me = StandardDeviationExpectedReturns()), rd)
 w_vol = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
-                          opt = JuMPOptimiser(; pe = pr_vol, slv = slv, bgt = 1.0,
+                          opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.0,
                                               wb = WeightBounds(; lb = 0.0, ub = 1.0),
                                               ret = ArithmeticReturn(;
+                                                                     mu = StandardDeviationExpectedReturns(),
                                                                      ucs = L1UncertaintySet(;
                                                                                             eps = 0.05))))).w
+sd_assets = sqrt.(diag(pr.sigma))
 act_vol = findall(>(1e-6), w_vol)
-pretty_table(DataFrame(; asset = rd.nx[act_vol], volatility = pr_vol.mu[act_vol],
+pretty_table(DataFrame(; asset = rd.nx[act_vol], volatility = sd_assets[act_vol],
                        weight = w_vol[act_vol]); formatters = [resfmt])
 
 #=
-Mind the direction. The objective *maximises* the characteristic, so putting volatility in the
-mean slot ranks the **most** volatile assets first — which is the opposite of the Low
-Volatility factor the paper is chasing. A characteristic is only "attractive" if larger is
-better; when it is not, negate it:
+!!! warning "Do not put the characteristic in the outer prior"
+    An earlier version of this page ranked on volatility by building the *prior* on
+    [`StandardDeviationExpectedReturns`](@ref) and leaving the term bare. On this page the two
+    routes agree to the last bit, because `NoRisk` means nothing else reads `μ`. They stop
+    agreeing the moment anything does: every moment risk measure centres on the prior's `μ`,
+    as do the value-at-risk family and [`MaximumRatio`](@ref)'s normalisation. Swap `NoRisk`
+    for a mean-centred measure and the hijack silently measures deviation about a vector of
+    *volatilities*: the same nominal problem then solves to a different portfolio, and nothing
+    warns. The prior's `μ` is the universe's expected returns; a ranking is not one, so it
+    rides on the term.
+
+Mind the direction. The objective *maximises* the characteristic, so ranking on volatility
+puts the **most** volatile assets first — the opposite of the Low Volatility factor the paper
+is chasing. A characteristic is only "attractive" if larger is better; when it is not, negate
+it. The `mu` slot takes a plain vector too:
 =#
 
-sd_assets = sqrt.(diag(pr.sigma))
-pr_lowvol = prior(EmpiricalPrior(; me = CustomValueExpectedReturns(; val = -sd_assets)), rd)
+lowvol = ArithmeticReturn(; mu = -sd_assets, ucs = L1UncertaintySet(; eps = 0.05))
 w_lowvol = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
-                             opt = JuMPOptimiser(; pe = pr_lowvol, slv = slv, bgt = 1.0,
+                             opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.0,
                                                  wb = WeightBounds(; lb = 0.0, ub = 1.0),
-                                                 ret = ArithmeticReturn(;
-                                                                        ucs = L1UncertaintySet(;
-                                                                                               eps = 0.05))))).w
+                                                 ret = lowvol))).w
 act_lv = findall(>(1e-6), w_lowvol)
 pretty_table(DataFrame(; asset = rd.nx[act_lv], volatility = sd_assets[act_lv],
                        weight = w_lowvol[act_lv]); formatters = [resfmt])
@@ -352,7 +365,59 @@ minus sign between them.
  universe = round.(extrema(sd_assets); sigdigits = 3))
 
 #=
-## 10. Composing with constraints
+## 10. Several terms at once, and what a floor costs
+
+A ranking is one thing to want and an expected return is another, and an optimiser takes
+**both**: `ret` accepts a vector of return terms, exactly as `r` accepts a vector of risk
+measures. The model's return expression is their weighted sum `Σᵢ scaleᵢ · retᵢ` — there is no
+scalariser on this side and there is not going to be one (ADR 0052).
+
+The interesting term is the one that stays **out** of that sum. Every term carries a
+[`JuMPReturnsSettings`](@ref) bundle, and setting `rte = false` keeps the term out of the
+objective while its own `lb` still binds. That is a **constraint-only** return term: it shapes
+the feasible set and is never rewarded.
+
+So the low-volatility quintile above can be asked what it costs to keep a floor under the
+portfolio's ordinary expected return. The floor term states no `mu` of its own, so it falls
+back to the prior's — the real expected returns, which is exactly the quantity the hijack
+would have overwritten:
+=#
+
+floor_term(lb) = ArithmeticReturn(; settings = JuMPReturnsSettings(; rte = false, lb = lb))
+function lowvol_with_floor(lb)
+    return optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.0,
+                                                 wb = WeightBounds(; lb = 0.0, ub = 1.0),
+                                                 ret = [lowvol, floor_term(lb)]))).w
+end
+
+floors = [0.0, 0.0005, 0.001, 0.0015]
+ws = [iszero(lb) ? w_lowvol : lowvol_with_floor(lb) for lb in floors]
+pretty_table(DataFrame(; floor = ["none", "0.05 %", "0.10 %", "0.15 %"],
+                       names = [count(>(1e-6), w) for w in ws],
+                       expected_return = [dot(pr.mu, w) for w in ws],
+                       avg_volatility = [dot(sd_assets, w) for w in ws]);
+             formatters = [resfmt])
+
+#=
+The floor binds exactly — the realised expected return sits on it at every level — and the
+price is paid in the currency the first term is denominated in: the portfolio holds fewer
+names and louder ones as the floor rises. That is the trade the two terms were written to
+price, and neither term could express it alone.
+
+Two things to keep in mind when a model carries several terms:
+
+  - **`scale` is a weight, not a normalisation.** The terms are summed as written, so two
+    terms are not averaged unless you halve both. Fees follow the same arithmetic: a term
+    charges them only if its `fee` flag says so, so two flagged terms at `scale = 1` subtract
+    the fees twice. That is a statement about the configuration, not a defect — set `fee` and
+    `mic` to `false` on any term that is not in return units.
+  - **`rte = false` covers two different wants.** A term that is not in return units has no
+    business in a sum of returns; and a term that *is* in return units, like the floor above,
+    may still be wanted as a bound alone. The flag says only "this term does not enter the
+    objective" — its `lb` binds either way.
+
+## 11. Composing with constraints
 
 None of the above is special-cased, which is the whole reason the quintile portfolio is an
 uncertainty set rather than an optimiser. Every constraint in the library still applies. Cap
@@ -374,7 +439,7 @@ Note the active count moved away from the requested four — exactly the calibra
 section 3. The radius still says "four assets"; the weight cap says otherwise, and the cap
 wins.
 
-## 11. The benchmarks
+## 12. The benchmarks
 
 The paper's motivation is that these heuristics beat the theory-based portfolios. Those are
 all ordinary `MeanRisk` recipes. Note that GMRP — maximise return, no risk term — is the same
@@ -456,7 +521,7 @@ cannot price, and the trade only pays out of sample — which this page does not
 [cross validation](../5_validation_tuning/01_Cross_Validation.md) examples for the machinery that
 does.
 
-## 12. Takeaways
+## 13. Takeaways
 
   - The quintile and 1/N portfolios are **exact solutions** of a robust optimisation problem,
     not heuristics. `ε` is the only dial and it decides how many assets you hold.
@@ -469,7 +534,11 @@ does.
     the *geometry of the ball*.
   - Budgets **bound** realised exposure rather than pinning it; `xbgt` pins them, at the price
     of a MILP.
-  - The characteristic need not be a return — a prior on
-    [`StandardDeviationExpectedReturns`](@ref) ranks on volatility instead. Mind the
+  - The characteristic need not be a return — [`ArithmeticReturn`](@ref)'s `mu` slot ranks on
+    whatever you put in it, including the estimator that computes it. Put it on the **term**,
+    never in the outer prior, whose `μ` every mean-centred risk measure reads. Mind the
     direction: the objective maximises, so negate any characteristic where smaller is better.
+  - `ret` takes **several terms**, summed with weights (ADR 0052). A term with `rte = false`
+    stays out of the objective and keeps its own `lb`, which is how you price what a floor on
+    one quantity costs in another.
 =#

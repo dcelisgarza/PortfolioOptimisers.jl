@@ -67,6 +67,9 @@ assert_shared_state
 shared_set!
 shared_has
 shared_get
+frontier_point_count
+frontier_sweep_points
+assert_frontier_sweep_cap
 state_key
 state_set!
 state_has

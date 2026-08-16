@@ -219,10 +219,58 @@ function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothin
     assert_internal_optimiser(opt)
     return nothing
 end
+"""
+    stated_constraint_space_basis(space::FactorSpace) -> Bool
+    stated_constraint_space_basis(ece::ExposureConstraintEstimator) -> Bool
+    stated_constraint_space_basis(lcse::AbstractVector) -> Bool
+    stated_constraint_space_basis(::Any) -> Bool
+
+Report whether anything in an `lcse` slot carries a **precomputed** basis, so an outer optimiser can refuse it.
+
+A stated basis is asset-indexed data written before the universe was known. An inner solve slices the universe, and [`port_opt_view`](@ref) slices the basis with it, so a stated basis is legal there. An outer solve *replaces* the universe with cluster names, and no slice of asset loadings follows that — so it must be refused, in the same shape as the refusals on `opt.re` and `opt.rba.re`.
+
+The predicate is `false` for everything else, including a space whose `re` is an *estimator*: an estimator refits against whatever universe it is handed, which is exactly what makes it the remedy the message names.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`FactorSpace`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function stated_constraint_space_basis(space::FactorSpace)::Bool
+    return isa(space.re, AbstractRegressionResult)
+end
+function stated_constraint_space_basis(::Any)::Bool
+    return false
+end
+function stated_constraint_space_basis(ece::ExposureConstraintEstimator)::Bool
+    return stated_constraint_space_basis(ece.space)
+end
+function stated_constraint_space_basis(lcse::AbstractVector)::Bool
+    return any(stated_constraint_space_basis, lcse)
+end
+"""
+    assert_external_lcse(opt) -> Nothing
+
+Assert that an outer optimiser's `lcse` slot carries no precomputed basis.
+
+Factored out because the three JuMP-side [`assert_external_optimiser`](@ref) methods all need it and already share the precomputed-prior refusal. See [`stated_constraint_space_basis`](@ref) for why an outer solve refuses what an inner one views.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`stated_constraint_space_basis`](@ref)
+"""
+function assert_external_lcse(opt)::Nothing
+    @argcheck(!stated_constraint_space_basis(opt.opt.lcse),
+              ArgumentError("a constraint space in opt.opt.lcse cannot hold a precomputed AbstractRegressionResult in re; use an estimator instead. The outer problem replaces the asset universe with cluster names, so stated loadings cannot be sliced to follow it, and a row re-based through them would name assets that no longer exist"))
+    return nothing
+end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
               ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -247,6 +295,7 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
         @argcheck(!isa(opt.rba.re, AbstractRegressionResult),
                   ArgumentError("opt.rba.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
     end
+    assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -256,6 +305,7 @@ function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
               ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     @argcheck(!isa(opt.re, AbstractRegressionResult),
               ArgumentError("opt.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
+    assert_external_lcse(opt)
     assert_internal_optimiser(opt)
     return nothing
 end

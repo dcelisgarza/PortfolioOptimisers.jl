@@ -10,6 +10,8 @@ needs_previous_weights(opt::MeanRisk)
 factory(mr::MeanRisk, w::AbstractVector)
 port_opt_view(mr::MeanRisk, i, X::MatNum, args...)
 solve_mean_risk!
+return_term
+set_ret_frontier_parameters!
 compute_ret_lbs
 _rebuild_risk_frontier
 rebuild_risk_frontier

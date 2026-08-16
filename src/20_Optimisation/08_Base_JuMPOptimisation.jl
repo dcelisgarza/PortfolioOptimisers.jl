@@ -919,13 +919,18 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # the weights through its own prefixed `:w`; it does not
                                   # reshape the long/short parts.
                                   :lw, :sw, :wp, :wn, :w1, :w_obj, :wip,
-                                  # Returns and objective plumbing, outer level only.
-                                  :ohf, :op, :cost_bgt_expr, :bucs_w, :t_eucs_gw, :sr_risk,
-                                  # Risk accumulation and frontier bookkeeping: collected by
-                                  # the terminal scalarise seam (ADR 0024), which runs once
-                                  # at the outer level. A nested build returns its
-                                  # expression to its caller instead of pushing here.
-                                  :risk_vec, :risk_frontier, :ret_frontier,
+                                  # Returns and objective plumbing, outer level only. The
+                                  # robust-cone scratch a return term raises (`bucs_w_i`,
+                                  # `t_eucs_gw_i`) is index-suffixed and read by index, so
+                                  # it is not on this list; `sr_risk` stays because the
+                                  # ratio constraint is hoisted and registers exactly one.
+                                  :ohf, :op, :cost_bgt_expr, :sr_risk,
+                                  # Risk and return accumulation and frontier bookkeeping:
+                                  # collected by the terminal scalarise seams (ADR 0024),
+                                  # which run once at the outer level. A nested build
+                                  # returns its expression to its caller instead of pushing
+                                  # here.
+                                  :risk_vec, :risk_frontier, :ret_vec, :ret_frontier,
                                   # Per-optimiser scratch on the outer model.
                                   :noc_rk, :noc_rt, :psi,
                                   # The one deliberate write-prefixed / read-bare entry
@@ -993,6 +998,105 @@ function shared_get(model::JuMP.Model, name::Symbol)
     @argcheck(haskey(model, name),
               ArgumentError("model[:$name] has not been registered; it is being read before the builder that produces it has run"))
     return model[name]
+end
+"""
+    frontier_point_count(front::Frontier)
+    frontier_point_count(front::VecNum)
+
+Number of sweep points one frontier bound asks for.
+
+A [`Frontier`](@ref) states its count in `N`; a stated vector of bounds states it in its
+length. Both shapes are admissible in `:ret_frontier` and `:risk_frontier` (see
+[`Front_NumVec`](@ref)), and at Model Assembly time a `Frontier` has not yet been resolved
+into its range, so the count is read from the shape rather than from a materialised vector.
+
+# Related
+
+  - [`frontier_sweep_points`](@ref)
+  - [`Frontier`](@ref)
+"""
+function frontier_point_count(front::Frontier)
+    return Int(front.N)
+end
+function frontier_point_count(front::VecNum)
+    return length(front)
+end
+"""
+    frontier_sweep_points(model::JuMP.Model)
+
+Count the solves the model's frontier sweep runs, and the factors that make up the count.
+
+The sweep is a **product**: every swept return term and every swept risk measure joins the
+same `Iterators.product`, so `k` bounds of `N` points each cost `N^k` full solves rather
+than `k * N`. This reads both frontier registries — `:ret_frontier` and `:risk_frontier` —
+and multiplies their per-entry counts together.
+
+The product is accumulated as a `BigInt`, so it is exact and cannot overflow into a value
+that would pass a cap it should fail.
+
+# Returns
+
+  - `(total, factors)`: the total number of sweep points, and a `bound_key => count` pair
+    per swept entry, in registration order (return terms first).
+
+# Related
+
+  - [`assert_frontier_sweep_cap`](@ref)
+  - [`frontier_point_count`](@ref)
+  - [`SHARED_STATE`](@ref)
+"""
+function frontier_sweep_points(model::JuMP.Model)
+    factors = Pair{Symbol, Int}[]
+    for name in (:ret_frontier, :risk_frontier)
+        if !shared_has(model, name)
+            continue
+        end
+        for entry in shared_get(model, name)
+            push!(factors, entry.first[2] => frontier_point_count(entry.second[2]))
+        end
+    end
+    return prod(big(n) for (_, n) in factors; init = big(1)), factors
+end
+"""
+    assert_frontier_sweep_cap(model::JuMP.Model)
+
+Assert the **total** frontier sweep does not exceed the active `max_frontier` ceiling.
+
+[`Frontier`](@ref)'s constructor caps the `N` of one bound; nothing there sees the product,
+so `k` bounds at the ceiling cost `max_frontier^k` solves and no guard fires. This is the
+guard, and it runs at Model Assembly — the point at which both frontier registries are
+complete and no sweep solve has started yet.
+
+Every sweep point runs a full inner `optimise_JuMP_model!` solve, so the product is the
+compute-exhaustion sink `max_frontier` exists to bound (see [`RESOURCE_LIMITS`](@ref)). The
+cap applies to the risk side and the return side alike.
+
+# Returns
+
+  - `nothing`.
+
+# Throws
+
+  - `DomainError` if the product exceeds `RESOURCE_LIMITS[].max_frontier`. The message names
+    the product, the factors that made it, and the knob that raises the ceiling.
+
+# Related
+
+  - [`frontier_sweep_points`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`assert_resource_cap`](@ref)
+"""
+function assert_frontier_sweep_cap(model::JuMP.Model)
+    total, factors = frontier_sweep_points(model)
+    if isempty(factors)
+        return nothing
+    end
+    cap = RESOURCE_LIMITS[].max_frontier
+    @argcheck(total <= cap,
+              DomainError(total,
+                          "the frontier sweep is $total points — the product $(join(("$key = $n" for (key, n) in factors), " × ")) across every swept return term and every swept risk measure — and exceeds RESOURCE_LIMITS[].max_frontier = $cap. Every point runs a full solve, so the ceiling is on the product, not on any single Frontier's N. Sweep fewer bounds, or lower an N. Raise the ceiling with set_resource_limits!(; max_frontier) — or with_resource_limits for a single scope, or the \"max_frontier\" preference for a whole project — for genuinely large machine-authored runs."))
+    return nothing
 end
 """
     state_key(prefix::Symbol, name::Symbol)

@@ -707,7 +707,10 @@ end
                                                                     ce = Covariance(;
                                                                                     alg = SemiMoment())))
         tdpe = TimeDependent([EmpiricalPrior(), pe_semi])
-        tdret = TimeDependent([ArithmeticReturn(), ArithmeticReturn(; lb = 0.0005)])
+        tdret = TimeDependent([ArithmeticReturn(),
+                               ArithmeticReturn(;
+                                                settings = JuMPReturnsSettings(;
+                                                                               lb = 0.0005))])
         tdsca = TimeDependent([SumScalariser(), MaxScalariser()])
         setsA = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
         setsB = UniverseSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
@@ -727,7 +730,7 @@ end
                                         test_idx = 151:200)
             r2 = PortfolioOptimisers.update_time_dependent_estimator(opt, ctx2)
             @test r2.pe == pe_semi
-            @test r2.ret.lb == 0.0005
+            @test r2.ret.settings.lb == 0.0005
             @test isa(r2.sca, MaxScalariser)
             @test r2.sets === setsB
             # These fields are typed `TD` rather than `TD_Option`: they always carry a
@@ -779,7 +782,8 @@ end
             p1 = cross_val_predict(MeanRisk(;
                                             opt = JuMPOptimiser(; slv = slv,
                                                                 ret = ArithmeticReturn(;
-                                                                                       lb = 0.0005))),
+                                                                                       settings = JuMPReturnsSettings(;
+                                                                                                                      lb = 0.0005)))),
                                    rd, cvw)
             @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
             @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)

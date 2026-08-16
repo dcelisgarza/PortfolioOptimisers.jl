@@ -244,6 +244,57 @@ This is not a contrived split. It is exactly what every fold of a [`KFold`](@ref
 route is the default advice: the projection is recomputed inside each fold, with the prior
 actually in use.
 
+### Where the loadings come from: `FactorSpace(; re = ...)`
+
+Everything above reads the basis off the prior, which is what `FactorSpace()` means. The space also
+takes an `re` field naming the source outright, with the precedence every other factor consumer
+already uses: a precomputed [`Regression`](@ref) wins, then the prior's own loadings, then a refit
+from the returns.
+
+The third arm is the interesting one. It makes a factor mandate legal on a prior that carries **no
+factor block at all** — an [`EmpiricalPrior`](@ref), say — because the space fits the loadings
+itself, per fold and per subproblem, from the factor returns already in `rd`.
+=#
+
+re_fit = ExposureConstraintEstimator(;
+                                     lce = LinearConstraintEstimator(; val = "MTUM <= 0.1"),
+                                     space = FactorSpace(; re = StepwiseRegression()))
+
+res_fit = optimise(MeanRisk(; obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                sets = sets, lcse = re_fit)), rd_b)
+
+## The prior carries no regression: the basis is the space's own refit.
+isnothing(res_fit.pa.pr.rr)
+
+#=
+Measured against the loadings the space fitted, the mandate binds exactly as it does on the
+factor-prior route.
+=#
+
+rr_fit = regression(StepwiseRegression(), rd_b)
+
+pretty_table(DataFrame("Basis source" => ["`FactorPrior`'s own loadings",
+                                          "`FactorSpace(; re = StepwiseRegression())`"],
+                       "Realised MTUM exposure" => [dot(pr_b.rr.M[:, 1], res_live.w),
+                                                    dot(rr_fit.M[:, 1], res_fit.w)],
+                       "Cap" => [0.1, 0.1]); formatters = [resfmt],
+             title = "Reading the basis versus fitting it")
+
+#=
+!!! warning
+
+    A **precomputed** `re` does not refit, and that is the trap §7 just measured, in a supported
+    spelling. `FactorSpace(; re = pr_a.rr)` pins the basis to the first half's loadings exactly as
+    the hand-written equation did — the row is the right *shape* for the universe, so nothing can
+    detect that it is stale. Use it when the basis genuinely is fixed, and reach for
+    `re = <an estimator>` or a [`TimeDependent`](@ref) schedule on `lcse` when it is not.
+
+    A pinned basis is refused outright at a [`NestedClustered`](@ref) outer solve, where the asset
+    universe is *replaced* by cluster names rather than sliced, so no view of the loadings can
+    follow it. An estimator is accepted everywhere, because it refits against whatever universe it
+    is handed.
+
 ## 8. Mixing factor-space and asset-space constraints
 
 The `lcse` keyword takes a vector, and that vector may mix a re-based constraint with a plain
@@ -313,6 +364,9 @@ per-row, recoverable condition where the offending row is dropped and the rest o
 still the problem you described. A missing regression is not that — it makes *every* row
 unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying
 none of the requested exposure.
+
+"Missing" means *no* carrier holds any, so the remedy is either a prior that computes loadings or a
+space that supplies them — `FactorSpace(; re = ...)`, above. The message names both.
 =#
 
 try
@@ -396,7 +450,9 @@ place. `lt`/`st` and `wb` never took a linear constraint estimator to begin with
 
 The reason is not a missing feature. **A constraint can be re-based if and only if it is a linear
 form in the weights.** Under a change of basis `w_b = Pᵀw` a row `a` becomes `Pa` and nothing else
-about the problem changes — but:
+about the problem changes. The boundary is therefore a property of the *mechanism*: a re-basis
+rewrites a row and leaves the model alone, so a constraint that reaches the model through its own
+variables is out of reach even where the factor quantity is perfectly well defined.
 
   - **Cardinality** ([`IntegerPhylogeny`](@ref), `gcarde`, `sgcarde`) and **threshold**
     ([`ThresholdEstimator`](@ref)) rows index the binary *held indicators*, not `w`. A projected
@@ -405,6 +461,30 @@ about the problem changes — but:
   - **Weight bounds** ([`WeightBoundsEstimator`](@ref)) are a per-asset *box*. A factor box,
     `lb ≤ Mᵀw ≤ ub`, is a linear constraint and already has a home: write it as two rows through
     `lcse`.
+  - **Turnover** ([`Turnover`](@ref)) and **tracking error** ([`TrackingError`](@ref)) are *norm*
+    forms. Each declares its own auxiliary variables and cones, so it is not a row to rewrite. The
+    factor turnover `‖Mᵀ(w - w₀)‖` is a real quantity and is not equal to any asset-space
+    turnover — it is re-basable in mathematics, and not by this mechanism.
+  - **Fees** ([`Fees`](@ref)) are priced per *traded position*: the proportional rates index the
+    long/short weight split, the fixed charges index the MIP indicator bits, and the total is
+    subtracted from the return. A factor is not traded, so there is nothing for `M` to carry.
+
+The list illustrates the rule rather than exhausting it. The question to ask of a new constraint is
+not which bullet it matches, but whether the constraint *is* a row in `w` — because that is the
+only thing `ExposureConstraintEstimator` rewrites.
+
+### Tracking a factor already works
+
+One case looks like a gap and is not. [`ReturnsTracking`](@ref) takes a benchmark **return
+series** rather than a benchmark weight vector, and a factor's return series is a column of `F`.
+So tracking a factor needs no re-basis at all — pass the column:
+
+```julia
+TrackingError(; tr = ReturnsTracking(; w = view(rd.F, :, 1)), err = 0.05)
+```
+
+The projection is unnecessary here rather than unavailable: the benchmark is already in the
+factor's own units.
 
 ## 12. Two things to watch
 
@@ -454,6 +534,15 @@ pretty_table(DataFrame(["Factor" => rd.nf,
 plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - UPDATE (issue #302, ADR 0047's basis-source amendment): §7 gained the
+#src   "Where the loadings come from" subsection. Re-run end-to-end; every number above it is
+#src   unchanged (38.18% stale vs 10.0% live still holds). The new table shows
+#src   `FactorSpace(; re = StepwiseRegression())` on an `EmpiricalPrior` landing on **10.0%**,
+#src   the same as the `FactorPrior` route — which is the point: the space fitted the basis
+#src   itself, on a prior carrying none, a combination that threw before the field existed.
+#src   Placed as a subsection of §7 rather than as a new numbered section deliberately: §7 is
+#src   the staleness argument, and a pinned `re` is that trap in a supported spelling, so the
+#src   warning belongs beside the measurement rather than eight sections away.
 #src - New deep dive for ADR 0047 (issue #228). Every binding below was run end-to-end on kaimon
 #src   (session 420ea1ac) against the real SP500 + Factors slice, `FactorPrior()` with the default
 #src   `StepwiseRegression`; the numbers in the prose are the ones the page prints.

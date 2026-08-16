@@ -330,10 +330,17 @@ const arg_dict = Dict(
                       :scale_c => "`scale`: Scaling factor applied to constraint coefficients.",#
                       # Risk measure settings.
                       :settings_rm => "`settings`: Risk measure settings.",#
-                      :scale_rm => "`scale`: Scaling factor applied to the risk measure.",#
+                      :scale_rm => "`scale`: Weight of this risk measure in the aggregate risk expression formed from a vector of measures. It is a combination weight, so it is inert on a single measure: an optimiser given one measure drops it before the risk expression is built, and the value-level readers ignore it too. The upper bound in `ub` binds on the measure's own expression, before `scale` is applied.",#
                       :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
                       :lb_rms => "`lb`: Lower bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
                       :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
+                      # Return term settings.
+                      :settings_rt => "`settings`: Return term settings.",#
+                      :scale_rt => "`scale`: Scaling factor applied to the return term in the weighted sum that forms the `JuMP` return expression.",#
+                      :lb_rts => "`lb`: Lower bound(s) for the return term. Can be a scalar, vector, or [`Frontier`](@ref). The bound binds on the term's own expression, net of the term's own flagged charges and before `scale` is applied, and it binds whether or not `rte` is `true`.",#
+                      :rte => "`rte`: Whether to include the return term in the `JuMP` return expression.",#
+                      :fee_rts => "`fee`: Whether to subtract the portfolio fees from this return term. Set it to `false` for a term that is not in return units.",#
+                      :mic_rts => "`mic`: Whether to subtract the market impact cost from this return term. Set it to `false` for a term that is not in return units, or to leave the cost to the budget constraint alone.",#
                       # Frontier.
                       :N_fr => "`N`: Number of points on the efficient frontier.",#
                       :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
@@ -434,7 +441,7 @@ const arg_dict = Dict(
                       :lcsr => "`lcsr`: Processed linear constraint set result.",#
                       :gcardr => "`gcardr`: Processed grouped cardinality constraint result.",#
                       :sgcardr => "`sgcardr`: Processed sub-grouped cardinality constraint result.",#
-                      :ret_jmp => "`ret`: Returns estimator for the `JuMP` model.",#
+                      :ret_jmp => "`ret`: Return term, or vector of return terms, for the `JuMP` model. Several terms are weighted-summed into the model's single scalar return expression, in the same way [`MeanRisk`](@ref)'s `r` takes several risk measures.",#
                       :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
                       :cobj => "`cobj`: Custom `JuMP` objective.",#
                       :sc => "`sc`: Constraint scale factor.",#
@@ -580,6 +587,7 @@ const arg_dict = Dict(
                       :rt_opt => "`rt_opt`: Optimal return target.",#
                       :rt_max => "`rt_max`: Maximum return target.",#
                       :rt_min => "`rt_min`: Minimum return target.",#
+                      :rt_ends => "`rt_ends`: Per-term return spans for a return-frontier sweep, as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term declares a frontier bound. The aggregate `rt_min`/`rt_max` pair above serves the barrier; these serve the sweep, and the two are different quantities because a term's own span must be read off a portfolio that maximised that term alone.",#
                       :rk_opt => "`rk_opt`: Optimal risk target.",#
                       :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",#
                       # Discrete allocation result fields.
@@ -620,6 +628,7 @@ const arg_dict = Dict(
                       :lce_val => "`val`: Constraint equation(s) to parse.",#
                       :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
                       :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
+                      :fs_re => "`re`: Source of the loadings the rows are re-based through, or `nothing` to read the prior's `rr`. A precomputed `Regression` states the basis outright; an estimator fits one from the returns, which is what makes a factor mandate legal on a prior that carries no factor block. The precedence is `resolve_factor_regression`'s: a precomputed result wins, then the prior's `rr`, then a refit.",#
                       :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                       :asets_vals => "`vals`: Either group name keys whose partitions are stacked into the feature axis, at least two (one partition alone is one-hot, which makes the distance two-valued for every metric), or an ordered edge-authoring program of `Pair`s over the declared feature axis `sets.dict[sets.zkey]`. The two are dispatched on element type and are different contracts — see [`asset_sets_features`](@ref).",#
                       :asets_strict => "`strict`: Whether an unresolvable *name* in a graded `vals` program throws instead of warning. Governs names only: nothing structural is refused, so an all-zero row and a one-column matrix are both legal. Ignored on the group-name-key path, where an absent key is an unconditional `KeyError`.",#
@@ -1397,7 +1406,7 @@ There is **one cap per sink**, each named to mirror the field it guards. Reuse a
 
   - `max_n_sim`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`. *Memory*-bound.
   - `max_n_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
-  - `max_frontier`: maximum efficient-frontier sweep points (`N`) accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`.
+  - `max_frontier`: maximum efficient-frontier sweep points accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`. Enforced **twice**: [`Frontier`](@ref)'s constructor caps the `N` of one bound, and [`assert_frontier_sweep_cap`](@ref) caps the **product** across every swept return term and every swept risk measure at Model Assembly, since the sweep is an `Iterators.product` and `k` bounds of `N` points cost `N^k` solves.
   - `max_bins`: maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref) (default `10_000`). The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is ≈ 800 MB per histogram — below OOM yet far above the ~50-bin range legitimate binning produces.
 
 The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the four caps are same-typed and two share the value `100_000`, so positional construction is error-prone.
@@ -1447,7 +1456,7 @@ Configure the global default resource caps read at the config→allocation trust
 
   - `max_n_sim`: maximum `n_sim` accepted by the uncertainty-set estimators.
   - `max_n_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
-  - `max_frontier`: maximum `N` accepted by the [`Frontier`](@ref) sweep.
+  - `max_frontier`: maximum `N` accepted by one [`Frontier`](@ref), and maximum total sweep points across every swept bound.
   - `max_bins`: maximum `bins` accepted by the mutual-information estimators.
 
 Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. All must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
@@ -2930,6 +2939,7 @@ Assert that an untrusted sizing integer `val` does not exceed the active [`RESOU
   - [`RESOURCE_LIMITS`](@ref)
   - [`set_resource_limits!`](@ref)
   - [`with_resource_limits`](@ref)
+  - [`assert_frontier_sweep_cap`](@ref)
 """
 function assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str,
                              knob::Sym_Str)::Nothing

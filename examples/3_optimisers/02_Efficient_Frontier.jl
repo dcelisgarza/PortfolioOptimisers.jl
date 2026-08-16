@@ -96,7 +96,10 @@ giving a 30-point frontier. The lower bound lives on the *return* side, so it is
 =#
 
 optA = JuMPOptimiser(; pe = pr, slv = slv,
-                     ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+                     ret = ArithmeticReturn(;
+                                            settings = JuMPReturnsSettings(;
+                                                                           lb = Frontier(;
+                                                                                         N = 30))))
 resA = optimise(MeanRisk(; opt = optA, r = r))
 
 #=
@@ -175,7 +178,7 @@ For an apples-to-apples comparison we build *both* frontiers over the same 15-po
 sweep — only the optimiser changes.
 =#
 
-ret15 = ArithmeticReturn(; lb = Frontier(; N = 15))
+ret15 = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 15)))
 resM = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_noc, ret = ret15),
                          r = r))
 resN = optimise(NearOptimalCentering(;
@@ -263,6 +266,6 @@ plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),
 #src     59.5%, peak 93.6% vs 100% — NOC fans out except at the return-max corner where both pin.
 #src     NOC points sit inside the MeanRisk frontier (higher CVaR for a given return), as expected.
 #src - API confirmed: risk-side frontier bound = RiskMeasureSettings(; ub = Frontier(; N)); NOC
-#src   accepts ret = ArithmeticReturn(; lb = Frontier(...)) and returns a vector frontier.
+#src   accepts ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(...))) and returns a vector frontier.
 #src - No doc/ergonomics/bug findings beyond the harmless `Plots.mm not public` warning (pre-existing).
 #src   Group rollup: issue #125.

@@ -1766,6 +1766,24 @@ function linear_constraints(lcs::Option{<:LinearConstraint}, args...;
                             kwargs...)::Option{<:LinearConstraint}
     return lcs
 end
+"""
+    port_opt_view(lc::LinearConstraint, i, args...) -> LinearConstraint
+
+Return a precomputed [`LinearConstraint`](@ref) unchanged under an asset sub-selection.
+
+The identity is deliberate, and it is **not** the claim that a full-universe row means the same thing over a subset — it does not. It is what the `lcse` slot already did: the slot was passed unviewed until a constraint space gained a basis a view has to follow, and slicing `A` here would change the behaviour of a path this method exists only to leave alone. A [`NestedClustered`](@ref) inner solve refuses a bare precomputed constraint outright for exactly this reason; [`Stacking`](@ref) and [`SubsetResampling`](@ref) carry no such guard, and that gap pre-dates the view.
+
+A constraint reaching a meta-optimiser through an [`ExposureConstraintEstimator`](@ref) is a different case and is handled: its `A` is factor-width and is re-projected against the viewed prior's loadings, so the view it needs is of the *basis*, not of the row.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`LinearConstraint`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function port_opt_view(lc::LinearConstraint, ::Any, args...)::LinearConstraint
+    return lc
+end
 function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
                             kwargs...)::AbstractVector{<:LinearConstraint}
     return lcs
@@ -1864,6 +1882,8 @@ It is used for type stability and to provide a uniform interface for processing 
 
 `rr` is accepted so that a caller holding loadings — [`processed_jump_optimiser_attributes`](@ref) does — can pass them uniformly to whatever sits in `lcse`, without inspecting its type first. A bare [`LinearConstraintEstimator`](@ref) **drops** them: the asset frame is the absence of a re-basis, and an estimator that quietly re-based itself because loadings happened to be available would make the space depend on the prior rather than on what the user wrote. A re-basis is asked for by wrapping in an [`ExposureConstraintEstimator`](@ref) and by nothing else.
 
+`rd` rides along for the same reason and is dropped for a stronger one: only a space can ask for a refit, and a bare estimator has no space.
+
 # Related
 
   - [`linear_constraints`](@ref)
@@ -1872,15 +1892,17 @@ It is used for type stability and to provide a uniform interface for processing 
 function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing)::Option{<:LinearConstraint}
+                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rd::Option{<:ReturnsResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false,
-                            rr::Option{<:AbstractRegressionResult} = nothing)
+                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag, rr = rr) for lc in lcs]
+                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 
 export UniverseSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

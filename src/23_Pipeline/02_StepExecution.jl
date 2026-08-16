@@ -291,6 +291,8 @@ Execute an [`ExposureConstraintEstimator`](@ref) step: re-base its rows through 
 
 This is the one constraint step that reads a computed slot other than `:returns`. The basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
 
+`ctx.returns` is passed as well, so a space that names a regression **estimator** refits the loadings here rather than throwing. That is the one arrangement in which a prior carrying no factor block still admits a factor mandate — see [`FactorSpace`](@ref).
+
 !!! warning
 
     The constraint is **pinned to the pipeline's prior**. Its rows were projected through the loadings this step saw, and a downstream optimiser that refits its own prior does not re-project them. Passing the estimator to the optimiser's `lcse` field instead recomputes the projection with the optimiser's own prior, per fold, which is what a cross-validated factor mandate needs.
@@ -304,7 +306,8 @@ This is the one constraint step that reads a computed slot other than `:returns`
 """
 function run_step(ce::ExposureConstraintEstimator, ctx::PipelineContext)
     require_slot(ctx, :prior, ce)
-    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr)
+    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr,
+                             rd = ctx.returns)
     return res, add_constraint_result(ctx, res)
 end
 function run_step(ce::AbstractPhylogenyConstraintEstimator, ctx::PipelineContext)

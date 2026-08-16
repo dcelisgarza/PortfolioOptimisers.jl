@@ -99,7 +99,11 @@ end
     mr1 = MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv))
     mr2 = MeanRisk(; obj = MaximumRatio(), opt = JuMPOptimiser(; pe = pr, slv = slv))
     mr3 = MeanRisk(;
-                   opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = Frontier(; N = 10)),
+                   opt = JuMPOptimiser(;
+                                       ret = ArithmeticReturn(;
+                                                              settings = JuMPReturnsSettings(;
+                                                                                             lb = Frontier(;
+                                                                                                           N = 10))),
                                        slv = slv))
     nco = NestedClustered(; opti = mr1, opto = mr3)
     res = optimise(nco, rd)

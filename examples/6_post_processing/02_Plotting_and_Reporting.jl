@@ -39,8 +39,9 @@ res_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                  ret = ArithmeticReturn(;
-                                                                        lb = Frontier(;
-                                                                                      N = 15)))))
+                                                                        settings = JuMPReturnsSettings(;
+                                                                                                       lb = Frontier(;
+                                                                                                                     N = 15))))))
 
 #=
 ## 2. Inspecting the inputs

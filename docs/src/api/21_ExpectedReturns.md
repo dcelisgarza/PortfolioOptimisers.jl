@@ -19,6 +19,7 @@ PrRM
 expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
 expected_return
+term_fees
 expected_ratio
 expected_risk_ret_ratio
 expected_sric

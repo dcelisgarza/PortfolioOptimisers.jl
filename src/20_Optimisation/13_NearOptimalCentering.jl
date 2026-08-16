@@ -260,6 +260,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                   fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NearOptimalCentering)
         assert_risk_measure_required(r, :NearOptimalCentering)
+        assert_return_term_required(opt.ret, :NearOptimalCentering)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
@@ -393,10 +394,12 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
                                       w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     r = factory(r, pr, slv)
-    scale = r.settings.scale
-    risk_min = expected_risk(r, w_min, X, fees) * scale
-    risk_opt = expected_risk(r, w_opt, X, fees) * scale
-    risk_max = expected_risk(r, w_max, X, fees) * scale
+    # No `scale` here. The barrier compares these targets against the model's `:risk`
+    # expression, and the model drops a lone measure's combination weight, so the two sides
+    # must agree. The vector method below does apply it, because there the measures combine.
+    risk_min = expected_risk(r, w_min, X, fees)
+    risk_opt = expected_risk(r, w_opt, X, fees)
+    risk_max = expected_risk(r, w_max, X, fees)
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(sca::Scalariser, rs::VecRM, pr::AbstractPriorResult,
@@ -449,6 +452,10 @@ $(DocStringExtensions.FIELDS)
     """
     rt_max
     """
+    $(field_dict[:rt_ends])
+    """
+    rt_ends
+    """
     $(field_dict[:w_min_noc])
     """
     w_min
@@ -486,31 +493,32 @@ $(DocStringExtensions.FIELDS)
     function NearOptimalSetup(w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
                               rt_opt::Union{<:Number, <:VecNum},
                               rt_min::Union{<:Number, <:VecNum},
-                              rt_max::Union{<:Number, <:VecNum}, w_min::VecNum_VecVecNum,
-                              w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
-                              attrs::ProcessedJuMPOptimiserAttributes,
+                              rt_max::Union{<:Number, <:VecNum}, rt_ends::Option{<:VecPair},
+                              w_min::VecNum_VecVecNum, w_max::VecNum_VecVecNum, r::RM_VecRM,
+                              opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
                               w_min_retcode::OptimisationReturnCode,
                               w_opt_retcode::OptRetCode_VecOptRetCode,
                               w_max_retcode::OptimisationReturnCode)
         return new{typeof(w_opt), typeof(rk_opt), typeof(rt_opt), typeof(rt_min),
-                   typeof(rt_max), typeof(w_min), typeof(w_max), typeof(r), typeof(opt),
-                   typeof(attrs), typeof(w_min_retcode), typeof(w_opt_retcode),
-                   typeof(w_max_retcode)}(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min,
-                                          w_max, r, opt, attrs, w_min_retcode,
+                   typeof(rt_max), typeof(rt_ends), typeof(w_min), typeof(w_max), typeof(r),
+                   typeof(opt), typeof(attrs), typeof(w_min_retcode), typeof(w_opt_retcode),
+                   typeof(w_max_retcode)}(w_opt, rk_opt, rt_opt, rt_min, rt_max, rt_ends,
+                                          w_min, w_max, r, opt, attrs, w_min_retcode,
                                           w_opt_retcode, w_max_retcode)
     end
 end
 function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
                           rt_opt::Union{<:Number, <:VecNum},
                           rt_min::Union{<:Number, <:VecNum},
-                          rt_max::Union{<:Number, <:VecNum}, w_min::VecNum_VecVecNum,
+                          rt_max::Union{<:Number, <:VecNum},
+                          rt_ends::Option{<:VecPair} = nothing, w_min::VecNum_VecVecNum,
                           w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
                           attrs::ProcessedJuMPOptimiserAttributes,
                           w_min_retcode::OptimisationReturnCode,
                           w_opt_retcode::OptRetCode_VecOptRetCode,
                           w_max_retcode::OptimisationReturnCode)::NearOptimalSetup
-    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
-                            attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
+    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, rt_ends, w_min, w_max, r,
+                            opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
 end
 """
     near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; dims::Int = 1)
@@ -550,7 +558,11 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     r = ucs_risk_measure(noc.r, rd)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
-    if w_min_flag || w_max_flag || unconstrained
+    # The per-term corner solves need the same unbounded pair the max-return corner uses, so
+    # the pair is built whenever a return term declares a frontier bound, even when both
+    # anchor portfolios were supplied.
+    swept = frontier_return_terms(attrs.ret)
+    if w_min_flag || w_max_flag || unconstrained || !isempty(swept)
         nb_r = no_bounds_risk_measure(r, Val(noc.ucs_flag))
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
@@ -580,6 +592,11 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     rt_min = expected_return(ret, w_min, pr, fees)
     rt_opt = expected_return(ret, w_opt, pr, fees)
     rt_max = expected_return(ret, w_max, pr, fees)
+    rt_ends = if isempty(swept)
+        nothing
+    else
+        return_term_ends(swept, attrs.ret, nb_r, nb_opt, rd, pr, fees, w_min, noc.w_max_ini)
+    end
     ibins = if isnothing(noc.bins)
         T, N = size(pr.X)
         N / T
@@ -594,9 +611,67 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         r, opt = nb_r, nb_opt
     end
     return NearOptimalSetup(; w_opt = w_opt, rk_opt = rk_opt, rt_opt = rt_opt,
-                            rt_min = rt_min, rt_max = rt_max, w_min = w_min, w_max = w_max,
-                            r = r, opt = opt, attrs = attrs, w_min_retcode = w_min_retcode,
-                            w_opt_retcode = w_opt_retcode, w_max_retcode = w_max_retcode)
+                            rt_min = rt_min, rt_max = rt_max, rt_ends = rt_ends,
+                            w_min = w_min, w_max = w_max, r = r, opt = opt, attrs = attrs,
+                            w_min_retcode = w_min_retcode, w_opt_retcode = w_opt_retcode,
+                            w_max_retcode = w_max_retcode)
+end
+"""
+    frontier_return_terms(ret)
+
+Return the indices of the return terms that declare a [`Frontier`](@ref) lower bound.
+
+A term whose `settings.lb` is already a vector of numbers is not swept — its sweep points are
+stated — so it does not need a corner solve. An empty answer means the return frontier costs
+nothing.
+
+# Related
+
+  - [`return_term_ends`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+"""
+function frontier_return_terms(ret::JuMPReturnsEstimator)
+    return isa(ret.settings.lb, Frontier) ? [1] : Int[]
+end
+function frontier_return_terms(ret::VecJRE)
+    return [i for (i, r) in enumerate(ret) if isa(r.settings.lb, Frontier)]
+end
+"""
+    return_term_ends(swept, ret, nb_r, nb_opt, rd, pr, fees, w_min, w_ini)
+
+Solve one maximum-return corner per swept return term and read off that term's span.
+
+The low end of every span is the shared minimum-risk portfolio `w_min`, which
+[`near_optimal_centering_setup`](@ref) already has. The high end of term *i*'s span comes
+from a portfolio that maximised term *i* **alone**, which is why this costs `k` extra solves.
+Reading it off the aggregate maximum-return corner instead would make the span an artefact of
+the other terms' `scale`, and can leave `rt_min > rt_max`.
+
+# Returns
+
+  - A vector of `i => (rt_min_i, rt_max_i)` pairs, one per swept term.
+
+# Related
+
+  - [`frontier_return_terms`](@ref)
+  - [`MaximumElementReturn`](@ref)
+  - [`compute_ret_lbs`](@ref)
+"""
+function return_term_ends(swept::VecInt, ret::JRE_VecJRE, nb_r, nb_opt::JuMPOptimiser,
+                          rd::ReturnsResult, pr::AbstractPriorResult, fees::Option{<:Fees},
+                          w_min::VecNum, w_ini)
+    ends = Pair{Int, Tuple{<:Number, <:Number}}[]
+    for i in swept
+        rt = return_term(ret, i)
+        res = optimise(MeanRisk(; r = nb_r, obj = MaximumElementReturn(i), opt = nb_opt,
+                                wi = w_ini), rd; save = false)
+        @argcheck(isa(res.retcode, OptimisationSuccess),
+                  ArgumentError("maximum-return solve for return term $i failed with retcode $(res.retcode)"))
+        push!(ends,
+              i => (expected_return(rt, w_min, pr, fees),
+                    expected_return(rt, res.w, pr, fees)))
+    end
+    return ends
 end
 """
     set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
@@ -749,21 +824,21 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     return retcodes, sols
 end
 """
-    compute_ret_lbs(lbs::Frontier, rt_min::Number, rt_max::Number, args...)
+    compute_ret_lbs(ret_frontier::VecPair, ::Nothing)
 
-Compute return lower bounds for a `NearOptimalCentering` frontier sweep from pre-computed minimum and maximum return values.
+Return a `NearOptimalCentering` return frontier unchanged.
 
-Constructs a uniformly spaced range of `lbs.N` return targets between `rt_min` and `rt_max`.
+`nothing` means no swept term declared a [`Frontier`](@ref), so every sweep point was stated
+outright and there is no span to resolve.
 
 # Arguments
 
-  - `lbs::Frontier`: Frontier configuration specifying the number of points.
-  - `rt_min::Number`: Minimum portfolio return (from the minimum-risk portfolio).
-  - `rt_max::Number`: Maximum portfolio return (from the maximum-return portfolio).
+  - `ret_frontier::VecPair`: The `:ret_frontier` Model State entry.
+  - `::Nothing`: No per-term spans were computed.
 
 # Returns
 
-  - Range of `lbs.N` equally spaced return lower bounds.
+  - `ret_frontier`, unchanged.
 
 # Related
 
@@ -771,28 +846,69 @@ Constructs a uniformly spaced range of `lbs.N` return targets between `rt_min` a
   - [`NearOptimalCentering`](@ref)
   - [`solve_noc!`](@ref)
 """
-function compute_ret_lbs(lbs::Frontier, rt_min::Number, rt_max::Number, args...)
-    return range(rt_min, rt_max; length = lbs.N)
+function compute_ret_lbs(ret_frontier::VecPair, ::Nothing)
+    # Every swept term stated its sweep points as a vector, so there is nothing to compute.
+    return ret_frontier
+end
+"""
+    compute_ret_lbs(ret_frontier::VecPair, rt_ends::VecPair)
+
+Resolve a `NearOptimalCentering` return frontier from spans computed during setup.
+
+`NearOptimalCentering` does not re-solve for its corners here, unlike [`MeanRisk`](@ref):
+[`near_optimal_centering_setup`](@ref) has already paid for one minimum-risk solve and one
+maximum-return solve per swept term, so this only turns each span into its `N` sweep points.
+
+# Arguments
+
+  - `ret_frontier::VecPair`: The `:ret_frontier` Model State entry.
+  - `rt_ends::VecPair`: The per-term spans, as `i => (rt_min_i, rt_max_i)`.
+
+# Returns
+
+  - The return frontier with every span resolved into a range of sweep points.
+
+# Related
+
+  - [`return_term_ends`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`solve_noc!`](@ref)
+"""
+function compute_ret_lbs(ret_frontier::VecPair, rt_ends::VecPair)
+    ret_frontier = copy(ret_frontier)
+    for (j, rtf) in enumerate(ret_frontier)
+        expr, front, i = rtf.second
+        if isa(front, VecNum)
+            continue
+        end
+        idx = findfirst(x -> x.first == i, rt_ends)
+        @argcheck(!isnothing(idx),
+                  ArgumentError("no return span was computed for return term $i; `near_optimal_centering_setup` and `set_return_bounds!` disagree about which terms are swept"))
+        rt_min, rt_max = rt_ends[idx].second
+        ret_frontier[j] = rtf.first => (expr, range(rt_min, rt_max; length = front.N), i)
+    end
+    return ret_frontier
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
-                    ::Any, ::Any, ::Val{true}, ::Val{false}, args...)
-    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), rt_min, rt_max, args...)
-    sc = get_constraint_scale(model)
+                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
+                    rt_ends::Option{<:VecPair}, ::Any, ::Any, ::Val{true}, ::Val{false},
+                    args...)
+    ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
+    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
     retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
-    ret = get_ret(model)
-    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
     set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for (i, (rk_opt, rt_opt, lb)) in enumerate(zip(rk_opts, rt_opts, lbs))
-        JuMP.set_parameter_value(ret_lb_var, lb)
+    for (i, (rk_opt, rt_opt, rkeys, lbs)) in
+        enumerate(zip(rk_opts, rt_opts, rpitrs[1], rpitrs[2]))
+        for (rkey, lb) in zip(rkeys, lbs)
+            JuMP.set_parameter_value(model[rkey], lb)
+        end
         JuMP.set_parameter_value(noc_rk, rk_opt)
         JuMP.set_parameter_value(noc_rt, rt_opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
@@ -877,8 +993,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, w_min::VecNum,
-                    w_max::VecNum, ::Val{false}, ::Val{true}, args...)
+                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, ::Any,
+                    w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     sc = get_constraint_scale(model)
     for (keys, vals) in risk_frontier
@@ -912,9 +1028,10 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
-                    w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true}, args...)
-    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), rt_min, rt_max, args...)
+                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
+                    rt_ends::Option{<:VecPair}, w_min::VecNum, w_max::VecNum, ::Val{true},
+                    ::Val{true}, args...)
+    ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     sc = get_constraint_scale(model)
     for (keys, vals) in risk_frontier
@@ -926,16 +1043,16 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
+    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
     retcodes = sizehint!(OptimisationReturnCode[], length(rt_opts) * length(rk_opts))
     sols = sizehint!(JuMPOptimisationSolution[], length(rt_opts) * length(rk_opts))
-    ret = get_ret(model)
-    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
     set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for lb in lbs
-        JuMP.set_parameter_value(ret_lb_var, lb)
+    for (rkeys, lbs) in zip(rpitrs[1], rpitrs[2])
+        for (rkey, lb) in zip(rkeys, lbs)
+            JuMP.set_parameter_value(model[rkey], lb)
+        end
         for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
             for (key, ub) in zip(keys, ubs)
                 JuMP.set_parameter_value(model[key], ub)
@@ -1059,10 +1176,10 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    (; w_opt, rk_opt, rt_opt, r, opt, attrs, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
-                                                                                                                                                       rd;
-                                                                                                                                                       dims = dims,
-                                                                                                                                                       kwargs...)
+    (; w_opt, rk_opt, rt_opt, r, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
+                                                                                                                                                                rd;
+                                                                                                                                                                dims = dims,
+                                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -1071,7 +1188,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     assemble_jump_model!(model, noc, opt, attrs, rd, r)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max,
-                                  w_min, w_max, Val(shared_has(model, :ret_frontier)),
+                                  rt_ends, w_min, w_max,
+                                  Val(shared_has(model, :ret_frontier)),
                                   Val(shared_has(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;

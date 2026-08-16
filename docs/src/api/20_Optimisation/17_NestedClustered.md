@@ -16,6 +16,8 @@ needs_previous_weights(opt::NestedClustered)
 is_time_dependent(opt::NestedClustered)
 reset_time_dependent_estimator(opt::NestedClustered)
 assert_rc_pl(::Any)
+stated_constraint_space_basis
+assert_external_lcse
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
 RiskBudgetingOptimiser
 assert_rc_variance

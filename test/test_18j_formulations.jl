@@ -64,7 +64,10 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
-                        ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                        ret = ArithmeticReturn(;
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = Frontier(;
+                                                                                            N = 5))))
     res5 = optimise(MeanRisk(; r = Variance(;), opt = opt))
     res6 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
     res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 1e-3)
@@ -82,8 +85,11 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         ret = ArithmeticReturn(;
-                                               lb = range(; start = rt_min, stop = rt_max,
-                                                          length = 5)))
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = range(;
+                                                                                         start = rt_min,
+                                                                                         stop = rt_max,
+                                                                                         length = 5))))
     res7 = optimise(MeanRisk(; r = Variance(;), opt = opt))
     res8 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
     res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 1e-3)
@@ -166,7 +172,10 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
-                        ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                        ret = ArithmeticReturn(;
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = Frontier(;
+                                                                                            N = 5))))
     res5 = optimise(MeanRisk(;
                              r = LowOrderMoment(;
                                                 alg = SecondMoment(; alg2 = QuadRiskExpr())),
@@ -190,8 +199,11 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         ret = ArithmeticReturn(;
-                                               lb = range(; start = rt_min, stop = rt_max,
-                                                          length = 5)))
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = range(;
+                                                                                         start = rt_min,
+                                                                                         stop = rt_max,
+                                                                                         length = 5))))
     res7 = optimise(MeanRisk(;
                              r = LowOrderMoment(; settings = RiskMeasureSettings(;),
                                                 alg = SecondMoment(; alg2 = QuadRiskExpr())),
@@ -302,7 +314,10 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv[7:end],
-                        ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                        ret = ArithmeticReturn(;
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = Frontier(;
+                                                                                            N = 5))))
     res5 = optimise(MeanRisk(; r = NegativeSkewness(; alg = SquaredSOCRiskExpr()),
                              opt = opt))
     res6 = optimise(MeanRisk(; r = NegativeSkewness(; alg = QuadRiskExpr()), opt = opt))
@@ -321,8 +336,11 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
 
     opt = JuMPOptimiser(; pe = pr, slv = slv[7:end],
                         ret = ArithmeticReturn(;
-                                               lb = range(; start = rt_min, stop = rt_max,
-                                                          length = 5)))
+                                               settings = JuMPReturnsSettings(;
+                                                                              lb = range(;
+                                                                                         start = rt_min,
+                                                                                         stop = rt_max,
+                                                                                         length = 5))))
     res7 = optimise(MeanRisk(; r = NegativeSkewness(; alg = SquaredSOCRiskExpr()),
                              opt = opt))
     res8 = optimise(MeanRisk(; r = NegativeSkewness(; alg = QuadRiskExpr()), opt = opt))

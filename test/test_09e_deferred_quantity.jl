@@ -1076,8 +1076,9 @@ end
     @test factory(rt, ucs).mu === me
 
     # `lb` and `ucs` are untouched by the resolution.
-    rtb = ArithmeticReturn(; mu = me, lb = 0.001, ucs = ucs)
-    @test factory(rtb, lop).lb == 0.001
+    rtb = ArithmeticReturn(; mu = me, settings = JuMPReturnsSettings(; lb = 0.001),
+                           ucs = ucs)
+    @test factory(rtb, lop).settings.lb == 0.001
     @test factory(rtb, lop).ucs === ucs
 
     # The value-level twin of the `ret` expression applies the same ladder, and the prior is
@@ -1092,7 +1093,7 @@ end
     X = randn(rng, 200, 5)
     i = [1, 3, 5]
     me = MedianExpectedReturns()
-    rt = ArithmeticReturn(; mu = me, lb = 0.001)
+    rt = ArithmeticReturn(; mu = me, settings = JuMPReturnsSettings(; lb = 0.001))
 
     # `port_opt_view` runs before `factory`, so the Estimator crosses unsliced and then
     # computes on the subset.
@@ -1103,8 +1104,13 @@ end
     # The frontier sub-problem strips the bounds and forwards the slot, which its own
     # prior-carrying `factory` then resolves.
     @test PO.no_bounds_returns_estimator(rt).mu === me
-    @test isnothing(PO.no_bounds_returns_estimator(rt).lb)
-    @test isnothing(PO.no_bounds_returns_estimator(rt, false).mu)
+    @test isnothing(PO.no_bounds_returns_estimator(rt).settings.lb)
+    # `flag = false` strips the uncertainty set, and the characteristic stays put. It used
+    # to be dropped too, which silently re-centred the corner solve on the prior's own
+    # vector — the ADR 0050 defect class, and with several terms it collapsed every corner
+    # onto the same one.
+    @test PO.no_bounds_returns_estimator(rt, false).mu === me
+    @test isnothing(PO.no_bounds_returns_estimator(rt, false).ucs)
 end
 
 @testset "Deferred Quantity: `ArithmeticReturn.mu` keeps the #277 ladder intact" begin

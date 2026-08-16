@@ -134,12 +134,18 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                            ret = ArithmeticReturn(;
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = Frontier(;
+                                                                                                N = 5))))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_max, length = 5)))
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_max,
+                                                                                             length = 5))))
         res4 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
         @test all(isapprox.(res3.w, res4.w))
         success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
@@ -229,13 +235,19 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
-                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                            ret = ArithmeticReturn(;
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = Frontier(;
+                                                                                                N = 5))))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
         opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_max, length = 5)))
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_max,
+                                                                                             length = 5))))
         res4 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
         @test all(isapprox.(res3.w, res4.w))
@@ -291,10 +303,13 @@
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr,
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_min +
-                                                                     0.0009316063452440891,
-                                                              length = 3)), slv = slv)
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_min +
+                                                                                                    0.0009316063452440891,
+                                                                                             length = 3))),
+                            slv = slv)
         r1 = StandardDeviation(;
                                settings = RiskMeasureSettings(; scale = 2e2,
                                                               ub = range(;
@@ -337,8 +352,9 @@
                                                                                                        drk1)),
                                              opt = JuMPOptimiser(; pe = pr,
                                                                  ret = ArithmeticReturn(;
-                                                                                        lb = rt_min .-
-                                                                                             drt),
+                                                                                        settings = JuMPReturnsSettings(;
+                                                                                                                       lb = rt_min .-
+                                                                                                                            drt)),
                                                                  slv = slv),
                                              alg = ConstrainedNearOptimalCentering()))
         success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-4)

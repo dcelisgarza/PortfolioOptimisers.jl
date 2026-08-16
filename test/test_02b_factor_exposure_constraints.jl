@@ -455,4 +455,171 @@
         # re-based at generation time rather than written out once by the caller.
         @test preds.pred[1].res.pa.pr.rr.M != preds.pred[2].res.pa.pr.rr.M
     end
+    # A space carries the *source* of its basis (ADR 0047, amended). `FactorSpace` stopped
+    # being a singleton and gained `re`, whose precedence is `resolve_factor_regression`'s —
+    # the one every other factor consumer already uses.
+    stated = Regression(; M = [2.0 0.0 0.0; 0.0 3.0 0.0; 0.0 0.0 4.0])
+    lcem = LinearConstraintEstimator(; val = "MTUM <= 0.3")
+    sece(space) = ExposureConstraintEstimator(; lce = lcem, space = space)
+    @testset "The space carries its basis source" begin
+        @test fieldnames(FactorSpace) == (:re,)
+        # `nothing` is the default, and it is what every constraint written before the
+        # field did: read the prior's loadings.
+        @test isnothing(FactorSpace().re)
+        @test isnothing(fs.re)
+        # The bound is `RegE_Reg` — a fitted result or an estimator. A bare matrix is not a
+        # basis source, it is a basis, and the space deliberately does not hold one.
+        @test_throws TypeError FactorSpace(; re = M)
+        @test_throws TypeError FactorSpace(; re = "MTUM")
+        @test isa(FactorSpace(; re = rr).re, Regression)
+        @test isa(FactorSpace(; re = StepwiseRegression()).re, StepwiseRegression)
+    end
+    @testset "The precedence is resolve_factor_regression's" begin
+        # 1. A precomputed result wins outright: the caller has stated the answer.
+        @test vec(linear_constraints(sece(FactorSpace(; re = stated)), sets; rr = rr).ineq.A) ==
+              stated.M[:, 1]
+        # 2. The prior's loadings are next — and a stated *estimator* loses to them, which
+        #    is the documented asymmetry, not an oversight. Pass a fitted `Regression` to
+        #    override a factor prior.
+        @test vec(linear_constraints(sece(FactorSpace(; re = StepwiseRegression())), sets;
+                                     rr = rr).ineq.A) == M[:, 1]
+        # 3. `re === nothing` is bit-identical to the singleton it replaced.
+        @test linear_constraints(sece(FactorSpace()), sets; rr = rr).ineq.A ==
+              linear_constraints(sece(fs), sets; rr = rr).ineq.A
+    end
+    @testset "The standalone route cannot refit" begin
+        # `linear_constraints(ece, sets; rr = ...)` receives the loadings and never the data
+        # behind them, so the third arm is unreachable here and says so rather than
+        # silently doing nothing.
+        ece_fit = sece(FactorSpace(; re = StepwiseRegression()))
+        @test_throws PortfolioOptimisers.IsNothingError linear_constraints(ece_fit, sets)
+        msg = try
+            linear_constraints(ece_fit, sets)
+        catch e
+            sprint(showerror, e)
+        end
+        # The message names the estimator that could not be fitted and both fixes.
+        @test occursin("StepwiseRegression", msg)
+        @test occursin("Regression(; M = ...)", msg)
+        @test occursin("JuMPOptimiser", msg)
+        # A space that names no source at all is the older diagnosis, and it now points at
+        # the field as a third remedy.
+        msg = try
+            linear_constraints(sece(fs), sets)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("space.re === nothing", msg)
+        @test occursin("FactorSpace(; re = StepwiseRegression())", msg)
+    end
+    @testset "An estimator refits: a factor mandate with no factor prior" begin
+        # The capability the field buys. `EmpiricalPrior` carries no regression, so before
+        # `re` this combination threw — it is the case the older test above asserts.
+        ece_fit = ExposureConstraintEstimator(; lce = lcem,
+                                              space = FactorSpace(;
+                                                                  re = StepwiseRegression()))
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = oslv,
+                                                    sets = osets, lcse = ece_fit)), rdo)
+        # The prior really carries none: the basis came from the refit and nowhere else.
+        @test isnothing(res.pa.pr.rr)
+        fitted = regression(StepwiseRegression(), rdo)
+        @test vec(res.lcsr.ineq.A) ≈ fitted.M[:, 1]
+        # And it binds, measured against the loadings the refit produced.
+        @test dot(fitted.M[:, 1], res.w) <= 0.3 + 1e-6
+        # A stated result at the optimiser is the pinned case: the row is exactly `M * a`
+        # for the loadings handed in, whatever the prior would have fitted.
+        pin = Regression(; M = [1.0 0.0; 0.0 1.0; 1.0 1.0])
+        resp = optimise(MeanRisk(;
+                                 opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                                     sets = osets,
+                                                     lcse = ExposureConstraintEstimator(;
+                                                                                        lce = lcem,
+                                                                                        space = FactorSpace(;
+                                                                                                            re = pin)))),
+                        rdo)
+        @test vec(resp.lcsr.ineq.A) == pin.M[:, 1]
+        @test vec(resp.lcsr.ineq.A) != resp.pa.pr.rr.M[:, 1]
+    end
+    @testset "A stated basis is viewed where the universe is sliced" begin
+        # The loadings are assets-major, so a subset of assets is a subset of rows and the
+        # projection over the subset is exact. This is why an inner solve views rather than
+        # refuses.
+        ece_st = ExposureConstraintEstimator(; lce = lcem,
+                                             space = FactorSpace(;
+                                                                 re = Regression(; M = Mo)))
+        i = [1, 3]
+        v = PortfolioOptimisers.port_opt_view(ece_st, i)
+        @test v.space.re.M == Mo[i, :]
+        # A stated basis is usually just `M`. Viewing one used to crash on `view(nothing,
+        # i)` for `b`, and to materialise `L` as a copy of `M` because the `swap(L, M)`
+        # property rule makes `re.L` never `nothing` — both fixed, and both only reachable
+        # once a constraint space could hold a hand-written `Regression`.
+        @test isnothing(getfield(v.space.re, :L))
+        @test isnothing(getfield(v.space.re, :b))
+        rfull = Regression(; M = Mo, L = Mo .* 2, b = [1.0, 2.0, 3.0])
+        @test PortfolioOptimisers.port_opt_view(rfull, i).L == (Mo .* 2)[i, :]
+        @test PortfolioOptimisers.port_opt_view(rfull, i).b == [1.0, 3.0]
+        # The wrapped shape is written in the space's names, so an asset index means
+        # nothing to it and it is passed through.
+        @test v.lce === ece_st.lce
+        # A space that states no source, and a space holding an estimator, come back with
+        # nothing to slice.
+        @test isnothing(PortfolioOptimisers.port_opt_view(oece, i).space.re)
+        @test isa(PortfolioOptimisers.port_opt_view(sece(FactorSpace(;
+                                                                     re = StepwiseRegression())),
+                                                    i).space.re, StepwiseRegression)
+        # A vector maps elementwise. Without the method the universal fallback would `view`
+        # the vector itself, slicing a list of constraints by asset indices.
+        vv = PortfolioOptimisers.port_opt_view(PortfolioOptimisers.EcE_LcE_Lc[ece_st, lcem],
+                                               i)
+        @test length(vv) == 2
+        @test vv[1].space.re.M == Mo[i, :]
+        @test vv[2] === lcem
+        # A precomputed `LinearConstraint` in `lcse` is passed through unchanged. The
+        # identity is what the slot already did; slicing `A` here would change a path this
+        # work does not touch. See ADR 0047's 2026-08-16 basis-source amendment.
+        lc = LinearConstraint(;
+                              ineq = PartialLinearConstraint(; A = transpose(Mo[:, 1:1]),
+                                                             B = [0.3]))
+        @test PortfolioOptimisers.port_opt_view(lc, i) === lc
+    end
+    @testset "A stated basis is refused where the universe is replaced" begin
+        # An NCO outer solve writes cluster names over `sets.dict[xkey]` rather than
+        # slicing it, so no view of asset-major loadings can follow it.
+        pinned = ExposureConstraintEstimator(; lce = lcem,
+                                             space = FactorSpace(;
+                                                                 re = Regression(; M = Mo)))
+        fitting = ExposureConstraintEstimator(; lce = lcem,
+                                              space = FactorSpace(;
+                                                                  re = StepwiseRegression()))
+        jopt(l) = MeanRisk(;
+                           opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
+                                               sets = osets, lcse = l))
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(jopt(pinned))
+        # The inner path views instead, so it accepts what the outer refuses.
+        @test isnothing(PortfolioOptimisers.assert_internal_optimiser(jopt(pinned)))
+        # An estimator is refused nowhere: it refits against whatever universe it is
+        # handed, which is exactly the remedy the message names.
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(jopt(fitting)))
+        # And a space that states no source is unaffected — no configuration that was legal
+        # before this field became refusable.
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(jopt(oece)))
+        # A vector is walked, not ignored.
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(jopt(PortfolioOptimisers.EcE_LcE_Lc[lcem,
+                                                                                                                     pinned]))
+        # The refusal is wired at construction, in the shape of the `opt.re` and
+        # `opt.rba.re` refusals it copies.
+        hclust = ClustersEstimator()
+        @test_throws ArgumentError NestedClustered(; pe = FactorPrior(), cle = hclust,
+                                                   opti = jopt(oece), opto = jopt(pinned))
+        @test NestedClustered(; pe = FactorPrior(), cle = hclust, opti = jopt(pinned),
+                              opto = jopt(oece)) isa NestedClustered
+        # `Stacking` routes its outer optimiser through the same assertion, and its outer
+        # universe is the synthetic sub-portfolios, so the refusal is right there too.
+        @test_throws ArgumentError Stacking(; opti = [jopt(oece)], opto = jopt(pinned))
+        # `SubsetResampling` asserts the *internal* contract, because it slices. A stated
+        # basis is therefore legal under it, and correct: the view follows the subset.
+        @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
+    end
 end

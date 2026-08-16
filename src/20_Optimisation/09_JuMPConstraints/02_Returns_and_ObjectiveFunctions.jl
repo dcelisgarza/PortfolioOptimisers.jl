@@ -1,4 +1,125 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+Per-term settings bundle carried by every [`JuMPReturnsEstimator`](@ref).
+
+A [`JuMPOptimiser`](@ref) takes one return term or a vector of them, and the model's single
+scalar return expression is the weighted sum ``\\mathrm{ret} = \\sum_i s_i\\, \\mathrm{ret}_i``
+over the terms whose `rte` is `true`. This bundle carries everything that belongs to *one*
+term rather than to the optimiser: its weight in that sum, its own lower bound, whether it
+enters the sum at all, and which of the two portfolio charges are netted out of it.
+
+The bundle sits in a field called `settings`, placed **first** on every return estimator, in
+the same position [`RiskMeasureSettings`](@ref) takes on a risk measure.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    JuMPReturnsSettings(;
+        scale::Number = 1.0,
+        lb::Option{<:RkRtBounds} = nothing,
+        rte::Bool = true,
+        fee::Bool = true,
+        mic::Bool = true
+    ) -> JuMPReturnsSettings
+
+Keywords correspond to the struct's fields.
+
+## Details
+
+  - `scale` is the term's weight in the sum, and it is *not* normalised. Two terms at
+    `scale = 1` charge their flagged fees twice; a blend of two terms at `scale = 0.5`
+    charges them once. That is a statement about the configuration, not a defect.
+  - `fee` and `mic` are independent because market impact already constrains the budget, so a
+    caller may net the fees into a term while leaving the impact cost out of it.
+  - `rte = false` is the route for a term that is not in return units: it still takes its own
+    `lb`, so a **constraint-only** return term is expressible.
+
+## Validation
+
+  - `isfinite(scale)`.
+  - If `lb` is a number: `isfinite(lb)`.
+  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`JuMPReturnsEstimator`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
+@concrete struct JuMPReturnsSettings <: AbstractEstimator
+    """
+    $(field_dict[:scale_rt])
+    """
+    scale
+    """
+    $(field_dict[:lb_rts])
+    """
+    lb
+    """
+    $(field_dict[:rte])
+    """
+    rte
+    """
+    $(field_dict[:fee_rts])
+    """
+    fee
+    """
+    $(field_dict[:mic_rts])
+    """
+    mic
+    function JuMPReturnsSettings(scale::Number, lb::Option{<:RkRtBounds}, rte::Bool,
+                                 fee::Bool, mic::Bool)
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
+        if isa(lb, Number)
+            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
+        elseif isa(lb, VecNum)
+            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+            @argcheck(all(isfinite, lb),
+                      IsNonFiniteError("all elements of lb must be finite"))
+        end
+        return new{typeof(scale), typeof(lb), typeof(rte), typeof(fee), typeof(mic)}(scale,
+                                                                                     lb,
+                                                                                     rte,
+                                                                                     fee,
+                                                                                     mic)
+    end
+end
+function JuMPReturnsSettings(; scale::Number = 1.0, lb::Option{<:RkRtBounds} = nothing,
+                             rte::Bool = true, fee::Bool = true, mic::Bool = true)
+    return JuMPReturnsSettings(scale, lb, rte, fee, mic)
+end
+"""
+    const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
+
+Alias for a vector of return terms.
+
+Mirrors [`VecRM`](@ref) on the risk side.
+
+# Related
+
+  - [`JuMPReturnsEstimator`](@ref)
+  - [`JRE_VecJRE`](@ref)
+"""
+const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
+"""
+    const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+
+Field bound for [`JuMPOptimiser`](@ref)'s `ret` slot: one return term or several.
+
+Mirrors [`RM_VecRM`](@ref) on the risk side.
+
+# Related
+
+  - [`JuMPReturnsEstimator`](@ref)
+  - [`VecJRE`](@ref)
+"""
+const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
+"""
     const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
 
 Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot: the expected returns themselves, or the Estimator that computes them (a **Deferred Quantity** — see [`DeferredQuantity`](@ref)).
@@ -17,12 +138,12 @@ const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
 """
 $(DocStringExtensions.TYPEDEF)
 
-JuMP returns estimator that computes portfolio returns as the arithmetic (dot-product)
+JuMP return term that computes portfolio returns as the arithmetic (dot-product)
 mean return: ``r = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
 
-Optionally supports an uncertainty set on the mean vector (box or ellipsoidal) and a lower
-bound on the portfolio return. When `ucs` is set the optimiser maximises the **worst-case**
-expected return over the set instead of the point estimate `μ`, giving a robust return.
+Optionally supports an uncertainty set on the mean vector (box, ellipsoidal or
+``\\ell_1``). When `ucs` is set the optimiser maximises the **worst-case** expected return
+over the set instead of the point estimate `μ`, giving a robust return.
 
 # Fields
 
@@ -31,8 +152,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ArithmeticReturn(;
+        settings::JuMPReturnsSettings = JuMPReturnsSettings(),
         ucs::Option{<:UcSE_UcS} = nothing,
-        lb::Option{<:RkRtBounds} = nothing,
         mu::Option{<:ArithRetMu} = nothing
     ) -> ArithmeticReturn
 
@@ -43,12 +164,11 @@ Keywords correspond to the struct's fields.
   - `ucs` accepts either a pre-built mean uncertainty set (the result of [`mu_ucs`](@ref), e.g. a `BoxUncertaintySet` or `EllipsoidalUncertaintySet`) or an uncertainty-set *estimator*. A pre-built set is the simplest path — symmetric with how [`UncertaintySetVariance`](@ref) takes a pre-built [`sigma_ucs`](@ref) result. Passing an estimator defers construction to solve time and requires the returns data (`rd`) to be threaded through the optimiser.
   - `mu` accepts a **Deferred Quantity**: an expected-returns estimator or a prior estimator that computes the vector against the optimisation's own prior at [`factory`](@ref) time. See [`resolve_deferred_quantities`](@ref).
   - A `ucs` that carries its own centre outranks `mu`, and `mu` outranks `pr.mu` (ADR 0050). A Deferred Quantity is a state of the `mu` rung, not a rung of its own: beside a centre-carrying set it is resolved and then goes unused, exactly as a stated vector does.
+  - The lower bound lives on `settings.lb`, not on the term itself (ADR 0052).
 
 ## Validation
 
   - If `ucs` is an `EllipsoidalUncertaintySet`: must be parameterised by `MuEllipsoidalUncertaintySet`.
-  - If `lb` is a number: `isfinite(lb)`.
-  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
   - If `mu` is a number: `isfinite(mu)`.
   - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
 
@@ -58,37 +178,31 @@ Keywords correspond to the struct's fields.
 
 # Related
 
+  - [`JuMPReturnsSettings`](@ref)
   - [`bounds_returns_estimator`](@ref)
   - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     """
+    $(field_dict[:settings_rt])
+    """
+    settings
+    """
     $(field_dict[:ucs])
     """
     ucs
     """
-    $(field_dict[:lb])
-    """
-    lb
-    """
     $(field_dict[:mu_ret_slot])
     """
     mu
-    function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
+    function ArithmeticReturn(settings::JuMPReturnsSettings, ucs::Option{<:UcSE_UcS},
                               mu::Option{<:ArithRetMu})
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
                           EllipsoidalUncertaintySet{<:Any, <:Any,
                                                     <:MuEllipsoidalUncertaintySet}),
                       ArgumentError("ucs must be parameterised by MuEllipsoidalUncertaintySet, got $(typeof(ucs))"))
-        end
-        if isa(lb, Number)
-            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
-        elseif isa(lb, VecNum)
-            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
-            @argcheck(all(isfinite, lb),
-                      IsNonFiniteError("all elements of lb must be finite"))
         end
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
@@ -97,20 +211,20 @@ Keywords correspond to the struct's fields.
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        return new{typeof(ucs), typeof(lb), typeof(mu)}(ucs, lb, mu)
+        return new{typeof(settings), typeof(ucs), typeof(mu)}(settings, ucs, mu)
     end
 end
-function ArithmeticReturn(; ucs::Option{<:UcSE_UcS} = nothing,
-                          lb::Option{<:RkRtBounds} = nothing,
+function ArithmeticReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(),
+                          ucs::Option{<:UcSE_UcS} = nothing,
                           mu::Option{<:ArithRetMu} = nothing)
-    return ArithmeticReturn(ucs, lb, mu)
+    return ArithmeticReturn(settings, ucs, mu)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a **Deferred Quantity** in [`ArithmeticReturn`](@ref)'s `mu` slot against prior result `pr`. The estimator carries one prior-derived slot, so the slot itself admits the Estimator and there is no fan-out to make.
 
-Every `JuMP` path reaches this through [`factory`](@ref), which [`processed_jump_optimiser_attributes`](@ref) calls on `opt.ret` before any model is built. A returns estimator needs no second entry point, unlike a risk measure.
+Every `JuMP` path reaches this through [`factory`](@ref), which [`processed_jump_optimiser_attributes`](@ref) calls on `opt.ret` before any model is built. A return term needs no second entry point, unlike a risk measure.
 
 # Related
 
@@ -123,29 +237,50 @@ function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResu
     if !isa(rt.mu, DeferredQuantity)
         return rt
     end
-    return ArithmeticReturn(; ucs = rt.ucs, lb = rt.lb, mu = resolve_slot(rt.mu, :mu, pr))
+    return ArithmeticReturn(; settings = rt.settings, ucs = rt.ucs,
+                            mu = resolve_slot(rt.mu, :mu, pr))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
+    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
+    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
+    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     # No prior in hand, so a Deferred Quantity cannot resolve here. It travels on unchanged
     # and the prior-carrying `factory` the sub-problem runs resolves it.
-    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb, mu = rt.mu)
+    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
+                            mu = rt.mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply [`factory`](@ref) to each term of a vector of return terms.
+
+The vector is the multiplicity carrier ([`JRE_VecJRE`](@ref)), so every seam that reaches one
+term reaches all of them. Each term keeps its own settings, its own uncertainty set and its
+own characteristic; the outer `ucs` argument, when there is one, is the same for all of them,
+because only a single-term configuration can be routed a bare mean uncertainty set (see
+[`pipe_route`](@ref)).
+
+# Related
+
+  - [`JRE_VecJRE`](@ref)
+  - [`ArithmeticReturn`](@ref)
+"""
+function factory(rt::VecJRE, args...; kwargs...)
+    return [factory(rti, args...; kwargs...) for rti in rt]
 end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
@@ -153,23 +288,32 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     # identity on an Estimator. It then computes on the subset, which is the whole
     # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
-    return ArithmeticReturn(; ucs = uset, lb = r.lb, mu = mu)
+    return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu)
+end
+function port_opt_view(r::VecJRE, i, args...)
+    return [port_opt_view(ri, i, args...) for ri in r]
 end
 """
     no_bounds_returns_estimator(r, args...)
 
-Create a version of the returns estimator with lower bounds removed.
+Create a version of the return term with its lower bound removed.
 
-Used internally in risk frontier sub-problems to remove return lower bounds from the estimator so the sub-problem is unconstrained.
+Used internally in frontier and near-optimal-centering sub-problems, where the corner solves
+must range freely over the feasible set.
+
+Only `lb` and — when `flag` is `false` — `ucs` are stripped. Everything else the term carries
+survives, `mu` included: dropping the characteristic would silently re-centre the term on the
+prior's own vector, which is the [`ADR 0050`](@ref) defect class, and with several terms it
+would collapse every one of them onto the same corner.
 
 # Arguments
 
-  - `r`: JuMP returns estimator ([`ArithmeticReturn`](@ref) or [`LogarithmicReturn`](@ref)).
-  - `args...`: Additional arguments (e.g. `flag::Bool` for uncertainty set handling).
+  - `r`: One return term, or a vector of them.
+  - `flag::Bool`: When `false` the uncertainty set is stripped too.
 
 # Returns
 
-  - Returns estimator without bounds.
+  - The term(s) without bounds.
 
 # Related
 
@@ -178,15 +322,36 @@ Used internally in risk frontier sub-problems to remove return lower bounds from
   - [`no_bounds_optimiser`](@ref)
 """
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
-    return flag ? ArithmeticReturn(; ucs = r.ucs, mu = r.mu) : ArithmeticReturn()
+    return ArithmeticReturn(; settings = no_bounds_returns_settings(r.settings),
+                            ucs = ifelse(flag, r.ucs, nothing), mu = r.mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of `settings` with its lower bound cleared.
+
+`scale`, `rte`, `fee` and `mic` are not bounds, so they survive: a corner solve must charge
+the same fees and weight the same terms as the sweep it seeds.
+
+# Related
+
+  - [`no_bounds_returns_estimator`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+"""
+function no_bounds_returns_settings(settings::JuMPReturnsSettings)
+    return JuMPReturnsSettings(; scale = settings.scale, lb = nothing, rte = settings.rte,
+                               fee = settings.fee, mic = settings.mic)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-JuMP returns estimator that computes portfolio returns as the logarithmic (geometric)
+JuMP return term that computes portfolio returns as the logarithmic (geometric)
 mean return: ``r = \\prod_{t=1}^T (1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})^{1/T} - 1``.
 
-Optionally supports observation weights and a lower bound on the portfolio return.
+Optionally supports observation weights.
+
+Unlike [`ArithmeticReturn`](@ref) this term holds **no per-asset quantity at all**, which is
+why the plural noun of this family is the *return term* rather than the characteristic.
 
 # Fields
 
@@ -195,8 +360,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LogarithmicReturn(;
-        w::Option{<:ObsWeights} = nothing,
-        lb::Option{<:RkRtBounds} = nothing
+        settings::JuMPReturnsSettings = JuMPReturnsSettings(),
+        w::Option{<:ObsWeights} = nothing
     ) -> LogarithmicReturn
 
 Keywords correspond to the struct's fields.
@@ -204,67 +369,167 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `w` is provided: `!isempty(w)`, all elements non-negative and finite.
-  - If `lb` is a number: `isfinite(lb)`.
-  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
 
 # Related
 
+  - [`JuMPReturnsSettings`](@ref)
   - [`bounds_returns_estimator`](@ref)
   - [`ArithmeticReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     """
+    $(field_dict[:settings_rt])
+    """
+    settings
+    """
     $(field_dict[:oow])
     """
     w
-    """
-    $(field_dict[:lb])
-    """
-    lb
-    function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
+    function LogarithmicReturn(settings::JuMPReturnsSettings, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
-        if isa(lb, Number)
-            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
-        elseif isa(lb, VecNum)
-            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
-            @argcheck(all(isfinite, lb),
-                      IsNonFiniteError("all elements of lb must be finite"))
-        end
-        return new{typeof(w), typeof(lb)}(w, lb)
+        return new{typeof(settings), typeof(w)}(settings, w)
     end
 end
-function LogarithmicReturn(; w::Option{<:ObsWeights} = nothing,
-                           lb::Option{<:RkRtBounds} = nothing)
-    return LogarithmicReturn(w, lb)
+function LogarithmicReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(),
+                           w::Option{<:ObsWeights} = nothing)
+    return LogarithmicReturn(settings, w)
 end
 function factory(rt::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs...)
-    return LogarithmicReturn(; w = nothing_scalar_array_selector(rt.w, pr.w), lb = rt.lb)
+    return LogarithmicReturn(; settings = rt.settings,
+                             w = nothing_scalar_array_selector(rt.w, pr.w))
 end
 function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
-    return LogarithmicReturn(; w = r.w)
+    return LogarithmicReturn(; settings = no_bounds_returns_settings(r.settings), w = r.w)
 end
 """
-    bounds_returns_estimator(r, lb::Number)
+$(DocStringExtensions.TYPEDEF)
 
-Return a copy of returns estimator `r` with its lower bound set to `lb`.
+Return term that contributes no return.
 
-# Arguments
+`NoReturn` computes nothing: its value-level twin returns zero and its optimisation
+formulation adds a zero return expression. It exists so that an optimiser which genuinely has
+no return term can say so, without a vestigial one changing the model class. The return-side
+mirror of [`NoRisk`](@ref).
 
-  - `r`: Returns estimator.
-  - `lb::Number`: Lower bound on the portfolio return.
+# Fields
 
-# Returns
+$(DocStringExtensions.FIELDS)
 
-  - Returns estimator with updated lower bound.
+# Constructors
+
+    NoReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings()) -> NoReturn
+
+Keywords correspond to the struct's fields.
+
+# Details
+
+[`set_return_constraints!`](@ref) runs from the shared Model Assembly whatever the optimiser
+is, and [`JuMPOptimiser`](@ref)'s `ret` slot defaults to [`ArithmeticReturn`](@ref). Three
+optimisers never read `:ret` at all — [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref)
+and [`FactorRiskContribution`](@ref) — so today they build the whole expression, mean
+uncertainty-set cones included, and discard it. That is [`NoRisk`](@ref)'s own argument from
+the other side: a vestigial term drags constraints into a model that does not need them, and
+a conic solver onto a problem that is a linear program. `NoReturn` keeps such problems in the
+class they belong to, and it is the main use of the type.
+
+It also makes "no return term" something a caller **states**, rather than something that falls
+out of setting `settings.rte = false` on every term.
+
+# Notes
+
+`NoReturn` is only coherent where nothing reads the return expression:
+
+| Optimiser and objective                                                                   | `NoReturn` |
+|:----------------------------------------------------------------------------------------- |:---------- |
+| [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref), [`FactorRiskContribution`](@ref) | ok         |
+| [`MeanRisk`](@ref) + [`MinimumRisk`](@ref)                                                | ok         |
+| [`MeanRisk`](@ref) + [`MaximumUtility`](@ref)                                             | ok         |
+| [`MeanRisk`](@ref) + [`MaximumReturn`](@ref)                                              | **throws** |
+| [`MeanRisk`](@ref) + [`MaximumRatio`](@ref)                                               | **throws** |
+| [`NearOptimalCentering`](@ref)                                                            | **throws** |
+
+The two [`MeanRisk`](@ref) refusals come from
+[`assert_no_return_objective_compatibility`](@ref): a [`MaximumReturn`](@ref) objective would
+be identically zero, so the solver returns an arbitrary feasible portfolio and reports
+success, and a [`MaximumRatio`](@ref) numerator would vanish. The
+[`NearOptimalCentering`](@ref) refusal comes from [`assert_return_term_required`](@ref), and
+it is an **infeasibility**, not a degeneracy: the barrier constrains
+`exp(log_ret) <= ret - rt`, and with no return term both sides are zero.
+
+The term holds no per-asset quantity, so `settings.scale`, `settings.fee` and `settings.mic`
+are inert — zero scaled is still zero, and a charge subtracted here would make the expression
+non-zero, which every guard above rests on. Setting `settings.lb` is legal but binds on a
+quantity that is always zero, so a positive bound makes the model infeasible; this is
+[`NoRisk`](@ref)'s `settings.ub`, which is legal and pointless for the same reason.
 
 # Related
 
+  - [`NoRisk`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+  - [`JuMPReturnsEstimator`](@ref)
+  - [`noreturn_flag`](@ref)
+  - [`assert_no_return_objective_compatibility`](@ref)
+  - [`assert_return_term_required`](@ref)
+"""
+@concrete struct NoReturn <: JuMPReturnsEstimator
+    """
+    $(field_dict[:settings_rt])
+    """
+    settings
+    function NoReturn(settings::JuMPReturnsSettings)
+        return new{typeof(settings)}(settings)
+    end
+end
+function NoReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings())::NoReturn
+    return NoReturn(settings)
+end
+function no_bounds_returns_estimator(r::NoReturn, args...)
+    return NoReturn(; settings = no_bounds_returns_settings(r.settings))
+end
+function no_bounds_returns_estimator(r::VecJRE, args...)
+    return [no_bounds_returns_estimator(ri, args...) for ri in r]
+end
+"""
+    bounds_returns_estimator(r, lb)
+
+Return a copy of return term `r` with its lower bound set to `lb`.
+
+The pairing is **term by term**. One term takes a scalar bound or `nothing`; *k* terms take
+`nothing` (which clears all *k*) or a vector of *k* bounds, one per term.
+
+A scalar **number** against *k* terms is **refused**. The bound binds on each term's own
+expression, and the terms are heterogeneous in unit, so no check could tell whether one
+number means the same thing to all of them.
+
+# Arguments
+
+  - `r`: One return term, or a vector of them.
+  - `lb`: The lower bound; a number, `nothing`, or a vector of one per term.
+
+# Returns
+
+  - The term(s) with the updated lower bound.
+
+# Related
+
+  - [`JuMPReturnsSettings`](@ref)
   - [`ArithmeticReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
 """
-function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Number)
-    return Accessors.@set r.lb = lb
+function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBounds})
+    return Accessors.@set r.settings.lb = lb
+end
+function bounds_returns_estimator(r::VecJRE, lb::Nothing)
+    return [bounds_returns_estimator(ri, nothing) for ri in r]
+end
+function bounds_returns_estimator(r::VecJRE, lb::Number)
+    return throw(ArgumentError("cannot apply the single bound $lb to $(length(r)) return terms: a bound binds on one term's own expression, and the terms are not guaranteed to share a unit. Pass a vector of $(length(r)) bounds, or `nothing` to clear them all."))
+end
+function bounds_returns_estimator(r::VecJRE, lb::AbstractVector)
+    @argcheck(length(lb) == length(r),
+              DimensionMismatch("`lb` must have one entry per return term:\n`length(lb)` => $(length(lb))\n`length(r)` => $(length(r))"))
+    return [bounds_returns_estimator(ri, lbi) for (ri, lbi) in zip(r, lb)]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -353,6 +618,11 @@ Where:
   - ``r_f``: Risk-free rate.
   - $(math_dict[:R_w])
 
+The ratio is taken at the **aggregate** level: its numerator is the model's single `ret`
+expression, whatever number of terms built it. `rf` is therefore a single rate on that
+aggregate, and a term that is not in return units belongs out of the numerator through
+`settings.rte = false`, not through a per-term rate.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -403,24 +673,150 @@ Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\interc
   - [`MinimumRisk`](@ref)
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
-  - [`MinimumRisk`](@ref)
-  - [`MaximumUtility`](@ref)
-  - [`MaximumRatio`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 struct MaximumReturn <: ObjectiveFunction end
 """
-    set_maximum_ratio_factor_variables!(model, mu, obj)
+$(DocStringExtensions.TYPEDEF)
+
+Internal objective that maximises the expression of **one** return term.
+
+Used only by the return-frontier corner solves. With *k* terms the span of term *i* has to be
+read off a portfolio that maximised term *i* alone: reading it off the aggregate
+maximum-return corner makes it an artefact of the other terms' `scale`, and can leave
+`rt_min > rt_max`, so the sweep range descends.
+
+Not part of the user-facing API.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`MaximumReturn`](@ref)
+  - [`compute_ret_lbs`](@ref)
+"""
+@concrete struct MaximumElementReturn <: ObjectiveFunction
+    """
+    `i`: Index of the return term to maximise.
+    """
+    i
+    function MaximumElementReturn(i::Integer)
+        @argcheck(i > zero(i), DomainError(i, "i must be > 0"))
+        return new{typeof(i)}(i)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` when `r` is a [`NoReturn`](@ref), or a non-empty collection in which **every**
+term is one.
+
+The quantifier is `all`, where [`norisk_flag`](@ref) uses `any`. The divergence is
+deliberate, not an oversight. Every degeneracy this predicate guards against needs the model's
+`:ret` expression to be *identically* zero, and `:ret` is the weighted sum of the terms, so
+one real term beside a `NoReturn` leaves it non-zero. `[ArithmeticReturn(), NoReturn()]`
+solves correctly under every objective and in every optimiser, and `any` would refuse it.
+
+The predicate is a **type** test, so it does not see a term taken out of the sum by
+`settings.rte = false`. That route reaches the same zero expression, and
+[`set_max_ratio_return_constraints!`](@ref) covers it with a settings-aware check at model
+build time, because the ratio is the objective for which an empty numerator is unrecoverable.
+
+# Related
+
+  - [`NoReturn`](@ref)
+  - [`assert_no_return_objective_compatibility`](@ref)
+  - [`assert_return_term_required`](@ref)
+  - [`norisk_flag`](@ref)
+"""
+function noreturn_flag(r)::Bool
+    return isa(r, NoReturn) ||
+           (isa(r, AbstractVector) && !isempty(r) && all(x -> isa(x, NoReturn), r))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a [`NoReturn`](@ref) term is paired with an objective that ignores the return.
+
+Rejects [`NoReturn`](@ref) under [`MaximumReturn`](@ref) — whose objective would be
+identically zero, so the solver returns an arbitrary feasible portfolio and reports success —
+and under [`MaximumRatio`](@ref), whose numerator would vanish.
+
+Called from [`MeanRisk`](@ref)'s constructor, which is where a return term and an objective
+first meet: the term lives on [`JuMPOptimiser`](@ref) and the objective on the optimiser.
+
+A [`TimeDependent`](@ref) schedule on either side is skipped, as in
+[`assert_no_risk_objective_compatibility`](@ref) — but the two are **not** covered equally
+afterwards. A scheduled `obj` comes back through
+[`assert_time_dependent_substitution`](@ref), which re-runs [`MeanRisk`](@ref)'s constructor
+on each scheduled entry. A scheduled `ret` does not: it is a field of
+[`JuMPOptimiser`](@ref), so the substitution pass re-runs *that* constructor, which has no
+objective to check the entry against. A schedule whose entries are all `NoReturn` therefore
+reaches [`MaximumReturn`](@ref) unrefused, where the static equivalent does not.
+
+# Related
+
+  - [`NoReturn`](@ref)
+  - [`noreturn_flag`](@ref)
+  - [`assert_return_term_required`](@ref)
+  - [`MeanRisk`](@ref)
+"""
+function assert_no_return_objective_compatibility(ret, obj)::Nothing
+    if isa(ret, TimeDependent) || isa(obj, TimeDependent) || !noreturn_flag(ret)
+        return nothing
+    end
+    @argcheck(!isa(obj, MaximumReturn),
+              ArgumentError("NoReturn is incompatible with MaximumReturn: the objective would be identically zero, so every feasible portfolio is optimal and the solver would return an arbitrary one while reporting success. NoReturn exists so that a formulation which never reads the return expression can avoid a vestigial term — use obj = MinimumRisk() or obj = MaximumUtility(), or give a real return term."))
+    @argcheck(!isa(obj, MaximumRatio),
+              ArgumentError("NoReturn is incompatible with MaximumRatio: the ratio's numerator vanishes, so its homogenisation variable k collapses to zero when rf > 0, and the problem returns an arbitrary feasible point when rf = 0. Use obj = MinimumRisk() or obj = MaximumUtility(), or give a real return term."))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `ret` holds a real return term, for optimisers whose formulation is built around
+one.
+
+[`NoReturn`](@ref) is coherent in the three optimisers that never read `:ret`, and in
+[`MeanRisk`](@ref) under an objective that never reads it.
+[`NearOptimalCentering`](@ref) is the one optimiser that neither describes: its logarithmic
+barrier constrains `exp(log_ret) <= ret - rt`, so with no return term the model is
+**infeasible** rather than degenerate, and without this check the failure arrives as a solver
+`OptimisationFailure` naming nothing.
+
+`T` names the calling optimiser, for the error message. [`TimeDependent`](@ref) schedules are
+skipped, mirroring [`assert_risk_measure_required`](@ref).
+
+# Related
+
+  - [`NoReturn`](@ref)
+  - [`noreturn_flag`](@ref)
+  - [`assert_no_return_objective_compatibility`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
+function assert_return_term_required(ret, T::Symbol)::Nothing
+    if isa(ret, TimeDependent) || !noreturn_flag(ret)
+        return nothing
+    end
+    return throw(ArgumentError("NoReturn cannot be used with $T: its logarithmic barrier constrains exp(log_ret) <= ret - rt, and with no return term the reference return rt and the model's return expression are both zero, so the constraint reads exp(log_ret) <= 0, which no real log_ret satisfies. The model is infeasible, not merely degenerate. Give a real return term. NoReturn is for the optimisers whose formulation never reads the return expression — RiskBudgeting, RelaxedRiskBudgeting and FactorRiskContribution — and for MeanRisk under MinimumRisk or MaximumUtility."))
+end
+"""
+    set_maximum_ratio_factor_variables!(model, obj)
     set_maximum_ratio_factor_variables!(model, args...)
 
-Set factor variables for the maximum ratio objective in the JuMP model.
+Register the homogenisation variable `k` for the maximum ratio objective.
 
-Configures the normalisation factor (`ohf`) and the homogenisation variable (`k`) required for the maximum Sharpe or similar ratio objectives. The no-op overload sets `k` to `1` for non-ratio objectives.
+This runs **before** the model is assembled, because [`set_weight_constraints!`](@ref) reads
+`k` immediately afterwards. The other half of the old bundle — the normalisation factor `ohf`
+— is sized from the *resolved* return characteristic, which does not exist until the return
+builders have run, so [`set_maximum_ratio_normalisation!`](@ref) registers it later. The
+no-op overload sets `k` to `1` for non-ratio objectives.
 
 # Arguments
 
   - `model`: JuMP optimisation model.
-  - `mu`: Expected return vector or scalar.
   - `obj`: Objective function (e.g., [`MaximumRatio`](@ref)).
   - `args...`: Arguments (ignored in the fallback overload).
 
@@ -431,17 +827,10 @@ Configures the normalisation factor (`ohf`) and the homogenisation variable (`k`
 # Related
 
   - [`MaximumRatio`](@ref)
+  - [`set_maximum_ratio_normalisation!`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
-function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
-                                             obj::MaximumRatio)
-    ohf = if isnothing(obj.ohf)
-        min(1e3, max(1e-3, Statistics.mean(abs.(mu))))
-    else
-        @argcheck(obj.ohf > zero(obj.ohf), DomainError(obj.ohf, "obj.ohf must be > 0"))
-        obj.ohf
-    end
-    JuMP.@expression(model, ohf, ohf)
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, obj::MaximumRatio)
     JuMP.@variable(model, k >= 0)
     return nothing
 end
@@ -450,18 +839,63 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, args...)
     return nothing
 end
 """
-    set_return_bounds!(args...)
-    set_return_bounds!(model::JuMP.Model, lb::Number)
-    set_return_bounds!(model::JuMP.Model, lb::Front_NumVec)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a return lower bound constraint to the JuMP model.
+Register the ratio problem's normalisation factor `ohf`.
 
-The no-op fallback does nothing. With a scalar `lb`, adds a constraint `ret >= lb`. With a `Frontier` or vector `lb`, registers a return frontier expression for efficient frontier sweeps.
+Sized from the resolved aggregate characteristic ``\\sum_{i:\\,\\mathrm{rte}} s_i \\boldsymbol{\\mu}_i`` when there is one, and from the prior's own vector when no term carries
+a per-asset quantity. Reading it off the resolved aggregate corrects a pre-existing mismatch:
+the factor used to come from `pr.mu` alone, so it ignored a term's own `mu` and a set's
+carried centre. The change is numerical, not semantic — any `ohf > 0` recovers the same
+`w / k`.
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `lb`: Lower bound on portfolio return (scalar, vector, or `Frontier`).
+  - $(arg_dict[:model])
+  - `obj::MaximumRatio`: The ratio objective.
+  - `mu`: The resolved aggregate characteristic, or `nothing`.
+  - `pr`: Prior result, the fallback when `mu` is `nothing`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_maximum_ratio_factor_variables!`](@ref)
+  - [`set_max_ratio_return_constraints!`](@ref)
+"""
+function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
+                                          mu::Option{<:Num_VecNum}, pr::AbstractPriorResult)
+    ohf = if isnothing(obj.ohf)
+        mu = isnothing(mu) ? pr.mu : mu
+        min(1e3, max(1e-3, Statistics.mean(abs.(mu))))
+    else
+        @argcheck(obj.ohf > zero(obj.ohf), DomainError(obj.ohf, "obj.ohf must be > 0"))
+        obj.ohf
+    end
+    JuMP.@expression(model, ohf, ohf)
+    return nothing
+end
+"""
+    set_return_bounds!(model, i, ret_expr, lb)
+
+Bound the expression of return term `i` from below.
+
+The `Nothing` overload does nothing. With a scalar `lb`, adds `ret_i >= lb * k`. With a
+[`Frontier`](@ref) or a vector, pushes the term onto the `:ret_frontier` Model State entry
+for a later sweep, exactly as [`set_risk_upper_bound!`](@ref) does on the risk side.
+
+The bound binds on the term's **own** expression, net of that term's own flagged charges and
+before `settings.scale` is applied, and it binds whether or not `settings.rte` is `true` — so
+a term may constrain the portfolio without entering the objective at all.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i`: Index of the return term.
+  - `ret_expr`: The term's own JuMP return expression.
+  - `lb`: Lower bound on the term (scalar, vector, or `Frontier`).
 
 # Returns
 
@@ -470,36 +904,49 @@ The no-op fallback does nothing. With a scalar `lb`, adds a constraint `ret >= l
 # Related
 
   - [`set_return_constraints!`](@ref)
-  - [`ArithmeticReturn`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
 """
-function set_return_bounds!(args...)
+function set_return_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing)
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, lb::Number)
+function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number)
     sc = get_constraint_scale(model)
     k = get_k(model)
-    ret = get_ret(model)
-    JuMP.@constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
+    model[Symbol(:ret_lb_, i)] = JuMP.@constraint(model, sc * (ret_expr - lb * k) >= 0)
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, lb::Front_NumVec)
-    JuMP.@expression(model, ret_frontier, lb)
+function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
+    bound_key = Symbol(:ret_lb_, i)
+    bound_var_key = Symbol(:ret_lb_var_, i)
+    if !shared_has(model, :ret_frontier)
+        JuMP.@expression(model, ret_frontier,
+                         Pair{Tuple{Symbol, Symbol},
+                              Tuple{<:JuMP.AbstractJuMPScalar, <:Front_NumVec, <:Integer}}[(bound_var_key, bound_key) => (ret_expr,
+                                                                                                                          lb,
+                                                                                                                          i)])
+    else
+        push!(shared_get(model, :ret_frontier),
+              (bound_var_key, bound_key) => (ret_expr, lb, i))
+    end
     return nothing
 end
 """
-    set_max_ratio_return_constraints!(args...)
-    set_max_ratio_return_constraints!(model, obj, mu)
+    set_return_expression!(model, i, ret_expr, scale, rte)
 
-Set maximum ratio return constraints in the JuMP model.
+Push the scaled expression of return term `i` onto the `:ret_vec` Model State entry.
 
-Various overloads handle different optimiser types (e.g., [`MaximumRatio`](@ref) objective). No-op fallback when not applicable.
+If `rte` is `false` the function does nothing, so the term contributes nothing to the model's
+return expression while its own bound still binds. The twin of
+[`set_risk_expression!`](@ref).
 
 # Arguments
 
-  - `args...`: JuMP model and optimiser parameters (ignored in no-op fallback).
-  - `model`: JuMP optimisation model.
-  - `obj`: Objective function.
-  - `mu`: Expected return vector or scalar.
+  - $(arg_dict[:model])
+  - `i`: Index of the return term.
+  - `ret_expr`: The term's own JuMP return expression.
+  - `scale::Number`: The term's weight in the sum.
+  - `rte::Bool`: When `false` this method is a no-op.
 
 # Returns
 
@@ -507,20 +954,120 @@ Various overloads handle different optimiser types (e.g., [`MaximumRatio`](@ref)
 
 # Related
 
-  - [`set_max_ratio_log_return_constraints!`](@ref)
-  - [`MaximumRatio`](@ref)
+  - [`scalarise_return_expression!`](@ref)
+  - [`set_return_bounds!`](@ref)
 """
-function set_max_ratio_return_constraints!(args...)
+function set_return_expression!(model::JuMP.Model, i, ret_expr, scale::Number, rte::Bool)
+    if !rte
+        return nothing
+    end
+    if !shared_has(model, :ret_vec)
+        JuMP.@expression(model, ret_vec, JuMP.AffExpr[])
+    end
+    push!(shared_get(model, :ret_vec), scale * ret_expr)
     return nothing
 end
-function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
-                                           mu::Num_VecNum)
+"""
+    scalarise_return_expression!(model)
+
+Collapse the `:ret_vec` entries into the model's single scalar `:ret` expression.
+
+The collapse is always the **weighted sum** ``\\sum_i s_i\\, \\mathrm{ret}_i``. There is no
+scalariser on this side, and there is no configuration in which there is one (ADR 0052): the
+package's scalarisers follow cvxpy's `scalarize` transforms, whose `max` and `log_sum_exp`
+discard the objective's sense and so fail on a maximised concave expression, and cvxpy ships
+no `min`. Normalising the sense to rescue them is barred, because `:ret` is a model-global
+name that the objective, the bounds, the ratio and [`NearOptimalCentering`](@ref) all read,
+and a stored `-ret` leads every one of them astray.
+
+An empty `:ret_vec` — every term opted out through `settings.rte = false` — gives a zero
+return expression rather than an error, because such a configuration is meaningful for every
+objective except [`MaximumRatio`](@ref), which refuses it separately.
+
+# Arguments
+
+  - $(arg_dict[:model])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_return_expression!`](@ref)
+  - [`set_return_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+"""
+function scalarise_return_expression!(model::JuMP.Model)
+    JuMP.@expression(model, ret, zero(JuMP.AffExpr))
+    if !shared_has(model, :ret_vec)
+        return nothing
+    end
+    for ret_i in shared_get(model, :ret_vec)
+        JuMP.add_to_expression!(ret, ret_i)
+    end
+    return nothing
+end
+"""
+    set_max_ratio_return_constraints!(model, obj, rets, mus, robust, pr)
+
+Add the maximum-ratio homogenisation constraint to the model.
+
+The constraint is **hoisted** out of the per-term builders and runs exactly once. It reads
+the model-global `:ret` and registers the model-global names `sr_ret` and `sr_risk`, so *k*
+copies of it would collide and each would read the wrong expression.
+
+Which of the two forms is used is decided by a **structural `any`** and a **numeric
+aggregate**:
+
+ 1. If any term has no per-asset characteristic (a [`LogarithmicReturn`](@ref)) or builds a
+    robust cone (a box or ellipsoidal uncertainty set), the risk form is used.
+ 2. Otherwise the aggregate ``\\sum_{i:\\,\\mathrm{rte}} s_i \\boldsymbol{\\mu}_i`` decides:
+    `all(x -> x <= rf, ·)` selects the risk form.
+
+Step 2 is the exact generalisation of the single-term test. A per-term `any` would send two
+terms at `0.9 r_f` and `scale = 1` down the weaker branch, though their sum is `1.8 r_f`.
+
+An **empty numerator** is refused, mirroring [`NoRisk`](@ref) under this objective: with every
+term out of `:ret`, `k` collapses to `0` at `rf > 0` and the problem returns an arbitrary
+feasible point at `rf = 0`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `obj`: Objective function; a no-op unless it is a [`MaximumRatio`](@ref).
+  - `rets`: The return terms.
+  - `mus`: Each term's resolved characteristic, `nothing` where it has none.
+  - `robust`: Whether each term built a robust cone.
+  - `pr`: Prior result, the fallback for sizing `ohf`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MaximumRatio`](@ref)
+  - [`set_maximum_ratio_normalisation!`](@ref)
+"""
+function set_max_ratio_return_constraints!(::JuMP.Model, ::ObjectiveFunction, args...)
+    return nothing
+end
+function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, rets,
+                                           mus::AbstractVector, robust::AbstractVector,
+                                           pr::AbstractPriorResult)
+    # A term out of the numerator is a term out of the numerator, whether it got there by
+    # type or by flag, so the predicate tests both.
+    @argcheck(any(x -> x.settings.rte && !isa(x, NoReturn), rets),
+              ArgumentError("`MaximumRatio` needs a non-zero return expression, and every return term is out of it: each of the $(length(rets)) terms is either a `NoReturn` or carries `settings.rte = false`. The ratio's homogenisation variable `k` collapses to zero when `rf > 0`, and the problem returns an arbitrary feasible point when `rf = 0`. Give a return term that is in the expression, or use a different objective."))
+    mu = aggregate_return_characteristic(rets, mus)
+    set_maximum_ratio_normalisation!(model, obj, mu, pr)
     sc = get_constraint_scale(model)
     k = get_k(model)
     ohf = shared_get(model, :ohf)
     ret = get_ret(model)
     rf = obj.rf
-    if shared_has(model, :bucs_w) || shared_has(model, :t_eucs_gw) || all(x -> x <= rf, mu)
+    if any(robust) || isnothing(mu) || all(x -> x <= rf, mu)
         risk = get_risk(model)
         JuMP.@constraint(model, sr_risk, sc * (risk - ohf) <= 0)
     else
@@ -529,16 +1076,48 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     return nothing
 end
 """
-    add_fees_to_ret!(model::JuMP.Model, ret)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Subtract the fees expression from the portfolio return expression in the JuMP model.
+Sum the characteristics of the terms that are in the return expression, each at its own scale.
 
-If no fees are registered in the model, does nothing.
+Returns `nothing` when no included term carries a per-asset quantity, which is the state a
+pure [`LogarithmicReturn`](@ref) problem is in. A term whose `settings.rte` is `false` is
+skipped: it contributes nothing to `:ret`, so it must contribute nothing to the aggregate the
+ratio's tests read.
+
+# Related
+
+  - [`set_max_ratio_return_constraints!`](@ref)
+  - [`set_maximum_ratio_normalisation!`](@ref)
+"""
+function aggregate_return_characteristic(rets, mus::AbstractVector)
+    mu = nothing
+    for (r, mu_i) in zip(rets, mus)
+        if !r.settings.rte || isnothing(mu_i)
+            continue
+        end
+        term = r.settings.scale * mu_i
+        mu = isnothing(mu) ? term : mu .+ term
+    end
+    return mu
+end
+"""
+    add_fees_to_ret!(model, ret, fee::Bool)
+
+Subtract the fees expression from one term's return expression.
+
+Does nothing when the term's `settings.fee` is `false`, or when no fees are registered.
+
+The charge stays **inside** each builder, so with *k* terms the multiplier on the fee is
+``\\sum_{i:\\,\\mathrm{fee}} s_i``. That multiplier is deliberately unconstrained: a blend of
+two terms at `scale = 0.5` charges the fee once, and two terms at `scale = 1` charge it
+twice.
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
+  - $(arg_dict[:model])
   - `ret`: JuMP return expression to modify in-place.
+  - `fee::Bool`: The term's `settings.fee`.
 
 # Returns
 
@@ -549,25 +1128,27 @@ If no fees are registered in the model, does nothing.
   - [`add_market_impact_cost!`](@ref)
   - [`set_return_constraints!`](@ref)
 """
-function add_fees_to_ret!(model::JuMP.Model, ret)
-    if !shared_has(model, :fees)
+function add_fees_to_ret!(model::JuMP.Model, ret, fee::Bool)
+    if !fee || !shared_has(model, :fees)
         return nothing
     end
-    fees = shared_get(model, :fees)
-    JuMP.add_to_expression!(ret, -fees)
+    JuMP.add_to_expression!(ret, -shared_get(model, :fees))
     return nothing
 end
 """
-    add_market_impact_cost!(model::JuMP.Model, ret)
+    add_market_impact_cost!(model, ret, mic::Bool)
 
-Subtract market impact costs from the portfolio return expression in the JuMP model.
+Subtract the market impact cost from one term's return expression.
 
-If no market impact cost expression is registered in the model, does nothing.
+Does nothing when the term's `settings.mic` is `false`, or when no market impact cost is
+registered. Only [`BudgetMarketImpact`](@ref) registers one; a plain budget cost constrains
+the budget and never reaches the return expression, despite sharing the `cost_bgt_expr` name.
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
+  - $(arg_dict[:model])
   - `ret`: JuMP return expression to modify in-place.
+  - `mic::Bool`: The term's `settings.mic`.
 
 # Returns
 
@@ -578,59 +1159,92 @@ If no market impact cost expression is registered in the model, does nothing.
   - [`add_fees_to_ret!`](@ref)
   - [`set_return_constraints!`](@ref)
 """
-function add_market_impact_cost!(model::JuMP.Model, ret)
-    if !shared_has(model, :wip)
+function add_market_impact_cost!(model::JuMP.Model, ret, mic::Bool)
+    if !mic || !shared_has(model, :wip)
         return nothing
     end
-    cost_bgt_expr = shared_get(model, :cost_bgt_expr)
-    JuMP.add_to_expression!(ret, -cost_bgt_expr)
+    JuMP.add_to_expression!(ret, -shared_get(model, :cost_bgt_expr))
     return nothing
 end
 """
     set_return_constraints!(model, pret, obj, pr; kwargs...)
+    set_return_constraints!(model, i, pret, pr; kwargs...)
 
-Add portfolio return expression and associated constraints to the JuMP model.
+Build the model's return expression and the constraints that go with it.
 
-Dispatches based on the return estimator type. Registers the `ret` expression, applies fees and market impact costs, configures maximum Sharpe ratio constraints, and adds return lower bounds.
+The four-argument methods are the seam every JuMP optimiser reaches. They run the per-term
+builder once per return term, collapse the results into the single `:ret` expression, and
+then add the hoisted maximum-ratio constraint. The five-argument methods are the per-term
+builders, which dispatch on the term's type and on the shape of its uncertainty set.
+
+Each per-term builder registers its own index-suffixed names (`ret_1`, `t_l1ucs_2`, …),
+applies that term's own flagged charges, bounds that term, and pushes the scaled expression
+onto `:ret_vec`.
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `pret`: JuMP returns estimator ([`ArithmeticReturn`](@ref) or [`LogarithmicReturn`](@ref)).
+  - $(arg_dict[:model])
+  - `pret`: One return term, or a vector of them.
+  - `i`: Index of the return term (per-term builders).
   - `obj::ObjectiveFunction`: Portfolio objective function.
   - `pr::AbstractPriorResult`: Prior result with asset moments.
   - `kwargs...`: Additional keyword arguments (e.g. `rd` for uncertainty sets).
 
 # Returns
 
-  - `nothing`.
+  - The four-argument methods return `nothing`. A per-term builder returns
+    `(mu, robust)`: the characteristic it resolved (or `nothing`), and whether it built a
+    robust cone.
 
 # Related
 
   - [`ArithmeticReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
+  - [`NoReturn`](@ref)
+  - [`scalarise_return_expression!`](@ref)
   - [`set_return_bounds!`](@ref)
   - [`add_fees_to_ret!`](@ref)
 """
-function set_return_constraints!(model::JuMP.Model,
-                                 pret::ArithmeticReturn{Nothing, <:Any, <:Any},
+function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
-    w = get_w(model)
-    lb = pret.lb
-    mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    JuMP.@expression(model, ret, dot_scalar(mu, w))
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    set_max_ratio_return_constraints!(model, obj, mu)
-    set_return_bounds!(model, lb)
+    mu, robust = set_return_constraints!(model, 1, pret, pr; kwargs...)
+    scalarise_return_expression!(model)
+    set_max_ratio_return_constraints!(model, obj, (pret,), [mu], [robust], pr)
     return nothing
 end
+function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::ObjectiveFunction,
+                                 pr::AbstractPriorResult; kwargs...)
+    @argcheck(!isempty(pret), IsEmptyError("`ret` cannot be an empty vector"))
+    mus = Vector{Any}(undef, length(pret))
+    robust = Vector{Bool}(undef, length(pret))
+    for (i, pret_i) in enumerate(pret)
+        mus[i], robust[i] = set_return_constraints!(model, i, pret_i, pr; kwargs...)
+    end
+    scalarise_return_expression!(model)
+    set_max_ratio_return_constraints!(model, obj, pret, mus, robust, pr)
+    return nothing
+end
+function set_return_constraints!(model::JuMP.Model, i,
+                                 pret::ArithmeticReturn{<:Any, Nothing, <:Any},
+                                 pr::AbstractPriorResult; kwargs...)
+    w = get_w(model)
+    settings = pret.settings
+    mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model, dot_scalar(mu, w))
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_expression!(model, i, ret, settings.scale, settings.rte)
+    return mu, false
+end
 """
-    set_ucs_return_constraints!(model, ucs, mu)
+    set_ucs_return_constraints!(model, i, ucs, mu, settings)
 
-Add uncertainty-set-robust return constraints to the JuMP model.
+Build one term's uncertainty-set-robust return expression.
 
-Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone constraint. For `EllipsoidalUncertaintySet`, uses a second-order cone constraint.
+Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone
+constraint. For `EllipsoidalUncertaintySet`, a second-order cone. For the two ``\\ell_1``
+sets, an infinity-norm cone and a pair of linear epigraphs respectively.
 
 # Mathematical definition
 
@@ -661,87 +1275,72 @@ Ellipsoidal uncertainty set (worst-case return):
 
 Where:
 
-  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
-  - $(math_dict[:mu_er])
-  - $(math_dict[:w_port])
   - ``\\kappa``: Ellipsoidal uncertainty set radius.
   - ``\\mathbf{G}``: Upper Cholesky factor of the uncertainty set covariance.
 
 # Arguments
 
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `ucs`: Uncertainty set ([`BoxUncertaintySet`](@ref) or [`EllipsoidalUncertaintySet`](@ref)).
+  - $(arg_dict[:model])
+  - `i`: Index of the return term, which suffixes every name the builder registers.
+  - `ucs`: The uncertainty set.
   - `mu`: Fallback characteristic vector, used when the set carries none of its own.
+  - `settings::JuMPReturnsSettings`: The term's settings, read for `fee` and `mic`.
 
 # Returns
 
-  - `mu`: The characteristic vector the set is centred on. The set's own field wins over the fallback (ADR 0050). The caller needs it, because [`set_max_ratio_return_constraints!`](@ref) reads it as a value.
+  - `(ret, mu, robust)`: the term's expression, the characteristic the set is centred on —
+    the set's own field wins over the fallback (ADR 0050) — and whether the builder raised a
+    cone the ratio's `ret == rf k + ohf` normalisation cannot be used with.
 
 # Related
 
   - [`set_return_constraints!`](@ref)
   - [`ArithmeticReturn`](@ref)
 """
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
-                                     mu::Num_VecNum)
+function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySet,
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
     sc = get_constraint_scale(model)
     w = get_w(model)
     N = length(w)
     mu = something(ucs.val, mu)
     d_mu = (ucs.ub - ucs.lb) * 0.5
-    JuMP.@variable(model, bucs_w[1:N])
-    JuMP.@constraint(model, bucs_ret[i = 1:N],
-                     [sc * bucs_w[i]; sc * w[i]] in JuMP.MOI.NormOneCone(2))
-    JuMP.@expression(model, ret, dot_scalar(mu, w) - LinearAlgebra.dot(d_mu, bucs_w))
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    return mu
+    bucs_w = model[Symbol(:bucs_w_, i)] = JuMP.@variable(model, [1:N])
+    model[Symbol(:bucs_ret_, i)] = JuMP.@constraint(model, [j = 1:N],
+                                                    [sc * bucs_w[j]; sc * w[j]] in
+                                                    JuMP.MOI.NormOneCone(2))
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
+                                                     dot_scalar(mu, w) -
+                                                     LinearAlgebra.dot(d_mu, bucs_w))
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, true
 end
-"""
-    set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet, mu::Num_VecNum)
-
-Add ellipsoidal uncertainty-set-robust return constraints to the JuMP model.
-
-Introduces a second-order cone constraint to model the worst-case expected return under an ellipsoidal uncertainty set for the mean vector.
-
-# Arguments
-
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set with covariance `sigma` and radius `k`.
-  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
-
-# Returns
-
-  - `mu`: The characteristic vector the set is centred on. The set's own `val` field wins over the fallback (ADR 0050).
-
-# Related
-
-  - [`set_ucs_return_constraints!`](@ref)
-  - [`EllipsoidalUncertaintySet`](@ref)
-  - [`BoxUncertaintySet`](@ref)
-"""
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet,
-                                     mu::Num_VecNum)
+function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet,
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.val, mu)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     k = ucs.k
-    JuMP.@expression(model, x_eucs_w, G * w)
-    JuMP.@variable(model, t_eucs_gw)
-    JuMP.@constraint(model, eucs_ret,
-                     [sc * t_eucs_gw; sc * x_eucs_w] in JuMP.SecondOrderCone())
-    JuMP.@expression(model, ret, dot_scalar(mu, w) - k * t_eucs_gw)
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    return mu
+    x_eucs_w = model[Symbol(:x_eucs_w_, i)] = JuMP.@expression(model, G * w)
+    t_eucs_gw = model[Symbol(:t_eucs_gw_, i)] = JuMP.@variable(model)
+    model[Symbol(:eucs_ret_, i)] = JuMP.@constraint(model,
+                                                    [sc * t_eucs_gw; sc * x_eucs_w] in
+                                                    JuMP.SecondOrderCone())
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
+                                                     dot_scalar(mu, w) - k * t_eucs_gw)
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, true
 end
 """
-    set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet, mu::Num_VecNum)
+    set_ucs_return_constraints!(model, i, ucs::L1UncertaintySet, mu, settings)
 
-Add ``\\ell_1``-uncertainty-set-robust return constraints to the JuMP model.
+Build one term's ``\\ell_1``-robust return expression.
 
-Introduces an infinity-norm cone constraint to model the worst-case characteristic under an ``\\ell_1`` uncertainty set. The constraint is linear, so the resulting model is an LP whenever the rest of the problem is (see [`NoRisk`](@ref)).
+Introduces an infinity-norm cone constraint to model the worst-case characteristic under an
+``\\ell_1`` uncertainty set. The constraint is linear, so the resulting model is an LP
+whenever the rest of the problem is (see [`NoRisk`](@ref)).
 
 # Mathematical definition
 
@@ -759,15 +1358,8 @@ Where:
   - ``\\epsilon``: Radius of the ``\\ell_1`` uncertainty set.
   - ``\\boldsymbol{\\sigma}``: Per-asset scaling (`sd`); ``\\boldsymbol{1}`` when `sd` is `nothing`.
 
-# Arguments
-
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `ucs::L1UncertaintySet`: ``\\ell_1`` uncertainty set with radius `eps` and scaling `sd`.
-  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
-
-# Returns
-
-  - `mu`: The characteristic vector the set is centred on. The set's own `mu` field wins over the fallback (ADR 0050).
+Two ``\\ell_1`` terms whose `sd` differ do **not** collapse into one: the sum of their
+penalties is not a single infinity norm unless every `sd` matches.
 
 # Related
 
@@ -775,26 +1367,29 @@ Where:
   - [`L1UncertaintySet`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
 """
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet,
-                                     mu::Num_VecNum)
+function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet,
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    JuMP.@variable(model, t_l1ucs)
-    JuMP.@constraint(model, l1ucs_ret,
-                     [sc * t_l1ucs;
-                      sc * sw] in JuMP.MOI.NormInfinityCone(1 + length(w)))
-    JuMP.@expression(model, ret, dot_scalar(mu, w) - ucs.eps * t_l1ucs)
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    return mu
+    t_l1ucs = model[Symbol(:t_l1ucs_, i)] = JuMP.@variable(model)
+    model[Symbol(:l1ucs_ret_, i)] = JuMP.@constraint(model,
+                                                     [sc * t_l1ucs;
+                                                      sc * sw] in
+                                                     JuMP.MOI.NormInfinityCone(1 +
+                                                                               length(w)))
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
+                                                     dot_scalar(mu, w) - ucs.eps * t_l1ucs)
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, false
 end
 """
-    set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet, mu::Num_VecNum)
+    set_ucs_return_constraints!(model, i, ucs::SignedL1UncertaintySet, mu, settings)
 
-Add signed-``\\ell_1``-uncertainty-set-robust return constraints to the JuMP model.
+Build one term's signed-``\\ell_1``-robust return expression.
 
 Introduces one epigraph variable per error sign. Because the objective maximises the return expression, each variable is driven down to its lower bound, so `t_sl1ucs_p` attains ``[\\max_i(-\\sigma_i w_i)]_+`` and `t_sl1ucs_m` attains ``[\\max_i(\\sigma_i w_i)]_+`` at the optimum. The constraints are linear.
 
@@ -816,112 +1411,83 @@ Where:
 
 Modelling this worst case directly keeps the long-short problem *coupled*, so it does not need the decoupling of equations (27) and (28) of [quintile](@cite), nor the complementary-support caveat its Remark 12 attaches to recombining them.
 
-# Arguments
-
-  - `model::JuMP.Model`: JuMP optimisation model.
-  - `ucs::SignedL1UncertaintySet`: Signed ``\\ell_1`` uncertainty set with radii `ep`, `en` and scaling `sd`.
-  - `mu::Num_VecNum`: Fallback characteristic vector, used when the set carries none of its own.
-
-# Returns
-
-  - `mu`: The characteristic vector the set is centred on. The set's own `mu` field wins over the fallback (ADR 0050).
-
 # Related
 
   - [`set_ucs_return_constraints!`](@ref)
   - [`SignedL1UncertaintySet`](@ref)
   - [`L1UncertaintySet`](@ref)
 """
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet,
-                                     mu::Num_VecNum)
+function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1UncertaintySet,
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    JuMP.@variables(model, begin
-                        t_sl1ucs_p >= 0
-                        t_sl1ucs_m >= 0
-                    end)
-    JuMP.@constraints(model, begin
-                          sl1ucs_ret_p, sc * (-sw .- t_sl1ucs_p) <= 0
-                          sl1ucs_ret_m, sc * (sw .- t_sl1ucs_m) <= 0
-                      end)
-    JuMP.@expression(model, ret,
-                     dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p - ucs.en * t_sl1ucs_m)
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    return mu
+    t_sl1ucs_p = model[Symbol(:t_sl1ucs_p_, i)] = JuMP.@variable(model, lower_bound = 0)
+    t_sl1ucs_m = model[Symbol(:t_sl1ucs_m_, i)] = JuMP.@variable(model, lower_bound = 0)
+    model[Symbol(:sl1ucs_ret_p_, i)] = JuMP.@constraint(model,
+                                                        sc * (-sw .- t_sl1ucs_p) <= 0)
+    model[Symbol(:sl1ucs_ret_m_, i)] = JuMP.@constraint(model, sc * (sw .- t_sl1ucs_m) <= 0)
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
+                                                     dot_scalar(mu, w) -
+                                                     ucs.ep * t_sl1ucs_p -
+                                                     ucs.en * t_sl1ucs_m)
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, false
 end
-function set_return_constraints!(model::JuMP.Model,
-                                 pret::ArithmeticReturn{<:UcSE_UcS, <:Any, <:Any},
-                                 obj::ObjectiveFunction, pr::AbstractPriorResult;
-                                 rd::ReturnsResult, kwargs...)
-    lb = pret.lb
-    ucs = pret.ucs
+function set_return_constraints!(model::JuMP.Model, i,
+                                 pret::ArithmeticReturn{<:Any, <:UcSE_UcS, <:Any},
+                                 pr::AbstractPriorResult; rd::ReturnsResult, kwargs...)
+    settings = pret.settings
     # The set is a neighbourhood of the quantity it was calibrated on, so it names the
-    # centre. The estimator's own field and then the prior are the fallbacks (ADR 0050).
+    # centre. The term's own field and then the prior are the fallbacks (ADR 0050).
     fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    mu = set_ucs_return_constraints!(model, mu_ucs(ucs, rd; kwargs...), fb)
-    set_max_ratio_return_constraints!(model, obj, mu)
-    set_return_bounds!(model, lb)
-    return nothing
+    ret, mu, robust = set_ucs_return_constraints!(model, i, mu_ucs(pret.ucs, rd; kwargs...),
+                                                  fb, settings)
+    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_expression!(model, i, ret, settings.scale, settings.rte)
+    return mu, robust
 end
-"""
-    set_max_ratio_log_return_constraints!(args...)
-    set_max_ratio_log_return_constraints!(model, ::MaximumRatio)
-
-Set maximum ratio log-return constraints in the JuMP model.
-
-Various overloads handle different optimiser types with logarithmic return objectives. No-op fallback when not applicable.
-
-# Arguments
-
-  - `args...`: Arguments (ignored in no-op fallback).
-  - `model`: JuMP optimisation model.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_max_ratio_return_constraints!`](@ref)
-  - [`MaximumRatio`](@ref)
-"""
-function set_max_ratio_log_return_constraints!(args...)
-    return nothing
-end
-function set_max_ratio_log_return_constraints!(model::JuMP.Model, ::MaximumRatio)
-    sc = get_constraint_scale(model)
-    ohf = shared_get(model, :ohf)
-    risk = get_risk(model)
-    JuMP.@constraint(model, sr_elog_ret_risk, sc * (risk - ohf) <= 0)
-end
-function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
-                                 obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
+function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
+                                 pr::AbstractPriorResult; kwargs...)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    lb = pret.lb
+    settings = pret.settings
     X = set_portfolio_returns!(model, pr.X)
     T = length(X)
-    JuMP.@variable(model, t_elog_ret[1:T])
+    t_elog_ret = model[Symbol(:t_elog_ret_, i)] = JuMP.@variable(model, [1:T])
     wi = nothing_scalar_array_selector(pret.w, pr.w)
     wi = get_observation_weights(wi, X)
-    if isnothing(wi)
-        JuMP.@expression(model, ret, Statistics.mean(t_elog_ret))
+    ret = model[Symbol(:ret_, i)] = if isnothing(wi)
+        JuMP.@expression(model, Statistics.mean(t_elog_ret))
     else
-        JuMP.@expression(model, ret, Statistics.mean(t_elog_ret, wi))
+        JuMP.@expression(model, Statistics.mean(t_elog_ret, wi))
     end
-    add_fees_to_ret!(model, ret)
-    add_market_impact_cost!(model, ret)
-    set_max_ratio_log_return_constraints!(model, obj)
-    JuMP.@expression(model, kret, k .+ X)
-    JuMP.@constraint(model, elog_ret_ret[i = 1:T],
-                     [sc * t_elog_ret[i], sc * k, sc * kret[i]] in
-                     JuMP.MOI.ExponentialCone())
-    set_return_bounds!(model, lb)
-    return nothing
+    add_fees_to_ret!(model, ret, settings.fee)
+    add_market_impact_cost!(model, ret, settings.mic)
+    kret = model[Symbol(:kret_, i)] = JuMP.@expression(model, k .+ X)
+    model[Symbol(:elog_ret_ret_, i)] = JuMP.@constraint(model, [j = 1:T],
+                                                        [sc * t_elog_ret[j], sc * k,
+                                                         sc * kret[j]] in
+                                                        JuMP.MOI.ExponentialCone())
+    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_expression!(model, i, ret, settings.scale, settings.rte)
+    # A logarithmic term holds no per-asset quantity, which forces the ratio's risk form.
+    return nothing, false
+end
+function set_return_constraints!(model::JuMP.Model, i, pret::NoReturn,
+                                 ::AbstractPriorResult; kwargs...)
+    settings = pret.settings
+    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model, zero(JuMP.AffExpr))
+    # No charge is applied here, and this is why `settings.fee` and `settings.mic` are inert:
+    # the term's expression is identically zero by construction, every guard `NoReturn`
+    # carries rests on that, and a fee subtracted here would make it non-zero.
+    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_expression!(model, i, ret, settings.scale, settings.rte)
+    # No per-asset quantity, and no robust cone.
+    return nothing, false
 end
 """
     add_to_objective_penalty!(model::JuMP.Model, expr)
@@ -998,7 +1564,7 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     return expr
 end
 """
-    set_portfolio_objective_function!(model, obj, pret, optimiser, attrs)
+    set_portfolio_objective_function!(model, obj, optimiser, attrs)
 
 Set the portfolio objective function in the JuMP model.
 
@@ -1006,13 +1572,12 @@ Dispatches on the objective function type to build the appropriate JuMP objectiv
 
 Custom objective terms are applied *before* the penalty is folded in, because they contribute to the same accumulator: `add_penalty_to_objective!` applies the sign factor matching this method's optimisation sense, so a contribution always worsens the objective regardless of which objective is being built. See ADR 0036.
 
-`pret` is redundant in value — it is always `attrs.ret` — but is passed positionally because [`MaximumRatio`](@ref) dispatches on it: a [`LogarithmicReturn`](@ref) ratio problem never registers `:sr_risk`, so without its own method it would fall through to the risk-minimisation branch.
+The return term is **not** a parameter of this function. It used to be passed positionally so that a [`LogarithmicReturn`](@ref) ratio problem could dispatch to its own method, because the logarithmic builder registered `sr_elog_ret_risk` where every other branch registered `sr_risk`. The hoisted ratio constraint registers one name for every term shape, so the two methods collapse into one keyed on the presence of `:sr_risk`, and the positional lost its only dispatch reason.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)). This is the objective *being built*, which during a [`Frontier`](@ref) sweep differs from the one the user declared.
-  - `pret::JuMPReturnsEstimator`: Returns estimator; always `attrs.ret`.
   - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself). Supplies the custom objective terms as `optimiser.opt.cobj`.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
@@ -1030,7 +1595,6 @@ Custom objective terms are applied *before* the penalty is folded in, because th
   - [`add_custom_objective_term!`](@ref)
 """
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
-                                           ::JuMPReturnsEstimator,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     risk = get_risk(model)
@@ -1041,7 +1605,6 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
-                                           ::JuMPReturnsEstimator,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     ret = get_ret(model)
@@ -1054,20 +1617,6 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           ::LogarithmicReturn,
-                                           optimiser::JuMPOptimisationEstimator, attrs)
-    so = get_objective_scale(model)
-    ret = get_ret(model)
-    k = get_k(model)
-    rf = obj.rf
-    JuMP.@expression(model, obj_expr, ret - rf * k)
-    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
-    obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    JuMP.@objective(model, Max, so * obj_expr)
-    return nothing
-end
-function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           ::JuMPReturnsEstimator,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     if shared_has(model, :sr_risk)
@@ -1088,7 +1637,6 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
-                                           ::JuMPReturnsEstimator,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     ret = get_ret(model)
@@ -1098,6 +1646,16 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
+function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumElementReturn,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
+    so = get_objective_scale(model)
+    ret = model[Symbol(:ret_, obj.i)]
+    JuMP.@expression(model, obj_expr, ret)
+    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
+    obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
+    JuMP.@objective(model, Max, so * obj_expr)
+    return nothing
+end
 
-export ArithmeticReturn, LogarithmicReturn, MinimumRisk, MaximumUtility, MaximumRatio,
-       MaximumReturn, bounds_returns_estimator
+export JuMPReturnsSettings, ArithmeticReturn, LogarithmicReturn, NoReturn, MinimumRisk,
+       MaximumUtility, MaximumRatio, MaximumReturn, bounds_returns_estimator

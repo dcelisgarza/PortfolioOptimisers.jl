@@ -71,7 +71,10 @@
     mr_res = optimise(mr, rd)
     @test isapprox(res.w, mr_res.w, rtol = 0.05)
 
-    jopt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; lb = Frontier(5)))
+    jopt = JuMPOptimiser(; slv = slv,
+                         ret = ArithmeticReturn(;
+                                                settings = JuMPReturnsSettings(;
+                                                                               lb = Frontier(5))))
     mr = MeanRisk(; opt = jopt)
 
     opt = SubsetResampling(; subset_size = eps(), n_subsets = 20, pe = pr, opt = mr)

@@ -33,7 +33,7 @@ $(DocStringExtensions.FIELDS)
         smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
         slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-        plr::Option{<:AbstractPhylogenyConstraintResult}, ret::JuMPReturnsEstimator
+        plr::Option{<:AbstractPhylogenyConstraintResult}, ret::JRE_VecJRE
     ) -> ProcessedJuMPOptimiserAttributes
 
 Keywords correspond to the struct's fields. The field types are the *result* side of the
@@ -160,7 +160,7 @@ true
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                               plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JuMPReturnsEstimator)
+                                              ret::JRE_VecJRE)
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
@@ -187,7 +187,7 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                           plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JuMPReturnsEstimator)::ProcessedJuMPOptimiserAttributes
+                                          ret::JRE_VecJRE)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
                                             plr, ret)
@@ -357,7 +357,7 @@ $(DocStringExtensions.FIELDS)
         sets::TD_Option{<:UniverseSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
         ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+        ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
         sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
         ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
         cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
@@ -601,8 +601,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
                            sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
-                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
-                           ret::TD{<:JuMPReturnsEstimator},
+                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC}, ret::TD{<:JRE_VecJRE},
                            sca::TD{<:NonHierarchicalScalariser},
                            ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
                            cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
@@ -880,7 +879,7 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        sets::TD_Option{<:UniverseSets} = nothing,
                        tr::TD_Option{<:Tr_VecTr} = nothing,
                        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                       ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+                       ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
                        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
                        ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
                        cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing, sc::Number = 1,
@@ -1051,6 +1050,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
         sgst = port_opt_view(opt.sgst, i)
     end
     tn = port_opt_view(opt.tn, i)
+    lcse = port_opt_view(opt.lcse, i)
     sets = port_opt_view(opt.sets, i)
     fees = port_opt_view(opt.fees, i)
     tr = port_opt_view(opt.tr, i, X)
@@ -1058,15 +1058,15 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
-                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st,
-                         lcse = opt.lcse, cte = opt.cte, gcarde = opt.gcarde,
-                         sgcarde = opt.sgcarde, smtx = smtx, sgmtx = sgmtx, slt = slt,
-                         sst = sst, sglt = sglt, sgst = sgst, tn = tn, fees = fees,
-                         sets = sets, tr = tr, ple = opt.ple, ret = ret, sca = opt.sca,
-                         ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
-                         card = opt.card, scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc,
-                         linfc = opt.linfc, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
+                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st, lcse = lcse,
+                         cte = opt.cte, gcarde = opt.gcarde, sgcarde = opt.sgcarde,
+                         smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
+                         sgst = sgst, tn = tn, fees = fees, sets = sets, tr = tr,
+                         ple = opt.ple, ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
+                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
+                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
                          strict = opt.strict)
 end
 """
@@ -1148,7 +1148,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
-                              rr = pr.rr)
+                              rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                  x_src = opt.x_src, z_src = opt.z_src, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
@@ -1191,10 +1191,10 @@ end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
 
-Return a copy of `opt` with the returns estimator replaced by its unbounded variant.
+Return a copy of `opt` with every return term replaced by its unbounded variant.
 
 Used internally in risk-frontier sub-problems where weight and risk bounds must be
-removed so the solver can range freely.
+removed so the solver can range freely. A vector of terms is stripped term by term.
 
 # Arguments
 
@@ -1203,7 +1203,7 @@ removed so the solver can range freely.
 
 # Returns
 
-  - `JuMPOptimiser`: Optimiser with an unbounded returns estimator.
+  - `JuMPOptimiser`: Optimiser whose return terms carry no bounds.
 
 # Examples
 
@@ -1373,6 +1373,11 @@ and *tail* (objective + solve). The head must have populated Model State (`w`/`k
 before calling this function. See `Model Assembly` in `CONTEXT.md` and
 `0008-jump-model-assembly.md`.
 
+The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
+complete here and no sweep solve has started, so this is the one point at which the **total**
+sweep — the product across every swept return term and every swept risk measure — is in hand
+and can be capped.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -1419,6 +1424,7 @@ true
   - [`ProcessedJuMPOptimiserAttributes`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
+  - [`assert_frontier_sweep_cap`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
@@ -1455,6 +1461,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
         set_sdp_phylogeny_constraints!(model, plr)
     end
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
+    assert_frontier_sweep_cap(model)
     return nothing
 end
 """
@@ -1463,6 +1470,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Route a mean uncertainty set into a [`JuMPOptimiser`](@ref)'s return estimator.
 
 One of the two [Routing Targets](@ref PIPELINE_ROUTING_TARGETS) that names no plain field: the set lands in `ret.ucs`, and only an [`ArithmeticReturn`](@ref) can bound expected returns, so any other return estimator is an error rather than a silent drop.
+
+A **vector** of return terms is refused for the same reason, from the other side: one set is a neighbourhood of one quantity (ADR 0050), so broadcasting it across *k* terms would apply a ball fitted on one fit to every other one — the very defect [#277](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/277) removed. Name the set on the term it belongs to instead.
 
 Internal machinery — not part of the user-facing API.
 
@@ -1473,7 +1482,11 @@ Internal machinery — not part of the user-facing API.
 """
 function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
     @argcheck(isa(cfg.ret, ArithmeticReturn),
-              ArgumentError("cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"))
+              ArgumentError(if isa(cfg.ret, VecJRE)
+                                "cannot route a mean uncertainty set into $(length(cfg.ret)) return terms: a set is a neighbourhood of the one quantity it was calibrated on (ADR 0050), so it cannot be broadcast across terms. Name the set in the `ucs` field of the term it belongs to."
+                            else
+                                "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
+                            end))
     return Accessors.set(cfg, Accessors.PropertyLens{:ret}(),
                          Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
 end

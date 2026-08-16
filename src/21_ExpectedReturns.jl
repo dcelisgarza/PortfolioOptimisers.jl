@@ -3,6 +3,8 @@
                     fees::Option{<:Fees} = nothing, kwargs...)
     expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
+    expected_return(ret::NoReturn, w::VecNum, pr::AbstractPriorResult;
+                    fees::Option{<:Fees} = nothing, kwargs...)
     expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
 
@@ -30,6 +32,7 @@ Compute the expected portfolio return using the specified return estimator.
 
   - [`ArithmeticReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
+  - [`NoReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`VecNum`](@ref)
@@ -48,7 +51,7 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
     # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
     r = resolve_deferred_quantities(r, pr)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
+    return LinearAlgebra.dot(w, mu) - term_fees(w, fees, r.settings.fee)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
@@ -59,9 +62,64 @@ function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorRes
     else
         Statistics.mean(log1p.(X * w), rw)
     end
-    return kret - calc_fees(w, fees)
+    return kret - term_fees(w, fees, ret.settings.fee)
 end
-function expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult,
+function expected_return(::NoReturn, w::VecNum, ::AbstractPriorResult,
+                         ::Option{<:Fees} = nothing; kwargs...)
+    # The scalar twin of a zero expression. No charge is applied, exactly as
+    # `set_return_constraints!` applies none: `settings.fee` is inert on this term.
+    return zero(eltype(w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Charge the fees to a return term only when that term's `settings.fee` says so.
+
+The scalar twin follows the **fee** flag alone. Market impact is absent from `expected_return`
+on either side of the multiplicity, so this preserves a pre-existing divergence between the
+model expression and its scalar twin rather than widening one.
+
+# Related
+
+  - [`expected_return`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+  - [`calc_fees`](@ref)
+"""
+function term_fees(w::VecNum, fees::Option{<:Fees}, fee::Bool)
+    return fee ? calc_fees(w, fees) : zero(eltype(w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Sum the value-level returns of several return terms, each at its own scale.
+
+The scalar twin of the model's `ret` expression, which is the same weighted sum over the same
+terms. A term whose `settings.rte` is `false` is skipped, exactly as it is skipped in the
+model.
+
+This is the one carve-out from the rule that the value-level `expected_*` family stays
+singular: [`NearOptimalCentering`](@ref)'s barrier needs the aggregate scalar, and this
+function declares itself the scalar twin of the `ret` expression. The rest of the family, and
+the whole risk side, still take one measure and one term.
+
+# Related
+
+  - [`expected_return`](@ref)
+  - [`JRE_VecJRE`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
+function expected_return(ret::VecJRE, w::VecNum, pr::AbstractPriorResult,
+                         fees::Option{<:Fees} = nothing; kwargs...)
+    rt = zero(eltype(w))
+    for ret_i in ret
+        if !ret_i.settings.rte
+            continue
+        end
+        rt += ret_i.settings.scale * expected_return(ret_i, w, pr, fees; kwargs...)
+    end
+    return rt
+end
+function expected_return(ret::JRE_VecJRE, w::VecVecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     return [expected_return(ret, wi, pr, fees; kwargs...) for wi in w]
 end
@@ -268,9 +326,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 julia> ExpectedReturn()
 ExpectedReturn
   rt ┼ ArithmeticReturn
-     │   ucs ┼ nothing
-     │    lb ┼ nothing
-     │    mu ┴ nothing
+     │   settings ┼ JuMPReturnsSettings
+     │            │   scale ┼ Float64: 1.0
+     │            │      lb ┼ nothing
+     │            │     rte ┼ Bool: true
+     │            │     fee ┼ Bool: true
+     │            │     mic ┴ Bool: true
+     │        ucs ┼ nothing
+     │         mu ┴ nothing
 ```
 
 # Related
@@ -361,9 +424,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 julia> ExpectedReturnRiskRatio()
 ExpectedReturnRiskRatio
   rt ┼ ArithmeticReturn
-     │   ucs ┼ nothing
-     │    lb ┼ nothing
-     │    mu ┴ nothing
+     │   settings ┼ JuMPReturnsSettings
+     │            │   scale ┼ Float64: 1.0
+     │            │      lb ┼ nothing
+     │            │     rte ┼ Bool: true
+     │            │     fee ┼ Bool: true
+     │            │     mic ┴ Bool: true
+     │        ucs ┼ nothing
+     │         mu ┴ nothing
   rk ┼ Variance
      │   settings ┼ RiskMeasureSettings
      │            │   scale ┼ Float64: 1.0

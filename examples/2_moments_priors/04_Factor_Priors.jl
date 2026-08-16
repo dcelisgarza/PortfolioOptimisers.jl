@@ -265,11 +265,20 @@ First let's examine the mean-standard deviation efficient frontier using the emp
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[2], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[3], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))))]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = StandardDeviation(), obj = MinimumRisk(), opt = opt) for opt in opts]
@@ -342,11 +351,20 @@ Here we will perform the exact same procedure as before, but using the negative 
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[7], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[8], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))))]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for opt in opts]
@@ -422,11 +440,20 @@ Again we will do the same as before but with the kurtosis.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
 opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[7], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),
         JuMPOptimiser(; pe = prs[8], slv = slv,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))))]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opts]

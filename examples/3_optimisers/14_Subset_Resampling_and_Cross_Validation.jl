@@ -149,7 +149,7 @@ apply the same frontier sweep to the bagged optimiser, which gives us a frontier
 bagged portfolios rather than a frontier from a single full-universe fit.
 =#
 
-frontier_ret = ArithmeticReturn(; lb = Frontier(; N = 15))
+frontier_ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 15)))
 mr_front = MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = frontier_ret))
 ssr_front = SubsetResampling(; pe = pr,
                              opt = MeanRisk(;

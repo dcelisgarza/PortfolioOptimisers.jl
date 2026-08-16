@@ -49,3 +49,47 @@ self-documenting: a caller who set `n_sim` and hit `max_n_sim` sees the link imm
   silently ignored (the shipped default applies) rather than erroring — the rename is silent at load.
 - Every future sizing sink of this class is expected to add its own field rather than borrow an
   existing one; borrowing is the specific mistake this ADR exists to prevent.
+
+## Amendment (2026-08-16)
+
+**A cap must be measured against the sink, not against the field that names it.** The decision
+above classified `Frontier.N` as a compute sink of the linear kind — "one unit → one solve" — and
+placed the check in `Frontier`'s constructor, where a single `N` is in hand. That classification was
+wrong about the sink, in the same way the report's `bins` proposal was wrong about `bins`.
+
+The efficient-frontier sweep is an `Iterators.product`. Each swept risk measure pushes its own entry
+onto `:risk_frontier`, and since [ADR 0052](0052-a-return-expression-is-a-weighted-sum-of-terms.md)'s return
+multiplicity each swept return term pushes its own onto `:ret_frontier`; the solve loops range over
+the product of all of them. So `k` bounds of `N` points each cost `N^k` full solves, not `k · N`.
+`Frontier`'s constructor sees one `N` and can never see the product, so **two risk measures at the
+`100_000` ceiling asked for `10^10` solves and no guard fired** — a hole in the same trust boundary
+this ADR was written to close, present since the risk frontier first accepted several measures.
+
+The rule is therefore two checks against one ceiling, not two ceilings:
+
+```
+Frontier(N)   assert N <= max_frontier                 # the cheap early check, unchanged
+assembly      assert prod(Nᵢ) * prod(Nⱼ) <= max_frontier
+```
+
+This is **not** the cap reuse the decision forbids. Reuse is one ceiling standing in for two
+*different* sinks, as `max_samples` would have for `bins`. Here there is one sink — total solves —
+and the constructor check was only ever a lower bound on it; the assembly check measures the same
+sink correctly. Adding a second field would ask a caller to reason about two numbers for one cost.
+
+`assert_frontier_sweep_cap` (`src/20_Optimisation/08_Base_JuMPOptimisation.jl`) is the second check,
+called as the last statement of `assemble_jump_model!`. Model Assembly is the earliest point at
+which the whole sweep is in hand — both frontier registries are complete there, and no sweep solve
+has started. A `Frontier` is *not* yet resolved into its range at that point (resolution happens in
+`compute_ret_lbs` / `compute_risk_ubs`, which pay corner solves to do it), so the count is read off
+the shape: a `Frontier`'s `N`, or a stated bound vector's `length`. The product is accumulated as a
+`BigInt`, because four bounds at the shipped ceiling is `10^20` and an `Int64` product would wrap
+past the very check it is feeding.
+
+The generalisation for future sinks: **when a sink is fed by several instances of a config object,
+the cap belongs where the instances meet, and a per-instance check is at best an early exit.**
+
+Behaviour-changing, not API-breaking: a configuration whose product exceeds the ceiling now raises a
+`DomainError` naming the product, the bounds that made it, and the knob. The ceiling is raised
+deliberately as before — `set_resource_limits!(; max_frontier)`, `with_resource_limits` for a single
+scope, or the `"max_frontier"` preference for a project.

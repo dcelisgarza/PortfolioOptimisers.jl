@@ -68,6 +68,14 @@ peak-to-trough paths ([`MaximumDrawdown`](@ref)), or the whole ordered loss curv
 which optimisers accept it — is the [risk measures](03_Risk_Measures.md) page; you can also mix
 several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
 
+The **return** side is the `ret` field of [`JuMPOptimiser`](@ref), an
+[`ArithmeticReturn`](@ref) by default. Like `r`, it takes one term or a vector of them, summed
+with weights into the model's single return expression. Each term carries its own
+[`JuMPReturnsSettings`](@ref) — its weight in that sum, its own lower bound, and whether it
+enters the sum at all — so a term can bound the portfolio without being rewarded, which is how
+you price what a floor on one quantity costs in another
+([ℓ1 uncertainty sets](../examples/2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md)).
+
 The drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
 [`drawdowns`](@ref) on a realised book — when you want to measure rather than optimise it
 ([Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md)).

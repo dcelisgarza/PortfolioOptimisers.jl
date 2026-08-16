@@ -492,7 +492,7 @@ Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)).
+  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples

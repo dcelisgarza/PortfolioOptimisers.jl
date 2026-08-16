@@ -148,9 +148,14 @@ MeanRisk
       │        tr ┼ nothing
       │       ple ┼ nothing
       │       ret ┼ ArithmeticReturn
-      │           │   ucs ┼ nothing
-      │           │    lb ┼ nothing
-      │           │    mu ┴ nothing
+      │           │   settings ┼ JuMPReturnsSettings
+      │           │            │   scale ┼ Float64: 1.0
+      │           │            │      lb ┼ nothing
+      │           │            │     rte ┼ Bool: true
+      │           │            │     fee ┼ Bool: true
+      │           │            │     mic ┴ Bool: true
+      │           │        ucs ┼ nothing
+      │           │         mu ┴ nothing
       │       sca ┼ SumScalariser()
       │      ccnt ┼ nothing
       │      cobj ┼ nothing
@@ -257,6 +262,7 @@ Where:
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         assert_no_risk_objective_compatibility(r, obj)
+        assert_no_return_objective_compatibility(opt.ret, obj)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
@@ -300,24 +306,26 @@ function port_opt_view(mr::MeanRisk, i, X::MatNum, args...)::MeanRisk
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = mr.fb)
 end
 """
-    solve_mean_risk!(model, mr, ret, pr, ::Val{false}, ::Val{false}, args...)
-    solve_mean_risk!(model, mr, ret, pr, ::Val{true}, ::Val{false}, fees, args...)
-    solve_mean_risk!(model, mr, ret, pr, ::Val{false}, ::Val{true}, fees, args...)
-    solve_mean_risk!(model, mr, ret, pr, ::Val{true}, ::Val{true}, fees, args...)
+    solve_mean_risk!(model, mr, pr, ::Val{false}, ::Val{false}, fees, attrs)
+    solve_mean_risk!(model, mr, pr, ::Val{true}, ::Val{false}, fees, attrs)
+    solve_mean_risk!(model, mr, pr, ::Val{false}, ::Val{true}, fees, attrs)
+    solve_mean_risk!(model, mr, pr, ::Val{true}, ::Val{true}, fees, attrs)
 
 Solve the Mean-Risk optimisation problem.
 
 Dispatches based on whether a return frontier and/or risk frontier sweep is requested (controlled by `Val` arguments). Single-point, return-frontier, risk-frontier, and combined sweeps are all handled.
 
+The return terms are read off `attrs.ret` rather than taken positionally: the positional used to exist so [`set_portfolio_objective_function!`](@ref) could dispatch a logarithmic ratio problem, and it lost that reason when the ratio constraint was hoisted.
+
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `mr::MeanRisk`: MeanRisk estimator configuration.
-  - `ret::JuMPReturnsEstimator`: Returns estimator.
   - `pr::AbstractPriorResult`: Prior result with asset moments.
   - `::Val{bool}`: Whether to do a return frontier sweep.
   - `::Val{bool}`: Whether to do a risk frontier sweep.
   - `fees`: Optional fees configuration.
+  - `attrs`: Pre-computed constraint and prior bundle, which carries the return terms.
 
 # Returns
 
@@ -329,96 +337,146 @@ Dispatches based on whether a return frontier and/or risk frontier sweep is requ
   - [`compute_ret_lbs`](@ref)
   - [`compute_risk_ubs`](@ref)
 """
-function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                          pr::AbstractPriorResult, ::Val{false}, ::Val{false},
-                          ::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
-    set_portfolio_objective_function!(model, mr.obj, ret, mr, attrs)
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          ::Val{false}, ::Val{false}, ::Option{<:Fees},
+                          attrs::ProcessedJuMPOptimiserAttributes)
+    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
 """
-    compute_ret_lbs(lbs, args...)
+    return_term(ret, i)
 
-Compute the return lower bounds for the efficient frontier sweep.
+Select return term `i` from the optimiser's `ret` slot.
 
-Dispatches based on the type of `lbs`: if a pre-computed vector of lower bounds is provided, returns it directly. If a `Frontier` specification is given, solves the minimum and maximum return sub-problems and constructs a range of bounds.
-
-# Arguments
-
-  - `lbs`: Pre-computed return bounds vector (`VecNum`) or `Frontier` configuration.
-  - `args...`: Additional arguments (model, optimiser, prior, etc.) needed when `lbs` is a `Frontier`.
-
-# Returns
-
-  - Vector or range of return lower bounds for frontier sweep.
+The slot holds one term or a vector of them, so this is the one place that difference is
+resolved for the value-level readers. A single term answers to every index, because a
+single-term configuration only ever has index `1`.
 
 # Related
 
-  - [`MeanRisk`](@ref)
-  - [`NearOptimalCentering`](@ref)
-  - [`solve_mean_risk!`](@ref)
+  - [`JRE_VecJRE`](@ref)
+  - [`compute_ret_lbs`](@ref)
 """
-function compute_ret_lbs(lbs::VecNum, args...)
-    return lbs
+function return_term(ret::JuMPReturnsEstimator, ::Any)
+    return ret
+end
+function return_term(ret::VecJRE, i)
+    return ret[i]
 end
 """
-    compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, fees::Option{<:Fees}, args...)
+    compute_ret_lbs(model, mr, pr, fees, attrs)
 
-Compute return lower bounds for a `MeanRisk` efficient frontier sweep by solving minimum and maximum return sub-problems.
+Resolve the return frontier's sweep points, one span per swept return term.
 
-Solves the minimum-risk and maximum-return portfolios, then constructs a uniformly spaced range of `lbs.N` return targets spanning the two extremes.
+Entries whose bound is already a vector of numbers are left alone. Every entry that still
+holds a [`Frontier`](@ref) is given a span read off two corner portfolios:
+
+ 1. **One** shared minimum-risk solve, which supplies the low end of every span.
+ 2. **One** [`MaximumElementReturn`](@ref) solve **per swept term**, which supplies that
+    term's high end.
+
+So the endpoint cost is `k + 1` solves, not `2`. The per-term maximum is what makes the span
+correct: term *i*'s value at the *aggregate* maximum-return corner is an artefact of the
+other terms' `scale`, and can fall below its value at the minimum-risk corner, which leaves
+`rt_min > rt_max` and makes `range` descend. A portfolio that maximised term *i* alone
+maximises over the same feasible set that contains `w_min`, so the span ascends by
+construction.
 
 # Arguments
 
-  - `lbs::Frontier`: Frontier configuration specifying the number of points.
   - `model::JuMP.Model`: JuMP optimisation model.
   - `mr::MeanRisk`: MeanRisk estimator configuration.
-  - `ret::JuMPReturnsEstimator`: Returns estimator.
   - `pr::AbstractPriorResult`: Prior result with asset moments.
   - `fees::Option{<:Fees}`: Optional fees configuration.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed bundle, which carries the terms.
 
 # Returns
 
-  - Range of return lower bounds for the frontier sweep.
+  - The return frontier vector of `(keys, vals)` pairs, with every span resolved.
 
 # Related
 
-  - [`compute_ret_lbs`](@ref)
   - [`MeanRisk`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`compute_risk_ubs`](@ref)
   - [`solve_mean_risk!`](@ref)
 """
-function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
-                         ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
+function compute_ret_lbs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+    ret_frontier = shared_get(model, :ret_frontier)
+    idx = Vector{Int}(undef, 0)
+    for (j, rtf) in enumerate(ret_frontier)
+        if !isa(rtf.second[2], VecNum)
+            push!(idx, j)
+        end
+    end
+    if isempty(idx)
+        return ret_frontier
+    end
     X = pr.X
-    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr, attrs)
+    ret_frontier = copy(ret_frontier)
+    set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr, attrs)
-    retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess),
-              ArgumentError("maximum-return solve failed with retcode $retcode"))
-    JuMP.unregister(model, :obj_expr)
-    rt_min = expected_return(ret, sol_min.w, pr, fees)
-    rt_max = expected_return(ret, sol_max.w, pr, fees)
-    return range(rt_min, rt_max; length = lbs.N)
+    for j in idx
+        expr, front, i = ret_frontier[j].second
+        set_portfolio_objective_function!(model, MaximumElementReturn(i), mr, attrs)
+        retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
+        @argcheck(isa(retcode, OptimisationSuccess),
+                  ArgumentError("maximum-return solve for return term $i failed with retcode $retcode"))
+        JuMP.unregister(model, :obj_expr)
+        rt = return_term(attrs.ret, i)
+        rt_min = expected_return(rt, sol_min.w, pr, fees)
+        rt_max = expected_return(rt, sol_max.w, pr, fees)
+        ret_frontier[j] = ret_frontier[j].first =>
+            (expr, range(rt_min, rt_max; length = front.N), i)
+    end
+    return ret_frontier
 end
-function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                          pr::AbstractPriorResult, ::Val{true}, ::Val{false},
-                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
-    X = pr.X
-    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), model, mr, ret, pr, fees, attrs)
-    retcodes = sizehint!(OptimisationReturnCode[], length(lbs))
-    sols = sizehint!(JuMPOptimisationSolution[], length(lbs))
-    k = get_k(model)
+"""
+    set_ret_frontier_parameters!(model, ret_frontier)
+
+Register one parameter and one lower-bound constraint per swept return term.
+
+The twin of the risk side's parameter loop. Each term's bound binds on that term's **own**
+expression, so the sweep is a product across terms rather than a single ladder.
+
+# Returns
+
+  - `pitrs`: The `(keys, bounds)` product iterators over every swept term.
+
+# Related
+
+  - [`compute_ret_lbs`](@ref)
+  - [`solve_mean_risk!`](@ref)
+"""
+function set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
     sc = get_constraint_scale(model)
-    ret_expr = get_ret(model)
-    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
-    set_portfolio_objective_function!(model, mr.obj, ret, mr, attrs)
-    for lb in lbs
-        JuMP.set_parameter_value(ret_lb_var, lb)
+    k = get_k(model)
+    for (keys, vals) in ret_frontier
+        lb = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - lb * k) >= 0)
+    end
+    itrs = [(Iterators.repeated(rtf[1][1], length(rtf[2][2])), rtf[2][2])
+            for rtf in ret_frontier]
+    return Iterators.product.(itrs...)
+end
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          ::Val{true}, ::Val{false}, fees::Option{<:Fees},
+                          attrs::ProcessedJuMPOptimiserAttributes)
+    X = pr.X
+    ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
+    pitrs = set_ret_frontier_parameters!(model, ret_frontier)
+    retcodes = sizehint!(OptimisationReturnCode[], length(pitrs[1]))
+    sols = sizehint!(JuMPOptimisationSolution[], length(pitrs[1]))
+    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    for (keys, lbs) in zip(pitrs[1], pitrs[2])
+        for (key, lb) in zip(keys, lbs)
+            JuMP.set_parameter_value(model[key], lb)
+        end
         retcode, sol = optimise_JuMP_model!(model, mr, eltype(X))
         push!(retcodes, retcode)
         push!(sols, sol)
@@ -492,17 +550,17 @@ Extracts and recomputes risk bound values from the optimised model for use in su
 """
 function rebuild_risk_frontier(model::JuMP.Model,
                                mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
-                               ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
-                               fees::Option{<:Fees}, risk_frontier::VecPair, idx::VecInt,
+                               pr::AbstractPriorResult, fees::Option{<:Fees},
+                               risk_frontier::VecPair, idx::VecInt,
                                attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
     risk_frontier = copy(risk_frontier)
-    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr, attrs)
+    set_portfolio_objective_function!(model, MaximumReturn(), mr, attrs)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("maximum-return solve failed with retcode $retcode"))
@@ -515,16 +573,16 @@ function rebuild_risk_frontier(model::JuMP.Model,
     return risk_frontier
 end
 function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:Any, <:Any},
-                               ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
-                               fees::Option{<:Fees}, risk_frontier::VecPair, ::Any,
+                               pr::AbstractPriorResult, fees::Option{<:Fees},
+                               risk_frontier::VecPair, ::Any,
                                attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
-    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr, attrs)
+    set_portfolio_objective_function!(model, MaximumReturn(), mr, attrs)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("maximum-return solve failed with retcode $retcode"))
@@ -555,9 +613,8 @@ Extracts the risk frontier from the model and rebuilds any frontier bounds that 
   - [`NearOptimalCentering`](@ref)
   - [`solve_mean_risk!`](@ref)
 """
-function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                          pr::AbstractPriorResult, fees::Option{<:Fees},
-                          attrs::ProcessedJuMPOptimiserAttributes)
+function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
     risk_frontier = shared_get(model, :risk_frontier)
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
@@ -568,13 +625,13 @@ function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     if isempty(idx)
         return risk_frontier
     end
-    return rebuild_risk_frontier(model, mr, ret, pr, fees, risk_frontier, idx, attrs)
+    return rebuild_risk_frontier(model, mr, pr, fees, risk_frontier, idx, attrs)
 end
-function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                          pr::AbstractPriorResult, ::Val{false}, ::Val{true},
-                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          ::Val{false}, ::Val{true}, fees::Option{<:Fees},
+                          attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
-    risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees, attrs)
+    risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     k = get_k(model)
     sc = get_constraint_scale(model)
     for (keys, vals) in risk_frontier
@@ -588,7 +645,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(pitrs))
     sols = sizehint!(JuMPOptimisationSolution[], length(pitrs))
-    set_portfolio_objective_function!(model, mr.obj, ret, mr, attrs)
+    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
     for (keys, ubs) in zip(pitrs[1], pitrs[2])
         for (key, ub) in zip(keys, ubs)
             JuMP.set_parameter_value(model[key], ub)
@@ -599,12 +656,12 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     end
     return retcodes, sols
 end
-function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                          pr::AbstractPriorResult, ::Val{true}, ::Val{true},
-                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          ::Val{true}, ::Val{true}, fees::Option{<:Fees},
+                          attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
-    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), model, mr, ret, pr, fees, attrs)
-    risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees, attrs)
+    ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
+    risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     sc = get_constraint_scale(model)
     k = get_k(model)
     for (keys, vals) in risk_frontier
@@ -616,14 +673,14 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
-    retcodes = sizehint!(OptimisationReturnCode[], length(lbs) * length(pitrs))
-    sols = sizehint!(JuMPOptimisationSolution[], length(lbs) * length(pitrs))
-    ret_expr = get_ret(model)
-    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
-    set_portfolio_objective_function!(model, mr.obj, ret, mr, attrs)
-    for lb in lbs
-        JuMP.set_parameter_value(ret_lb_var, lb)
+    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
+    retcodes = sizehint!(OptimisationReturnCode[], length(rpitrs[1]) * length(pitrs))
+    sols = sizehint!(JuMPOptimisationSolution[], length(rpitrs[1]) * length(pitrs))
+    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    for (rkeys, lbs) in zip(rpitrs[1], rpitrs[2])
+        for (rkey, lb) in zip(rkeys, lbs)
+            JuMP.set_parameter_value(model[rkey], lb)
+        end
         for (keys, ubs) in zip(pitrs[1], pitrs[2])
             for (key, ub) in zip(keys, ubs)
                 JuMP.set_parameter_value(model[key], ub)
@@ -642,11 +699,11 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
-    set_maximum_ratio_factor_variables!(model, attrs.pr.mu, mr.obj)
+    set_maximum_ratio_factor_variables!(model, mr.obj)
     set_w!(model, attrs.pr.X, mr.wi)
     set_weight_constraints!(model, attrs.wb, mr.opt.bgt, mr.opt.sbgt; gbgt = mr.opt.gbgt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
-    retcode, sol = solve_mean_risk!(model, mr, attrs.ret, attrs.pr,
+    retcode, sol = solve_mean_risk!(model, mr, attrs.pr,
                                     Val(shared_has(model, :ret_frontier)),
                                     Val(shared_has(model, :risk_frontier)), attrs.fees,
                                     attrs)

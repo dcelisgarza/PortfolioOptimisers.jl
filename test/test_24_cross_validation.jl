@@ -679,7 +679,10 @@
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; slv = slv,
-                                          ret = ArithmeticReturn(; lb = Frontier(; N = 15))))
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = Frontier(;
+                                                                                                              N = 15)))))
         cv = IndexWalkForward(127, 171)
         eff_front = cross_val_predict(mr, rd, cv)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front.pred[1]),

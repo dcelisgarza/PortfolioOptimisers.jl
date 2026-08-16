@@ -11,6 +11,12 @@ This example shows how to use multiple risk measures.
     settings, so the objective and constraints can blend them rather than forcing you to pick
     one. If you instead want to trade several criteria off against each other across many
     portfolios, see the Pareto-surface example.
+
+!!! note "The return side takes several terms too"
+    `JuMPOptimiser`'s `ret` field mirrors `r`: one return term or a vector of them, each with
+    its own [`JuMPReturnsSettings`](@ref). The one asymmetry is deliberate — return terms are
+    always a **weighted sum**, so no scalariser applies to them (ADR 0052). See
+    [ℓ1 uncertainty sets](../2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md).
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.

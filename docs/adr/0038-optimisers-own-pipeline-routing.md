@@ -217,3 +217,12 @@ this seam.
 **Deferred.** Extending the construction-time check to constraints would need a per-estimator
 target trait, reintroducing a declaration that can drift from the results the estimator
 actually produces.
+
+## Amendment (2026-08-16): a vector of return terms is refused at this seam
+
+`JuMPOptimiser.ret` now takes one return term or several (ADR 0052). The `:mu_ucs` route is
+unchanged and still requires a single `ArithmeticReturn`: an uncertainty set is a neighbourhood
+of the one quantity it was calibrated on (ADR 0050), so routing one set into *k* terms would
+broadcast it across quantities it never bounded. The guard already refused anything that is not
+an `ArithmeticReturn`; it now says which of the two failures happened, and points the caller at
+the `ucs` field of the term the set belongs to.

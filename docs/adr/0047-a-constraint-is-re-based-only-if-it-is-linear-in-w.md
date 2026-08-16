@@ -269,3 +269,154 @@ The consequence recorded above — that `FactorRiskBudgeting.sets` must **become
 carries both axes — held exactly as written, and is now the case. `rkb` deliberately does not: an
 asset index has no meaning on a factor budget, and unlike `AssetRiskBudgeting.rkb` it must not be
 sliced.
+
+## Amendment (2026-08-16): the exclusion list is not exhausted by indicators and boxes
+
+"The rule has teeth because of what does *not* get the field" gives two reasons for the excluded
+set: the constraint indexes the binary held indicators (cardinality, sub-group cardinality, buy-in
+thresholds), or it is a per-asset box (weight bounds). Turnover, tracking error and fees are
+**neither**, and they are excluded too. The list is correct about what it names and wrong to read as
+exhaustive.
+
+The boundary is a property of the **mechanism**, not only of the constraint.
+[`ExposureConstraintEstimator`](../../src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl)
+re-bases by rewriting a row and leaving the model untouched, so it is valid exactly when the
+constraint *is* that row: a linear form in `w`. A constraint that reaches the model through its own
+variables is outside the mechanism even where a change of basis is perfectly well defined for the
+quantity it constrains. Restating the rule as "linear in `w`" was always right; the two reasons were
+an incomplete enumeration of the ways a constraint fails it.
+
+**Turnover is a norm form.**
+[`_set_turnover_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl)
+declares an auxiliary variable per asset and one `MOI.NormOneCone` per asset to realise
+`|w - w₀|`. The factor quantity `|Mᵀ(w - w₀)|` is meaningful — the turnover of the exposures — and it
+is not equal to any asset-space turnover, so this is a genuine absence rather than a redundancy. It
+is nonetheless out of reach: realising it needs its own variables and its own cones, so it is
+re-basable in mathematics and not by this mechanism. That is the distinction the two-reason list
+could not draw, and it makes a factor turnover norm a different feature rather than this one with a
+space attached.
+
+**Tracking error is one norm form, and its benchmark is a return series.**
+[`set_tracking_error_constraints!`](../../src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl)
+constrains `‖Xw − b‖` in a cone chosen by the norm algorithm, where `b = tracking_benchmark(tr.tr,
+X)`. Both tracking algorithms reach it through that one call, so the norm itself is no more re-basable
+than turnover's. The asset axis enters only through the *benchmark*: `WeightsTracking` holds an
+asset-length weight vector and computes `b = calc_net_returns(wₐ, X, fees)`, which is `X wₐ` net of
+any fees it carries.
+
+**And `ReturnsTracking` already tracks a factor, with no re-basis at all.** It stores the benchmark
+return series itself ([`18_Tracking.jl`](../../src/18_Tracking.jl), `field_dict[:w_bm_ret]`), and a
+factor's return series is a column of `F`. Passing that column as the benchmark tracks the factor
+directly: the benchmark is already in the factor's own units, and the quantity compared against it is
+a portfolio return either way. The re-basis is *unnecessary* here rather than unavailable — a third
+relation to the rule that the two-reason list has no slot for, and a capability the library has today
+and documents nowhere, which is why it is recorded in an ADR amendment.
+
+**Fees have no factor referent at all.** Every field of `Fees` is priced against something that is
+per-asset by construction. In
+[`set_non_fixed_fees!`](../../src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl) the
+proportional rates `l` and `s` are contracted with the long/short split variables `lw`/`sw`, and `tn`
+is turnover; in
+[`set_fixed_fees!`](../../src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl) the fixed
+charges `fl` and `fs` are contracted with the MIP long and short indicator bits. Every coefficient
+is priced per *traded position*, and there is no `M` that carries a rate into factor coordinates,
+because a factor is not a thing that is traded. This is neither the box case nor the indicator case,
+and it is not even the mechanism's problem: `add_fees_to_ret!` subtracts the accumulated `fees`
+expression from the return, so a fee is not a constraint on `w` at all.
+
+Nothing in the decision changes. `LinearConstraintEstimator` still gets no space field, the
+decorator's bound is still exactly `lcse`'s, and no family named here gains a constraint space. What
+changes is the justification. A constraint is excluded because the re-basis mechanism cannot express
+it; indexing the indicators and being a per-asset box are two ways of standing outside that
+mechanism, not the only two.
+
+## Amendment (2026-08-16): a space carries its basis *source*
+
+The Decision writes `FactorSpace` as a singleton:
+
+```julia
+struct FactorSpace <: AbstractConstraintSpace end
+```
+
+It now carries one field.
+
+```julia
+@concrete struct FactorSpace <: AbstractConstraintSpace
+    re          # Option{<:RegE_Reg}, default nothing
+end
+```
+
+The rule the field expresses is that **each space carries the information it needs to map back to
+the universe and to compute its values**. A singleton could not: it read the basis off the prior
+implicitly, so the only way to state a basis was to change the prior, and a mandate written in
+factor names was legal only on a prior that happened to carry loadings. The slot goes on the space
+rather than on `ExposureConstraintEstimator` or on the prior, so that a future member declares what
+it needs without changing anything else.
+
+**The shape is not invented here.** `FactorRiskContribution` already holds `re::TD{<:RegE_Reg}`, and
+[`resolve_factor_regression`](../../src/19_RiskMeasures/27_ExpectedRisk.jl) already fixes the
+precedence: a precomputed `Regression` wins, then the prior's own `rr`, then a refit from the
+returns. `FactorSpace` takes the same slot and the same precedence, so `re === nothing` reproduces
+the previous behaviour exactly and every constraint written before the field is unaffected.
+
+`FactorSpace.re` is deliberately **not** `TD`-wrapped, although `FactorRiskContribution.re` is.
+`lcse` is already `TD_Option` and schedules the whole estimator, so a basis that changes over time is
+already spellable; a nested schedule would need its own resolution pass for no capability.
+
+### The third arm is a capability, not a fallback
+
+`FactorSpace(; re = StepwiseRegression())` is **a factor mandate on a prior that carries no
+loadings**, which previously threw. It needs the returns, which are in scope at the `JuMPOptimiser`
+(`processed_jump_optimiser_attributes` holds `rd` beside `pr`) and in the `Pipeline` step (whose
+`pipe_reads` is already `(:returns, :prior)`), so `rd` is threaded to constraint generation from
+both. The standalone route `linear_constraints(ece, sets; rr = …)` receives loadings and never the
+data behind them, so an estimator there throws, naming both fixes.
+
+### A stated basis is viewed where the universe is sliced, and refused where it is replaced
+
+This is the same asymmetry the guard family already writes for `re` elsewhere, and the reason is
+structural rather than conventional. A `NestedClustered` **inner** solve slices the asset universe,
+so a row-slice of asset-major loadings is exact and `port_opt_view` performs it. The **outer** solve
+*replaces* the universe: `_update_asset_sets` writes the cluster names over `sets.dict[xkey]`, and
+no slice of an asset-indexed basis can follow that. So `assert_external_optimiser` refuses a
+precomputed `re` inside `lcse`, in the shape of the existing refusals on `opt.re` and `opt.rba.re`,
+while the inner path views it.
+
+Two seams moved to make that hold. `port_opt_view(::JuMPOptimiser)` passed `lcse` **unviewed**; it
+now views it, which is inert for every shape `lcse` held before this change, because those carry
+only strings — with one deliberate exception recorded below. And the refusal had to reach *inside* a
+space, which is what `stated_constraint_space_basis` does.
+
+An estimator in `re` is **not** refused at an outer solve. It refits against whatever universe it is
+handed, which is exactly why it is the remedy the refusal message names.
+
+### Two pre-existing facts, recorded rather than changed
+
+**A precomputed `LinearConstraint` in `lcse` is still passed through a view unchanged.** Making the
+new view slice its `A` would have changed the behaviour of a path this work does not otherwise
+touch, so `port_opt_view(::LinearConstraint, …)` is the identity and says so. A `NestedClustered`
+inner solve refuses a bare precomputed constraint outright, which is why this is not reachable
+there.
+
+**`Stacking` and `SubsetResampling` carry no `lcse` guard at all**, although both slice the
+universe. For the basis this is harmless — they slice rather than replace, so the new view is exact
+and a stated `re` is correct under both — but the older gap around a bare precomputed
+`LinearConstraint` remains, and closing it would refuse shapes those two accept today. It is named
+here and left for its own effort.
+
+### The staleness caveat is prose
+
+Nothing at constraint-generation time can see that it is inside a cross-validation fold: a stated
+basis is the right *shape* for the full universe, so it is silently stale rather than wrong. A
+runtime check would need a new signal threaded through an otherwise pure path. The warning therefore
+lives on `FactorSpace`'s docstring, in the shape of the pinned-projection warning
+`ExposureConstraintEstimator` already carries for the pipeline route, and it names the two spellings
+that already exist for a basis that must move: `re = <an estimator>`, and a `TD` schedule on `lcse`.
+
+### `AbstractConstraintSpace` still has one member
+
+The family's second member, `FeatureSpace` — a re-basis through the **Feature Matrix** `Z` rather
+than through the loadings — is designed and deferred to its own effort. It reads `Z` from the
+carrier and carries no data of its own, which is the same decision as this one seen from the other
+side: a space carries the *source* of its basis, and `Z`'s source is already on the carrier by
+ADR 0045.

@@ -23,7 +23,10 @@ mr = MR(;
                       # L2 regularisation using a squared L2 norm with a penalty coefficient of 0.0001.
                       l2 = L2Reg(; val = 0.0001, alg = QuadRiskExpr()),
                       # Arithmetic returns with 100 evenly distributed points between the minimum and maximum returns in the training set. This way we can compute the efficient frontier, which is a subset of pareto fronts.
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 100))) # opt
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 100)))) # opt
         ) # mr
 # Perform optimisation on the training set.
 res = optimise(mr, rd_train)

@@ -228,3 +228,11 @@ decision removes.
 budget semantics library-wide and carry `TimeDependent`, factory and view plumbing. `xbgt`
 in particular documents a pre-existing property most callers will not have known —
 that a short budget is a bound, not an equality.
+
+## Amendment (2026-08-16): multiplicity does not widen the Characteristic Vector
+
+A JuMP optimiser now takes several return terms, each with its own mean uncertainty set. The
+plural noun is the **term**, not the characteristic: this ADR's Characteristic Vector keeps its
+narrow meaning, and an optimisation now simply holds one per set-bearing term. See ADR 0052.
+
+The recipe above still compiles verbatim, because the new per-term `settings` field defaults.

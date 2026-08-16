@@ -111,6 +111,11 @@ vector of risk measures.
 The single-measure overload calls `set_risk_constraints!(model, 1, r, ...)`. The vector
 overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
 
+The single-measure overload also drops the measure's `scale` through
+[`unit_scale_risk_measure`](@ref). `scale` weights a measure inside an aggregate built from
+several measures, and one measure is not an aggregate, so the weight is inert. The vector
+overload keeps every element's `scale`.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -136,8 +141,13 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # A `JuMP` model builder reads the measure's slots directly and never calls `factory`,
     # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
     # alone; each builder's own prior fallback is untouched.
-    set_risk_constraints!(model, 1, resolve_deferred_quantities(r, pr), opt, pr, pl, fees,
-                          args...; kwargs...)
+    #
+    # `scale` is a combination weight, so it is dropped here: a lone measure is not an
+    # aggregate and the weight has nothing to weigh. The vector method below keeps it,
+    # because there the measures really do combine.
+    set_risk_constraints!(model, 1,
+                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
+                          pr, pl, fees, args...; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
