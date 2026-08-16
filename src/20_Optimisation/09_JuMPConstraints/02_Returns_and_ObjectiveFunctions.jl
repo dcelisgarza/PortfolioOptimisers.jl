@@ -303,7 +303,7 @@ must range freely over the feasible set.
 
 Only `lb` and — when `flag` is `false` — `ucs` are stripped. Everything else the term carries
 survives, `mu` included: dropping the characteristic would silently re-centre the term on the
-prior's own vector, which is the [`ADR 0050`](@ref) defect class, and with several terms it
+prior's own vector, which is the ADR 0050 defect class, and with several terms it
 would collapse every one of them onto the same corner.
 
 # Arguments
@@ -1348,13 +1348,14 @@ function set_return_constraints!(model::JuMP.Model, i,
     return mu, false
 end
 """
-    set_ucs_return_constraints!(model, i, ucs, mu, settings)
+    set_ucs_return_constraints!(model, i, ucs::BoxUncertaintySet, mu, settings)
 
-Build one term's uncertainty-set-robust return expression.
+Build one term's box-robust return expression.
 
-Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone
-constraint. For `EllipsoidalUncertaintySet`, a second-order cone. For the two ``\\ell_1``
-sets, an infinity-norm cone and a pair of linear epigraphs respectively.
+Introduces a norm-1 cone constraint to model the worst-case characteristic under a box
+uncertainty set. The family dispatches on the set type: an [`EllipsoidalUncertaintySet`](@ref)
+raises a second-order cone, and the two ``\\ell_1`` sets raise an infinity-norm cone and a pair
+of linear epigraphs respectively.
 
 # Mathematical definition
 
@@ -1374,19 +1375,6 @@ Where:
   - $(math_dict[:w_port])
   - ``\\boldsymbol{\\Delta}``: Half-width of the box uncertainty set.
   - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bounds of the box uncertainty set.
-
-Ellipsoidal uncertainty set (worst-case return):
-
-```math
-\\begin{align}
-\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\kappa``: Ellipsoidal uncertainty set radius.
-  - ``\\mathbf{G}``: Upper Cholesky factor of the uncertainty set covariance.
 
 # Arguments
 
@@ -1425,6 +1413,37 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySe
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, true
 end
+"""
+    set_ucs_return_constraints!(model, i, ucs::EllipsoidalUncertaintySet, mu, settings)
+
+Build one term's ellipsoid-robust return expression.
+
+Introduces a second-order cone constraint to model the worst-case characteristic under an
+ellipsoidal uncertainty set. The cone is not linear, so the term is reported as `robust`, and
+the ratio's `ret == rf k + ohf` normalisation cannot be used with it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``: Ellipsoidal uncertainty set radius.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the uncertainty set covariance.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`CharacteristicUncertaintySet`](@ref)
+"""
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings)
     sc = get_constraint_scale(model)

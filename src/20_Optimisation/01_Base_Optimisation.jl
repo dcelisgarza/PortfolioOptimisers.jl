@@ -2649,8 +2649,8 @@ function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     end
 end
 """
-    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
-    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
 
 Compute the expected risk for an [`OptimisationResult`](@ref).
 
@@ -2658,11 +2658,13 @@ Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref
 
 When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or `res.pa.pr` before delegating.
 
+`r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
+
 # Related
 
   - [`expected_risk`](@ref)
   - [`OptimisationResult`](@ref)
-  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`BaseRM_VecBaseRM`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)

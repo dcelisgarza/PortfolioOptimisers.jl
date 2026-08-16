@@ -175,6 +175,7 @@ WeightsReturnsFeesInput
 WeightsInput
 risk_input_kind
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(rs::VecBaseRM)
 supports_precomputed_returns(::NetReturnsInput, ::Any)
 supports_precomputed_returns(::WeightsInput, ::Any)
 supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)

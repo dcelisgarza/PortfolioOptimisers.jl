@@ -10,7 +10,7 @@ issues. Priority ordering reflects effort vs. value, not importance.
 
 reusable Wasserstein ambiguity primitive
 
-**Priority: high (docs), medium (refactor)**
+**Priority: high (docs), medium (refactor).**
 
 ### Verdict on the existing implementation
 
@@ -23,7 +23,8 @@ genuine tractable reformulation of the Wasserstein-ball worst-case CVaR: a dual 
 piecewise-affine-loss reformulation — the same one skfolio's
 [`DistributionallyRobustCVaR`](https://skfolio.org/_modules/skfolio/optimization/convex/_distributionally_robust.html)
 ([example](https://skfolio.org/auto_examples/distributionally_robust_cvar/plot_1_distributionally_robust_cvar.html))
-and the [MOSEK Fusion tutorial](https://github.com/MOSEK/Tutorials/blob/master/dist-robust-portfolio/Data-driven_distributionally_robust_portfolio.ipynb)
+and MOSEK's Fusion tutorial notebook
+`Data-driven_distributionally_robust_portfolio.ipynb` (in MOSEK's own `Tutorials` repository)
 implement — extended here to also cover the two-sided range and CDaR, which neither of those does.
 This is a solid, correct-looking implementation.
 
@@ -34,7 +35,7 @@ Three gaps found while reading it closely:
 `src/19_RiskMeasures/07_ConditionalXatRisk.jl` documents the "Mathematical definition" of DR-CVaR
 as the closed form:
 
-```
+```text
 DR-CVaR = CVaR + l·r
 ```
 
@@ -60,7 +61,7 @@ For a worked reference implementation to cross-check the docstring rewrite again
 tutorial notebook implements the same paper's numerical experiments end-to-end, including the
 exact piecewise-linear CVaR encoding (`a_k`, `b_k` coefficient lists) and Wasserstein-radius
 parameterization that the JuMP code here mirrors:
-[MOSEK/Tutorials — `Data-driven_distributionally_robust_portfolio.ipynb`](https://github.com/MOSEK/Tutorials/blob/master/dist-robust-portfolio/Data-driven_distributionally_robust_portfolio.ipynb)
+`Data-driven_distributionally_robust_portfolio.ipynb`, in MOSEK's own `Tutorials` repository
 (companion [blog post](https://themosekblog.blogspot.com/2021/04/data-driven-distributionally-robust.html)
 with the paper's authors walking through it).
 
@@ -183,7 +184,7 @@ checking against for numerical correctness when porting any of these algorithms.
 
 ## Issue 4 — Wasserstein radius / DR-CVaR hyperparameter guidance
 
-**Priority: low, small — pairs naturally with Issue 1**
+**Priority: low, small — pairs naturally with Issue 1.**
 
 `r` (Wasserstein radius) and `l` in `DistributionallyRobustConditionalValueatRisk` are free
 user-supplied constants with no calibration guidance, unlike the ℓ1 uncertainty set's
@@ -213,7 +214,7 @@ this one, rather than living in the core repo.
 
 ## Issue 6 — Python interoperability wrapper
 
-**Priority: low, high-leverage if pursued**
+**Priority: low, high-leverage if pursued.**
 
 The Julia quant-finance community is much smaller than Python's. A thin `PythonCall`/`juliacall`-based
 wrapper package exposing the pipeline API (`fit`, `optimise`, cross-validation, prediction) to
@@ -227,7 +228,7 @@ suited as a separate thin package, not a core-repo change.
 
 ## Issue 7 — GPU / sparse solver support for large universes
 
-**Priority: low — matters only past a few hundred assets**
+**Priority: low — matters only past a few hundred assets.**
 
 Most examples in the docs run at ~20–25 assets. For institutional-scale universes (thousands of
 names), sparse covariance handling and a GPU-accelerated conic solver path (e.g. via
@@ -242,7 +243,7 @@ code.
 
 ## Issue 8 — Dedicated ESG / factor-tilt constraint helpers
 
-**Priority: low — mostly a convenience layer over what already exists**
+**Priority: low — mostly a convenience layer over what already exists.**
 
 The existing linear/group constraint machinery (`AssetSets`, group cardinality, equation parsing)
 can already express ESG-style scoring constraints, but a purpose-built module — named constraint
@@ -254,7 +255,7 @@ themselves.
 
 ## Appendix — Repos, papers, and tools referenced above
 
-**Comparison libraries**
+### Comparison libraries
 
 - [robertmartin8/PyPortfolioOpt](https://github.com/robertmartin8/PyPortfolioOpt) — cookbook at
   [/cookbook](https://github.com/robertmartin8/PyPortfolioOpt/tree/main/cookbook)
@@ -265,21 +266,21 @@ themselves.
 - [skfolio/skfolio](https://github.com/skfolio/skfolio) — DR-CVaR source at
   [`_distributionally_robust.py`](https://skfolio.org/_modules/skfolio/optimization/convex/_distributionally_robust.html)
 
-**Multi-period optimisation / backtesting**
+### Multi-period optimisation / backtesting
 
 - [cvxgrp/cvxportfolio](https://github.com/cvxgrp/cvxportfolio)
 - [stefan-jansen/zipline-reloaded](https://github.com/stefan-jansen/zipline-reloaded)
 - [mementum/backtrader](https://github.com/mementum/backtrader)
 
-**Reporting**
+### Reporting
 
 - [ranaroussi/quantstats](https://github.com/ranaroussi/quantstats)
 
-**GPU / sparse solvers**
+### GPU / sparse solvers
 
 - [exanauts/CUDSS.jl](https://github.com/exanauts/CUDSS.jl)
 
-**Wasserstein DRO — papers and reference implementations**
+### Wasserstein DRO — papers and reference implementations
 
 - Mohajerin Esfahani, P. & Kuhn, D. (2018), "Data-driven distributionally robust optimization
   using the Wasserstein metric: performance guarantees and tractable reformulations,"
@@ -288,13 +289,13 @@ themselves.
   Risk* 2, 21–42.
 - Blanchet, J., Chen, L. & Zhou, X.Y. (2022), "Distributionally Robust Mean-Variance Portfolio
   Selection with Wasserstein Distances," *Management Science* 68(9).
-- [MOSEK/Tutorials — `Data-driven_distributionally_robust_portfolio.ipynb`](https://github.com/MOSEK/Tutorials/blob/master/dist-robust-portfolio/Data-driven_distributionally_robust_portfolio.ipynb) —
+- `Data-driven_distributionally_robust_portfolio.ipynb`, in MOSEK's own `Tutorials` repository —
   worked Fusion-API implementation of the Esfahani-Kuhn paper's numerical experiments, using the
   same `a_k`/`b_k` piecewise-affine-loss/λ/dual-cone structure as PortfolioOptimisers.jl's JuMP
   code. Companion [blog post](https://themosekblog.blogspot.com/2021/04/data-driven-distributionally-robust.html)
   with the paper's authors.
 
-**Online Portfolio Selection — papers and reference implementation**
+### Online Portfolio Selection — papers and reference implementation
 
 - Cover, T. (1991), "Universal Portfolios," *Mathematical Finance* 1(1). (pre-arXiv, journal only)
 - Helmbold, D.P., Schapire, R.E., Singer, Y. & Warmuth, M.K. (1998), "On-Line Portfolio Selection
@@ -311,7 +312,7 @@ themselves.
 - [OLPS/OLPS](https://github.com/OLPS/OLPS) — the authors' own MATLAB/Octave reference toolbox,
   useful for numerical cross-checking when porting these algorithms.
 
-**Primary source (this repo)**
+### Primary source (this repo)
 
 - [dcelisgarza/PortfolioOptimisers.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl)
 - [Julia Discourse announcement thread](https://discourse.julialang.org/t/ann-portfoliooptimisers-jl-ape-together-strong/133099)

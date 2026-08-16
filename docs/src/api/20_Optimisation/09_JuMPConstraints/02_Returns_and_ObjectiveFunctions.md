@@ -15,7 +15,9 @@ assert_return_term_required
 bounds_returns_estimator
 no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
 no_bounds_returns_settings
+unit_scale_returns_estimator
 no_bounds_optimiser
+factory(rt::VecJRE, args...; kwargs...)
 MinimumRisk
 MaximumUtility
 MaximumRatio

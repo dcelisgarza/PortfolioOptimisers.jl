@@ -642,7 +642,7 @@ function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; k
     return expected_risk(r, ppred.pred; kwargs...)
 end
 """
-    sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure; kwargs...)
+    sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
 
 Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
 risk under `r`. Paths where any fold returned a non-success retcode are excluded.
@@ -650,14 +650,21 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
 # Arguments
 
   - `ppred::PopulationPredictionResult`: Population prediction to sort.
-  - `r::AbstractBaseRiskMeasure`: Risk measure used for ranking.
+  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is scalarised by `kwargs.sca`, defaulting to [`SumScalariser`](@ref).
+  - `kwargs...`: Keyword arguments forwarded to `expected_risk`.
 
 # Returns
 
   - `Vector{MultiPeriodPredictionResult}`: Sorted vector of successful path predictions.
 
+## A mixed vector is refused here, and accepted by its sibling
+
+The ranking direction comes from [`bigger_is_better`](@ref), which **throws** on a vector whose elements disagree on polarity, because the flag decides which tail of the ranking is best and neither answer would be right. [`quantile_by_measure`](@ref) takes an explicit `sign` instead, so it admits a mixed vector.
+
 # Related
 
+  - [`quantile_by_measure`](@ref)
+  - [`bigger_is_better`](@ref)
   - [`PopulationPredictionResult`](@ref)
   - [`expected_risk`](@ref)
 """
@@ -680,6 +687,7 @@ Select the successful path in `ppred` whose expected risk under `r` is closest t
   - `q::Real`: Quantile level in `[0, 1]`.
   - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
+  - `sign::Integer = 1`: Orientation of the risk scale. Use `1` when a larger risk is worse, `-1` when it is better. This is what lets a mixed vector through, see below.
 
 # Returns
 

@@ -193,7 +193,7 @@ function (r::MeanReturnRiskRatio)(x::VecNum)
            expected_risk_from_returns(r.rk, x; sca = r.sca)
 end
 """
-    resolve_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum_Pr)
+    resolve_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
 
 Turn a value-level data argument into the pair a kernel takes: the measure to evaluate, and the returns matrix to evaluate it on.
 
@@ -249,7 +249,7 @@ function original_returns(rd::ReturnsResult)
     return rd.X
 end
 """
-    resolve_factor_risk_inputs(r::AbstractBaseRiskMeasure, X::MatNum_Pr)
+    resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
 
 Turn a value-level data argument into the pair a **factor attribution** takes: the measure to evaluate, and the returns matrix to evaluate it on.
 

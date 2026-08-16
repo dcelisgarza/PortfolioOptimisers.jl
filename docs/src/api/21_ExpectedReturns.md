@@ -29,5 +29,6 @@ expected_risk_ret_sric
 factory(r::ExpectedReturn, args...; kwargs...)
 factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
 needs_previous_weights(r::ExpectedReturnRiskRatio)
+prrm_prediction_message
 brinson_attribution
 ```
