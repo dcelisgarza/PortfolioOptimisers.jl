@@ -203,7 +203,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
-        assert_risk_measure_required(r, :FactorRiskContribution)
+        assert_risk_measure_required(r, :FactorRiskContribution;
+                                     flag = zero_risk_expression_flag)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end

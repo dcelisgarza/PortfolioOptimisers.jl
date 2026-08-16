@@ -9,7 +9,7 @@ ArithmeticReturn
 resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
 LogarithmicReturn
 NoReturn
-noreturn_flag
+zero_return_expression_flag
 assert_no_return_objective_compatibility
 assert_return_term_required
 bounds_returns_estimator

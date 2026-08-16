@@ -262,7 +262,6 @@ Where:
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         assert_no_risk_objective_compatibility(r, obj)
-        assert_no_return_objective_compatibility(opt.ret, obj)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end

@@ -29,15 +29,16 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
 end
 
 @testset "NoReturn: the predicate uses `all`, where the risk side uses `any`" begin
-    @test PortfolioOptimisers.noreturn_flag(NoReturn())
-    @test PortfolioOptimisers.noreturn_flag([NoReturn(), NoReturn()])
-    @test !PortfolioOptimisers.noreturn_flag(ArithmeticReturn())
+    @test PortfolioOptimisers.zero_return_expression_flag(NoReturn())
+    @test PortfolioOptimisers.zero_return_expression_flag([NoReturn(), NoReturn()])
+    @test !PortfolioOptimisers.zero_return_expression_flag(ArithmeticReturn())
     # This is the whole divergence: `:ret` is a sum, so one real term beside a `NoReturn`
     # leaves it non-zero, and every degeneracy the guards catch needs it identically zero.
-    @test !PortfolioOptimisers.noreturn_flag([ArithmeticReturn(), NoReturn()])
-    @test !PortfolioOptimisers.noreturn_flag([NoReturn(), LogarithmicReturn()])
-    @test !PortfolioOptimisers.noreturn_flag(PortfolioOptimisers.JuMPReturnsEstimator[])
-    # The risk side quantifies the other way, and that asymmetry is deliberate.
+    @test !PortfolioOptimisers.zero_return_expression_flag([ArithmeticReturn(), NoReturn()])
+    @test !PortfolioOptimisers.zero_return_expression_flag([NoReturn(),
+                                                            LogarithmicReturn()])
+    @test !PortfolioOptimisers.zero_return_expression_flag(PortfolioOptimisers.JuMPReturnsEstimator[])
+    # The risk side quantifies the other way on its *type* half, and that is deliberate.
     @test PortfolioOptimisers.norisk_flag([Variance(), NoRisk()])
 end
 
@@ -124,31 +125,37 @@ end
 end
 
 @testset "NoReturn: the refusals" begin
+    # The objective-level refusals live at the shared model-build seam, not at a constructor,
+    # so they arrive at `optimise` time (ADR 0054). Construction itself succeeds.
+    mr_ret = MeanRisk(; obj = MaximumReturn(),
+                      opt = JuMPOptimiser(; pe = pr, slv = slv, ret = NoReturn()))
+    @test isa(mr_ret, MeanRisk)
     # The objective would be identically zero, so every feasible portfolio is optimal and the
     # solver returns an arbitrary one while reporting success.
-    @test_throws ArgumentError MeanRisk(; obj = MaximumReturn(),
-                                        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                            ret = NoReturn()))
+    @test_throws ArgumentError optimise(mr_ret)
     # The ratio's numerator vanishes.
-    @test_throws ArgumentError MeanRisk(; obj = MaximumRatio(),
-                                        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                            ret = NoReturn()))
+    @test_throws ArgumentError optimise(MeanRisk(; obj = MaximumRatio(),
+                                                 opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                     ret = NoReturn())))
     # A vector of nothing but `NoReturn` is the same configuration.
-    @test_throws ArgumentError MeanRisk(; obj = MaximumReturn(),
-                                        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                            ret = [NoReturn(), NoReturn()]))
+    @test_throws ArgumentError optimise(MeanRisk(; obj = MaximumReturn(),
+                                                 opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                     ret = [NoReturn(),
+                                                                            NoReturn()])))
     # NOC is infeasible rather than degenerate: its barrier constrains
-    # `exp(log_ret) <= ret - rt`, and with no return term both sides are zero.
+    # `exp(log_ret) <= ret - rt`, and with no return term both sides are zero. This one is a
+    # *formulation* guard, so it stays at the constructor.
     @test_throws ArgumentError NearOptimalCentering(; r = StandardDeviation(),
                                                     opt = JuMPOptimiser(; pe = pr,
                                                                         slv = slv,
                                                                         ret = NoReturn()))
-    # The three permitted objectives are not refused.
-    @test isa(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = NoReturn())),
-              MeanRisk)
-    @test isa(MeanRisk(; obj = MaximumUtility(),
-                       opt = JuMPOptimiser(; pe = pr, slv = slv, ret = NoReturn())),
-              MeanRisk)
+    # The two permitted objectives are not refused, and they solve.
+    @test isa(optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, ret = NoReturn()))).retcode,
+              PortfolioOptimisers.OptimisationSuccess)
+    @test isa(optimise(MeanRisk(; obj = MaximumUtility(),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, ret = NoReturn()))).retcode,
+              PortfolioOptimisers.OptimisationSuccess)
 end
 
 @testset "NoReturn: one real term beside it is coherent everywhere" begin
@@ -175,11 +182,11 @@ end
 end
 
 @testset "NoReturn: the ratio's empty numerator is caught by type or by flag" begin
-    # `noreturn_flag` is a type test, so this configuration passes the constructor: not every
-    # term is a `NoReturn`. The model-build check is settings-aware and catches it, which is
-    # the same degeneracy reached by the other route.
+    # The predicate is FUSED, so it sees a vector that mixes the two routes. A composed
+    # `all(isa NoReturn) || all(!rte)` would return `false` here and let the degeneracy
+    # through (ADR 0054).
     rets = [NoReturn(), ArithmeticReturn(; settings = JuMPReturnsSettings(; rte = false))]
-    @test !PortfolioOptimisers.noreturn_flag(rets)
+    @test PortfolioOptimisers.zero_return_expression_flag(rets)
     mr = MeanRisk(; obj = MaximumRatio(),
                   opt = JuMPOptimiser(; pe = pr, slv = slv, ret = rets))
     @test isa(mr, MeanRisk)

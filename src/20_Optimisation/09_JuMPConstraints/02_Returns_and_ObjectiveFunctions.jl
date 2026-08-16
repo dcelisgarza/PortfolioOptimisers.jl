@@ -481,22 +481,33 @@ out of setting `settings.rte = false` on every term.
 
 `NoReturn` is only coherent where nothing reads the return expression:
 
-| Optimiser and objective                                                                   | `NoReturn` |
-|:----------------------------------------------------------------------------------------- |:---------- |
-| [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref), [`FactorRiskContribution`](@ref) | ok         |
-| [`MeanRisk`](@ref) + [`MinimumRisk`](@ref)                                                | ok         |
-| [`MeanRisk`](@ref) + [`MaximumUtility`](@ref)                                             | ok         |
-| [`MeanRisk`](@ref) + [`MaximumReturn`](@ref)                                              | **throws** |
-| [`MeanRisk`](@ref) + [`MaximumRatio`](@ref)                                               | **throws** |
-| [`NearOptimalCentering`](@ref)                                                            | **throws** |
+| Optimiser and objective                                     | `NoReturn` |
+|:----------------------------------------------------------- |:---------- |
+| [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref)     | ok         |
+| [`FactorRiskContribution`](@ref) + [`MinimumRisk`](@ref)    | ok         |
+| [`FactorRiskContribution`](@ref) + [`MaximumUtility`](@ref) | ok         |
+| [`FactorRiskContribution`](@ref) + [`MaximumReturn`](@ref)  | **throws** |
+| [`FactorRiskContribution`](@ref) + [`MaximumRatio`](@ref)   | **throws** |
+| [`MeanRisk`](@ref) + [`MinimumRisk`](@ref)                  | ok         |
+| [`MeanRisk`](@ref) + [`MaximumUtility`](@ref)               | ok         |
+| [`MeanRisk`](@ref) + [`MaximumReturn`](@ref)                | **throws** |
+| [`MeanRisk`](@ref) + [`MaximumRatio`](@ref)                 | **throws** |
+| [`NearOptimalCentering`](@ref)                              | **throws** |
 
-The two [`MeanRisk`](@ref) refusals come from
-[`assert_no_return_objective_compatibility`](@ref): a [`MaximumReturn`](@ref) objective would
-be identically zero, so the solver returns an arbitrary feasible portfolio and reports
-success, and a [`MaximumRatio`](@ref) numerator would vanish. The
-[`NearOptimalCentering`](@ref) refusal comes from [`assert_return_term_required`](@ref), and
-it is an **infeasibility**, not a degeneracy: the barrier constrains
-`exp(log_ret) <= ret - rt`, and with no return term both sides are zero.
+[`RiskBudgeting`](@ref) and [`RelaxedRiskBudgeting`](@ref) hold no objective at all, so
+nothing there can read `:ret`. [`FactorRiskContribution`](@ref) does hold one, so it is
+refused on exactly the same two objectives as [`MeanRisk`](@ref).
+
+The objective refusals come from [`assert_no_return_objective_compatibility`](@ref), at model
+build: a [`MaximumReturn`](@ref) objective would be identically zero, so the solver returns an
+arbitrary feasible portfolio and reports success, and a [`MaximumRatio`](@ref) numerator would
+vanish. The [`NearOptimalCentering`](@ref) refusal comes from
+[`assert_return_term_required`](@ref) at its constructor, and it is an **infeasibility**, not
+a degeneracy: the barrier constrains `exp(log_ret) <= ret - rt`, and with no return term both
+sides are zero.
+
+Every refusal above is reached by `settings.rte = false` on every term too, because the guards
+test the state of the expression and not the type of the term (ADR 0054).
 
 The term holds no per-asset quantity, so `settings.scale`, `settings.fee` and `settings.mic`
 are inert — zero scaled is still zero, and a charge subtracted here would make the expression
@@ -509,7 +520,7 @@ quantity that is always zero, so a positive bound makes the model infeasible; th
   - [`NoRisk`](@ref)
   - [`JuMPReturnsSettings`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
-  - [`noreturn_flag`](@ref)
+  - [`zero_return_expression_flag`](@ref)
   - [`assert_no_return_objective_compatibility`](@ref)
   - [`assert_return_term_required`](@ref)
 """
@@ -751,97 +762,144 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` when `r` is a [`NoReturn`](@ref), or a non-empty collection in which **every**
-term is one.
+Return `true` when the model's `:ret` expression is identically zero.
 
-The quantifier is `all`, where [`norisk_flag`](@ref) uses `any`. The divergence is
-deliberate, not an oversight. Every degeneracy this predicate guards against needs the model's
-`:ret` expression to be *identically* zero, and `:ret` is the weighted sum of the terms, so
-one real term beside a `NoReturn` leaves it non-zero. `[ArithmeticReturn(), NoReturn()]`
-solves correctly under every objective and in every optimiser, and `any` would refuse it.
+The degeneracy guard tests the **state** of the expression, not the **type** of the term (ADR
+0054). Two routes reach that state — a [`NoReturn`](@ref) term, and a term taken out of the
+sum by `settings.rte = false` — and this predicate is one **fused** test over both.
 
-The predicate is a **type** test, so it does not see a term taken out of the sum by
-`settings.rte = false`. That route reaches the same zero expression, and
-[`set_max_ratio_return_constraints!`](@ref) covers it with a settings-aware check at model
-build time, because the ratio is the objective for which an empty numerator is unrecoverable.
+The fusion is load-bearing. `:ret` is the weighted sum of the terms, so it is zero exactly
+when *every* term is out of it, by either route. Testing the routes separately and composing
+them is wrong:
+
+```julia
+r = [NoReturn(), ArithmeticReturn(; settings = JuMPReturnsSettings(; rte = false))]
+```
+
+Every term here is out of `:ret`, yet `all(isa NoReturn) || all(!rte)` returns `false`. Only
+`all(isa NoReturn || !rte)` sees it. The risk axis composes instead, because its two halves
+carry different quantifiers; see [`zero_risk_expression_flag`](@ref).
+
+One real term beside a `NoReturn` leaves `:ret` non-zero, so `[ArithmeticReturn(), NoReturn()]` solves correctly under every objective and is not refused. An empty vector is
+refused separately by [`set_return_constraints!`](@ref).
 
 # Related
 
   - [`NoReturn`](@ref)
   - [`assert_no_return_objective_compatibility`](@ref)
   - [`assert_return_term_required`](@ref)
-  - [`norisk_flag`](@ref)
+  - [`zero_risk_expression_flag`](@ref)
 """
-function noreturn_flag(r)::Bool
-    return isa(r, NoReturn) ||
-           (isa(r, AbstractVector) && !isempty(r) && all(x -> isa(x, NoReturn), r))
+function zero_return_expression_flag(r)::Bool
+    return if isa(r, AbstractVector)
+        !isempty(r) && all(x -> isa(x, NoReturn) || !x.settings.rte, r)
+    else
+        isa(r, NoReturn) || !r.settings.rte
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a [`NoReturn`](@ref) term is paired with an objective that ignores the return.
+Assert that an objective which reads the return expression is given a non-zero one.
 
-Rejects [`NoReturn`](@ref) under [`MaximumReturn`](@ref) — whose objective would be
-identically zero, so the solver returns an arbitrary feasible portfolio and reports success —
-and under [`MaximumRatio`](@ref), whose numerator would vanish.
+Dispatches on the objective. Three of them read `:ret` and are refused when it is degenerate;
+every other objective takes the no-op fallback, because a zero `:ret` is legitimate under
+[`MinimumRisk`](@ref) and [`MaximumUtility`](@ref).
 
-Called from [`MeanRisk`](@ref)'s constructor, which is where a return term and an objective
-first meet: the term lives on [`JuMPOptimiser`](@ref) and the objective on the optimiser.
+| Objective                      | Refused when                     |
+|:------------------------------ |:-------------------------------- |
+| [`MaximumReturn`](@ref)        | every term is out of `:ret`      |
+| [`MaximumRatio`](@ref)         | every term is out of `:ret`      |
+| [`MaximumElementReturn`](@ref) | term `i` is a [`NoReturn`](@ref) |
 
-A [`TimeDependent`](@ref) schedule on either side is skipped, as in
-[`assert_no_risk_objective_compatibility`](@ref) — but the two are **not** covered equally
-afterwards. A scheduled `obj` comes back through
-[`assert_time_dependent_substitution`](@ref), which re-runs [`MeanRisk`](@ref)'s constructor
-on each scheduled entry. A scheduled `ret` does not: it is a field of
-[`JuMPOptimiser`](@ref), so the substitution pass re-runs *that* constructor, which has no
-objective to check the entry against. A schedule whose entries are all `NoReturn` therefore
-reaches [`MaximumReturn`](@ref) unrefused, where the static equivalent does not.
+The first two use [`zero_return_expression_flag`](@ref), so both routes to a zero expression
+are covered (ADR 0054). [`MaximumElementReturn`](@ref) is **per index** and ignores
+`settings.rte` entirely: it maximises `ret_i` directly, which the builder registers whatever
+the flag says, so a `false` flag removes that term from the *sum* without touching the
+objective. Only the sentinel type makes `ret_i` itself zero.
+
+[`MaximumElementReturn`](@ref)'s method **range-checks `i` first**, because the `NoReturn`
+test indexes `ret[i]`. The refusal is a `DomainError`, matching the constructor's own
+`i > zero(i)` guard: the two halves of one domain, spelled alike. The constructor cannot
+check the upper half, because it never sees `ret`. A [`TimeDependent`](@ref) schedule is
+checked **per fold**, by construction — a callable schedule has no value until its fold
+exists, so an eager scan could cover vector schedules only.
+
+Called from [`set_return_constraints!`](@ref), the shared model-build hook every JuMP
+optimiser reaches, **not** from a constructor. The hook is the only site that sees all three
+objective-carrying optimisers: [`MeanRisk`](@ref), [`FactorRiskContribution`](@ref) — which
+carries its own `obj` and had no return-side guard at all — and
+[`NearOptimalCentering`](@ref). The cost is that a refusal now arrives at `optimise` time
+rather than at construction time.
+
+The seam is also where a [`TimeDependent`](@ref) schedule is already resolved, so neither side
+needs a schedule skip here.
 
 # Related
 
   - [`NoReturn`](@ref)
-  - [`noreturn_flag`](@ref)
+  - [`zero_return_expression_flag`](@ref)
   - [`assert_return_term_required`](@ref)
-  - [`MeanRisk`](@ref)
+  - [`set_return_constraints!`](@ref)
 """
-function assert_no_return_objective_compatibility(ret, obj)::Nothing
-    if isa(ret, TimeDependent) || isa(obj, TimeDependent) || !noreturn_flag(ret)
-        return nothing
-    end
-    @argcheck(!isa(obj, MaximumReturn),
-              ArgumentError("NoReturn is incompatible with MaximumReturn: the objective would be identically zero, so every feasible portfolio is optimal and the solver would return an arbitrary one while reporting success. NoReturn exists so that a formulation which never reads the return expression can avoid a vestigial term — use obj = MinimumRisk() or obj = MaximumUtility(), or give a real return term."))
-    @argcheck(!isa(obj, MaximumRatio),
-              ArgumentError("NoReturn is incompatible with MaximumRatio: the ratio's numerator vanishes, so its homogenisation variable k collapses to zero when rf > 0, and the problem returns an arbitrary feasible point when rf = 0. Use obj = MinimumRisk() or obj = MaximumUtility(), or give a real return term."))
+function assert_no_return_objective_compatibility(ret, ::ObjectiveFunction)::Nothing
+    return nothing
+end
+function assert_no_return_objective_compatibility(ret, ::MaximumReturn)::Nothing
+    @argcheck(!zero_return_expression_flag(ret),
+              ArgumentError("MaximumReturn needs a non-zero return expression, and every return term is out of it: each term is either a `NoReturn` or carries `settings.rte = false`. The objective would be identically zero, so every feasible portfolio is optimal and the solver would return an arbitrary one while reporting success. Use obj = MinimumRisk() or obj = MaximumUtility(), or give a return term that is in the expression."))
+    return nothing
+end
+function assert_no_return_objective_compatibility(ret, ::MaximumRatio)::Nothing
+    @argcheck(!zero_return_expression_flag(ret),
+              ArgumentError("MaximumRatio needs a non-zero return expression, and every return term is out of it: each term is either a `NoReturn` or carries `settings.rte = false`. The ratio's homogenisation variable `k` collapses to zero when `rf > 0`, and the problem returns an arbitrary feasible point when `rf = 0`. Use obj = MinimumRisk() or obj = MaximumUtility(), or give a return term that is in the expression."))
+    return nothing
+end
+function assert_no_return_objective_compatibility(ret, obj::MaximumElementReturn)::Nothing
+    i = obj.i
+    rets = isa(ret, AbstractVector) ? ret : (ret,)
+    @argcheck(i <= length(rets),
+              DomainError(i,
+                          "i must be <= the number of return terms; ret has $(length(rets)) $(length(rets) == 1 ? "term" : "terms")"))
+    @argcheck(!isa(rets[i], NoReturn),
+              ArgumentError("MaximumElementReturn($i) needs a non-zero return term at index $i, and that term is a `NoReturn`, whose expression is identically zero. The objective would be identically zero, so every feasible portfolio is optimal and the solver would return an arbitrary one while reporting success. Name a different term, or give a real return term at index $i. `settings.rte` is not consulted here: it removes a term from the summed `:ret` expression, while this objective reads `ret_$i` directly."))
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `ret` holds a real return term, for optimisers whose formulation is built around
-one.
+Assert that `ret` gives a non-zero return expression, for optimisers built around one.
 
-[`NoReturn`](@ref) is coherent in the three optimisers that never read `:ret`, and in
-[`MeanRisk`](@ref) under an objective that never reads it.
-[`NearOptimalCentering`](@ref) is the one optimiser that neither describes: its logarithmic
-barrier constrains `exp(log_ret) <= ret - rt`, so with no return term the model is
-**infeasible** rather than degenerate, and without this check the failure arrives as a solver
+A zero `:ret` is coherent in the three optimisers that never read it, and in
+[`MeanRisk`](@ref) under an objective that never reads it. [`NearOptimalCentering`](@ref) is
+the one optimiser that neither describes: its logarithmic barrier constrains
+`exp(log_ret) <= ret - rt`, so with a zero return expression the model is **infeasible**
+rather than degenerate, and without this check the failure arrives as a solver
 `OptimisationFailure` naming nothing.
 
+The criterion is [`zero_return_expression_flag`](@ref), so both routes to a zero expression
+are covered (ADR 0054). This guard stays at the **constructor**, unlike the objective-level
+[`assert_no_return_objective_compatibility`](@ref), and the split is principled: this one asks
+whether the *formulation* needs a return term, which is knowable from the estimator alone,
+while the other asks whether the *objective* does, and objective and term first meet at model
+build.
+
 `T` names the calling optimiser, for the error message. [`TimeDependent`](@ref) schedules are
-skipped, mirroring [`assert_risk_measure_required`](@ref).
+skipped here and reached instead through [`assert_time_dependent_substitution`](@ref), which
+re-runs the host's own constructor on each resolved entry.
 
 # Related
 
   - [`NoReturn`](@ref)
-  - [`noreturn_flag`](@ref)
+  - [`zero_return_expression_flag`](@ref)
   - [`assert_no_return_objective_compatibility`](@ref)
   - [`NearOptimalCentering`](@ref)
 """
 function assert_return_term_required(ret, T::Symbol)::Nothing
-    if isa(ret, TimeDependent) || !noreturn_flag(ret)
+    if isa(ret, TimeDependent) || !zero_return_expression_flag(ret)
         return nothing
     end
-    return throw(ArgumentError("NoReturn cannot be used with $T: its logarithmic barrier constrains exp(log_ret) <= ret - rt, and with no return term the reference return rt and the model's return expression are both zero, so the constraint reads exp(log_ret) <= 0, which no real log_ret satisfies. The model is infeasible, not merely degenerate. Give a real return term. NoReturn is for the optimisers whose formulation never reads the return expression — RiskBudgeting, RelaxedRiskBudgeting and FactorRiskContribution — and for MeanRisk under MinimumRisk or MaximumUtility."))
+    return throw(ArgumentError("$T needs a non-zero return expression, and every return term is out of it: each term is either a `NoReturn` or carries `settings.rte = false`. $T's logarithmic barrier constrains exp(log_ret) <= ret - rt, and with a zero return expression the reference return rt and the model's return expression are both zero, so the constraint reads exp(log_ret) <= 0, which no real log_ret satisfies. The model is infeasible, not merely degenerate. Give a return term that is in the expression. A zero return expression is for the optimisers whose formulation never reads it — RiskBudgeting, RelaxedRiskBudgeting and FactorRiskContribution — and for MeanRisk under MinimumRisk or MaximumUtility."))
 end
 """
     set_maximum_ratio_factor_variables!(model, obj)
@@ -1022,8 +1080,10 @@ name that the objective, the bounds, the ratio and [`NearOptimalCentering`](@ref
 and a stored `-ret` leads every one of them astray.
 
 An empty `:ret_vec` — every term opted out through `settings.rte = false` — gives a zero
-return expression rather than an error, because such a configuration is meaningful for every
-objective except [`MaximumRatio`](@ref), which refuses it separately.
+return expression rather than an error here. The refusal belongs to the objective, not to the
+collapse: [`MinimumRisk`](@ref) and [`MaximumUtility`](@ref) read a zero `:ret` legitimately,
+while [`MaximumReturn`](@ref) and [`MaximumRatio`](@ref) are refused upstream by
+[`assert_no_return_objective_compatibility`](@ref).
 
 # Arguments
 
@@ -1097,10 +1157,8 @@ end
 function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, rets,
                                            mus::AbstractVector, robust::AbstractVector,
                                            pr::AbstractPriorResult)
-    # A term out of the numerator is a term out of the numerator, whether it got there by
-    # type or by flag, so the predicate tests both.
-    @argcheck(any(x -> x.settings.rte && !isa(x, NoReturn), rets),
-              ArgumentError("`MaximumRatio` needs a non-zero return expression, and every return term is out of it: each of the $(length(rets)) terms is either a `NoReturn` or carries `settings.rte = false`. The ratio's homogenisation variable `k` collapses to zero when `rf > 0`, and the problem returns an arbitrary feasible point when `rf = 0`. Give a return term that is in the expression, or use a different objective."))
+    # The empty-numerator refusal is not here: it is one of the three objective refusals
+    # `assert_no_return_objective_compatibility` makes at the top of this seam.
     mu = aggregate_return_characteristic(rets, mus)
     set_maximum_ratio_normalisation!(model, obj, mu, pr)
     sc = get_constraint_scale(model)
@@ -1256,6 +1314,7 @@ function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
     # `aggregate_return_characteristic`, which applies `settings.scale` to `mu_i` in its own
     # right. Dropping the weight at the first call alone would leave `MaximumRatio`'s
     # normalisation scaled while `:ret` is not — worse than not dropping it at all.
+    assert_no_return_objective_compatibility(pret, obj)
     pret = unit_scale_returns_estimator(pret)
     mu, robust = set_return_constraints!(model, 1, pret, pr; kwargs...)
     scalarise_return_expression!(model)
@@ -1265,6 +1324,7 @@ end
 function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::ObjectiveFunction,
                                  pr::AbstractPriorResult; kwargs...)
     @argcheck(!isempty(pret), IsEmptyError("`ret` cannot be an empty vector"))
+    assert_no_return_objective_compatibility(pret, obj)
     mus = Vector{Any}(undef, length(pret))
     robust = Vector{Bool}(undef, length(pret))
     for (i, pret_i) in enumerate(pret)
