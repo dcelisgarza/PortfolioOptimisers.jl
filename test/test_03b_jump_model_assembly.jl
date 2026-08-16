@@ -32,7 +32,7 @@
                                                     sst = nt.sst, sglt = nt.sglt,
                                                     sgst = nt.sgst, tn = nt.tn,
                                                     fees = nt.fees, plr = nt.plr,
-                                                    ret = nt.ret)
+                                                    ret = nt.ret, sca = nt.sca)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
                                 sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
