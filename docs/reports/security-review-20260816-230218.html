@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Security review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      /* shared shell — identical in every /improve-* report */
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      /* domain accent — security */
+      .boundary { stroke-dasharray: 5 4; stroke: #d97706; }
+      .taint    { stroke: #dc2626; stroke-width: 2px; }
+      .sink     { background: #7f1d1d; color: #fff; }
+      .swatch   { display:inline-block; width:.75rem; height:.75rem; border-radius:2px; vertical-align:middle; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Security review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-08-16 · branch <code>dev</code> · <code>3efb13d80</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Ninth hardening pass, scoped to the ~20,600 lines added to <code>src/</code> and <code>ext/</code> since the eighth
+          pass on 2026-07-23. The parser and resource baseline held: no new eval, dispatch-on-a-name, subprocess,
+          network or deserialization sink was added anywhere, and every cap from ADRs 0025, 0027 and 0041 still
+          fails closed under a live probe. What the new code did add is a set of <em>asymmetries</em> — a boundary
+          hardened on one arm and not its twin, a cap applied at one seam and not the identical one next door.
+          Every finding below was reproduced against running code in a fresh session; two of the traced leads did not
+          survive that check and were downgraded or dropped.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-orange-600 text-white font-semibold">2 High</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Medium</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">3 Low</span>
+          <span class="text-slate-400">·</span>
+          <span class="text-slate-600"><span class="swatch" style="background:#dc2626"></span> taint flow</span>
+          <span class="text-slate-600"><span class="swatch" style="background:#fff;border:2px dashed #d97706"></span> trust boundary</span>
+          <span class="text-slate-600"><span class="swatch" style="background:#7f1d1d"></span> sink</span>
+          <span class="text-slate-400">·</span>
+          <span class="text-slate-600">all findings reproduced live</span>
+        </div>
+      </header>
+
+      <!-- ============================================ BASELINE ============================================ -->
+      <section class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Baseline held — verified live, not read off the source</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          A fresh REPL on <code>3efb13d80</code>, <code>test/test_02_equation_parsing.jl</code> green. Each boundary was
+          probed with a real payload:
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm font-mono border-collapse">
+            <thead>
+              <tr class="text-left text-xs uppercase tracking-wider text-slate-500">
+                <th class="py-1 pr-4">Boundary</th><th class="py-1 pr-4">Probe</th><th class="py-1">Result</th>
+              </tr>
+            </thead>
+            <tbody class="text-slate-700">
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">Parser allowlist (ADR 0025)</td><td class="py-1 pr-4">"3 * exit(1) * AAPL &lt;= 1"</td><td class="py-1 text-green-700">Meta.ParseError</td></tr>
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">Equation length (ADR 0027)</td><td class="py-1 pr-4">5,000 nested parens</td><td class="py-1 text-green-700">Meta.ParseError</td></tr>
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">max_bins (quadratic)</td><td class="py-1 pr-4">bins = 50_000</td><td class="py-1 text-green-700">DomainError</td></tr>
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">max_n_sim</td><td class="py-1 pr-4">n_sim = 10_000_000</td><td class="py-1 text-green-700">DomainError</td></tr>
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">max_frontier</td><td class="py-1 pr-4">N = 10_000_000</td><td class="py-1 text-green-700">DomainError</td></tr>
+              <tr class="border-t border-emerald-200"><td class="py-1 pr-4">Message discipline (ADR 0026)</td><td class="py-1 pr-4">"APPL" / "ZZZQX"</td><td class="py-1 text-green-700">count + gated suggestion / count only</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          The supply-chain surface also <em>shrank</em>: <code>PrecompileTools</code> was dropped and <code>Impute</code>
+          became a weak dependency, taking its <code>DataDeps</code>/<code>HTTP</code> subtree out of the default footprint
+          behind a 12-line extension. A new <code>assert_frontier_sweep_cap</code> closes the <code>N^k</code> multi-bound
+          sweep gap that a single <code>Frontier</code> cap could not. No committed secrets or key material in the tracked tree.
+        </p>
+      </section>
+
+      <section id="findings" class="space-y-10">
+
+        <!-- ============================================ 1 ============================================ -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">1 · The string arm of <code>pipeline_lens</code> fails open where its symbol twin fails closed</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-orange-600 text-white font-semibold">High</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/05_SearchCrossValidation.jl:75–98</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["search grid key<br/>(config / UI / notebook)"] -->|untrusted| B["pipeline_lens(pipe, key)"]
+  B --> C{"key type?"}
+  C -->|"Symbol"| D["step-name table miss<br/>→ ArgumentError + did_you_mean"]
+  C -.taint.->|"String — primary form"| E["parse_lens(key)"]
+  E -.taint.-> F["PropertyLens rooted at the Pipeline"]
+  F --> G["Accessors.set during the fold loop"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  classDef safe fill:#f0fdf4,stroke:#166534;
+  class B,E,F taint
+  class G sink
+  class D safe
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — observed live, pipeline with one step named "impute"</div>
+              pipeline_lens(pipe, <span class="font-bold">"imputer"</span>) &nbsp;→ &nbsp;(@o _.imputer) &nbsp;&nbsp;<span class="text-slate-500"># typo silently accepted</span><br/>
+              pipeline_lens(pipe, <span class="font-bold">"names"</span>) &nbsp;&nbsp;&nbsp;→ &nbsp;(@o _.names) &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-slate-500"># resolves to a real Pipeline field</span><br/>
+              pipeline_lens(pipe, <span class="font-bold">"steps"</span>) &nbsp;&nbsp;&nbsp;→ &nbsp;(@o _.steps) &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-slate-500"># resolves to a real Pipeline field</span>
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">The Symbol arm, nine lines below, already does the right thing</div>
+              pipeline_lens(pipe, <span class="font-bold">:imputer</span>) &nbsp;→ &nbsp;ArgumentError: `imputer` is not a step name<br/>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; among the 1 named pipeline steps (did you mean `impute`?)
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">The code already knows.</span> The <code>Symbol</code> method carries a comment saying it
+            must "fail closed rather than silently reinterpreting it as a property access on the pipeline struct" — which is
+            precisely what the <code>AbstractString</code> method above it does. The seventh pass fixed the symbol arm; the
+            string arm, which is the primary documented key form, was left behind.
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable: a string grid key whose first dotted segment misses the
+            step-name table is reinterpreted as a property path on the <code>Pipeline</code> object itself, so a typo tunes
+            nothing and a name colliding with a real field (<code>steps</code>, <code>names</code>) gets written into by
+            <code>Accessors.set</code> on every fold.</p>
+            <p><span class="font-semibold">Direction.</span> Give the string arm the guard its symbol twin has — require a dot
+            before falling through to <code>parse_lens</code>, and route the miss through <code>did_you_mean</code> against
+            <code>pipe.names</code>.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed on unknown step name</li>
+            <li>blast radius: silent wrong result</li>
+            <li>one arm, mirrors existing code</li>
+            <li>typo gets a suggestion, not a lens</li>
+            <li>closes the 6th name boundary</li>
+            <li>no caller loses a legitimate key</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 2 ============================================ -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">2 · The callable branch of <code>CustomValueExpectedReturns</code> skips every check its vector branch makes</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-orange-600 text-white font-semibold">High</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/08_Moments/34_CustomValueExpectedReturns.jl:140–158</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">Vector branch — validated</div>
+              @argcheck(length(me.val) == _ncols,<br/>
+              &nbsp;&nbsp;DimensionMismatch("length(val) …<br/>
+              &nbsp;&nbsp;must match the number of assets"))<br/><br/>
+              <span class="text-slate-500">CustomValueExpectedReturns(val=[0.1,0.2])<br/>
+              on 4 assets → DimensionMismatch ✓</span>
+            </div>
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Callable branch — nothing checked</div>
+              assert_dims(dims)<br/>
+              return me.val(X; dims = dims, kwargs...)<br/><br/>
+              <span class="text-slate-500">val = (X; kw...) -&gt; 0.123<br/>
+              → mu = 0.123 ::Float64 &nbsp;<span class="text-red-700 font-bold">ACCEPTED</span><br/>
+              val = (X; kw...) -&gt; [0.1, 0.2]<br/>
+              → mu = [0.1, 0.2] &nbsp;<span class="text-red-700 font-bold">ACCEPTED</span></span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable: the returned value becomes <code>pr.mu</code> and flows
+            into every optimiser without a shape, length or finiteness check, so a scalar or a wrong-length vector passes the
+            estimator boundary and surfaces — if at all — layers away from the field that caused it.</p>
+            <p><span class="font-semibold">Direction.</span> Apply the vector branch's own check to the callable's return value
+            at the point of call, which is the seam that can actually see it.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>validate what the callable returns</li>
+            <li>blast radius: silent wrong mu</li>
+            <li>error names the offending field</li>
+            <li>reuses the sibling's check</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 3 ============================================ -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">3 · <code>HopCount.n</code> is a matrix-power count with no ceiling, at either seam</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">least-privilege</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/11_Phylogeny/01_Base_Phylogeny.jl:305–312 · src/11_Phylogeny/06_Phylogeny.jl:2140, 2263, 2322, 2397</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["HopCount(; n)"] --> B["constructor: n >= 1 only"]
+  A2["HopCount(; n = rule)"] --> C["resolve_separation<br/>type-checks the answer only"]
+  B -.taint.-> D
+  C -.taint.-> D
+  D["for i in 0:n<br/>P .+= A^i"]
+  D --> E["n · log n · N³ flops"]
+  F["get_n_subsets<br/>SAME shape"] ==>|"assert_resource_cap ✓"| G["capped at max_n_subsets"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  classDef safe fill:#f0fdf4,stroke:#166534;
+  class B,C taint
+  class D,E sink
+  class F,G safe
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — observed live</div>
+              HopCount(; n = 10^9) &nbsp;→ &nbsp;ACCEPTED, n = 1000000000
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">The structural twin, already correct</div>
+              get_n_subsets(10^9) &nbsp;→ &nbsp;DomainError: n_subsets = 1000000000<br/>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exceeds RESOURCE_LIMITS[].max_n_subsets = 100000
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0041 — one cap per sink.</span> This sink is <em>linear</em> in <code>n</code>, so a
+            linear cap is the right shape, and the field already mirrors <code>max_n_subsets</code> in every other respect.
+            <code>get_n_subsets</code> caps at the <em>resolution</em> seam precisely because a constructor cannot see what a
+            callable rule ultimately returns; <code>resolve_separation</code> is the same seam and type-checks the answer without
+            capping it.
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable through one keyword: <code>n</code> drives
+            <code>for i in 0:n; P .+= A^i</code> at three readers, costing roughly <code>n · log n · N³</code> flops, so a large
+            value wedges the session on compute rather than memory.</p>
+            <p><span class="font-semibold">Direction.</span> Add a fifth <code>ResourceLimits</code> field and assert it in both
+            places <code>max_n_subsets</code> is asserted — the <code>HopCount</code> constructor and the
+            <code>resolve_separation</code> seam that resolves a caller-authored rule.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>blast radius: process wedge</li>
+            <li>linear cap bounds a linear sink</li>
+            <li>copies the proven twin exactly</li>
+            <li>closes constructor and resolution seam</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 4 ============================================ -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">4 · The <code>Graphs.jl</code> splat is guarded on one field, of one family, of one half of the file</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">least-privilege</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/11_Phylogeny/06_Phylogeny.jl:244, 327, 390, 739, 915–937, 1149–1157</div>
+
+          <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-sm font-mono">
+              <thead class="bg-slate-100 text-xs uppercase tracking-wider text-slate-600">
+                <tr><th class="text-left py-2 px-3">Constructor</th><th class="text-left py-2 px-3">Field</th><th class="text-left py-2 px-3">Probe: a matrix</th></tr>
+              </thead>
+              <tbody>
+                <tr class="border-t"><td class="py-2 px-3">BetweennessCentrality</td><td class="py-2 px-3">args</td><td class="py-2 px-3 text-green-700">ConflictingArgumentError ✓</td></tr>
+                <tr class="border-t"><td class="py-2 px-3">BetweennessCentrality</td><td class="py-2 px-3 font-bold">kwargs</td><td class="py-2 px-3 text-red-700 font-bold">ACCEPTED — kwargs unguarded</td></tr>
+                <tr class="border-t"><td class="py-2 px-3">KruskalTree</td><td class="py-2 px-3 font-bold">args</td><td class="py-2 px-3 text-red-700 font-bold">ACCEPTED — no guard</td></tr>
+                <tr class="border-t"><td class="py-2 px-3">BoruvkaTree</td><td class="py-2 px-3 font-bold">args</td><td class="py-2 px-3 text-red-700 font-bold">ACCEPTED — no guard</td></tr>
+                <tr class="border-t"><td class="py-2 px-3">PrimTree</td><td class="py-2 px-3 font-bold">args</td><td class="py-2 px-3 text-red-700 font-bold">ACCEPTED — no guard</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">The guard states its own rationale.</span> <code>assert_centrality_args</code> was added in
+            this window because a matrix in <code>args</code> binds to <code>vs</code> and "overflows the stack inside
+            <code>Graphs.degree</code>. That takes the session with it, not merely the call." That reasoning applies verbatim to
+            <code>kwargs</code>, and to <code>kruskal_mst(g, distmx)</code> whose second positional argument <em>is</em> a matrix.
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable: caller-supplied <code>args</code> and <code>kwargs</code> are
+            splatted into external <code>Graphs.jl</code> entry points — one of them the private <code>_degree_centrality</code> —
+            with no key allowlist and no value type check, so the hazard the guard was written for is still open on three tree
+            builders and on every <code>kwargs</code> field.</p>
+            <p><span class="font-semibold">Direction.</span> Extend the existing guard to <code>kwargs</code>, and call it from the
+            three tree constructors; prefer an enumerated key allowlist over rejecting matrices, so the permitted set is stated
+            rather than inferred.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>blast radius: process kill</li>
+            <li>guard already exists, extend it</li>
+            <li>attack surface: any kwarg → 0 unknown</li>
+            <li>drops a private external entry point</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 5 ============================================ -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">5 · Two CI workflows run a floating action tag that Dependabot cannot reach</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">supply-chain</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">.github/workflows/Aqua.yml:17 · .github/workflows/FormatCheck.yml:25 · .github/dependabot.yml</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — 2 of 11 workflows</div>
+              uses: julia-actions/setup-julia<span class="font-bold">@latest</span><br/><br/>
+              <span class="text-slate-500"># mutable ref: whatever the action<br/>
+              # owner pushes to `latest` executes<br/>
+              # dependabot: github-actions, weekly<br/>
+              #   → cannot bump a non-version tag</span>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — matches the other 9</div>
+              uses: julia-actions/setup-julia<span class="font-bold">@v2</span><br/><br/>
+              <span class="text-slate-500"># pinned, and inside the one<br/>
+              # supply-chain control the repo has</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Floating CI inputs have already bitten this repository.</span> The recent red workflows
+            tracked as #332/#333 were traced to a Julia point release arriving through a floating version selector, not to any
+            source change. That is the same class of exposure, and it argues the pinning question is live rather than theoretical.
+            Testing against the current 1.x is a deliberate choice; running an unpinned <em>action</em> is not, since nine sibling
+            workflows pin it.
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable on every push to <code>main</code> and on every pull request:
+            <code>@latest</code> resolves at run time to whatever the action owner last published, and <code>Aqua.yml</code> pairs
+            that with no <code>permissions:</code> block, so the job token falls back to the repository default rather than an
+            enumerated set. Seven of eleven workflows declare no permissions block.</p>
+            <p><span class="font-semibold">Direction.</span> Pin both to <code>@v2</code>, and add
+            <code>permissions: contents: read</code> to the workflows that only read, as <code>FormatCheck.yml</code> already does.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>supply-chain: mutable ref → pinned</li>
+            <li>brings 2 workflows under Dependabot</li>
+            <li>least-privilege: default → read-only</li>
+            <li>blast radius: two-line fix</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 6 ============================================ -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">6 · The search grid has no product cap, though the frontier sweep just got one</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl:388 · 10_GridSearchCrossValidation.jl:22 · 11_RandomisedSearchCrossValidation.jl:24–35</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Search grid — linear check, product sink</div>
+              assert_nonempty_gt0_finite_val(n_iter, :n_iter)<br/><br/>
+              vals = vec(collect(Iterators.product(<br/>
+              &nbsp;&nbsp;map(x -&gt; x[2], estval)...)))<br/><br/>
+              <span class="text-slate-500"># n_iter samples PER parameter<br/>
+              # k params → n_iter^k tuples, collected<br/>
+              # n_iter=100, k=4 → 10⁸ before one solve</span>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">Frontier sweep — the idiom already exists</div>
+              assert_frontier_sweep_cap(model)<br/><br/>
+              <span class="text-slate-500"># "the sweep is an Iterators.product and<br/>
+              #  k bounds of N points cost N^k solves"<br/>
+              # → caps the PRODUCT, not any single N<br/>
+              # src/…/10_JuMPOptimiser.jl:1482</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable through one keyword: <code>n_iter</code> is checked as a scalar
+            while the grid it feeds is a Cartesian product materialised by <code>collect</code>, so the memory and the solve count
+            both grow as <code>n_iter^k</code> and no guard fires. A linear check cannot bound a product sink — the same reasoning
+            that gave <code>max_bins</code> its own cap.</p>
+            <p><span class="font-semibold">Direction.</span> Cap the product where it is formed, mirroring
+            <code>assert_frontier_sweep_cap</code>: name the per-parameter counts in the message so the caller can see which
+            dimension to shrink.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>blast radius: OOM at collect</li>
+            <li>caps the product, not a factor</li>
+            <li>idiom shipped weeks ago</li>
+            <li>message names the guilty dimension</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <span class="font-semibold">Reachability note.</span> The grid construction itself is unchanged since the last pass —
+            only the constructor carrying the check was touched. Pre-existing, but the idiom that closes it is new.
+          </div>
+        </article>
+
+        <!-- ============================================ 7 ============================================ -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">7 · <code>GeneralExponentialSimilarity</code> accepts a non-finite coefficient and returns NaN</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/09_Distance/04_Similarity.jl:210–214, 373–377</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — observed live on a 3×3 distance matrix</div>
+              @argcheck(zero(coef) &lt; coef, DomainError) &nbsp;&nbsp;<span class="text-slate-500"># positivity only</span><br/>
+              exp.(-coef * D .^ power)<br/><br/>
+              coef = Inf &nbsp;→ &nbsp;ctor ACCEPTED; &nbsp;S all finite = <span class="font-bold">false</span>, any NaN = <span class="font-bold">true</span><br/>
+              <span class="text-slate-500">                     (the zero diagonal gives exp(-Inf * 0) = NaN)</span>
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">The file's own idiom, two members over</div>
+              assert_similarity_domain(::MaximumDistanceSimilarity, …)<br/>
+              &nbsp;&nbsp;@argcheck(all(isfinite, D), …) &nbsp;&nbsp;<span class="text-slate-500"># :449</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable: the constructor checks positivity but not finiteness, and a
+            NaN similarity matrix feeds <code>PMFG_T2s</code> and DBHT clustering, where it becomes a wrong or far-removed failure
+            rather than a typed error at the field.</p>
+            <p><span class="font-semibold">Direction.</span> Add <code>isfinite</code> to the existing positivity guard, matching
+            the <code>L1UncertaintySet</code> constructor next door.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed at the field</li>
+            <li>blast radius: NaN into clustering</li>
+            <li>one predicate, existing argcheck</li>
+            <li>matches the neighbouring idiom</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <span class="font-semibold">Corrected during verification.</span> A non-finite <code>power</code> was also suspected,
+            but <code>power = Inf</code> and <code>power = 1e308</code> both produce finite matrices. Only <code>coef</code>
+            reaches NaN, which is why this sits at Low rather than Medium.
+          </div>
+        </article>
+
+        <!-- ============================================ 8 ============================================ -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">8 · The gross-budget message prints a whole <code>WeightBounds</code> struct</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">info-leak</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl:530</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — observed live, 4-asset universe</div>
+              … the net budget (bgt) already constrains it. Got wb = WeightBounds<br/>
+              &nbsp;&nbsp;lb ┼ Vector{Float64}: <span class="font-bold">[0.01, 0.02, 0.03, 0.04]</span><br/>
+              &nbsp;&nbsp;ub ┴ Vector{Float64}: <span class="font-bold">[0.51, 0.52, 0.53, 0.54]</span>
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">The ADR 0026 shape — name the count, not the collection</div>
+              … the net budget (bgt) already constrains it.<br/>
+              Got weight bounds over 4 assets with no negative lower bound.
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <span class="font-semibold">Severity bounded by an existing control.</span> The pretty-show budget summarises vectors
+            longer than six elements — a 40-asset universe prints only <code>40-element Vector{Float64}</code>. The leak therefore
+            reaches small universes only, and the data is the caller's own input. Recorded as drift from the message discipline,
+            not as an exposure of anything the caller did not supply.
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Reachable by any caller setting <code>gbgt</code> with non-negative
+            bounds: the message interpolates the whole struct where the four shared builders name a count and one offending
+            element.</p>
+            <p><span class="font-semibold">Direction.</span> Report the asset count and the failed predicate, matching
+            <code>unknown_variable_msg</code> and its siblings in <code>src/02_Tools.jl</code>.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>counts, not collections</li>
+            <li>bounded message width</li>
+            <li>one message, no caller impact</li>
+            <li>restores the shared-builder shape</li>
+          </ul>
+        </article>
+
+        <!-- ============================================ 9 ============================================ -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">9 · Three boundaries that skip the discipline their own siblings apply</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/01_Base_Pipeline.jl:415–424 · src/19_RiskMeasures/27_ExpectedRisk.jl:666–672 · src/12_ConstraintGeneration/06_AssetSetsMatrix.jl:997</div>
+
+          <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-100 text-xs uppercase tracking-wider text-slate-600">
+                <tr><th class="text-left py-2 px-3">Probe (live)</th><th class="text-left py-2 px-3">Result</th><th class="text-left py-2 px-3">The sibling that gets it right</th></tr>
+              </thead>
+              <tbody class="font-mono text-xs">
+                <tr class="border-t"><td class="py-2 px-3">PipelineStep(writes = :bogus)</td><td class="py-2 px-3 text-green-700">ArgumentError, names the set ✓</td><td class="py-2 px-3">—</td></tr>
+                <tr class="border-t"><td class="py-2 px-3 font-bold">PipelineStep(target = :bogus)</td><td class="py-2 px-3 text-red-700 font-bold">ACCEPTED at construction</td><td class="py-2 px-3"><code>writes</code>, same struct</td></tr>
+                <tr class="border-t"><td class="py-2 px-3 font-bold">rolling_window_measure(…, 0)</td><td class="py-2 px-3 text-red-700 font-bold">raw BoundsError from a kernel</td><td class="py-2 px-3">plotting ext validates <code>rolling</code></td></tr>
+                <tr class="border-t"><td class="py-2 px-3 font-bold">asset_sets_feature_names(["sectr", …])</td><td class="py-2 px-3 text-red-700 font-bold">KeyError: key "sectr" not found</td><td class="py-2 px-3"><code>did_you_mean</code> → "sector"</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> All three are reachable and all three fail closed, so the cost is
+            diagnostic quality rather than exposure: a bogus <code>target</code> passes a constructor that allowlists its sibling
+            field and crashes at run time instead; a non-positive <code>window</code> raises a <code>BoundsError</code> from
+            inside a risk kernel rather than a typed error naming the argument; an unknown taxonomy key raises a bare
+            <code>KeyError</code> where the neighbouring boundary would have suggested the right spelling.</p>
+            <p><span class="font-semibold">Direction.</span> Allowlist <code>target</code> beside <code>writes</code>; validate
+            <code>window</code> at the exported entry point as the plotting sibling already does; route the taxonomy-key miss
+            through the shared builders.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fail closed at the boundary, not the kernel</li>
+            <li>blast radius: crash, no leak</li>
+            <li>each fix is one predicate</li>
+            <li>error names the offending argument</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <span class="font-semibold">Corrected during verification.</span> The <code>window</code> case was first traced as a
+            silent wrong result — a rolling series of degenerate risks reading as legitimate. Probing six risk measures showed
+            every one of them raises instead, so it fails closed and sits at Low.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ============================================ TOP REC ============================================ -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-red-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-red-800">Top recommendation — close the string arm of <code>pipeline_lens</code> first</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          <a href="#c1" class="text-red-700 underline font-semibold">Finding 1</a> is the only reachable path in this pass that
+          both produces a silent wrong result and writes into the object being tuned: a grid key of <code>"steps"</code> or
+          <code>"names"</code> resolves against a real <code>Pipeline</code> field, so cross-validation sets grid values into the
+          pipeline's own step table instead of tuning a step. It is also the cheapest to close — the <code>Symbol</code> method
+          nine lines below already contains the guard, the suggestion call and a comment explaining why the fallthrough is wrong,
+          so the fix is to apply the same three lines to the arm that callers actually use. Take
+          <a href="#c2" class="text-red-700 underline font-semibold">Finding 2</a> next: it is the other silent-wrong-result path,
+          and it likewise only needs the check its own sibling branch already performs.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-08-16 · <code>/improve-security</code> · ninth pass, scoped to the diff since 2026-07-23; every finding
+        reproduced in a live REPL on <code>3efb13d80</code>, with two traced leads downgraded after probing.
+      </footer>
+
+    </main>
+  </body>
+</html>

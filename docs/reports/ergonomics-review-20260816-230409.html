@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ergonomics review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      /* shared shell — identical in every /improve-* report */
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      /* domain accent — ergonomics */
+      .friction { border-left: 4px solid #dc2626; }
+      .signal   { border-left: 4px solid #059669; }
+      pre { white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-08-16 · branch <code>dev</code> · <code>3efb13d80</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          This pass walked the public surface for caller-facing friction: names that carry no signal, error
+          messages that describe implementation state, defaults no caller accepts, and capabilities reachable
+          only by reading source. Everything the five earlier reviews closed was excluded up front, so all
+          thirteen candidates are fresh ground. Every quotation below was read from the file at the stated
+          line, and every claim about dispatch was checked against the constructor that guards it — an
+          earlier review fabricated an error message by reading the string without the signature.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">9 Strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Worth exploring</span>
+          <span class="text-slate-400">·</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-red-600"></span> friction</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-emerald-600"></span> high signal</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-amber-400"></span> ADR callout</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ============ C1 ============ -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">1 · The shared <code>w</code> description says "portfolio weights" for thirteen measures that take observation weights</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:382 · 14 docstring sites across src/19_RiskMeasures/**, src/13_Prior/08_FactorBlackLittermanPrior.jl</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 space-y-2">
+              <div class="text-xs uppercase tracking-wider text-red-700">Before — what 13 of 14 docstrings render</div>
+<pre>:w_rm =&gt; "`w`: Optional portfolio weights.",#</pre>
+              <div class="text-xs text-red-700">…but the field it documents is</div>
+<pre>w::Option{&lt;:ObsWeights} = nothing,</pre>
+            </div>
+            <div class="diff-new rounded p-3 space-y-2">
+              <div class="text-xs uppercase tracking-wider text-green-700">The correct sibling already exists, unused here</div>
+<pre>:oow =&gt; "`w`: Optional observation weights
+vector `observations × 1`, or a concrete
+subtype of `DynamicAbstractWeights`. If
+`nothing`, the computation is unweighted.",#</pre>
+              <div class="text-xs text-green-700">src/01_Base.jl:31 — states the ADR 0043 contract exactly</div>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-3">Who interpolates <code>field_dict[:w_rm]</code> — measured</div>
+            <div class="space-y-2">
+              <div>
+                <div class="h-6 rounded overflow-hidden flex text-xs text-white">
+                  <div class="bg-red-500 flex items-center justify-center" style="width:92.8%">13 sites · <code class="ml-1">Option{&lt;:ObsWeights}</code> — description is wrong</div>
+                  <div class="bg-emerald-500 flex items-center justify-center" style="width:7.2%">1</div>
+                </div>
+                <div class="text-xs text-slate-500 mt-1">The one correct consumer is <code>FactorBlackLittermanPrior</code> (<code>w::Option{&lt;:VecNum}</code>, the equilibrium anchor) — and the dict key is named <code>:w_rm</code>, "w for risk measure".</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller who reads <code>?MAD</code>, <code>?Kurtosis</code> or <code>?AverageDrawdown</code> is told <code>w</code> is a per-asset portfolio weight vector, passes one of length <code>N</code>, and fails on a field that wants observation weights of length <code>T</code>. Thirteen of the fourteen consumers are risk measures, which is the most-used part of the alias surface.</p>
+            <p><span class="font-semibold">Direction.</span> Point the thirteen risk measures at an observation-weights description and leave <code>:w_rm</code> — or a renamed entry — to the one prior that genuinely takes portfolio weights.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: description matches the field type</li>
+            <li>blast radius: docs only, 14 sites</li>
+            <li>convention: aligns with <code>:oow</code></li>
+            <li>no source change, no test change</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0043.</span> <code>nothing</code> observation weights means <em>unweighted</em>, not unavailable — the contract <code>:oow</code> already states and <code>:w_rm</code> omits.
+          </div>
+        </article>
+
+        <!-- ============ C2 ============ -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">2 · Three <code>@argcheck</code> sites destroy their own diagnostic when they fire</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/11_Phylogeny/05_NonHierarchicalClustering.jl:59 · src/08_Moments/22_StepwiseRegression.jl:141 · src/08_Moments/23_DimensionReductionRegression.jl:247</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-slate-50 border border-slate-200">
+              <div class="text-xs uppercase tracking-wider mb-1 text-slate-500">The check</div>
+<pre>@argcheck(isa(kwargs.weights, AbstractVector), TypeError)</pre>
+            </div>
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — <code>KMeansAlgorithm(; kwargs = (; weights = 1.0))</code></div>
+<pre>MethodError: no method matching TypeError(::String)
+The type `TypeError` exists, but no method is defined for this
+combination of argument types when trying to construct it.</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — the diagnostic survives</div>
+<pre>ArgumentError: `kwargs.weights` must be an AbstractVector of
+observation weights, got Float64. Pass a vector of length
+size(X, 1), or omit `weights` for an unweighted clustering.</pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4 text-sm">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Why</div>
+            <p class="text-slate-700 leading-relaxed">ArgCheck builds the exception by calling <code class="font-mono">T(msg::String)</code> on a bare exception <em>type</em>. <code class="font-mono">Core.TypeError</code> ships only two constructors — <code class="font-mono">TypeError(where, expected::Type, got)</code> and <code class="font-mono">TypeError(func, context, expected::Type, got)</code> — so the one-string call cannot resolve. The check works; only its failure path is broken.</p>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The caller passes the wrong type for <code>weights</code> and sees an internal exception-construction failure. They never learn which argument was wrong, what was expected, or that <code>weights</code> was even the subject.</p>
+            <p><span class="font-semibold">Direction.</span> Replace the bare <code>TypeError</code> with an exception the library can construct from a message, and name the offending keyword and the type received.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: names the caller's keyword</li>
+            <li>blast radius: 3 sites</li>
+            <li>removes an unconstructible exception</li>
+            <li>failure path currently unreachable to read</li>
+          </ul>
+        </article>
+
+        <!-- ============ C3 ============ -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">3 · A shipped measure hands the caller an extension-author instruction</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/19_RiskMeasures/18_TrackingRiskMeasure.jl:226, 233, 236, 517, 530 · message at src/19_RiskMeasures/01_Base_RiskMeasures.jl:296</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["TrackingRiskMeasure(; tr = ReturnsTracking(...))"] --> B["new{typeof(settings),<br/>typeof(tr), typeof(alg)}"]
+  B --> C{"parameter 1<br/>= settings type"}
+  C -->|"never matches"| D["TrackingRiskMeasure{&lt;:ReturnsTracking}<br/>4 signatures unreachable"]
+  D --> E["falls through to<br/>AbstractBaseRiskMeasure fallback"]
+  E --> F["'declare it at the measure's<br/>definition site'"]
+  classDef bad stroke:#dc2626,stroke-width:2px;
+  class D,E,F bad
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-slate-50 border border-slate-200">
+              <div class="text-xs uppercase tracking-wider mb-1 text-slate-500">The four signatures that can never match</div>
+<pre>supports_precomputed_returns(::TrackingRiskMeasure{&lt;:WeightsTracking}) = false
+supports_precomputed_returns(::TrackingRiskMeasure{&lt;:ReturnsTracking}) = true
+function (r::TrackingRiskMeasure{&lt;:ReturnsTracking})(X::VecNum)
+function (r::TrackingRiskMeasure{&lt;:WeightsTracking})(::VecNum)</pre>
+            </div>
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — what an end user scoring a walk-forward CV sees</div>
+<pre>`TrackingRiskMeasure{…}` is a `WeightsReturnsFeesInput` risk measure
+that does not declare `supports_precomputed_returns`. Declare it at the
+measure's definition site: a moment measure as
+`supports_precomputed_returns(r::…) = weight_independent_target(r.mu)`;
+a weights-dependent measure (tracking, variance-carrying composite) as
+`supports_precomputed_returns(::…) = false`.</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The struct stores <code>settings</code> first, so the tracking algorithm is parameter 2 and every <code>{&lt;:ReturnsTracking}</code> / <code>{&lt;:WeightsTracking}</code> signature is unsatisfiable. Dispatch falls through to a fallback written for extension authors, which tells a caller of a shipped measure to go add a method to a library type. The <code>ReturnsTracking</code> case should simply have worked.</p>
+            <p><span class="font-semibold">Direction.</span> Order the type parameters so the dispatched-on field comes first, then let the two declarations bind. The fallback message stays correct for its real audience.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>a live route starts working</li>
+            <li>signal: fallback reaches only authors</li>
+            <li>blast radius: 5 lines, one file</li>
+            <li>unblocks CV scoring with tracking</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Adjacent, same root cause.</span> Line 239 raises <code>MethodError(r, "…")</code> with a <code>String</code> where <code>args</code> belongs; <code>showerror</code> then throws <code>TypeError: in typeassert, expected DataType, got a value of type String</code>. That line is dead today <em>because of</em> this dispatch bug, so fixing the parameter order makes it reachable — correct it in the same change.
+          </div>
+        </article>
+
+        <!-- ============ C4 ============ -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">4 · <code>check_sol</code>'s default covers 11 of 252 call sites</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/10_JuMPModelOptimisation.jl:143 · doc text at src/01_Base.jl:211</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the shipped default</div>
+<pre>Solver(; name::Sym_Str = "", solver::Any,
+       settings::Option{&lt;:SlvSettings} = nothing,
+       check_sol::NamedTuple = (;),
+       add_bridges::Bool = true)</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — what 241 call sites write by hand</div>
+<pre>check_sol::NamedTuple =
+    (; allow_local = true,
+       allow_almost = true)</pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-3">Default coverage — <code>check_sol=</code>, measured over test/ examples/ user_guide/</div>
+            <div>
+              <div class="h-6 rounded overflow-hidden flex text-xs text-white">
+                <div class="bg-slate-400 flex items-center justify-center" style="width:95.6%">241 of 252 pass the identical value</div>
+                <div class="bg-emerald-400 flex items-center justify-center" style="width:4.4%">11</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-1">
+                <code>examples/</code> 110 of 110 identical · <code>user_guide/</code> 5 of 5 identical · <code>test/</code> 126 of 137
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">The doc text the caller gets instead</div>
+<pre>"`check_sol`: Named tuple of solution for keyword arguments in
+`assert_is_solved_and_feasible`."</pre>
+              <div class="text-xs text-red-700 mt-1">Garbled, and it sends the caller to JuMP's own docs to discover a value 241 sites already share.</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> With <code>(;)</code>, <code>is_solved_and_feasible</code> accepts only <code>OPTIMAL</code>. A caller who does not know the incantation gets an <code>OptimisationFailure</code> on a solution the library's own examples treat as good — and the field description does not name the value, it names a JuMP function.</p>
+            <p><span class="font-semibold">Direction.</span> Either make the near-universal pair the default, or keep <code>(;)</code> and say in the description what the examples pass and why. The first covers 96% of callers; the second at least gives the signal.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>default would cover 96% of callers</li>
+            <li>removes a spurious failure mode</li>
+            <li>blast radius: additive, no call site breaks</li>
+            <li>doc text is garbled regardless</li>
+          </ul>
+        </article>
+
+        <!-- ============ C5 ============ -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">5 · <code>OWA_RG</code> breaks the <code>_RG</code> convention and shadows the type it appears to name</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">aliases</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl:346–382, 519, 531, 552 · src/19_RiskMeasures/10_OWARiskMeasures.jl:1783</div>
+
+          <div class="rounded-lg border border-slate-200 p-4 space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500">The <code>_RG</code> naming map — convention holds 7 of 10</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">VaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">CVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">DRCVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">EVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">RVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">PNVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">GVaR_RG → …Range</div>
+              <div class="rounded px-2 py-1 bg-red-50 text-red-800 border border-red-300 font-semibold">OWA_RG → OrderedWeightsArray</div>
+              <div class="rounded px-2 py-1 bg-red-50 text-red-800 border border-red-300 font-semibold">OWA_CVaR_RG → OrderedWeightsArray</div>
+              <div class="rounded px-2 py-1 bg-red-50 text-red-800 border border-red-300 font-semibold">OWA_TG_RG → OrderedWeightsArray</div>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — what the caller gets</div>
+<pre>function OWA_RG(; settings = RiskMeasureSettings(),
+                alg = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = owa_rg, alg = alg)
+end</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">The type they expected — exported, no alias</div>
+<pre>@concrete struct OrderedWeightsArrayRange &lt;: RiskMeasure
+    # w1, w2 — two weight vectors
+end</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Seven <code>X_RG</code> aliases name a <code>…Range</code> type. The three <code>OWA_*_RG</code> names are functions returning a plain <code>OrderedWeightsArray</code> built with the <code>owa_rg</code> weight generator. A caller who learned <code>CVaR_RG</code> reaches for <code>OWA_RG</code> expecting the two-weight range measure and silently gets a single-weight one. <code>owa_rg</code>, <code>OWA_RG</code> and <code>OrderedWeightsArrayRange</code> are all exported into the same namespace.</p>
+            <p><span class="font-semibold">Direction.</span> Give <code>OrderedWeightsArrayRange</code> the alias the convention predicts, and rename the three generator-based entry points to say they select weights rather than a range type. Alias first — the old names appear at 60 sites.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: holds 7 of 10 today</li>
+            <li>blast radius: 60 sites, alias first</li>
+            <li>removes a silent wrong-measure path</li>
+            <li>discoverability: real Range type gains an alias</li>
+          </ul>
+        </article>
+
+        <!-- ============ C6 ============ -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">6 · <code>UniverseSets</code> gives the factor axis a good error and the asset axis a raw one</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl:349, 363, 366–377 · <code>did_you_mean</code> at src/01_Base.jl:1538</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">The convention — already present, same constructor, factor axis</div>
+<pre>@argcheck(haskey(dict, fkey),
+          KeyError("$fkey (the factor universe), required by
+                    the factor partition $k"))</pre>
+            </div>
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Where it breaks — the asset axis, which is the required one</div>
+<pre>@argcheck(haskey(dict, xkey), KeyError)
+@argcheck(length(dict[k]) == length(dict[xkey]), DimensionMismatch)</pre>
+            </div>
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — <code>UniverseSets(; xkey = "nx", dict = Dict("assets" =&gt; ["A","B","C"]))</code></div>
+<pre>KeyError: key "haskey(dict, xkey) must hold. Got\ndict =&gt; Dict("assets"=&gt;["A", "B", "C"])\nxkey =&gt; "nx"" not found</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After</div>
+<pre>KeyError: "nx" (the asset universe) is required by `UniverseSets`
+but `dict` does not contain it. Found keys: "assets".
+Did you mean "assets"? Pass xkey = "assets", or rename the key.</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The single most common <code>UniverseSets</code> mistake — a dict keyed by the wrong universe name — returns a blob whose "key" is the text of the check, with literal <code>\n</code> escapes. The length checks never interpolate <code>k</code>, so with a dozen taxonomy keys the caller is told the two counts but not which partition is short, and must bisect their own dict.</p>
+            <p><span class="font-semibold">Direction.</span> Extend the factor axis's message shape to the asset axis, interpolate the offending key in the length checks, and reach for the <code>did_you_mean</code> helper the codebase already ships.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention exists in the same function</li>
+            <li>signal: names the offending key</li>
+            <li>reuses shipped <code>did_you_mean</code></li>
+            <li>blast radius: 6 checks, one constructor</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Same family.</span> <code>asset_sets_matrix</code> (src/12_ConstraintGeneration/06_AssetSetsMatrix.jl:146) wraps its own sentence in a <code>KeyError</code>, rendering <code>KeyError: key "key nx_secter not found in `sets.dict`" not found</code>. The <code>AssertionError</code> three lines later restates <code>haskey(sets.dict, smtx)</code>, which is guaranteed true by then.
+          </div>
+        </article>
+
+        <!-- ============ C7 ============ -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">7 · <code>CombinatorialCrossValidation</code>'s default is accepted by zero call sites</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl:78</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before</div>
+<pre>CombinatorialCrossValidation(;
+    n_folds::Integer = 10,
+    n_test_folds::Integer = 8,
+    ...)</pre>
+              <div class="text-xs text-red-700 mt-2">8 of 10 folds reserved for test</div>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">What call sites actually pass</div>
+<pre>n_test_folds = 2   (13 sites)
+n_test_folds = 3   (4 sites)
+n_folds      = 4   (14 sites)</pre>
+              <div class="text-xs text-green-700 mt-2">no site anywhere passes 8</div>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-3">Default coverage — <code>n_test_folds=</code></div>
+            <div class="h-6 rounded overflow-hidden flex text-xs text-white">
+              <div class="bg-slate-400 flex items-center justify-center" style="width:100%">22 of 22 call sites override it · 0 accept the default</div>
+            </div>
+            <div class="text-xs text-slate-500 mt-1">Searched <code>test/</code>, <code>examples/</code>, <code>user_guide/</code>; the only <code>n_test_folds = 8</code> in the repo is the auto-generated default printout in <code>docs/</code>.</div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller who trusts the default gets 45 combinations built on near-empty training windows. No call site in the repository wants it, so the default is a guess rather than a cover.</p>
+            <p><span class="font-semibold">Direction.</span> Move the default to the shape the library's own usage demonstrates, or drop the default and make the split an explicit caller decision.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>default covers 0% of callers</li>
+            <li>blast radius: every site is explicit</li>
+            <li>removes a costly wrong-shape run</li>
+            <li>evidence: 22 measured call sites</li>
+          </ul>
+        </article>
+
+        <!-- ============ C8 ============ -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">8 · <code>Distance(; power = 1)</code> is written 38 times and changes nothing</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/09_Distance/02_Distance.jl:78, 125–155 · src/09_Distance/03_DistanceDistance.jl:90</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">power = nothing</div>
+<pre>sqrt.(clamp!((1 .- rho) * 0.5, 0, 1))</pre>
+            </div>
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">power = 1 — <code>isodd(1)</code> ⇒ scale = 0.5</div>
+<pre>sqrt.(clamp!((1 .- rho .^ 1) * 0.5, 0, 1))</pre>
+            </div>
+          </div>
+          <p class="text-sm text-slate-600">Identical. The same holds for <code>SimpleAbsoluteDistance</code>, <code>LogDistance</code> and <code>CorrelationDistance</code> — all four <code>_dist_from_cor</code> pairs coincide at <code>p = 1</code>. Meanwhile the docstring says: <em>"If power is not <code>nothing</code>, computes the generalised distance estimator."</em></p>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-3">Explicit <code>power=</code> call sites, by value</div>
+            <div class="h-6 rounded overflow-hidden flex text-xs text-white">
+              <div class="bg-slate-400 flex items-center justify-center" style="width:97.4%">37 sites pass <code class="mx-1">1</code> — the no-op value</div>
+              <div class="bg-emerald-400" style="width:2.6%"></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-1"><code>Distance.power</code> 19 of 20 explicit sites · <code>DistanceDistance.power</code> 18 of 18 · 38 <code>power = 1</code> occurrences overall.</div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The docstring frames <code>power</code> as the switch into the generalised estimator, so a caller writes <code>power = 1</code> believing they selected it. They get the base distance, and nothing tells them the knob was inert at that value.</p>
+            <p><span class="font-semibold">Direction.</span> Say in the description that <code>p = 1</code> reproduces the base distance, so the knob's neutral position is stated rather than discovered.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: neutral value documented</li>
+            <li>blast radius: docs only</li>
+            <li>38 measured no-op call sites</li>
+            <li>no behaviour change</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Second half, same constructor.</span> <code>Distance</code> defaults <code>alg = SimpleDistance()</code>, but every phylogeny entry point that nests one substitutes <code>Distance(; alg = CanonicalDistance())</code> — <code>02_Clusters.jl:459</code>, <code>04_DBHT.jl:1666</code> and <code>:1716</code>, <code>06_Phylogeny.jl:1232</code>. The library never accepts its own default, so a caller reading <code>SimpleDistance()</code> as the house default is reading a default nothing uses.
+          </div>
+        </article>
+
+        <!-- ============ C9 ============ -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">9 · <code>:ple</code> is defined twice in one dict, so one description is dead text</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:102 and :442 — both inside the <code>arg_dict = Dict(</code> literal opened at :27</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Line 102 — unreachable, the later key wins</div>
+<pre>:ple =&gt; "`ple`: Phylogeny estimator.",#</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">Line 442 — what every consumer actually renders</div>
+<pre>:ple =&gt; "`ple`: Phylogeny constraint estimator(s).",#</pre>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-600"><code>ple</code> is the <strong>only</strong> duplicated key in the whole dict — I scanned lines 27–713 and it is the single entry appearing twice. <code>field_dict</code> is derived from <code>arg_dict</code> at line 714, so the shadowing propagates to both.</p>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> One four-letter abbreviation is documented as two different things, and the description a maintainer reads at line 102 is not the one a caller sees. Whichever docstring the caller lands on, they cannot tell whether <code>ple</code> wants a phylogeny estimator or a phylogeny <em>constraint</em> estimator.</p>
+            <p><span class="font-semibold">Direction.</span> Delete the shadowed entry, or split the two meanings under distinct keys if both are genuinely in use — the same resolution an earlier review applied to the <code>:pler</code> duplicate.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>removes dead documentation</li>
+            <li>blast radius: one dict entry</li>
+            <li>precedent: the <code>:pler</code> fix</li>
+            <li>only duplicate key in the dict</li>
+          </ul>
+        </article>
+
+        <!-- ============ C10 ============ -->
+        <article id="c10" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">10 · No optimiser docstring links the verb that runs it — 0 of 16</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/** — 16 top-level optimiser type docstrings</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["Capability Catalogue<br/>(links the type — ADR 0040)"] --> B["MeanRisk docstring"]
+  B --> C["# Related:<br/>JuMPOptimiser, MeanRiskResult,<br/>ObjectiveFunction"]
+  C --> D["dead end —<br/>no link to optimise"]
+  B -.->|missing| E["optimise"]
+  classDef bad stroke:#dc2626,stroke-width:2px;
+  classDef good stroke:#059669,stroke-width:2px,stroke-dasharray:4;
+  class D bad
+  class E good
+            </pre>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — <code>HierarchicalRiskParity</code> # Related</div>
+<pre>- ClusteringOptimisationEstimator
+- HierarchicalOptimiser
+- HierarchicalEqualRiskContribution
+- SchurComplementHierarchicalRiskParity
+- factory</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After</div>
+<pre>- optimise                      ← the verb
+- HierarchicalRiskParityResult  ← where w lives
+- ClusteringOptimisationEstimator
+- HierarchicalOptimiser
+- ...</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller arrives at an optimiser from the Capability Catalogue, which links the type. The type's <code># Related</code> block never links <code>optimise</code> — the link exists only on method docstrings one level down. Seven optimisers link neither <code>optimise</code> nor their own Result, so the caller also cannot find the type whose field <code>w</code> holds the answer.</p>
+            <p><span class="font-semibold">Direction.</span> Add <code>optimise</code> and the corresponding Result to the <code># Related</code> block of every optimiser type. <code>MeanRisk</code>, <code>NestedClustered</code>, <code>Stacking</code>, <code>SubsetResampling</code> and both allocators already link their Result, so this closes an inconsistency rather than setting a new policy.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>discoverability: entry verb reachable</li>
+            <li>convention: 6 of 16 already comply</li>
+            <li>blast radius: docs only, 16 blocks</li>
+            <li>closes the type → Result → field path</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Same shape, cross-validation.</span> No CV scheme links <code>cross_val_predict</code> or <code>search_cross_validation</code> — <code>KFold</code>, <code>CombinatorialCrossValidation</code>, <code>IndexWalkForward</code>, <code>DateWalkForward</code> and <code>MultipleRandomised</code> all name only their Result and <code>n_splits</code>.
+          </div>
+        </article>
+
+        <!-- ============ C11 ============ -->
+        <article id="c11" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">11 · The Capability Catalogue offers a fifth objective the caller must not choose</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">docs/capability_catalogue.jl:768 · src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl:734, 741</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Listed beside the four real objectives, with no <code>label</code></div>
+<pre>Cap(:MaximumReturn; label = "Maximum return"),
+Cap(:MaximumElementReturn)]),</pre>
+            </div>
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">So ADR 0040 renders its first docstring sentence</div>
+<pre>Internal objective that maximises the expression of **one** return term.</pre>
+              <div class="text-xs text-red-700 mt-1">…and the sentence the catalogue does <em>not</em> render, seven lines later: <code>Not part of the user-facing API.</code></div>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-600">I confirmed <code>MaximumElementReturn</code> is <strong>not exported</strong>, appears in zero user-guide pages and zero examples, and is absent from <code>CONTEXT.md</code> §4.3, which names only the four Objective Functions.</p>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The page ADR 0040 defines as the Choice Surface inventory lists an internal, unexported type among the four objectives a caller picks from — and discloses that only in a sentence the catalogue does not show.</p>
+            <p><span class="font-semibold">Direction.</span> Drop the entry from the objective-functions group. The Choice Surface is concrete leaf Estimators and Algorithms a caller writes down; an unexported internal is not one.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>catalogue matches the Choice Surface</li>
+            <li>blast radius: one catalogue line</li>
+            <li>signal: no unchoosable option offered</li>
+            <li>aligns with CONTEXT.md §4.3</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0040.</span> The catalogue curates grouping, not descriptions — so an entry with no <code>label</code> renders whatever its docstring opens with. That is what surfaces the word "Internal" onto the caller's inventory page.
+          </div>
+        </article>
+
+        <!-- ============ C12 ============ -->
+        <article id="c12" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">12 · The <code>R_</code> prefix rule holds four times and breaks once</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl:396, 408, 414, 433, 439, 445, 587, 593, 611, 617, 1046</div>
+
+          <div class="rounded-lg border border-slate-200 p-4 space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500">"Prefix <code>R_</code> to the base alias" — the rule a caller learns from autocomplete</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-xs">
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">CDaR → R_CDaR</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">EDaR → R_EDaR</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">ADD → R_ADD</div>
+              <div class="rounded px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200">MDD → R_MDD</div>
+              <div class="rounded px-2 py-1 bg-red-50 text-red-800 border border-red-300 font-semibold">RLDaR → R_RDaR ✗</div>
+              <div class="rounded px-2 py-1 bg-red-50 text-red-800 border border-red-300">R_RLDaR → UndefVarError</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>RelativisticDrawdownatRisk</code> is <code>RLDaR</code>, but its relative form is <code>R_RDaR</code> — the stem changes. A caller who learned the rule from the other four writes <code>R_RLDaR</code> and gets an <code>UndefVarError</code>; a caller reading <code>R_RDaR</code> parses it as "relative RVaR", which is a value-at-risk, not a drawdown.</p>
+            <p><span class="font-semibold">Direction.</span> Settle on one stem for "relativistic" across the family and alias the other spelling rather than removing it.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: holds 4 of 5</li>
+            <li>blast radius: small, alias first</li>
+            <li>signal: stem predicts the base name</li>
+            <li>removes an UndefVarError guess</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Adjacent.</span> <code>MinRk</code>, <code>MaxRt</code> and <code>MaxUt</code> abbreviate their type names; <code>MaxSR = MaximumRatio</code> substitutes a different noun. The type is risk-measure-agnostic, so <code>MaxSR</code> paired with <code>CDaR</code> is a Calmar-type ratio and not a Sharpe — the alias asserts a metric the type does not commit to.
+          </div>
+        </article>
+
+        <!-- ============ C13 ============ -->
+        <article id="c13" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">13 · The clustering half of the surface starts with <code>()</code>; the JuMP half needs two nested constructors</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/11_MeanRisk.jl:279 · 10_JuMPOptimiser.jl:878 · 05_HierarchicalRiskParity.jl:189 · 04_Base_ClusteringOptimisation.jl:435</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">Clustering half — fully defaulted</div>
+<pre>HierarchicalRiskParity(;
+  opt::HierarchicalOptimiser =
+      HierarchicalOptimiser(), ...)
+
+# caller writes:
+HierarchicalRiskParity()</pre>
+            </div>
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">JuMP half — two required constructors</div>
+<pre>MeanRisk(; opt::JuMPOptimiser, ...)
+JuMPOptimiser(; pe = EmpiricalPrior(),
+                slv::Slv_VecSlv, ...)
+
+# caller writes:
+MeanRisk(; opt = JuMPOptimiser(; slv = slv))</pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-3">How much the inner constructor carries — measured</div>
+            <div class="space-y-3">
+              <div>
+                <div class="font-mono text-sm mb-1"><code>JuMPOptimiser</code> — 676 calls</div>
+                <div class="h-5 rounded overflow-hidden flex text-xs text-white">
+                  <div class="bg-slate-400 flex items-center justify-center" style="width:32.5%">220 carry only <code class="mx-1">slv</code> / <code class="mx-1">pe</code></div>
+                  <div class="bg-emerald-400 flex items-center justify-center" style="width:67.5%">456 carry real configuration</div>
+                </div>
+              </div>
+              <div>
+                <div class="font-mono text-sm mb-1"><code>MeanRisk</code> — 869 calls</div>
+                <div class="h-5 rounded overflow-hidden flex text-xs text-white">
+                  <div class="bg-slate-400 flex items-center justify-center" style="width:29.7%">258 pass only <code class="mx-1">opt</code></div>
+                  <div class="bg-emerald-400 flex items-center justify-center" style="width:70.3%">611</div>
+                </div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-500 mt-2">In <code>examples/</code> the empty-inner share is higher still: 85 of 202 (42%); in <code>user_guide/</code>, 8 of 14 (57%).</div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller learns from the clustering optimisers that an optimiser can be constructed and refined, then meets the JuMP half, where two nested constructors must be written before any of the problem is stated — and in a third of real call sites the inner one exists only to hold a solver.</p>
+            <p><span class="font-semibold">Direction.</span> Not a default solver: the library declares no solver dependency in <code>Project.toml</code>, so the backend is genuinely the caller's. The direction is a forwarding path, so the common case names the solver once at the level it is thinking about.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: holds on clustering half only</li>
+            <li>220 of 676 inner calls are pass-through</li>
+            <li>blast radius: additive forwarding</li>
+            <li>solver stays the caller's choice</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — correct the shared <code>w</code> description before anything else</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          Take <a href="#c1" class="text-emerald-700 underline font-semibold">candidate 1</a> first. It is the only finding here that actively teaches the caller a wrong fact
+          about a field they must fill: thirteen risk-measure docstrings state that <code>w</code> is a portfolio weight vector when
+          the field is typed <code>Option{&lt;:ObsWeights}</code>. It is also the cheapest to close — the correct wording already exists
+          as <code>:oow</code> at <code>src/01_Base.jl:31</code>, the change is docs-only across fourteen sites, and no test asserts on it.
+          Pair it with <a href="#c9" class="text-emerald-700 underline">candidate 9</a>, the duplicated <code>:ple</code> key, since both live in the same dict and
+          the <code>:pler</code> fix set the precedent.
+        </p>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          Then take <a href="#c3" class="text-emerald-700 underline">candidate 3</a> and <a href="#c2" class="text-emerald-700 underline">candidate 2</a>: both are defects rather than
+          preferences. <code>TrackingRiskMeasure</code>'s type parameters are ordered so that four of its own dispatch signatures can
+          never match, and three <code>@argcheck</code> sites raise an exception type Julia cannot construct from a message, so their
+          diagnostics are destroyed exactly when a caller needs them.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-08-16 · <code>/improve-ergonomics</code> · branch <code>dev</code> at <code>3efb13d80</code>, clean tree · every quotation read from the file at the stated line; dispatch and duplicate-key claims verified against the guarding constructor; findings closed by the five earlier ergonomics reviews excluded by construction.
+      </footer>
+
+    </main>
+  </body>
+</html>
