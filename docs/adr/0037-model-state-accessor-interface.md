@@ -151,3 +151,85 @@ the *outer* flag. Prefixing that read would silently re-add the penalty under tr
   than model-wide (`:noc_rk`, `:noc_rt`, `:psi`, `:w_obj`) and could earn their own
   narrower home later. That is a separate question from whether they may be read bare, which
   is the one this ADR answers.
+
+## Amendment (2026-08-17) — the index is the second axis, and it is now inside the seam
+
+The decision above policed **one** of the two ways a Model State key is disambiguated. A key
+carries two independent axes:
+
+- the **prefix**, which separates one *build* from another (ADR 0005), and
+- the **index** `i`, which separates one *measure instance* from another inside a single
+  build, so two `ConditionalValueatRisk` measures in one vector get their own scratch.
+
+Rules 1 and 2 covered the prefix. The index was spelled by hand — `model[Symbol(:cvar_risk_, i)]`
+— at ~200 sites across 21 files, carrying the same do-not-collide invariant and matching
+neither rule. Inside `20_RiskMeasureConstraints/` alone, 6 files used the interface only, 9
+used bare index keys only, and 5 used both in the same file.
+
+### 1. `state_key` resolves both axes
+
+`state_key(prefix, name, i)` joins `state_key(prefix, name)`, and `state_set!`, `state_get`,
+`state_has`, `state_build!` and `mark_state!` each grow the matching indexed method. An
+emitter now writes `state_set!(model, prefix, :cvar_risk_, i, expr)` and names neither
+convention.
+
+`nested_index(tag, i)` is the index axis's `nested_prefix`: a composite measure that builds
+its parts **in the same build** — `set_range_risk_constraints!` over its `loss` and `gain`
+tails — separates the parts by index, because they share the build's infrastructure entries
+and must not each rebuild them.
+
+### 2. The tracking path stopped carrying the same fact twice
+
+`set_risk_tr_constraints!` took the composed tracking prefix and passed it as the `prefix`
+keyword **and** as the seed of the measure index (`Symbol(tprefix, i)`), so a nested CVaR
+landed at `:cvar_risk_tr_iv_2_1`. Separation across builds is the prefix's job alone; the
+index now means what it means everywhere else, and the entry is `:tr_iv_2_cvar_risk_1`.
+Nesting still composes — `nested_prefix` on one axis, `nested_index` on the other — so
+tracking-nested-in-tracking is collision-free with each axis stating one thing.
+
+Keys the caller may rely on are unchanged: with the default empty prefix,
+`state_key(Symbol(""), :ret_, 1)` is `:ret_1`, exactly as before. Only the *nested* spellings
+move, and those were never namable from outside.
+
+### 3. The seam-lock grows a third rule, and it polices the access rather than the spelling
+
+Rule 3 is that outside the interface `model[…]` and `haskey(model, …)` are simply not
+reached for. Stating it on the *access* rather than on key construction is deliberate: a
+construction-shaped rule stops `model[Symbol(:foo_, i)]` but not `key = Symbol(:foo_, i);
+model[key] = v`, which is the same defect with one more line. Like rules 1 and 2, it names
+no keys.
+
+Two exemptions, both named by file or function and neither naming a key:
+
+- `mip_key(sp, name)` — the MIP space's own resolver (ADR 0034). It is a *third* namespace,
+  but it already has exactly one home, so it is not the defect this amendment fixes.
+  Naming it is a claim: a second such resolver fails the lock until someone decides whether
+  it belongs in the interface.
+- `11_MeanRisk.jl` / `13_NearOptimalCentering.jl` — the frontier sweep loops read back a key
+  `set_risk_upper_bound!` minted and handed them through the `:risk_frontier` registry. They
+  compose nothing.
+
+### 4. Two latent defects the scope change surfaced
+
+- `set_tracking_error_constraints!` for `DependentVariableTracking` registered the risk
+  difference at `Symbol(key, i)` — the *already composed* key with the index appended a
+  second time — putting entry 1 at `:te_dr_11`, which is the key `te_dr` itself takes at
+  entry 11. It is now its own name, `:te_dr_diff_`.
+- `set_variance_risk!`'s `SquaredSOCRiskExpr` overload registered its SOC constraint at
+  `Symbol(key_dev, :_soc)` (`:dev_1_soc`) while its `QuadRiskExpr` sibling used
+  `:cdev_soc_1` for the same thing. Both now use `:cdev_soc_`.
+
+Neither was reachable in the test suite; both are the class the rule exists to prevent.
+
+### 5. Consequences
+
+- `set_risk_bounds_and_expression!` and `set_variance_risk_bounds_and_expression!` take
+  `(name, i)` and resolve the key themselves, so the bound keys (`<key>_ub`,
+  `<key>_ub_var`) cannot drift from the key the emitter registered the expression under.
+  Several helpers that took a composed `key::Symbol` across a function boundary
+  (`set_kurtosis_risk!`, `set_negative_skewness_risk!`, `set_tracking_risk!`,
+  `set_second_moment_risk!`, `set_variance_risk!`, `set_ucs_variance_risk!`) now take the
+  index instead: a resolved key no longer escapes an emitter at all.
+- `arg_dict[:key_sym]` lost its last user and is deleted.
+- Rule 3 reports **zero** violations, so the migration is provably complete rather than
+  believed complete — the same standard §6 set for rules 1 and 2.

@@ -359,11 +359,10 @@ Where:
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
     val = l2.val
-    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
-    model[Symbol(:cl2_soc_, i)] = JuMP.@constraint(model,
-                                                   [sc * t_l2; sc * w] in
-                                                   JuMP.SecondOrderCone())
-    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2)
+    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :cl2_soc_, i,
+               JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
@@ -371,29 +370,29 @@ function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr},
                                  sc::Number)
     val = l2.val
-    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
-    model[Symbol(:cl2_soc_, i)] = JuMP.@constraint(model,
-                                                   [sc * t_l2; sc * w] in
-                                                   JuMP.SecondOrderCone())
-    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2^2)
+    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :cl2_soc_, i,
+               JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2^2))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
     val = l2.val
-    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * LinearAlgebra.dot(w, w))
+    l2 = state_set!(model, Symbol(""), :l2_, i,
+                    JuMP.@expression(model, val * LinearAlgebra.dot(w, w)))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
     val = l2.val
-    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
-    model[Symbol(:cl2_rsoc_, i)] = JuMP.@constraint(model,
-                                                    [sc * t_l2; 0.5; sc * w] in
-                                                    JuMP.RotatedSecondOrderCone())
-    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2)
+    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :cl2_rsoc_, i,
+               JuMP.@constraint(model,
+                                [sc * t_l2; 0.5; sc * w] in JuMP.RotatedSecondOrderCone()))
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
@@ -505,27 +504,23 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     for (i, lp) in enumerate(lps)
         val = lp.val
         p_inv = inv(lp.p)
-        t_lp, r_lp = model[Symbol(:t_lp_, i)], model[Symbol(:r_lp_, i)] = JuMP.@variables(model,
-                                                                                          begin
-                                                                                              ()
-                                                                                              [1:N]
-                                                                                          end)
-        model[(Symbol(:clp_, i))], model[Symbol(:cslp_, i)] = JuMP.@constraints(model,
-                                                                                begin
-                                                                                    [i = 1:N],
-                                                                                    [sc *
-                                                                                     r_lp[i],
-                                                                                     sc *
-                                                                                     t_lp,
-                                                                                     sc *
-                                                                                     w[i]] in
-                                                                                    JuMP.MOI.PowerCone(p_inv)
-                                                                                    sc *
-                                                                                    (sum(r_lp) -
-                                                                                     t_lp) ==
-                                                                                    0
-                                                                                end)
-        lp_expr = model[Symbol(:lp_, i)] = JuMP.@expression(model, val * t_lp)
+        t_lp, r_lp = JuMP.@variables(model, begin
+                                         ()
+                                         [1:N]
+                                     end)
+        state_set!(model, Symbol(""), :t_lp_, i, t_lp)
+        state_set!(model, Symbol(""), :r_lp_, i, r_lp)
+        clp, cslp = JuMP.@constraints(model,
+                                      begin
+                                          [i = 1:N],
+                                          [sc * r_lp[i], sc * t_lp, sc * w[i]] in
+                                          JuMP.MOI.PowerCone(p_inv)
+                                          sc * (sum(r_lp) - t_lp) == 0
+                                      end)
+        state_set!(model, Symbol(""), :clp_, i, clp)
+        state_set!(model, Symbol(""), :cslp_, i, cslp)
+        lp_expr = state_set!(model, Symbol(""), :lp_, i,
+                             JuMP.@expression(model, val * t_lp))
         add_to_objective_penalty!(model, lp_expr)
     end
 end

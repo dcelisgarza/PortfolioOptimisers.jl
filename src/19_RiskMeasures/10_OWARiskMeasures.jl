@@ -1842,6 +1842,16 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   rev::Bool = false)
     return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)
 end
+# Tail decomposition — see `range_tails`. Declared for the approximate formulation only: the
+# exact one collapses both tails into a single constraint on `w1 - w2`, so it fuses rather
+# than duplicating. `w2` is already reversed by the constructor (`rev` is a done flag), so
+# each tail is an ordinary `OrderedWeightsArray` over its own weight vector.
+function range_tails(r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
+                                                 <:ApproxOrderedWeightsArray})
+    settings = RiskMeasureSettings(; rke = false)
+    return (; loss = OrderedWeightsArray(; settings = settings, w = r.w1, alg = r.alg),
+            gain = OrderedWeightsArray(; settings = settings, w = r.w2, alg = r.alg))
+end
 function (r::OrderedWeightsArrayRange)(x::VecNum)
     w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(length(x))
     w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(length(x))

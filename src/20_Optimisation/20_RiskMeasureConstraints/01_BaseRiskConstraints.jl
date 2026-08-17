@@ -274,8 +274,8 @@ end
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key,
                                flag::Bool = true)
-    bound_key = Symbol(key, :_ub)
-    bound_var_key = Symbol(key, :_ub_var)
+    bound_key = state_key(key, :_ub)
+    bound_var_key = state_key(key, :_ub_var)
     if !shared_has(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
@@ -294,9 +294,8 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                flag::Bool = true)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    bound_key = Symbol(key, :_ub)
     d = ifelse(flag, 1, -1)
-    model[bound_key] = JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0)
+    state_set!(model, key, :_ub, JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0))
     return nothing
 end
 """
@@ -350,9 +349,11 @@ with `settings.scale` and `settings.rke`.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
   - `name`: Bare Model State entry name seeding the derived bound keys (`<name>_ub`,
-    `<name>_ub_var`). Per-instance Category-B scratch names are passed as-is; a
-    prefix-managed name is resolved against `prefix` here rather than at the call site, so
-    emitters never build a key by hand (ADR 0037).
+    `<name>_ub_var`). The key is resolved here rather than at the call site, so emitters
+    never build a key by hand (ADR 0037).
+  - `i`: Measure index, for per-measure entry names. The indexed method resolves the same
+    key the emitter registered the risk expression under, so the bound keys and the entry
+    key cannot drift apart.
   - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
 
 # Keyword arguments
@@ -372,9 +373,19 @@ with `settings.scale` and `settings.rke`.
 function set_risk_bounds_and_expression!(model::JuMP.Model,
                                          opt::RiskJuMPOptimisationEstimator,
                                          r_expr::JuMP.AbstractJuMPScalar,
-                                         settings::RiskMeasureSettings, name,
+                                         settings::RiskMeasureSettings, name::Symbol,
                                          flag::Bool = true; prefix::Symbol = Symbol(""))
     key = state_key(prefix, name)
+    set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
+    set_risk_expression!(model, r_expr, settings.scale, settings.rke)
+    return nothing
+end
+function set_risk_bounds_and_expression!(model::JuMP.Model,
+                                         opt::RiskJuMPOptimisationEstimator,
+                                         r_expr::JuMP.AbstractJuMPScalar,
+                                         settings::RiskMeasureSettings, name::Symbol, i,
+                                         flag::Bool = true; prefix::Symbol = Symbol(""))
+    key = state_key(prefix, name, i)
     set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
@@ -438,4 +449,59 @@ function set_drawdown_constraints!(model::JuMP.Model, X::MatNum;
                                     sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0))
         return dd
     end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add a range risk measure's constraints to `model` by building its two tails and summing them.
+
+A range measure is its base measure applied twice, so this builds it that way. It reads the
+two point measures from [`range_tails`](@ref), calls [`set_risk_constraints!`](@ref) on the
+loss tail with `loss = true` and on the gain tail with `loss = false`, and registers the sum
+under `key`. The gain tail sees the *negated* net portfolio returns, which is the whole of
+what "the other tail" means and is what each base builder's `loss` keyword does.
+
+The two tails carry `rke = false` and no upper bound, so only the composite expression
+reaches the objective and the bound. Each tail builds under its own measure index, composed
+by [`nested_index`](@ref), so a two-tail model names its parts by the side they describe and
+a range nested in a range stays collision-free.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The range risk measure.
+  - `name::Symbol`: Bare Model State entry name for the composite range expression.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `range_risk`: The combined `loss + gain` risk expression added to the model.
+
+# Related
+
+  - [`range_tails`](@ref)
+  - [`nested_index`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_range_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                     name::Symbol, opt::RiskJuMPOptimisationEstimator,
+                                     pr::AbstractPriorResult, args...;
+                                     prefix::Symbol = Symbol(""), kwargs...)
+    (; loss, gain) = range_tails(r)
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
+                                      args...; loss = true, prefix = prefix, kwargs...)
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
+                                      args...; loss = false, prefix = prefix, kwargs...)
+    range_risk = state_set!(model, prefix, name, i,
+                            JuMP.@expression(model, loss_risk + gain_risk))
+    set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
+                                    prefix = prefix)
+    return range_risk
 end

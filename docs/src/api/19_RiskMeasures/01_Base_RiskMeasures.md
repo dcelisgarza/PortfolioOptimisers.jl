@@ -178,6 +178,7 @@ NetReturnsInput
 WeightsReturnsFeesInput
 WeightsInput
 risk_input_kind
+range_tails
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
 supports_precomputed_returns(rs::VecBaseRM)
 supports_precomputed_returns(::NetReturnsInput, ::Any)

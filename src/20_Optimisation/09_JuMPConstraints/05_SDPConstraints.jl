@@ -115,13 +115,13 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
         if !isa(pl, SemiDefinitePhylogeny)
             continue
         end
-        key = Symbol(:sdp_plg_, i)
         A = pl.A
-        model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
+        state_set!(model, Symbol(""), :sdp_plg_, i,
+                   JuMP.@constraint(model, sc * A ⊙ W == 0))
         if !shared_has(model, :variance_flag)
-            key = Symbol(key, :_p)
             p = pl.p
-            plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))
+            plp = state_set!(model, Symbol(""), :sdp_plg_p_, i,
+                             JuMP.@expression(model, p * LinearAlgebra.tr(W)))
             add_to_objective_penalty!(model, plp)
         end
     end
@@ -161,13 +161,13 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
         if !isa(pl, SemiDefinitePhylogeny)
             continue
         end
-        key = Symbol(:frc_sdp_plg_, i)
         A = pl.A
-        model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
+        state_set!(model, Symbol(""), :frc_sdp_plg_, i,
+                   JuMP.@constraint(model, sc * A ⊙ W == 0))
         if !shared_has(model, :variance_flag)
-            key = Symbol(key, :_p)
             p = pl.p
-            plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))
+            plp = state_set!(model, Symbol(""), :frc_sdp_plg_p_, i,
+                             JuMP.@expression(model, p * LinearAlgebra.tr(W)))
             add_to_objective_penalty!(model, plp)
         end
     end

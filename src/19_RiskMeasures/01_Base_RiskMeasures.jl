@@ -197,6 +197,37 @@ function risk_input_kind(r::AbstractBaseRiskMeasure)
     return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
+    range_tails(r::RiskMeasure) -> @NamedTuple{loss, gain}
+
+Decompose a *range* risk measure into the two point measures it is the sum of.
+
+A range measure is its base measure applied twice: once to the losses at level `alpha`, and once to the gains at the second level the range carries (`beta`, `w2`, …). The two point measures are the whole content of that statement, so a range declares them here once and both of its consumers read them from this one place:
+
+  - [`set_range_risk_constraints!`](@ref) builds the model by calling [`set_risk_constraints!`](@ref) on `loss` with `loss = true` and on `gain` with `loss = false`, then sums the two expressions.
+  - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
+
+The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref)) declares no tails, because there are no two sub-models to build.
+
+There is no default. A measure that is not a range, or one that fuses, throws rather than returning a decomposition that does not describe it.
+
+# Arguments
+
+  - `r`: Range risk measure.
+
+# Returns
+
+  - `(; loss, gain)`: The loss-tail and gain-tail point measures.
+
+# Related
+
+  - [`set_range_risk_constraints!`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
+function range_tails(r::AbstractBaseRiskMeasure)
+    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none."))
+end
+"""
     (r::AbstractBaseRiskMeasure)(::VecNum)
 
 Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`

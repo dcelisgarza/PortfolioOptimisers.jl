@@ -79,4 +79,5 @@ state_get
 state_build!
 mark_state!
 nested_prefix
+nested_index
 ```

@@ -60,40 +60,40 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
-    key = Symbol(:evar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     if !loss
         net_X = -net_X
     end
     T = length(net_X)
-    t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = JuMP.@variables(model,
-                                                                                                                                  begin
-                                                                                                                                      ()
-                                                                                                                                      (),
-                                                                                                                                      (lower_bound = 0)
-                                                                                                                                      [1:T]
-                                                                                                                                  end)
+    t_evar, z_evar, u_evar = JuMP.@variables(model, begin
+                                                 ()
+                                                 (), (lower_bound = 0)
+                                                 [1:T]
+                                             end)
+    state_set!(model, prefix, :t_evar_, i, t_evar)
+    state_set!(model, prefix, :z_evar_, i, z_evar)
+    state_set!(model, prefix, :u_evar_, i, u_evar)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
     at = if isnothing(wi)
-        model[Symbol(:cevar_, i)] = JuMP.@constraint(model,
-                                                     sc * (sum(u_evar) - z_evar) <= 0)
+        state_set!(model, prefix, :cevar_, i,
+                   JuMP.@constraint(model, sc * (sum(u_evar) - z_evar) <= 0))
         r.alpha * T
     else
-        model[Symbol(:cevar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (LinearAlgebra.dot(wi, u_evar) -
-                                                      z_evar) <= 0)
+        state_set!(model, prefix, :cevar_, i,
+                   JuMP.@constraint(model,
+                                    sc * (LinearAlgebra.dot(wi, u_evar) - z_evar) <= 0))
         r.alpha * sum(wi)
     end
-    model[Symbol(:cevar_exp_cone_, i)] = JuMP.@constraint(model, [i = 1:T],
-                                                          [sc * (-net_X[i] - t_evar),
-                                                           sc * z_evar, sc * u_evar[i]] in
-                                                          JuMP.MOI.ExponentialCone())
-    evar_risk = model[Symbol(:evar_risk_, i)] = JuMP.@expression(model,
-                                                                 t_evar - z_evar * log(at))
-    set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, key)
+    state_set!(model, prefix, :cevar_exp_cone_, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * (-net_X[i] - t_evar), sc * z_evar, sc * u_evar[i]] in
+                                JuMP.MOI.ExponentialCone()))
+    evar_risk = state_set!(model, prefix, :evar_risk_, i,
+                           JuMP.@expression(model, t_evar - z_evar * log(at)))
+    set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, :evar_risk_, i;
+                                    prefix = prefix)
     return evar_risk
 end
 """
@@ -101,8 +101,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `EntropicValueatRiskRange` (EVaR range) to `model`.
 
-Introduces two sets of exponential cone variables for the lower-tail and upper-tail EVaR
-expressions and computes their difference as the range risk.
+Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
+the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
+EVaR expressions. Each tail brings its own exponential cone block.
 
 # Arguments
 
@@ -114,96 +115,19 @@ expressions and computes their difference as the range risk.
 
 # Returns
 
-  - `nothing`.
+  - `evar_risk_range`: The combined `loss + gain` risk expression added to the model.
 
 # Related
 
   - [`EntropicValueatRiskRange`](@ref)
-  - [`set_risk_constraints!`](@ref)
+  - [`range_tails`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:evar_risk_range_, i)
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    T = length(net_X)
-    t_evar_l, z_evar_l, u_evar_l, t_evar_h, z_evar_h, u_evar_h = model[Symbol(:t_evar_l_, i)], model[Symbol(:z_evar_l_, i)], model[Symbol(:u_evar_l_, i)], model[Symbol(:t_evar_h_, i)], model[Symbol(:z_evar_h_, i)], model[Symbol(:u_evar_h_, i)] = JuMP.@variables(model,
-                                                                                                                                                                                                                                                                      begin
-                                                                                                                                                                                                                                                                          ()
-                                                                                                                                                                                                                                                                          (),
-                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                          [1:T]
-                                                                                                                                                                                                                                                                          ()
-                                                                                                                                                                                                                                                                          (),
-                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                          [1:T]
-                                                                                                                                                                                                                                                                      end)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    at, bt = if isnothing(wi)
-        model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = JuMP.@constraints(model,
-                                                                                     begin
-                                                                                         sc *
-                                                                                         (sum(u_evar_l) -
-                                                                                          z_evar_l) <=
-                                                                                         0
-                                                                                         sc *
-                                                                                         (sum(u_evar_h) -
-                                                                                          z_evar_h) <=
-                                                                                         0
-                                                                                     end)
-        r.alpha * T, r.beta * T
-    else
-        sw = sum(wi)
-        model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = JuMP.@constraints(model,
-                                                                                     begin
-                                                                                         sc *
-                                                                                         (LinearAlgebra.dot(wi,
-                                                                                                            u_evar_l) -
-                                                                                          z_evar_l) <=
-                                                                                         0
-                                                                                         sc *
-                                                                                         (LinearAlgebra.dot(wi,
-                                                                                                            u_evar_h) -
-                                                                                          z_evar_h) <=
-                                                                                         0
-                                                                                     end)
-        r.alpha * sw, r.beta * sw
-    end
-    model[Symbol(:cevar_exp_cone_l_, i)], model[Symbol(:cevar_exp_cone_h_, i)] = JuMP.@constraints(model,
-                                                                                                   begin
-                                                                                                       [i = 1:T],
-                                                                                                       [sc *
-                                                                                                        (-net_X[i] -
-                                                                                                         t_evar_l),
-                                                                                                        sc *
-                                                                                                        z_evar_l,
-                                                                                                        sc *
-                                                                                                        u_evar_l[i]] in
-                                                                                                       JuMP.MOI.ExponentialCone()
-                                                                                                       [i = 1:T],
-                                                                                                       [sc *
-                                                                                                        (net_X[i] -
-                                                                                                         t_evar_h),
-                                                                                                        sc *
-                                                                                                        z_evar_h,
-                                                                                                        sc *
-                                                                                                        u_evar_h[i]] in
-                                                                                                       JuMP.MOI.ExponentialCone()
-                                                                                                   end)
-    evar_risk_l, evar_risk_h = model[Symbol(:evar_risk_l_, i)], model[Symbol(:evar_risk_h_, i)] = JuMP.@expressions(model,
-                                                                                                                    begin
-                                                                                                                        t_evar_l -
-                                                                                                                        z_evar_l *
-                                                                                                                        log(at)
-                                                                                                                        t_evar_h -
-                                                                                                                        z_evar_h *
-                                                                                                                        log(bt)
-                                                                                                                    end)
-    evar_risk_range = model[key] = JuMP.@expression(model, evar_risk_l + evar_risk_h)
-    set_risk_bounds_and_expression!(model, opt, evar_risk_range, r.settings, key)
-    return evar_risk_range
+    return set_range_risk_constraints!(model, i, r, :evar_risk_range_, opt, pr, args...;
+                                       prefix = prefix, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -234,36 +158,37 @@ drawdown-at-risk at confidence level `r.alpha`.
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:edar_risk_, i)
     sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     at = r.alpha * T
-    t_edar, z_edar, u_edar = model[Symbol(:t_edar_, i)], model[Symbol(:z_edar_, i)], model[Symbol(:u_edar_, i)] = JuMP.@variables(model,
-                                                                                                                                  begin
-                                                                                                                                      ()
-                                                                                                                                      (),
-                                                                                                                                      (lower_bound = 0)
-                                                                                                                                      [1:T]
-                                                                                                                                  end)
+    t_edar, z_edar, u_edar = JuMP.@variables(model, begin
+                                                 ()
+                                                 (), (lower_bound = 0)
+                                                 [1:T]
+                                             end)
+    state_set!(model, prefix, :t_edar_, i, t_edar)
+    state_set!(model, prefix, :z_edar_, i, z_edar)
+    state_set!(model, prefix, :u_edar_, i, u_edar)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, pr.X)
     at = if isnothing(wi)
-        model[Symbol(:cedar_, i)] = JuMP.@constraint(model,
-                                                     sc * (sum(u_edar) - z_edar) <= 0)
+        state_set!(model, prefix, :cedar_, i,
+                   JuMP.@constraint(model, sc * (sum(u_edar) - z_edar) <= 0))
         r.alpha * T
     else
-        model[Symbol(:cedar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (LinearAlgebra.dot(wi, u_edar) -
-                                                      z_edar) <= 0)
+        state_set!(model, prefix, :cedar_, i,
+                   JuMP.@constraint(model,
+                                    sc * (LinearAlgebra.dot(wi, u_edar) - z_edar) <= 0))
         r.alpha * sum(wi)
     end
-    model[Symbol(:cedar_exp_cone_, i)] = JuMP.@constraint(model, [i = 1:T],
-                                                          [sc * (dd[i + 1] - t_edar),
-                                                           sc * z_edar, sc * u_edar[i]] in
-                                                          JuMP.MOI.ExponentialCone())
-    edar_risk = model[key] = JuMP.@expression(model, t_edar - z_edar * log(at))
-    set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, key)
+    state_set!(model, prefix, :cedar_exp_cone_, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * (dd[i + 1] - t_edar), sc * z_edar, sc * u_edar[i]] in
+                                JuMP.MOI.ExponentialCone()))
+    edar_risk = state_set!(model, prefix, :edar_risk_, i,
+                           JuMP.@expression(model, t_edar - z_edar * log(at)))
+    set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, :edar_risk_, i;
+                                    prefix = prefix)
     return edar_risk
 end

@@ -659,3 +659,42 @@ function mr_block6()
     end
     return nothing
 end
+
+function mr_block6_asymmetric()
+    # ADR 0057. The pairs above are symmetric — both tails share every parameter — so they
+    # pass even when a range builder shapes its gain tail with the *loss* tail's parameter.
+    # Two of them did: `RelativisticValueatRiskRange` built both power cones from `kappa_a`,
+    # and `PowerNormValueatRiskRange` built both from `pa`. Give the two tails different
+    # parameters and the range must still equal the two point measures it is the sum of.
+    rs1 = [RelativisticValueatRiskRange(; alpha = 0.03, kappa_a = 0.1, beta = 0.08,
+                                        kappa_b = 0.8),
+           PowerNormValueatRiskRange(; alpha = 0.03, pa = 1.5, beta = 0.08, pb = 4.0),
+           ConditionalValueatRiskRange(; alpha = 0.03, beta = 0.08),
+           EntropicValueatRiskRange(; alpha = 0.03, beta = 0.08)]
+    rs2 = [GenericValueatRiskRange(;
+                                   loss = RelativisticValueatRisk(; alpha = 0.03,
+                                                                  kappa = 0.1),
+                                   gain = RelativisticValueatRisk(; alpha = 0.08,
+                                                                  kappa = 0.8)),
+           GenericValueatRiskRange(; loss = PowerNormValueatRisk(; alpha = 0.03, p = 1.5),
+                                   gain = PowerNormValueatRisk(; alpha = 0.08, p = 4.0)),
+           GenericValueatRiskRange(; loss = ConditionalValueatRisk(; alpha = 0.03),
+                                   gain = ConditionalValueatRisk(; alpha = 0.08)),
+           GenericValueatRiskRange(; loss = EntropicValueatRisk(; alpha = 0.03),
+                                   gain = EntropicValueatRisk(; alpha = 0.08))]
+    for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
+        opt = JuMPOptimiser(; pe = pr2, slv = mip_slv)
+        res1 = optimise(MeanRisk(; r = r1, opt = opt), rd2)
+        res2 = optimise(MeanRisk(; r = r2, opt = opt), rd2)
+        @test isa(res1.retcode, OptimisationSuccess)
+        @test isa(res2.retcode, OptimisationSuccess)
+        success = isapprox(res1.w, res2.w; rtol = 1e-6)
+        if !success
+            println("Counter: $i")
+            find_tol(res1.w, res2.w)
+            display([res1.w res2.w])
+        end
+        @test success
+    end
+    return nothing
+end

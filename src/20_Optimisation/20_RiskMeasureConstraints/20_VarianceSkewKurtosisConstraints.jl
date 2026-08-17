@@ -35,10 +35,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
                                :CoskewnessEstimator)
     assert_high_order_quantity(r.kt.kt, pr, :VarianceSkewKurtosis, :kt,
                                :CokurtosisEstimator)
-    key = Symbol(:vr_sk_kt_risk_, i)
-    vr_key = Symbol(:vr_risk_, i)
-    sk_key = Symbol(:sk_risk_, i)
-    kt_key = Symbol(:kt_risk_, i)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     k = effective_k(model)
@@ -70,34 +66,36 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     end
     W2 = state_get(model, prefix, :W2_vr_sk_kt)
     W3 = state_get(model, prefix, :W3_vr_sk_kt)
-    vr_risk, sk_risk, kt_risk = model[Symbol(:vr_risk_, i)], model[Symbol(:sk_risk_, i)], model[Symbol(:kt_risk_, i)] = JuMP.@expressions(model,
-                                                                                                                                          begin
-                                                                                                                                              LinearAlgebra.tr(sigma *
-                                                                                                                                                               W1)
-                                                                                                                                              LinearAlgebra.tr(sk *
-                                                                                                                                                               D2 *
-                                                                                                                                                               W2)
-                                                                                                                                              LinearAlgebra.tr(S2 *
-                                                                                                                                                               kt *
-                                                                                                                                                               transpose(S2) *
-                                                                                                                                                               W3)
-                                                                                                                                          end)
+    vr_risk, sk_risk, kt_risk = JuMP.@expressions(model,
+                                                  begin
+                                                      LinearAlgebra.tr(sigma * W1)
+                                                      LinearAlgebra.tr(sk * D2 * W2)
+                                                      LinearAlgebra.tr(S2 *
+                                                                       kt *
+                                                                       transpose(S2) *
+                                                                       W3)
+                                                  end)
+    state_set!(model, prefix, :vr_risk_, i, vr_risk)
+    state_set!(model, prefix, :sk_risk_, i, sk_risk)
+    state_set!(model, prefix, :kt_risk_, i, kt_risk)
     vr_bound = variance_risk_bounds_val(LinearBound(), r.vr.settings.ub)
     sk_bound = variance_risk_bounds_val(LinearBound(), r.sk.settings.lb)
     kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg1, QuadSecondMomentFormulations),
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
-    set_variance_risk_bounds_and_expression!(model, opt, vr_risk, vr_bound, vr_key, vr_risk,
-                                             r.vr.settings)
+    set_variance_risk_bounds_and_expression!(model, opt, vr_risk, vr_bound, :vr_risk_, i,
+                                             vr_risk, r.vr.settings; prefix = prefix)
     # We want to maximise the skewness (distribution skewed towards more positive values), so we set a lower bound instead.
-    set_variance_risk_bounds_and_expression!(model, opt, sk_risk, sk_bound, sk_key, sk_risk,
-                                             r.sk.settings, false)
-    set_variance_risk_bounds_and_expression!(model, opt, kt_risk, kt_bound, kt_key, kt_risk,
-                                             r.kt.settings)
-    vr_sk_kt_risk = model[key] = JuMP.@expression(model,
-                                                  r.vr.settings.scale * vr_risk -
-                                                  r.sk.settings.scale * sk_risk +
-                                                  r.kt.settings.scale * kt_risk)
-    set_risk_bounds_and_expression!(model, opt, vr_sk_kt_risk, r.settings, key)
+    set_variance_risk_bounds_and_expression!(model, opt, sk_risk, sk_bound, :sk_risk_, i,
+                                             sk_risk, r.sk.settings, false; prefix = prefix)
+    set_variance_risk_bounds_and_expression!(model, opt, kt_risk, kt_bound, :kt_risk_, i,
+                                             kt_risk, r.kt.settings; prefix = prefix)
+    vr_sk_kt_risk = state_set!(model, prefix, :vr_sk_kt_risk_, i,
+                               JuMP.@expression(model,
+                                                r.vr.settings.scale * vr_risk -
+                                                r.sk.settings.scale * sk_risk +
+                                                r.kt.settings.scale * kt_risk))
+    set_risk_bounds_and_expression!(model, opt, vr_sk_kt_risk, r.settings, :vr_sk_kt_risk_,
+                                    i; prefix = prefix)
     return vr_sk_kt_risk
 end

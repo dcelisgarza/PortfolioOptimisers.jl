@@ -416,6 +416,9 @@ end
 @testset "Generic X at Range" begin
     mr_block6()
 end
+@testset "Range measures equal their two tails when the tails differ" begin
+    mr_block6_asymmetric()
+end
 @testset "L2 regularisation formulations reach affine objectives" begin
     # Regression: a quadratic penalty (QuadRiskExpr, SquaredSOCRiskExpr) added to an affine
     # objective (MaximumReturn) needs `obj_expr` promoted to a QuadExpr. The promotion

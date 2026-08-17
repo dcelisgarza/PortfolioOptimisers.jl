@@ -545,6 +545,16 @@ end
 deferred_slots(r::ValueatRisk) = (; alg = r.alg)
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ValueatRiskRange) = (; alg = r.alg)
+# Tail decomposition — see `range_tails`. Declared for the MIP formulation only: the
+# `DistributionValueatRisk` range shares one `g_var` cone between its two tails, so it fuses
+# rather than duplicating, and has no two sub-models to build.
+function range_tails(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = ValueatRisk(; settings = settings, alpha = r.alpha, w = r.w,
+                               alg = r.alg),
+            gain = ValueatRisk(; settings = settings, alpha = r.beta, w = r.w, alg = r.alg))
+end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     x = copy(x)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))

@@ -274,6 +274,16 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
+# Tail decomposition — see `range_tails`. The functor below is the value-level twin: it is
+# the same two tails, evaluated instead of built.
+function range_tails(r::EntropicValueatRiskRange)
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.alpha,
+                                       w = r.w),
+            gain = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.beta,
+                                       w = r.w))
+end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end

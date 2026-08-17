@@ -72,16 +72,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
-    key = Symbol(:var_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
-    var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = JuMP.@variables(model,
-                                                                              begin
-                                                                                  ()
-                                                                                  [1:T],
-                                                                                  (binary = true)
-                                                                              end)
+    var_risk, z_var = JuMP.@variables(model, begin
+                                          ()
+                                          [1:T], (binary = true)
+                                      end)
+    state_set!(model, prefix, :var_risk_, i, var_risk)
+    state_set!(model, prefix, :z_var_, i, z_var)
     if !loss
         net_X = -net_X
         z_var = -z_var
@@ -90,18 +89,20 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
     if isnothing(wi)
-        model[Symbol(:csvar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (sum(z_var) - alpha * T + s * T) <= 0)
+        state_set!(model, prefix, :csvar_, i,
+                   JuMP.@constraint(model, sc * (sum(z_var) - alpha * T + s * T) <= 0))
     else
         sw = sum(wi)
-        model[Symbol(:csvar_, i)] = JuMP.@constraint(model,
-                                                     sc * (LinearAlgebra.dot(wi, z_var) -
-                                                           alpha * sw + s * sw) <= 0)
+        state_set!(model, prefix, :csvar_, i,
+                   JuMP.@constraint(model,
+                                    sc *
+                                    (LinearAlgebra.dot(wi, z_var) - alpha * sw + s * sw) <=
+                                    0))
     end
-    model[Symbol(:cvar_, i)] = JuMP.@constraint(model,
-                                                sc * ((net_X + b * z_var) .+ var_risk) >= 0)
-    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
+    state_set!(model, prefix, :cvar_, i,
+               JuMP.@constraint(model, sc * ((net_X + b * z_var) .+ var_risk) >= 0))
+    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, :var_risk_, i;
+                                    prefix = prefix)
     return var_risk
 end
 """
@@ -110,9 +111,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `ValueatRiskRange` using a MIP (big-M) formulation to
 `model`.
 
-Introduces binary variables and big-M constraints to encode both the lower-tail and
-upper-tail empirical quantiles. The range risk expression is the difference between the
-two VaR expressions.
+Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
+the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
+VaR expressions. Each tail brings its own binary indicator set and big-M block.
 
 # Arguments
 
@@ -125,91 +126,22 @@ two VaR expressions.
 
 # Returns
 
-  - `nothing`.
+  - `var_range_risk`: The combined `loss + gain` risk expression added to the model.
 
 # Related
 
   - [`ValueatRiskRange`](@ref)
   - [`MIPValueatRisk`](@ref)
-  - [`set_risk_constraints!`](@ref)
+  - [`range_tails`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
-    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
-    @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
-    key = Symbol(:var_range_risk_, i)
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    T = length(net_X)
-    var_risk_l, z_var_l, var_risk_h, z_var_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:z_var_l_, i)], model[Symbol(:var_risk_h_, i)], model[Symbol(:z_var_h_, i)] = JuMP.@variables(model,
-                                                                                                                                                                                          begin
-                                                                                                                                                                                              ()
-                                                                                                                                                                                              [1:T],
-                                                                                                                                                                                              (binary = true)
-                                                                                                                                                                                              ()
-                                                                                                                                                                                              [1:T],
-                                                                                                                                                                                              (binary = true)
-                                                                                                                                                                                          end)
-    alpha = r.alpha
-    beta = r.beta
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    if isnothing(wi)
-        model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = JuMP.@constraints(model,
-                                                                                     begin
-                                                                                         sc *
-                                                                                         (sum(z_var_l) -
-                                                                                          alpha *
-                                                                                          T +
-                                                                                          s *
-                                                                                          T) <=
-                                                                                         0
-                                                                                         sc *
-                                                                                         (sum(z_var_h) -
-                                                                                          beta *
-                                                                                          T +
-                                                                                          s *
-                                                                                          T) <=
-                                                                                         0
-                                                                                     end)
-    else
-        sw = sum(wi)
-        model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = JuMP.@constraints(model,
-                                                                                     begin
-                                                                                         sc *
-                                                                                         (LinearAlgebra.dot(wi,
-                                                                                                            z_var_l) -
-                                                                                          alpha *
-                                                                                          sw +
-                                                                                          s *
-                                                                                          sw) <=
-                                                                                         0
-                                                                                         sc *
-                                                                                         (LinearAlgebra.dot(wi,
-                                                                                                            z_var_h) -
-                                                                                          beta *
-                                                                                          sw +
-                                                                                          s *
-                                                                                          sw) <=
-                                                                                         0
-                                                                                     end)
-    end
-    model[Symbol(:cvar_, i)] = JuMP.@constraints(model,
-                                                 begin
-                                                     sc *
-                                                     ((net_X + b * z_var_l) .+ var_risk_l) >=
-                                                     0
-                                                     sc *
-                                                     ((net_X + b * z_var_h) .+ var_risk_h) <=
-                                                     0
-                                                 end)
-    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l - var_risk_h)
-    set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
-    return var_range_risk
+    return set_range_risk_constraints!(model, i, r, :var_range_risk_, opt, pr, args...;
+                                       prefix = prefix, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -323,13 +255,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         compute_value_at_risk_cz(r.alg.dist, r.alpha)
     end
-    key = Symbol(:var_risk_, i)
-    g_var = model[Symbol(:g_var_, i)] = JuMP.@variable(model)
-    var_risk = model[key] = JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var)
-    model[Symbol(:cvar_soc_, i)] = JuMP.@constraint(model,
-                                                    [sc * g_var; sc * G * w] in
-                                                    JuMP.SecondOrderCone())
-    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
+    g_var = state_set!(model, prefix, :g_var_, i, JuMP.@variable(model))
+    var_risk = state_set!(model, prefix, :var_risk_, i,
+                          JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var))
+    state_set!(model, prefix, :cvar_soc_, i,
+               JuMP.@constraint(model, [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()))
+    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, :var_risk_, i;
+                                    prefix = prefix)
     return loss ? var_risk : -var_risk
 end
 """
@@ -376,27 +308,24 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
     z_h = compute_value_at_risk_cz(dist, r.beta)
-    key = Symbol(:var_range_risk_, i)
-    g_var = model[Symbol(:g_var_range_, i)] = JuMP.@variable(model)
-    var_range_mu = model[Symbol(:var_range_mu_, i)] = JuMP.@expression(model,
-                                                                       LinearAlgebra.dot(mu,
-                                                                                         w))
-    var_risk_l, var_risk_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:var_risk_h_, i)] = JuMP.@expressions(model,
-                                                                                                                begin
-                                                                                                                    -var_range_mu +
-                                                                                                                    z_l *
-                                                                                                                    g_var
-                                                                                                                    -var_range_mu +
-                                                                                                                    z_h *
-                                                                                                                    g_var
-                                                                                                                end)
-    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l - var_risk_h)
-    model[Symbol(:cvar_range_soc_, i)] = JuMP.@constraints(model,
-                                                           begin
-                                                               [sc * g_var; sc * G * w] in
-                                                               JuMP.SecondOrderCone()
-                                                           end)
-    set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
+    g_var = state_set!(model, prefix, :g_var_range_, i, JuMP.@variable(model))
+    var_range_mu = state_set!(model, prefix, :var_range_mu_, i,
+                              JuMP.@expression(model, LinearAlgebra.dot(mu, w)))
+    var_risk_l, var_risk_h = JuMP.@expressions(model, begin
+                                                   -var_range_mu + z_l * g_var
+                                                   -var_range_mu + z_h * g_var
+                                               end)
+    state_set!(model, prefix, :var_risk_l_, i, var_risk_l)
+    state_set!(model, prefix, :var_risk_h_, i, var_risk_h)
+    var_range_risk = state_set!(model, prefix, :var_range_risk_, i,
+                                JuMP.@expression(model, var_risk_l - var_risk_h))
+    state_set!(model, prefix, :cvar_range_soc_, i,
+               JuMP.@constraints(model,
+                                 begin
+                                     [sc * g_var; sc * G * w] in JuMP.SecondOrderCone()
+                                 end))
+    set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings,
+                                    :var_range_risk_, i; prefix = prefix)
     return var_range_risk
 end
 """
@@ -431,33 +360,33 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
     b = ifelse(!isnothing(r.b), r.b, 1e3)
     s = ifelse(!isnothing(r.s), r.s, 1e-5)
     @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
-    key = Symbol(:dar_risk_, i)
     sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
-    dar_risk, z_dar = model[key], model[Symbol(:z_dar_, i)] = JuMP.@variables(model,
-                                                                              begin
-                                                                                  ()
-                                                                                  [1:T],
-                                                                                  (binary = true)
-                                                                              end)
+    dar_risk, z_dar = JuMP.@variables(model, begin
+                                          ()
+                                          [1:T], (binary = true)
+                                      end)
+    state_set!(model, prefix, :dar_risk_, i, dar_risk)
+    state_set!(model, prefix, :z_dar_, i, z_dar)
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, pr.X)
     if isnothing(wi)
-        model[Symbol(:csdar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (sum(z_dar) - alpha * T + s * T) <= 0)
+        state_set!(model, prefix, :csdar_, i,
+                   JuMP.@constraint(model, sc * (sum(z_dar) - alpha * T + s * T) <= 0))
     else
         sw = sum(wi)
-        model[Symbol(:csdar_, i)] = JuMP.@constraint(model,
-                                                     sc * (LinearAlgebra.dot(wi, z_dar) -
-                                                           alpha * sw + s * sw) <= 0)
+        state_set!(model, prefix, :csdar_, i,
+                   JuMP.@constraint(model,
+                                    sc *
+                                    (LinearAlgebra.dot(wi, z_dar) - alpha * sw + s * sw) <=
+                                    0))
     end
-    model[Symbol(:cdar_, i)] = JuMP.@constraint(model,
-                                                sc *
-                                                ((-view(dd, 2:(T + 1)) + b * z_dar) .+
-                                                 dar_risk) >= 0)
-    set_risk_bounds_and_expression!(model, opt, dar_risk, r.settings, key)
+    state_set!(model, prefix, :cdar_, i,
+               JuMP.@constraint(model,
+                                sc * ((-view(dd, 2:(T + 1)) + b * z_dar) .+ dar_risk) >= 0))
+    set_risk_bounds_and_expression!(model, opt, dar_risk, r.settings, :dar_risk_, i;
+                                    prefix = prefix)
     return dar_risk
 end

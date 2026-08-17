@@ -1012,12 +1012,13 @@ end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number)
     sc = get_constraint_scale(model)
     k = get_k(model)
-    model[Symbol(:ret_lb_, i)] = JuMP.@constraint(model, sc * (ret_expr - lb * k) >= 0)
+    state_set!(model, Symbol(""), :ret_lb_, i,
+               JuMP.@constraint(model, sc * (ret_expr - lb * k) >= 0))
     return nothing
 end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
-    bound_key = Symbol(:ret_lb_, i)
-    bound_var_key = Symbol(:ret_lb_var_, i)
+    bound_key = state_key(Symbol(""), :ret_lb_, i)
+    bound_var_key = state_key(Symbol(""), :ret_lb_var_, i)
     if !shared_has(model, :ret_frontier)
         JuMP.@expression(model, ret_frontier,
                          Pair{Tuple{Symbol, Symbol},
@@ -1340,7 +1341,8 @@ function set_return_constraints!(model::JuMP.Model, i,
     w = get_w(model)
     settings = pret.settings
     mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model, dot_scalar(mu, w))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model, dot_scalar(mu, w)))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     set_return_bounds!(model, i, ret, settings.lb)
@@ -1402,13 +1404,13 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySe
     N = length(w)
     mu = something(ucs.val, mu)
     d_mu = (ucs.ub - ucs.lb) * 0.5
-    bucs_w = model[Symbol(:bucs_w_, i)] = JuMP.@variable(model, [1:N])
-    model[Symbol(:bucs_ret_, i)] = JuMP.@constraint(model, [j = 1:N],
-                                                    [sc * bucs_w[j]; sc * w[j]] in
-                                                    JuMP.MOI.NormOneCone(2))
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
-                                                     dot_scalar(mu, w) -
-                                                     LinearAlgebra.dot(d_mu, bucs_w))
+    bucs_w = state_set!(model, Symbol(""), :bucs_w_, i, JuMP.@variable(model, [1:N]))
+    state_set!(model, Symbol(""), :bucs_ret_, i,
+               JuMP.@constraint(model, [j = 1:N],
+                                [sc * bucs_w[j]; sc * w[j]] in JuMP.MOI.NormOneCone(2)))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model,
+                                      dot_scalar(mu, w) - LinearAlgebra.dot(d_mu, bucs_w)))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, true
@@ -1451,13 +1453,13 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncer
     mu = something(ucs.val, mu)
     G = LinearAlgebra.cholesky(ucs.sigma).U
     k = ucs.k
-    x_eucs_w = model[Symbol(:x_eucs_w_, i)] = JuMP.@expression(model, G * w)
-    t_eucs_gw = model[Symbol(:t_eucs_gw_, i)] = JuMP.@variable(model)
-    model[Symbol(:eucs_ret_, i)] = JuMP.@constraint(model,
-                                                    [sc * t_eucs_gw; sc * x_eucs_w] in
-                                                    JuMP.SecondOrderCone())
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
-                                                     dot_scalar(mu, w) - k * t_eucs_gw)
+    x_eucs_w = state_set!(model, Symbol(""), :x_eucs_w_, i, JuMP.@expression(model, G * w))
+    t_eucs_gw = state_set!(model, Symbol(""), :t_eucs_gw_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :eucs_ret_, i,
+               JuMP.@constraint(model,
+                                [sc * t_eucs_gw; sc * x_eucs_w] in JuMP.SecondOrderCone()))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model, dot_scalar(mu, w) - k * t_eucs_gw))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, true
@@ -1503,14 +1505,13 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    t_l1ucs = model[Symbol(:t_l1ucs_, i)] = JuMP.@variable(model)
-    model[Symbol(:l1ucs_ret_, i)] = JuMP.@constraint(model,
-                                                     [sc * t_l1ucs;
-                                                      sc * sw] in
-                                                     JuMP.MOI.NormInfinityCone(1 +
-                                                                               length(w)))
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
-                                                     dot_scalar(mu, w) - ucs.eps * t_l1ucs)
+    t_l1ucs = state_set!(model, Symbol(""), :t_l1ucs_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :l1ucs_ret_, i,
+               JuMP.@constraint(model,
+                                [sc * t_l1ucs;
+                                 sc * sw] in JuMP.MOI.NormInfinityCone(1 + length(w))))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model, dot_scalar(mu, w) - ucs.eps * t_l1ucs))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, false
@@ -1553,15 +1554,18 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1Uncertai
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    t_sl1ucs_p = model[Symbol(:t_sl1ucs_p_, i)] = JuMP.@variable(model, lower_bound = 0)
-    t_sl1ucs_m = model[Symbol(:t_sl1ucs_m_, i)] = JuMP.@variable(model, lower_bound = 0)
-    model[Symbol(:sl1ucs_ret_p_, i)] = JuMP.@constraint(model,
-                                                        sc * (-sw .- t_sl1ucs_p) <= 0)
-    model[Symbol(:sl1ucs_ret_m_, i)] = JuMP.@constraint(model, sc * (sw .- t_sl1ucs_m) <= 0)
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model,
-                                                     dot_scalar(mu, w) -
-                                                     ucs.ep * t_sl1ucs_p -
-                                                     ucs.en * t_sl1ucs_m)
+    t_sl1ucs_p = state_set!(model, Symbol(""), :t_sl1ucs_p_, i,
+                            JuMP.@variable(model, lower_bound = 0))
+    t_sl1ucs_m = state_set!(model, Symbol(""), :t_sl1ucs_m_, i,
+                            JuMP.@variable(model, lower_bound = 0))
+    state_set!(model, Symbol(""), :sl1ucs_ret_p_, i,
+               JuMP.@constraint(model, sc * (-sw .- t_sl1ucs_p) <= 0))
+    state_set!(model, Symbol(""), :sl1ucs_ret_m_, i,
+               JuMP.@constraint(model, sc * (sw .- t_sl1ucs_m) <= 0))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model,
+                                      dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p -
+                                      ucs.en * t_sl1ucs_m))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, false
@@ -1586,21 +1590,23 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
     settings = pret.settings
     X = set_portfolio_returns!(model, pr.X)
     T = length(X)
-    t_elog_ret = model[Symbol(:t_elog_ret_, i)] = JuMP.@variable(model, [1:T])
+    t_elog_ret = state_set!(model, Symbol(""), :t_elog_ret_, i,
+                            JuMP.@variable(model, [1:T]))
     wi = nothing_scalar_array_selector(pret.w, pr.w)
     wi = get_observation_weights(wi, X)
-    ret = model[Symbol(:ret_, i)] = if isnothing(wi)
+    ret = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(t_elog_ret))
     else
         JuMP.@expression(model, Statistics.mean(t_elog_ret, wi))
     end
+    state_set!(model, Symbol(""), :ret_, i, ret)
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
-    kret = model[Symbol(:kret_, i)] = JuMP.@expression(model, k .+ X)
-    model[Symbol(:elog_ret_ret_, i)] = JuMP.@constraint(model, [j = 1:T],
-                                                        [sc * t_elog_ret[j], sc * k,
-                                                         sc * kret[j]] in
-                                                        JuMP.MOI.ExponentialCone())
+    kret = state_set!(model, Symbol(""), :kret_, i, JuMP.@expression(model, k .+ X))
+    state_set!(model, Symbol(""), :elog_ret_ret_, i,
+               JuMP.@constraint(model, [j = 1:T],
+                                [sc * t_elog_ret[j], sc * k, sc * kret[j]] in
+                                JuMP.MOI.ExponentialCone()))
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     # A logarithmic term holds no per-asset quantity, which forces the ratio's risk form.
@@ -1609,7 +1615,8 @@ end
 function set_return_constraints!(model::JuMP.Model, i, pret::NoReturn,
                                  ::AbstractPriorResult; kwargs...)
     settings = pret.settings
-    ret = model[Symbol(:ret_, i)] = JuMP.@expression(model, zero(JuMP.AffExpr))
+    ret = state_set!(model, Symbol(""), :ret_, i,
+                     JuMP.@expression(model, zero(JuMP.AffExpr)))
     # No charge is applied here, and this is why `settings.fee` and `settings.mic` are inert:
     # the term's expression is identically zero by construction, every guard `NoReturn`
     # carries rests on that, and a fee subtracted here would make it non-zero.
@@ -1778,7 +1785,7 @@ end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumElementReturn,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
-    ret = model[Symbol(:ret_, obj.i)]
+    ret = state_get(model, Symbol(""), :ret_, obj.i)
     JuMP.@expression(model, obj_expr, ret)
     add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)

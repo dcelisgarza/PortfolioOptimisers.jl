@@ -146,6 +146,10 @@ end
 # Deferrable slots — see `deferred_slots`. Both sides carry their own, so both the check and
 # the derived recursion in `resolve_deferred_quantities` reach them through the two children.
 deferred_slots(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
+# Tail decomposition — see `range_tails`. This is the one range whose tails are given rather
+# than derived: the caller states both measures, and the constructor has already stripped
+# their risk-expression contribution. Their `ub` is *kept*, so a caller can bound one tail.
+range_tails(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
 function (r::GenericValueatRiskRange)(x::VecNum)
     loss = r.loss(x)
     gain = r.gain(-x)

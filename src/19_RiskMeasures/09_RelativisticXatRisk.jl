@@ -381,6 +381,17 @@ function RelativisticValueatRiskRange(;
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
+# Tail decomposition — see `range_tails`. Each tail carries its own deformation parameter:
+# `kappa_a` shapes the loss side, `kappa_b` the gain side. The functor below is the
+# value-level twin, and it is what pins that pairing.
+function range_tails(r::RelativisticValueatRiskRange)
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.alpha, kappa = r.kappa_a, w = r.w),
+            gain = RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.beta, kappa = r.kappa_b, w = r.w))
+end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end

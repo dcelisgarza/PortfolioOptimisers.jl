@@ -109,23 +109,25 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:flm_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
-    flm = model[Symbol(:flm_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
+    flm = state_set!(model, prefix, :flm_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
-    flm_risk = model[key] = if isnothing(wi)
+    flm_risk = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(flm))
     else
         JuMP.@expression(model, Statistics.mean(flm, wi))
     end
-    model[Symbol(:cflm_mar_, i)] = JuMP.@constraint(model, sc * ((net_X + flm) .- tgt) >= 0)
-    set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
+    state_set!(model, prefix, :flm_risk_, i, flm_risk)
+    state_set!(model, prefix, :cflm_mar_, i,
+               JuMP.@constraint(model, sc * ((net_X + flm) .- tgt) >= 0))
+    set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, :flm_risk_, i;
+                                    prefix = prefix)
     return flm_risk
 end
 """
@@ -161,23 +163,25 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                  <:MeanAbsoluteDeviation},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:mad_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
-    mad = model[Symbol(:mad_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
+    mad = state_set!(model, prefix, :mad_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
-    mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
+    mad_risk = if isnothing(wi)
         JuMP.@expression(model, 2 * Statistics.mean(mad))
     else
         JuMP.@expression(model, 2 * Statistics.mean(mad, wi))
     end
-    model[Symbol(:cmar_mad_, i)] = JuMP.@constraint(model, sc * ((net_X + mad) .- tgt) >= 0)
-    set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
+    state_set!(model, prefix, :mad_risk_, i, mad_risk)
+    state_set!(model, prefix, :cmar_mad_, i,
+               JuMP.@constraint(model, sc * ((net_X + mad) .- tgt) >= 0))
+    set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, :mad_risk_, i;
+                                    prefix = prefix)
     return mad_risk
 end
 """
@@ -197,9 +201,13 @@ scaling factor.
   - $(arg_dict[:ci])
   - `factor::Number`: Variance correction factor (e.g. `1 / (T - 1)`).
   - `second_moment`: Return deviation vector or matrix.
-  - $(arg_dict[:key_sym])
-  - `keyt`, `keyc`: Symbols for the auxiliary variable and its constraint.
+  - `namet`, `namec`: Bare Model State entry names for the auxiliary variable and its
+    constraint.
   - `tsecond_moment`: Pre-existing SOC variable (used by SquaredSOC/SOC overloads).
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
 
@@ -210,35 +218,41 @@ scaling factor.
   - [`set_risk_constraints!`](@ref)
   - [`second_moment_bound_val`](@ref)
 """
-function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
-                                 second_moment, key::Symbol, args...)
-    return model[key] = JuMP.@expression(model,
-                                         factor *
-                                         LinearAlgebra.dot(second_moment, second_moment)),
-                        sqrt(factor)
+function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, i::Any, factor::Number,
+                                 second_moment, args...; prefix::Symbol = Symbol(""))
+    return state_set!(model, prefix, :second_moment_risk_, i,
+                      JuMP.@expression(model,
+                                       factor *
+                                       LinearAlgebra.dot(second_moment, second_moment))),
+           sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Number,
-                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
-                                 args...)
+                                 second_moment, namet::Symbol, namec::Symbol, args...;
+                                 prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    tsecond_moment = model[Symbol(keyt, i)] = JuMP.@variable(model)
-    model[Symbol(keyc, i)] = JuMP.@constraint(model,
-                                              [sc * tsecond_moment;
-                                               0.5;
-                                               sc * second_moment] in
-                                              JuMP.RotatedSecondOrderCone())
-    return model[key] = JuMP.@expression(model, factor * tsecond_moment), sqrt(factor)
+    tsecond_moment = state_set!(model, prefix, namet, i, JuMP.@variable(model))
+    state_set!(model, prefix, namec, i,
+               JuMP.@constraint(model,
+                                [sc * tsecond_moment
+                                 0.5
+                                 sc * second_moment] in JuMP.RotatedSecondOrderCone()))
+    return state_set!(model, prefix, :second_moment_risk_, i,
+                      JuMP.@expression(model, factor * tsecond_moment)), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any,
-                                 factor::Number, second_moment, key::Symbol, keyt::Symbol,
-                                 keyc::Symbol, tsecond_moment::JuMP.AbstractJuMPScalar)
-    return model[key] = JuMP.@expression(model, factor * tsecond_moment^2), sqrt(factor)
+                                 factor::Number, second_moment, namet::Symbol,
+                                 namec::Symbol, tsecond_moment::JuMP.AbstractJuMPScalar;
+                                 prefix::Symbol = Symbol(""))
+    return state_set!(model, prefix, :second_moment_risk_, i,
+                      JuMP.@expression(model, factor * tsecond_moment^2)), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Number,
-                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
-                                 tsecond_moment::JuMP.AbstractJuMPScalar)
+                                 second_moment, namet::Symbol, namec::Symbol,
+                                 tsecond_moment::JuMP.AbstractJuMPScalar;
+                                 prefix::Symbol = Symbol(""))
     factor = sqrt(factor)
-    return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
+    return state_set!(model, prefix, :second_moment_risk_, i,
+                      JuMP.@expression(model, factor * tsecond_moment)), factor
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -316,52 +330,47 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:second_moment_risk_, i)
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
-    bound_key = Symbol(:sqrt_second_moment_, i)
-    sqrt_second_moment = model[bound_key] = JuMP.@variable(model)
-    second_moment = model[Symbol(:second_moment_, i)] = JuMP.@expression(model,
-                                                                         net_X .- tgt)
+    sqrt_second_moment = state_set!(model, prefix, :sqrt_second_moment_, i,
+                                    JuMP.@variable(model))
+    second_moment = state_set!(model, prefix, :second_moment_, i,
+                               JuMP.@expression(model, net_X .- tgt))
     if isa(r.alg.alg1, SemiMoment)
-        second_lower_moment = model[Symbol(:second_lower_moment_, i)] = JuMP.@variable(model,
-                                                                                       [1:T],
-                                                                                       (lower_bound = 0))
-        model[Symbol(:csecond_lower_moment_mar_, i)] = JuMP.@constraint(model,
-                                                                        sc *
-                                                                        (second_moment +
-                                                                         second_lower_moment) >=
-                                                                        0)
+        second_lower_moment = state_set!(model, prefix, :second_lower_moment_, i,
+                                         JuMP.@variable(model, [1:T], (lower_bound = 0)))
+        state_set!(model, prefix, :csecond_lower_moment_mar_, i,
+                   JuMP.@constraint(model, sc * (second_moment + second_lower_moment) >= 0))
         second_moment = second_lower_moment
     end
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
     second_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment, key,
+        set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment,
                                 :tsecond_moment_risk_, :csecond_moment_rsoc_,
-                                sqrt_second_moment)
+                                sqrt_second_moment; prefix = prefix)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi = sqrt.(wi)
-        second_moment = model[Symbol(:scaled_second_moment_, i)] = JuMP.@expression(model,
-                                                                                    wi .*
-                                                                                    second_moment)
-        set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment, key,
+        second_moment = state_set!(model, prefix, :scaled_second_moment_, i,
+                                   JuMP.@expression(model, wi .* second_moment))
+        set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment,
                                 :tsecond_moment_risk_, :csecond_moment_rsoc_,
-                                sqrt_second_moment)
+                                sqrt_second_moment; prefix = prefix)
     end
-    model[Symbol(:csqrt_second_moment_soc_, i)] = JuMP.@constraint(model,
-                                                                   [sc * sqrt_second_moment
-                                                                    sc * second_moment] in
-                                                                   JuMP.SecondOrderCone())
+    state_set!(model, prefix, :csqrt_second_moment_soc_, i,
+               JuMP.@constraint(model,
+                                [sc * sqrt_second_moment
+                                 sc * second_moment] in JuMP.SecondOrderCone()))
     ub = second_moment_bound_val(r.alg.alg2, r.settings.ub, factor)
-    set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_moment, ub, bound_key,
-                                             second_moment_risk, r.settings)
+    set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_moment, ub,
+                                             :sqrt_second_moment_, i, second_moment_risk,
+                                             r.settings; prefix = prefix)
     return second_moment_risk
 end
 """
@@ -423,7 +432,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:even_moment_risk_, i)
     w = get_w(model, prefix)
     k = effective_k(model)
     sc = get_constraint_scale(model)
@@ -432,49 +440,50 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     p = r.alg.p
     Td = T - r.alg.ddof
-    even_moment_u, even_moment_t, even_moment_risk = model[Symbol(:even_moment_u_, i)], model[Symbol(:even_moment_t_, i)], model[key] = JuMP.@variables(model,
-                                                                                                                                                        begin
-                                                                                                                                                            [1:T]
-                                                                                                                                                            [1:T]
-                                                                                                                                                            (),
-                                                                                                                                                            (lower_bound = 0)
-                                                                                                                                                        end)
-    even_moment = model[Symbol(:even_moment_, i)] = JuMP.@expression(model, net_X .- tgt)
+    even_moment_u, even_moment_t, even_moment_risk = JuMP.@variables(model,
+                                                                     begin
+                                                                         [1:T]
+                                                                         [1:T]
+                                                                         (),
+                                                                         (lower_bound = 0)
+                                                                     end)
+    state_set!(model, prefix, :even_moment_u_, i, even_moment_u)
+    state_set!(model, prefix, :even_moment_t_, i, even_moment_t)
+    state_set!(model, prefix, :even_moment_risk_, i, even_moment_risk)
+    even_moment = state_set!(model, prefix, :even_moment_, i,
+                             JuMP.@expression(model, net_X .- tgt))
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)
-    model[Symbol(:ceven_moment_s_, i)] = if isnothing(wi)
-        JuMP.@constraint(model, sc * (sum(even_moment_u) - even_moment_risk) <= 0)
-    else
-        Td = Td / T * sum(wi)
-        JuMP.@constraint(model,
-                         sc * (LinearAlgebra.dot(even_moment_u, wi) - even_moment_risk) <=
-                         0)
-    end
-    model[Symbol(:cpoweven_moment_p_, i)] = JuMP.@constraint(model, [i = 1:T],
-                                                             [sc * even_moment_u[i] * Td,
-                                                              sc * even_moment_risk,
-                                                              sc * even_moment_t[i]] in
-                                                             JuMP.MOI.PowerCone(inv(p)))
+    state_set!(model, prefix, :ceven_moment_s_, i,
+               if isnothing(wi)
+                   JuMP.@constraint(model,
+                                    sc * (sum(even_moment_u) - even_moment_risk) <= 0)
+               else
+                   Td = Td / T * sum(wi)
+                   JuMP.@constraint(model,
+                                    sc * (LinearAlgebra.dot(even_moment_u, wi) -
+                                          even_moment_risk) <= 0)
+               end)
+    state_set!(model, prefix, :cpoweven_moment_p_, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * even_moment_u[i] * Td, sc * even_moment_risk,
+                                 sc * even_moment_t[i]] in JuMP.MOI.PowerCone(inv(p))))
     if isa(r.alg.alg, FullMoment)
-        model[Symbol(:cpoweven_moment_, i)] = JuMP.@constraint(model, [i = 1:T],
-                                                               [sc * even_moment_t[i],
-                                                                sc * k,
-                                                                sc * even_moment[i]] in
-                                                               JuMP.MOI.PowerCone(0.5))
+        state_set!(model, prefix, :cpoweven_moment_, i,
+                   JuMP.@constraint(model, [i = 1:T],
+                                    [sc * even_moment_t[i], sc * k, sc * even_moment[i]] in
+                                    JuMP.MOI.PowerCone(0.5)))
     else
-        even_lower_moment = model[Symbol(:even_lower_moment_, i)] = JuMP.@variable(model,
-                                                                                   [1:T],
-                                                                                   (lower_bound = 0))
-        model[Symbol(:ceven_lower_moment_mar_, i)] = JuMP.@constraint(model,
-                                                                      sc * (even_moment +
-                                                                            even_lower_moment) >=
-                                                                      0)
-        model[Symbol(:cpoweven_moment_, i)] = JuMP.@constraint(model, [i = 1:T],
-                                                               [sc * even_moment_t[i],
-                                                                sc * k,
-                                                                sc * even_lower_moment[i]] in
-                                                               JuMP.MOI.PowerCone(0.5))
+        even_lower_moment = state_set!(model, prefix, :even_lower_moment_, i,
+                                       JuMP.@variable(model, [1:T], (lower_bound = 0)))
+        state_set!(model, prefix, :ceven_lower_moment_mar_, i,
+                   JuMP.@constraint(model, sc * (even_moment + even_lower_moment) >= 0))
+        state_set!(model, prefix, :cpoweven_moment_, i,
+                   JuMP.@constraint(model, [i = 1:T],
+                                    [sc * even_moment_t[i], sc * k,
+                                     sc * even_lower_moment[i]] in JuMP.MOI.PowerCone(0.5)))
     end
-    set_risk_bounds_and_expression!(model, opt, even_moment_risk, r.settings, key)
+    set_risk_bounds_and_expression!(model, opt, even_moment_risk, r.settings,
+                                    :even_moment_risk_, i; prefix = prefix)
     return even_moment_risk
 end

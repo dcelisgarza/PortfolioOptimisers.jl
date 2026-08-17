@@ -39,7 +39,8 @@ function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
         A = pl.A
         B = pl.B
         ib = held_bin(ind)
-        model[Symbol(:card_plg_, i)] = JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0)
+        state_set!(model, Symbol(""), :card_plg_, i,
+                   JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0))
     end
     return nothing
 end

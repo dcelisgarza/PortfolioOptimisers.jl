@@ -50,7 +50,7 @@ The `SOCRiskExpr` overload passes the SOC variable directly to
   - `r::NegativeSkewness`: Negative-skewness risk measure instance.
   - $(arg_dict[:opt_rjumpe])
   - `nskew_risk`: SOC variable for negative-skewness risk.
-  - $(arg_dict[:key_sym])
+  - $(arg_dict[:ci])
   - `V::MatNum`: Co-skewness matrix (used only by the Quad overload).
 
 # Returns
@@ -66,20 +66,22 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SOCRiskExpr},
                                      opt::RiskJuMPOptimisationEstimator,
-                                     nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
-                                     args...; prefix::Symbol = Symbol(""))
-    set_risk_bounds_and_expression!(model, opt, nskew_risk, r.settings, key)
+                                     nskew_risk::JuMP.AbstractJuMPScalar, i, args...;
+                                     prefix::Symbol = Symbol(""))
+    set_risk_bounds_and_expression!(model, opt, nskew_risk, r.settings, :nskew_risk_, i;
+                                    prefix = prefix)
     return nskew_risk
 end
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SquaredSOCRiskExpr},
                                      opt::RiskJuMPOptimisationEstimator,
-                                     nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
-                                     args...; prefix::Symbol = Symbol(""))
-    qnskew_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model, nskew_risk^2)
+                                     nskew_risk::JuMP.AbstractJuMPScalar, i, args...;
+                                     prefix::Symbol = Symbol(""))
+    qnskew_risk = state_set!(model, prefix, :sq_nskew_risk_, i,
+                             JuMP.@expression(model, nskew_risk^2))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    set_risk_upper_bound!(model, opt, nskew_risk, ub, key)
+    set_risk_upper_bound!(model, opt, nskew_risk, ub, state_key(prefix, :nskew_risk_, i))
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
     return qnskew_risk
 end
@@ -87,13 +89,13 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:QuadRiskExpr},
                                      opt::RiskJuMPOptimisationEstimator,
-                                     nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
-                                     V::MatNum; prefix::Symbol = Symbol(""))
+                                     nskew_risk::JuMP.AbstractJuMPScalar, i, V::MatNum;
+                                     prefix::Symbol = Symbol(""))
     w = get_w(model, prefix)
-    qnskew_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
-                                                              LinearAlgebra.dot(w, V, w))
+    qnskew_risk = state_set!(model, prefix, :qd_nskew_risk_, i,
+                             JuMP.@expression(model, LinearAlgebra.dot(w, V, w)))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
-    set_risk_upper_bound!(model, opt, nskew_risk, ub, key)
+    set_risk_upper_bound!(model, opt, nskew_risk, ub, state_key(prefix, :nskew_risk_, i))
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
     return qnskew_risk
 end
@@ -152,7 +154,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
     # `sk` and `V` are both-or-neither on either side, so the gate reads the pair through
     # `sk` and the kernel below can take `pr.V` whenever it takes `pr.sk`.
     assert_high_order_quantity(r.sk, pr, :NegativeSkewness, :sk, :CoskewnessEstimator)
-    key = Symbol(:nskew_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     V, G = if isnothing(r.V)
@@ -160,9 +161,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
     else
         (r.V, LinearAlgebra.cholesky(r.V).U)
     end
-    nskew_risk = model[key] = JuMP.@variable(model)
-    model[Symbol(:cnskew_soc_, i)] = JuMP.@constraint(model,
-                                                      [sc * nskew_risk; sc * G * w] in
-                                                      JuMP.SecondOrderCone())
-    return set_negative_skewness_risk!(model, r, opt, nskew_risk, key, V; prefix = prefix)
+    nskew_risk = state_set!(model, prefix, :nskew_risk_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cnskew_soc_, i,
+               JuMP.@constraint(model,
+                                [sc * nskew_risk; sc * G * w] in JuMP.SecondOrderCone()))
+    return set_negative_skewness_risk!(model, r, opt, nskew_risk, i, V; prefix = prefix)
 end

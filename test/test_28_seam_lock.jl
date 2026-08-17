@@ -6,7 +6,7 @@
     # `state_key` / `state_set!` / `state_has` / `state_get` / `state_build!` /
     # `nested_prefix`, plus the named accessors built on them (`get_X`, `get_dd`, …).
     #
-    # Two rules hold the seam shut (ADR 0037, amending ADR 0004 §2 and §6.5):
+    # Three rules hold the seam shut (ADR 0037, amending ADR 0004 §2 and §6.5):
     #
     #   1. CONSTRUCTION. No file outside the interface may build a prefixed key by hand.
     #      This rule is *closed*: it names no keys, so an entry added in future is covered
@@ -20,6 +20,18 @@
     #      against `SHARED_STATE` **at run time**. So this rule, too, names no keys: the
     #      classification lives with the code it describes, and reaching for a per-build
     #      entry without a prefix throws rather than merely failing CI.
+    #
+    #   3. INDEXED CONSTRUCTION. A Model State key is disambiguated on TWO axes — the
+    #      per-build `prefix` and the per-measure index `i` — and rules 1 and 2 policed
+    #      only the first. The index suffix carries the same do-not-collide invariant and
+    #      was spelled by hand at ~200 sites (`model[Symbol(:cvar_risk_, i)]`), matching
+    #      neither rule. Both axes now resolve in `state_key`, so no emitter composes a key
+    #      inside a Model State access at all. Like the other two, this rule names no keys.
+    #
+    #      A composed key must not escape into a local either, so the rule polices the
+    #      access site: `model[<anything but a plain identifier>]`. The identifiers that
+    #      remain are exempt for a stated reason, and the exemptions name files and
+    #      functions — never keys (see `registry_readers` and `mip_key` below).
     #
     #      The polarity is what matters. The old lint enumerated the *managed* keys, so
     #      forgetting to list a newly-managed key silently opened a hole. `SHARED_STATE`
@@ -69,11 +81,29 @@
         return out
     end
 
+    # Files that read back a key the interface itself minted and handed to them. The
+    # frontier registry stores `(bound_var_key, bound_key)` pairs built by
+    # `set_risk_upper_bound!`; the sweep loops later create the parameter and constraint
+    # under exactly those keys. They compose nothing — the key arrives already resolved —
+    # so rule 3 exempts them by FILE, with this reason, and still names no key.
+    registry_readers = ["11_MeanRisk.jl", "13_NearOptimalCentering.jl"]
+
     construction = Regex("Symbol\\(\\s*prefix\\b")
     bare = Regex("(?:model\\[|haskey\\(\\s*model\\s*,\\s*):([A-Za-z_][A-Za-z_0-9]*)")
+    # Rule 3 polices the ACCESS, not the spelling of the key: outside the interface,
+    # `model[…]` and `haskey(model, …)` are simply not reached for. That subsumes a key
+    # composed inline AND one laundered through a local first, which a
+    # construction-shaped rule would miss.
+    #
+    # `mip_key(sp, :ib)` is the MIP space's own single-home resolver (ADR 0034) — a third
+    # namespace that already has one home, not a convention re-spelled per site — so it is
+    # named here rather than policed. Naming it is a claim: if a second such resolver
+    # appears, it fails here until someone decides whether it belongs in the interface.
+    indexed = Regex("(?:model\\[|haskey\\(\\s*model\\s*,\\s*)\\s*(?!mip_key\\()")
 
     build_violations = String[]
     read_violations = String[]
+    index_violations = String[]
     for (root, _, files) in walkdir(srcdir), file in files
         if !endswith(file, ".jl") || file == interface
             continue
@@ -91,10 +121,13 @@
                 push!(read_violations,
                       string(rel, ":", lineno, "  [", m.captures[1], "]  ", strip(raw)))
             end
+            if !(file in registry_readers) && occursin(indexed, raw)
+                push!(index_violations, string(rel, ":", lineno, "  ", strip(raw)))
+            end
         end
     end
 
-    # Self-checks: both matchers fire on the thing they are meant to catch, and stay quiet
+    # Self-checks: every matcher fires on the thing it is meant to catch, and stays quiet
     # on the sanctioned spellings.
     @test occursin(construction, "x = model[Symbol(prefix, :net_X)]")
     @test occursin(construction, "tp = Symbol(prefix, :tr_iv_, i, :_)")
@@ -108,6 +141,17 @@
         @test isempty(hit("x = shared_get(model, :risk_vec)"))
         @test isempty(hit("if shared_has(model, :fees)"))
     end
+    # Rule 3 catches the index suffix in every spelling it had — inline, laundered through
+    # a local, and probed — and stays quiet on the interface calls that replaced them.
+    @test occursin(indexed, "model[Symbol(:cvar_risk_, i)] = v")
+    @test occursin(indexed, "key = Symbol(:cvar_risk_, i); model[key] = v")
+    @test occursin(indexed, "if haskey(model, Symbol(:cvar_risk_, i))")
+    @test occursin(indexed, "x = model[keys[1]]")
+    @test !occursin(indexed, "state_set!(model, prefix, :cvar_risk_, i, v)")
+    @test !occursin(indexed, "x = state_get(model, prefix, :cvar_risk_, i)")
+    @test !occursin(indexed, "if state_has(model, prefix, :cvar_risk_, i)")
+    @test !occursin(indexed, "k = state_key(prefix, :cvar_risk_, i)")
+    @test !occursin(indexed, "model[mip_key(sp, :ib)] = v")
 
     # SHARED_STATE is the runtime half of rule 2; the lock is only as good as that set
     # actually being enforced, so check the guard rejects a per-build entry.
@@ -126,6 +170,14 @@
                 "adding it to SHARED_STATE with the reason:")
         foreach(v -> println("  ", v), read_violations)
     end
+    if !isempty(index_violations)
+        println("Seam-lock (indexed construction): these reach Model State directly. A ",
+                "per-measure entry goes through state_set!/state_get/state_has/",
+                "state_build! with its bare name and its index — state_key resolves both ",
+                "the prefix and the index, so neither is spelled at the call site:")
+        foreach(v -> println("  ", v), index_violations)
+    end
+    @test isempty(index_violations)
     @test isempty(build_violations)
     @test isempty(read_violations)
 end

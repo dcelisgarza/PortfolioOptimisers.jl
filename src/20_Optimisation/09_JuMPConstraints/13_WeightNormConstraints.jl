@@ -138,27 +138,23 @@ function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
     for (i, lp) in enumerate(lps)
         val = lp.val
         p_inv = inv(lp.p)
-        t_lpc, r_lpc = model[Symbol(:t_lpc_, i)], model[Symbol(:r_lpc_, i)] = JuMP.@variables(model,
-                                                                                              begin
-                                                                                                  ()
-                                                                                                  [1:N]
-                                                                                              end)
-        model[(Symbol(:clpc_, i))], model[Symbol(:cslpc_, i)] = JuMP.@constraints(model,
-                                                                                  begin
-                                                                                      [i = 1:N],
-                                                                                      [sc *
-                                                                                       r_lpc[i],
-                                                                                       sc *
-                                                                                       t_lpc,
-                                                                                       sc *
-                                                                                       w[i]] in
-                                                                                      JuMP.MOI.PowerCone(p_inv)
-                                                                                      sc *
-                                                                                      (sum(r_lpc) -
-                                                                                       t_lpc) ==
-                                                                                      0
-                                                                                  end)
-        model[Symbol(:clpc_bnd_, i)] = JuMP.@constraint(model, sc * (t_lpc - val * k) <= 0)
+        t_lpc, r_lpc = JuMP.@variables(model, begin
+                                           ()
+                                           [1:N]
+                                       end)
+        state_set!(model, Symbol(""), :t_lpc_, i, t_lpc)
+        state_set!(model, Symbol(""), :r_lpc_, i, r_lpc)
+        clpc, cslpc = JuMP.@constraints(model,
+                                        begin
+                                            [i = 1:N],
+                                            [sc * r_lpc[i], sc * t_lpc, sc * w[i]] in
+                                            JuMP.MOI.PowerCone(p_inv)
+                                            sc * (sum(r_lpc) - t_lpc) == 0
+                                        end)
+        state_set!(model, Symbol(""), :clpc_, i, clpc)
+        state_set!(model, Symbol(""), :cslpc_, i, cslpc)
+        state_set!(model, Symbol(""), :clpc_bnd_, i,
+                   JuMP.@constraint(model, sc * (t_lpc - val * k) <= 0))
     end
     return nothing
 end

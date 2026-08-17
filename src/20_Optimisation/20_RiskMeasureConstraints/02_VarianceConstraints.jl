@@ -71,10 +71,16 @@ via [`set_risk_expression!`](@ref) according to `settings`.
   - $(arg_dict[:opt_rjumpe])
   - `r_expr_ub::JuMP.AbstractJuMPScalar`: Expression used for the upper-bound check.
   - `ub`: Upper bound value.
-  - $(arg_dict[:key_sym])
+  - `name::Symbol`: Bare Model State entry name seeding the derived bound keys.
+  - `i`: Measure index. `name` and `i` are resolved here, so the bound keys cannot drift
+    from the key the emitter registered the risk expression under (ADR 0037).
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk expression added to the objective.
   - `settings::RiskMeasureSettings`: Settings carrying scale and `rke` flag.
   - `flag::Bool`: If true, sets upper bound; if false sets lower bound.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace for `name` (default: empty, i.e. the bare key).
 
 # Returns
 
@@ -84,15 +90,17 @@ via [`set_risk_expression!`](@ref) according to `settings`.
 
   - [`set_risk_upper_bound!`](@ref)
   - [`set_risk_expression!`](@ref)
+  - [`state_key`](@ref)
 """
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::JuMP.AbstractJuMPScalar,
-                                                  ub::Option{<:RkRtBounds}, key::Symbol,
+                                                  ub::Option{<:RkRtBounds}, name::Symbol, i,
                                                   r_expr::JuMP.AbstractJuMPScalar,
                                                   settings::JuMPRiskMeasureSettings,
-                                                  flag::Bool = true)
-    set_risk_upper_bound!(model, opt, r_expr_ub, ub, key, flag)
+                                                  flag::Bool = true;
+                                                  prefix::Symbol = Symbol(""))
+    set_risk_upper_bound!(model, opt, r_expr_ub, ub, state_key(prefix, name, i), flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
@@ -151,7 +159,9 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
 
 # Returns
 
-  - A 2-tuple `(risk_expr, key)` of the JuMP risk expression and its model key.
+  - A 2-tuple `(risk_expr, name)` of the JuMP risk expression and the bare Model State
+    entry name it was registered under. The caller pairs the name with the same index to
+    resolve the key, so no composed key crosses the boundary (ADR 0037).
 
 # Related
 
@@ -161,15 +171,14 @@ where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` 
 function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
                    opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...;
                    prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:sd_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     G = chol_sigma_selector(model, pr, r)
-    sd_risk = model[key] = JuMP.@variable(model)
-    model[Symbol(:csd_risk_soc_, i)] = JuMP.@constraint(model,
-                                                        [sc * sd_risk; sc * G * w] in
-                                                        JuMP.SecondOrderCone())
-    return sd_risk, key
+    sd_risk = state_set!(model, prefix, :sd_risk_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :csd_risk_soc_, i,
+               JuMP.@constraint(model,
+                                [sc * sd_risk; sc * G * w] in JuMP.SecondOrderCone()))
+    return sd_risk, :sd_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -203,9 +212,10 @@ formulations based on risk-contribution and phylogeny settings.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
-    sd_risk, key = set_risk!(model, i, r, opt, pr, args...; kwargs...)
-    set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
+    sd_risk, name = set_risk!(model, i, r, opt, pr, args...; prefix = prefix, kwargs...)
+    set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, name, i;
+                                    prefix = prefix)
     return sd_risk
 end
 """
@@ -291,7 +301,7 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - `flag`:
       + `::LinearBound`: Use the SDP formulation.
       + `::SquareRootBound`: Use the SOC formulation.
-  - $(arg_dict[:key_sym])
+  - $(arg_dict[:ci])
 
 # Returns
 
@@ -303,20 +313,20 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - [`set_risk_constraints!`](@ref)
 """
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            ::LinearBound, key::Symbol; prefix::Symbol = Symbol(""))
-    return set_sdp_variance_risk!(model, i, r, pr, key; prefix = prefix)
+                            ::LinearBound; prefix::Symbol = Symbol(""))
+    return set_sdp_variance_risk!(model, i, r, pr; prefix = prefix)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            ::SquareRootBound, key::Symbol; prefix::Symbol = Symbol(""))
-    return set_variance_risk!(model, i, r, pr, key; prefix = prefix)
+                            ::SquareRootBound; prefix::Symbol = Symbol(""))
+    return set_variance_risk!(model, i, r, pr; prefix = prefix)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the SDP variance risk expression using the semidefinite matrix `W`.
 
-Computes `sigma_W = sigma * W` and stores `tr(sigma_W)` as the variance risk expression
-under `key`.
+Computes `sigma_W = sigma * W` and registers `tr(sigma_W)` as the `:variance_risk_` entry
+at index `i`.
 
 # Arguments
 
@@ -324,7 +334,6 @@ under `key`.
   - $(arg_dict[:ci])
   - `r::Variance`: Variance risk measure.
   - $(arg_dict[:pr_sigma])
-  - $(arg_dict[:key_sym])
 
 # Returns
 
@@ -335,48 +344,45 @@ under `key`.
   - [`set_variance_risk!`](@ref)
 """
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
-                                pr::AbstractPriorResult, key::Symbol;
-                                prefix::Symbol = Symbol(""))
+                                pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
     W = set_sdp_constraints!(model; prefix = prefix)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model, sigma * W)
-    return model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
+    sigma_W = state_set!(model, prefix, :sigma_W_, i, JuMP.@expression(model, sigma * W))
+    return state_set!(model, prefix, :variance_risk_, i,
+                      JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
-                            pr::AbstractPriorResult, key::Symbol;
-                            prefix::Symbol = Symbol(""))
+                            pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     G = chol_sigma_selector(model, pr, r)
-    key_dev = Symbol(:dev_, i)
-    dev = model[key_dev] = JuMP.@variable(model)
-    model[Symbol(key_dev, :_soc)] = JuMP.@constraint(model,
-                                                     [sc * dev; sc * G * w] in
-                                                     JuMP.SecondOrderCone())
-    return model[key] = JuMP.@expression(model, dev^2)
+    dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cdev_soc_, i,
+               JuMP.@constraint(model, [sc * dev; sc * G * w] in JuMP.SecondOrderCone()))
+    return state_set!(model, prefix, :variance_risk_, i, JuMP.@expression(model, dev^2))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
-                            pr::AbstractPriorResult, key::Symbol;
-                            prefix::Symbol = Symbol(""))
+                            pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     G = chol_sigma_selector(model, pr, r)
-    dev = model[Symbol(:dev_, i)] = JuMP.@variable(model)
-    model[Symbol(:cdev_soc_, i)] = JuMP.@constraint(model,
-                                                    [sc * dev; sc * G * w] in
-                                                    JuMP.SecondOrderCone())
-    return model[key] = JuMP.@expression(model, LinearAlgebra.dot(w, sigma, w))
+    dev = state_set!(model, prefix, :dev_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cdev_soc_, i,
+               JuMP.@constraint(model, [sc * dev; sc * G * w] in JuMP.SecondOrderCone()))
+    return state_set!(model, prefix, :variance_risk_, i,
+                      JuMP.@expression(model, LinearAlgebra.dot(w, sigma, w)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the JuMP expression and symbol key used for the variance upper-bound check.
+Return the JuMP expression and the bare Model State entry name used for the variance
+upper-bound check.
 
-When `flag` is `true` (SDP formulation) the variance expression and `:variance_risk_i` key
-are returned; otherwise the standard-deviation variable and `:dev_i` key are returned.
+When `flag` is `true` (SDP formulation) the variance expression and the `:variance_risk_`
+name are returned; otherwise the standard-deviation variable and the `:dev_` name.
 
 # Arguments
 
@@ -388,19 +394,19 @@ are returned; otherwise the standard-deviation variable and `:dev_i` key are ret
 
 # Returns
 
-  - A 2-tuple `(expr, key)` of the bound expression and its model key.
+  - A 2-tuple `(expr, name)` of the bound expression and its bare Model State entry name.
 
 # Related
 
   - [`variance_risk_bounds_val`](@ref)
 """
-function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::LinearBound)
-    key = Symbol(:variance_risk_, i)
-    return model[key], key
+function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::LinearBound;
+                                   prefix::Symbol = Symbol(""))
+    return state_get(model, prefix, :variance_risk_, i), :variance_risk_
 end
-function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::SquareRootBound)
-    key = Symbol(:dev_, i)
-    return model[key], key
+function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::SquareRootBound;
+                                   prefix::Symbol = Symbol(""))
+    return state_get(model, prefix, :dev_, i), :dev_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -485,21 +491,19 @@ end
 function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstraint,
                                   variance_risk::JuMP.AbstractJuMPScalar;
                                   prefix::Symbol = Symbol(""))
-    sigma_W = model[Symbol(:sigma_W_, i)]
+    sigma_W = state_get(model, prefix, :sigma_W_, i)
     sc = get_constraint_scale(model)
     mark_state!(model, prefix, :rc_variance)
-    rc_key = Symbol(:rc_variance_, i)
     vsw = vec(LinearAlgebra.diag(sigma_W))
     if !isnothing(rc.A_ineq)
-        model[Symbol(rc_key, :_ineq)] = JuMP.@constraint(model,
-                                                         sc * (rc.A_ineq * vsw -
-                                                               rc.B_ineq * variance_risk) <=
-                                                         0)
+        state_set!(model, prefix, :rc_variance_ineq_, i,
+                   JuMP.@constraint(model,
+                                    sc * (rc.A_ineq * vsw - rc.B_ineq * variance_risk) <= 0))
     end
     if !isnothing(rc.A_eq)
-        model[Symbol(rc_key, :_eq)] = JuMP.@constraint(model,
-                                                       sc * (rc.A_eq * vsw -
-                                                             rc.B_eq * variance_risk) == 0)
+        state_set!(model, prefix, :rc_variance_eq_, i,
+                   JuMP.@constraint(model,
+                                    sc * (rc.A_eq * vsw - rc.B_eq * variance_risk) == 0))
     end
     return nothing
 end
@@ -510,8 +514,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, pl; prefix = prefix)
-    key = Symbol(:variance_risk_, i)
-    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key; prefix = prefix)
+    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag; prefix = prefix)
     rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
     return variance_risk, sdp_flag
 end
@@ -549,10 +552,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonF
     mark_state!(model, prefix, :variance_flag)
     variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
                                         kwargs...)
-    var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, sdp_flag)
+    var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, sdp_flag;
+                                                               prefix = prefix)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
-    set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,
-                                             variance_risk, r.settings)
+    set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_name,
+                                             i, variance_risk, r.settings; prefix = prefix)
     return variance_risk
 end
 """
@@ -590,18 +594,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     mark_state!(model, prefix, :variance_flag)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
-    key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
     W = shared_get(model, :frc_W)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model,
-                                                             transpose(b1) * sigma * b1 * W)
-    variance_risk = model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
+    sigma_W = state_set!(model, prefix, :sigma_W_, i,
+                         JuMP.@expression(model, transpose(b1) * sigma * b1 * W))
+    variance_risk = state_set!(model, prefix, :variance_risk_, i,
+                               JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
     rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
-    var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, LinearBound())
+    var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, LinearBound();
+                                                               prefix = prefix)
     ub = variance_risk_bounds_val(LinearBound(), r.settings.ub)
-    set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,
-                                             variance_risk, r.settings)
+    set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_name,
+                                             i, variance_risk, r.settings; prefix = prefix)
     return variance_risk
 end
 """
@@ -623,7 +628,8 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 
 # Returns
 
-  - A 2-tuple `(ucs_variance_risk, key)` of the uncertainty-set variance expression and its model key.
+  - A 2-tuple `(ucs_variance_risk, name)` of the uncertainty-set variance expression and its
+    bare Model State entry name.
 
 # Related
 
@@ -642,14 +648,14 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
                    JuMP.@constraint(model, sc * (Au - Al - W) == 0))
         return Au
     end
-    key = Symbol(:bucs_variance_risk_, i)
     Al = state_get(model, prefix, :Al)
     ub = ucs.ub
     lb = ucs.lb
-    ucs_variance_risk = model[key] = JuMP.@expression(model,
-                                                      LinearAlgebra.tr(Au * ub) -
-                                                      LinearAlgebra.tr(Al * lb))
-    return ucs_variance_risk, key
+    ucs_variance_risk = state_set!(model, prefix, :bucs_variance_risk_, i,
+                                   JuMP.@expression(model,
+                                                    LinearAlgebra.tr(Au * ub) -
+                                                    LinearAlgebra.tr(Al * lb)))
+    return ucs_variance_risk, :bucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum; prefix::Symbol = Symbol(""))
@@ -663,27 +669,25 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
                    JuMP.@constraint(model, sc * E in JuMP.PSDCone()))
         return E
     end
-    key = Symbol(:eucs_variance_risk_, i)
     WpE = state_get(model, prefix, :WpE)
     # The set is a neighbourhood of the covariance it was calibrated on, so it names the
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
     k = ucs.k
     G = LinearAlgebra.cholesky(ucs.sigma).U
-    t_eucs = model[Symbol(:t_eucs, i)] = JuMP.@variable(model)
-    x_eucs, ucs_variance_risk = model[Symbol(:x_eucs, i)], model[key] = JuMP.@expressions(model,
-                                                                                          begin
-                                                                                              G *
-                                                                                              vec(WpE)
-                                                                                              LinearAlgebra.tr(sigma *
-                                                                                                               WpE) +
-                                                                                              k *
-                                                                                              t_eucs
-                                                                                          end)
-    model[Symbol(:ge_soc, i)] = JuMP.@constraint(model,
-                                                 [sc * t_eucs; sc * x_eucs] in
-                                                 JuMP.SecondOrderCone())
-    return ucs_variance_risk, key
+    t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
+    x_eucs, ucs_variance_risk = JuMP.@expressions(model,
+                                                  begin
+                                                      G * vec(WpE)
+                                                      LinearAlgebra.tr(sigma * WpE) +
+                                                      k * t_eucs
+                                                  end)
+    state_set!(model, prefix, :x_eucs, i, x_eucs)
+    state_set!(model, prefix, :eucs_variance_risk_, i, ucs_variance_risk)
+    state_set!(model, prefix, :ge_soc, i,
+               JuMP.@constraint(model,
+                                [sc * t_eucs; sc * x_eucs] in JuMP.SecondOrderCone()))
+    return ucs_variance_risk, :eucs_variance_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -720,8 +724,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     set_sdp_constraints!(model; prefix = prefix)
     ucs = r.ucs
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, rd; kwargs...),
-                                                    sigma; prefix = prefix)
-    set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
+    ucs_variance_risk, name = set_ucs_variance_risk!(model, i,
+                                                     sigma_ucs(ucs, rd; kwargs...), sigma;
+                                                     prefix = prefix)
+    set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, name, i;
+                                    prefix = prefix)
     return ucs_variance_risk
 end
