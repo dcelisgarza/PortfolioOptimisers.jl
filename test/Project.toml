@@ -33,7 +33,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [sources]
-PortfolioOptimisers = {path = "/mnt/storage/dev/PortfolioOptimisers.jl/dev"}
+PortfolioOptimisers = {path = ".."}
 
 [compat]
 Accessors = "0.1"
