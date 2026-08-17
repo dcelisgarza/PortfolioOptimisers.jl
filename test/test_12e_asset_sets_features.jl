@@ -148,6 +148,22 @@ end
     # A key that is not in the taxonomy, or whose length does not match the universe, is
     # `asset_sets_matrix`'s existing job.
     @test_throws KeyError asset_sets_features(["nx_sector", "nx_nope"], TAX)
+
+    # Both consumers of a caller-supplied taxonomy key read `sets.dict` through the one
+    # `taxonomy_column` helper, so the miss names the consumer and suggests the spelling
+    # instead of raising the bare `KeyError` a plain `sets.dict[key]` gives.
+    for (f, need) in ((asset_sets_features, "asset_sets_matrix"),
+                      (asset_sets_feature_names, "asset_sets_feature_names"))
+        err = try
+            f(["nx_sector", "nx_sectr"], TAX)
+        catch e
+            e
+        end
+        @test isa(err, KeyError)
+        msg = sprint(showerror, err)
+        @test occursin(need, msg)
+        @test occursin("did you mean `nx_sector`?", msg)
+    end
     short = UniverseSets(; xkey = "nx",
                          dict = Dict("nx" => rd.nx, "nx_sector" => TAX.dict["nx_sector"],
                                      "shortgroup" => ["a", "b"]))

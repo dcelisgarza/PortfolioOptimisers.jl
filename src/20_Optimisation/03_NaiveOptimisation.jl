@@ -294,6 +294,8 @@ InverseVolatility
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
   - [`NaiveOptimisationEstimator`](@ref)
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
@@ -493,6 +495,8 @@ EqualWeighted
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
   - [`NaiveOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
   - [`RandomWeighted`](@ref)
@@ -662,6 +666,8 @@ RandomWeighted
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
   - [`NaiveOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)

@@ -525,6 +525,8 @@ Create new turnover constraints or estimators with updated portfolio weights.
 
 Applies [`factory`](@ref) to each element in `tn`, constructing a new collection of turnover constraints or estimators with the provided portfolio weights `w`.
 
+This is the generic vector [`factory`](@ref) plus [`concrete_typed_array_if_abstract`](@ref): a mixed vector of [`Turnover`](@ref) and [`TurnoverEstimator`](@ref) keeps a concrete element type.
+
 # Arguments
 
   - `tn`: Vector of turnover constraints or estimators.
@@ -563,11 +565,7 @@ julia> factory([tn1, tn2], [0.1, 0.4, 0.5])
   - [`factory(tn::TurnoverEstimator, w::VecNum)`](@ref)
 """
 function factory(tn::VecTnE_Tn, w::VecNum)
-    val = [factory(tni, w) for tni in tn]
-    if isabstracttype(eltype(val))
-        val = concrete_typed_array(val)
-    end
-    return val
+    return concrete_typed_array_if_abstract([factory(tni, w) for tni in tn])
 end
 """
     port_opt_view(tn::VecTnE_Tn, i)
@@ -575,6 +573,8 @@ end
 Create views of multiple turnover constraints or estimators for a subset of assets.
 
 `port_opt_view` returns a vector of turnover constraint or estimator objects, each restricted to the indices or assets specified by `i`.
+
+This is the generic vector [`port_opt_view`](@ref) plus [`concrete_typed_array_if_abstract`](@ref): a mixed vector of [`Turnover`](@ref) and [`TurnoverEstimator`](@ref) keeps a concrete element type.
 
 # Arguments
 
@@ -620,14 +620,10 @@ julia> PortfolioOptimisers.port_opt_view(concrete_typed_array([tn1, tn2]), 1:2)
   - [`VecTnE_Tn`](@ref)
   - [`turnover_constraints`](@ref)
   - [`port_opt_view`](@ref)
-  - [`concrete_typed_array`](@ref)
+  - [`concrete_typed_array_if_abstract`](@ref)
 """
 function port_opt_view(tn::VecTnE_Tn, i, args...)
-    val = [port_opt_view(tni, i) for tni in tn]
-    if isabstracttype(eltype(val))
-        val = concrete_typed_array(val)
-    end
-    return val
+    return concrete_typed_array_if_abstract([port_opt_view(tni, i, args...) for tni in tn])
 end
 """
     needs_previous_weights(tn::TnE_Tn) -> Bool

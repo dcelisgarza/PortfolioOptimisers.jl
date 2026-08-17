@@ -226,9 +226,6 @@ Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`
   - [`VecOptBt`](@ref)
 """
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
-function port_opt_view(t::VecOptBtE_Bt, i, args...)
-    return [port_opt_view(ti, i) for ti in t]
-end
 """
     threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)
 

@@ -82,11 +82,13 @@ STRING_DISTANCE
 set_string_distance!
 with_string_distance
 did_you_mean
+suggest_declared_key
 unknown_variable_msg
 misaligned_axis_msg
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg
+gross_budget_bounds_msg
 failed_solve_msg
 first_error_line
 EquationLimits
@@ -187,6 +189,7 @@ Func_VecNum
 In order to standardise the documentation we use a arg_dict of terms.
 
 ```@docs
+unique_key_dict
 arg_dict
 val_dict
 ret_dict

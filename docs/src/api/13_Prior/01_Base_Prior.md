@@ -10,6 +10,7 @@ prior_regression_remedy
 forward_prior
 reconstruct_prior
 prior_field_values
+prior_result_property_pool
 bound_field_is_stale
 returns_matrix_picker
 clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior, kwargs...)

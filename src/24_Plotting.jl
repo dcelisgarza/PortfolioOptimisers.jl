@@ -570,7 +570,7 @@ Bar chart of asset centrality scores, sorted in descending order.
 
 # Arguments
 
-  - `cte`: Centrality estimator.
+  - $(arg_dict[:cte])
   - `X`: Asset returns matrix (observations × assets).
   - `nx`: Asset names.
   - `N::Option{<:Number} = nothing`: Maximum number of assets to display.

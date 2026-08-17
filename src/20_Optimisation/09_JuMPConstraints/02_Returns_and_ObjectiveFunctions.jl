@@ -100,10 +100,19 @@ Alias for a vector of return terms.
 
 Mirrors [`VecRM`](@ref) on the risk side.
 
+The vector is the multiplicity carrier ([`JRE_VecJRE`](@ref)), so every seam that reaches one
+term reaches all of them. [`factory`](@ref) and [`port_opt_view`](@ref) therefore need no method
+of their own here: their generic vector methods rebuild and view each term in turn. Each term
+keeps its own settings, its own uncertainty set and its own characteristic; the outer `ucs`
+argument, when there is one, is the same for all of them, because only a single-term
+configuration can be routed a bare mean uncertainty set (see [`pipe_route`](@ref)).
+
 # Related
 
   - [`JuMPReturnsEstimator`](@ref)
   - [`JRE_VecJRE`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 const VecJRE = AbstractVector{<:JuMPReturnsEstimator}
 """
@@ -263,25 +272,6 @@ function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
                             mu = rt.mu)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Apply [`factory`](@ref) to each term of a vector of return terms.
-
-The vector is the multiplicity carrier ([`JRE_VecJRE`](@ref)), so every seam that reaches one
-term reaches all of them. Each term keeps its own settings, its own uncertainty set and its
-own characteristic; the outer `ucs` argument, when there is one, is the same for all of them,
-because only a single-term configuration can be routed a bare mean uncertainty set (see
-[`pipe_route`](@ref)).
-
-# Related
-
-  - [`JRE_VecJRE`](@ref)
-  - [`ArithmeticReturn`](@ref)
-"""
-function factory(rt::VecJRE, args...; kwargs...)
-    return [factory(rti, args...; kwargs...) for rti in rt]
-end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
     # A Deferred Quantity crosses the view unsliced: `nothing_scalar_array_view` is the
@@ -289,9 +279,6 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
     return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu)
-end
-function port_opt_view(r::VecJRE, i, args...)
-    return [port_opt_view(ri, i, args...) for ri in r]
 end
 """
     no_bounds_returns_estimator(r, args...)

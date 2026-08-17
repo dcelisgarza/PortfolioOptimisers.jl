@@ -223,6 +223,59 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
     return GerberCovariance(ve, me, pdm, t, alg)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the up and down indicator matrices shared by every Gerber correlation variant.
+
+# Arguments
+
+  - $(arg_dict[:gerbce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
+
+# Returns
+
+  - `(U, D)::Tuple{Matrix{Bool}, Matrix{Bool}}`: `U[t, i]` marks `X[t, i] >= ce.t * sd[i]`, and `D[t, i]` marks `X[t, i] <= -ce.t * sd[i]`.
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+  - [`concordance_counts`](@ref)
+"""
+function gerber_updown(ce::GerberCovariance, X::MatNum, sd::ArrNum)
+    T, N = size(X)
+    U = Matrix{Bool}(undef, T, N)
+    D = Matrix{Bool}(undef, T, N)
+    ts = sd * ce.t
+    U .= X .>= ts
+    D .= X .<= -ts
+    return U, D
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Split the concordant and discordant co-movement counts out of their difference and their sum.
+
+`nconc[i, j]` counts the observations on which assets `i` and `j` both crossed a threshold in the same direction. `ndisc[i, j]` counts the observations on which they crossed in opposite directions. A matrix product delivers the difference and the sum directly, so the two counts are recovered from those instead of by two more matrix products. The split is exact, and the reduction in [`comovement_ratio`](@ref) sees the same numerator and denominator as the matrix formula.
+
+# Arguments
+
+  - `pmn::AbstractMatrix`: The difference `nconc - ndisc`.
+  - `ppn::AbstractMatrix`: The sum `nconc + ndisc`.
+
+# Returns
+
+  - `(nconc, ndisc)::Tuple{AbstractMatrix, AbstractMatrix}`: The concordant and the discordant counts.
+
+# Related
+
+  - [`gerber_updown`](@ref)
+  - [`comovement_ratio`](@ref)
+"""
+function concordance_counts(pmn::AbstractMatrix, ppn::AbstractMatrix)
+    return (ppn .+ pmn) ./ 2, (ppn .- pmn) ./ 2
+end
+"""
     gerber(
         ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0},
         X::MatNum,
@@ -272,17 +325,19 @@ Where:
 
 The algorithm proceeds as follows:
 
-  - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X .>= ce.t * sd`.
-      + `D`: Entries where `X .<= -ce.t * sd`.
+  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
   - Compute `UmD = U - D` and `UpD = U + D`.
-  - The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
+  - Recover the concordant and discordant counts from `UmD' * UmD` and `UpD' * UpD` with [`concordance_counts`](@ref).
+  - Reduce each pair to `(nconc - ndisc) / (nconc + ndisc)` with [`comovement_ratio`](@ref), which returns zero when the denominator vanishes.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
+  - [`gerber_updown`](@ref)
+  - [`concordance_counts`](@ref)
+  - [`comovement_ratio`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -291,18 +346,11 @@ The algorithm proceeds as follows:
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
                 sd::ArrNum)
-    T, N = size(X)
-    U = Matrix{Bool}(undef, T, N)
-    D = Matrix{Bool}(undef, T, N)
-    sd = sd * ce.t
-    U .= X .>= sd
-    D .= X .<= -sd
-    # nconc = transpose(U) * U + transpose(D) * D
-    # ndisc = transpose(U) * D + transpose(D) * U
-    # H = nconc - ndisc
+    U, D = gerber_updown(ce, X, sd)
     UmD = U - D
     UpD = U + D
-    rho = (transpose(UmD) * UmD) ⊘ (transpose(UpD) * UpD)
+    nconc, ndisc = concordance_counts(transpose(UmD) * UmD, transpose(UpD) * UpD)
+    rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, 0, eltype(X))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -357,18 +405,21 @@ Where:
 
 The algorithm proceeds as follows:
 
-  - For each entry in `X`, compute three Boolean matrices:
-      + `U`: Entries where `X .>= ce.t * sd`.
-      + `D`: Entries where `X .<= -ce.t * sd`.
-      + `N`: Entries where `X in (-ce.t * sd, ce.t * sd)` (i.e., neither up nor down).
+  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
+  - Compute the neutral matrix `Nt`, whose entries mark `X in (-ce.t * sd, ce.t * sd)` (i.e., neither up nor down).
   - Compute `UmD = U - D`.
-  - The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
+  - Split the denominator `T .- (Nt' * Nt)` into the observations on which both assets crossed a threshold and the observations on which exactly one of them crossed.
+  - Recover the concordant and discordant counts from `UmD' * UmD` and the both-crossed count with [`concordance_counts`](@ref).
+  - Reduce each pair to `(nconc - ndisc) / (nconc + ndisc + nneut)` with [`comovement_ratio`](@ref), which returns zero when the denominator vanishes.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
   - [`GerberCovariance`](@ref)
   - [`Gerber1`](@ref)
+  - [`gerber_updown`](@ref)
+  - [`concordance_counts`](@ref)
+  - [`comovement_ratio`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -377,19 +428,20 @@ The algorithm proceeds as follows:
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
                 sd::ArrNum)
-    T, N = size(X)
-    U = Matrix{Bool}(undef, T, N)
-    D = Matrix{Bool}(undef, T, N)
-    N = Matrix{Bool}(undef, T, N)
-    sd = sd * ce.t
-    U .= X .>= sd
-    D .= X .<= -sd
-    N .= .!U .& .!D
-    # nconc = transpose(U) * U + transpose(D) * D
-    # ndisc = transpose(U) * D + transpose(D) * U
-    # H = nconc - ndisc
+    T = size(X, 1)
+    U, D = gerber_updown(ce, X, sd)
+    Nt = Matrix{Bool}(undef, size(X)...)
+    Nt .= .!U .& .!D
+    NtN = transpose(Nt) * Nt
+    nneutral = vec(sum(Nt; dims = 1))
     UmD = U - D
-    rho = transpose(UmD) * (UmD) ⊘ (T .- transpose(N) * N)
+    # A pair is neutral together on NtN observations, so it crosses a threshold together on
+    # T - nneutral_i - nneutral_j + NtN of them, and exactly one of the two crosses on
+    # nneutral_i + nneutral_j - 2 NtN. The three counts sum to the T .- NtN denominator.
+    nconc, ndisc = concordance_counts(transpose(UmD) * UmD,
+                                      T .- nneutral .- transpose(nneutral) .+ NtN)
+    nneut = nneutral .+ transpose(nneutral) .- 2 .* NtN
+    rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, nneut, eltype(X))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -442,18 +494,18 @@ Where:
 
 The algorithm proceeds as follows:
 
-  - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X .>= ce.t * sd`.
-      + `D`: Entries where `X .<= -ce.t * sd`.
+  - Build the indicator matrices `U` and `D` with [`gerber_updown`](@ref).
   - Compute the signed indicator matrix `UmD = U - D`.
-  - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
-  - Normalise `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+  - Compute the raw Gerber2 matrix `rho = UmD' * UmD`.
+  - Normalise `rho` by the geometric mean of its diagonal with [`standardise_comovement!`](@ref), which clamps the diagonal roots away from zero.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
   - [`GerberCovariance`](@ref)
   - [`Gerber2`](@ref)
+  - [`gerber_updown`](@ref)
+  - [`standardise_comovement!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -462,19 +514,10 @@ The algorithm proceeds as follows:
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
                 sd::ArrNum)
-    T, N = size(X)
-    U = Matrix{Bool}(undef, T, N)
-    D = Matrix{Bool}(undef, T, N)
-    sd = sd * ce.t
-    U .= X .>= sd
-    D .= X .<= -sd
-    # nconc = transpose(U) * U + transpose(D) * D
-    # ndisc = transpose(U) * D + transpose(D) * U
-    # H = nconc - ndisc
+    U, D = gerber_updown(ce, X, sd)
     UmD = U - D
-    H = transpose(UmD) * (UmD)
-    h = sqrt.(LinearAlgebra.diag(H))
-    rho = H ⊘ (h * transpose(h))
+    rho = Matrix{eltype(X)}(transpose(UmD) * UmD)
+    standardise_comovement!(ce.alg, rho)
     posdef!(ce.pdm, rho)
     return rho
 end

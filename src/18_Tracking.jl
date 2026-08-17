@@ -559,61 +559,8 @@ function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormError = L2Norm())
     return TrackingError(tr, err, alg)
 end
-"""
-    port_opt_view(tr::VecTr, args...)
-
-Return a vector of tracking views for each element in a vector of tracking results.
-
-This function applies `port_opt_view` to each element of the input vector of tracking results, passing any additional arguments. It enables efficient subsetting and composability for collections of tracking error or tracking constraint results.
-
-# Arguments
-
-  - `tr`: A vector of tracking result objects (`VecTr`).
-  - `args...`: Additional arguments to pass to each `port_opt_view` call.
-
-# Returns
-
-  - `tres::Vector{<:AbstractTracking}`: Vector of tracking view results.
-
-# Details
-
-  - Applies `port_opt_view` to each element in the input vector.
-  - Passes all additional arguments to each call.
-  - Returns a vector of the results.
-
-# Examples
-
-```jldoctest
-julia> tr = TrackingError(; tr = WeightsTracking(; w = [0.5, 0.5, 0.5]), err = 0.01);
-
-julia> PortfolioOptimisers.port_opt_view([tr], 1:2)
-1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Norm{Int64}}}:
- TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.5]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Norm
-      │   ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`AbstractTracking`](@ref)
-  - [`TrackingError`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function port_opt_view(tr::VecTr, i, args...)
-    return [port_opt_view(t, i, args...) for t in tr]
-end
 function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)
-end
-function factory(tr::VecTr, w::VecNum)
-    return [factory(t, w) for t in tr]
 end
 function needs_previous_weights(tr::VecTr)
     return any(needs_previous_weights.(tr))

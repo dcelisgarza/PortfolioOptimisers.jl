@@ -380,10 +380,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`NestedClusteredResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalRiskParity`](@ref)
   - [`Stacking`](@ref)
-  - [`NestedClusteredResult`](@ref)
 """
 @propagatable @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     """

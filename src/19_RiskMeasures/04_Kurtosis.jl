@@ -137,7 +137,7 @@ Kurtosis
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
@@ -344,24 +344,7 @@ function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Any, <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:SemiMoment,
-                      <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
-                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2, pe = r.pe)(w, X, fees)
-end
-function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:SemiMoment,
-                      <:Any})(x::VecNum)
-    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, x), mu = r.mu,
-                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2, pe = r.pe)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

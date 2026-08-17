@@ -208,6 +208,18 @@ DistancePolarity()
   - [`StressCentrality`](@ref)
 """
 struct TopologyOnly <: AbstractAlgorithm end
+# The one refusal both splat guards make: a `Graphs.jl` entry point takes its weights in a
+# positional slot, so anything of that shape in `args` is a second channel answering a question the
+# declared one already answered. `assert_centrality_args` and `assert_tree_args` differ only in
+# which shape reaches a channel and in which declared channel they name.
+function assert_no_weight_channel_args(::Type{T}, args::Tuple, S::Type,
+                                       shape::AbstractString,
+                                       channel::AbstractString) where {T}
+    idx = findfirst(a -> isa(a, S), args)
+    @argcheck(isnothing(idx),
+              ConflictingArgumentError("`args` of a $(T) must not contain a $(shape): $(channel). Got\nargs[$(idx)] => $(isnothing(idx) ? nothing : typeof(args[idx]))"))
+    return nothing
+end
 """
     assert_centrality_args(::Type{T}, args::Tuple) where {T}
 
@@ -215,11 +227,13 @@ Refuse a matrix inside a centrality algorithm's `args`.
 
 `args` is splatted straight into the `Graphs.jl` centrality function, so a matrix in it is a `distmx` — a second, undeclared way to weight the graph. [`centrality_polarity`](@ref) is the declared one, and it picks the weights the algorithm's own mathematics needs, from the structure that was actually built. Two channels answering the same question is one too many, and this one was never safe:
 
-  - `Graphs.betweenness_centrality`'s `distmx` is its **third** positional argument, so a matrix in `args` binds to `vs` instead and the call **overflows the stack** inside `Graphs.degree`. That takes the session with it, not merely the call.
+  - `Graphs.betweenness_centrality`'s `distmx` is its **third** positional argument, so a matrix in `args` binds to `vs` instead and the call **overflows the stack** inside `Graphs.degree`. The `StackOverflowError` is catchable and the process survives it, so what is lost is the call and not the session.
   - `Graphs.closeness_centrality`'s is its second, so that one worked — silently overriding the polarity, and reporting a wrong-sized matrix as a `BoundsError` rather than a `DimensionMismatch`.
   - `Graphs.stress_centrality` has no `distmx` at all.
 
 Non-matrix entries are untouched: a vertex list or a sample count is a genuine positional argument of those functions and says nothing about weights.
+
+`kwargs` needs no companion guard. A keyword binds **by name**, so a matrix there cannot reach a positional slot: none of the four functions declares a matrix-valued keyword, and every one of `normalize`, `endpoints`, `rng` and `seed` refuses a matrix on its own. The whole family fails closed with a `MethodError` or a `TypeError`.
 
 # Arguments
 
@@ -237,14 +251,59 @@ Non-matrix entries are untouched: a vertex list or a sample count is a genuine p
 # Related
 
   - [`centrality_polarity`](@ref)
+  - [`assert_tree_args`](@ref)
   - [`BetweennessCentrality`](@ref)
   - [`ClosenessCentrality`](@ref)
   - [`StressCentrality`](@ref)
 """
 function assert_centrality_args(::Type{T}, args::Tuple) where {T}
-    idx = findfirst(a -> isa(a, AbstractMatrix), args)
-    @argcheck(isnothing(idx),
-              ConflictingArgumentError("`args` of a $(T) must not contain a matrix: a weight matrix reaches the centrality algorithm through `centrality_polarity`, not through `args`. Got\nargs[$(idx)] => $(isnothing(idx) ? nothing : typeof(args[idx]))"))
+    assert_no_weight_channel_args(T, args, AbstractMatrix, "matrix",
+                                  "a weight matrix reaches the centrality algorithm through `centrality_polarity`, not through `args`")
+    return nothing
+end
+"""
+    assert_tree_args(::Type{T}, args::Tuple, kwargs::NamedTuple) where {T}
+
+Refuse a second weighting channel inside a spanning-tree algorithm's `args` and `kwargs`.
+
+Both fields are splatted straight into the `Graphs.jl` spanning-tree function, and **every** channel they can reach re-weights or re-orients a tree that [`calc_weighted_adjacency_graph`](@ref) has already weighted. The graph it hands to [`calc_mst`](@ref) carries the distances the estimator's `de` and `ce` produced, and `Graphs.jl` defaults `distmx` to exactly those weights. A caller who fills these fields therefore answers a question that was already answered, and the wrong answer is **silent**:
+
+  - `kruskal_mst`, `boruvka_mst` and `prim_mst` all take `distmx` as their second positional argument, so a matrix in `args` replaces the estimator's distances outright. It is correctly sized often enough to succeed, and the tree it builds is a legitimate-looking tree of the wrong graph.
+  - `kruskal_mst` also takes a `weight_vector` there, which is the same override in the other shape.
+  - `minimize` in `kwargs` inverts the sense of the search. The tree branch is *defined* by minimising a distance — [`calc_weighted_adjacency_graph`](@ref) and [`SimilarityPolarity`](@ref) both say so — and `minimize = false` yields a **maximum** spanning tree while everything downstream still reads it as a minimum one.
+
+Non-matrix, non-vector entries are untouched, and so is every other keyword. Those reach no weighting channel, and the three functions declare none, so they fail closed at the call.
+
+# Arguments
+
+  - `T`: Spanning-tree algorithm type, named in the error message.
+  - `args`: Positional arguments destined for the `Graphs.jl` spanning-tree function.
+  - `kwargs`: Keyword arguments destined for the same function.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `AbstractMatrix` or an `AbstractVector`.
+  - Throws a [`ConflictingArgumentError`](@ref) if `kwargs` contains `minimize`.
+
+# Related
+
+  - [`assert_centrality_args`](@ref)
+  - [`calc_mst`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+  - [`KruskalTree`](@ref)
+  - [`BoruvkaTree`](@ref)
+  - [`PrimTree`](@ref)
+"""
+function assert_tree_args(::Type{T}, args::Tuple, kwargs::NamedTuple) where {T}
+    assert_no_weight_channel_args(T, args, Union{AbstractMatrix, AbstractVector},
+                                  "matrix or vector",
+                                  "the weights of a spanning tree reach it through the graph the `NetworkEstimator` built, not through `args`")
+    @argcheck(!haskey(kwargs, :minimize),
+              ConflictingArgumentError("`kwargs` of a $(T) must not contain `minimize`: the tree branch is defined by minimising a distance, so `minimize = false` silently yields a maximum spanning tree. Got\nkwargs.minimize => $(get(kwargs, :minimize, nothing))"))
     return nothing
 end
 """
@@ -1013,6 +1072,7 @@ KruskalTree
     """
     kwargs
     function KruskalTree(args::Tuple, kwargs::NamedTuple)
+        assert_tree_args(KruskalTree, args, kwargs)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -1063,6 +1123,7 @@ BoruvkaTree
     """
     kwargs
     function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
+        assert_tree_args(BoruvkaTree, args, kwargs)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -1113,6 +1174,7 @@ PrimTree
     """
     kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
+        assert_tree_args(PrimTree, args, kwargs)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
@@ -1390,7 +1452,7 @@ NetworkClustersEstimator
 """
 @propagatable @concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
     """
-    Network estimator.
+    $(field_dict[:nte])
     """
     @fprop nte
     """
@@ -1615,7 +1677,7 @@ The two-argument form exists for a caller that already holds that matrix. [`clus
   - `alg`: Tree or similarity matrix algorithm.
   - $(arg_dict[:D])
   - $(arg_dict[:S])
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -1673,7 +1735,7 @@ The two entry points are [`calc_weighted_adjacency_graph`](@ref)'s two entry poi
 
   - `alg`: Tree or similarity matrix algorithm.
   - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -1708,7 +1770,7 @@ Consumers that need the weights call [`calc_weighted_adjacency`](@ref) instead. 
 
 # Arguments
 
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -1746,7 +1808,7 @@ What must not happen is a path taken over the similarities themselves. A shortes
 
 # Arguments
 
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -2099,7 +2161,7 @@ The alternative was to resolve inside [`separation_budget`](@ref), and it does n
 
 A functor's return type is not part of its signature, so a [`HopCountAlgorithm`](@ref) cannot promise an `Integer` in the type system. This kernel checks the value and throws otherwise. The check earns its place: three readers use `0:n` as a **matrix-power count**, where `0:1.5` drops a power silently.
 
-Resolution goes back through the ordinary constructor, so the rule's answer meets exactly the validation a stated budget meets — `n >= 1` and `dmax > 0`.
+Resolution goes back through the ordinary constructor, so the rule's answer meets exactly the validation a stated budget meets — `n >= 1`, `n <= RESOURCE_LIMITS[].max_hop_count`, and `dmax > 0`. That is why the resource cap needs no second check here: a rule that returns an absurd hop count is rejected by the same `assert_resource_cap` a stated one meets.
 
 # Arguments
 
@@ -2369,7 +2431,7 @@ The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the sep
 # Arguments
 
   - `sep`: Separation algorithm, taken from `nte.sep` by the public method.
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -2537,7 +2599,7 @@ The three-argument methods taking `ct` resolve [`centrality_polarity`](@ref) and
   - $(field_dict[:pler])
   - $(field_dict[:cta])
   - `polarity`: Effective polarity of `ct`, from [`centrality_polarity`](@ref).
-  - `nte`: Network estimator.
+  - $(arg_dict[:nte])
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -2607,7 +2669,7 @@ This function builds the graph with [`centrality_graph`](@ref) — weighted in t
 # Arguments
 
   - `pl`: Phylogeny estimator.
-  - `ct`: Centrality algorithm.
+  - $(arg_dict[:cta])
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -2640,7 +2702,7 @@ This function applies the centrality algorithm in the estimator to the network c
 
 # Arguments
 
-  - `cte`: Centrality estimator.
+  - $(arg_dict[:cte])
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -2669,7 +2731,7 @@ This function computes the centrality vector and returns the weighted average us
 # Arguments
 
   - `pl`: NetworkEstimator estimator.
-  - `ct`: Centrality algorithm.
+  - $(arg_dict[:cta])
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
@@ -2699,7 +2761,7 @@ This function applies the centrality algorithm in the estimator to the network a
 
 # Arguments
 
-  - `cte`: Centrality estimator.
+  - $(arg_dict[:cte])
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])

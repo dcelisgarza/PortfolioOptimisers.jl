@@ -347,6 +347,8 @@ end
 
 Union type for fee constraint objects and estimators.
 
+There is no vector counterpart, and [`fees_constraints`](@ref) has no vector method. [`Fees`](@ref) already sums every fee component into one object, so an optimiser holds exactly one. See [`RkbE_Rkb`](@ref) for why some constraint families are singular and others are not.
+
 # Related
 
   - [`Fees`](@ref)

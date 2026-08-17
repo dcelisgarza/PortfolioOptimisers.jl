@@ -4,6 +4,7 @@ The variance is used throughout the library, it can be used as part of the expec
 
 ```@docs
 SimpleVariance
+simple_variance_kernel
 std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 std(ve::SimpleVariance, X::VecNum; mean = nothing)

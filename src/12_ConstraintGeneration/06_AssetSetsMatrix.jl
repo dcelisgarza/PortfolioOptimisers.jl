@@ -100,6 +100,40 @@ const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Read the taxonomy column `sets.dict[key]`, checking that the key exists.
+
+The sibling of [`factor_universe`](@ref) and [`feature_universe`](@ref) for a **group name key**, and written for the same reason: one shared helper whose message names the key and says what to do about it, so every consumer of a caller-supplied taxonomy key fails the same way. A bare `sets.dict[key]` raises a `KeyError` carrying the key alone, which says nothing about which of the two producers asked for it, and offers no help with a typo.
+
+`need` names the consumer. The suggestion comes from [`suggest_declared_key`](@ref), the looser configuration shared by every declaration-key suggestion: the candidates here are `sets.dict` keys the caller authored, not asset names, so the info-leak boundary of ADR 0026 does not apply.
+
+The exception stays a `KeyError`, as [`factor_universe`](@ref) and [`feature_universe`](@ref) do, because a missing key is what it is — only the message improves.
+
+# Arguments
+
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
+  - `key`: The group name key to read.
+  - `need`: Names the consumer in the error message.
+
+# Returns
+
+  - `col`: The value of `sets.dict[key]`, one group per asset.
+
+# Related
+
+  - [`asset_sets_matrix`](@ref)
+  - [`asset_sets_feature_names`](@ref)
+  - [`factor_universe`](@ref)
+  - [`feature_universe`](@ref)
+  - [`suggest_declared_key`](@ref)
+"""
+function taxonomy_column(sets::UniverseSets, key::AbstractString, need::AbstractString)
+    @argcheck(haskey(sets.dict, key),
+              KeyError("$key (a group name key), required by $need. `sets.dict` holds no such key: correct the spelling$(suggest_declared_key(key, keys(sets.dict))), or add `$key => <one group per asset>` to `sets.dict`."))
+    return sets.dict[key]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Construct a binary asset-group membership matrix from asset set groupings.
 
 `asset_sets_matrix` generates a binary (0/1) matrix indicating asset membership in groups or categories, based on the key or group name `smtx` in the provided [`UniverseSets`](@ref). Each row corresponds to a unique group value, and each column to an asset in the universe. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
@@ -121,7 +155,7 @@ Construct a binary asset-group membership matrix from asset set groupings.
 
 # Validation
 
-  - `haskey(sets.dict, smtx)`.
+  - `haskey(sets.dict, smtx)`, via [`taxonomy_column`](@ref).
   - Throws an `AssertionError` if the length of `sets.dict[smtx]` does not match the asset universe.
 
 # Examples
@@ -143,10 +177,9 @@ julia> asset_sets_matrix(\"nx_sector\", sets)
   - [`AssetSetsMatrixEstimator`](@ref)
 """
 function asset_sets_matrix(smtx::AbstractString, sets::UniverseSets)
-    @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
-    all_sets = sets.dict[smtx]
+    all_sets = taxonomy_column(sets, smtx, "asset_sets_matrix")
     @argcheck(length(sets.dict[sets.xkey]) == length(all_sets),
-              AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.xkey] and `all_sets` must be equal:\nlength(sets.dict[sets.xkey]) => length(sets.dict[$(sets.xkey)]) => $(length(sets.dict[sets.xkey]))\nlength(all_sets) => $(length(all_sets))"))
+              AssertionError("lengths of sets.dict[sets.xkey] and `all_sets` must be equal:\nlength(sets.dict[sets.xkey]) => length(sets.dict[$(sets.xkey)]) => $(length(sets.dict[sets.xkey]))\nlength(all_sets) => length(sets.dict[$smtx]) => $(length(all_sets))"))
     unique_sets = unique(all_sets)
     A = BitMatrix(undef, length(all_sets), length(unique_sets))
     for (i, val) in pairs(unique_sets)
@@ -369,7 +402,7 @@ This is the **exogenous** feature source: a sector, industry or country classifi
 
   - `vals`: Group name keys in `sets.dict`, at least two (see [`assert_feature_keys`](@ref)).
   - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
-  - `strict`: Accepted for a uniform interface with the graded method and **ignored**. `strict` governs name resolution, and on this path every name is a `sets.dict` key whose absence is an unconditional `KeyError` from [`asset_sets_matrix`](@ref) — there is no soft failure for it to govern.
+  - `strict`: Accepted for a uniform interface with the graded method and **ignored**. `strict` governs name resolution, and on this path every name is a `sets.dict` key whose absence is an unconditional `KeyError` from [`taxonomy_column`](@ref) — there is no soft failure for it to govern.
 
 # Returns
 
@@ -994,7 +1027,8 @@ julia> asset_sets_feature_names([\"nx_sector\", \"nx_country\"], sets)
 function asset_sets_feature_names(vals::AbstractVector{<:AbstractString},
                                   sets::UniverseSets)::Vector{String}
     assert_feature_keys(vals)
-    return [string(v, "=", g) for v in vals for g in unique(sets.dict[v])]
+    return [string(v, "=", g) for v in vals
+            for g in unique(taxonomy_column(sets, v, "asset_sets_feature_names"))]
 end
 """
     asset_sets_feature_names(vals::AbstractVector{<:Pair}, sets::UniverseSets) -> Vector{String}
@@ -1070,11 +1104,18 @@ function port_opt_view(smtx::MatNum, i, args...; kwargs...)
     return view(smtx, :, i)
 end
 function port_opt_view(smtx::VecMatNum_ASetMatE, i, args...; kwargs...)
-    val = [port_opt_view(smtxi, i; kwargs...) for smtxi in smtx]
-    if isabstracttype(eltype(val))
-        val = concrete_typed_array(val)
-    end
-    return val
+    return concrete_typed_array_if_abstract([port_opt_view(smtxi, i, args...; kwargs...)
+                                             for smtxi in smtx])
+end
+# A vector of estimators alone matches both the signature above and the generic vector method
+# in `02_Tools.jl`, and neither is more specific: `MatNum` is outside the generic's element
+# union, `Nothing` is outside this one's. This method is that intersection, so the two never
+# tie. Its body is the one above, because a membership matrix and its estimator must produce
+# the same element type.
+function port_opt_view(smtx::AbstractVector{<:AssetSetsMatrixEstimator}, i, args...;
+                       kwargs...)
+    return concrete_typed_array_if_abstract([port_opt_view(smtxi, i, args...; kwargs...)
+                                             for smtxi in smtx])
 end
 
 export AssetSetsMatrixEstimator, asset_sets_matrix, asset_sets_features,

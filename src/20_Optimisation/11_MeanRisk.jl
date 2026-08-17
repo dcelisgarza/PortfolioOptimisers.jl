@@ -223,6 +223,7 @@ Where:
 
 # Related
 
+  - [`optimise`](@ref)
   - [`scalarise_risk_expression!`](@ref)
   - [`set_risk_constraints!`](@ref)
   - [`ArithmeticReturn`](@ref)
@@ -595,6 +596,40 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)
 end
 """
+    unresolved_risk_frontier(model::JuMP.Model)
+
+Read the risk frontier out of `model` and find the entries that still need a rebuild.
+
+An entry is *resolved* when its bound is already a numeric vector; anything else is a frontier
+range that [`rebuild_risk_frontier`](@ref) must turn into numbers. This is the shared half of
+every [`compute_risk_ubs`](@ref) method — the methods differ only in the `rebuild_risk_frontier`
+call they close with.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model containing `risk_frontier`.
+
+# Returns
+
+  - `(risk_frontier, idx)`: The frontier vector of pairs, and the indices of its unresolved
+    entries. An empty `idx` means that no rebuild is needed.
+
+# Related
+
+  - [`compute_risk_ubs`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
+"""
+function unresolved_risk_frontier(model::JuMP.Model)
+    risk_frontier = shared_get(model, :risk_frontier)
+    idx = Vector{Int}(undef, 0)
+    for (i, rkf) in enumerate(risk_frontier)
+        if !isa(rkf.second[2], VecNum)
+            push!(idx, i)
+        end
+    end
+    return risk_frontier, idx
+end
+"""
     compute_risk_ubs(model, opt, ...)
 
 Compute or rebuild risk upper bounds for the efficient frontier sweep.
@@ -616,16 +651,11 @@ Extracts the risk frontier from the model and rebuilds any frontier bounds that 
   - [`MeanRisk`](@ref)
   - [`NearOptimalCentering`](@ref)
   - [`solve_mean_risk!`](@ref)
+  - [`unresolved_risk_frontier`](@ref)
 """
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
-    risk_frontier = shared_get(model, :risk_frontier)
-    idx = Vector{Int}(undef, 0)
-    for (i, rkf) in enumerate(risk_frontier)
-        if !isa(rkf.second[2], VecNum)
-            push!(idx, i)
-        end
-    end
+    risk_frontier, idx = unresolved_risk_frontier(model)
     if isempty(idx)
         return risk_frontier
     end
@@ -705,7 +735,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_w!(model, attrs.pr.X, mr.wi)
-    set_weight_constraints!(model, attrs.wb, mr.opt.bgt, mr.opt.sbgt; gbgt = mr.opt.gbgt)
+    set_weight_constraints!(model, attrs.wb, mr.opt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     retcode, sol = solve_mean_risk!(model, mr, attrs.pr,
                                     Val(shared_has(model, :ret_frontier)),

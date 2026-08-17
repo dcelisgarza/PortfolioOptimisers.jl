@@ -172,7 +172,7 @@ FactorBlackLittermanPrior
     """
     views_conf
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:eqw])
     """
     w
     """

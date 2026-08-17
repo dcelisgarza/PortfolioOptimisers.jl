@@ -151,6 +151,8 @@ Where:
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalOptimiser`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -289,6 +291,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -392,6 +396,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -439,6 +445,10 @@ Run the Hierarchical Risk Parity portfolio optimisation.
   - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Details
+
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
 # Related
 

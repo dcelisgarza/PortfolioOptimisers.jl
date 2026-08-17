@@ -161,6 +161,33 @@
                                                                       D = Dbig),
                            one(eltype(Dbig)) .- Dbig)
         end
+        @testset "The coefficient is finite as well as positive" begin
+            #=
+            `coef = Inf` used to construct. The zero diagonal then gives `exp(-Inf * 0)`,
+            which is `NaN`, so a NaN similarity matrix reached `PMFG_T2s` and the DBHT
+            clustering instead of a typed error naming the field. `power` is a separate
+            case and stays as it was: `power = Inf` yields a finite matrix.
+            =#
+            Dc = [0.0 0.5 0.25; 0.5 0.0 0.75; 0.25 0.75 0.0]
+            for coef in (Inf, -Inf, NaN)
+                @test_throws DomainError GeneralExponentialSimilarity(; coef = coef)
+            end
+            msg = try
+                GeneralExponentialSimilarity(; coef = Inf)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("coef", msg)
+            # The positivity half of the guard is unchanged.
+            for coef in (0, -1)
+                @test_throws DomainError GeneralExponentialSimilarity(; coef = coef)
+            end
+            # A finite coefficient still builds, and an infinite `power` is still admitted.
+            sec = GeneralExponentialSimilarity(; coef = 2, power = Inf)
+            @test sec isa GeneralExponentialSimilarity
+            @test all(isfinite, PortfolioOptimisers.distance_to_similarity(sec; D = Dc))
+        end
         @testset "The precondition at the PMFG entry points" begin
             #=
             The oracle is that every pairing the precondition refuses already throws today,
@@ -2072,6 +2099,51 @@ struct _test_UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgor
             @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (1:3, D))
             @test isa(T(; args = (1:3,)), T)
             @test isa(T(), T)
+        end
+    end
+
+    @testset "A second weighting channel is refused on the tree family" begin
+        #=
+        The tree family carries the same two splat fields, and every channel they can reach
+        re-weights a graph that is already weighted. Unlike the centrality case the calls
+        SUCCEED, so the cost is a silent wrong result rather than a crash: a matrix binds to
+        `distmx`, a vector binds to `kruskal_mst`'s `weight_vector`, and `minimize = false`
+        yields a MAXIMUM spanning tree that everything downstream still reads as a minimum
+        one. None of the three functions declares a positional argument that is not a weight,
+        so both shapes are refused outright.
+        =#
+        D = zeros(3, 3)
+        for T in (KruskalTree, BoruvkaTree, PrimTree)
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (D,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(;
+                                                                        args = (zeros(3),))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (1:3,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (2, D))
+            for kw in ((; minimize = false), (; minimize = true))
+                @test_throws PortfolioOptimisers.ConflictingArgumentError T(; kwargs = kw)
+            end
+            @test isa(T(), T)
+            @test isa(T(; args = (), kwargs = (;)), T)
+        end
+    end
+
+    @testset "kwargs needs no guard on the centrality family" begin
+        #=
+        A keyword binds by NAME, so a matrix in `kwargs` can never reach the positional slot
+        the `args` guard was written for. None of the four functions declares a matrix-valued
+        keyword and each of them refuses one on its own, so the family fails closed at the
+        call without a guard. Constructing is deliberately left alone.
+        =#
+        D = zeros(6, 6)
+        cc = PortfolioOptimisers.calc_centrality
+        g = PortfolioOptimisers.Graphs.SimpleGraph(PortfolioOptimisers.Graphs.grid((3, 2)))
+        for (T, kw) in
+            ((BetweennessCentrality, (; distmx = D)), (ClosenessCentrality, (; distmx = D)),
+             (StressCentrality, (; distmx = D)), (DegreeCentrality, (; normalize = D)),
+             (BetweennessCentrality, (; normalize = D)))
+            ct = T(; kwargs = kw)
+            @test isa(ct, T)
+            @test_throws Union{MethodError, TypeError} cc(ct, g)
         end
     end
 end

@@ -54,6 +54,7 @@ TopologyOnly
 centrality_polarity
 centrality_graph
 assert_centrality_args
+assert_tree_args
 calc_centrality
 Tree_SimMat
 NwE_ClE

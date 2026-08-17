@@ -168,7 +168,7 @@ A narrowed step fills its half of the [`PipelineUncertaintySets`](@ref) pair and
 """
 function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
                               ctx::PipelineContext)
-    @argcheck(target in (:mu, :sigma, :both),
+    @argcheck(target in PIPELINE_STEP_TARGETS,
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
     require_slot(ctx, :returns, ue)
     cur = ctx.uncertainty

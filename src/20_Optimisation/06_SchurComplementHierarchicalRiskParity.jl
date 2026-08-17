@@ -464,6 +464,8 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -860,6 +862,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = sh.opt.x_src, z_src = sh.opt.z_src)
     items = [clr.res.order]
@@ -890,6 +894,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      x_src = sh.opt.x_src, z_src = sh.opt.z_src)
     items = [clr.res.order]
@@ -923,6 +929,10 @@ Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
   - $(arg_dict[:rd]) If `isa(sh.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Details
+
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
 # Related
 

@@ -244,7 +244,8 @@ DimensionReductionRegression
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
         if haskey(retgt.kwargs, :weights)
-            @argcheck(isa(retgt.kwargs.weights, ObsWeights), TypeError)
+            @argcheck(isa(retgt.kwargs.weights, ObsWeights),
+                      ArgumentError("retgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\nretgt.kwargs.weights => $(typeof(retgt.kwargs.weights))"))
             if isa(retgt.kwargs.weights, AbstractVector)
                 @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
             end

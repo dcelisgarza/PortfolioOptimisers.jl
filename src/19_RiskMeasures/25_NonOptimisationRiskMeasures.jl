@@ -87,7 +87,7 @@ MeanReturn
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     """
@@ -319,7 +319,7 @@ ThirdCentralMoment
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     """
@@ -457,23 +457,7 @@ function moment_risk(r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractW
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
-                                                                               X::MatNum,
-                                                                               fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::ThirdCentralMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights})(w::VecNum, X::MatNum,
-                                                                  fees::Option{<:Fees} = nothing)
-    return ThirdCentralMoment(; settings = r.settings, w = get_observation_weights(r.w, X),
-                              mu = r.mu)(w, X, fees)
-end
-function (r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return ThirdCentralMoment(; settings = r.settings, w = get_observation_weights(r.w, x),
-                              mu = r.mu)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::MeanReturn) = NetReturnsInput()

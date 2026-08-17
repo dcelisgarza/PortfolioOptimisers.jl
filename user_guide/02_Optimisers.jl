@@ -25,6 +25,18 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestam
 rd = prices_to_returns(X)
 pr = prior(EmpiricalPrior(), rd)
 
+#=
+Every JuMP optimiser below shares this one solver. Its `check_sol` field is splatted into JuMP's
+`assert_is_solved_and_feasible` after each solve, and decides which solver statuses count as a
+solved model. The default `(;)` is strict on purpose — it accepts only `OPTIMAL` or
+`LOCALLY_SOLVED` at a `FEASIBLE_POINT`, so a solution the solver itself flags as approximate is
+rejected rather than silently used. Passing `allow_almost = true` widens it to the `ALMOST_*`
+statuses, which is what we want here: a first-order conic solver that reaches its tolerance on a
+well-posed portfolio problem gives a usable answer, and rejecting it would only make the optimiser
+fall through to the next solver. Tighten it the other way with `allow_local = false` when nothing
+short of a certified global optimum will do.
+=#
+
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))

@@ -220,6 +220,16 @@
                                                 writes = :nonsense)
         @test_throws ArgumentError PipelineStep(; est = EmpiricalPrior(),
                                                 reads = (:nonsense,), writes = :prior)
+
+        # The routing annotation is allowlisted here too, so a mistyped target is refused
+        # where it is written rather than by the step that reads it, mid-pipeline.
+        @test_throws ArgumentError PipelineStep(; est = NormalUncertaintySet(),
+                                                reads = (:returns,), writes = :uncertainty,
+                                                target = :nonsense)
+        for t in PortfolioOptimisers.PIPELINE_STEP_TARGETS
+            @test PipelineStep(; est = NormalUncertaintySet(), reads = (:returns,),
+                               writes = :uncertainty, target = t).target === t
+        end
     end
 
     @testset "PipelineContext" begin

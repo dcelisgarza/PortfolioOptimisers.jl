@@ -163,8 +163,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
-  - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
+  - [`optimise`](@ref)
   - [`SubsetResamplingResult`](@ref)
+  - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator

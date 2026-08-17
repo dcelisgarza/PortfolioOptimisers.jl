@@ -162,7 +162,7 @@ PowerNormValueatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
@@ -296,7 +296,7 @@ PowerNormValueatRiskRange
     """
     pb
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
@@ -440,7 +440,7 @@ PowerNormDrawdownatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
@@ -580,7 +580,7 @@ RelativePowerNormDrawdownatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,

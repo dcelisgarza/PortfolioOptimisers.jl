@@ -304,9 +304,11 @@ HopCount
     n
     function HopCount(n::HopCountValue)
         # A rule is a promise about a value that does not exist yet, so there is nothing to
-        # check here. `resolve_separation` checks what it returns.
+        # check here. `resolve_separation` checks what it returns -- and it returns it
+        # through this constructor, so the resource cap below covers a computed `n` too.
         if isa(n, Integer)
             @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
+            assert_resource_cap(n, RESOURCE_LIMITS[].max_hop_count, :n, :max_hop_count)
         end
         return new{typeof(n)}(n)
     end

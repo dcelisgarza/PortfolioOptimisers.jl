@@ -941,7 +941,9 @@ stays aligned with the windowed returns. Only `window = nothing`, which resolves
   - `X`: Data matrix of asset returns.
   - `iv`: Optional instrument variable matrix; subsetted to the window when `window` is a
     `VecInt`.
-  - `dims`: Observation dimension — 1 for rows (default), 2 for columns.
+  - `dims`: Observation dimension — 1 for rows (default), 2 for columns. Checked by
+    [`assert_dims`](@ref), so every generated windowed method rejects an out-of-range `dims`
+    instead of silently resolving a one-observation window.
   - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref).
 
 # Returns
@@ -964,6 +966,7 @@ stays aligned with the windowed returns. Only `window = nothing`, which resolves
 function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
                            X::MatNum; iv::Option{<:MatNum} = nothing, dims::Int = 1,
                            kwargs...)
+    assert_dims(dims)
     win = get_window(window, X, dims)
     X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
     inner = factory(est, w_new)
@@ -1073,25 +1076,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Suggest the nearest `candidates` entry to a mistyped [`@windowed_estimator`](@ref) key.
 
-Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default:
-Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The
-strict global default exists to keep near-miss probes from echoing real *asset names* back to
-the caller (ADR 0026); that boundary does not apply here, because the candidates are
-compile-time constants — block keys and `field_dict`/`ret_dict` names — with nothing to leak.
-At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5
-against `noun`, so the suggestion would be dead code.
+Delegates to [`suggest_declared_key`](@ref), which holds the looser scoped configuration every
+declaration-key suggestion shares: Damerau-Levenshtein at `min_score = 0.5`, because the
+candidates here are compile-time constants — block keys and `field_dict`/`ret_dict` names —
+with nothing to leak.
 
 # Related
 
   - [`@windowed_estimator`](@ref)
+  - [`suggest_declared_key`](@ref)
   - [`did_you_mean`](@ref)
-  - [`with_string_distance`](@ref)
 """
 function windowed_estimator_suggest(key, candidates)
-    return with_string_distance(; dist = StringDistances.DamerauLevenshtein(),
-                                min_score = 0.5) do
-        return did_you_mean(string(key), string.(collect(candidates)))
-    end
+    return suggest_declared_key(key, candidates)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

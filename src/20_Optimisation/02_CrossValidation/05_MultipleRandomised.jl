@@ -103,6 +103,8 @@ $(DocStringExtensions.FIELDS)
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`MultipleRandomisedResult`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`IndexWalkForward`](@ref)

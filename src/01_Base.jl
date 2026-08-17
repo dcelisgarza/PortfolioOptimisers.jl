@@ -1,4 +1,31 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build a documentation dictionary from `pairs`, and throw if a key appears more than once.
+
+A `Dict` literal is last-wins, so a repeated key drops the earlier entry with no warning and
+makes its prose unreachable. This constructor is the guard against that: it fails at load
+time and names both descriptions, so the duplicate is visible instead of silent. `name` is
+the dictionary under construction, and is used in the error message.
+
+# Related
+
+  - [`arg_dict`](@ref)
+  - [`val_dict`](@ref)
+  - [`ret_dict`](@ref)
+  - [`err_name_dict`](@ref)
+"""
+function unique_key_dict(name::Symbol, pairs::Pair{Symbol, <:AbstractString}...)
+    dict = Dict{Symbol, String}()
+    for (key, val) in pairs
+        if haskey(dict, key)
+            throw(ArgumentError("`$(name)` has a repeated key, `:$(key)`. Each key must appear exactly once.\n  first: $(dict[key])\n  later: $(val)"))
+        end
+        dict[key] = val
+    end
+    return dict
+end
+"""
     arg_dict
 
 Maps a parameter key to the docstring description of the corresponding argument or
@@ -17,693 +44,654 @@ strips the ``"`name`: "`` prefix. A few illustrative entries:
     :plsrc => "`pl`: Network estimator or clustering estimator -- a source that refits, never a precomputed result."
 
 The `const` definition below is the single source of truth; consult it for the full
-table of keys and descriptions.
+table of keys and descriptions. A key must appear once: [`unique_key_dict`](@ref) builds
+the table and refuses a repeat, because a `Dict` literal drops the earlier entry in silence.
 
 # Related
 
+  - [`unique_key_dict`](@ref)
   - [`field_dict`](@ref)
   - [`val_dict`](@ref)
 """
-const arg_dict = Dict(
-                      # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector `assets × 1`.",#
-                      :ow => "`w`: Observation weights vector `observations × 1`.",#
-                      :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
-                      :eqw => "`eqw`: Equilibrium weights vector `assets × 1`.",#
-                      # Matrix processing.
-                      :pdm => "`pdm`: Positive definite matrix estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :dn => "`dn`: Matrix denoising estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
-                      :dna => "`dna`: Matrix denoising algorithm.",
-                      :dt => "`dt`: Matrix detoning estimator.",
-                      :odt => "`dt`: Optional matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :omp => "`mp`: Optional matrix processing estimator.",
-                      :mpa => "`mpa`: Matrix processing algorithm.",
-                      # Moments.
-                      :me => "`me`: Expected returns estimator.",
-                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
-                      :ce => "`ce`: Covariance estimator.",#
-                      :ve => "`ve`: Variance estimator.",#
-                      :ske => "`ske`: Coskewness estimator.",
-                      :kte => "`kte`: Cokurtosis estimator.",
-                      :de => "`de`: Distance matrix estimator.",
-                      :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
-                      :malg => "`alg`: Moment algorithm.",
-                      :corrected => "`corrected`: Whether to apply Bessel's correction.",#
-                      :mutgt => "`tgt`: Shrinkage target.",#
-                      :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
-                      :metric => "`metric`: Distance metric used for pairwise computations.",#
-                      :metric_args => "`args`: Additional positional arguments for the distance metric.",#
-                      :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
-                      :t => "`t`: Threshold value.",#
-                      :iv => "`iv`: Implied volatility matrix.",
-                      :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
-                      ## Regression
-                      :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
-                      :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
-                      :b => "`b`: Regression intercept vector.",#
-                      :crit => "`crit`: Factor selection criterion.",#
-                      :realg => "`alg`: Regression algorithm.",#
-                      :retgt => "`tgt`: Regression model target.",#
-                      :dretgt => "`retgt`: Regression model target.",#
-                      :drtgt => "`drtgt`: Dimension reduction target.",
-                      ## Gerber
-                      :gerbalg => "`alg`: Gerber covariance algorithm.",#
-                      :gerbce => "`ce`: Gerber covariance estimator.",#
-                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
-                      :c1 => "`c1`: Zone of confusion parameter.",#
-                      :c2 => "`c2`: Zone of indecision lower bound.",#
-                      :c3 => "`c3`: Zone of indecision upper bound.",#
-                      :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
-                      :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
-                      ## Mutual and var info
-                      :bins => "`bins`: Binning algorithm or fixed number of bins.",#
-                      :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
-                      ## Distance
-                      :dopower => "`power`: Optional matrix exponent.",#
-                      :dalg => "`alg`: Distance algorithm.",#
-                      :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
-                      :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
-                      :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
-                      :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
-                      :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
-                      :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
-                      :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
-                      # Priors.
-                      :pe => "`pe`: Prior estimator.",#
-                      :pr => "`pr`: Prior result.",#
-                      :per => "`pr`: Prior estimator or result.",#
-                      # Phylogeny.
-                      :cle => "`cle`: Clusters estimator.",#
-                      :clr => "`clr`: Clusters result.",#
-                      :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",#
-                      :plr => "`plr`: Phylogeny result.",#
-                      :nte => "`nte`: Network estimator.",#
-                      :ntr => "`pl`: Network result.",#
-                      :nter => "`pl`: Network estimator or result.",#
-                      :cte => "`cte`: Centrality estimator.",#
-                      :cta => "`ct`: Centrality algorithm.",#
-                      :ctr => "`ct`: Centrality result.",#
-                      :cter => "`ct`: Centrality estimator or result.",#
-                      :ctargs => "`args`: Positional arguments for the centrality function.",#
-                      :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
-                      :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
-                      :treeargs => "`args`: Positional arguments for the centrality function.",#
-                      :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
-                      :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
-                      :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
-                      :ntn => "`n`: Number of steps to take in the network for deciding adjacency. An `Integer` is used as it stands. A [`HopCountAlgorithm`](@ref) or a `Function` is a **rule**, called as `n(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return an `Integer`.",#
-                      :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a **rule**, called as `dmax(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return a `Number`.",#
-                      :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
-                      :clres => "`res`: Clustering result.",#
-                      :S => "`S`: Similarity matrix",#
-                      :D => "`D`: Distance matrix",#
-                      :ck => "`k`: Optimal number of clusters.",#
-                      :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
-                      :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(assets))`.",#
-                      :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
-                      :clalg => "`alg`: Clustering algorithm.",#
-                      :onc => "`onc`: Optimal number of clusters estimator.",#
-                      :phX_Xv => "`X`: Phylogeny matrix or vector.",#
-                      :phX => "`X`: Phylogeny matrix.",#
-                      :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
-                      :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
-                      ## Separation and separation decay
-                      :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
-                      :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. Larger values decay faster. The per-step retention form, `ratio^d`, is `rate = -log(ratio)`.",#
-                      :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. Larger values decay faster.",#
-                      ## DBHT
-                      :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
-                      :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
-                      :sim => "`sim`: Similarity matrix algorithm. The PMFG cannot take a negative weight, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
-                      :root => "`root`: Root selection method.",#
-                      # Estimators
-                      :sets => "`sets`: Sets used to map estimator values to assets.",#
-                      :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
-                      :ekey => "`key`: Key to specify the universe in `sets.dict` that names resolve against. If `nothing`, the key is taken from `sets.xkey` — or, where the caller is written against another declared axis, from that axis' key.",#
-                      :sets_f => "`sets`: Universe sets. The **factor** axis, `sets.dict[sets.fkey]`, is what this estimator reads: it is the universe the views are written in, and it must name the columns of `F` in order. The asset axis is required by [`UniverseSets`](@ref) and is what a view slices — the factor entries come back from [`port_opt_view`](@ref) untouched.",#
-                      :sets_frb => "`sets`: Universe sets. The **factor** axis, `sets.dict[sets.fkey]`, is what this algorithm reads: it is the universe the risk budget is written in, and it must name the columns of `rr.L` in order — the budget is over the factor weights `w1`, one per column of the loadings the risk decomposition uses. It is only read when `rkb` is a [`RiskBudgetEstimator`](@ref); a [`RiskBudget`](@ref) result carries its own vector and resolves no names. The asset axis is required by [`UniverseSets`](@ref) and is what a view slices — the factor entries come back from [`port_opt_view`](@ref) untouched.",#
-                      :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
-                      :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
-                      # Constraints
-                      :A => "`A`: Linear constraint coefficient matrix.",#
-                      :B => "`B`: Linear constraint response vector.",#
-                      :eq => "`eq`: Optional equality constraints.",#
-                      :ineq => "`ineq`: Optional inequality constraints.",#
-                      # Turnover.
-                      :tne => "`tn`: Turnover estimator.",#
-                      :tnr => "`tn`: Turnover result.",
-                      :tner => "`tn`: Turnover estimator or result.",
-                      :tnes => "`tn`: Turnover estimator(s).",
-                      :tnrs => "`tn`: Turnover result(s).",
-                      :tners => "`tn`: Turnover estimator(s) or result(s).",
-                      # Tracking.
-                      :tre => "`tr`: Tracking error estimator.",
-                      :trr => "`tr`: Tracking error result.",
-                      :trer => "`tr`: Tracking error estimator or result.",
-                      :tres => "`tr`: Tracking error estimator(s).",
-                      :trrs => "`tr`: Tracking error result(s).",
-                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                      # Weight bounds.
-                      :wbe => "`wb`: Weight bounds estimator.",
-                      :wbr => "`wb`: Weight bounds result.",
-                      :wber => "`wb`: Weight bounds estimator or result.",
-                      # Fees.
-                      :feese => "`fees`: Fees estimator.",#
-                      :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.",
-                      # Stats.
-                      :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
-                      :mu => "`mu`: Expected returns vector `assets × 1`.",#
-                      :rho => "`rho`: Correlation matrix `assets × assets`.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `assets × assets`.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `assets × assets`.",
-                      :kt => "`kt`: Cokurtosis matrix `assets^2 × assets^2`.",#
-                      :sk => "`sk`: Coskewness matrix `assets × assets^2`.",#
-                      :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `assets × assets`.",
-                      :X => "`X`: Data matrix `observations × assets` if the `dims` keyword does not exist or `dims = 1`, `assets × observations` when `dims = 2`.",#
-                      :o_X => "`o_X`: The returns matrix the caller supplied, kept only when the carrier's own `X` is not it, and `nothing` otherwise. The three estimators that lift a factor-axis prior onto the asset axis overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`; `o_X` is the asset returns they were handed, over the same observations and the same assets. Read it as `original_X`, which is always a matrix, rather than as this field.",#
-                      :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
-                      :Xv => "`X`: Data vector `observations × 1`.",#
-                      :X_Xv => "`X`: Data matrix or vector.",#
-                      :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
-                      :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from a `UniverseSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
-                      :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
-                      :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
-                      :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
-                      :dims => "`dims`: Dimension along which to perform the computation.",#
-                      :omean => "`mean`: Optional mean value to use for centering.",
-                      :stdvec => "`sd`: Vector of standard deviations for each asset.",#
-                      :ex => "`ex`: Parallel execution strategy.",#
-                      :alpha => "`alpha`: Quantile level for the lower tail.",#
-                      :beta => "`beta`: Quantile level for the upper tail.",#
-                      :l => "`l`: Risk aversion parameter.",#
-                      :rf => "`rf`: Risk-free rate.",#
-                      # Errors
-                      :msg => "`msg`: Error message describing the condition that triggered the exception.",#
-                      # Solver
-                      :name => "`name`: Symbol or string identifier for logging purposes.",#
-                      :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
-                      :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
-                      :check_sol => "`check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).",#
-                      :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
-                      # RNG
-                      :rng => "`rng`: Random number generator.",#
-                      :seed => "`seed`: Seed for the random number generator.",
-                      # JuMP Optimisation
-                      :model => "`model::JuMP.Model`: The JuMP optimisation model.",
-                      :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
-                      :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
-                      :ci => "`i`: Constraint index for unique variable and constraint naming.",
-                      :key_sym => "`key::Symbol`: Symbol used to name constraints or expressions in the model.",
-                      :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
-                      :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
-                      :lt_arg => "`lt::Option{<:Threshold}`: Long-side minimum-holding threshold.",
-                      :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
-                      :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
-                      :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
-                      :xbgt_flag_arg => "`xbgt_flag::Bool`: Whether to pin the long/short decomposition, so the budgets built on `lw`/`sw` hold exactly (see [`set_exact_budget_constraints!`](@ref)).",
-                      :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
-                      :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
-                      :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
-                      :r_risk => "`r`: Risk measure instance.",
-                      :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
-                      :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
-                      :pl_opt => "`pl`: Optional phylogeny constraints.",
-                      :fees_opt => "`fees`: Optional fees structure.",
-                      :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
-                      :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
-                      :ignargs => "`args`: Additional positional arguments (ignored).",
-                      :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
-                      :rd => "`rd`: The returns result to use.",
-                      :window => "`window`: Observation window.",
-                      # Prior results.
-                      :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
-                      :w_prior => "`w`: Observation weights the prior was computed under `observations × 1` (see [`ObsWeights`](@ref)), or `nothing` if it was computed unweighted. Binds `ens`, `kld` and `ow`, which are diagnostics of it (see [`forward_prior`](@ref)).",#
-                      :ens => "`ens`: Effective sample size.",#
-                      :kld => "`kld`: Kullback-Leibler divergence of `w` from the weights it was derived from: a scalar against the prior observation weights for a single reweighting, or one entry per opinion when `w` came from pooling several.",#
-                      :fpr => "`fpr`: Prior result over the factor axis, or `nothing`. Its `X` is the factor returns matrix, so its `mu`, `sigma` and `w` describe factors rather than assets, over the same observations as the asset block.",#
-                      :op_w => "`ow`: Opinion pooling weights.",#
-                      :reg_rr => "`rr`: Regression result.",#
-                      # Prior estimators.
-                      :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
-                      :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
-                      :views => "`views`: Views estimator or result.",#
-                      :views_conf => "`views_conf`: Views confidence estimator or result.",#
-                      :a_pe => "`a_pe`: Asset prior estimator.",#
-                      :f_pe => "`f_pe`: Factor prior estimator.",#
-                      :a_views => "`a_views`: Asset views estimator or result.",#
-                      :f_views => "`f_views`: Factor views estimator or result.",#
-                      :sets_af => "`sets`: Universe sets. This estimator reads **both** declared axes: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.fkey]`, and each axis must name the columns of `X` and `F` respectively, in order. Only the axis a [`LinearConstraintEstimator`](@ref) actually resolves names against is required — views supplied as a [`BlackLittermanViews`](@ref) result carry their own matrix and need no universe. A view slices the asset axis and leaves the factor entries untouched, which is why this field is `@vprop`.",#
-                      :a_views_conf => "`a_views_conf`: Asset views confidence estimator or result.",#
-                      :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
-                      :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
-                      :f_mp => "`f_mp`: Factor matrix processing estimator.",#
-                      :re => "`re`: Regression estimator.",#
-                      :pes => "`pes`: Vector of prior estimators.",#
-                      :pe1 => "`pe1`: Pre-processing prior estimator.",#
-                      :pe2 => "`pe2`: Post-processing prior estimator.",#
-                      :p_pool => "`p`: Opinion pooling blending parameter.",#
-                      # Entropy pooling.
-                      :mu_views => "`mu_views`: Expected returns views estimator or result.",#
-                      :var_views => "`var_views`: Value-at-risk views estimator or result.",#
-                      :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
-                      :sigma_views => "`sigma_views`: Variance views estimator or result.",#
-                      :sk_views => "`sk_views`: Skewness views estimator or result.",#
-                      :kt_views => "`kt_views`: Kurtosis views estimator or result.",#
-                      :cov_views => "`cov_views`: Covariance views estimator or result.",#
-                      :rho_views => "`rho_views`: Correlation views estimator or result.",#
-                      :var_alpha => "`var_alpha`: Quantile level for variance views.",#
-                      :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
-                      :ds_opt => "`ds_opt`: Thin wrapper for arguments and keyword arguments used in `Roots.findzero` for use with a single conditional value-at-risk view.",#
-                      :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
-                      :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
-                      # Black-Litterman views.
-                      :P => "`P`: Views loading matrix `views × assets`.",#
-                      :Q => "`Q`: Views values vector `views × 1`.",#
-                      :excl => "`excl`: Indices of views to exclude.",#
-                      # High order priors.
-                      :skmp => "`skmp`: Coskewness matrix processing estimator.",#
-                      :D2 => "`D2`: Duplication matrix.",#
-                      :L2 => "`L2`: Elimination matrix.",#
-                      :S2 => "`S2`: Summation matrix.",#
-                      # Uncertainty sets.
-                      :lb => "`lb`: Lower bound.",#
-                      :ub => "`ub`: Upper bound.",#
-                      :dmu => "`dmu`: Uncertainty bound for expected returns.",#
-                      :dsigma => "`dsigma`: Uncertainty bound for covariance.",#
-                      :dist => "`dist`: Probability distribution.",#
-                      :k_ucs => "`k`: Uncertainty set scaling parameter.",#
-                      :class_ucs => "`class`: Uncertainty set class.",#
-                      :val_ucs => "`val`: Quantity the set is a neighbourhood of — a characteristic vector on the mean axis, a covariance matrix on the covariance axis. `nothing` defers to the consumer's own quantity. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
-                      :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
-                      :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
-                      :eps_ucs => "`eps`: Radius of the ``\\\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
-                      :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\\\ell_1`` uncertainty set.",#
-                      :en_ucs => "`en`: Radius of the negative-error side of the signed ``\\\\ell_1`` uncertainty set.",#
-                      :sd_ucs => "`sd`: Per-asset scaling vector for the ``\\\\ell_1`` uncertainty set (the estimated standard deviations). `nothing` leaves the set unscaled, so every element of the characteristic vector is assumed to suffer the same estimation error.",#
-                      :mu_l1_ucs => "`mu`: Characteristic vector the ``\\\\ell_1`` set is a neighbourhood of. `nothing` defers to the consumer's own characteristic. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
-                      :method_l1_ucs => "`method`: Radius of the ``\\\\ell_1`` uncertainty set. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
-                      :mp_ucs => "`mp`: Radius of the positive-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
-                      :mm_ucs => "`mm`: Radius of the negative-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
-                      :scaled_ucs => "`scaled`: Whether to scale the uncertainty set by the estimated standard deviations. `false` assumes every characteristic suffers the same estimation error; `true` assumes assets with larger variance suffer larger estimation error, which yields inverse-volatility weights.",#
-                      :active_ucs => "`active`: Target number of active assets on the *unconstrained* problem, as a count (integer `>= 1`) or a fraction of the universe (float in `(0, 1)`). This is a radius calibration, not a cardinality constraint: it selects the radius that would activate this many assets subject only to the budget and sign constraints. Any further constraint may change the realised count. Use `card` for a hard cardinality constraint.",#
-                      :n_sim => "`n_sim`: Number of simulation samples.",#
-                      :block_size => "`block_size`: Block size for bootstrap sampling.",#
-                      :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
-                      :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
-                      :ucs => "`ucs`: Uncertainty set.",#
-                      :ucsa => "`alg`: Uncertainty set algorithm.",#
-                      # Constraint generation.
-                      :dval => "`dval`: Default value for assets not specified in `val`.",#
-                      :dict => "`dict`: Dictionary mapping group identifiers to member labels.",#
-                      :vars => "`vars`: Variable names in the parsed constraint expression.",#
-                      :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
-                      :op => "`op`: Comparison operator (`==`, `<=`, or `>=`).",#
-                      :rhs => "`rhs`: Right-hand side value of the constraint.",#
-                      :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
-                      :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
-                      :comp => "`comp`: Constraint comparison type.",#
-                      :scale_c => "`scale`: Scaling factor applied to constraint coefficients.",#
-                      # Risk measure settings.
-                      :settings_rm => "`settings`: Risk measure settings.",#
-                      :scale_rm => "`scale`: Weight of this risk measure in the aggregate risk expression formed from a vector of measures. It is a combination weight, so it is inert on a single measure: an optimiser given one measure drops it before the risk expression is built, and the value-level readers ignore it too. The upper bound in `ub` binds on the measure's own expression, before `scale` is applied.",#
-                      :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
-                      :lb_rms => "`lb`: Lower bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
-                      :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
-                      # Return term settings.
-                      :settings_rt => "`settings`: Return term settings.",#
-                      :scale_rt => "`scale`: Weight of this return term in the weighted sum that forms the `JuMP` return expression. It is a combination weight, so it is inert on a single term: an optimiser given one term drops it before the return expression is built, and the value-level readers ignore it too. The lower bound in `lb` binds on the term's own expression, before `scale` is applied.",#
-                      :lb_rts => "`lb`: Lower bound(s) for the return term. Can be a scalar, vector, or [`Frontier`](@ref). The bound binds on the term's own expression, net of the term's own flagged charges and before `scale` is applied, and it binds whether or not `rte` is `true`.",#
-                      :rte => "`rte`: Whether to include the return term in the `JuMP` return expression.",#
-                      :fee_rts => "`fee`: Whether to subtract the portfolio fees from this return term. Set it to `false` for a term that is not in return units.",#
-                      :mic_rts => "`mic`: Whether to subtract the market impact cost from this return term. Set it to `false` for a term that is not in return units, or to leave the cost to the budget constraint alone.",#
-                      # Frontier.
-                      :N_fr => "`N`: Number of points on the efficient frontier.",#
-                      :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
-                      :bound_fr => "`bound`: What operation needs to be performed on the risk lower bound.",#
-                      # Risk measure fields.
-                      :rc => "`rc`: Risk contribution constraint.",#
-                      :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
-                      :vr_rm => "`vr`: Variance risk measure component.",#
-                      :sk_rm => "`sk`: Skewness risk measure component.",#
-                      :kt_rm => "`kt`: Kurtosis risk measure component.",#
-                      :alg1 => "`alg1`: First algorithm variant.",#
-                      :alg2 => "`alg2`: Second algorithm variant.",#
-                      :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#
-                      :kappa => "`kappa`: Relativistic deformation parameter.",#
-                      :kappa_a => "`kappa_a`: Relativistic deformation parameter for the lower tail.",#
-                      :kappa_b => "`kappa_b`: Relativistic deformation parameter for the upper tail.",#
-                      :l_a => "`l_a`: Risk aversion parameter for the lower tail.",#
-                      :r_a => "`r_a`: Radius parameter for the lower tail.",#
-                      :l_b => "`l_b`: Risk aversion parameter for the upper tail.",#
-                      :r_b => "`r_b`: Radius parameter for the upper tail.",#
-                      :gamma => "`gamma`: Log-sum-exp scalariser smoothing parameter.",#
-                      :b_mip => "`b`: Big-M upper bound for MIP formulations.",#
-                      :s_mip => "`s`: Small-M lower bound for MIP formulations.",#
-                      :slv => "`slv`: Solver or vector of solvers.",#
-                      :p_rm => "`p`: Power or order parameter.",#
-                      :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
-                      # Deferred Quantity slots. Each admits the value itself or the Estimator that
-                      # computes it, resolved against the optimisation's own prior. See
-                      # `DeferredQuantity` and ADR 0051.
-                      :mu_slot => "`mu`: Optional centre the moment is taken about, a scalar or a vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the centre against the optimisation's own prior, at [`factory`](@ref) time (see [`MuSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
-                      :sigma_slot => "`sigma`: Optional covariance matrix `assets × assets`. Also admits a **Deferred Quantity** — a covariance estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`SigmaSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
-                      :chol_slot => "`chol`: Optional Cholesky factorisation of the covariance matrix. Derived from `sigma`, so it never defers: it arrives as one pair with whatever `sigma` resolves to. Give it with a matrix `sigma` and with neither otherwise — stating it without `sigma`, or while `sigma` holds a Deferred Quantity, is refused at construction (see [`assert_derived_slot_has_source`](@ref)). If `nothing`, the prior supplies the pair, or the kernel derives the factorisation from a stated `sigma`.",#
-                      :kt_slot => "`kt`: Optional cokurtosis matrix `assets^2 × assets^2`. Also admits a **Deferred Quantity** — a cokurtosis estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`KtSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). A cokurtosis estimator supplies `mu` as well, from its own `me`, so that the tensor and the centre it was taken about come out of one object. If `nothing`, the prior supplies it.",#
-                      :sk_slot => "`sk`: Optional coskewness matrix `assets × assets^2`. Also admits a **Deferred Quantity** — a coskewness estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`SkSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). A coskewness estimator supplies `mu` as well, from its own `me`, so that the tensor and the centre it was taken about come out of one object. If `nothing`, the prior supplies it.",#
-                      :V_slot => "`V`: Optional sum of the negative spectral slices of the coskewness matrix `assets × assets`. Derived from `sk`, so it never defers: it arrives as one pair with whatever `sk` resolves to, and the matrix processing estimator that built it travels with it and replaces `mp`. Give it with a matrix `sk` and with neither otherwise. Stating it while `sk` holds a Deferred Quantity is refused at construction.",#
-                      :mu_dvar_slot => "`mu`: Optional expected returns vector `assets × 1`, the location of `dist`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`MuSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
-                      :mu_mad_slot => "`mu`: Centre the absolute deviation is taken about. It is a [`MedianCenteringFunction`](@ref) that centres the portfolio series at the point of use, a scalar or a vector `assets × 1`, or a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the centre against the optimisation's own prior, at [`factory`](@ref) time (see [`MedAbsDevMu`](@ref) and [`resolve_deferred_quantities`](@ref)). There is no `nothing` state; the default is [`MedianCentering`](@ref).",#
-                      :mu_ret_slot => "`mu`: Optional expected returns vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`ArithRetMu`](@ref) and [`resolve_deferred_quantities`](@ref)). A `ucs` that carries its own centre outranks it, and it outranks the prior's own vector (ADR 0050). If `nothing`, the prior supplies it.",#
-                      :w_rm => "`w`: Optional portfolio weights.",#
-                      :ddof => "`ddof`: Degrees-of-freedom correction.",#
-                      :flag => "`flag`: Algorithm selection flag.",#
-                      :pos => "`pos`: Whether to consider only positive deviations.",#
-                      # Turnover.
-                      :w_tn => "`w`: Current portfolio weights vector.",#
-                      :w_ref => "`w`: Reference portfolio weights vector.",#
-                      :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
-                      :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
-                      # Tracking specification.
-                      :tr_spec => "`tr`: Benchmark tracking specification.",#
-                      # Power norm parameters.
-                      :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
-                      :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
-                      # Generic Value-at-Risk range components.
-                      :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
-                      :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
-                      # Fees.
-                      :tn_fees => "`tn`: Turnover estimator or result.",#
-                      :l_fees => "`l`: Long proportional fees.",#
-                      :s_fees => "`s`: Short proportional fees.",#
-                      :fl => "`fl`: Long fixed fees.",#
-                      :fs => "`fs`: Short fixed fees.",#
-                      :dl => "`dl`: Default long proportional fee.",#
-                      :ds => "`ds`: Default short proportional fee.",#
-                      :dfl => "`dfl`: Default long fixed fee.",#
-                      :dfs => "`dfs`: Default short fixed fee.",#
-                      :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
-                      # Optimisation results.
-                      :pa => "`pa`: Processed optimisation attributes.",#
-                      :retcode => "`retcode`: Optimisation return code.",#
-                      :sol => "`sol`: Optimisation solution.",#
-                      :fb => "`fb`: Fallback result or estimator.",#
-                      # Optimiser fields.
-                      :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
-                      :r_opt => "`r`: Risk measure or vector of risk measures.",#
-                      :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored **resolved** — a **Deferred Quantity** has already been fitted and an unstated slot has already taken the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
-                      :obj => "`obj`: Portfolio objective function.",#
-                      :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
-                      :sca => "`sca`: Scalariser for combining multiple risk measures.",#
-                      :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one.",#
-                      :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
-                      :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default budgets *bound* the realised exposure rather than pinning it (see `xbgt`). Together with `sbgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
-                      :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, a [`BudgetRange`](@ref) bounds it; by default it *bounds*, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. Together with `bgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
-                      :gbgt => "`gbgt`: Gross budget (leverage) constraint, `sum(lw) + sum(sw)`. A number pins the gross exposure; a [`BudgetRange`](@ref) bounds it, e.g. `BudgetRange(; lb = nothing, ub = 2.0)` caps leverage at 2x. Unlike `bgt` and `sbgt` — which pin the net and gross exposures only *together* — this constrains the gross exposure on its own, leaving the net free. Requires weight bounds that admit short positions, and is bounded rather than pinned unless `xbgt` is set.",#
-                      :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
-                      :lt => "`lt`: Long-side minimum holding threshold.",#
-                      :st => "`st`: Short-side minimum holding threshold.",#
-                      :lcse => "`lcse`: Linear constraint set estimator(s). This is the one constraint slot that also admits an `ExposureConstraintEstimator`, so a row may be written in the names of another basis — factor names, say — and re-based through the prior's loadings at generation time. What reaches the model is an ordinary asset-space `LinearConstraint` either way.",#
-                      :gcarde => "`gcarde`: Grouped cardinality constraint estimator.",#
-                      :sgcarde => "`sgcarde`: Sub-grouped cardinality constraint estimator(s).",#
-                      :smtx => "`smtx`: Sub-group selection matrix or estimator.",#
-                      :sgmtx => "`sgmtx`: Sub-grouped selection matrix or estimator.",#
-                      :slt => "`slt`: Sub-group long threshold.",#
-                      :sst => "`sst`: Sub-group short threshold.",#
-                      :sglt => "`sglt`: Sub-grouped long threshold.",#
-                      :sgst => "`sgst`: Sub-grouped short threshold.",#
-                      :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
-                      :fees_jmp => "`fees`: Fee estimator or fee structure.",#
-                      :tr_jmp => "`tr`: Tracking error constraint(s).",#
-                      :ple => "`ple`: Phylogeny constraint estimator(s).",#
-                      :lcsr => "`lcsr`: Processed linear constraint set result.",#
-                      :gcardr => "`gcardr`: Processed grouped cardinality constraint result.",#
-                      :sgcardr => "`sgcardr`: Processed sub-grouped cardinality constraint result.",#
-                      :ret_jmp => "`ret`: Return term, or vector of return terms, for the `JuMP` model. Several terms are weighted-summed into the model's single scalar return expression, in the same way [`MeanRisk`](@ref)'s `r` takes several risk measures.",#
-                      :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
-                      :cobj => "`cobj`: Custom `JuMP` objective.",#
-                      :sc => "`sc`: Constraint scale factor.",#
-                      :so => "`so`: Objective scale factor.",#
-                      :ss => "`ss`: Optional scalar shrinkage parameter.",#
-                      :card => "`card`: Global cardinality constraint.",#
-                      :scard => "`scard`: Sub-group cardinality constraint(s).",#
-                      :l2c => "`l2c`: 2-norm ceiling on the weights — bounds `norm(w, 2) <= l2c * k` (`k` is the budget, `1` for a fully invested portfolio). Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`.",#
-                      :lpc => "`lpc`: p-norm ceiling(s) on the weights at an arbitrary norm order. Each [`LpRegularisation`](@ref) supplies a norm order `p` and a bound `val`, enforcing `norm(w, p) <= val * k`. Smaller `val` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `val = m^(-1/p)` requires at least `m` p-norm effective assets (`inv(norm(w, p)^p) >= m`). Norm-constraint family with `l2c` and `linfc`.",#
-                      :linfc => "`linfc`: ∞-norm ceiling on the weights — a cap on the largest absolute weight: `norm(w, Inf) <= linfc * k`. So `linfc = 0.2` caps the largest weight at 20% of a fully invested portfolio. Used as a diversification floor via the reciprocal: `linfc = 1 / m` spreads the portfolio across at least `m` assets. Norm-constraint family with `l2c` and `lpc`.",#
-                      :l1 => "`l1`: L1 regularisation coefficient.",#
-                      :l2 => "`l2`: L2 regularisation term(s).",#
-                      :linf => "`linf`: L∞ regularisation coefficient.",#
-                      :lp => "`lp`: Lp regularisation specification(s).",#
-                      :l2reg_val => "`val`: L2 regularisation penalty coefficient.",#
-                      :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
-                      :lpreg_p => "`p`: Norm order, `p > 1`.",#
-                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
-                      :brt => "`brt`: Whether to use bootstrap returns.",#
-                      :x_src => "`x_src`: Which returns matrix the clustering, phylogeny and centrality estimators read: `:prior` takes the prior result's `X`, `:data` takes the raw returns result's `X`. Ignored when no returns result is available, in which case the prior result's `X` is used.",#
-                      :z_src => "`z_src`: Which feature matrix a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator reads: `:data` takes the raw returns result's `Z`, `:prior` takes the prior result's `Z`. It defaults to `:data` — the opposite of `x_src` — because an explicitly supplied feature matrix outranks a derived one. Ignored when no [`FeatureDistance`](@ref) is present; a [`FeatureDistance`](@ref) with no `Z` on the selected carrier throws. A `Z` that is carried but unused stays silent, matching `iv`, `ivpa`, `F` and `B` — including the one sub-case that *is* a configuration error and is deliberately not detected: setting `z_src` explicitly with no [`FeatureDistance`](@ref) anywhere in the estimator tree. Detecting it would mean walking an arbitrary estimator tree for a type, which the layer resolving `z_src` cannot do.",#
-                      :wf => "`wf`: Weight finaliser.",#
-                      :rkb => "`rkb`: Risk budget estimator or result.",#
-                      :rba => "`rba`: Risk budget algorithm.",#
-                      :resi => "`resi`: Inner optimisation results.",#
-                      :reso => "`reso`: Outer optimisation results.",#
-                      :opti => "`opti`: Inner optimiser.",#
-                      :opto => "`opto`: Outer optimiser.",#
-                      # Cross-validation.
-                      :n_folds => "`n`: Number of folds.",#
-                      :n_test_folds => "`n_test_folds`: Number of test folds.",#
-                      :purged_size => "`purged_size`: Number of observations to purge between train and test sets.",#
-                      :embargo_size => "`embargo_size`: Number of observations to embargo after the test set.",#
-                      :train_idx => "`train_idx`: Training set indices.",#
-                      :test_idx => "`test_idx`: Test set indices.",#
-                      :train_size => "`train_size`: Training window size.",#
-                      :test_size => "`test_size`: Test window size.",#
-                      :period => "`period`: Time period for date-based walk-forward cross-validation.",#
-                      :period_offset => "`period_offset`: Offset applied to the walk-forward period.",#
-                      :adjuster => "`adjuster`: Function for adjusting walk-forward dates.",#
-                      :previous => "`previous`: Whether to include the previous period in the training window.",#
-                      :expand_train => "`expand_train`: Whether to expand the training window over time.",#
-                      :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
-                      :subset_size => "`subset_size`: Size of each random subset.",#
-                      :n_subsets => "`n_subsets`: Number of random subsets.",#
-                      :max_comb => "`max_comb`: Maximum number of unique asset subsets.",#
-                      :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
-                      :n_iter => "`n_iter`: Number of random iterations.",#
-                      :cv => "`cv`: Cross-validation estimator.",#
-                      :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
-                      :train_score => "`train_score`: Whether to also compute the training set score.",#
-                      :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
-                      :train_scores => "`train_scores`: Training set scores.",#
-                      :test_scores => "`test_scores`: Test set scores.",#
-                      :lens_grid => "`lens_grid`: Grid lengths for each parameter.",#
-                      :val_grid => "`val_grid`: Grid values for each parameter.",#
-                      :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
-                      :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
-                      :asset_idx => "`asset_idx`: Asset column indices per fold.",#
-                      :q_scorer => "`q`: Target quantile for scoring.",#
-                      :r_kwargs => "`r_kwargs`: Keyword arguments passed to the risk measure.",#
-                      :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
-                      :p_cv => "`p`: Hyperparameter search grid.",#
-                      # Prediction result fields.
-                      :pred_nx => "`nx`: Asset name vector.",#
-                      :pred_nf => "`nf`: Factor name vector.",#
-                      :pred_nb => "`nb`: Benchmark name vector.",#
-                      :pred_B => "`B`: Benchmark returns.",#
-                      :ts => "`ts`: Timestamp vector.",#
-                      :iv_ret => "`iv`: Investment vehicle returns.",#
-                      :ivpa => "`ivpa`: Investment vehicle per-asset allocation.",#
-                      :pred_res => "`res`: Optimisation result from the training fold.",#
-                      :pred => "`pred`: Collection of fold predictions.",#
-                      :mrd => "`mrd`: Aggregated multi-period returns result.",#
-                      :id_pred => "`id`: Path or fold identifier.",#
-                      # Allocation.
-                      :shares => "`shares`: Number of shares allocated per asset.",#
-                      :cost_alloc => "`cost`: Cost of the allocation.",#
-                      :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
-                      :unit => "`unit`: Minimum purchase unit (e.g., price per share or lot size).",#
-                      :sc_alloc => "`sc`: Constraint check named tuple for the allocation solver.",#
-                      :so_alloc => "`so`: Objective settings for the allocation solver.",#
-                      :wf_alloc => "`wf`: Weight finaliser for the allocation result.",#
-                      # Cluster node.
-                      :id_node => "`id`: Node identifier.",#
-                      :left_node => "`left`: Left child node.",#
-                      :right_node => "`right`: Right child node.",#
-                      :height_node => "`height`: Height of the node in the dendrogram.",#
-                      :level_node => "`level`: Level of the node in the hierarchical structure.",#
-                      # Other.
-                      :linkage => "`linkage`: Hierarchical clustering linkage method.",#
-                      :dlb => "`dlb`: Default lower bound.",#
-                      :dub => "`dub`: Default upper bound.",#
-                      :err => "`err`: Tracking error tolerance.",#
-                      :tralg => "`alg`: Tracking formulation algorithm.",#
-                      :rt => "`rt`: Returns estimator, or a vector of them. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`. There is no scalariser on the return axis.",#
-                      :rk => "`rk`: Risk measure for ratio computation, or a vector of them scalarised by `sca`.",#
-                      :ohf => "`ohf`: Whether to compute the ratio only for long positions.",#
-                      :r1 => "`r1`: First risk measure.",#
-                      :r2 => "`r2`: Second risk measure.",#
-                      :r1_vec => "`r1`: First risk measure, or a vector of them scalarised by `sca1`.",#
-                      :r2_vec => "`r2`: Second risk measure, or a vector of them scalarised by `sca2`.",#
-                      :sca_rk => "`sca`: Scalariser combining the risk measures in `rk` into one number. Inert when `rk` holds a single measure. The field beats a `sca` keyword supplied at the call site.",#
-                      :sca_r1 => "`sca1`: Scalariser combining the risk measures in `r1` into one number. Inert when `r1` holds a single measure.",#
-                      :sca_r2 => "`sca2`: Scalariser combining the risk measures in `r2` into one number. Inert when `r2` holds a single measure.",#
-                      :ri => "`ri`: Inner risk measure.",#
-                      :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
-                      :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
-                      :ro => "`ro`: Outer risk measure.",#
-                      :scai => "`scai`: Inner scalariser.",#
-                      :scao => "`scao`: Outer scalariser.",#
-                      :params => "`params`: Schur complement decomposition parameters.",#
-                      :gamma_schur => "`gamma`: Schur complement decomposition parameter.",#
-                      :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
-                      :z => "`z`: Regularisation coefficient for log risk budgeting.",#
-                      :tol => "`tol`: Convergence tolerance.",#
-                      :iter => "`iter`: Maximum number of iterations.",#
-                      :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
-                      :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#
-                      :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
-                      :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
-                      :slv_alloc => "`slv`: Solver or vector of solvers for the allocation problem.",#
-                      # Optimiser config.
-                      :opt => "`opt`: `JuMP` optimiser configuration.",#
-                      :kwargs => "`kwargs`: Additional keyword arguments.",#
-                      # Index.
-                      :idx => "`idx`: Index vector.",#
-                      # Risk measure.
-                      :r => "`r`: Risk measure or vector of risk measures.",#
-                      # Returns estimator.
-                      :ret => "`ret`: Returns estimator for `JuMP` models.",#
-                      # Weight bounds.
-                      :wb => "`wb`: Weight bounds.",#
-                      # Turnover.
-                      :tn => "`tn`: Turnover constraint estimator.",#
-                      # Tracking.
-                      :tr => "`tr`: Tracking error constraint estimator.",#
-                      # Fees.
-                      :fees => "`fees`: Fees estimator or result.",#
-                      # Near optimal centering result fields.
-                      :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
-                      :w_opt => "`w_opt`: Optimal portfolio weights.",#
-                      :w_max => "`w_max`: Maximum-risk portfolio weights.",#
-                      :w_min => "`w_min`: Minimum-risk portfolio weights.",#
-                      :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",#
-                      :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",#
-                      :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",#
-                      :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",#
-                      :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",#
-                      :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",#
-                      :rt_opt => "`rt_opt`: Optimal return target.",#
-                      :rt_max => "`rt_max`: Maximum return target.",#
-                      :rt_min => "`rt_min`: Minimum return target.",#
-                      :rt_ends => "`rt_ends`: Per-term return spans for a return-frontier sweep, as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term declares a frontier bound. The aggregate `rt_min`/`rt_max` pair above serves the barrier; these serve the sweep, and the two are different quantities because a term's own span must be read off a portfolio that maximised that term alone.",#
-                      :rk_opt => "`rk_opt`: Optimal risk target.",#
-                      :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",#
-                      # Discrete allocation result fields.
-                      :l_model => "`l_model`: `JuMP` model for the long allocation.",#
-                      :s_model => "`s_model`: `JuMP` model for the short allocation.",#
-                      :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",#
-                      :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
-                      # Risk budgeting.
-                      :prb => "`prb`: Processed risk budgeting configuration.",#
-                      :l_wass => "`l`: Weight of the tail term in the Esfahani-Kuhn loss. The mean term is not scaled by it.",#
-                      :r_wass => "`r`: Radius of the type-1 Wasserstein ambiguity ball. It multiplies a decision variable, so it is not a constant offset.",#
-                      :g_rm => "`g`: Risk aversion parameter.",#
-                      :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
-                      :w1_owa => "`w1`: Optional first OWA weight vector.",#
-                      :w2_owa => "`w2`: Optional second OWA weight vector.",#
-                      :rev_owa => "`rev`: Whether `w2` is *already* reversed. It is a done-flag, not an instruction: the constructor reverses `w2` when `rev == false`, and leaves it as-is when `rev == true`. The field is stored as `true` whatever the caller passes, because `w2` is reversed by the time the object exists, so rebuilding an instance from its own fields does not reverse twice. A default-constructed instance therefore prints `rev` as `true`.",#
-                      :owa_w => "`w`: Optional OWA weight vector.",#
-                      :owa_method => "`method`: OWA weight estimation method.",#
-                      :lm_k => "`k`: L-moment order.",#
-                      :alpha_i => "`alpha_i`: Lower integration bound for the tail Gini approximation.",#
-                      :a_sim => "`a_sim`: Number of integration points for the tail Gini approximation.",#
-                      :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
-                      :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
-                      # Constraint generation.
-                      :rkb_val => "`val`: Vector of risk budget allocations.",#
-                      :rkbe_val => "`val`: Mapping of names to risk budget values.",#
-                      :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
-                      :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
-                      :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
-                      :us_ufkey => "`ufkey`: Key prefix for unique-entry factor group variants in `dict`. Validated at construction, never recomputed by a view.",#
-                      :us_zkey => "`zkey`: Key in `dict` identifying the declared feature axis — the node list a graded feature program writes its columns against. Optional, like `fkey`, and it carries no prefix convention: nothing is partitioned over the feature axis, so it has no unique-entry sibling and no length rule beyond `allunique`.",#
-                      :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
-                      :A_phylo => "`A`: Phylogeny constraint matrix.",#
-                      :B_phylo => "`B`: Group sizes or allocations vector.",#
-                      :scale_phylo => "`scale`: Non-negative big-M scaling factor for the MIP formulation.",#
-                      :cc_A => "`A`: Centrality estimator.",#
-                      :cc_B => "`B`: Centrality threshold or reduction measure.",#
-                      :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
-                      :lce_val => "`val`: Constraint equation(s) to parse.",#
-                      :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
-                      :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
-                      :fs_re => "`re`: Source of the loadings the rows are re-based through, or `nothing` to read the prior's `rr`. A precomputed `Regression` states the basis outright; an estimator fits one from the returns, which is what makes a factor mandate legal on a prior that carries no factor block. The precedence is `resolve_factor_regression`'s: a precomputed result wins, then the prior's `rr`, then a refit.",#
-                      :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
-                      :asets_vals => "`vals`: Either group name keys whose partitions are stacked into the feature axis, at least two (one partition alone is one-hot, which makes the distance two-valued for every metric), or an ordered edge-authoring program of `Pair`s over the declared feature axis `sets.dict[sets.zkey]`. The two are dispatched on element type and are different contracts — see [`asset_sets_features`](@ref).",#
-                      :asets_strict => "`strict`: Whether an unresolvable *name* in a graded `vals` program throws instead of warning. Governs names only: nothing structural is refused, so an all-zero row and a one-column matrix are both legal. Ignored on the group-name-key path, where an absent key is an unconditional `KeyError`.",#
-                      :thr_val => "`val`: Asset-specific threshold value(s).",#
-                      :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
-                      # Entropy pooling.
-                      :sc1 => "`sc1`: Scaling parameter for the objective function.",#
-                      :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
-                      :epalg => "`alg`: Entropy pooling algorithm.",#
-                      :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
-                      :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
-                      # Opinion pooling.
-                      :opalg => "`alg`: Opinion pooling algorithm.",#
-                      # Non-optimisation risk measures.
-                      :rt_mean => "`rt`: Mean return estimator.",#
-                      # Regime adjusted estimators.
-                      :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#
-                      :min_obs => "`min_obs`: Minimum number of observations required before the estimator produces a valid result.",#
-                      :hac_lags => "`hac_lags`: Optional number of lags for Heteroskedasticity and Autocorrelation Consistent (HAC) kernel correction of squared returns. If `nothing`, no HAC correction is applied.",#
-                      :regime_method => "`regime_method`: Regime adjustment method used to compute the per-observation regime state.",#
-                      :regime_decay => "`regime_decay`: Exponential decay factor for smoothing the regime state.",#
-                      :regime_min_obs => "`regime_min_obs`: Minimum number of regime observations required before the regime multiplier is applied.",#
-                      :regime_lohi_mult => "`regime_lohi_mult`: Optional `(lo, hi)` tuple bounding the regime multiplier range. If `nothing`, no clamping is applied.",#
-                      :min_val => "`min_val`: Minimum threshold to prevent division by zero or degenerate estimates.",#
-                      :centred => "`centred`: Whether to treat the returns as pre-centred (mean zero). If `false`, the location is estimated online.",#
-                      :ra_x => "`x`: Shape parameter of the log regime adjustment.",#
-                      :ra_y => "`y`: Scale parameter of the log regime adjustment.",#
-                      :ra_kappa => "`kappa`: Precomputed normalisation constant `digamma(x) + log(y)` for the log regime adjustment.",#
-                      :ra_norm_x => "`x`: First-moment normalisation constant for the regime adjustment.",#
-                      :ret_buffer => "`ret_buffer`: Optional circular buffer of recent centred returns for HAC kernel correction.",#
-                      :ra_variance => "`variance`: Running per-asset variance vector.",#
-                      :ra_X2 => "`X2`: Working array for current (possibly HAC-adjusted) squared returns.",#
-                      :ra_X_old_i => "`X_old_i`: Working array for lagged centred returns.",#
-                      :ra_z2 => "`z2`: Standardised squared innovations used for regime state computation.",#
-                      :ra_location => "`location`: Exponentially smoothed location (mean) vector.",#
-                      :obs_count => "`obs_count`: Per-asset count of observations processed.",#
-                      :old_obs_count => "`old_obs_count`: Per-asset observation count from the previous step.",#
-                      :ra_active => "`active`: Boolean mask indicating which assets are currently active.",#
-                      :regime_state => "`regime_state`: Current smoothed regime state value.",#
-                      :n_regime_obs => "`n_regime_obs`: Number of observations used to update the regime state.",#
-                      :cor_decay => "`cor_decay`: Exponential decay factor for the correlation smoother.",#
-                      :regime_target => "`regime_target`: Target structure for the regime-adjusted covariance update.",#
-                      :ra_w => "`w`: Optional portfolio weights vector for the portfolio target. If `nothing`, equal weights are used.",#
-                      :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#
-                      :wfalg => "`alg`: Weight finaliser error formulation algorithm.",#
-                      :res_retcode => "`res`: Optional result or message from the solver.",#
-                      :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",#
-                      :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",#
-                      :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
-                      :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
-                      :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
-                      :schalg => "`alg`: Schur complement algorithm variant.",#
-                      :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
-                      :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
-                      :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
-                      :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
-                      :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
-                      :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
-                      :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. `NaN` if the volatility is zero.",#
-                      :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`, corrected for the skewness and excess kurtosis of the returns.",#
-                      :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
-                      :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
-                      :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
-                      :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.")
+const arg_dict = unique_key_dict(:arg_dict,
+                                 # Weight vectors.
+                                 :pw => "`w`: Portfolio weights vector `assets × 1`.",#
+                                 :ow => "`w`: Observation weights vector `observations × 1`.",#
+                                 :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
+                                 :eqw => "`w`: Optional equilibrium weights vector `assets × 1`. If `nothing`, equal weights are used.",#
+                                 # Matrix processing.
+                                 :pdm => "`pdm`: Positive definite matrix estimator.",
+                                 :opdm => "`pdm`: Optional positive definite matrix estimator.",
+                                 :dn => "`dn`: Matrix denoising estimator.",
+                                 :odn => "`dn`: Optional matrix denoising estimator.",
+                                 :dt => "`dt`: Matrix detoning estimator.",
+                                 :odt => "`dt`: Optional matrix detoning estimator.",
+                                 :mp => "`mp`: Matrix processing estimator.",
+                                 :omp => "`mp`: Optional matrix processing estimator.",
+                                 :mpa => "`mpa`: Matrix processing algorithm.",
+                                 # Moments.
+                                 :me => "`me`: Expected returns estimator.",
+                                 :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
+                                 :ce => "`ce`: Covariance estimator.",#
+                                 :ve => "`ve`: Variance estimator.",#
+                                 :ske => "`ske`: Coskewness estimator.",
+                                 :kte => "`kte`: Cokurtosis estimator.",
+                                 :de => "`de`: Distance matrix estimator.",
+                                 :malg => "`alg`: Moment algorithm.",
+                                 :corrected => "`corrected`: Whether to apply Bessel's correction.",#
+                                 :mutgt => "`tgt`: Shrinkage target.",#
+                                 :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
+                                 :metric => "`metric`: Distance metric used for pairwise computations.",#
+                                 :metric_args => "`args`: Additional positional arguments for the distance metric.",#
+                                 :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
+                                 :t => "`t`: Threshold value.",#
+                                 :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
+                                 ## Regression
+                                 :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
+                                 :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                                 :b => "`b`: Regression intercept vector.",#
+                                 :crit => "`crit`: Factor selection criterion.",#
+                                 :realg => "`alg`: Regression algorithm.",#
+                                 :retgt => "`tgt`: Regression model target.",#
+                                 :dretgt => "`retgt`: Regression model target.",#
+                                 :drtgt => "`drtgt`: Dimension reduction target.",
+                                 ## Gerber
+                                 :gerbalg => "`alg`: Gerber covariance algorithm.",#
+                                 :gerbce => "`ce`: Gerber covariance estimator.",#
+                                 :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
+                                 :c1 => "`c1`: Zone of confusion parameter.",#
+                                 :c2 => "`c2`: Zone of indecision lower bound.",#
+                                 :c3 => "`c3`: Zone of indecision upper bound.",#
+                                 :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
+                                 :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
+                                 ## Mutual and var info
+                                 :bins => "`bins`: Binning algorithm or fixed number of bins.",#
+                                 :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
+                                 ## Distance
+                                 :dopower => "`power`: Optional matrix exponent. `nothing` and `1` both give the base distance, so only `power >= 2` changes the result.",#
+                                 :dalg => "`alg`: Distance algorithm.",#
+                                 :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
+                                 :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
+                                 :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
+                                 :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
+                                 :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
+                                 :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
+                                 :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
+                                 # Priors.
+                                 :pe => "`pe`: Prior estimator.",#
+                                 :pr => "`pr`: Prior result.",#
+                                 :per => "`pr`: Prior estimator or result.",#
+                                 # Phylogeny.
+                                 :cle => "`cle`: Clusters estimator.",#
+                                 :clr => "`clr`: Clusters result.",#
+                                 :plr => "`plr`: Phylogeny result.",#
+                                 :nte => "`nte`: Network estimator.",#
+                                 :cte => "`cte`: Centrality estimator.",#
+                                 :cta => "`ct`: Centrality algorithm.",#
+                                 :ctr => "`ct`: Centrality result.",#
+                                 :ctargs => "`args`: Positional arguments for the centrality function.",#
+                                 :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                                 :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
+                                 :treeargs => "`args`: Positional arguments for the spanning tree function. Every positional slot those functions declare is a weight channel, so [`assert_tree_args`](@ref) refuses a matrix or a vector here: the weights arrive with the graph.",#
+                                 :treekwargs => "`kwargs`: Keyword arguments for the spanning tree function. [`assert_tree_args`](@ref) refuses `minimize`, which would invert the minimisation the tree branch is defined by.",#
+                                 :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
+                                 :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
+                                 :ntn => "`n`: Number of steps to take in the network for deciding adjacency. An `Integer` is used as it stands. A [`HopCountAlgorithm`](@ref) or a `Function` is a **rule**, called as `n(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return an `Integer`.",#
+                                 :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a **rule**, called as `dmax(nte, X; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, and must return a `Number`.",#
+                                 :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
+                                 :clres => "`res`: Clustering result.",#
+                                 :S => "`S`: Similarity matrix",#
+                                 :D => "`D`: Distance matrix",#
+                                 :ck => "`k`: Optimal number of clusters.",#
+                                 :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
+                                 :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(assets))`.",#
+                                 :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
+                                 :clalg => "`alg`: Clustering algorithm.",#
+                                 :onc => "`onc`: Optimal number of clusters estimator.",#
+                                 :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                                 :phX => "`X`: Phylogeny matrix.",#
+                                 :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
+                                 :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
+                                 ## Separation and separation decay
+                                 :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
+                                 :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. Larger values decay faster. The per-step retention form, `ratio^d`, is `rate = -log(ratio)`.",#
+                                 :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. Larger values decay faster.",#
+                                 ## DBHT
+                                 :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
+                                 :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
+                                 :sim => "`sim`: Similarity matrix algorithm. The PMFG cannot take a negative weight, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
+                                 :root => "`root`: Root selection method.",#
+                                 # Estimators
+                                 :sets => "`sets`: Sets used to map estimator values to assets.",#
+                                 :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
+                                 :ekey => "`key`: Key to specify the universe in `sets.dict` that names resolve against. If `nothing`, the key is taken from `sets.xkey` — or, where the caller is written against another declared axis, from that axis' key.",#
+                                 :sets_f => "`sets`: Universe sets. The **factor** axis, `sets.dict[sets.fkey]`, is what this estimator reads: it is the universe the views are written in, and it must name the columns of `F` in order. The asset axis is required by [`UniverseSets`](@ref) and is what a view slices — the factor entries come back from [`port_opt_view`](@ref) untouched.",#
+                                 :sets_frb => "`sets`: Universe sets. The **factor** axis, `sets.dict[sets.fkey]`, is what this algorithm reads: it is the universe the risk budget is written in, and it must name the columns of `rr.L` in order — the budget is over the factor weights `w1`, one per column of the loadings the risk decomposition uses. It is only read when `rkb` is a [`RiskBudgetEstimator`](@ref); a [`RiskBudget`](@ref) result carries its own vector and resolves no names. The asset axis is required by [`UniverseSets`](@ref) and is what a view slices — the factor entries come back from [`port_opt_view`](@ref) untouched.",#
+                                 :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
+                                 :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
+                                 # Constraints
+                                 :A => "`A`: Linear constraint coefficient matrix.",#
+                                 :B => "`B`: Linear constraint response vector.",#
+                                 :eq => "`eq`: Optional equality constraints.",#
+                                 :ineq => "`ineq`: Optional inequality constraints.",#
+                                 # Turnover.
+                                 :tnr => "`tn`: Turnover result.",
+                                 # Fees.
+                                 :feese => "`fees`: Fees estimator.",#
+                                 :feesr => "`fees`: Fees result.",
+                                 # Stats.
+                                 :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
+                                 :mu => "`mu`: Expected returns vector `assets × 1`.",#
+                                 :rho => "`rho`: Correlation matrix `assets × assets`.",
+                                 :sigrho => "`sigma`: Covariance-like or correlation-like matrix `assets × assets`.",
+                                 :sigrhoX => "`X`: Covariance-like or correlation-like matrix `assets × assets`.",
+                                 :kt => "`kt`: Cokurtosis matrix `assets^2 × assets^2`.",#
+                                 :sk => "`sk`: Coskewness matrix `assets × assets^2`.",#
+                                 :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `assets × assets`.",
+                                 :X => "`X`: Data matrix `observations × assets` if the `dims` keyword does not exist or `dims = 1`, `assets × observations` when `dims = 2`.",#
+                                 :o_X => "`o_X`: The returns matrix the caller supplied, kept only when the carrier's own `X` is not it, and `nothing` otherwise. The three estimators that lift a factor-axis prior onto the asset axis overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`; `o_X` is the asset returns they were handed, over the same observations and the same assets. Read it as `original_X`, which is always a matrix, rather than as this field.",#
+                                 :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
+                                 :Xv => "`X`: Data vector `observations × 1`.",#
+                                 :X_Xv => "`X`: Data matrix or vector.",#
+                                 :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
+                                 :Z_prior => "`Z`: Derived feature matrix, canonically assets-major: `assets × features` when static, `observations × assets × features` when time-varying. Nameless — feature names live on the `ReturnsResult` or come from a `UniverseSets`. Populated only by a producer that declares the matrix to be features; a user's `rd.Z` never reaches a prior result.",#
+                                 :ze => "`ze`: Feature matrix estimator: the producer that computes `Z` from the wrapped prior result.",#
+                                 :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
+                                 :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
+                                 :dims => "`dims`: Dimension along which to perform the computation.",#
+                                 :omean => "`mean`: Optional mean value to use for centering.",
+                                 :ex => "`ex`: Parallel execution strategy.",#
+                                 :alpha => "`alpha`: Quantile level for the lower tail.",#
+                                 :beta => "`beta`: Quantile level for the upper tail.",#
+                                 :l => "`l`: Risk aversion parameter.",#
+                                 :rf => "`rf`: Risk-free rate.",#
+                                 # Errors
+                                 :msg => "`msg`: Error message describing the condition that triggered the exception.",#
+                                 # Solver
+                                 :name => "`name`: Symbol or string identifier for logging purposes.",#
+                                 :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                                 :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
+                                 :check_sol => "`check_sol`: Named tuple of keyword arguments splatted into [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible) after each solve. It decides which solver statuses count as a solved model. The default `(;)` accepts JuMP's own defaults, `allow_local = true` and `allow_almost = false`: the termination status must be `OPTIMAL` or `LOCALLY_SOLVED`, and the primal status must be `FEASIBLE_POINT`. The strictness is deliberate — a solution the solver itself flags as approximate is rejected rather than silently accepted, so a solver stage that fails this check falls through to the next solver in the vector. The common relaxation is `check_sol = (; allow_local = true, allow_almost = true)`, which also accepts `ALMOST_OPTIMAL`, `ALMOST_LOCALLY_SOLVED` and `NEARLY_FEASIBLE_POINT`; it is what the examples, the user guide and the test suite pass, because a first-order solver reaching its tolerance on a well-posed portfolio problem is usually good enough. Go the other way with `allow_local = false` to reject `LOCALLY_SOLVED` and demand a certified global optimum, and add `dual = true` to also require a feasible dual point.",#
+                                 :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                                 # RNG
+                                 :rng => "`rng`: Random number generator.",#
+                                 :seed => "`seed`: Seed for the random number generator.",
+                                 # JuMP Optimisation
+                                 :model => "`model::JuMP.Model`: The JuMP optimisation model.",
+                                 :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
+                                 :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
+                                 :ci => "`i`: Constraint index for unique variable and constraint naming.",
+                                 :key_sym => "`key::Symbol`: Symbol used to name constraints or expressions in the model.",
+                                 :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
+                                 :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
+                                 :lt_arg => "`lt::Option{<:Threshold}`: Long-side minimum-holding threshold.",
+                                 :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
+                                 :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
+                                 :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
+                                 :xbgt_flag_arg => "`xbgt_flag::Bool`: Whether to pin the long/short decomposition, so the budgets built on `lw`/`sw` hold exactly (see [`set_exact_budget_constraints!`](@ref)).",
+                                 :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
+                                 :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
+                                 :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
+                                 :r_risk => "`r`: Risk measure instance.",
+                                 :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
+                                 :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
+                                 :pl_opt => "`pl`: Optional phylogeny constraints.",
+                                 :fees_opt => "`fees`: Optional fees structure.",
+                                 :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
+                                 :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
+                                 :ignargs => "`args`: Additional positional arguments (ignored).",
+                                 :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
+                                 :rd => "`rd`: The returns result to use.",
+                                 :window => "`window`: Observation window.",
+                                 # Prior results.
+                                 :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
+                                 :w_prior => "`w`: Observation weights the prior was computed under `observations × 1` (see [`ObsWeights`](@ref)), or `nothing` if it was computed unweighted. Binds `ens`, `kld` and `ow`, which are diagnostics of it (see [`forward_prior`](@ref)).",#
+                                 :ens => "`ens`: Effective sample size.",#
+                                 :kld => "`kld`: Kullback-Leibler divergence of `w` from the weights it was derived from: a scalar against the prior observation weights for a single reweighting, or one entry per opinion when `w` came from pooling several.",#
+                                 :fpr => "`fpr`: Prior result over the factor axis, or `nothing`. Its `X` is the factor returns matrix, so its `mu`, `sigma` and `w` describe factors rather than assets, over the same observations as the asset block.",#
+                                 :op_w => "`ow`: Opinion pooling weights.",#
+                                 :reg_rr => "`rr`: Regression result.",#
+                                 # Prior estimators.
+                                 :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
+                                 :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
+                                 :views => "`views`: Views estimator or result.",#
+                                 :views_conf => "`views_conf`: Views confidence estimator or result.",#
+                                 :a_pe => "`a_pe`: Asset prior estimator.",#
+                                 :f_pe => "`f_pe`: Factor prior estimator.",#
+                                 :a_views => "`a_views`: Asset views estimator or result.",#
+                                 :f_views => "`f_views`: Factor views estimator or result.",#
+                                 :sets_af => "`sets`: Universe sets. This estimator reads **both** declared axes: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against `sets.dict[sets.fkey]`, and each axis must name the columns of `X` and `F` respectively, in order. Only the axis a [`LinearConstraintEstimator`](@ref) actually resolves names against is required — views supplied as a [`BlackLittermanViews`](@ref) result carry their own matrix and need no universe. A view slices the asset axis and leaves the factor entries untouched, which is why this field is `@vprop`.",#
+                                 :a_views_conf => "`a_views_conf`: Asset views confidence estimator or result.",#
+                                 :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
+                                 :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
+                                 :f_mp => "`f_mp`: Factor matrix processing estimator.",#
+                                 :re => "`re`: Regression estimator.",#
+                                 :pes => "`pes`: Vector of prior estimators.",#
+                                 :pe1 => "`pe1`: Pre-processing prior estimator.",#
+                                 :pe2 => "`pe2`: Post-processing prior estimator.",#
+                                 :p_pool => "`p`: Opinion pooling blending parameter.",#
+                                 # Entropy pooling.
+                                 :mu_views => "`mu_views`: Expected returns views estimator or result.",#
+                                 :var_views => "`var_views`: Value-at-risk views estimator or result.",#
+                                 :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
+                                 :sigma_views => "`sigma_views`: Variance views estimator or result.",#
+                                 :sk_views => "`sk_views`: Skewness views estimator or result.",#
+                                 :kt_views => "`kt_views`: Kurtosis views estimator or result.",#
+                                 :cov_views => "`cov_views`: Covariance views estimator or result.",#
+                                 :rho_views => "`rho_views`: Correlation views estimator or result.",#
+                                 :var_alpha => "`var_alpha`: Quantile level for variance views.",#
+                                 :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
+                                 :ds_opt => "`ds_opt`: Thin wrapper for arguments and keyword arguments used in `Roots.findzero` for use with a single conditional value-at-risk view.",#
+                                 :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
+                                 :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
+                                 # Black-Litterman views.
+                                 :P => "`P`: Views loading matrix `views × assets`.",#
+                                 :Q => "`Q`: Views values vector `views × 1`.",#
+                                 :excl => "`excl`: Indices of views to exclude.",#
+                                 # High order priors.
+                                 :skmp => "`skmp`: Coskewness matrix processing estimator.",#
+                                 :D2 => "`D2`: Duplication matrix.",#
+                                 :L2 => "`L2`: Elimination matrix.",#
+                                 :S2 => "`S2`: Summation matrix.",#
+                                 # Uncertainty sets.
+                                 :lb => "`lb`: Lower bound.",#
+                                 :ub => "`ub`: Upper bound.",#
+                                 :dmu => "`dmu`: Uncertainty bound for expected returns.",#
+                                 :dsigma => "`dsigma`: Uncertainty bound for covariance.",#
+                                 :dist => "`dist`: Probability distribution.",#
+                                 :k_ucs => "`k`: Uncertainty set scaling parameter.",#
+                                 :class_ucs => "`class`: Uncertainty set class.",#
+                                 :val_ucs => "`val`: Quantity the set is a neighbourhood of — a characteristic vector on the mean axis, a covariance matrix on the covariance axis. `nothing` defers to the consumer's own quantity. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
+                                 :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
+                                 :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                                 :eps_ucs => "`eps`: Radius of the ``\\\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
+                                 :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                                 :en_ucs => "`en`: Radius of the negative-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                                 :sd_ucs => "`sd`: Per-asset scaling vector for the ``\\\\ell_1`` uncertainty set (the estimated standard deviations). `nothing` leaves the set unscaled, so every element of the characteristic vector is assumed to suffer the same estimation error.",#
+                                 :mu_l1_ucs => "`mu`: Characteristic vector the ``\\\\ell_1`` set is a neighbourhood of. `nothing` defers to the consumer's own characteristic. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
+                                 :method_l1_ucs => "`method`: Radius of the ``\\\\ell_1`` uncertainty set. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                                 :mp_ucs => "`mp`: Radius of the positive-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                                 :mm_ucs => "`mm`: Radius of the negative-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                                 :scaled_ucs => "`scaled`: Whether to scale the uncertainty set by the estimated standard deviations. `false` assumes every characteristic suffers the same estimation error; `true` assumes assets with larger variance suffer larger estimation error, which yields inverse-volatility weights.",#
+                                 :active_ucs => "`active`: Target number of active assets on the *unconstrained* problem, as a count (integer `>= 1`) or a fraction of the universe (float in `(0, 1)`). This is a radius calibration, not a cardinality constraint: it selects the radius that would activate this many assets subject only to the budget and sign constraints. Any further constraint may change the realised count. Use `card` for a hard cardinality constraint.",#
+                                 :n_sim => "`n_sim`: Number of simulation samples.",#
+                                 :block_size => "`block_size`: Block size for bootstrap sampling.",#
+                                 :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
+                                 :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
+                                 :ucs => "`ucs`: Uncertainty set.",#
+                                 :ucsa => "`alg`: Uncertainty set algorithm.",#
+                                 # Constraint generation.
+                                 :dval => "`dval`: Default value for assets not specified in `val`.",#
+                                 :dict => "`dict`: Dictionary mapping group identifiers to member labels.",#
+                                 :vars => "`vars`: Variable names in the parsed constraint expression.",#
+                                 :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
+                                 :op => "`op`: Comparison operator (`==`, `<=`, or `>=`).",#
+                                 :rhs => "`rhs`: Right-hand side value of the constraint.",#
+                                 :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
+                                 :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
+                                 # Risk measure settings.
+                                 :settings_rm => "`settings`: Risk measure settings.",#
+                                 :scale_rm => "`scale`: Weight of this risk measure in the aggregate risk expression formed from a vector of measures. It is a combination weight, so it is inert on a single measure: an optimiser given one measure drops it before the risk expression is built, and the value-level readers ignore it too. The upper bound in `ub` binds on the measure's own expression, before `scale` is applied.",#
+                                 :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
+                                 :lb_rms => "`lb`: Lower bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
+                                 :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
+                                 # Return term settings.
+                                 :settings_rt => "`settings`: Return term settings.",#
+                                 :scale_rt => "`scale`: Weight of this return term in the weighted sum that forms the `JuMP` return expression. It is a combination weight, so it is inert on a single term: an optimiser given one term drops it before the return expression is built, and the value-level readers ignore it too. The lower bound in `lb` binds on the term's own expression, before `scale` is applied.",#
+                                 :lb_rts => "`lb`: Lower bound(s) for the return term. Can be a scalar, vector, or [`Frontier`](@ref). The bound binds on the term's own expression, net of the term's own flagged charges and before `scale` is applied, and it binds whether or not `rte` is `true`.",#
+                                 :rte => "`rte`: Whether to include the return term in the `JuMP` return expression.",#
+                                 :fee_rts => "`fee`: Whether to subtract the portfolio fees from this return term. Set it to `false` for a term that is not in return units.",#
+                                 :mic_rts => "`mic`: Whether to subtract the market impact cost from this return term. Set it to `false` for a term that is not in return units, or to leave the cost to the budget constraint alone.",#
+                                 # Frontier.
+                                 :N_fr => "`N`: Number of points on the efficient frontier.",#
+                                 :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
+                                 :bound_fr => "`bound`: What operation needs to be performed on the risk lower bound.",#
+                                 # Risk measure fields.
+                                 :rc => "`rc`: Risk contribution constraint.",#
+                                 :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
+                                 :vr_rm => "`vr`: Variance risk measure component.",#
+                                 :sk_rm => "`sk`: Skewness risk measure component.",#
+                                 :kt_rm => "`kt`: Kurtosis risk measure component.",#
+                                 :alg1 => "`alg1`: First algorithm variant.",#
+                                 :alg2 => "`alg2`: Second algorithm variant.",#
+                                 :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#
+                                 :kappa => "`kappa`: Relativistic deformation parameter.",#
+                                 :kappa_a => "`kappa_a`: Relativistic deformation parameter for the lower tail.",#
+                                 :kappa_b => "`kappa_b`: Relativistic deformation parameter for the upper tail.",#
+                                 :l_a => "`l_a`: Risk aversion parameter for the lower tail.",#
+                                 :r_a => "`r_a`: Radius parameter for the lower tail.",#
+                                 :l_b => "`l_b`: Risk aversion parameter for the upper tail.",#
+                                 :r_b => "`r_b`: Radius parameter for the upper tail.",#
+                                 :gamma => "`gamma`: Log-sum-exp scalariser smoothing parameter.",#
+                                 :b_mip => "`b`: Big-M upper bound for MIP formulations.",#
+                                 :s_mip => "`s`: Small-M lower bound for MIP formulations.",#
+                                 :slv => "`slv`: Solver or vector of solvers.",#
+                                 :p_rm => "`p`: Power or order parameter.",#
+                                 :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
+                                 # Deferred Quantity slots. Each admits the value itself or the Estimator that
+                                 # computes it, resolved against the optimisation's own prior. See
+                                 # `DeferredQuantity` and ADR 0051.
+                                 :mu_slot => "`mu`: Optional centre the moment is taken about, a scalar or a vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the centre against the optimisation's own prior, at [`factory`](@ref) time (see [`MuSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
+                                 :sigma_slot => "`sigma`: Optional covariance matrix `assets × assets`. Also admits a **Deferred Quantity** — a covariance estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`SigmaSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
+                                 :chol_slot => "`chol`: Optional Cholesky factorisation of the covariance matrix. Derived from `sigma`, so it never defers: it arrives as one pair with whatever `sigma` resolves to. Give it with a matrix `sigma` and with neither otherwise — stating it without `sigma`, or while `sigma` holds a Deferred Quantity, is refused at construction (see [`assert_derived_slot_has_source`](@ref)). If `nothing`, the prior supplies the pair, or the kernel derives the factorisation from a stated `sigma`.",#
+                                 :kt_slot => "`kt`: Optional cokurtosis matrix `assets^2 × assets^2`. Also admits a **Deferred Quantity** — a cokurtosis estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`KtSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). A cokurtosis estimator supplies `mu` as well, from its own `me`, so that the tensor and the centre it was taken about come out of one object. If `nothing`, the prior supplies it.",#
+                                 :sk_slot => "`sk`: Optional coskewness matrix `assets × assets^2`. Also admits a **Deferred Quantity** — a coskewness estimator or a prior estimator that computes the matrix against the optimisation's own prior, at [`factory`](@ref) time (see [`SkSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). A coskewness estimator supplies `mu` as well, from its own `me`, so that the tensor and the centre it was taken about come out of one object. If `nothing`, the prior supplies it.",#
+                                 :V_slot => "`V`: Optional sum of the negative spectral slices of the coskewness matrix `assets × assets`. Derived from `sk`, so it never defers: it arrives as one pair with whatever `sk` resolves to, and the matrix processing estimator that built it travels with it and replaces `mp`. Give it with a matrix `sk` and with neither otherwise. Stating it while `sk` holds a Deferred Quantity is refused at construction.",#
+                                 :mu_dvar_slot => "`mu`: Optional expected returns vector `assets × 1`, the location of `dist`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`MuSlot`](@ref) and [`resolve_deferred_quantities`](@ref)). If `nothing`, the prior supplies it.",#
+                                 :mu_mad_slot => "`mu`: Centre the absolute deviation is taken about. It is a [`MedianCenteringFunction`](@ref) that centres the portfolio series at the point of use, a scalar or a vector `assets × 1`, or a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the centre against the optimisation's own prior, at [`factory`](@ref) time (see [`MedAbsDevMu`](@ref) and [`resolve_deferred_quantities`](@ref)). There is no `nothing` state; the default is [`MedianCentering`](@ref).",#
+                                 :mu_ret_slot => "`mu`: Optional expected returns vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`ArithRetMu`](@ref) and [`resolve_deferred_quantities`](@ref)). A `ucs` that carries its own centre outranks it, and it outranks the prior's own vector (ADR 0050). If `nothing`, the prior supplies it.",#
+                                 :ddof => "`ddof`: Degrees-of-freedom correction.",#
+                                 :flag => "`flag`: Algorithm selection flag.",#
+                                 :pos => "`pos`: Whether to consider only positive deviations.",#
+                                 # Turnover.
+                                 :w_tn => "`w`: Current portfolio weights vector.",#
+                                 :w_ref => "`w`: Reference portfolio weights vector.",#
+                                 :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
+                                 :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
+                                 # Tracking specification.
+                                 :tr_spec => "`tr`: Benchmark tracking specification.",#
+                                 # Power norm parameters.
+                                 :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
+                                 :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
+                                 # Generic Value-at-Risk range components.
+                                 :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
+                                 :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
+                                 # Fees.
+                                 :tn_fees => "`tn`: Turnover estimator or result.",#
+                                 :l_fees => "`l`: Long proportional fees.",#
+                                 :s_fees => "`s`: Short proportional fees.",#
+                                 :fl => "`fl`: Long fixed fees.",#
+                                 :fs => "`fs`: Short fixed fees.",#
+                                 :dl => "`dl`: Default long proportional fee.",#
+                                 :ds => "`ds`: Default short proportional fee.",#
+                                 :dfl => "`dfl`: Default long fixed fee.",#
+                                 :dfs => "`dfs`: Default short fixed fee.",#
+                                 :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
+                                 # Optimisation results.
+                                 :pa => "`pa`: Processed optimisation attributes.",#
+                                 :retcode => "`retcode`: Optimisation return code.",#
+                                 :sol => "`sol`: Optimisation solution.",#
+                                 :fb => "`fb`: Fallback result or estimator.",#
+                                 # Optimiser fields.
+                                 :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
+                                 :r_opt => "`r`: Risk measure or vector of risk measures.",#
+                                 :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored **resolved** — a **Deferred Quantity** has already been fitted and an unstated slot has already taken the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`.",#
+                                 :obj => "`obj`: Portfolio objective function.",#
+                                 :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
+                                 :sca => "`sca`: Scalariser for combining multiple risk measures.",#
+                                 :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one.",#
+                                 :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
+                                 :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default budgets *bound* the realised exposure rather than pinning it (see `xbgt`). Together with `sbgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
+                                 :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, a [`BudgetRange`](@ref) bounds it; by default it *bounds*, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. Together with `bgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
+                                 :gbgt => "`gbgt`: Gross budget (leverage) constraint, `sum(lw) + sum(sw)`. A number pins the gross exposure; a [`BudgetRange`](@ref) bounds it, e.g. `BudgetRange(; lb = nothing, ub = 2.0)` caps leverage at 2x. Unlike `bgt` and `sbgt` — which pin the net and gross exposures only *together* — this constrains the gross exposure on its own, leaving the net free. Requires weight bounds that admit short positions, and is bounded rather than pinned unless `xbgt` is set.",#
+                                 :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
+                                 :lt => "`lt`: Long-side minimum holding threshold.",#
+                                 :st => "`st`: Short-side minimum holding threshold.",#
+                                 :lcse => "`lcse`: Linear constraint set estimator(s). This is the one constraint slot that also admits an `ExposureConstraintEstimator`, so a row may be written in the names of another basis — factor names, say — and re-based through the prior's loadings at generation time. What reaches the model is an ordinary asset-space `LinearConstraint` either way.",#
+                                 :gcarde => "`gcarde`: Grouped cardinality constraint estimator.",#
+                                 :sgcarde => "`sgcarde`: Sub-grouped cardinality constraint estimator(s).",#
+                                 :smtx => "`smtx`: Sub-group selection matrix or estimator.",#
+                                 :sgmtx => "`sgmtx`: Sub-grouped selection matrix or estimator.",#
+                                 :slt => "`slt`: Sub-group long threshold.",#
+                                 :sst => "`sst`: Sub-group short threshold.",#
+                                 :sglt => "`sglt`: Sub-grouped long threshold.",#
+                                 :sgst => "`sgst`: Sub-grouped short threshold.",#
+                                 :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
+                                 :fees_jmp => "`fees`: Fee estimator or fee structure.",#
+                                 :tr_jmp => "`tr`: Tracking error constraint(s).",#
+                                 :ple_jmp => "`ple`: Phylogeny constraint estimator(s).",#
+                                 :lcsr => "`lcsr`: Processed linear constraint set result.",#
+                                 :gcardr => "`gcardr`: Processed grouped cardinality constraint result.",#
+                                 :sgcardr => "`sgcardr`: Processed sub-grouped cardinality constraint result.",#
+                                 :ret_jmp => "`ret`: Return term, or vector of return terms, for the `JuMP` model. Several terms are weighted-summed into the model's single scalar return expression, in the same way [`MeanRisk`](@ref)'s `r` takes several risk measures.",#
+                                 :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
+                                 :cobj => "`cobj`: Custom `JuMP` objective.",#
+                                 :sc => "`sc`: Constraint scale factor.",#
+                                 :so => "`so`: Objective scale factor.",#
+                                 :ss => "`ss`: Optional scalar shrinkage parameter.",#
+                                 :card => "`card`: Global cardinality constraint.",#
+                                 :scard => "`scard`: Sub-group cardinality constraint(s).",#
+                                 :l2c => "`l2c`: 2-norm ceiling on the weights — bounds `norm(w, 2) <= l2c * k` (`k` is the budget, `1` for a fully invested portfolio). Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`.",#
+                                 :lpc => "`lpc`: p-norm ceiling(s) on the weights at an arbitrary norm order. Each [`LpRegularisation`](@ref) supplies a norm order `p` and a bound `val`, enforcing `norm(w, p) <= val * k`. Smaller `val` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `val = m^(-1/p)` requires at least `m` p-norm effective assets (`inv(norm(w, p)^p) >= m`). Norm-constraint family with `l2c` and `linfc`.",#
+                                 :linfc => "`linfc`: ∞-norm ceiling on the weights — a cap on the largest absolute weight: `norm(w, Inf) <= linfc * k`. So `linfc = 0.2` caps the largest weight at 20% of a fully invested portfolio. Used as a diversification floor via the reciprocal: `linfc = 1 / m` spreads the portfolio across at least `m` assets. Norm-constraint family with `l2c` and `lpc`.",#
+                                 :l1 => "`l1`: L1 regularisation coefficient.",#
+                                 :l2 => "`l2`: L2 regularisation term(s).",#
+                                 :linf => "`linf`: L∞ regularisation coefficient.",#
+                                 :lp => "`lp`: Lp regularisation specification(s).",#
+                                 :l2reg_val => "`val`: L2 regularisation penalty coefficient.",#
+                                 :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
+                                 :lpreg_p => "`p`: Norm order, `p > 1`.",#
+                                 :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
+                                 :brt => "`brt`: Whether to use bootstrap returns.",#
+                                 :x_src => "`x_src`: Which returns matrix the clustering, phylogeny and centrality estimators read: `:prior` takes the prior result's `X`, `:data` takes the raw returns result's `X`. Ignored when no returns result is available, in which case the prior result's `X` is used.",#
+                                 :z_src => "`z_src`: Which feature matrix a [`FeatureDistance`](@ref) inside the clustering, phylogeny or centrality estimator reads: `:data` takes the raw returns result's `Z`, `:prior` takes the prior result's `Z`. It defaults to `:data` — the opposite of `x_src` — because an explicitly supplied feature matrix outranks a derived one. Ignored when no [`FeatureDistance`](@ref) is present; a [`FeatureDistance`](@ref) with no `Z` on the selected carrier throws. A `Z` that is carried but unused stays silent, matching `iv`, `ivpa`, `F` and `B` — including the one sub-case that *is* a configuration error and is deliberately not detected: setting `z_src` explicitly with no [`FeatureDistance`](@ref) anywhere in the estimator tree. Detecting it would mean walking an arbitrary estimator tree for a type, which the layer resolving `z_src` cannot do.",#
+                                 :wf => "`wf`: Weight finaliser.",#
+                                 :rkb => "`rkb`: Risk budget estimator or result.",#
+                                 :rba => "`rba`: Risk budget algorithm.",#
+                                 :resi => "`resi`: Inner optimisation results.",#
+                                 :reso => "`reso`: Outer optimisation results.",#
+                                 :opti => "`opti`: Inner optimiser.",#
+                                 :opto => "`opto`: Outer optimiser.",#
+                                 # Cross-validation.
+                                 :n_folds => "`n`: Number of folds.",#
+                                 :n_test_folds => "`n_test_folds`: Number of folds held out for testing in each combination. The remaining `n_folds - n_test_folds` folds train.",#
+                                 :purged_size => "`purged_size`: Number of observations to purge between train and test sets.",#
+                                 :embargo_size => "`embargo_size`: Number of observations to embargo after the test set.",#
+                                 :train_idx => "`train_idx`: Training set indices.",#
+                                 :test_idx => "`test_idx`: Test set indices.",#
+                                 :train_size => "`train_size`: Training window size.",#
+                                 :test_size => "`test_size`: Test window size.",#
+                                 :period => "`period`: Time period for date-based walk-forward cross-validation.",#
+                                 :period_offset => "`period_offset`: Offset applied to the walk-forward period.",#
+                                 :adjuster => "`adjuster`: Function for adjusting walk-forward dates.",#
+                                 :previous => "`previous`: Whether to include the previous period in the training window.",#
+                                 :expand_train => "`expand_train`: Whether to expand the training window over time.",#
+                                 :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
+                                 :subset_size => "`subset_size`: Size of each random subset.",#
+                                 :n_subsets => "`n_subsets`: Number of random subsets.",#
+                                 :max_comb => "`max_comb`: Maximum number of unique asset subsets.",#
+                                 :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
+                                 :n_iter => "`n_iter`: Number of random iterations.",#
+                                 :cv => "`cv`: Cross-validation estimator.",#
+                                 :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
+                                 :train_score => "`train_score`: Whether to also compute the training set score.",#
+                                 :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
+                                 :train_scores => "`train_scores`: Training set scores.",#
+                                 :test_scores => "`test_scores`: Test set scores.",#
+                                 :lens_grid => "`lens_grid`: Grid lengths for each parameter.",#
+                                 :val_grid => "`val_grid`: Grid values for each parameter.",#
+                                 :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
+                                 :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
+                                 :asset_idx => "`asset_idx`: Asset column indices per fold.",#
+                                 :q_scorer => "`q`: Target quantile for scoring.",#
+                                 :r_kwargs => "`r_kwargs`: Keyword arguments passed to the risk measure.",#
+                                 :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
+                                 :p_cv => "`p`: Hyperparameter search grid.",#
+                                 # Prediction result fields.
+                                 :pred_nx => "`nx`: Asset name vector.",#
+                                 :pred_nf => "`nf`: Factor name vector.",#
+                                 :pred_nb => "`nb`: Benchmark name vector.",#
+                                 :pred_B => "`B`: Benchmark returns.",#
+                                 :ts => "`ts`: Timestamp vector.",#
+                                 :iv_ret => "`iv`: Investment vehicle returns.",#
+                                 :ivpa => "`ivpa`: Investment vehicle per-asset allocation.",#
+                                 :pred_res => "`res`: Optimisation result from the training fold.",#
+                                 :pred => "`pred`: Collection of fold predictions.",#
+                                 :mrd => "`mrd`: Aggregated multi-period returns result.",#
+                                 :id_pred => "`id`: Path or fold identifier.",#
+                                 # Allocation.
+                                 :shares => "`shares`: Number of shares allocated per asset.",#
+                                 :cost_alloc => "`cost`: Cost of the allocation.",#
+                                 :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
+                                 :unit => "`unit`: Minimum purchase unit (e.g., price per share or lot size).",#
+                                 # Cluster node.
+                                 :id_node => "`id`: Node identifier.",#
+                                 :left_node => "`left`: Left child node.",#
+                                 :right_node => "`right`: Right child node.",#
+                                 :height_node => "`height`: Height of the node in the dendrogram.",#
+                                 :level_node => "`level`: Level of the node in the hierarchical structure.",#
+                                 # Other.
+                                 :dlb => "`dlb`: Default lower bound.",#
+                                 :dub => "`dub`: Default upper bound.",#
+                                 :err => "`err`: Tracking error tolerance.",#
+                                 :tralg => "`alg`: Tracking formulation algorithm.",#
+                                 :rt => "`rt`: Returns estimator, or a vector of them. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`. There is no scalariser on the return axis.",#
+                                 :rk => "`rk`: Risk measure for ratio computation, or a vector of them scalarised by `sca`.",#
+                                 :r1 => "`r1`: First risk measure.",#
+                                 :r2 => "`r2`: Second risk measure.",#
+                                 :r1_vec => "`r1`: First risk measure, or a vector of them scalarised by `sca1`.",#
+                                 :r2_vec => "`r2`: Second risk measure, or a vector of them scalarised by `sca2`.",#
+                                 :sca_rk => "`sca`: Scalariser combining the risk measures in `rk` into one number. Inert when `rk` holds a single measure. The field beats a `sca` keyword supplied at the call site.",#
+                                 :sca_r1 => "`sca1`: Scalariser combining the risk measures in `r1` into one number. Inert when `r1` holds a single measure.",#
+                                 :sca_r2 => "`sca2`: Scalariser combining the risk measures in `r2` into one number. Inert when `r2` holds a single measure.",#
+                                 :ri => "`ri`: Inner risk measure.",#
+                                 :ri_res => "`ri`: The intra-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
+                                 :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored **resolved**.",#
+                                 :ro => "`ro`: Outer risk measure.",#
+                                 :scai => "`scai`: Inner scalariser.",#
+                                 :scao => "`scao`: Outer scalariser.",#
+                                 :params => "`params`: Schur complement decomposition parameters.",#
+                                 :gamma_schur => "`gamma`: Schur complement decomposition parameter.",#
+                                 :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
+                                 :tol => "`tol`: Convergence tolerance.",#
+                                 :iter => "`iter`: Maximum number of iterations.",#
+                                 :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
+                                 :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#
+                                 :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
+                                 :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
+                                 # Optimiser config.
+                                 :kwargs => "`kwargs`: Additional keyword arguments.",#
+                                 # Index.
+                                 :idx => "`idx`: Index vector.",#
+                                 # Risk measure.
+                                 :r => "`r`: Risk measure or vector of risk measures.",#
+                                 # Weight bounds.
+                                 :wb => "`wb`: Weight bounds.",#
+                                 # Tracking.
+                                 :tr => "`tr`: Tracking error constraint estimator.",#
+                                 # Fees.
+                                 :fees => "`fees`: Fees estimator or result.",#
+                                 # Near optimal centering result fields.
+                                 :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
+                                 :w_opt => "`w_opt`: Optimal portfolio weights (vector or vector of vectors).",#
+                                 :w_max => "`w_max`: Maximum-risk portfolio weights.",#
+                                 :w_min => "`w_min`: Minimum-risk portfolio weights.",#
+                                 :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",#
+                                 :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",#
+                                 :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",#
+                                 :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",#
+                                 :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",#
+                                 :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",#
+                                 :rt_opt => "`rt_opt`: Optimal return target.",#
+                                 :rt_max => "`rt_max`: Maximum return target.",#
+                                 :rt_min => "`rt_min`: Minimum return target.",#
+                                 :rt_ends => "`rt_ends`: Per-term return spans for a return-frontier sweep, as `i => (rt_min_i, rt_max_i)` pairs, or `nothing` when no return term declares a frontier bound. The aggregate `rt_min`/`rt_max` pair above serves the barrier; these serve the sweep, and the two are different quantities because a term's own span must be read off a portfolio that maximised that term alone.",#
+                                 :rk_opt => "`rk_opt`: Optimal risk target.",#
+                                 :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",#
+                                 # Discrete allocation result fields.
+                                 :l_model => "`l_model`: `JuMP` model for the long allocation.",#
+                                 :s_model => "`s_model`: `JuMP` model for the short allocation.",#
+                                 :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",#
+                                 :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
+                                 # Risk budgeting.
+                                 :prb => "`prb`: Processed risk budgeting configuration.",#
+                                 :l_wass => "`l`: Weight of the tail term in the Esfahani-Kuhn loss. The mean term is not scaled by it.",#
+                                 :r_wass => "`r`: Radius of the type-1 Wasserstein ambiguity ball. It multiplies a decision variable, so it is not a constant offset.",#
+                                 :g_rm => "`g`: Risk aversion parameter.",#
+                                 :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
+                                 :w1_owa => "`w1`: Optional first OWA weight vector.",#
+                                 :w2_owa => "`w2`: Optional second OWA weight vector.",#
+                                 :rev_owa => "`rev`: Whether `w2` is *already* reversed. It is a done-flag, not an instruction: the constructor reverses `w2` when `rev == false`, and leaves it as-is when `rev == true`. The field is stored as `true` whatever the caller passes, because `w2` is reversed by the time the object exists, so rebuilding an instance from its own fields does not reverse twice. A default-constructed instance therefore prints `rev` as `true`.",#
+                                 :owa_w => "`w`: Optional OWA weight vector.",#
+                                 :owa_method => "`method`: OWA weight estimation method.",#
+                                 :lm_k => "`k`: L-moment order.",#
+                                 :alpha_i => "`alpha_i`: Lower integration bound for the tail Gini approximation.",#
+                                 :a_sim => "`a_sim`: Number of integration points for the tail Gini approximation.",#
+                                 :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
+                                 :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
+                                 # Constraint generation.
+                                 :rkb_val => "`val`: Vector of risk budget allocations.",#
+                                 :rkbe_val => "`val`: Mapping of names to risk budget values.",#
+                                 :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
+                                 :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
+                                 :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
+                                 :us_ufkey => "`ufkey`: Key prefix for unique-entry factor group variants in `dict`. Validated at construction, never recomputed by a view.",#
+                                 :us_zkey => "`zkey`: Key in `dict` identifying the declared feature axis — the node list a graded feature program writes its columns against. Optional, like `fkey`, and it carries no prefix convention: nothing is partitioned over the feature axis, so it has no unique-entry sibling and no length rule beyond `allunique`.",#
+                                 :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
+                                 :A_phylo => "`A`: Phylogeny constraint matrix.",#
+                                 :B_phylo => "`B`: Group sizes or allocations vector.",#
+                                 :scale_phylo => "`scale`: Non-negative big-M scaling factor for the MIP formulation.",#
+                                 :cc_A => "`A`: Centrality estimator.",#
+                                 :cc_B => "`B`: Centrality threshold or reduction measure.",#
+                                 :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
+                                 :lce_val => "`val`: Constraint equation(s) to parse.",#
+                                 :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
+                                 :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
+                                 :fs_re => "`re`: Source of the loadings the rows are re-based through, or `nothing` to read the prior's `rr`. A precomputed `Regression` states the basis outright; an estimator fits one from the returns, which is what makes a factor mandate legal on a prior that carries no factor block. The precedence is `resolve_factor_regression`'s: a precomputed result wins, then the prior's `rr`, then a refit.",#
+                                 :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
+                                 :asets_vals => "`vals`: Either group name keys whose partitions are stacked into the feature axis, at least two (one partition alone is one-hot, which makes the distance two-valued for every metric), or an ordered edge-authoring program of `Pair`s over the declared feature axis `sets.dict[sets.zkey]`. The two are dispatched on element type and are different contracts — see [`asset_sets_features`](@ref).",#
+                                 :asets_strict => "`strict`: Whether an unresolvable *name* in a graded `vals` program throws instead of warning. Governs names only: nothing structural is refused, so an all-zero row and a one-column matrix are both legal. Ignored on the group-name-key path, where an absent key is an unconditional `KeyError`.",#
+                                 :thr_val => "`val`: Asset-specific threshold value(s).",#
+                                 :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
+                                 # Entropy pooling.
+                                 :sc1 => "`sc1`: Scaling parameter for the objective function.",#
+                                 :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
+                                 :epalg => "`alg`: Entropy pooling algorithm.",#
+                                 :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
+                                 :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
+                                 # Opinion pooling.
+                                 :opalg => "`alg`: Opinion pooling algorithm.",#
+                                 # Non-optimisation risk measures.
+                                 :rt_mean => "`rt`: Mean return estimator.",#
+                                 # Regime adjusted estimators.
+                                 :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#
+                                 :min_obs => "`min_obs`: Minimum number of observations required before the estimator produces a valid result.",#
+                                 :hac_lags => "`hac_lags`: Optional number of lags for Heteroskedasticity and Autocorrelation Consistent (HAC) kernel correction of squared returns. If `nothing`, no HAC correction is applied.",#
+                                 :regime_method => "`regime_method`: Regime adjustment method used to compute the per-observation regime state.",#
+                                 :regime_decay => "`regime_decay`: Exponential decay factor for smoothing the regime state.",#
+                                 :regime_min_obs => "`regime_min_obs`: Minimum number of regime observations required before the regime multiplier is applied.",#
+                                 :regime_lohi_mult => "`regime_lohi_mult`: Optional `(lo, hi)` tuple bounding the regime multiplier range. If `nothing`, no clamping is applied.",#
+                                 :min_val => "`min_val`: Minimum threshold to prevent division by zero or degenerate estimates.",#
+                                 :centred => "`centred`: Whether to treat the returns as pre-centred (mean zero). If `false`, the location is estimated online.",#
+                                 :ra_x => "`x`: Shape parameter of the log regime adjustment.",#
+                                 :ra_y => "`y`: Scale parameter of the log regime adjustment.",#
+                                 :ra_kappa => "`kappa`: Precomputed normalisation constant `digamma(x) + log(y)` for the log regime adjustment.",#
+                                 :ra_norm_x => "`x`: First-moment normalisation constant for the regime adjustment.",#
+                                 :ret_buffer => "`ret_buffer`: Optional circular buffer of recent centred returns for HAC kernel correction.",#
+                                 :ra_variance => "`variance`: Running per-asset variance vector.",#
+                                 :ra_X2 => "`X2`: Working array for current (possibly HAC-adjusted) squared returns.",#
+                                 :ra_X_old_i => "`X_old_i`: Working array for lagged centred returns.",#
+                                 :ra_z2 => "`z2`: Standardised squared innovations used for regime state computation.",#
+                                 :ra_location => "`location`: Exponentially smoothed location (mean) vector.",#
+                                 :obs_count => "`obs_count`: Per-asset count of observations processed.",#
+                                 :old_obs_count => "`old_obs_count`: Per-asset observation count from the previous step.",#
+                                 :ra_active => "`active`: Boolean mask indicating which assets are currently active.",#
+                                 :regime_state => "`regime_state`: Current smoothed regime state value.",#
+                                 :n_regime_obs => "`n_regime_obs`: Number of observations used to update the regime state.",#
+                                 :cor_decay => "`cor_decay`: Exponential decay factor for the correlation smoother.",#
+                                 :regime_target => "`regime_target`: Target structure for the regime-adjusted covariance update.",#
+                                 :ra_w => "`w`: Optional portfolio weights vector for the portfolio target. If `nothing`, equal weights are used.",#
+                                 :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#
+                                 :wfalg => "`alg`: Weight finaliser error formulation algorithm.",#
+                                 :res_retcode => "`res`: Optional result or message from the solver.",#
+                                 :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",#
+                                 :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",#
+                                 :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
+                                 :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
+                                 :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
+                                 :schalg => "`alg`: Schur complement algorithm variant.",#
+                                 :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
+                                 :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
+                                 :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
+                                 :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
+                                 :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
+                                 :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
+                                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. `NaN` if the volatility is zero.",#
+                                 :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`, corrected for the skewness and excess kurtosis of the returns.",#
+                                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
+                                 :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
+                                 :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
+                                 :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.")
 """
     field_dict
 
@@ -721,90 +709,95 @@ message names what the caller supplied (e.g. `cokurtosis`) rather than the bare 
 symbol. The symbol itself is appended at the call site, giving messages like
 ``cokurtosis (`kt`) cannot be empty``.
 """
-const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
-                           :V => "negative spectral coskewness",
-                           :D2 => "duplication matrix", :L2 => "elimination matrix",
-                           :S2 => "summation matrix")
+const err_name_dict = unique_key_dict(:err_name_dict, :kt => "cokurtosis",
+                                      :sk => "coskewness",
+                                      :V => "negative spectral coskewness",
+                                      :D2 => "duplication matrix",
+                                      :L2 => "elimination matrix",
+                                      :S2 => "summation matrix")
 """
     const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
-const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                      :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                      :gerbt => "`0 <= t`.",#
-                      :t => "`0 < t < 1`.",#
-                      :c1 => "`0 < c1 <= 1`.",#
-                      :c2 => "`0 < c2 <= 1`.",#
-                      :c3c2 => "`c3 > c2`.",#
-                      :dims => "`dims in (1, 2)`.",#
-                      :alpha => "`0 < alpha < 1`.",#
-                      :beta => "`0 < beta < 1`.",#
-                      :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
-                      :dopower => "If `power` is not `nothing`, `power >= 1`.",#
-                      :settings => "If not `nothing`, `!isempty(settings)`.",#
-                      :S => "`!isempty(S)`.",#
-                      :D => "`!isempty(D)`.",#
-                      :ck => "`k >= 1`.",#
-                      :lm_k => "`k >= 2`.",#
-                      :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
-                      :a_sim_pos => "`a_sim > 0`.",#
-                      :beta_i_beta => "`0 < beta_i < beta < 1`.",#
-                      :b_sim_pos => "`b_sim > 0`.",#
-                      :S_D => "size(S) == size(D)`.",#
-                      :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
-                      :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
-                      :dbhtpower => "`power > 0`.",#
-                      :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
-                      :sdrate => "`rate > 0`.",#
-                      :sdpower => "`power > 0`.",#
-                      :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                      :ntn => "If `n` is an `Integer`, `n >= 1`. A rule is checked when it is resolved, not when it is stored.",#
-                      :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. A rule is checked when it is resolved, not when it is stored.",#
-                      :sepq => "`0 <= q <= 1`.",#
-                      :A => "`!isempty(A)`.",#
-                      :B => "`!isempty(B)`.",#
-                      :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
-                      :decay => "`decay > 0`.",#
-                      :rf => "`isfinite(rf)`.",#
-                      :q_scorer => "`0 <= q <= 1`.",#
-                      :unit => "`unit > 0`.",#
-                      :katz_alpha => "`alpha > 0`.",#
-                      :min_obs => "`min_obs > 0`.",#
-                      :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
-                      :regime_min_obs => "`regime_min_obs > 0`.",#
-                      :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
-                      :ra_x => "`x` is valid",#
-                      :ra_y => "`y` is valid",#
-                      :ra_norm_x => "`x` is valid")
+const val_dict = unique_key_dict(:val_dict,
+                                 :oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                                 :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                                 :gerbt => "`0 <= t`.",#
+                                 :t => "`0 < t < 1`.",#
+                                 :c1 => "`0 < c1 <= 1`.",#
+                                 :c2 => "`0 < c2 <= 1`.",#
+                                 :c3c2 => "`c3 > c2`.",#
+                                 :dims => "`dims in (1, 2)`.",#
+                                 :alpha => "`0 < alpha < 1`.",#
+                                 :beta => "`0 < beta < 1`.",#
+                                 :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
+                                 :dopower => "If `power` is not `nothing`, `power >= 1`.",#
+                                 :settings => "If not `nothing`, `!isempty(settings)`.",#
+                                 :S => "`!isempty(S)`.",#
+                                 :D => "`!isempty(D)`.",#
+                                 :ck => "`k >= 1`.",#
+                                 :lm_k => "`k >= 2`.",#
+                                 :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
+                                 :a_sim_pos => "`a_sim > 0`.",#
+                                 :beta_i_beta => "`0 < beta_i < beta < 1`.",#
+                                 :b_sim_pos => "`b_sim > 0`.",#
+                                 :S_D => "size(S) == size(D)`.",#
+                                 :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
+                                 :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                                 :dbhtpower => "`power > 0`.",#
+                                 :dbhtcoef => "`isfinite(coef) && coef > 0`.",#
+                                 :Xe => "`!isempty(X)`.",#
+                                 :sdrate => "`rate > 0`.",#
+                                 :sdpower => "`power > 0`.",#
+                                 :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
+                                 :ntn => "If `n` is an `Integer`, `1 <= n <= RESOURCE_LIMITS[].max_hop_count` (three readers sum `A^i` over `i in 0:n`, so the compute cost is linear in `n`; see [`RESOURCE_LIMITS`](@ref)). A rule is checked when it is resolved, not when it is stored.",#
+                                 :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. A rule is checked when it is resolved, not when it is stored.",#
+                                 :sepq => "`0 <= q <= 1`.",#
+                                 :A => "`!isempty(A)`.",#
+                                 :B => "`!isempty(B)`.",#
+                                 :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
+                                 :decay => "`decay > 0`.",#
+                                 :rf => "`isfinite(rf)`.",#
+                                 :q_scorer => "`0 <= q <= 1`.",#
+                                 :unit => "`unit > 0`.",#
+                                 :katz_alpha => "`alpha > 0`.",#
+                                 :min_obs => "`min_obs > 0`.",#
+                                 :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
+                                 :regime_min_obs => "`regime_min_obs > 0`.",#
+                                 :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
+                                 :ra_x => "`x` is valid",#
+                                 :ra_y => "`y` is valid",#
+                                 :ra_norm_x => "`x` is valid")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
-                      :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
-                      :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
-                      :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
-                      :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
-                      :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
-                      :cskewV => "`V::MatNum`: Processed coskewness matrix `assets x assets`.",#
-                      :kte => "`kte::MatNum`: Cokurtosis matrix `assets x assets`.",#
-                      :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                      :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
-                      :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                      :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
-                      :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
-                      :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
-                      :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
-                      :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
-                      :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                      :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
-                      :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                      :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                      :stdnum => "`vr::Number`: Standard deviation of `X`",
-                      :varnum => "`vr::Number`: Variance of `X`",
-                      :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
-                      :alg => "`alg`: The original algorithm instance.")
+const ret_dict = unique_key_dict(:ret_dict,
+                                 :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
+                                 :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
+                                 :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
+                                 :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
+                                 :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
+                                 :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
+                                 :cskewV => "`V::MatNum`: Processed coskewness matrix `assets x assets`.",#
+                                 :kte => "`kte::MatNum`: Cokurtosis matrix `assets x assets`.",#
+                                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                                 :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
+                                 :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                                 :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
+                                 :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
+                                 :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
+                                 :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
+                                 :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
+                                 :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                                 :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                                 :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                                 :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                                 :stdnum => "`vr::Number`: Standard deviation of `X`",
+                                 :varnum => "`vr::Number`: Variance of `X`",
+                                 :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                                 :alg => "`alg`: The original algorithm instance.")
 """
     math_dict
 
@@ -1431,8 +1424,10 @@ There is **one cap per sink**, each named to mirror the field it guards. Reuse a
   - `max_n_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
   - `max_frontier`: maximum efficient-frontier sweep points accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`. Enforced **twice**: [`Frontier`](@ref)'s constructor caps the `N` of one bound, and [`assert_frontier_sweep_cap`](@ref) caps the **product** across every swept return term and every swept risk measure at Model Assembly, since the sweep is an `Iterators.product` and `k` bounds of `N` points cost `N^k` solves.
   - `max_bins`: maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref) (default `10_000`). The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is ≈ 800 MB per histogram — below OOM yet far above the ~50-bin range legitimate binning produces.
+  - `max_hop_count`: maximum hop count (`n`) accepted by [`HopCount`](@ref) (default `100_000`). Three readers sum `A^i` over `i in 0:n`, so the sink is *linear* in `n` at `N³` flops a power and a large `n` wedges the session on compute rather than memory. Like `max_n_subsets` it is compute-bound and mirrors that ceiling; the shipped default is `n = 1`. The cap is read in `HopCount`'s constructor, which is also where [`resolve_separation`](@ref) sends a rule's answer, so one check covers the stated value and the computed one alike.
+  - `max_search_grid`: maximum search-grid candidates accepted by [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref) (default `100_000`). Every candidate runs a full cross-validated fit, so this is *compute*-bound like `max_n_subsets`. The grid is an `Iterators.product` materialised by `collect`, so `k` parameters of `N` values cost `N^k` candidates: the cap is asserted on the **product** by [`assert_search_grid_cap`](@ref) where the grid is formed, since a per-parameter check can never see it.
 
-The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the four caps are same-typed and two share the value `100_000`, so positional construction is error-prone.
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the six caps are same-typed and four share the value `100_000`, so positional construction is error-prone.
 
 # Related
 
@@ -1447,21 +1442,33 @@ struct ResourceLimits
     max_n_subsets::Int
     max_frontier::Int
     max_bins::Int
+    max_hop_count::Int
+    max_search_grid::Int
     function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,
-                            max_frontier::Integer, max_bins::Integer)
-        @argcheck(max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0,
-                  ArgumentError("max_n_sim, max_n_subsets, max_frontier and max_bins must be positive."))
-        return new(Int(max_n_sim), Int(max_n_subsets), Int(max_frontier), Int(max_bins))
+                            max_frontier::Integer, max_bins::Integer,
+                            max_hop_count::Integer, max_search_grid::Integer)
+        @argcheck(max_n_sim > 0 &&
+                  max_n_subsets > 0 &&
+                  max_frontier > 0 &&
+                  max_bins > 0 &&
+                  max_hop_count > 0 &&
+                  max_search_grid > 0,
+                  ArgumentError("max_n_sim, max_n_subsets, max_frontier, max_bins, max_hop_count and max_search_grid must be positive."))
+        return new(Int(max_n_sim), Int(max_n_subsets), Int(max_frontier), Int(max_bins),
+                   Int(max_hop_count), Int(max_search_grid))
     end
 end
 function ResourceLimits(; max_n_sim::Integer = 1_000_000, max_n_subsets::Integer = 100_000,
-                        max_frontier::Integer = 100_000, max_bins::Integer = 10_000)
-    return ResourceLimits(max_n_sim, max_n_subsets, max_frontier, max_bins)
+                        max_frontier::Integer = 100_000, max_bins::Integer = 10_000,
+                        max_hop_count::Integer = 100_000,
+                        max_search_grid::Integer = 100_000)
+    return ResourceLimits(max_n_sim, max_n_subsets, max_frontier, max_bins, max_hop_count,
+                          max_search_grid)
 end
 """
     RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 
-Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` preferences (see [`apply_preferences!`](@ref)).
+Default global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"` preferences (see [`apply_preferences!`](@ref)).
 
 # Related
 
@@ -1473,7 +1480,8 @@ Default global resource caps for the sampling- and sweep-based estimators, guard
 const RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 """
     set_resource_limits!(; max_n_sim::Integer, max_n_subsets::Integer,
-                         max_frontier::Integer, max_bins::Integer)
+                         max_frontier::Integer, max_bins::Integer,
+                         max_hop_count::Integer, max_search_grid::Integer)
 
 Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
 
@@ -1481,6 +1489,8 @@ Configure the global default resource caps read at the config→allocation trust
   - `max_n_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
   - `max_frontier`: maximum `N` accepted by one [`Frontier`](@ref), and maximum total sweep points across every swept bound.
   - `max_bins`: maximum `bins` accepted by the mutual-information estimators.
+  - `max_hop_count`: maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
+  - `max_search_grid`: maximum total candidates in a search cross-validation grid.
 
 Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. All must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
 
@@ -1496,15 +1506,20 @@ function set_resource_limits!(;
                               max_n_sim::Integer = (@atomic RESOURCE_LIMITS.default).max_n_sim,
                               max_n_subsets::Integer = (@atomic RESOURCE_LIMITS.default).max_n_subsets,
                               max_frontier::Integer = (@atomic RESOURCE_LIMITS.default).max_frontier,
-                              max_bins::Integer = (@atomic RESOURCE_LIMITS.default).max_bins)
+                              max_bins::Integer = (@atomic RESOURCE_LIMITS.default).max_bins,
+                              max_hop_count::Integer = (@atomic RESOURCE_LIMITS.default).max_hop_count,
+                              max_search_grid::Integer = (@atomic RESOURCE_LIMITS.default).max_search_grid)
     return set_default!(RESOURCE_LIMITS,
-                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
+                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
+                                       max_hop_count, max_search_grid))
 end
 """
     with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
                          max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
                          max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
-                         max_bins::Integer = RESOURCE_LIMITS[].max_bins)
+                         max_bins::Integer = RESOURCE_LIMITS[].max_bins,
+                         max_hop_count::Integer = RESOURCE_LIMITS[].max_hop_count,
+                         max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid)
 
 Run `f()` with the resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
 
@@ -1518,9 +1533,12 @@ Useful to raise the ceiling for one deliberately large run without loosening the
 function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
                               max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
                               max_frontier::Integer = RESOURCE_LIMITS[].max_frontier,
-                              max_bins::Integer = RESOURCE_LIMITS[].max_bins)
+                              max_bins::Integer = RESOURCE_LIMITS[].max_bins,
+                              max_hop_count::Integer = RESOURCE_LIMITS[].max_hop_count,
+                              max_search_grid::Integer = RESOURCE_LIMITS[].max_search_grid)
     return with_config(f, RESOURCE_LIMITS,
-                       ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins))
+                       ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
+                                      max_hop_count, max_search_grid))
 end
 """
     did_you_mean(name::AbstractString, candidates) -> String
@@ -1543,6 +1561,26 @@ function did_you_mean(name::AbstractString, candidates)
     match, _ = StringDistances.findnearest(name, candidates, sd.dist;
                                            min_score = sd.min_score)
     return isnothing(match) ? "" : " (did you mean `$(match)`?)"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Suggest the nearest `candidates` entry to a mistyped **declaration key**: a macro block key, a dictionary key, a struct field name, or a keyword of a generated constructor.
+
+Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default: Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The strict global default exists to keep near-miss probes from echoing real *asset names* back to the caller (ADR 0026); that boundary does not apply here, because the candidates are compile-time constants — block keys, dictionary keys and field names — with nothing to leak. At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5 against `noun`, so the suggestion would be dead code.
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`with_string_distance`](@ref)
+  - [`windowed_estimator_suggest`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+"""
+function suggest_declared_key(key, candidates)
+    return with_string_distance(; dist = StringDistances.DamerauLevenshtein(),
+                                min_score = 0.5) do
+        return did_you_mean(string(key), string.(collect(candidates)))
+    end
 end
 """
     unknown_variable_msg(v, nx, key; candidates = nx, axis = "asset") -> String
@@ -1596,6 +1634,25 @@ This diagnosis exists only under a re-basis, and it is a different failure from 
 """
 function empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constraint")
     return "$(noun) `$(eqn)` resolved against the factor universe ($(length(nf)) factors under key `$(key)`) but projected to an all-zero row over $(n) assets: every matched factor has zero loadings; row dropped"
+end
+"""
+    gross_budget_bounds_msg(lb, ub) -> String
+
+Build the error text for a gross budget (`gbgt`) whose weight bounds `lb` and `ub` admit no short position. With no negative bound the gross exposure equals the net exposure, so the net budget (`bgt`) already owns the constraint and `gbgt` has nothing left to express.
+
+Names the *size* of the bounds and the failed predicate only — never the bound values — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref) and its siblings. Scalar or absent bounds have no size, so the message names the bounds without a count.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`assert_gross_budget_admissible`](@ref)
+  - [`w_neg_flag`](@ref)
+"""
+function gross_budget_bounds_msg(lb, ub)
+    n = max(isa(lb, AbstractVector) ? length(lb) : 0,
+            isa(ub, AbstractVector) ? length(ub) : 0)
+    scope = iszero(n) ? "weight bounds" : "weight bounds over $(n) assets"
+    return "gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got $(scope) with no negative element in lb or ub."
 end
 """
     missing_group_assets_msg(group, missing_assets, nx, key) -> String
@@ -1713,7 +1770,7 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
 
   - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
-  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"`: positive integers for [`RESOURCE_LIMITS`](@ref).
+  - `"max_n_sim"` / `"max_n_subsets"` / `"max_frontier"` / `"max_bins"` / `"max_hop_count"` / `"max_search_grid"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
@@ -1725,8 +1782,9 @@ Preferences.jl offers no way to enumerate the keys a project has set, so a missp
   - [`apply_preferences!`](@ref)
 """
 const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
-                         "max_n_subsets", "max_frontier", "max_bins",
-                         "suggestion_min_score", "suggestion_distance", "compact_show")
+                         "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
+                         "max_search_grid", "suggestion_min_score", "suggestion_distance",
+                         "compact_show")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1744,6 +1802,8 @@ max_n_sim = 50_000
 max_n_subsets = 1_000
 max_frontier = 1_000
 max_bins = 500
+max_hop_count = 100
+max_search_grid = 10_000
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
@@ -1774,9 +1834,11 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
     xb = get(prefs, "max_n_subsets", nothing)
     xf = get(prefs, "max_frontier", nothing)
     xn = get(prefs, "max_bins", nothing)
-    if !(isnothing(xs) && isnothing(xb) && isnothing(xf) && isnothing(xn))
+    xh = get(prefs, "max_hop_count", nothing)
+    xg = get(prefs, "max_search_grid", nothing)
+    if !all(isnothing, (xs, xb, xf, xn, xh, xg))
         for (key, val) in ("max_n_sim" => xs, "max_n_subsets" => xb, "max_frontier" => xf,
-                           "max_bins" => xn)
+                           "max_bins" => xn, "max_hop_count" => xh, "max_search_grid" => xg)
             @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
                       ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
         end
@@ -1784,7 +1846,9 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         set_resource_limits!(; max_n_sim = something(xs, rlim.max_n_sim),
                              max_n_subsets = something(xb, rlim.max_n_subsets),
                              max_frontier = something(xf, rlim.max_frontier),
-                             max_bins = something(xn, rlim.max_bins))
+                             max_bins = something(xn, rlim.max_bins),
+                             max_hop_count = something(xh, rlim.max_hop_count),
+                             max_search_grid = something(xg, rlim.max_search_grid))
     end
     ms = get(prefs, "suggestion_min_score", nothing)
     if !isnothing(ms)

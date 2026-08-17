@@ -15,6 +15,7 @@ set_ret_frontier_parameters!
 compute_ret_lbs
 _rebuild_risk_frontier
 rebuild_risk_frontier
+unresolved_risk_frontier
 compute_risk_ubs
 optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

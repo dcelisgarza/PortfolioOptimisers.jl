@@ -237,6 +237,27 @@ function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum
     return rk, rt, (rt - rf) / rk
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the estimation-error penalty that turns a ratio into a SRIC.
+
+The penalty is `N / (T * sr)`, where `T` and `N` are the observation and asset counts of the
+prior result. It is applied once to the aggregate ratio, never per element. This is the only
+difference between [`expected_sric`](@ref) and [`expected_ratio`](@ref), and between
+[`expected_risk_ret_sric`](@ref) and [`expected_risk_ret_ratio`](@ref), so both SRIC
+functions delegate here rather than restate the ratio.
+
+# Related
+
+  - [`expected_sric`](@ref)
+  - [`expected_risk_ret_sric`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
+function sric_penalty(sr::Number, pr::AbstractPriorResult)
+    T, N = size(pr.X)
+    return N / (T * sr)
+end
+"""
     expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                   pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                   rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
@@ -279,9 +300,8 @@ The ratio it penalises is [`expected_ratio`](@ref)'s, so it inherits the same ru
 function expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                        rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
-    T, N = size(pr.X)
-    sr = expected_ratio(r, ret, w, pr; fees = fees, rf = rf, sca = sca, kwargs...)
-    return sr - N / (T * sr)
+    sr = expected_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
+    return sr - sric_penalty(sr, pr)
 end
 """
     expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
@@ -329,10 +349,8 @@ function expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                 pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                 rf::Number = 0, sca::Scalariser = SumScalariser(),
                                 kwargs...)
-    T, N = size(pr.X)
-    rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr; fees = fees, rf = rf, sca = sca,
-                                         kwargs...)
-    return rk, rt, sr - N / (T * sr)
+    rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
+    return rk, rt, sr - sric_penalty(sr, pr)
 end
 """
 $(DocStringExtensions.TYPEDEF)

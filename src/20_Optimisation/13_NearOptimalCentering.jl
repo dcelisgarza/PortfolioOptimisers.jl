@@ -193,6 +193,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
   - [`scalarise_risk_expression!`](@ref)
   - [`set_risk_constraints!`](@ref)
   - [`RiskJuMPOptimisationEstimator`](@ref)
@@ -381,9 +383,9 @@ Used internally by Near Optimal Centering to evaluate the risk at the three anch
   - `pr`: Prior result containing asset data.
   - `fees`: Optional fees configuration.
   - `slv`: Solver or vector of solvers.
-  - `w_min`: Minimum-risk portfolio weights.
-  - `w_opt`: Optimal portfolio weights (vector or vector of vectors).
-  - `w_max`: Maximum-risk portfolio weights.
+  - $(arg_dict[:w_min])
+  - $(arg_dict[:w_opt])
+  - $(arg_dict[:w_max])
 
 # Returns
 
@@ -973,6 +975,7 @@ Identifies risk frontier entries that are not yet resolved (i.e. not concrete we
   - [`compute_risk_ubs`](@ref)
   - [`NearOptimalCentering`](@ref)
   - [`solve_noc!`](@ref)
+  - [`unresolved_risk_frontier`](@ref)
 """
 function compute_risk_ubs(model::JuMP.Model,
                           noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
@@ -981,13 +984,7 @@ function compute_risk_ubs(model::JuMP.Model,
                                                     <:ConstrainedNearOptimalCentering},
                           pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum,
                           w_max::VecNum, args...)
-    risk_frontier = shared_get(model, :risk_frontier)
-    idx = Vector{Int}(undef, 0)
-    for (i, rkf) in enumerate(risk_frontier)
-        if !isa(rkf.second[2], VecNum)
-            push!(idx, i)
-        end
-    end
+    risk_frontier, idx = unresolved_risk_frontier(model)
     if isempty(idx)
         return risk_frontier
     end
@@ -1138,7 +1135,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_model_scales!(model, opt.sc, opt.so)
     JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
-    set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
+    set_weight_constraints!(model, opt.wb, opt)
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
@@ -1192,7 +1189,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_model_scales!(model, opt.sc, opt.so)
     JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
-    set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
+    set_weight_constraints!(model, opt.wb, opt)
     assemble_jump_model!(model, noc, opt, attrs, rd, r)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max,
                                   rt_ends, w_min, w_max,

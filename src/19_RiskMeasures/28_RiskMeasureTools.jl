@@ -185,5 +185,46 @@ function measure_label(rs::VecBaseRM)
     return join(measure_label.(rs), " + ")
 end
 
+"""
+    const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T}, <:Kurtosis{<:Any, T}, <:Skewness{<:Any, <:Any, <:Any, T}, <:ThirdCentralMoment{<:Any, T}}
+
+Parameterised union of the five central-moment risk measures sharing the same observation-weight (`T`) type parameter.
+
+The members are [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Kurtosis`](@ref), [`Skewness`](@ref) and [`ThirdCentralMoment`](@ref). Each evaluates the same way — deviations from the centring target, then [`moment_risk`](@ref) — and each resolves a [`DynamicAbstractWeights`](@ref) the same way, so the four functor methods are written once here rather than four times per measure.
+
+`T` selects the arm:
+
+  - `Option{<:StatsBase.AbstractWeights}`: the weights are resolved, so the measure computes.
+  - `<:DynamicAbstractWeights`: the weights are not resolved, so the measure resolves them against the data it was handed and re-calls itself.
+
+The rebuild replaces `w` and copies every other field, so it names no field list and cannot drop a field. The ten hand-written rebuilds it replaces did: [`Skewness`](@ref) reset its `settings`, and [`Kurtosis`](@ref) bound its rebuild to `SemiMoment`, which left a default [`Kurtosis`](@ref) carrying dynamic weights matching no method at all.
+
+# Related
+
+  - [`moment_risk`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T},
+                                    <:Kurtosis{<:Any, T},
+                                    <:Skewness{<:Any, <:Any, <:Any, T},
+                                    <:ThirdCentralMoment{<:Any, T}}
+function (r::MomentRiskMeasures{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
+                                                                        X::MatNum,
+                                                                        fees::Option{<:Fees} = nothing)
+    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::MomentRiskMeasures{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
+    return moment_risk(r, calc_deviations_vec(r, x))
+end
+function (r::MomentRiskMeasures{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                           fees::Option{<:Fees} = nothing)
+    return (Accessors.@set r.w = get_observation_weights(r.w, X))(w, X, fees)
+end
+function (r::MomentRiskMeasures{<:DynamicAbstractWeights})(x::VecNum)
+    return (Accessors.@set r.w = get_observation_weights(r.w, x))(x)
+end
+
 export no_bounds_risk_measure, no_bounds_no_risk_expr_risk_measure,
        no_risk_expr_risk_measure, bounds_risk_measure, unit_scale_risk_measure

@@ -24,6 +24,7 @@ expected_return
 term_fees
 expected_ratio
 expected_risk_ret_ratio
+sric_penalty
 expected_sric
 expected_risk_ret_sric
 factory(r::ExpectedReturn, args...; kwargs...)

@@ -148,7 +148,7 @@ MedianAbsoluteDeviation
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     """

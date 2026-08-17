@@ -34,6 +34,8 @@ KFold
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`KFoldResult`](@ref)
   - [`n_splits`](@ref)

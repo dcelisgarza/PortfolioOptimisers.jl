@@ -781,28 +781,17 @@ function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new vector of risk measures with [`factory`](@ref) applied element-wise.
-
-# Related
-
-  - [`VecBaseRM`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(rs::VecBaseRM, args...; kwargs...)
-    return [factory(r, args...; kwargs...) for r in rs]
-end
-"""
     port_opt_view(rs, i, X)
 
 Get a view or subset of a risk measure for asset cluster index `i`.
 
 Returns the risk measure sliced for the given cluster or asset index. Used internally in hierarchical optimisation to apply risk measures to each cluster.
 
+A vector of risk measures ([`VecBaseRM`](@ref)) is handled by the generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref), which rebuild and view each measure in turn.
+
 # Arguments
 
-  - `rs`: Risk measure (or vector thereof).
+  - `rs`: Risk measure.
   - `i`: Cluster or asset index.
   - `X`: Data matrix (used for dimension-aware slicing).
 
@@ -813,13 +802,11 @@ Returns the risk measure sliced for the given cluster or asset index. Used inter
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
 """
 function port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any,
                        args...)::AbstractBaseRiskMeasure
     return rs
-end
-function port_opt_view(rs::VecBaseRM, i, X::MatNum, args...)
-    return [port_opt_view(r, i, X) for r in rs]
 end
 """
 $(DocStringExtensions.TYPEDEF)

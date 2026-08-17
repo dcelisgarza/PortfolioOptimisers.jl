@@ -443,7 +443,7 @@ Returns the prior unchanged for estimators (they are not sliceable), or returns 
 
 # Arguments
 
-  - `pr`: Prior estimator or result.
+  - $(arg_dict[:per])
   - `args...`: Additional arguments (index, etc.).
   - `kwargs...`: Additional keyword arguments.
 
@@ -638,7 +638,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 
 # Arguments
 
-  - `cte`: Centrality estimator.
+  - $(arg_dict[:cte])
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
 
@@ -670,7 +670,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 # Arguments
 
   - `pl`: Network estimator, res estimator, or clustering result.
-  - `ct`: Centrality algorithm.
+  - $(arg_dict[:cta])
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
 
@@ -704,7 +704,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 # Arguments
 
   - `pl`: Network estimator or phylogeny result.
-  - `ct`: Centrality algorithm.
+  - $(arg_dict[:cta])
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
@@ -736,7 +736,7 @@ Compute the weighted average centrality for a centrality estimator.
 
 # Arguments
 
-  - `cte`: Centrality estimator.
+  - $(arg_dict[:cte])
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
@@ -1417,6 +1417,33 @@ function reconstruct_prior(pr::LowOrderPrior, patch::NamedTuple)::LowOrderPrior
 end
 function reconstruct_prior(pr::HighOrderPrior, patch::NamedTuple)::HighOrderPrior
     return HighOrderPrior(; merge(prior_field_values(pr), patch)...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return every property name a prior result can answer, unioned over the carriers.
+
+This is the candidate pool [`propagatable_contract_violations`](@ref) checks an `@pprop` field
+name against: the generated `factory(x, pr::AbstractPriorResult, args...)` reads
+`getproperty(pr, :field)`, and the carrier that arrives is not known at the declaration.
+
+The names of the two carriers are written out, as in [`reconstruct_prior`](@ref); their fields
+are derived, so a carrier that gains a field needs no edit here. `HighOrderPrior` forwards the
+whole of the `pr` it wraps, so the low-order names are properties of it too without being
+fields — that forwarding is the reason a plain `fieldnames` of one carrier is not the pool.
+
+These methods are defined here, after both carriers, because they name the concrete types.
+
+# Related
+
+  - [`propagatable_contract_violations`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+  - [`@pprop`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
+function prior_result_property_pool()
+    return unique!(Symbol[fieldnames(LowOrderPrior)..., fieldnames(HighOrderPrior)...])
 end
 
 export prior, LowOrderPrior, HighOrderPrior

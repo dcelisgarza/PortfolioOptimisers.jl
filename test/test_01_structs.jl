@@ -2192,6 +2192,32 @@
         chain_opt = factory(chain_opt, w0)
         @test chain_opt.fb.fb.fb.r.w === w0
     end
+    @testset "Documentation dictionaries" begin
+        # A `Dict` literal is last-wins, so a repeated key used to drop the earlier entry
+        # with no warning. `unique_key_dict` builds the four documentation dictionaries and
+        # refuses a repeat at load time, naming both descriptions.
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict(:demo, :a => "one",
+                                                                       :b => "two",
+                                                                       :a => "three")
+        msg = try
+            PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :a => "three")
+        catch err
+            sprint(showerror, err)
+        end
+        @test occursin("`demo` has a repeated key, `:a`", msg)
+        @test occursin("first: one", msg)
+        @test occursin("later: three", msg)
+        good = PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :b => "two")
+        @test good == Dict(:a => "one", :b => "two")
+        @test isa(good, Dict{Symbol, String})
+        # The `:ple` collision this guard was written for: the surviving JuMP entry is now
+        # named like its neighbours, and the shadowed phylogeny entry had no reader.
+        @test !haskey(PortfolioOptimisers.arg_dict, :ple)
+        @test occursin("Phylogeny constraint estimator(s).",
+                       PortfolioOptimisers.arg_dict[:ple_jmp])
+        @test PortfolioOptimisers.field_dict[:ple_jmp] ==
+              "Phylogeny constraint estimator(s)."
+    end
     @testset "UniverseSets" begin
         both = Dict{String, Vector{String}}("nx" => ["AAPL", "MSFT", "JPM"],
                                             "nx_sector" => ["Tech", "Tech", "Fin"],

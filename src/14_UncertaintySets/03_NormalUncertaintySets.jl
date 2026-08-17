@@ -280,6 +280,79 @@ function mu_normal_box_set(mu::VecNum, sigma_mu::MatNum, q::Number)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u, val = mu)
 end
 """
+    sigma_normal_box_set(ue::NormalUncertaintySet, pr::LowOrderPrior, T::Number,
+                         sigma_mu::MatNum, q::Number)
+
+Covariance box uncertainty set of a [`NormalUncertaintySet`](@ref).
+
+Draws `ue.n_sim` Wishart matrices with `T` degrees of freedom and scale `sigma_mu`, takes the element-wise `q` and `1 - q` quantiles as the bounds, then projects each bound to the nearest positive definite matrix. This is the covariance half of [`ucs`](@ref) and the whole of [`sigma_ucs`](@ref), so the simulation is written once and the two entry points cannot drift apart.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `pr`: Prior result carrying the point estimate `pr.sigma`.
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref), used as the Wishart degrees of freedom.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref), used as the Wishart scale.
+  - `q`: Half significance level.
+
+# Returns
+
+  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty set.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`normal_box_preamble`](@ref)
+  - [`mu_normal_box_set`](@ref)
+  - [`box_quantile_bounds`](@ref)
+"""
+function sigma_normal_box_set(ue::NormalUncertaintySet, pr::LowOrderPrior, T::Number,
+                              sigma_mu::MatNum, q::Number)
+    sigma = pr.sigma
+    rng = resolve_rng(ue.rng, ue.seed)
+    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    sigma_l, sigma_u = box_quantile_bounds(eltype(sigma), (i, j) -> getindex.(sigmas, i, j),
+                                           size(pr.X, 2), q, ue.kwargs)
+    posdef!(ue.pdm, sigma_l)
+    posdef!(ue.pdm, sigma_u)
+    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = sigma)
+end
+"""
+    normal_box_preamble(ue::NormalUncertaintySet, X::MatNum,
+                        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+
+Shared preamble of the three box entry points of a [`NormalUncertaintySet`](@ref).
+
+Fits the prior, resolves the scaling parameter, and derives the two quantities both box sets are built from. [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) all start here, so the prior call and the scaling choice are written once instead of three times.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator.
+  - `X`: Data matrix.
+  - `F`: Optional factor matrix. Used by the prior estimator.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+
+# Returns
+
+  - `(pr, T, sigma_mu, q)`: Prior result, scaling parameter, mean asymptotic covariance, and half significance level.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+  - [`choose_scaling_parameter`](@ref)
+  - [`mu_asymptotic_cov`](@ref)
+  - [`mu_normal_box_set`](@ref)
+  - [`sigma_normal_box_set`](@ref)
+"""
+function normal_box_preamble(ue::NormalUncertaintySet, X::MatNum,
+                             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    T = choose_scaling_parameter(ue, pr)
+    return pr, T, mu_asymptotic_cov(ue.pdm, pr.sigma, T), ue.q * 0.5
+end
+"""
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
@@ -349,20 +422,9 @@ Where:
 function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                       <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
-    sigma = pr.sigma
-    q = ue.q * 0.5
-    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    rng = resolve_rng(ue.rng, ue.seed)
-    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    sigma_l, sigma_u = box_quantile_bounds(eltype(sigma), (i, j) -> getindex.(sigmas, i, j),
-                                           N, q, ue.kwargs)
-    posdef!(ue.pdm, sigma_l)
-    posdef!(ue.pdm, sigma_u)
+    pr, T, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
     return mu_normal_box_set(pr.mu, sigma_mu, q),
-           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = sigma)
+           sigma_normal_box_set(ue, pr, T, sigma_mu, q)
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
@@ -418,10 +480,7 @@ Where:
 function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                          <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    T = choose_scaling_parameter(ue, pr)
-    sigma_mu = mu_asymptotic_cov(ue.pdm, pr.sigma, T)
-    q = ue.q * 0.5
+    pr, _, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
     return mu_normal_box_set(pr.mu, sigma_mu, q)
 end
 """
@@ -481,19 +540,8 @@ Where:
 function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
                                             <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    T = choose_scaling_parameter(ue, pr)
-    sigma = pr.sigma
-    q = ue.q * 0.5
-    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    rng = resolve_rng(ue.rng, ue.seed)
-    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
-    sigma_l, sigma_u = box_quantile_bounds(eltype(sigma), (i, j) -> getindex.(sigmas, i, j),
-                                           N, q, ue.kwargs)
-    posdef!(ue.pdm, sigma_l)
-    posdef!(ue.pdm, sigma_u)
-    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u, val = sigma)
+    pr, T, sigma_mu, q = normal_box_preamble(ue, X, F; dims = dims, kwargs...)
+    return sigma_normal_box_set(ue, pr, T, sigma_mu, q)
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,

@@ -209,3 +209,47 @@ on the full universe while believing it had a subset. A `port_opt_view(::Abstrac
 args...)` tripwire therefore throws: returns data is never a leaf value, so an unhandled
 subtype is a missing method, not a pass-through. This keeps the fail-closed posture of
 ADRs 0025–0027.
+
+## Amendment (2026-08-17): `@propagatable`'s keyword contract is checked at the declaration
+
+The tags of decision 0010§1 buy their leverage from codegen: 127 declarations emit 231
+`factory` / `port_opt_view` methods. Every one of those methods rebuilds the struct as
+`StructName(; field = …)` over **all** fields, tagged or not, and the prior-selecting method
+additionally reads `getproperty(pr, :field)` for each `@pprop` field. Both are contracts on
+the declaration, and neither was stated where the struct is written. The first signal of a
+breach was a `MethodError` at the first `factory` call — from a method no reader can grep for.
+
+The 2026-08-16 maintainability review recorded this as candidate 4, "231 generated methods,
+and the keyword contract behind them", and asked for the treatment ADR 0039 gave
+`@windowed_estimator`: keep the codegen, add the check.
+
+**The check is now declared where the codegen is.** `@propagatable` appends each type and its
+`@pprop` field names to `PROPAGATABLE_CONTRACTS`, and `check_propagatable_contracts()` runs
+once at the end of the module. It reports **every** violation together, each with a
+`suggest_declared_key` suggestion, and throws. The package refuses to precompile rather than
+shipping a type whose generated methods throw on first use — the fail-closed posture of ADRs
+0025–0027.
+
+Three points the implementation had to settle.
+
+**Registration cannot check.** The outer keyword constructor is written *below* the struct, so
+at the point the macro expands it does not exist yet. This is why the check cannot be a
+macro-expansion-time one like `@windowed_estimator`'s, and why the macro only records. The
+whole registry is checked when the module is complete, which is also what makes the check
+cover a type declared in an external package: such a package calls
+`check_propagatable_contracts()` at the end of its own module and gets the same guarantee.
+
+**A `kwargs...` slurp does not satisfy the contract.** A constructor that slurps accepts
+`field = value` and then discards it, which is the silent failure the check exists to catch,
+so `propagatable_keywords` drops a slurp rather than counting it.
+
+**The `@pprop` pool is derived, not listed.** The carrier that reaches
+`factory(x, pr::AbstractPriorResult, args...)` is not known at the declaration, so the pool is
+the union over both carriers, in `prior_result_property_pool`. `HighOrderPrior` forwards the
+whole of the `pr` it wraps, so the low-order names are properties of it without being its
+fields — which is exactly why a `fieldnames` of one carrier is not the pool. The two carrier
+*names* are written out, as in `reconstruct_prior`; their fields are derived, so a carrier that
+gains a field needs no edit.
+
+All 127 declarations satisfied both clauses when the check was introduced, so it ratchets
+rather than fixes: it cannot be broken silently from here.

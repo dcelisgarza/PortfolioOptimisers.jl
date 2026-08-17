@@ -67,7 +67,7 @@ this ADR was written to close, present since the risk frontier first accepted se
 
 The rule is therefore two checks against one ceiling, not two ceilings:
 
-```
+```julia
 Frontier(N)   assert N <= max_frontier                 # the cheap early check, unchanged
 assembly      assert prod(Nᵢ) * prod(Nⱼ) <= max_frontier
 ```
@@ -93,3 +93,37 @@ Behaviour-changing, not API-breaking: a configuration whose product exceeds the 
 `DomainError` naming the product, the bounds that made it, and the knob. The ceiling is raised
 deliberately as before — `set_resource_limits!(; max_frontier)`, `with_resource_limits` for a single
 scope, or the `"max_frontier"` preference for a project.
+
+## Amendment (2026-08-17)
+
+The ninth security pass (`docs/reports/security-review-20260816-230218.html`) found two more sinks of
+this class, one of each shape the ADR already distinguishes. `ResourceLimits` therefore holds **six**
+caps: `max_hop_count` and `max_search_grid` join the four above, with the same naming rule and the
+same no-reuse rule.
+
+`max_hop_count` (default `100_000`) bounds `HopCount.n`. Three readers sum `A^i` over `i in 0:n`, so
+the sink is linear in `n` at `N³` flops a power: a compute sink of exactly the `max_n_subsets` shape,
+and it takes the linear cap that shape calls for. `HopCount`'s constructor was bounded only from
+below (`n >= 1`), so `HopCount(; n = 10^9)` was accepted while the structurally identical
+`get_n_subsets(10^9)` failed closed.
+
+The check goes in the constructor **alone**, and that is the whole of it: `resolve_separation` builds
+its answer with `HopCount(n)`, so a hop count computed by a caller-authored rule meets the same cap
+as a stated one. Where the frontier needed two checks because the constructor could not see the
+product, here one constructor sees every value that ever reaches the sink.
+
+`max_search_grid` (default `100_000`) bounds the search cross-validation grid, and it is the
+frontier's lesson applied a second time. The grid is an `Iterators.product` materialised by
+`collect`, so `k` tuned parameters of `N` values cost `N^k` candidates and `N^k` full cross-validated
+fits; `RandomisedSearchCrossValidation` checked `n_iter` as a scalar, which is a linear check on a
+product sink. `assert_search_grid_cap`
+(`src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl`) is called by
+`lens_val_grid` and `pipeline_lens_val_grid` before the `collect`, accumulates the product as a
+`BigInt`, and names each parameter's value count in the message. Concatenated parameter sets are a
+**sum** of products rather than a product, so each set is capped as it is built and the concatenated
+total is capped again on the way out — a per-set check alone would let `k` sets at the ceiling
+through, which is the hole this ADR exists to prevent.
+
+Behaviour-changing, not API-breaking, on both counts. `ResourceLimits`'s positional constructor takes
+six arguments now; the keyword constructor, which the decision above already made the recommended
+path, is unaffected.

@@ -87,6 +87,10 @@ Where:
 
 !!! note
 
+    Optimiser heads do not call this method directly. They pass their [`JuMPOptimiser`](@ref), whose method forwards the whole budget group (`bgt`, `sbgt`, `gbgt`) in one hand-off, so a budget field cannot reach one head and miss the others.
+
+!!! note
+
     The budgets set here **bound** the realised exposures rather than pinning them, because `lw` and `sw` are upper bounds on the parts of `w`. Pinning them is the `xbgt` option of [`short_mip_threshold_constraints`](@ref), applied later by [`set_mip_constraints!`](@ref).
 
 # Validation
@@ -103,6 +107,8 @@ Where:
   - [`w_finite_flag`](@ref)
   - [`WeightBounds`](@ref)
   - [`set_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+  - [`JuMPOptimiser`](@ref)
 """
 function set_weight_constraints!(args...)
     return nothing

@@ -187,10 +187,15 @@
         ps_bad = PipelineStep(; est = DeltaUncertaintySet(), writes = :uncertainty)
         @test_throws ArgumentError PortfolioOptimisers.run_step(ps_bad, ctx)
 
-        # an unknown target is rejected
-        ps_wrong = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),
-                                writes = :uncertainty, target = :nonsense)
-        @test_throws ArgumentError PortfolioOptimisers.run_step(ps_wrong, ctx)
+        # An unknown target is rejected at construction, beside the allowlist `writes`
+        # already gets, rather than by the step run after every earlier step has been fitted.
+        @test_throws ArgumentError PipelineStep(; est = DeltaUncertaintySet(),
+                                                reads = (:returns,), writes = :uncertainty,
+                                                target = :nonsense)
+        # `run_uncertainty_step` keeps its own check, because an unwrapped estimator reaches
+        # it having declared no target at all.
+        @test_throws ArgumentError PortfolioOptimisers.run_uncertainty_step(DeltaUncertaintySet(),
+                                                                            :nonsense, ctx)
 
         # unroutable targets fail loudly
         @test_throws ArgumentError fit(Pipeline(; steps = (ps_sigma, EqualWeighted())), rd)

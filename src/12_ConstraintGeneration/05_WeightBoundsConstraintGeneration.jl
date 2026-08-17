@@ -239,6 +239,8 @@ Alias for a weight bounds estimator or result.
 
 Matches either a [`WeightBoundsEstimator`](@ref) (specifying how to generate weight bounds constraints) or a [`WeightBounds`](@ref) result. Used internally for dispatch in weight bounds constraint generation.
 
+There is no vector counterpart, and [`weight_bounds_constraints`](@ref) has no vector method. Weight bounds are one box over the whole universe, so an optimiser holds exactly one. See [`RkbE_Rkb`](@ref) for why some constraint families are singular and others are not.
+
 # Related
 
   - [`WeightBoundsEstimator`](@ref)

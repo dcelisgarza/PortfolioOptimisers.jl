@@ -254,4 +254,9 @@ include("23_Pipeline/04_PredictionCV.jl")
 include("23_Pipeline/05_SearchCrossValidation.jl")
 include("24_Plotting.jl")
 include("25_Aliases.jl")
+
+# Every `@propagatable` struct is declared by now, and so is every outer keyword
+# constructor, so the contract behind the generated `factory`/`port_opt_view` methods is
+# checked at the declaration instead of at the first call. Runs at precompile time only.
+check_propagatable_contracts()
 end

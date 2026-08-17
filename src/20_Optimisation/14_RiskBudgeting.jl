@@ -444,6 +444,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`RiskBudgetingResult`](@ref)
   - [`scalarise_risk_expression!`](@ref)
   - [`set_risk_constraints!`](@ref)
   - [`RiskJuMPOptimisationEstimator`](@ref)
@@ -639,7 +641,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
+    set_weight_constraints!(model, wb, rb.opt, true)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -661,7 +663,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                           mipcrkb, sc * (sum(w) - k) >= 0
                           orthcrkb, sc * w >= 0
                       end)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -673,7 +675,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                        rb.rba.flag, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
 """
@@ -728,7 +730,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     sc = get_constraint_scale(model)
     k = get_k(model)
     JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

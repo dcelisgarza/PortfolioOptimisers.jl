@@ -1661,19 +1661,6 @@ const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`factory`](@ref) element-wise to a vector of optimisation estimators or results, elements that are [`TimeDependent`](@ref) schedules included.
-
-# Related
-
-  - [`VecOptE_Opt_TD`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(opt::VecOptE_Opt_TD, args...)
-    return [factory(opti, args...) for opti in opt]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Apply [`factory`](@ref) through a [`TimeDependent`](@ref) schedule: to each vector entry and to the `default`, rebuilding the schedule.
 
 A schedule can survive a fold loop's resolution pass (a `bind = :nearest` element left for a meta's inner cross-validation), so the factory pass that follows resolution must see through it. Callable forms pass through unchanged — their per-fold values do not exist yet, and a callable receives the fold's context (including `w_prev`) when it runs.
@@ -2320,19 +2307,6 @@ function port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args
 end
 function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Apply [`port_opt_view`](@ref) element-wise to a vector of optimisation estimators.
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`VecOptE`](@ref)
-"""
-function port_opt_view(opt::Union{<:VecOptE, <:VecOptE_Opt_TD}, i, args...)
-    return [port_opt_view(opti, i, args...) for opti in opt]
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult

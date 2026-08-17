@@ -149,9 +149,10 @@ DiscreteAllocation
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`GreedyAllocation`](@ref)
-  - [`DiscreteAllocationResult`](@ref)
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
     """

@@ -13,6 +13,7 @@ fit_and_score(pipe::Pipeline,
                                   <:RandomisedSearchCrossValidation{<:Any, <:Any}},
                        cv::CrossValidationResult, rd::Prices_RR, i::Integer)
 pipeline_lens
+has_lens_structure
 pipeline_lens_val_grid
 pipeline_data_view
 cv_data_eltype

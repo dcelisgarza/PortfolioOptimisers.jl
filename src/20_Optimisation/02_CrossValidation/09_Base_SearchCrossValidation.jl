@@ -699,5 +699,61 @@ function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,
                                <:Accessors.IndexLens})
     return key
 end
+"""
+    assert_search_grid_cap(total::Integer, detail::AbstractString)
+    assert_search_grid_cap(factors::AbstractVector{<:Pair})
+    assert_search_grid_cap(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
+    assert_search_grid_cap(estval::AbstractDict{<:Any, <:AbstractVector})
+
+Assert the **total** number of search-grid candidates does not exceed the active `max_search_grid` ceiling.
+
+The grid is an `Iterators.product` materialised by `collect`, so `k` tuned parameters of `N` values each cost `N^k` candidates and `N^k` full cross-validated fits. A per-parameter check never sees that product — the same reasoning that gave the frontier sweep [`assert_frontier_sweep_cap`](@ref) — so the cap is asserted where the grid is formed, before the `collect`.
+
+Concatenated parameter sets are a **sum** of products, not a product: each set is capped as it is built, and the concatenated total is capped again on the way out.
+
+# Arguments
+
+  - `total`: Candidate count already computed (a `BigInt` on the product path, since `k` parameters at the ceiling overflow an `Int64` before the check reads it).
+  - `detail`: Phrase naming how `total` was made, interpolated into the message.
+  - `factors`: `key => value-count` pairs, one per tuned parameter.
+  - `estval`: The parameter grid itself, from which the factors are derived.
+
+# Returns
+
+  - `nothing`.
+
+# Throws
+
+  - `DomainError` if the count exceeds `RESOURCE_LIMITS[].max_search_grid`. The message names the count, the factors that made it, and the knob that raises the ceiling.
+
+# Related
+
+  - [`lens_val_grid`](@ref)
+  - [`pipeline_lens_val_grid`](@ref)
+  - [`assert_frontier_sweep_cap`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+"""
+function assert_search_grid_cap(total::Integer, detail::AbstractString)::Nothing
+    cap = RESOURCE_LIMITS[].max_search_grid
+    @argcheck(total <= cap,
+              DomainError(total,
+                          "the search grid is $total candidates — $detail — and exceeds RESOURCE_LIMITS[].max_search_grid = $cap. Every candidate runs a full cross-validated fit, so the ceiling is on the whole grid, not on any single parameter's value count. Tune fewer parameters, or shorten a value vector. Raise the ceiling with set_resource_limits!(; max_search_grid) — or with_resource_limits for a single scope, or the \"max_search_grid\" preference for a whole project — for genuinely large machine-authored runs."))
+    return nothing
+end
+function assert_search_grid_cap(factors::AbstractVector{<:Pair})::Nothing
+    if isempty(factors)
+        return nothing
+    end
+    return assert_search_grid_cap(prod(big(n) for (_, n) in factors; init = big(1)),
+                                  "the product " *
+                                  join(("$key = $n" for (key, n) in factors), " × ") *
+                                  " across every tuned parameter")
+end
+function assert_search_grid_cap(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})::Nothing
+    return assert_search_grid_cap([x[1] => length(x[2]) for x in estval])
+end
+function assert_search_grid_cap(estval::AbstractDict{<:Any, <:AbstractVector})::Nothing
+    return assert_search_grid_cap([key => length(val) for (key, val) in estval])
+end
 
 export SearchCrossValidationResult, HighestMeanScore

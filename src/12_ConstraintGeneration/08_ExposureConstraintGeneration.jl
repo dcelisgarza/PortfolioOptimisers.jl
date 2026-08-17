@@ -233,13 +233,12 @@ function port_opt_view(space::FactorSpace, i, args...)::FactorSpace
 end
 """
     port_opt_view(ece::ExposureConstraintEstimator, i, args...) -> ExposureConstraintEstimator
-    port_opt_view(lcse::VecEcE_LcE_Lc, i, args...) -> AbstractVector
 
 Return an asset-sliced copy of the `lcse` slot.
 
 The wrapped constraint is passed through and the **space** is viewed. That split is the whole content of the method: the wrapped shape is written in the space's names, so an asset index means nothing to it, while the space's basis is the one thing in the slot that is indexed by asset.
 
-The vector method exists because the universal fallback would `view` the vector itself, slicing a list of constraints by asset indices. It covers every vector shape `lcse` admits, mixed or not.
+A vector slot ([`VecEcE_LcE_Lc`](@ref)) is covered by the generic vector [`port_opt_view`](@ref) method, mixed or not, which views each element in turn instead of slicing the list of constraints by asset index.
 
 # Related
 
@@ -251,9 +250,6 @@ function port_opt_view(ece::ExposureConstraintEstimator, i,
                        args...)::ExposureConstraintEstimator
     return ExposureConstraintEstimator(; lce = ece.lce,
                                        space = port_opt_view(ece.space, i, args...))
-end
-function port_opt_view(lcse::VecEcE_LcE_Lc, i, args...)
-    return [port_opt_view(lc, i, args...) for lc in lcse]
 end
 """
     factor_space_regression(re::Option{<:RegE_Reg}, rr::Option{<:AbstractRegressionResult},

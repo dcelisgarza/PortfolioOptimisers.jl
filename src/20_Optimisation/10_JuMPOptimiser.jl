@@ -520,7 +520,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     tr
     """
-    $(field_dict[:ple])
+    $(field_dict[:ple_jmp])
     """
     ple
     """
@@ -1323,6 +1323,42 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                                   kwargs...)
     attrs = processed_jump_optimiser_attributes(opt, rd; dims = dims, kwargs...)
     return jump_optimiser_from_attributes(opt, attrs)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add weight bound and budget constraints to `model` from the optimiser's own budget group.
+
+Every JuMP optimiser head reaches [`set_weight_constraints!`](@ref) through this method, so
+the whole budget group (`bgt`, `sbgt`, `gbgt`) travels as one object. A budget field added
+to [`JuMPOptimiser`](@ref) is therefore read in one place rather than at every head, which
+is how the gross budget once reached [`MeanRisk`](@ref) alone and was silently dropped by
+the other four heads.
+
+`long = true` forbids negative weight bounds, so the long/short decomposition is never
+built and `sbgt` and `gbgt` cannot apply; they are still forwarded, because the bound check
+is what rejects the combination.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
+  - `opt::JuMPOptimiser`: Optimiser supplying the budget group.
+  - `long::Bool = false`: When `true`, raises an error if any weight bound is negative.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds, opt::JuMPOptimiser,
+                                 long::Bool = false)
+    return set_weight_constraints!(model, wb, opt.bgt, opt.sbgt, long; gbgt = opt.gbgt)
 end
 
 """

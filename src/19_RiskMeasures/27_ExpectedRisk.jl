@@ -655,6 +655,12 @@ Compute the expected risk of a risk measure over rolling windows of the returns 
 
   - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
 
+# Validation
+
+  - `1 <= window <= size(X, 1)`, else a `DomainError` naming `window`.
+
+The window is checked here rather than left to the risk kernel. A non-positive window indexes `X` out of bounds and surfaces as a bare `BoundsError` from inside whichever measure `r` names, and a window longer than the sample produces an empty vector of risks that reads as a legitimate result. Both are caller errors, so both are refused at the boundary — the same discipline [`plot_rolling_measure`](@ref) applies to its own `rolling` keyword.
+
 # Returns
 
   - `risks::VecNum`: Expected risk values for each rolling window.
@@ -662,11 +668,15 @@ Compute the expected risk of a risk measure over rolling windows of the returns 
 # Related
 
   - [`expected_risk`](@ref)
+  - [`plot_rolling_measure`](@ref)
 """
 function rolling_window_measure(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum,
                                 fees::Option{<:Fees}, window::Integer;
                                 sca::Scalariser = SumScalariser(), kwargs...)
     T = size(X, 1)
+    @argcheck(1 <= window <= T,
+              DomainError(window,
+                          "window must be in 1:$(T), the number of observations in X; got window => $window"))
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees; sca = sca, kwargs...)
             for t in window:T]
 end

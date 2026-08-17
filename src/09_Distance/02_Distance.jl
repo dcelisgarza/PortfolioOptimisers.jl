@@ -1,13 +1,22 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-If power is not `nothing`, computes the generalised distance estimator.
+Distance estimator. If `power` is not `nothing`, computes the generalised distance estimator, which raises the quantity the algorithm is built on to the integer power ``p``.
+
+!!! note
+
+    `power = 1` reproduces the base distance exactly, for every algorithm. It is the neutral position of the knob, not a way to select the generalised estimator. Only ``p \\geq 2`` changes the result. `power = nothing` and `power = 1` are kept apart by dispatch alone, so that the base case never raises a matrix to a power.
 
 # Mathematical definition
 
+The four correlation-based algorithms (see [`RhoDistanceAlgorithm`](@ref)) raise the *correlation* to ``p`` inside their own base formula.
+
 ```math
 \\begin{align}
-_{g}d_{i,\\,j} &= s \\cdot \\left(d_{i,\\,j}\\right)^{p}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{S}} &= \\sqrt{s\\left(1 - \\rho_{i,\\,j}^{p}\\right)}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{SA}} &= \\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert^{p}}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{L}} &= \\max\\left(-\\log{\\lvert\\rho_{i,\\,j}\\rvert^{p}},\\, 0\\right)\\\\
+_{g}d_{i,\\,j}^{\\mathrm{C}} &= \\sqrt{1 - \\rho_{i,\\,j}^{p}}\\\\
     s &= \\begin{cases}
         1/2 & \\text{if } p \\mod 2 \\neq 0\\\\
         1 & \\text{otherwise}
@@ -15,12 +24,23 @@ _{g}d_{i,\\,j} &= s \\cdot \\left(d_{i,\\,j}\\right)^{p}\\\\
 \\end{align}
 ```
 
+[`VariationInfoDistance`](@ref) has no correlation to raise, so it raises the *distance* itself.
+
+```math
+\\begin{align}
+_{g}d_{i,\\,j}^{\\mathrm{VI}} &= \\left(d_{i,\\,j}^{\\mathrm{VI}}\\right)^{p}\\,,
+\\end{align}
+```
+
 Where:
 
-  - ``_{g}d_{i,\\,j}``: Generalised distance between assets ``i`` and ``j``.
+  - ``_{g}d_{i,\\,j}``: Generalised distance between assets ``i`` and ``j``, superscripted by the algorithm: [`SimpleDistance`](@ref) (S), [`SimpleAbsoluteDistance`](@ref) (SA), [`LogDistance`](@ref) (L), [`CorrelationDistance`](@ref) (C), [`VariationInfoDistance`](@ref) (VI).
   - ``d_{i,\\,j}``: Base distance computed using the specified distance algorithm.
+  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
   - ``p``: Integer power.
-  - ``s``: Scaling factor (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``).
+  - ``s``: Scaling factor of [`SimpleDistance`](@ref) alone (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``). The halving is dropped for even ``p`` because ``\\rho_{i,\\,j}^{p}`` is then non-negative, so ``1 - \\rho_{i,\\,j}^{p}`` already lies in ``[0,\\,1]``.
+
+[`CanonicalDistance`](@ref) is a redirect and owns no formula. It forwards `power` to the algorithm it selects.
 
 # Fields
 
@@ -34,6 +54,10 @@ $(DocStringExtensions.FIELDS)
     ) -> Distance
 
 Keywords correspond to the struct's fields.
+
+!!! note "Why the default `alg` is `SimpleDistance`"
+
+    [`CanonicalDistance`](@ref) picks an algorithm from the covariance estimator, and falls back to [`SimpleDistance`](@ref) when the estimator carries no preference. A bare `Distance()` also serves the matrix entry point `distance(de, rho)`, which holds no estimator to pick from. The two therefore agree except on the estimators [`CanonicalDistance`](@ref) treats specially. Library entry points that always hold a covariance estimator default to `Distance(; alg = CanonicalDistance())` instead, so that the special cases are honoured.
 
 ## Validation
 
@@ -218,41 +242,6 @@ Matches [`LowerTailDependenceCovariance`](@ref) or any [`PortfolioOptimisersCova
 const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
                                        <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
 """
-    distance(de::Distance{<:Any, <:LogDistance},
-             ce::LTDCov_AllInternalLTDCov,
-             X::MatNum; dims::Int = 1, kwargs...)
-
-Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance estimator and data matrix.
-
-# Arguments
-
-  - `de::Distance{<:Any, <:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
-  - `ce`: LTD covariance estimator or a PortfolioOptimisersCovariance wrapping an LTD estimator.
-  - `X`: Data matrix (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the correlation computation.
-
-# Returns
-
-  - `D::Matrix{<:Number}`: Matrix of pairwise log-distances.
-
-# Related
-
-  - [`Distance`](@ref)
-  - [`LogDistance`](@ref)
-  - [`cor_and_dist`](@ref)
-"""
-function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
-                  X::MatNum; dims::Int = 1, kwargs...)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return max.(-log.(rho), zero(eltype(rho)))
-end
-function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
-                  X::MatNum; dims::Int = 1, kwargs...)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return max.(-log.(rho .^ de.power), zero(eltype(rho)))
-end
-"""
     distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::MatNum;
              dims::Int = 1, kwargs...)
 
@@ -387,16 +376,6 @@ function cor_and_dist(de::Distance{<:Any, <:RhoDistanceAlgorithm},
                       kwargs...)
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho, _dist_from_cor(de.alg, de.power, rho)
-end
-function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
-                      X::MatNum; dims::Int = 1, kwargs...)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return rho, -log.(rho)
-end
-function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
-                      X::MatNum; dims::Int = 1, kwargs...)
-    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
-    return rho, -log.(rho .^ de.power)
 end
 function cor_and_dist(de::Distance{<:Any, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,

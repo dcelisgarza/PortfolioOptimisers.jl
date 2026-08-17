@@ -518,6 +518,7 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
   - [`JuMPOptimiser`](@ref)
   - [`set_gross_budget_constraints!`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
+  - [`gross_budget_bounds_msg`](@ref)
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
     if isnothing(gbgt) || isa(gbgt, TimeDependent)
@@ -527,7 +528,7 @@ function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
               ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
-                  ArgumentError("gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got wb = $wb."))
+                  ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))
     end
     return nothing
 end

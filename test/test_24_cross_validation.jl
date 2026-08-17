@@ -483,6 +483,23 @@
         @test all(x -> length(x) in (272 - 17, 274 - 16), test_idx)
         @test train_idx == UnitRange{Int64}[16:32, 288:304, 561:576]
         @test test_idx == UnitRange{Int64}[33:287, 305:559, 577:834]
+
+        # A negative period_offset puts the first date of the range before the first
+        # timestamp, so searchsortedlast returns 0. n_splits must survive that and stay in
+        # step with split.
+        @test PortfolioOptimisers.walk_forward_date_range(rd.ts, Month(1), Day(-10),
+                                                          identity)[1] < rd.ts[1]
+        for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
+                   DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
+                                   previous = true),
+                   DateWalkForward(Month(12), 3; period = Month(1), period_offset = Day(-10)),
+                   DateWalkForward(Month(12), 3; period = Month(1), period_offset = Day(-10),
+                                   previous = true))
+            (; train_idx, test_idx) = split(cv, rd)
+            N = n_splits(cv, rd)
+            @test length(train_idx) == length(test_idx) == N
+            @test N > 0
+        end
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)

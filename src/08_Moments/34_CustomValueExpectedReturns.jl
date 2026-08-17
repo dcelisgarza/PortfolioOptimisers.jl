@@ -135,26 +135,68 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Assert that a custom expected returns value is a per-asset vector of the expected length.
+
+Both the vector field of [`CustomValueExpectedReturns`](@ref) and the value returned by a callable `val` must be a vector of numbers with one element per asset. The callable is checked at the point of call, which is the only seam that can see what the callable returned.
+
+# Arguments
+
+  - `val`: Custom value to validate. Either the stored `me.val` vector or the value returned by a callable `me.val`.
+  - `N`: Number of assets implied by the data matrix and `dims`.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - `isa(val, VecNum)`.
+  - `length(val) == N`.
+
+# Details
+
+  - Throws `ArgumentError` if `val` is not a vector of numbers.
+  - Throws `DimensionMismatch` if the length of `val` does not match the number of assets.
+
+# Related
+
+  - [`CustomValueExpectedReturns`](@ref)
+  - [`CustomExpectedReturnsValueAlgorithm`](@ref)
+"""
+function assert_custom_expected_returns_val(val, N::Integer,
+                                            val_sym::Sym_Str = :val)::Nothing
+    @argcheck(isa(val, VecNum),
+              ArgumentError("$val_sym must be a vector of numbers, one element per asset. Got\n$val_sym => $(typeof(val))"))
+    @argcheck(length(val) == N,
+              DimensionMismatch("length($val_sym) ($(length(val))) must match the number of assets ($N)"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Vector overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Returns the stored vector `me.val` reshaped to match `dims`.
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1,
                          kwargs...)
     assert_dims(dims)
     _ncols = size(X, setdiff((1, 2), (dims,))[1])
-    @argcheck(length(me.val) == _ncols,
-              DimensionMismatch("length(val) ($(length(me.val))) must match the number of assets ($_ncols)"))
+    assert_custom_expected_returns_val(me.val, _ncols)
     return insertdims(me.val; dims = dims)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Function overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Delegates to the callable `me.val` with the same arguments.
+Function overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Delegates to the callable `me.val` with the same arguments, and validates the value it returns against the number of assets.
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:Union{<:Function,
                                                                 <:CustomExpectedReturnsValueAlgorithm}},
                          X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
-    return me.val(X; dims = dims, kwargs...)
+    _ncols = size(X, setdiff((1, 2), (dims,))[1])
+    val = me.val(X; dims = dims, kwargs...)
+    assert_custom_expected_returns_val(val, _ncols, "val(X; dims = $dims, kwargs...)")
+    return val
 end
 
 export CustomValueExpectedReturns

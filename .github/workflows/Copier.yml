@@ -5,6 +5,11 @@ on:
     - cron: 0 7 1/7 * * # Every 7 days at 7:00 UTC
   workflow_dispatch:
 
+# Both writes -- the checkout and the pull request -- carry `COPIER_PAT`, and a `permissions:`
+# block governs the job token alone. So the job token needs no write of its own.
+permissions:
+  contents: read
+
 jobs:
   Copier:
     runs-on: ubuntu-latest
@@ -12,7 +17,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ secrets.COPIER_PAT }}
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
           version: "1"
       - name: Use Julia cache

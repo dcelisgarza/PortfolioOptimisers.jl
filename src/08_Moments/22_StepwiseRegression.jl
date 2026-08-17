@@ -138,7 +138,8 @@ StepwiseRegression
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
         if haskey(tgt.kwargs, :weights)
-            @argcheck(isa(tgt.kwargs.weights, ObsWeights), TypeError)
+            @argcheck(isa(tgt.kwargs.weights, ObsWeights),
+                      ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
             if isa(tgt.kwargs.weights, AbstractVector)
                 @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
             end

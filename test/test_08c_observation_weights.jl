@@ -87,6 +87,43 @@ const PO = PortfolioOptimisers
         @test occursin("DynamicAbstractWeights", msg)
     end
 
+    @testset "kwargs.weights constructor guards" begin
+        # Three constructors screen a `weights` entry that they forward to a third-party
+        # kernel. The check itself always worked. Its failure path did not: ArgCheck builds
+        # the exception with `T(msg::String)`, and `Core.TypeError` has no such
+        # constructor, so a wrong type raised `MethodError: no method matching
+        # TypeError(::String)` and named neither the keyword nor the type received.
+        bad = (; weights = 1.0)
+        bad_tgt = LinearModel(; kwargs = bad)
+        for (sym, f) in (("kwargs.weights", () -> KMeansAlgorithm(; kwargs = bad)),
+                         ("tgt.kwargs.weights", () -> StepwiseRegression(; tgt = bad_tgt)),
+                         ("retgt.kwargs.weights", () -> DimensionReductionRegression(; retgt = bad_tgt)))
+            @test_throws ArgumentError f()
+            msg = sprint(showerror, try
+                             f()
+                         catch e
+                             e
+                         end)
+            # The message must name the offending keyword and the type received.
+            @test occursin(sym, msg)
+            @test occursin("observation weights", msg)
+            @test occursin("Float64", msg)
+        end
+
+        # The emptiness guard beside it is unaffected: its exception takes a message.
+        empty_tgt = LinearModel(; kwargs = (; weights = aweights(Float64[])))
+        @test_throws PO.IsEmptyError KMeansAlgorithm(; kwargs = (; weights = Float64[]))
+        @test_throws PO.IsEmptyError StepwiseRegression(; tgt = empty_tgt)
+        @test_throws PO.IsEmptyError DimensionReductionRegression(; retgt = empty_tgt)
+
+        # A well-formed `weights` entry still constructs.
+        good = (; weights = aweights(fill(inv(60), 60)))
+        good_tgt = LinearModel(; kwargs = good)
+        @test KMeansAlgorithm(; kwargs = good).kwargs === good
+        @test StepwiseRegression(; tgt = good_tgt).tgt.kwargs === good
+        @test DimensionReductionRegression(; retgt = good_tgt).retgt.kwargs === good
+    end
+
     @testset "moment_window_and_weights" begin
         idx = collect(21:30)
 
@@ -165,5 +202,38 @@ const PO = PortfolioOptimisers
         # Unweighted and pre-weighted measures behave exactly as before.
         @test isa(LowOrderMoment()(w, X), Number)
         @test isa(LowOrderMoment(; w = eweights(1:60, inv(60); scale = true))(w, X), Number)
+
+        # All five central-moment measures rebuild through one generic, so the rule is
+        # asserted on all five rather than on the two that used to be covered. Only
+        # `LowOrderMoment` and `HighOrderMoment` were tested here, which is how the other
+        # three drifted: `Skewness` dropped `settings` from its rebuild, and `Kurtosis`
+        # bound its rebuild to `SemiMoment`, so the default `FullMoment` matched no method.
+        rw = PO.get_observation_weights(cw, X; dims = 1)
+        for (dyn, sta) in ((LowOrderMoment(; w = cw), LowOrderMoment(; w = rw)),
+                           (HighOrderMoment(; w = cw), HighOrderMoment(; w = rw)),
+                           (Kurtosis(; w = cw), Kurtosis(; w = rw)),
+                           (Kurtosis(; w = cw, alg1 = PO.SemiMoment()),
+                            Kurtosis(; w = rw, alg1 = PO.SemiMoment())),
+                           (Skewness(; w = cw), Skewness(; w = rw)),
+                           (PO.ThirdCentralMoment(; w = cw), PO.ThirdCentralMoment(; w = rw)))
+            # Resolving the weights is all the rebuild does: the answer is the one the
+            # measure gives when it is handed the same weights directly.
+            @test dyn(w, X) == sta(w, X)
+            @test dyn(X * w) == sta(X * w)
+            # An unresolvable type still raises rather than going quietly unweighted.
+            dyn_vw = PO.Accessors.@set dyn.w = vw
+            @test_throws PO.ObservationWeightsError dyn_vw(w, X)
+        end
+
+        # The rebuild replaces `w` and copies every other field, so a non-default setting
+        # survives it. The ten hand-written rebuilds named their fields one by one.
+        for r in (LowOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3)),
+                  Kurtosis(; w = cw, settings = RiskMeasureSettings(; scale = 3), N = 7),
+                  Skewness(; w = cw, settings = MaxRiskMeasureSettings(; scale = 3)))
+            rebuilt = PO.Accessors.@set r.w = PO.get_observation_weights(r.w, X)
+            @test isa(rebuilt.w, StatsBase.AbstractWeights)
+            @test all(f -> f === :w || getfield(rebuilt, f) === getfield(r, f),
+                      fieldnames(typeof(r)))
+        end
     end
 end

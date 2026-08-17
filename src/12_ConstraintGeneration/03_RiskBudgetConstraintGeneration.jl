@@ -128,6 +128,8 @@ Alias for a risk budget estimator or result.
 
 Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk budget constraints) or a [`RiskBudget`](@ref) result (a pre-computed risk budget allocation). Used internally to accept either form in constraint generation dispatch.
 
+There is no vector counterpart, and [`risk_budget_constraints`](@ref) has no vector method. A risk budget is one allocation over the whole universe, so an optimiser holds exactly one. This is the same reason [`WbE_Wb`](@ref) and [`FeesE_Fees`](@ref) are singular, and the reason [`TnE_Tn`](@ref), [`LcE_Lc`](@ref) and [`PlCE_PlC`](@ref) are not: several turnover, linear or phylogeny constraints can hold at once, and each of those does carry a vector alias and a broadcast method.
+
 # Related
 
   - [`RiskBudgetEstimator`](@ref)
@@ -293,10 +295,4 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets,
                                  strict::Bool = false, kwargs...)::RiskBudget
     return risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict, kwargs...)
 end
-# const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
-# function risk_budget_constraints(rb::VecRkbE, sets::UniverseSets; strict::Bool = false,
-#                                  kwargs...)
-#     return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
-# end
-
 export RiskBudget, RiskBudgetEstimator, risk_budget_constraints

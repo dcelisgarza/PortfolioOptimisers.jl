@@ -195,9 +195,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`StackingResult`](@ref)
   - [`BaseStackingOptimisationEstimator`](@ref)
   - [`NestedClustered`](@ref)
-  - [`StackingResult`](@ref)
 """
 @propagatable @concrete struct Stacking <: BaseStackingOptimisationEstimator
     """

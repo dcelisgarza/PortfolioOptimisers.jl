@@ -250,6 +250,57 @@ Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
 """
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Collect the `dict` keys that start with `prefix`, as the candidate pool of a [`suggest_declared_key`](@ref) suggestion inside [`UniverseSets`](@ref).
+
+A missing partition key is reported by the *group* that asked for it, so the whole key set is the wrong pool: the nearest neighbour of `nx_sector` in `Dict("ux_sector" => …)` is `ux_sector`, the very key under validation, and the caller would be told to rename the one thing that is correct. Narrowing the pool to the prefix the missing key must carry leaves only keys that could genuinely have been meant.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `prefix`: The axis prefix the missing key must carry, `xkey` or `fkey`.
+
+# Returns
+
+  - `candidates::Vector{String}`: The keys of `dict` that start with `prefix`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`unclaimed_sets_keys`](@ref)
+  - [`suggest_declared_key`](@ref)
+"""
+function prefixed_sets_keys(dict::AbstractDict, prefix::AbstractString)
+    return String[string(k) for k in keys(dict) if startswith(string(k), prefix)]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Collect the `dict` keys that no axis in `claimed` has taken, as the candidate pool of the missing-`xkey` suggestion inside [`UniverseSets`](@ref).
+
+The counterpart of [`prefixed_sets_keys`](@ref) for the one key with no prefix of its own. The asset universe is whichever key holds the asset names, so it cannot be found by a prefix; what *can* be ruled out is every key another declared axis already speaks for. Without that, a dict carrying only a feature axis answers a mistyped `xkey` with the feature key, which is a different axis and never the right fix.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `claimed`: The other declared axis prefixes, `uxkey`, `fkey`, `ufkey` and `zkey`.
+
+# Returns
+
+  - `candidates::Vector{String}`: The keys of `dict` that start with no entry of `claimed`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`prefixed_sets_keys`](@ref)
+  - [`suggest_declared_key`](@ref)
+"""
+function unclaimed_sets_keys(dict::AbstractDict, claimed)
+    return String[string(k)
+                  for k in keys(dict) if !any(p -> startswith(string(k), p), claimed)]
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Container for the universe axes and group information used in constraint generation.
@@ -346,7 +397,8 @@ UniverseSets
                           ufkey::AbstractString, zkey::AbstractString,
                           dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
-        @argcheck(haskey(dict, xkey), KeyError)
+        @argcheck(haskey(dict, xkey),
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, fkey, ufkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
         knames = ("xkey", "uxkey", "fkey", "ufkey", "zkey")
         kvals = (xkey, uxkey, fkey, ufkey, zkey)
         for i in eachindex(kvals), j in eachindex(kvals)
@@ -360,21 +412,27 @@ UniverseSets
         end
         for k in setdiff(keys(dict), (xkey, fkey, zkey))
             if startswith(k, xkey)
-                @argcheck(length(dict[k]) == length(dict[xkey]), DimensionMismatch)
+                @argcheck(length(dict[k]) == length(dict[xkey]),
+                          DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
             elseif startswith(k, uxkey)
                 tmp_key = xkey * chopprefix(k, uxkey)
-                @argcheck(haskey(dict, tmp_key), KeyError)
-                @argcheck(length(dict[tmp_key]) == length(dict[xkey]), DimensionMismatch)
+                @argcheck(haskey(dict, tmp_key),
+                          KeyError("$tmp_key (the asset partition), required by the unique-entry asset group $k. Every `$uxkey`-prefixed group names the `$xkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, xkey))), or add `$tmp_key => <one group per asset>` to `dict`."))
+                @argcheck(length(dict[tmp_key]) == length(dict[xkey]),
+                          DimensionMismatch("the asset partition `$tmp_key`, required by the unique-entry asset group `$k`, and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
             elseif startswith(k, fkey)
                 @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the factor partition $k"))
-                @argcheck(length(dict[k]) == length(dict[fkey]), DimensionMismatch)
+                          KeyError("$fkey (the factor universe), required by the factor partition $k. A `$fkey`-prefixed key declares a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor partition."))
+                @argcheck(length(dict[k]) == length(dict[fkey]),
+                          DimensionMismatch("the factor partition `$k` and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
             elseif startswith(k, ufkey)
                 @argcheck(haskey(dict, fkey),
-                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k"))
+                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k. A `$ufkey`-prefixed key summarises a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor group."))
                 tmp_key = fkey * chopprefix(k, ufkey)
-                @argcheck(haskey(dict, tmp_key), KeyError)
-                @argcheck(length(dict[tmp_key]) == length(dict[fkey]), DimensionMismatch)
+                @argcheck(haskey(dict, tmp_key),
+                          KeyError("$tmp_key (the factor partition), required by the unique-entry factor group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
+                @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
+                          DimensionMismatch("the factor partition `$tmp_key`, required by the unique-entry factor group `$k`, and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
             end
         end
         return new{typeof(xkey), typeof(uxkey), typeof(fkey), typeof(ufkey), typeof(zkey),

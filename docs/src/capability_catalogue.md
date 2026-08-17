@@ -586,8 +586,8 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
 - Represents the Entropic Value-at-Risk (EVaR) risk measure. [`EntropicValueatRisk`](@ref)
 - Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure. [`EntropicValueatRiskRange`](@ref)
 - Represents the Entropic Drawdown-at-Risk (EDaR) risk measure. [`EntropicDrawdownatRisk`](@ref)
-- Represents the Relativistic Value-at-Risk (RVaR) risk measure. [`RelativisticValueatRisk`](@ref)
-- Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure. [`RelativisticValueatRiskRange`](@ref)
+- Represents the Relativistic Value-at-Risk (RLVaR) risk measure. [`RelativisticValueatRisk`](@ref)
+- Represents the Relativistic Value-at-Risk Range (RLVaR Range) risk measure. [`RelativisticValueatRiskRange`](@ref)
 - Represents the Relativistic Drawdown-at-Risk (RLDaR) risk measure. [`RelativisticDrawdownatRisk`](@ref)
 - ::: details Ordered Weights Array
   - ::: details Risk measures

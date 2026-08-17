@@ -308,14 +308,8 @@ end
 function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
 end
-function port_opt_view(cs::VecJuMPConstr, i::Any, args...; kwargs...)
-    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
-end
 function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
-end
-function port_opt_view(cs::VecJuMPObj, i::Any, args...; kwargs...)
-    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
 end
 """
     add_custom_objective_term!(model::JuMP.Model, obj, cobj::Nothing, optimiser, attrs)

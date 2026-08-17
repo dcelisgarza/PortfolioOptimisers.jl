@@ -833,7 +833,7 @@ LowOrderMoment
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
@@ -1018,7 +1018,7 @@ HighOrderMoment
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
@@ -1372,42 +1372,7 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
 end
-function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(w::VecNum,
-                                                                                         X::MatNum,
-                                                                                         fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(w::VecNum,
-                                                                                          X::MatNum,
-                                                                                          fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::LowOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
-                                                                            X::MatNum,
-                                                                            fees::Option{<:Fees} = nothing)
-    return LowOrderMoment(; settings = r.settings, alg = r.alg,
-                          w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
-end
-function (r::LowOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(x::VecNum)
-    return LowOrderMoment(; settings = r.settings, alg = r.alg,
-                          w = get_observation_weights(r.w, x), mu = r.mu)(x)
-end
-function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
-                                                                             X::MatNum,
-                                                                             fees::Option{<:Fees} = nothing)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg,
-                           w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
-end
-function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(x::VecNum)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg,
-                           w = get_observation_weights(r.w, x), mu = r.mu)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

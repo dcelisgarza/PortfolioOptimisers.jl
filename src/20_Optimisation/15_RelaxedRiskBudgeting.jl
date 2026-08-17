@@ -160,6 +160,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
   - [`JuMPOptimisationEstimator`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
@@ -457,7 +459,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                    Matrix(LinearAlgebra.Symmetric(rr.L \
                                                                                   pr.sigma *
                                                                                   b1)))
-    set_weight_constraints!(model, wb, rrb.opt.bgt, rrb.opt.sbgt)
+    set_weight_constraints!(model, wb, rrb.opt)
     return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
@@ -467,7 +469,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  pr::AbstractPriorResult, wb::WeightBounds,
                                                  args...)
     set_w!(model, pr.X, rrb.wi)
-    set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, true)
+    set_weight_constraints!(model, wb, rrb.opt, true)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, get_w(model), pr.sigma,
                                                    pr.chol)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)

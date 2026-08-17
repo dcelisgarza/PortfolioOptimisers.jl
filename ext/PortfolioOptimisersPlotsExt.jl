@@ -2049,9 +2049,11 @@ function PortfolioOptimisers.plot_rolling_drawdowns(ret::VecNum; ts::AbstractVec
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
-    cret = cumulative_returns(ret, compound)
-    rolling_mdd = [minimum(drawdowns(view(cret, (t - window + 1):t), compound; cX = true)) *
-                   100 for t in window:T]
+    # Each window is drawn down from its own entry value, so hand `drawdowns` the window's
+    # returns rather than a slice of the whole-history cumulative series -- the running peak
+    # is seeded with the capital at the start of the window, not the capital at inception.
+    rolling_mdd = [minimum(drawdowns(view(ret, (t - window + 1):t), compound)) * 100
+                   for t in window:T]
     ts_rolling = ts[window:end]
     label_str = "$(compound ? "Compound" : "Simple") Max Drawdown (window=$window)"
     return plot(ts_rolling, rolling_mdd; title = "Rolling Maximum Drawdown",

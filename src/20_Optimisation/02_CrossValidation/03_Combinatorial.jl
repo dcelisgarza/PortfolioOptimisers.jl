@@ -11,13 +11,15 @@ $(DocStringExtensions.FIELDS)
 
     CombinatorialCrossValidation(;
         n_folds::Integer = 10,
-        n_test_folds::Integer = 8,
+        n_test_folds::Integer = 2,
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
         max_comb::Integer = 100_000,
     ) -> CombinatorialCrossValidation
 
 Keyword arguments correspond to the struct's fields.
+
+The default holds out `2` of `10` folds for testing. This gives `binomial(10, 2) = 45` splits, `9` recombined test paths, and an average training set of `80%` of the observations. Because `binomial(n, k) == binomial(n, n - k)`, a transposed pair such as `n_test_folds = 8` produces the same number of splits on a training set of only `20%` of the observations. Choose `n_test_folds` well below `div(n_folds, 2)`, or let [`optimal_number_folds`](@ref) choose the pair.
 
 ## Validation
 
@@ -29,17 +31,19 @@ Keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> CombinatorialCrossValidation(; n_folds = 10, n_test_folds = 8, purged_size = 2,
+julia> CombinatorialCrossValidation(; n_folds = 10, n_test_folds = 2, purged_size = 2,
                                     embargo_size = 1)
 CombinatorialCrossValidation
        n_folds ┼ Int64: 10
-  n_test_folds ┼ Int64: 8
+  n_test_folds ┼ Int64: 2
    purged_size ┼ Int64: 2
   embargo_size ┴ Int64: 1
 ```
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
@@ -75,7 +79,7 @@ CombinatorialCrossValidation
                    typeof(embargo_size)}(n_folds, n_test_folds, purged_size, embargo_size)
     end
 end
-function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
+function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 2,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
                                       max_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,

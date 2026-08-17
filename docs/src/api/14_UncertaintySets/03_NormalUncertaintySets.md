@@ -57,4 +57,6 @@ choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
 mu_asymptotic_cov
 sigma_asymptotic_cov
 mu_normal_box_set
+sigma_normal_box_set
+normal_box_preamble
 ```

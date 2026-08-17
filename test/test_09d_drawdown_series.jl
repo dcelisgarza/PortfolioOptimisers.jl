@@ -79,4 +79,35 @@
         @test all(<=(0), PO.absolute_drawdown_vec(x))
         @test all(<=(0), PO.relative_drawdown_vec(x))
     end
+
+    # `drawdowns` used to re-inline the two array builders and drop their `init`, so its
+    # running peak started at the first observation. The JuMP path reads
+    # `absolute_drawdown_arr` and the reporting path reads `drawdowns`, so the constraint
+    # and the reported series disagreed on a portfolio that is under water at t = 1.
+    @testset "the exported drawdowns agrees with the array builders" begin
+        @test drawdowns([-0.1, 0.0]) ≈ [-0.1, -0.1]
+        @test drawdowns([-0.1, 0.0], true) ≈ [-0.1, -0.1]
+        @test all(<=(0), drawdowns(0.05 .* randn(100)))
+        @test all(<=(0), drawdowns(0.05 .* randn(100), true))
+
+        for _ in 1:50
+            X = 0.05 .* randn(rand(2:40), rand(1:5))
+            for dims in (1, 2)
+                @test drawdowns(X; dims = dims) ≈ PO.absolute_drawdown_arr(X; dims = dims)
+                @test drawdowns(X, true; dims = dims) ≈
+                      PO.relative_drawdown_arr(X; dims = dims)
+            end
+            cXa = PO.absolute_cumulative_returns(X; dims = 1)
+            cXr = PO.relative_cumulative_returns(X; dims = 1)
+            @test drawdowns(cXa; cX = true) ≈ PO.absolute_drawdown_arr(cXa; cX = true)
+            @test drawdowns(cXr, true; cX = true) ≈ PO.relative_drawdown_arr(cXr; cX = true)
+        end
+
+        # column by column, the array builder is the vector builder
+        X = 0.05 .* randn(30, 4)
+        for j in axes(X, 2)
+            @test drawdowns(X)[:, j] ≈ PO.absolute_drawdown_vec(X[:, j])
+            @test drawdowns(X, true)[:, j] ≈ PO.relative_drawdown_vec(X[:, j])
+        end
+    end
 end

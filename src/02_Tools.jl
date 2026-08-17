@@ -393,6 +393,37 @@ julia> PortfolioOptimisers.port_opt_view(nothing, 1)
 port_opt_view(::Nothing, ::Any; kwargs...) = nothing
 port_opt_view(::Nothing, ::Any, args...; kwargs...) = nothing
 """
+    port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...) -> Vector
+
+Generic vector method for [`port_opt_view`](@ref): view each element of `x` at the index selection `i`.
+
+This is the index-selection twin of the vector [`factory`](@ref) method, and it is the **one forwarding contract** for every vector-valued propagation field. The tail `args...` (typically the returns matrix `X`) and every keyword reach each element unchanged, so a family that admits a vector of estimators, algorithms, or results needs no method of its own.
+
+Without it such a vector falls through to the universal leaf method `port_opt_view(x, i, args...)`, which slices the vector itself through [`nothing_scalar_array_view`](@ref) — the asset index would select *elements* instead of assets. A family that needs more than the forward, such as a concrete element type ([`concrete_typed_array_if_abstract`](@ref)) or a passthrough, defines its own more specific method.
+
+# Arguments
+
+  - `x`: Vector of estimators, algorithms, results, or `nothing`.
+  - `i`: Index selection.
+  - `args...`: Threaded tail, forwarded to each element.
+  - `kwargs...`: Keyword arguments, forwarded to each element.
+
+# Returns
+
+  - `v::Vector`: The element-wise views.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`concrete_typed_array_if_abstract`](@ref)
+  - [`@vprop`](@ref)
+"""
+function port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
+                                                 <:AbstractAlgorithm, <:AbstractResult}}, i,
+                       args...; kwargs...)
+    return [port_opt_view(xi, i, args...; kwargs...) for xi in x]
+end
+"""
     get_window(window::Option{<:Colon}, args...) -> Option{<:Colon}
     get_window(window::Integer, X::MatNum, dims::Int = 1) -> VecInt
     get_window(window::Integer, X::VecNum, args...) -> VecInt
@@ -700,8 +731,49 @@ function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 """
+    concrete_typed_array_if_abstract(A::AbstractArray) -> AbstractArray
+
+Narrow the element type of `A` with [`concrete_typed_array`](@ref), but only when that element type is abstract.
+
+The generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref) rebuild a vector field element by element. A comprehension over a heterogeneous vector infers an abstract element type, which costs a dynamic dispatch at every later use. This is the opt-in narrowing step for the families that want the concrete element type back.
+
+# Arguments
+
+  - `A`: The rebuilt array.
+
+# Returns
+
+  - `A`: Unchanged if `eltype(A)` is concrete, else [`concrete_typed_array`](@ref) of `A`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.concrete_typed_array_if_abstract([1, 2, 3])
+3-element Vector{Int64}:
+ 1
+ 2
+ 3
+
+julia> PortfolioOptimisers.concrete_typed_array_if_abstract(Any[1, 2.0])
+2-element Vector{Union{Float64, Int64}}:
+ 1
+ 2.0
+```
+
+# Related
+
+  - [`concrete_typed_array`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function concrete_typed_array_if_abstract(A::AbstractArray)
+    return isabstracttype(eltype(A)) ? concrete_typed_array(A) : A
+end
+"""
     factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
                      <:AbstractResult}, args...; kwargs...) -> a
+    factory(a::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
+                                      <:AbstractResult}}, args...; kwargs...) -> Vector
 
 No-op factory function for constructing objects with a uniform interface.
 
@@ -712,15 +784,18 @@ They are duals: `factory` threads **runtime values** (prior moments, observation
 previous portfolio weights) down through a composed struct tree; `port_opt_view` threads an
 **index selection** (a subset of assets or observations) down through the same tree.
 
+The vector method is the **one forwarding contract** for every vector-valued propagation field: it applies `factory` to each element and forwards `args...` and `kwargs...` unchanged, so a family that admits a vector of estimators, algorithms, or results needs no method of its own. A family that needs more than the forward, such as a concrete element type ([`concrete_typed_array_if_abstract`](@ref)), defines its own more specific method.
+
 # Arguments
 
-  - `a`: Indicates no object should be constructed.
-  - `args...`: Arbitrary positional arguments (ignored).
-  - `kwargs...`: Arbitrary keyword arguments (ignored).
+  - `a`: Indicates no object should be constructed, or a vector whose elements are rebuilt one by one.
+  - `args...`: Arbitrary positional arguments (ignored by the scalar method, forwarded by the vector method).
+  - `kwargs...`: Arbitrary keyword arguments (ignored by the scalar method, forwarded by the vector method).
 
 # Returns
 
   - `a`: The input unchanged.
+  - `v::Vector`: The element-wise rebuilds, for the vector method.
 
 # Examples
 
@@ -743,8 +818,9 @@ function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
                           <:AbstractResult}, args...; kwargs...)
     return a
 end
-function factory(a::AbstractVector{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                           <:AbstractResult}}, args...; kwargs...)
+function factory(a::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
+                                           <:AbstractAlgorithm, <:AbstractResult}}, args...;
+                 kwargs...)
     return [factory(ai, args...; kwargs...) for ai in a]
 end
 
@@ -1321,6 +1397,112 @@ macro wprop(expr)
     return error("@wprop may only appear inside a @propagatable struct body")
 end
 
+# ---------------------------------------------------------------------------
+# @propagatable — the declaration-time contract check
+# ---------------------------------------------------------------------------
+
+"""
+    PROPAGATABLE_CONTRACTS
+
+Every type declared with [`@propagatable`](@ref), paired with its `@pprop`-tagged field names.
+
+One entry is appended by the macro itself, immediately after the struct it declares, so the
+list is complete by the time the module finishes loading — including types declared in
+external packages. [`check_propagatable_contracts`](@ref) is what reads it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`propagatable_register!`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+"""
+const PROPAGATABLE_CONTRACTS = Vector{Tuple{Type, Tuple{Vararg{Symbol}}}}()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Record type `T` and its `@pprop`-tagged field names in [`PROPAGATABLE_CONTRACTS`](@ref).
+
+Called by [`@propagatable`](@ref) at the declaration itself. It only records: the outer
+keyword constructor is written *below* the struct, so it does not exist yet and cannot be
+checked here. [`check_propagatable_contracts`](@ref) does the checking once the module is
+complete.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`PROPAGATABLE_CONTRACTS`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+"""
+function propagatable_register!(@nospecialize(T::Type), pprops::Tuple{Vararg{Symbol}})
+    push!(PROPAGATABLE_CONTRACTS, (T, pprops))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the keyword names accepted by the outer constructors of `T`, unioned over its methods.
+
+A `kwargs...` slurp is dropped rather than counted. A slurp accepts `field = value` and then
+discards it, which is the silent failure this check exists to catch, so it must not satisfy
+the contract.
+
+# Related
+
+  - [`check_propagatable_contracts`](@ref)
+"""
+function propagatable_keywords(@nospecialize(T::Type))
+    kws = Symbol[]
+    for m in methods(T)
+        append!(kws, Base.kwarg_decl(m))
+    end
+    return filter!(k -> !endswith(string(k), "..."), unique!(kws))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the broken clauses of one type's [`@propagatable`](@ref) contract, as messages.
+
+Two clauses are checked, and both are properties of the code the macro emits:
+
+  - **Every field name is a keyword of the outer constructor.** Each generated method rebuilds
+    the struct with `StructName(; field = …)` over *all* fields, tagged or not, so one field
+    that the keyword constructor does not name is a `MethodError` at the first
+    [`factory`](@ref) or [`port_opt_view`](@ref) call.
+  - **Every `@pprop` field is a property of a prior result.** The generated
+    `factory(x, pr::AbstractPriorResult, args...)` reads `getproperty(pr, :field)`, so a name
+    absent from [`prior_result_property_pool`](@ref) throws when a prior is threaded.
+
+The messages carry a [`suggest_declared_key`](@ref) suggestion, so a transposed or mistyped
+field name names its intended neighbour.
+
+# Related
+
+  - [`check_propagatable_contracts`](@ref)
+  - [`propagatable_keywords`](@ref)
+  - [`prior_result_property_pool`](@ref)
+"""
+function propagatable_contract_violations(@nospecialize(T::Type), pprops, pool)
+    msgs = String[]
+    kws = propagatable_keywords(T)
+    for f in fieldnames(T)
+        if !(f in kws)
+            push!(msgs,
+                  "`$(nameof(T))`: field `$(f)` is not a keyword of its outer constructor" *
+                  suggest_declared_key(f, kws) *
+                  ".")
+        end
+    end
+    for f in pprops
+        if !(f in pool)
+            push!(msgs,
+                  "`$(nameof(T))`: `@pprop` field `$(f)` is not a property of a " *
+                  "prior result" *
+                  suggest_declared_key(f, pool) *
+                  ".")
+        end
+    end
+    return msgs
+end
 """
     @propagatable expr
 
@@ -1361,6 +1543,21 @@ tagging is explicit and opt-in. The tags are independent and the relevant field 
 genuinely diverge. `@pprop` and `@cprop` are mutually exclusive on one field (a value comes
 from exactly one source); legal stacks are `@pprop @fprop` (sub-estimator) and
 `@pprop @wprop` (weights slot). See ADR 0010 and 0012.
+
+Two consequences of the emitted code are **contracts on the declaration**, and both are checked
+where the struct is written rather than at the first call:
+
+  - Every generated method rebuilds the struct as `StructName(; field = …)` over *all* fields,
+    tagged or not, so **every field name must also be a keyword of the outer constructor**. A
+    `kwargs...` slurp does not satisfy this: it accepts the keyword and then discards it.
+  - The prior method reads `getproperty(pr, :field)`, so **every `@pprop` field name must be a
+    property of a prior result** (see [`prior_result_property_pool`](@ref)).
+
+The macro registers each declaration in [`PROPAGATABLE_CONTRACTS`](@ref), and
+[`check_propagatable_contracts`](@ref) checks the whole registry once the module is complete.
+A mistyped field name therefore fails at precompilation with a
+[`suggest_declared_key`](@ref) suggestion, rather than surfacing as a `MethodError` at the
+first [`factory`](@ref) call. [`forward_prior`](@ref) leans on the same contract (ADR 0046).
 
 Composes with `@concrete` (put `@propagatable` outermost):
 
@@ -1470,10 +1667,47 @@ macro propagatable(expr)
         push!(defs, prior_def)
     end
 
+    pprop_tuple = Expr(:tuple, QuoteNode.(pprop_fields)...)
+
     return esc(quote
                    Base.@__doc__ $chain
                    $(defs...)
+                   propagatable_register!($struct_name, $pprop_tuple)
                end)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check the [`@propagatable`](@ref) contract of every type in [`PROPAGATABLE_CONTRACTS`](@ref).
+
+Runs once at the end of the module, so the contract behind 231 generated methods is enforced
+where the structs are *declared* rather than at the first [`factory`](@ref) call. The
+violations of every type are collected and reported together, because a run that stops at the
+first one hides the rest. See [`propagatable_contract_violations`](@ref) for the two clauses.
+
+Throws an [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError)
+listing every violation; the package refuses to precompile rather than shipping a type whose
+generated methods throw on first use. A package that declares its own `@propagatable` types
+calls this at the end of its own module to get the same guarantee.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`PROPAGATABLE_CONTRACTS`](@ref)
+  - [`propagatable_contract_violations`](@ref)
+  - [`@windowed_estimator`](@ref)
+"""
+function check_propagatable_contracts()
+    pool = prior_result_property_pool()
+    msgs = String[]
+    for (T, pprops) in PROPAGATABLE_CONTRACTS
+        append!(msgs, propagatable_contract_violations(T, pprops, pool))
+    end
+    if !isempty(msgs)
+        throw(ArgumentError("@propagatable: $(length(msgs)) broken contract(s). The generated `factory`/`port_opt_view` methods rebuild the struct by keyword, so each of these throws at its first call:\n  - " *
+                            join(msgs, "\n  - ")))
+    end
+    return nothing
 end
 
 # ---------------------------------------------------------------------------

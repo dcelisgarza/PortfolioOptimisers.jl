@@ -391,6 +391,22 @@
         @test expected_risk(r, w, rd.X) ==
               (mean(Xret) - rf) /
               expected_risk(RelativisticValueatRisk(; slv = slv), w, rd.X)
+
+        # The rolling window is checked at the exported entry point, not left to the risk
+        # kernel: a non-positive window indexed `X` out of bounds and surfaced as a bare
+        # `BoundsError` from inside the measure, and a window longer than the sample returned
+        # an empty vector that read as a legitimate result.
+        T = size(rd.X, 1)
+        rw = ConditionalValueatRisk()
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, w, rd.X, nothing, T)) ==
+              1
+        @test length(PortfolioOptimisers.rolling_window_measure(rw, w, rd.X, nothing, 20)) ==
+              T - 19
+        for bad in (0, -1, T + 1)
+            @test_throws DomainError PortfolioOptimisers.rolling_window_measure(rw, w, rd.X,
+                                                                                nothing,
+                                                                                bad)
+        end
     end
     @testset "Generic X at Risk Range" begin
         rs1=[GenericValueatRiskRange(; loss = ValueatRisk(), gain = ValueatRisk()),

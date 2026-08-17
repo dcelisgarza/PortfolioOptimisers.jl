@@ -175,7 +175,7 @@ Skewness
     """
     sk
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
@@ -399,24 +399,7 @@ function moment_risk(r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.Abstr
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
 end
-function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(w::VecNum,
-                                                                                          X::MatNum,
-                                                                                          fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(w::VecNum,
-                                                                             X::MatNum,
-                                                                             fees::Option{<:Fees} = nothing)
-    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, X), mu = r.mu,
-                    pe = r.pe)(w, X, fees)
-end
-function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(x::VecNum)
-    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, x), mu = r.mu,
-                    pe = r.pe)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDEF)
 

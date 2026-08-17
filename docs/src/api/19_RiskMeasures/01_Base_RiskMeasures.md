@@ -66,10 +66,10 @@ Table Key:
 | Tail drawdown | [`EntropicDrawdownatRisk`](@ref) ([`EDaR`](@ref))                                                                                             | JuMP + Hierarchical | EC             | Clarabel                    |
 | Tail drawdown | [`RelativeEntropicDrawdownatRisk`](@ref) ([`R_EDaR`](@ref))                                                                                   | Hierarchical        | EC             | Clarabel                    |
 | Dispersion    | [`EntropicValueatRiskRange`](@ref) ([`EVaR_RG`](@ref))                                                                                        | JuMP + Hierarchical | EC             | Clarabel                    |
-| Tail loss     | [`RelativisticValueatRisk`](@ref) ([`RVaR`](@ref))                                                                                            | JuMP + Hierarchical | PC             | Clarabel                    |
+| Tail loss     | [`RelativisticValueatRisk`](@ref) ([`RLVaR`](@ref))                                                                                           | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`RelativisticDrawdownatRisk`](@ref) ([`RLDaR`](@ref))                                                                                        | JuMP + Hierarchical | PC             | Clarabel                    |
-| Tail drawdown | [`RelativeRelativisticDrawdownatRisk`](@ref) ([`R_RDaR`](@ref))                                                                               | Hierarchical        | PC             | Clarabel                    |
-| Dispersion    | [`RelativisticValueatRiskRange`](@ref) ([`RVaR_RG`](@ref))                                                                                    | JuMP + Hierarchical | PC             | Clarabel                    |
+| Tail drawdown | [`RelativeRelativisticDrawdownatRisk`](@ref) ([`R_RLDaR`](@ref))                                                                              | Hierarchical        | PC             | Clarabel                    |
+| Dispersion    | [`RelativisticValueatRiskRange`](@ref) ([`RLVaR_RG`](@ref))                                                                                   | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail loss     | [`PowerNormValueatRisk`](@ref) ([`PNVaR`](@ref))                                                                                              | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`PowerNormDrawdownatRisk`](@ref) ([`PNDaR`](@ref))                                                                                           | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`RelativePowerNormDrawdownatRisk`](@ref) ([`R_PNDaR`](@ref))                                                                                 | Hierarchical        | PC             | Clarabel                    |
@@ -183,7 +183,6 @@ weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
-factory(rs::VecBaseRM, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 _Frontier
 ```

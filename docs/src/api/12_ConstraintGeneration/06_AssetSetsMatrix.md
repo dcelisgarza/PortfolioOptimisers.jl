@@ -6,6 +6,7 @@ AssetSetsMatrixEstimator
 MatNum_ASetMatE
 MatNum_ASetMatE_VecMatNum_ASetMatE
 VecMatNum_ASetMatE
+PortfolioOptimisers.taxonomy_column
 asset_sets_matrix
 PortfolioOptimisers.assert_feature_keys
 AbstractFeatureValue

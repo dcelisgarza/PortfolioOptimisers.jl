@@ -514,3 +514,55 @@ hop count is an integer, so `HopCountQuantile` rounds to a shell: on the same gr
 the one place where Decision 2's "not comparable as values, only interchangeable" has a practical
 consequence a caller can act on — the radius ball's intermediate cardinalities, which the
 Consequences record as its whole gain, become reachable **by name**.
+
+## Amendment (2026-08-17): the tree family carries the same two splat fields, and there every channel is a weight
+
+Decision 5 closed the `args` passthrough on the three centrality types that carry one. It stopped
+there, and the ninth security pass read the remainder as one gap. It is two, they are not the same
+gap, and only one of them is real.
+
+**`kwargs` never needed a guard, on any family.** A keyword binds by *name*, so a matrix in `kwargs`
+cannot reach the positional slot `assert_centrality_args` was written for. None of
+`betweenness_centrality`, `closeness_centrality`, `stress_centrality` or `_degree_centrality`
+declares a matrix-valued keyword, and `normalize`, `endpoints`, `rng` and `seed` each refuse one on
+their own. Probed live, all five pairings fail closed with a `MethodError` or a `TypeError`. The
+report's reasoning — that the `args` rationale "applies verbatim to `kwargs`" — does not hold, and
+no guard was added there.
+
+**The tree family is the real gap, and it is worse than the one already closed.** `KruskalTree`,
+`BoruvkaTree` and `PrimTree` carry the identical `args`/`kwargs` pair, and unlike the centrality
+case the calls **succeed**. Three channels, all silent:
+
+| Channel | Binds to | Effect |
+| --- | --- | --- |
+| `AbstractMatrix` in `args` | `distmx`, the **second** positional of all three | replaces the estimator's distances |
+| `AbstractVector` in `args` | `kruskal_mst`'s `weight_vector` | the same override in another shape |
+| `minimize` in `kwargs` | `kruskal_mst`/`boruvka_mst`'s `minimize` | a **maximum** spanning tree |
+
+`calc_weighted_adjacency_graph` hands `calc_mst` a graph already weighted by `de` and `ce`, and
+`Graphs.jl` defaults `distmx` to exactly those weights, so a filled `args` answers a question that
+was already answered. Measured on eight assets over three hundred observations, a bogus matrix in
+`KruskalTree.args` moved `20` of the `64` entries of the phylogeny matrix while leaving the edge
+count at `14` — nothing downstream can notice. Only a *wrong-sized* matrix fails, with a
+`BoundsError`. That makes this a silent wrong result where Decision 5's case was a crash, so it is
+the more serious of the two and was rated the other way round.
+
+**The refusal is therefore wider than the centrality one, and the asymmetry is deliberate.**
+`assert_tree_args` refuses a matrix *or a vector* in `args`, and `minimize` in `kwargs`. Centrality
+keeps its narrower rule because `vs` and `k` are genuine non-weight positionals there; the three
+spanning-tree functions declare **no** positional argument that is not a weight, so nothing
+legitimate is being turned away. Both guards now share one kernel,
+`assert_no_weight_channel_args`, which differs only in the shape it rejects and the declared channel
+it names.
+
+- **Not breaking in practice.** No caller in `src`, `test`, `examples` or `user_guide` fills either
+  field on a tree type, so the refusal removes no working configuration. It is breaking in
+  principle, on the same footing as Decision 5's.
+- **`minimize` is refused rather than honoured.** A maximum spanning tree is a coherent object, but
+  it is not the one this branch is defined to build, and the branch's identity is read by
+  `SimilarityPolarity` and by `calc_weighted_adjacency_graph`'s docstring. Making it reachable is a
+  separate decision about the *estimator*, not a keyword to leave open on the algorithm.
+- **The stack-overflow claim in Decision 5 was overstated.** Reproduced in a fresh subprocess,
+  `betweenness_centrality(g, M)` raises a catchable `StackOverflowError` and the process survives.
+  The docstring said it "takes the session with it"; it takes the call. The guard is unaffected —
+  the second-channel argument was always the load-bearing one.

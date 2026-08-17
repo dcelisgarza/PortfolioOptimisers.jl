@@ -177,6 +177,8 @@ Where:
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalRiskParity`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
