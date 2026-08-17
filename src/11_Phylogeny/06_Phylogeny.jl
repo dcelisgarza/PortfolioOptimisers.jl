@@ -208,10 +208,37 @@ DistancePolarity()
   - [`StressCentrality`](@ref)
 """
 struct TopologyOnly <: AbstractAlgorithm end
-# The one refusal both splat guards make: a `Graphs.jl` entry point takes its weights in a
-# positional slot, so anything of that shape in `args` is a second channel answering a question the
-# declared one already answered. `assert_centrality_args` and `assert_tree_args` differ only in
-# which shape reaches a channel and in which declared channel they name.
+"""
+    assert_no_weight_channel_args(::Type{T}, args::Tuple, S::Type, shape::AbstractString,
+                                  channel::AbstractString) where {T}
+
+Refuse an entry of `args` that would reach a second weighting channel.
+
+The one refusal both splat guards make. A `Graphs.jl` entry point takes its weights in a positional slot, so an entry of `args` with that shape is a second channel answering a question the declared one already answered. [`assert_centrality_args`](@ref) and [`assert_tree_args`](@ref) differ only in which shape reaches a channel and in which declared channel they name, so both call this with their own `S`, `shape` and `channel`.
+
+The index of the offending entry is reported with its type, because `args` is splatted and the caller sees no argument names.
+
+# Arguments
+
+  - `T`: Algorithm type, named in the error message.
+  - `args`: Positional arguments destined for the `Graphs.jl` function.
+  - `S`: The shape that reaches a weight slot, e.g. `AbstractMatrix`.
+  - `shape`: Name of that shape, used in the error message.
+  - `channel`: Sentence naming the declared channel the caller must use instead.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `S`.
+
+# Related
+
+  - [`assert_centrality_args`](@ref)
+  - [`assert_tree_args`](@ref)
+"""
 function assert_no_weight_channel_args(::Type{T}, args::Tuple, S::Type,
                                        shape::AbstractString,
                                        channel::AbstractString) where {T}

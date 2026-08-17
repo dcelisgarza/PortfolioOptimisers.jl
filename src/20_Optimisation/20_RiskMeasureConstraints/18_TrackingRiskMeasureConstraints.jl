@@ -459,6 +459,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
+    # `r` reached here through `set_risk_constraints!`, which resolved it. `deferred_slots`
+    # declares `r` as this container's child, so the derived recursion has already run and
+    # `ri` holds values. The benchmark scalar below and the model expression further down are
+    # therefore built from one resolution, not two.
     ri = r.r
     wb = r.tr.w
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)

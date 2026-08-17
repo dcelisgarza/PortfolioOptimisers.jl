@@ -579,18 +579,31 @@ end
 
 Return the homogenisation variable `model[:k]`.
 
-`k >= 0` is the auxiliary scaling variable used to homogenise fractional/ratio
-objectives (e.g. maximum ratio); recovered weights are `w / k`. Asserts `:k` has
-been registered; errors otherwise.
+`k` is the auxiliary scaling variable used to homogenise fractional/ratio objectives (e.g.
+maximum ratio); recovered weights are `w / k`. Asserts `:k` has been registered; errors
+otherwise.
+
+Two producers register it, and the error message names both because a head reaches only
+one of them:
+
+  - [`set_maximum_ratio_factor_variables!`](@ref) is the head-level producer. Every head
+    that shapes `w` from an objective calls it: `k >= 0` under [`MaximumRatio`](@ref), and
+    the literal `1` otherwise.
+  - [`_set_risk_budgeting_constraints!`](@ref) declares a *free* `k` instead, because the
+    log barrier it builds is what pins the scale. That head also declares
+    [`set_unit_budget!`](@ref), so downstream builders read [`effective_k`](@ref) and get
+    `1` rather than the free variable.
 
 # Related
 
   - [`process_model`](@ref)
   - [`get_w`](@ref)
+  - [`effective_k`](@ref)
+  - [`set_maximum_ratio_factor_variables!`](@ref)
 """
 function get_k(model::JuMP.Model)
     @argcheck(haskey(model, :k),
-              ArgumentError("model[:k] (homogenisation variable) has not been registered; call set_maximum_ratio_factor_variables! first"))
+              ArgumentError("model[:k] (homogenisation variable) has not been registered. A head registers it either through set_maximum_ratio_factor_variables! (objective-shaped heads: MeanRisk, FactorRiskContribution, NearOptimalCentering, RelaxedRiskBudgeting) or through _set_risk_budgeting_constraints!, whose log barrier declares a free k (RiskBudgeting). Call the one that matches the head before any builder that reads k."))
     return model[:k]
 end
 """

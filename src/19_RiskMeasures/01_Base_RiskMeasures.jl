@@ -1556,9 +1556,11 @@ end
 
 Declare the slots of `x` that may hold a **Deferred Quantity**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no deferrable slot needs no method.
 
-This is the declaration [`assert_resolved_slots`](@ref) reads, and it is the counterpart of [`resolve_deferred_quantities`](@ref) — the same slots, named rather than resolved. Declare both, or a widened slot resolves where a prior is in hand and passes unnoticed where one is not.
+This is the declaration both consumers read. [`assert_resolved_slots`](@ref) refuses a slot that a value-level entry point cannot resolve, and [`resolve_deferred_quantities`](@ref) derives its container recursion from it. A type that names its slots here needs no forwarding method of its own.
 
-A slot that holds a child measure is declared here too. The check recurses into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. That matters because a risk measure holds Estimators that are **not** deferred slots — a variance estimator in `ve`, an uncertainty-set estimator in `ucs` — and a blind walk would refuse them.
+A slot that holds a child measure is declared here too. Both consumers recurse into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. That matters because a risk measure holds Estimators that are **not** deferred slots — a variance estimator in `ve`, an uncertainty-set estimator in `ucs` — and a blind walk would refuse them.
+
+A type that resolves a quantity of its own — a matrix out of a covariance estimator, a tensor and the centre it was taken about out of a co-moment estimator — declares a [`resolve_deferred_quantities`](@ref) method beside this one. That method is per type because slots that travel together must be resolved together, which no derivation can know. Declaring the slots without the method is refused at the first call rather than passed over.
 
 # Related
 
@@ -1568,6 +1570,97 @@ A slot that holds a child measure is declared here too. The check recurses into 
 """
 deferred_slots(::Any) = (;)
 """
+    resolve_deferred_child(slot, pr::AbstractPriorResult)
+
+Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
+
+A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory_child`](@ref) already applies on the other path. Anything else — a stated value, `nothing`, a **Deferred Quantity** the enclosing type resolves itself — is returned unchanged.
+
+The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`factory_child`](@ref)
+"""
+function resolve_deferred_child(slot, pr::AbstractPriorResult)
+    return resolve_deferred_quantities(slot, pr)
+end
+function resolve_deferred_child(slot::AbstractArray{<:Union{<:AbstractEstimator,
+                                                            <:AbstractAlgorithm}},
+                                pr::AbstractPriorResult)
+    return [resolve_deferred_child(s, pr) for s in slot]
+end
+"""
+    rebuild_with_slots(x, slots::NamedTuple)
+
+Return a copy of `x` whose fields named by `slots` hold the values in `slots`.
+
+The field list is derived from the type and the constructor is recovered from it, so nothing is written per type. The call is positional, so the inner constructor runs and every guard the type states is re-applied to the rebuilt value.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+function rebuild_with_slots(x, slots::NamedTuple)
+    T = typeof(x)
+    props = NamedTuple{fieldnames(T)}(ntuple(i -> getfield(x, i), Val(fieldcount(T))))
+    return T.name.wrapper(values(merge(props, slots))...)
+end
+"""
+    assert_declared_slot_resolver(x, slots::NamedTuple)
+
+Refuse a type that declares a deferrable slot and no way to resolve it.
+
+`slots` is what the derived recursion produced. A **Deferred Quantity** that survives it names a type that declared the slot in [`deferred_slots`](@ref) and then wrote no [`resolve_deferred_quantities`](@ref) method, so the estimator would reach the model builders and be multiplied as though it were a matrix. ADR 0051 pairs the two declarations; this is where the pair is enforced.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+function assert_declared_slot_resolver(x, slots::NamedTuple)
+    for (key, slot) in pairs(slots)
+        @argcheck(!isa(slot, DeferredQuantity),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and `$(nameof(typeof(x)))` declares no `resolve_deferred_quantities` method to fit it. The derived recursion carries a child measure's own resolution, not a quantity of the enclosing type. Declare `resolve_deferred_quantities(x::$(nameof(typeof(x))), pr::AbstractPriorResult)` beside `deferred_slots`."))
+    end
+    return nothing
+end
+"""
+    resolve_deferred_quantities(x, pr::AbstractPriorResult)
+
+Resolve the children that [`deferred_slots`](@ref) declared, and return `x` itself when none of them changed.
+
+This is the derived half of the resolution rule. A container declares its children once and both entry points follow: [`factory`](@ref) reaches them through [`@fprop`](@ref), and the `JuMP` builders reach them through this method. Neither needs a forwarding method per container.
+
+A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
+
+# Related
+
+  - [`deferred_slots`](@ref)
+  - [`resolve_deferred_child`](@ref)
+  - [`assert_declared_slot_resolver`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function resolve_deferred_quantities(x, pr::AbstractPriorResult)
+    slots = deferred_slots(x)
+    if isempty(slots)
+        return x
+    end
+    resolved = map(slot -> resolve_deferred_child(slot, pr), slots)
+    assert_declared_slot_resolver(x, resolved)
+    # A container whose children resolved to themselves is returned unchanged, so the common
+    # case allocates nothing and the rebuild runs only where a slot really moved.
+    return if all(map(===, values(resolved), values(slots)))
+        x
+    else
+        rebuild_with_slots(x, resolved)
+    end
+end
+"""
     assert_resolved_slots(x)
 
 Refuse a **Deferred Quantity** that reached a value-level entry point, which has no prior result to resolve it against.
@@ -1576,7 +1669,7 @@ Refuse a **Deferred Quantity** that reached a value-level entry point, which has
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 
-The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
+The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. A slot that holds a vector of children is recursed element by element, which is the rule [`resolve_deferred_child`](@ref) applies on the resolution path. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
 
 The message names both types with `nameof`, not by printing the type. A printed type carries a module prefix whenever the name is not visible from `Main`, which is the case inside an isolated test worker and inside any module that imports the package qualified. `Variance.sigma` is the path the caller wrote, and the message must read the same in every process.
 
@@ -1592,6 +1685,13 @@ function assert_resolved_slots(x)
         @argcheck(!isa(slot, DeferredQuantity),
                   ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
         assert_resolved_slots(slot)
+    end
+    return nothing
+end
+function assert_resolved_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
+                                                         <:AbstractAlgorithm}})
+    for x in xs
+        assert_resolved_slots(x)
     end
     return nothing
 end

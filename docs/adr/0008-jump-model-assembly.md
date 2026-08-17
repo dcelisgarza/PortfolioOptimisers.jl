@@ -185,3 +185,44 @@ runs the head + `assemble_jump_model!` and asserts on the registered Model-State
 without solving — `r` routing (one indexed risk key per measure), the `r = nothing` no-op
 (risk keys absent, head and return constraints still present), and `wn2`/`l1` toggling their
 keys. 15 assertions, ~1 s — versus the multi-minute solver suites.
+
+## Amendment (2026-08-17)
+
+The architecture review of 2026-08-16 (candidate A) found that §3 conflated two jobs. How a
+head shapes `w` does vary per optimiser, and §3 is right about that. Which `JuMPOptimiser`
+settings reach the model does not vary, and it had no interface — so it was six hand-written
+argument lists, and they had drifted. This amendment records the seam that closes the gap.
+§3 is narrowed, not overturned: the head still owns `set_weight_constraints!`.
+
+1. **The budget group travels as one object.** `set_weight_constraints!(model, wb, opt, long)`
+   takes the `JuMPOptimiser` and forwards `bgt`, `sbgt` and `gbgt` together. Every head reaches
+   the builder through it, so a budget field added to `JuMPOptimiser` is read in one place.
+   Before this, `gbgt` was named at one head of five, so `JuMPOptimiser(; gbgt = …)`
+   constructed, validated and solved under the other four with the leverage cap dropped.
+
+   `gbgt` binds only where the long/short decomposition exists, which a negative weight bound
+   forces. The two long-only head shapes — default `RiskBudgeting` and default
+   `RelaxedRiskBudgeting` — therefore reject the combination through the `long = true` bound
+   check rather than dropping it.
+
+2. **`k` has one head-level producer.** `set_maximum_ratio_factor_variables!` registers both
+   spellings: `k >= 0` under `MaximumRatio`, the literal `1` under every other objective. The
+   heads whose formulation is fixed pass `MinimumRisk()` and take the second branch instead of
+   hand-writing `@expression(model, k, 1)`. Its second method now takes exactly one objective;
+   the former `args...` fallback absorbed a wrong-arity call and registered the constant under
+   a ratio objective, which is how `test_03b_jump_model_assembly.jl` called it — so the ratio
+   branch went untested while the call still looked correct.
+
+   `RiskBudgeting` is the one head outside this producer. Its log barrier pins the scale, so
+   `_set_risk_budgeting_constraints!` declares a *free* `k` and then `set_unit_budget!`.
+   `get_k`'s error message names both routes.
+
+3. **Unconstrained NOC reports the bundle it already holds.** §4 and the Consequences section
+   describe unconstrained NOC as building its own `ProcessedJuMPOptimiserAttributes`. It was
+   in fact hand-listing all 19 fields off a processed `JuMPOptimiser` that
+   `jump_optimiser_from_attributes` had itself built from the `attrs` the setup already
+   returns — a round trip whose hand list is the same silent drop that function's own comment
+   records, pointing the other way. It now uses `attrs` directly, as the constrained head does.
+   There is deliberately no inverse remap helper: the bundle is never reconstructed, it is kept.
+
+§6 still holds — unconstrained NOC has no middle, and this amendment does not give it one.

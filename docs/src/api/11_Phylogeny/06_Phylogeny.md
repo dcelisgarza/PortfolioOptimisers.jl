@@ -53,6 +53,7 @@ SimilarityPolarity
 TopologyOnly
 centrality_polarity
 centrality_graph
+assert_no_weight_channel_args
 assert_centrality_args
 assert_tree_args
 calc_centrality

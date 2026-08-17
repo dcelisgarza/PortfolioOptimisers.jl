@@ -18,21 +18,16 @@
     # be overridden to probe a single branch in isolation.
     function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj,
                            sdp_asset_phylogeny = true)
-        nt = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
-        PO.set_maximum_ratio_factor_variables!(model, nt.pr.mu, mr.obj)
-        PO.set_w!(model, nt.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, nt.wb, mr.opt.bgt, mr.opt.sbgt)
-        attrs = PO.ProcessedJuMPOptimiserAttributes(; pr = nt.pr, wb = nt.wb, lt = nt.lt,
-                                                    st = nt.st, lcsr = nt.lcsr,
-                                                    ctr = nt.ctr, gcardr = nt.gcardr,
-                                                    sgcardr = nt.sgcardr, smtx = nt.smtx,
-                                                    sgmtx = nt.sgmtx, slt = nt.slt,
-                                                    sst = nt.sst, sglt = nt.sglt,
-                                                    sgst = nt.sgst, tn = nt.tn,
-                                                    fees = nt.fees, plr = nt.plr,
-                                                    ret = nt.ret, sca = nt.sca)
+        # Reach the head's own seams, not a copy of them: `set_maximum_ratio_factor_variables!`
+        # takes exactly one objective, and the budget group travels as `mr.opt`. A hand-copied
+        # call used to pass three arguments here and to name `bgt`/`sbgt` alone, so the
+        # `MaximumRatio` branch was never built and `gbgt` never reached the model.
+        PO.set_maximum_ratio_factor_variables!(model, obj)
+        PO.set_w!(model, attrs.pr.X, mr.wi)
+        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
                                 sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
@@ -45,6 +40,36 @@
         @test "w" in ks
         @test "k" in ks
         @test "ret" in ks
+    end
+
+    # `k` has two spellings and the objective picks between them. A wrong-arity call to the
+    # producer used to be absorbed by a variadic fallback, which registered the constant
+    # under every objective — so this branch built but was never the one under test.
+    @testset "the objective picks the spelling of `k`" begin
+        model = JuMP.Model()
+        PO.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+        @test model[:k] == 1
+        @test !isa(model[:k], JuMP.VariableRef)
+
+        rmodel = JuMP.Model()
+        PO.set_maximum_ratio_factor_variables!(rmodel, MaximumRatio())
+        @test isa(rmodel[:k], JuMP.VariableRef)
+        @test JuMP.lower_bound(rmodel[:k]) == 0
+
+        # The producer takes exactly one objective; a wrong-arity call must not be absorbed.
+        @test_throws MethodError PO.set_maximum_ratio_factor_variables!(JuMP.Model(),
+                                                                        nothing,
+                                                                        MaximumRatio())
+    end
+
+    # The budget group travels as one object, so a head cannot read part of it. `gbgt` binds
+    # only once the long/short decomposition exists, which a negative weight bound forces.
+    @testset "the gross budget reaches the model through the optimiser" begin
+        gopt = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = -1.0, ub = 1.0),
+                             bgt = nothing, sbgt = nothing, gbgt = 2.0)
+        ks = assemble_keys(MeanRisk(; r = Variance(), opt = gopt))
+        @test "gbgt" in ks
+        @test "gbgt" ∉ assemble_keys(base)
     end
 
     @testset "risk is routed by the `r` kwarg" begin

@@ -592,10 +592,12 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     rb = rkb.val
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
-    JuMP.@variables(model, begin
-                        k
-                        log_w[1:N]
-                    end)
+    # This head is the one producer of `k` that is not
+    # `set_maximum_ratio_factor_variables!`: the barrier below pins the scale, so `k` is a
+    # *free* variable here rather than `k >= 0` or the literal `1`. `get_k`'s error message
+    # names both routes.
+    JuMP.@variable(model, k)
+    JuMP.@variable(model, log_w[1:N])
     JuMP.@constraints(model,
                       begin
                           clog_w[i = 1:N],

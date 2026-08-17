@@ -154,6 +154,10 @@ fan_out_slot
 deferred_derived_quantity
 resolve_slot
 deferred_slots
+resolve_deferred_quantities(x, pr::AbstractPriorResult)
+resolve_deferred_child
+rebuild_with_slots
+assert_declared_slot_resolver
 assert_resolved_slots
 sigma_chol_selector
 assert_derived_slot_has_source

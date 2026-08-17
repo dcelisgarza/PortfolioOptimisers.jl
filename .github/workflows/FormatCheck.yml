@@ -33,7 +33,10 @@ jobs:
           # If you update the version, also update the style guide docs.
           Pkg.add(PackageSpec(name="JuliaFormatter", version="2"))
           using JuliaFormatter
-          format("."; verbose = true)
+          # `verbose` names every file it visits, which was 374 of this job's 594 log lines
+          # and says nothing a reader needs: the check reports by its exit code, and the
+          # failure branch below prints the diff that identifies the file anyway.
+          format("."; verbose = false)
           out = String(read(Cmd(`git diff`)))
           if isempty(out)
               exit(0)

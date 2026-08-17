@@ -143,6 +143,9 @@ function GenericValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSe
                                  gain::ValueatRiskRMs = ConditionalValueatRisk())::GenericValueatRiskRange
     return GenericValueatRiskRange(settings, loss, gain)
 end
+# Deferrable slots — see `deferred_slots`. Both sides carry their own, so both the check and
+# the derived recursion in `resolve_deferred_quantities` reach them through the two children.
+deferred_slots(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
 function (r::GenericValueatRiskRange)(x::VecNum)
     loss = r.loss(x)
     gain = r.gain(-x)

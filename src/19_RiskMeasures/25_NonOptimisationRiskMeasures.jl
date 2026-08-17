@@ -214,6 +214,9 @@ function MeanReturnRiskRatio(;
                              rf::Number = 0.0)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(settings, rt, rk, sca, rf)
 end
+# Deferrable slots — see `deferred_slots`. `rt` is bounded to `MeanReturn`, which defers
+# nothing, so only the risk side is declared.
+deferred_slots(r::MeanReturnRiskRatio) = (; rk = r.rk)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

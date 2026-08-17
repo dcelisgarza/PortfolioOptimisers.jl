@@ -1133,7 +1133,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
-    JuMP.@expression(model, k, 1)
+    set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt)
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
@@ -1142,27 +1142,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(;
-                                                                  pa = ProcessedJuMPOptimiserAttributes(;
-                                                                                                        pr = opt.pe,
-                                                                                                        wb = opt.wb,
-                                                                                                        lt = opt.lt,
-                                                                                                        st = opt.st,
-                                                                                                        lcsr = opt.lcse,
-                                                                                                        ctr = opt.cte,
-                                                                                                        gcardr = opt.gcarde,
-                                                                                                        sgcardr = opt.sgcarde,
-                                                                                                        smtx = opt.smtx,
-                                                                                                        sgmtx = opt.sgmtx,
-                                                                                                        slt = opt.slt,
-                                                                                                        sst = opt.sst,
-                                                                                                        sglt = opt.sglt,
-                                                                                                        sgst = opt.sgst,
-                                                                                                        tn = opt.tn,
-                                                                                                        fees = opt.fees,
-                                                                                                        plr = opt.ple,
-                                                                                                        ret = opt.ret,
-                                                                                                        sca = opt.sca),
+                                      jr = JuMPOptimisationResult(; pa = attrs,
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,
@@ -1187,7 +1167,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
-    JuMP.@expression(model, k, 1)
+    set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt)
     assemble_jump_model!(model, noc, opt, attrs, rd, r)

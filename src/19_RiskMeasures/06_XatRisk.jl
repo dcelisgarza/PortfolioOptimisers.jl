@@ -539,43 +539,10 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Recurse into the formulation held by [`ValueatRisk`](@ref) `r`, so that a **Deferred Quantity** on a [`DistributionValueatRisk`](@ref) resolves on the `JuMP` path too.
-
-The `JuMP` model builders never call [`factory`](@ref) on a risk measure, so [`set_risk_constraints!`](@ref) is the second resolution point. It resolves the wrapper, and the quantities live one level down on `alg`. [`MIPValueatRisk`](@ref) defers nothing, so the recursion is the identity for it.
-
-# Related
-
-  - [`ValueatRisk`](@ref)
-  - [`DistributionValueatRisk`](@ref)
-  - [`resolve_deferred_quantities`](@ref)
-  - [`set_risk_constraints!`](@ref)
-"""
-function resolve_deferred_quantities(r::ValueatRisk, pr::AbstractPriorResult)::ValueatRisk
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w,
-                       alg = resolve_deferred_quantities(r.alg, pr))
-end
-# Deferrable slots — see `deferred_slots`. The formulation carries them, so the check
-# recurses into it.
+# Deferrable slots — see `deferred_slots`. The formulation carries them, so both the check and
+# the derived recursion in `resolve_deferred_quantities` reach them through `alg`.
+# `MIPValueatRisk` defers nothing, so the recursion is the identity for it.
 deferred_slots(r::ValueatRisk) = (; alg = r.alg)
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Recurse into the formulation held by [`ValueatRiskRange`](@ref) `r`. See [`resolve_deferred_quantities(r::ValueatRisk, pr::AbstractPriorResult)`](@ref).
-
-# Related
-
-  - [`ValueatRiskRange`](@ref)
-  - [`DistributionValueatRisk`](@ref)
-  - [`resolve_deferred_quantities`](@ref)
-"""
-function resolve_deferred_quantities(r::ValueatRiskRange,
-                                     pr::AbstractPriorResult)::ValueatRiskRange
-    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
-                            w = r.w, alg = resolve_deferred_quantities(r.alg, pr))
-end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::ValueatRiskRange) = (; alg = r.alg)
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)

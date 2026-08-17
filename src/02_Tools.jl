@@ -877,18 +877,21 @@ so whichever fallback the consumer already applies — `sel` on the factory path
 The two paths are separate: a `JuMP` model builder reads the risk measure's slots directly
 and never calls [`factory`](@ref), so both entry points resolve.
 
-The default is the identity: a type with no deferrable slot needs no method, and the call
-inlines away.
+This method is the identity, and it is the arm for a second argument that is not a prior
+result: with no prior in hand nothing can be fitted, so the deferred state travels on.
 
-A type defines a method when one of its slots may hold an estimator. Writing it per type —
-rather than per field — is what lets slots that travel together be resolved together: a
-deferred `sigma` supplies `chol` from the same fit, so the pair is never mixed across two
-sources.
+Given a prior result the rule has two halves. **Container recursion is derived** from
+[`deferred_slots`](@ref), so a type that only holds children needs no method at all. **A
+type that resolves a quantity of its own defines a method**, which overrides the derived one.
+Writing that half per type — rather than per field — is what lets slots that travel together
+be resolved together: a deferred `sigma` supplies `chol` from the same fit, so the pair is
+never mixed across two sources.
 
 # Related
 
   - [`@propagatable`](@ref)
   - [`resolve_slot`](@ref)
+  - [`deferred_slots`](@ref)
   - [`factory`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
@@ -1593,6 +1596,25 @@ macro propagatable(expr)
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
 
+    # Every name below is qualified against the module that *defines* the macro, because the
+    # emitted block is escaped and a bare name resolves where the struct is declared. `factory`
+    # is exported, which does not help: `using PortfolioOptimisers` binds it implicitly, so
+    # `function factory(...)` in the caller declares a **new** function of the caller's own and
+    # `PortfolioOptimisers.factory` never gains the method. That failure is silent -- the
+    # declaration compiles, the contract registers, and the type simply never joins the
+    # propagation chain. `@__MODULE__` in a macro body is the defining module, and interpolating
+    # the module object needs no binding in the caller at all (ADR 0002, decision 4).
+    POMOD = @__MODULE__
+    _factory = :($POMOD.factory)
+    _factory_child = :($POMOD.factory_child)
+    _port_opt_view = :($POMOD.port_opt_view)
+    _wprop_fn = :($POMOD._wprop)
+    _sel_fn = :($POMOD.sel)
+    _ctx_fn = :($POMOD._ctx)
+    _resolve_fn = :($POMOD.resolve_deferred_quantities)
+    _prior_result = :($POMOD.AbstractPriorResult)
+    _register_fn = :($POMOD.propagatable_register!)
+
     # --- factory propagation (@fprop recurses sub-estimators, @wprop replaces weights) ---
     if isempty(fprop_fields) && isempty(wprop_fields)
         factory_body = :x
@@ -1602,9 +1624,9 @@ macro propagatable(expr)
             xf = Expr(:., :x, QuoteNode(f))
             if f in fprop_fields
                 push!(factory_pairs,
-                      Expr(:kw, f, :(factory_child($xf, args...; kwargs...))))
+                      Expr(:kw, f, :($_factory_child($xf, args...; kwargs...))))
             elseif f in wprop_fields
-                push!(factory_pairs, Expr(:kw, f, :(_wprop($xf, args...; kwargs...))))
+                push!(factory_pairs, Expr(:kw, f, :($_wprop_fn($xf, args...; kwargs...))))
             else
                 push!(factory_pairs, Expr(:kw, f, xf))
             end
@@ -1613,7 +1635,7 @@ macro propagatable(expr)
     end
 
     factory_def = quote
-        function factory(x::$struct_name, args...; kwargs...)
+        function $_factory(x::$struct_name, args...; kwargs...)
             return $factory_body
         end
     end
@@ -1624,13 +1646,13 @@ macro propagatable(expr)
     if !isempty(vprop_fields)
         vpass = [f for f in all_fields if !(f in vprop_fields)]
         view_prop_pairs = [Expr(:kw, f,
-                                :(port_opt_view($(Expr(:., :x, QuoteNode(f))), i, args...)))
-                           for f in vprop_fields]
+                                :($_port_opt_view($(Expr(:., :x, QuoteNode(f))), i,
+                                                  args...))) for f in vprop_fields]
         view_pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f))) for f in vpass]
         view_body = Expr(:call, struct_name,
                          Expr(:parameters, view_prop_pairs..., view_pass_pairs...))
         view_def = quote
-            function port_opt_view(x::$struct_name, i, args...)
+            function $_port_opt_view(x::$struct_name, i, args...)
                 return $view_body
             end
         end
@@ -1645,22 +1667,22 @@ macro propagatable(expr)
             xf = Expr(:., :xr, QuoteNode(f))
             if f in pprop_fields            # @pprop wins over @fprop in the prior method
                 push!(sel_pairs,
-                      Expr(:kw, f, :(sel($xf, getproperty(pr, $(QuoteNode(f)))))))
+                      Expr(:kw, f, :($_sel_fn($xf, getproperty(pr, $(QuoteNode(f)))))))
             elseif f in cprop_fields
-                push!(sel_pairs, Expr(:kw, f, :(sel($xf, _ctx(args...)))))
+                push!(sel_pairs, Expr(:kw, f, :($_sel_fn($xf, $_ctx_fn(args...)))))
             elseif f in wprop_fields
-                push!(sel_pairs, Expr(:kw, f, :(_wprop($xf, args...; kwargs...))))
+                push!(sel_pairs, Expr(:kw, f, :($_wprop_fn($xf, args...; kwargs...))))
             elseif f in fprop_fields
                 push!(sel_pairs,
-                      Expr(:kw, f, :(factory_child($xf, pr, args...; kwargs...))))
+                      Expr(:kw, f, :($_factory_child($xf, pr, args...; kwargs...))))
             else
                 push!(sel_pairs, Expr(:kw, f, xf))
             end
         end
         prior_body = Expr(:call, struct_name, Expr(:parameters, sel_pairs...))
         prior_def = quote
-            function factory(x::$struct_name, pr::AbstractPriorResult, args...; kwargs...)
-                xr = resolve_deferred_quantities(x, pr)
+            function $_factory(x::$struct_name, pr::$_prior_result, args...; kwargs...)
+                xr = $_resolve_fn(x, pr)
                 return $prior_body
             end
         end
@@ -1672,7 +1694,7 @@ macro propagatable(expr)
     return esc(quote
                    Base.@__doc__ $chain
                    $(defs...)
-                   propagatable_register!($struct_name, $pprop_tuple)
+                   $_register_fn($struct_name, $pprop_tuple)
                end)
 end
 """

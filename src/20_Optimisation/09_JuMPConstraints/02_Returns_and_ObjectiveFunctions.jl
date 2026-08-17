@@ -249,6 +249,10 @@ function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResu
     return ArithmeticReturn(; settings = rt.settings, ucs = rt.ucs,
                             mu = resolve_slot(rt.mu, :mu, pr))
 end
+# Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a Deferred
+# Quantity, so it is not declared here. The declaration is what carries this slot into the
+# containers that hold a return term — `ExpectedReturn` and `ExpectedReturnRiskRatio`.
+deferred_slots(rt::ArithmeticReturn) = (; mu = rt.mu)
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
@@ -890,21 +894,29 @@ function assert_return_term_required(ret, T::Symbol)::Nothing
 end
 """
     set_maximum_ratio_factor_variables!(model, obj)
-    set_maximum_ratio_factor_variables!(model, args...)
 
 Register the homogenisation variable `k` for the maximum ratio objective.
+
+This is the head-level producer of `k`. Every head that shapes `w` from an objective calls
+it exactly once, so the two spellings of `k` live here rather than at each head: `k >= 0`
+under [`MaximumRatio`](@ref), and the literal `1` under every other objective. The heads
+whose formulation is fixed pass their own fixed objective ([`MinimumRisk`](@ref)) and take
+the second branch. [`RiskBudgeting`](@ref) is the one head that does not come through here
+— see [`get_k`](@ref).
 
 This runs **before** the model is assembled, because [`set_weight_constraints!`](@ref) reads
 `k` immediately afterwards. The other half of the old bundle — the normalisation factor `ohf`
 — is sized from the *resolved* return characteristic, which does not exist until the return
-builders have run, so [`set_maximum_ratio_normalisation!`](@ref) registers it later. The
-no-op overload sets `k` to `1` for non-ratio objectives.
+builders have run, so [`set_maximum_ratio_normalisation!`](@ref) registers it later.
+
+The second method takes exactly one objective, not `args...`. A variadic fallback used to
+absorb a wrong-arity call silently and register `k = 1` under a `MaximumRatio` objective, so
+the ratio branch went untested while the call still looked correct.
 
 # Arguments
 
   - `model`: JuMP optimisation model.
   - `obj`: Objective function (e.g., [`MaximumRatio`](@ref)).
-  - `args...`: Arguments (ignored in the fallback overload).
 
 # Returns
 
@@ -913,6 +925,7 @@ no-op overload sets `k` to `1` for non-ratio objectives.
 # Related
 
   - [`MaximumRatio`](@ref)
+  - [`get_k`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
@@ -920,7 +933,7 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, obj::MaximumRati
     JuMP.@variable(model, k >= 0)
     return nothing
 end
-function set_maximum_ratio_factor_variables!(model::JuMP.Model, args...)
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, obj)
     JuMP.@expression(model, k, 1)
     return nothing
 end

@@ -428,6 +428,10 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingRiskMeasure(settings, tr, r, alg)
 end
+# Deferrable slots — see `deferred_slots`. The tracked measure carries its own, so both the
+# check and the derived recursion in `resolve_deferred_quantities` reach them through `r`.
+# `tr` holds the benchmark weights and `alg` the tracking variable, neither of which defers.
+deferred_slots(r::RiskTrackingRiskMeasure) = (; r = r.r)
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::VecNum, X::MatNum,
                                                                      fees::Option{<:Fees} = nothing)

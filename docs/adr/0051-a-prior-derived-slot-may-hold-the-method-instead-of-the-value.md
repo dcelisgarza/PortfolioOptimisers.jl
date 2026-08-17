@@ -245,3 +245,177 @@ it belongs on the list.
   beside `deferred_slots` says to declare both. It is unreachable today, because `expected_return`
   has no bare-returns-matrix arm for `assert_resolved_slots` to guard, so this is a latent trap
   rather than a live defect. Adding such an arm must add the declaration with it.
+
+## Amendment (2026-08-17) — from candidate B of the architecture review of 2026-08-16
+
+The decision above pairs two declarations per type: `deferred_slots` names the slots, and
+`resolve_deferred_quantities` resolves them. The review read the shipped code and found that the
+pair is **not symmetric**. The naming half is one line per type. The resolving half is one line
+per type for a leaf and a *forwarding method* for a container — and a container gets that
+forwarding for free on the `factory` path, from `@fprop`, while on the `JuMP` path it has to be
+written by hand. Four containers had not written it.
+
+### Container recursion is derived, never written
+
+**`resolve_deferred_quantities` now has a derived method that reads `deferred_slots`.** It
+resolves each declared slot, rebuilds the type from its own field list when a slot moved, and
+returns the argument itself when none did. `resolve_deferred_child` carries the per-slot rule: a
+child resolves through its own method, a vector of children resolves element by element, and
+anything else is returned unchanged.
+
+**A type that resolves a quantity of its own still declares a method**, which is more specific
+than the derived one and wins. That half cannot be derived, and the reason is the rule this ADR
+already states: slots that travel together must be resolved together. A deferred `sigma` supplies
+`chol` from the same fit, a deferred `sk` supplies `V` and the `mp` that built it, and a `pe`
+fans one fit out over every slot the caller left unstated. No derivation can know any of that.
+
+So the interface is now one declaration per container and two per leaf, and the JuMP path and the
+factory path read the same declaration.
+
+### The gap was six containers, not two
+
+The review named `RiskTrackingRiskMeasure` and `GenericValueatRiskRange`. Reading every risk
+measure and returns estimator that holds a child found four more: `RiskRatio`,
+`NonOptimisationRiskRatio`, `ExpectedReturn` and `ExpectedReturnRiskRatio`. All six declare
+`deferred_slots` now and need no forwarding method. `ValueatRisk` and `ValueatRiskRange` keep
+their declarations and **lose** their hand-written forwarders.
+
+`MeanReturnRiskRatio` declares its risk axis alone. Its `rt` is bounded to `MeanReturn`, which
+defers nothing, so declaring it would name a slot that can never hold a Deferred Quantity.
+
+**`ArithmeticReturn` now declares `deferred_slots`**, which the 2026-08-12 amendment recorded as a
+latent trap. It is no longer latent: `ExpectedReturn.rt` and `ExpectedReturnRiskRatio.rt` reach it,
+so the value-level check now refuses a deferred `mu` one level down instead of passing it on.
+
+### A declaration without a resolver is refused at the call
+
+`assert_declared_slot_resolver` runs inside the derived method. A **Deferred Quantity** that
+survives the recursion means the type declared the slot and wrote no resolver, so the estimator
+would have reached a model builder and been multiplied as though it were a matrix. It now raises
+an `ArgumentError` naming the type, the slot and the method to declare. This is what makes the
+derived half safe to rely on: forgetting the resolving half is loud rather than silent.
+
+### The value-level check had the same vector gap
+
+`assert_resolved_slots` recursed into a slot that held one child and **not** into a slot that held
+a vector of them, so `NonOptimisationRiskRatio(r1 = [StandardDeviation(sigma = ce)])` passed the
+bare-returns-matrix entry point and failed several frames down. It now takes the same
+element-by-element arm as `resolve_deferred_child`. Both consumers of the declaration read it the
+same way.
+
+### Rejected alternatives
+
+**Generate the resolver from a field tag, beside `@fprop`.** A sixth `@propagatable` tag would
+put the declaration on the field and generate both halves from it, with no runtime reflection.
+Rejected because `RiskTrackingRiskMeasure` is not `@propagatable`, so the tag would not reach the
+container the review named first, and because the macro cannot tell a container from a leaf — it
+would have to generate a resolver for `Variance` too, and that one must stay hand-written.
+
+**Take a dependency for the rebuild.** `ConstructionBase.setproperties` does exactly what
+`rebuild_with_slots` does. Rejected under the standing preference for deriving the field list and
+recovering the constructor over adding a dependency for reflection-style work; the hand-written
+version is three lines and re-runs the inner constructor's guards.
+
+## Amendment (2026-08-17) — from candidate C of the architecture review of 2026-08-16
+
+The clause "the prior fallback for an unstated slot stays where it already was" **stands**, and
+this amendment records why, because the review proposed to reverse it. The proposal was to reach
+both halves of the precedence rule through one per-type declaration, so that a consumer holding a
+prior applies the whole rule by naming one function. Reading the shipped code found one real defect
+behind that proposal, and two independent reasons the proposal cannot be carried out: the moment
+slots would lose the model's shared factor, and the `w` slots have no declaration that covers them.
+
+### The value-level point was bypassed by two of its own callers
+
+`resolve_risk_inputs` is this decision's value-level resolution point, and the ratio family did
+not use it. `expected_ratio` and `expected_risk_ret_ratio` handed the risk axis `pr.X` and handed
+the return axis `pr`, two lines apart. So an unstated slot met the kernel as `nothing`, and a
+Deferred Quantity was refused by an error whose own text reads "Pass the prior result itself —
+`expected_risk(r, w, pr, fees)`", which is what the caller had done. The `VecVecNum` twin resolved
+first, so `expected_risk(errr, [w], pr)` answered where `expected_risk(errr, w, pr)` threw.
+
+**Both now hand the risk axis `pr`.** This is not a change to the decision. It makes two callers
+use the point the decision already named. A third caller had the same defect and the review did
+not cite it: `expected_risk(r, res::OptimisationResult, pr, fees)` took the prior out of the
+result and then unwrapped `pr.X`, so `expected_risk(Variance(), res)` — the call its own docstring
+asks for — reached the kernel with an unstated `sigma`. No test in the suite called that overload,
+because every other site passes `res.w` by hand. It now forwards the carrier whole.
+
+### The fallback has three spellings, not two
+
+The review counted two, a declarative `@pprop` tag and an imperative selector call. There is a
+third, and it is the one that matters:
+
+| Spelling | Where | Count |
+| -------- | ----- | ----- |
+| `@pprop <field>` | on the struct body, read by the generated `factory` | 29 tags, 28 types |
+| a hand-written `factory(r::T, pr, …)` method | when a tag cannot express the rule | `Variance`, `Kurtosis`, … |
+| `nothing_scalar_array_selector(r.w, pr.w)` | inside a `JuMP` risk builder | 23 sites |
+
+Of the 29 `@pprop` tags, 28 are `w` and one type adds `mu`. **`Variance.sigma` carries no tag at
+all**, and this is deliberate: `@pprop` selects field by field, and `sigma`/`chol` must be
+selected as a pair or the model optimises one quantity while the functor evaluates another. A
+field tag cannot say "as a pair", so `Variance` writes its `factory` by hand. Candidate B's
+rejected alternatives reach the same place from the other direction: a generated resolver "would
+have to generate a resolver for `Variance` too, and that one must stay hand-written."
+
+Pairing is not the only thing a tag cannot say. `Kurtosis` writes its `factory` by hand for a
+different reason: it needs one method per prior type, because a `HighOrderPrior` carries `kt` and
+a `LowOrderPrior` does not, and the second method has to fall the slot back to nothing rather
+than to a field that is absent. A field tag names a field, not a prior type.
+
+### Pre-resolving the measure would destroy the shared factor
+
+Three of the four `JuMP` optimisers hand the builders the raw measure — `MeanRisk`,
+`RiskBudgeting` and `FactorRiskContribution` pass `*.r` straight into `assemble_jump_model!`.
+`NearOptimalCentering` passes a `factory`-resolved one, so for that optimiser alone the builders'
+fallback calls are already no-ops. That is a third behaviour among four heads, and it is the part
+of the review's reading that holds up.
+
+It does **not** follow that the builders should resolve first. `chol_sigma_selector` reads
+`isnothing(r.sigma) && isnothing(r.chol)` as the signal that the prior supplies the pair, and only
+on that branch does it take the model-level `G` through `get_chol_or_sigma_pm`, which caches one
+expression across every measure that needs a factor. Resolve the measure before the builder and
+that signal is gone: each measure arrives holding a dense `sigma`, takes the
+`LinearAlgebra.cholesky(r.sigma).U` branch, and the single shared `G` becomes one factorisation
+per measure. The failure is silent and it is in the model, not in an error.
+
+So the moment slots must keep their fallback in the builder. This is also why the review's
+companion item, to collapse `sigma_chol_selector` and `chol_sigma_selector` into one, is
+**rejected**: the first returns a pair with the fallback applied, the second returns one `JuMP`
+expression and the cache decision, and once the pair is in hand the caller can no longer tell
+whether the prior supplied it.
+
+### The `w` half is not derivable from the declaration either
+
+The `w` half looked like the consolidatable remainder, and it is not. Its fallback carries no
+model-level cache, so nothing is lost by resolving it early: each builder reads
+`wi = nothing_scalar_array_selector(r.w, pr.w)` and then branches on `isnothing(wi)` to choose
+between a weighted and an unweighted expression. That branch is the *result* of the fallback and
+not a signal about its source, so it survives a pre-filled `w` unchanged. On that much the review
+is right.
+
+**The declaration does not cover the sites.** Of the 23 builder sites, 19 belong to a type tagged
+`@pprop w`. The other four belong to `LowOrderMoment`, which is a bare `@concrete struct` and not
+`@propagatable` at all, so it cannot carry the tag. A pass derived from `@pprop` would fill 19 and
+skip 4 in silence, and the symptom would be a risk measure that quietly ignores the prior's
+observation weights.
+
+Two ways to close that gap, both rejected:
+
+**Make `LowOrderMoment` `@propagatable` and tag `w`.** Rejected. It declares a hand-written inner
+constructor that guards `mu` and `w`, and the generic constructor `@concrete` generates for a
+`@propagatable` type bypasses a narrow inner bound rather than raising a `MethodError`. Buying a
+23-site consolidation with a silent validation bypass is the wrong trade. `HighOrderMoment` has the
+same shape.
+
+**Declare the prior slots per type, beside `deferred_slots`.** Rejected. It replaces 23 imperative
+sites with about 20 declarations, which is not leverage, and it adds a sixth declaration mechanism
+to a family that already has five. Candidate B rejected a field tag for the neighbouring problem on
+the same ground, that `RiskTrackingRiskMeasure` is not `@propagatable`; the constraint here is the
+same one, met from the other side.
+
+So the fallback stays in the builders for the `w` slot too, and the clause this amendment opened
+with is now confirmed for both halves rather than only for the moment slots. The drift the review
+saw is real — 23 copies of one rule — but every mechanism that would remove the copies costs more
+than the copies do.

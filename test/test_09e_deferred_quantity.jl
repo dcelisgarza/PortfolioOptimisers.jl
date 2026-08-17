@@ -20,6 +20,13 @@ function PortfolioOptimisers.prior(c::_test_CountingPriorEstimator, X, F = nothi
     return prior(c.pe, X, F; kwargs...)
 end
 
+# Declares a deferrable slot and writes no resolver, which is the half of ADR 0051's pair that
+# the derived recursion cannot supply. Nothing in `src/` may look like this.
+struct _test_DeclaresWithoutResolving{T}
+    mu::T
+end
+PortfolioOptimisers.deferred_slots(x::_test_DeclaresWithoutResolving) = (; mu = x.mu)
+
 @testset "Deferred Quantity: the slot aliases" begin
     # The dynamic half answers "is this slot deferred?" for all four quantity families and
     # for a prior estimator, which computes every quantity at once.
@@ -1390,4 +1397,229 @@ end
     @test f.vr.sigma ≈ g.vr.sigma
     @test f.sk.sk ≈ g.sk.sk
     @test f.kt.kt ≈ g.kt.kt
+end
+
+@testset "Deferred Quantity: container recursion is derived from the declaration" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+    ce = PortfolioOptimisersCovariance()
+    me = SimpleExpectedReturns()
+    R = PO.resolve_deferred_quantities
+
+    # A container declares its children in `deferred_slots` and writes no forwarding method.
+    # `ValueatRisk` and `ValueatRiskRange` had one and lost it, so this is the regression.
+    v = R(ValueatRisk(; alg = DistributionValueatRisk(; sigma = ce)), lop)
+    @test v.alg.sigma ≈ lop.sigma
+    vr = R(ValueatRiskRange(; alg = DistributionValueatRisk(; sigma = ce)), lop)
+    @test vr.alg.sigma ≈ lop.sigma
+
+    # The four containers that never wrote one now resolve the same way.
+    t = R(RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = fill(0.2, 5)),
+                                  r = Variance(; sigma = ce)), lop)
+    @test t.r.sigma ≈ lop.sigma
+    # The rebuild is positional, so the inner constructor re-applies the container's own rule
+    # that the tracked measure carries no risk expression of its own.
+    @test t.r.settings.rke === false
+
+    g = R(GenericValueatRiskRange(;
+                                  loss = ValueatRisk(;
+                                                     alg = DistributionValueatRisk(;
+                                                                                   sigma = ce)),
+                                  gain = ValueatRisk(;
+                                                     alg = DistributionValueatRisk(;
+                                                                                   mu = me))),
+          lop)
+    @test g.loss.alg.sigma ≈ lop.sigma
+    @test g.gain.alg.mu ≈ lop.mu
+
+    rr = R(RiskRatio(; r1 = Variance(; sigma = ce), r2 = LowOrderMoment(; mu = me)), lop)
+    @test rr.r1.sigma ≈ lop.sigma
+    @test rr.r2.mu ≈ lop.mu
+
+    er = R(ExpectedReturn(; rt = ArithmeticReturn(; mu = me)), lop)
+    @test er.rt.mu ≈ lop.mu
+
+    mrr = R(MeanReturnRiskRatio(; rk = Variance(; sigma = ce)), lop)
+    @test mrr.rk.sigma ≈ lop.sigma
+
+    # A vector slot resolves element by element, which is the rule `factory_child` already
+    # applies on the other path.
+    nrr = R(NonOptimisationRiskRatio(; r1 = [Variance(; sigma = ce), StandardDeviation()],
+                                     r2 = [LowOrderMoment(; mu = me)]), lop)
+    @test nrr.r1[1].sigma ≈ lop.sigma
+    @test isnothing(nrr.r1[2].sigma)
+    @test nrr.r2[1].mu ≈ lop.mu
+
+    errr = R(ExpectedReturnRiskRatio(; rt = [ArithmeticReturn(; mu = me)],
+                                     rk = [Variance(; sigma = ce),
+                                           LowOrderMoment(; mu = me)]), lop)
+    @test errr.rt[1].mu ≈ lop.mu
+    @test errr.rk[1].sigma ≈ lop.sigma
+    @test errr.rk[2].mu ≈ lop.mu
+
+    # A container whose children resolved to themselves is returned unchanged, so the common
+    # case allocates nothing.
+    for r in (ValueatRisk(), ValueatRiskRange(), RiskRatio(), GenericValueatRiskRange(),
+              ExpectedReturn(), MeanReturnRiskRatio(),
+              RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = fill(0.2, 5))))
+        @test R(r, lop) === r
+    end
+end
+
+@testset "Deferred Quantity: the derived recursion refuses a declaration with no resolver" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    lop = prior(EmpiricalPrior(), X)
+
+    # The derivation carries container recursion alone. A type that declares a quantity slot
+    # and writes no resolver would let the Estimator reach a model builder and be multiplied
+    # as though it were a matrix, so the derived method refuses it by name.
+    err = try
+        PO.resolve_deferred_quantities(_test_DeclaresWithoutResolving(SimpleExpectedReturns()),
+                                       lop)
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    msg = sprint(showerror, err)
+    @test occursin("`_test_DeclaresWithoutResolving.mu`", msg)
+    @test occursin("`SimpleExpectedReturns`", msg)
+    @test occursin("declares no `resolve_deferred_quantities` method", msg)
+
+    # A declared slot holding a plain value is not refused.
+    @test PO.resolve_deferred_quantities(_test_DeclaresWithoutResolving(lop.mu), lop).mu ===
+          lop.mu
+end
+
+@testset "Deferred Quantity: every resolver has a declaration beside it" begin
+    # ADR 0051 pairs the two declarations. The naming half may stand alone — that is a
+    # container, whose recursion is derived — but the resolving half never may, or a widened
+    # slot resolves where a prior is in hand and passes unnoticed where one is not.
+    base(T) = Base.typename(Base.unwrap_unionall(T)).wrapper
+    function firstargs(f)
+        out = Set{Any}()
+        for m in methods(f)
+            T = Base.unwrap_unionall(m.sig).parameters[2]
+            T === Any && continue
+            push!(out, base(T))
+        end
+        return out
+    end
+    resolvers = firstargs(PO.resolve_deferred_quantities)
+    declarations = firstargs(PO.deferred_slots)
+    @test isempty(setdiff(resolvers, declarations))
+
+    # `ArithmeticReturn` was the one violation, and it is reachable now: `ExpectedReturn.rt`
+    # carries it into the value-level check.
+    @test ArithmeticReturn in resolvers
+    @test ArithmeticReturn in declarations
+
+    # The six containers declare and resolve nothing of their own.
+    for T in (RiskTrackingRiskMeasure, GenericValueatRiskRange, RiskRatio,
+              NonOptimisationRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio)
+        @test T in declarations
+        @test !(T in resolvers)
+    end
+end
+
+@testset "Deferred Quantity: the value-level check recurses into a vector slot" begin
+    rng = StableRNG(987654321)
+    X = randn(rng, 200, 5)
+    w = fill(0.2, 5)
+    ce = PortfolioOptimisersCovariance()
+
+    # A slot that holds one child was recursed into and a slot that held a vector of them was
+    # not, so the refusal landed several frames down instead of naming the slot.
+    err = try
+        PO.assert_resolved_slots(NonOptimisationRiskRatio(;
+                                                          r1 = [StandardDeviation(;
+                                                                                  sigma = ce)]))
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("`StandardDeviation.sigma`", sprint(showerror, err))
+
+    @test_throws ArgumentError PO.assert_resolved_slots(ExpectedReturnRiskRatio(;
+                                                                                rk = [ConditionalValueatRisk(),
+                                                                                      Variance(;
+                                                                                               sigma = ce)]))
+    @test_throws ArgumentError PO.assert_resolved_slots(ExpectedReturn(;
+                                                                       rt = [ArithmeticReturn(;
+                                                                                              mu = SimpleExpectedReturns())]))
+    # A vector of measures that state nothing passes the check and evaluates. The two axes
+    # hold measures a bare returns matrix can evaluate; `StandardDeviation()` is not one,
+    # because it needs a `sigma` that this entry point does not carry.
+    @test isnothing(PO.assert_resolved_slots(NonOptimisationRiskRatio(;
+                                                                      r1 = [StandardDeviation()])))
+    @test isa(expected_risk(NonOptimisationRiskRatio(; r1 = [ConditionalValueatRisk()],
+                                                     r2 = [ConditionalValueatRisk(;
+                                                                                  alpha = 0.1)]),
+                            w, X), Number)
+end
+
+@testset "Deferred Quantity: a container that holds a declaring child declares it" begin
+    # `deferred_slots` cannot be derived by walking field values — ADR 0051's falsification
+    # witness is `SimpleVariance`, which is a Deferred Quantity by type and stands
+    # legitimately in `Skewness.ve`. So the declaration is per type, and this is the gate that
+    # catches the container that forgot one: it reads the field's own type bound off the
+    # positional constructor and asks whether that bound admits any type that declares slots.
+    # Six containers were missing before the recursion was derived.
+    tr = WeightsTracking(; w = fill(0.2, 5))
+    function instantiate(T)
+        for f in (() -> T(), () -> T(; tr = tr), () -> T(; w = fill(0.2, 5)))
+            try
+                return f()
+            catch
+            end
+        end
+        return nothing
+    end
+    base(T) = Base.typename(Base.unwrap_unionall(T)).wrapper
+    declaring = Any[]
+    for m in methods(PO.deferred_slots)
+        T = Base.unwrap_unionall(m.sig).parameters[2]
+        T === Any && continue
+        x = instantiate(base(T))
+        isnothing(x) || push!(declaring, x)
+    end
+    @test length(declaring) == 22
+
+    # The inner constructor states one bound per field, in field order.
+    function field_bounds(T)
+        n = fieldcount(Base.unwrap_unionall(T))
+        for m in methods(T)
+            ps = Base.unwrap_unionall(m.sig).parameters
+            if length(ps) == n + 1 && !Base.isvarargtype(last(ps))
+                return ps[2:end]
+            end
+        end
+        return nothing
+    end
+
+    pool = vcat(PO.traverse_concrete_subtypes(PO.AbstractBaseRiskMeasure),
+                PO.traverse_concrete_subtypes(PO.JuMPReturnsEstimator))
+    undeclared = String[]
+    unbounded = String[]
+    for T in pool
+        bounds = field_bounds(T)
+        x = instantiate(T)
+        @test !isnothing(bounds)
+        @test !isnothing(x)
+        declared = keys(PO.deferred_slots(x))
+        for (f, b) in zip(fieldnames(T), bounds)
+            if b === Any
+                # An unbounded field says nothing about what it admits, so the gate cannot
+                # read it. It is listed rather than skipped silently.
+                push!(unbounded, string(nameof(T), ".", f))
+            elseif !(f in declared) && any(d -> isa(d, b), declaring)
+                push!(undeclared, string(nameof(T), ".", f))
+            end
+        end
+    end
+    @test isempty(undeclared)
+    # One field in the two families is unbounded, and every sibling writes
+    # `settings::RiskMeasureSettings`. A new one must be bounded or added here deliberately.
+    @test unbounded == ["RelativisticDrawdownatRisk.settings"]
 end

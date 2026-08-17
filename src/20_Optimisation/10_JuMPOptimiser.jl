@@ -1280,6 +1280,10 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
     # fixed in 9ff28d6). Every `opt` field flows through by name (`base`); every `attrs` result
     # field overrides its optimiser slot. Six result fields carry a different name than their
     # slot — listed in `rename` — the other twelve match by name and map automatically.
+    #
+    # There is deliberately no inverse. A head that needs the bundle back keeps the `attrs` it
+    # already holds (both `NearOptimalCentering` heads do), because a reverse hand list is the
+    # same drop the comment above records — only pointing the other way.
     rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
               plr = :ple)
     of = fieldnames(JuMPOptimiser)

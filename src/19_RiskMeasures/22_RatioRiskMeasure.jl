@@ -86,6 +86,9 @@ function RiskRatio(; r1::OptimisationRiskMeasure = Variance(),
                    r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatio
     return RiskRatio(r1, r2)
 end
+# Deferrable slots — see `deferred_slots`. The two measures carry their own, so both the check
+# and the derived recursion in `resolve_deferred_quantities` reach them through the children.
+deferred_slots(r::RiskRatio) = (; r1 = r.r1, r2 = r.r2)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -193,5 +196,8 @@ function NonOptimisationRiskRatio(;
                                   sca2::Scalariser = SumScalariser())::NonOptimisationRiskRatio
     return NonOptimisationRiskRatio(settings, r1, sca1, r2, sca2)
 end
+# Deferrable slots — see `deferred_slots`. Each side is one measure or a vector of them, and
+# the derived recursion resolves a vector element by element.
+deferred_slots(r::NonOptimisationRiskRatio) = (; r1 = r.r1, r2 = r.r2)
 
 export RiskRatio, NonOptimisationRiskRatio

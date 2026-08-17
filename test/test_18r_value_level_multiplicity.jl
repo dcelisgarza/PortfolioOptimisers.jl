@@ -131,6 +131,31 @@ end
         @test expected_risk(res.r, res.w, res.pr; sca = res.sca) ≈
               expected_risk(res.r, res.w, res.pr.X; sca = res.sca)
     end
+
+    @testset "the result overload resolves the caller's own measure" begin
+        #=
+        `expected_risk(r, res, pr)` extracts the prior and then forwards it whole. It used
+        to unwrap `pr.X`, so the caller's own measure met the kernel with an unstated slot.
+        This overload had no test at all, because every other call site in the suite passes
+        `res.w` explicitly.
+
+        The invariant it must satisfy: it agrees with the explicit `res.w` route on the same
+        measure, in every slot state. Stated this way the assertion does not depend on
+        whether a bare `Covariance()` equals the prior's own estimator.
+        =#
+        fees = PortfolioOptimisers.extract_fees(res, nothing)
+        for r in (Variance(), Variance(; sigma = Covariance()), res.r)
+            # Both arms: the prior extracted from the result, and one passed explicitly.
+            @test expected_risk(r, res) ≈ expected_risk(r, res.w, res.pr, fees)
+            @test expected_risk(r, res, res.pr) ≈ expected_risk(r, res.w, res.pr, fees)
+        end
+        # The already-resolved measure reproduces the optimised figure through the overload.
+        @test expected_risk(res.r, res; sca = res.sca) ≈
+              expected_risk(res.r, res.w, res.pr; sca = res.sca)
+        # The matrix arm opts out of resolution, so it needs a fully stated measure.
+        @test expected_risk(factory(Variance(), res.pr), res, res.pr.X) ≈
+              expected_risk(factory(Variance(), res.pr), res.w, res.pr.X, fees)
+    end
 end
 
 @testset "Value-level multiplicity: the field beats a caller's keyword" begin
@@ -150,9 +175,9 @@ end
     X = randn(rng, 200, 5) ./ 100 .+ 0.0004
     w = fill(0.2, 5)
     pr = prior(EmpiricalPrior(), X)
-    # Resolved: `expected_ratio` evaluates the risk axis on `pr.X`, the matrix, so a
-    # measure with an unstated slot has no prior to fall back on there.
-    rks = [factory(Variance(), pr), ConditionalValueatRisk()]
+    # Unresolved: `expected_ratio` hands the risk axis the prior itself, so an unstated
+    # slot takes the prior's field. No `factory` call is needed at the call site.
+    rks = [Variance(), ConditionalValueatRisk()]
 
     errr_sum = ExpectedReturnRiskRatio(; rk = rks, sca = SumScalariser())
     errr_max = ExpectedReturnRiskRatio(; rk = rks, sca = MaxScalariser())
@@ -166,12 +191,48 @@ end
     @test expected_risk(errr_max, w, pr; sca = SumScalariser()) == v_max
 
     @testset "`NonOptimisationRiskRatio` carries one scalariser per axis" begin
-        # It is the only type in the family with two independent risk vectors.
-        r = NonOptimisationRiskRatio(; r1 = rks, sca1 = SumScalariser(), r2 = rks,
+        # It is the only type in the family with two independent risk vectors. This testset
+        # evaluates on the matrix, so it resolves the measures itself.
+        rrks = factory(rks, pr)
+        r = NonOptimisationRiskRatio(; r1 = rrks, sca1 = SumScalariser(), r2 = rrks,
                                      sca2 = MaxScalariser())
-        num = expected_risk(rks, w, pr.X; sca = SumScalariser())
-        den = expected_risk(rks, w, pr.X; sca = MaxScalariser())
+        num = expected_risk(rrks, w, pr.X; sca = SumScalariser())
+        den = expected_risk(rrks, w, pr.X; sca = MaxScalariser())
         @test expected_risk(r, w, pr.X) ≈ num / den
+    end
+
+    @testset "the ratio family routes its risk axis through the prior" begin
+        #=
+        `expected_ratio` used to unwrap `pr.X` for the risk axis while handing the return
+        axis `pr`, two lines apart. So an unstated slot reached the kernel as `nothing`, and
+        a Deferred Quantity was refused for want of a prior that was in the argument list.
+        The `VecVecNum` method resolved first, so the vector twin answered where the
+        singular one threw.
+        =#
+        unstated = ExpectedReturnRiskRatio(; rk = Variance())
+        deferred = ExpectedReturnRiskRatio(; rk = Variance(; sigma = Covariance()))
+        stated = ExpectedReturnRiskRatio(; rk = factory(Variance(), pr))
+
+        ref = expected_risk(stated, w, pr)
+        # All three slot states agree: the prior supplies the same matrix each way.
+        @test expected_risk(unstated, w, pr) ≈ ref
+        @test expected_risk(deferred, w, pr) ≈ ref
+        # The singular method and the `VecVecNum` twin agree on every state.
+        for m in (unstated, deferred, stated)
+            @test expected_risk(m, [w], pr)[1] ≈ expected_risk(m, w, pr)
+        end
+        # The four public ratio entry points take an unstated slot directly.
+        @test expected_ratio(Variance(), ArithmeticReturn(), w, pr) ≈ ref
+        @test expected_ratio(Variance(; sigma = Covariance()), ArithmeticReturn(), w, pr) ≈
+              ref
+        rk, rt, rr = expected_risk_ret_ratio(Variance(), ArithmeticReturn(), w, pr)
+        @test rr ≈ ref
+        @test rk ≈ expected_risk(factory(Variance(), pr), w, pr.X)
+        @test rt ≈ expected_return(ArithmeticReturn(), w, pr)
+        @test expected_sric(Variance(), ArithmeticReturn(), w, pr) < ref
+        srk, srt, ssr = expected_risk_ret_sric(Variance(), ArithmeticReturn(), w, pr)
+        @test (srk, srt) == (rk, rt)
+        @test ssr < rr
     end
 end
 

@@ -2634,11 +2634,14 @@ When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or 
 
 `r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 
+The prior-taking method forwards the carrier whole, so a caller's **own** measure resolves against it: an unstated slot takes the prior's field and a **Deferred Quantity** is fitted, exactly as in `expected_risk(r, w, pr)`. Pass a matrix instead to opt out and supply every slot yourself.
+
 # Related
 
   - [`expected_risk`](@ref)
   - [`OptimisationResult`](@ref)
   - [`BaseRM_VecBaseRM`](@ref)
+  - [`resolve_risk_inputs`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
@@ -2648,8 +2651,13 @@ end
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
                        kwargs...)
-    pr = extract_pr(res, pr)
-    return expected_risk(r, res, pr.X, fees; kwargs...)
+    # The carrier is forwarded whole, never unwrapped to `pr.X`. `expected_risk`'s own
+    # `Pr_RR` route resolves the measure through `resolve_risk_inputs`, which has an arm for
+    # each carrier: a prior result resolves the measure, a `ReturnsResult` only unwraps `X`.
+    # Unwrapping here dropped the prior fallback, so `expected_risk(Variance(), res)` — the
+    # call this docstring asks callers to make — hit the kernel with an unstated `sigma`.
+    fees = extract_fees(res, fees)
+    return expected_risk(r, res.w, extract_pr(res, pr), fees; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

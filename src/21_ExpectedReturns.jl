@@ -138,6 +138,10 @@ Both axes take one item or several, and the ratio is **aggregate over aggregate*
 
 Only the risk axis carries a scalariser. The return axis sums and never scalarises.
 
+# Resolution
+
+Both axes are handed `pr` itself, so both apply the same precedence rule: a stated slot wins, then the slot's own estimator, then the prior's field. The risk axis enters [`expected_risk`](@ref)'s prior route, which resolves the measure through [`resolve_risk_inputs`](@ref) once per call — a **Deferred Quantity** is fitted against `pr`, and an unstated slot takes the prior's field.
+
 # Arguments
 
   - `r`: Risk measure, or a vector of them.
@@ -162,13 +166,20 @@ Only the risk axis carries a scalariser. The return axis sums and never scalaris
   - [`Option`](@ref)
   - [`Fees`](@ref)
   - [`expected_return`](@ref)
+  - [`expected_risk`](@ref)
+  - [`resolve_risk_inputs`](@ref)
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_sric`](@ref)
 """
 function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                         rf::Number = 0, sca::Scalariser = SumScalariser(), kwargs...)
-    rk = expected_risk(r, w, pr.X, fees; sca = sca, kwargs...)
+    # Both axes are handed the prior itself, never `pr.X`. The risk axis then enters
+    # `expected_risk`'s own prior route, which resolves the measure through
+    # `resolve_risk_inputs` exactly once. Unwrapping the matrix here dropped the prior
+    # fallback for an unstated slot and refused a Deferred Quantity that this argument list
+    # was already holding the prior for.
+    rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return (rt - rf) / rk
 end
@@ -232,7 +243,8 @@ function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum
                                  pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                  rf::Number = 0, sca::Scalariser = SumScalariser(),
                                  kwargs...)
-    rk = expected_risk(r, w, pr.X, fees; sca = sca, kwargs...)
+    # The prior, not `pr.X` — see the note in `expected_ratio`.
+    rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return rk, rt, (rt - rf) / rk
 end
@@ -435,6 +447,9 @@ function ExpectedReturn(;
                         rt::JRE_VecJRE = ArithmeticReturn())::ExpectedReturn
     return ExpectedReturn(settings, rt)
 end
+# Deferrable slots — see `deferred_slots`. The return term carries its own `mu`, so both the
+# check and the derived recursion in `resolve_deferred_quantities` reach it through `rt`.
+deferred_slots(r::ExpectedReturn) = (; rt = r.rt)
 """
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
@@ -590,6 +605,9 @@ function ExpectedReturnRiskRatio(;
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio
     return ExpectedReturnRiskRatio(settings, rt, rk, sca, rf)
 end
+# Deferrable slots — see `deferred_slots`. Each axis is one item or a vector of them, and the
+# derived recursion resolves a vector element by element.
+deferred_slots(r::ExpectedReturnRiskRatio) = (; rt = r.rt, rk = r.rk)
 """
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
