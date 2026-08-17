@@ -312,6 +312,8 @@ Where:
 
 The factor co-moments are computed from `F` directly and nested as a [`HighOrderPrior`](@ref) over the wrapped prior's own factor block, so `fpr.pr === pr.fpr` — the co-moments and the low order factor moments describe one distribution, reachable by either route.
 
+The residual cokurtosis correction is defined on the **systematic** covariance, so a residual block the wrapped estimator added has to come back off first. Which estimator added one, and with what variance estimator, is a declaration the wrapped estimator makes through [`factor_residual_config`](@ref) rather than a field read — `pe` is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry the fields. A wrapper over either forwards the declaration; everything else answers `nothing`, and a `nothing` answer — like an answer whose `rsd` is `false` — leaves the covariance alone.
+
 !!! note
 
     A Black-Litterman prior underneath this estimator now **returns numbers where it used to throw**. Every wrapping estimator forwards `rr` and the factor block under ADR 0046, so `HighOrderFactorPriorEstimator(; pe = BlackLittermanPrior(; pe = FactorPrior(…)))` reaches a regression instead of an `IsNothingError`.
@@ -381,10 +383,18 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             posterior_sk .+= coskewness_residuals(err, pe.ske.me)
         end
         if !isnothing(f_kt)
-            if isnothing(pr.chol)
-                sigma = pr.sigma
+            # `cokurtosis_residuals` is defined on the *systematic* covariance, so a residual
+            # block the wrapped estimator added has to come back off. Which estimator added one,
+            # and with what variance estimator, is a declaration rather than a field read: the
+            # `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior`
+            # and `FactorBlackLittermanPrior` carry `ve` and `mp.pdm` — a wrapper over either
+            # forwards the declaration, everything else answers `nothing` (see
+            # [`factor_residual_config`](@ref)).
+            rsd_cfg = factor_residual_config(pe.pe)
+            sigma = if isnothing(rsd_cfg) || !rsd_cfg.rsd
+                pr.sigma
             else
-                err_sigma = vec(Statistics.var(pe.pe.ve, err; dims = 1))
+                err_sigma = vec(Statistics.var(rsd_cfg.ve, err; dims = 1))
                 sigma = if any(map((x, y) -> x > y, err_sigma,
                                    LinearAlgebra.diag(pr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
@@ -392,7 +402,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                 else
                     pr.sigma - LinearAlgebra.diagm(err_sigma)
                 end
-                posdef!(pe.pe.mp.pdm, sigma)
+                posdef!(rsd_cfg.pdm, sigma)
+                sigma
             end
             err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
             posterior_kt .+= err_kt

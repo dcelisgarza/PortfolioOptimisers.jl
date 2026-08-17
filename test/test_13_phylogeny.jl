@@ -1797,11 +1797,14 @@ end
 using PortfolioOptimisers, Test, SparseArrays, LinearAlgebra
 
 # A network estimator handing the kernels a *weighted* graph chosen by the test. Every
-# estimator `calc_adjacency` can build is connected -- a spanning tree or a PMFG -- so this
-# is the only way to drive the unreachable branch. It is an `AbstractNetworkEstimator` and
-# not a `NetworkEstimator`, which is also what makes it evidence that `phylogeny_matrix`
-# splits on the *separation* rather than on the estimator's own type. Defined at top level
-# because a `@testset` body becomes a function, which cannot host a struct.
+# structure `calc_adjacency` can build is connected -- a spanning tree or a PMFG -- so this is
+# the only way to drive the unreachable branch through a verb that takes an **estimator**:
+# `centrality_vector` and `phylogeny_matrix` do, and cannot be handed a graph. The separation
+# kernels themselves take the structure, so they are driven directly below. It is an
+# `AbstractNetworkEstimator` and not a `NetworkEstimator`, which is also what makes it
+# evidence that `phylogeny_matrix` splits on the *separation* rather than on the estimator's
+# own type. Defined at top level because a `@testset` body becomes a function, which cannot
+# host a struct.
 struct _test_FixedDistanceGraph{T} <: PortfolioOptimisers.AbstractNetworkEstimator
     W::Matrix{Float64}
     sep::T
@@ -1816,24 +1819,36 @@ end
 
 @testset "An unreachable pair is outside every budget" begin
     # Two disjoint edges, 1-2 and 3-4. `floyd_warshall_shortest_paths` reports `Inf` across
-    # the components, and the budget comparison rejects it without a repair.
+    # the components, and `is_related` rejects it without a repair. Every structure a shipped
+    # estimator can build is connected -- a spanning tree or a PMFG -- so the disconnected one
+    # is handed to the kernels directly, through their graph-taking entry points. No test
+    # double subtypes `AbstractNetworkEstimator` to answer an internal generic any more;
+    # `NetworkEstimator()` stands in the inert estimator slots.
+    PO = PortfolioOptimisers
+    SWG = PortfolioOptimisers.SimpleWeightedGraphs
     W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
-    X4 = zeros(Float64, 3, 4)
+    nte = NetworkEstimator()
+    gw = SWG.SimpleWeightedGraph(W)
     want = [0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
 
-    d = separation_matrix(PathLength(), _test_FixedDistanceGraph(W, PathLength()), X4)
+    d = separation_matrix(PathLength(), gw)
     @test d[1, 3] == Inf
-    @test separation_budget(PathLength(), _test_FixedDistanceGraph(W, PathLength()), d) ==
-          1.0
+    @test separation_budget(PathLength(), nte, d) == 1.0
+    @test !PO.is_reachable(PathLength(), d[1, 3])
+    @test PO.is_reachable(PathLength(), d[1, 2])
 
-    @test phylogeny_matrix(_test_FixedDistanceGraph(W, PathLength()), X4).X == want
+    @test PO._phylogeny_matrix(PathLength(), nte, gw) == want
     # The clamp to the observed diameter excludes the sentinel, so even a budget far above
     # the diameter cannot reach across a component.
-    @test phylogeny_matrix(_test_FixedDistanceGraph(W, PathLength(; dmax = 100.0)), X4).X ==
-          want
+    @test PO._phylogeny_matrix(PathLength(; dmax = 100.0), nte, gw) == want
     # A hop count agrees on this graph, which is what makes the comparison meaningful: the
-    # two separations differ on the budget, not on reachability.
-    @test phylogeny_matrix(_test_FixedDistanceGraph(W, HopCount(; n = 3)), X4).X == want
+    # two separations differ on the budget, not on reachability. It reads the same structure
+    # binarised, which is `separation_graph`'s graph-taking entry point.
+    gh = PO.separation_graph(HopCount(), gw)
+    @test PO._phylogeny_matrix(HopCount(; n = 3), nte, gh) == want
+    # And the sentinel a hop count reports is the one `isfinite` alone would let through.
+    @test separation_matrix(HopCount(), gh)[1, 3] == typemax(Int)
+    @test !PO.is_reachable(HopCount(), typemax(Int))
 end
 
 # A distance estimator that counts how often the correlation is derived from `X`. It only
@@ -1874,6 +1889,47 @@ end
         # The naive substitution, for contrast: it re-enters the derivation on its own.
         PortfolioOptimisers.calc_weighted_adjacency(nte, Xc)
         @test de.n_cor_and_dist + de.n_distance == 2
+    end
+
+    #=
+    And once is once with a budget *rule* too. A rule needs the structure to answer, so a
+    rule asked to derive its own would spend this method's saving right back -- the second
+    full derivation the two-argument entry point exists to prevent, inside the very function
+    that avoided it. `separation_graph` is what closes that: the structure is built once and
+    handed to `resolve_separation`.
+    =#
+    for alg in (KruskalTree(), ComplementSimilarity())
+        de = _test_CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg,
+                               sep = HopCount(; n = HopCountQuantile(; q = 0.5)))
+        clusterise(NetworkClustersEstimator(; nte = nte), Xc)
+        @test de.n_cor_and_dist == 1
+        @test de.n_distance == 0
+    end
+end
+
+@testset "phylogeny_matrix and phylogeny_features build one structure per call" begin
+    #=
+    The same guard on the other two consumers of a network, over both separations and over
+    both halves of the dial: a stated budget builds one structure, and a budget rule builds
+    the same one rather than a second. `phylogeny_features` reaches the separation kernels
+    through `Proximity`, so it is checked here beside `phylogeny_matrix` rather than by its
+    own counting fixture.
+    =#
+    Xc = randn(StableRNG(123456789), 200, 10)
+    seps = (HopCount(; n = 2), HopCount(; n = HopCountQuantile(; q = 0.5)), PathLength(),
+            PathLength(; dmax = PathLengthQuantile(; q = 0.5)))
+    for alg in (KruskalTree(), ComplementSimilarity()), sep in seps
+        de = _test_CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg, sep = sep)
+        phylogeny_matrix(nte, Xc)
+        # A tree branch derives `D` through `distance`, a PMFG branch derives both through
+        # `cor_and_dist`, so the sum is what the count is about.
+        @test de.n_cor_and_dist + de.n_distance == 1
+        de2 = _test_CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte2 = NetworkEstimator(; de = de2, alg = alg, sep = sep)
+        phylogeny_features(Proximity(), nte2, Xc)
+        @test de2.n_cor_and_dist + de2.n_distance == 1
     end
 end
 
@@ -2325,13 +2381,13 @@ end
 struct _test_ConstantHops{T} <: PortfolioOptimisers.HopCountAlgorithm
     n::T
 end
-function (r::_test_ConstantHops)(nte, X; dims::Int = 1, kwargs...)
+function (r::_test_ConstantHops)(nte, X, g; dims::Int = 1, kwargs...)
     return r.n
 end
 struct _test_ConstantRadius{T} <: PortfolioOptimisers.PathLengthAlgorithm
     dmax::T
 end
-function (r::_test_ConstantRadius)(nte, X; dims::Int = 1, kwargs...)
+function (r::_test_ConstantRadius)(nte, X, g; dims::Int = 1, kwargs...)
     return r.dmax
 end
 # Records what it was handed, so the argument contract is asserted rather than assumed.
@@ -2340,13 +2396,15 @@ mutable struct _test_RecordingHops <: PortfolioOptimisers.HopCountAlgorithm
     nte::Any
     size::Any
     dims::Int
+    g::Any
 end
-_test_RecordingHops() = _test_RecordingHops(0, nothing, nothing, 0)
-function (r::_test_RecordingHops)(nte, X; dims::Int = 1, kwargs...)
+_test_RecordingHops() = _test_RecordingHops(0, nothing, nothing, 0, nothing)
+function (r::_test_RecordingHops)(nte, X, g; dims::Int = 1, kwargs...)
     r.calls += 1
     r.nte = nte
     r.size = size(X)
     r.dims = dims
+    r.g = g
     return 2
 end
 
@@ -2380,11 +2438,22 @@ end
         resolved = resolve_separation(sep, nte, X)
         @test rec.calls == 1
         @test resolved == HopCount(; n = 2)
-        # The rule is handed the estimator that owns it and the data the network is about
-        # to be built from, which is what lets it build the structure itself.
+        # The rule is handed the estimator that owns it, the data the network is about to be
+        # built from, and the structure already built from them -- which is what lets it read
+        # the network without paying for a second one.
         @test rec.nte === nte
         @test rec.size == size(X)
         @test rec.dims == 1
+        @test rec.g == PortfolioOptimisers.separation_graph(sep, nte, X)
+        # It is the structure the separation measures over, which for a hop count is the
+        # binarised one: a weighted graph would make `A^i` sum products of distances.
+        @test isa(rec.g, PortfolioOptimisers.Graphs.SimpleGraph)
+        @test PortfolioOptimisers.Graphs.adjacency_matrix(rec.g) ==
+              PortfolioOptimisers.calc_adjacency(nte, X; dims = 1)
+        # And the graph-taking form is the one the wrapper delegates to.
+        @test resolve_separation(HopCount(; n = _test_RecordingHops()), nte, X,
+                                 PortfolioOptimisers.separation_graph(sep, nte, X)) ==
+              HopCount(; n = 2)
     end
 
     @testset "A rule answers exactly as the value it returns" begin
@@ -2394,9 +2463,9 @@ end
         @test related(PathLength(; dmax = _test_ConstantRadius(1.5))) ==
               related(PathLength(; dmax = 1.5))
         # A bare `Function` is admitted in the same field.
-        @test related(HopCount(; n = (nte, X; kwargs...) -> 3)) ==
+        @test related(HopCount(; n = (nte, X, g; kwargs...) -> 3)) ==
               related(HopCount(; n = 3))
-        @test related(PathLength(; dmax = (nte, X; kwargs...) -> 1.5)) ==
+        @test related(PathLength(; dmax = (nte, X, g; kwargs...) -> 1.5)) ==
               related(PathLength(; dmax = 1.5))
     end
 
@@ -2527,13 +2596,14 @@ end
         d = separation_matrix(HopCount(), pl, X4)
         @test maximum(d) == typemax(Int)
         for q in (0.0, 0.5, 1.0)
-            @test PortfolioOptimisers.separation_quantile(d, q) == 1
+            @test PortfolioOptimisers.separation_quantile(HopCount(), d, q) == 1
         end
         dp = separation_matrix(PathLength(), pl, X4)
         @test maximum(dp) == Inf
-        @test PortfolioOptimisers.separation_quantile(dp, 1.0) == 1.0
+        @test PortfolioOptimisers.separation_quantile(PathLength(), dp, 1.0) == 1.0
         # A structure with no reachable pair of distinct assets has no population.
-        @test_throws ArgumentError PortfolioOptimisers.separation_quantile(zeros(Int, 1, 1),
+        @test_throws ArgumentError PortfolioOptimisers.separation_quantile(HopCount(),
+                                                                           zeros(Int, 1, 1),
                                                                            0.5)
     end
 end

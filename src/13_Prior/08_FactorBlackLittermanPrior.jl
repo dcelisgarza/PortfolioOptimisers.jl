@@ -324,9 +324,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
-    rr = regression(pe.re, X, F)
-    (; b, M) = rr
-    posterior_X = F * transpose(M) .+ transpose(b)
+    rr, posterior_X = factor_reconstruction(pe.re, X, F)
+    M = rr.M
     # Precomputed views ignore both the sets and the key, and are the one shape that reaches here
     # with `pe.sets === nothing`, so the key is read only when there is a sets to read it from.
     f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
@@ -348,18 +347,10 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu,
                                                            prior_sigma, omega, P, Q)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
-    # Reconstruct the posteriors using the black litterman adjusted factor statistics.
-    posterior_mu = M * f_posterior_mu + b
-    posterior_sigma = M * f_posterior_sigma * transpose(M)
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * LinearAlgebra.cholesky(f_posterior_sigma).L
-    if pe.rsd
-        err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
-        posterior_sigma .+= err_sigma
-        posdef!(pe.mp.pdm, posterior_sigma)
-        posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
-    end
+    # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
+    # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
+    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_posterior_mu,
+                                      f_posterior_sigma, X, posterior_X; kwargs...)
     # No `Z` is forwarded: the only wrapped prior here is `f_prior`, fit on the factors, so
     # its feature matrix would be factors × features and would not describe the asset axis.
     #
@@ -374,11 +365,12 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046).
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = posterior_mu,
-                         sigma = posterior_sigma,
-                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, ens = f_prior.ens,
-                         kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)
+    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
+                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
+                         ow = f_prior.ow, rr = rr, fpr = fpr)
+end
+function factor_residual_config(pe::FactorBlackLittermanPrior)
+    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
 end
 
 export FactorBlackLittermanPrior

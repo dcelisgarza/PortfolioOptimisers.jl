@@ -16,6 +16,8 @@ PathLengthRule
 PathLengthValue
 HopCount
 PathLength
+PortfolioOptimisers.is_reachable
+PortfolioOptimisers.is_related
 AbstractSeparationDecayAlgorithm
 LinearDecay
 ExponentialDecay

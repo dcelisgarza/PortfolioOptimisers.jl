@@ -566,3 +566,115 @@ it names.
   `betweenness_centrality(g, M)` raises a catchable `StackOverflowError` and the process survives.
   The docstring said it "takes the session with it"; it takes the call. The guard is unaffected —
   the second-channel argument was always the load-bearing one.
+
+## Amendment (2026-08-17): the kernels take the structure, and the sentinel test belongs to the family
+
+Two candidates of the 2026-08-16 architecture review, D and E, are about the same seam from opposite
+ends: what the separation kernels are handed, and what a consumer does with an entry once it has
+one. Both are answered here, because both change the family's extension contract.
+
+### D. The kernels take the structure, not the producer that makes one
+
+Decision 2 gave the separation two kernels and the amendment above added a third, and every one of
+them took `(sep, nte, X)` — a producer plus the data — although a separation's behaviour depends on
+the **structure** alone. Each kernel therefore derived its own, privately. That is fine for one
+kernel and wrong for two: `phylogeny_matrix` and `phylogeny_features` call `resolve_separation` and
+then `separation_matrix`, so a budget **rule** made them derive the same structure twice.
+
+`clusterise` was the sharpest case. Decision 3's `calc_weighted_adjacency_graph` has a two-argument
+entry point precisely so that `clusterise` — which already holds `D` and `S` — does not re-derive
+the correlation, `98%` of its runtime under `VariationInfoDistance`. With a rule in the budget field
+the second full derivation happened anyway, inside the very function that avoided it.
+
+**`separation_graph` is now the family's first kernel, and the measuring kernels take its output.**
+
+| kernel | interface | wrapper |
+| :------ | :--------- | :------- |
+| `separation_graph` | `(sep, nte, X)`, plus `(sep, G)` for `HopCount` | — |
+| `separation_matrix` | `(sep, g)` | `(sep, nte, X)` |
+| `resolve_separation` | `(sep, nte, X, g)` | `(sep, nte, X)` |
+| `separation_budget` | `(sep, nte, d)` | — |
+
+- **A consumer builds one structure per call** and hands it to both readers. All four do:
+  `phylogeny_matrix`, `phylogeny_features`, and both `clusterise` methods, the last through
+  `separation_graph(sep, G)` off the graph they already build from the selecting quantity.
+- **The rule contract gains the graph**: `rule(nte, X, g; dims, kwargs...)`. This is **breaking** for
+  an extension rule and for a bare `Function` in a budget field, and it is the point — a rule that
+  wanted the structure had to build one, and the contract said so in as many words. `nte` and `X`
+  stay, inert for what ships, as the channel to what a graph does not carry.
+- **`resolve_separation` keeps a wrapper per case, not one generic wrapper.** The resolved case must
+  build *nothing*, so the identity fallback is reached without touching `separation_graph`; the
+  rule-carrying parameterisations get the wrapper that builds.
+- **Only `HopCount` takes a bare graph.** A graph carries no polarity tag — Decision 3 — so `G` is
+  distance-weighted on the tree branch and similarity-weighted on the PMFG branch, and a shortest
+  path over similarities returns an answer instead of raising. The hop count is exempt because it
+  discards the weights, and it is handed a **binarised** graph because `_phylogeny_matrix`'s power
+  sum reads `adjacency_matrix` off it, where a weight would sum products of distances.
+- **`separation_budget` is unchanged.** It already took the matrix rather than the data, which is
+  the reason it cannot resolve a rule, and that reason is untouched.
+- **`calc_weighted_adjacency` gains the same one-argument entry point**, `(G)`, because
+  `clusterise` now keeps the graph it builds and reads the matrix off it. Without that method the
+  read would be a bare `Graphs.adjacency_matrix` call and the polarity contract — *weights, not
+  `0`/`1`* — would sit one function away from the site that depends on it. It also means the
+  function keeps a caller in `src/`: the report's note that `calc_weighted_adjacency(nte, X)` has
+  none is now true of the two-argument form as well, and whether that surface should shrink is a
+  separate decision about public API.
+
+The extension contract is therefore **three** methods where Decision 2 said two:
+`separation_graph`, `separation_matrix`, `separation_budget`. `resolve_separation` and the two
+predicates below still have working fallbacks, so an extension still writes none of them.
+
+**Measured.** A `_test_CountingDistance` fixture counts derivations per consumer call. Over both
+branches and all four budgets — stated hops, `HopCountQuantile`, unstated radius,
+`PathLengthQuantile` — `phylogeny_matrix` and `phylogeny_features` derive **once**, and so does
+`clusterise` with a rule. Before, the three rule cases derived twice.
+
+**Two of three test doubles are gone, not three.** `FixedAdjacency` and `FixedWeights` in
+`test_12d_phylogeny_features.jl` subtyped `AbstractNetworkEstimator` and overrode `calc_adjacency`
+and `calc_distance_weighted_graph` only to choose a graph; they are now two helpers and a
+`SimpleWeightedGraph`. `_test_FixedDistanceGraph` in `test_13_phylogeny.jl` **stays**: two
+centrality testsets drive `centrality_vector` and `phylogeny_matrix` through it, and those verbs
+take an estimator, so no graph argument can replace it. The review's count was one too high.
+
+`_proximity_features` is split out of `phylogeny_features` for the same reason — the scoring loop is
+a function of the separations alone, so the unreachable branch is now driven by handing it a matrix
+rather than by an estimator that lies about its graph.
+
+### E. The sentinel test belongs to the family
+
+The rule *not the sentinel, and no further than the budget* was written out at four sites in four
+spellings, and two of them disagreed:
+
+| site | spelling |
+| :---- | :-------- |
+| `separation_budget`'s diameter reduction | `isfinite(dij)` |
+| `separation_quantile`'s population | `isfinite(d) && d != typemax(T)` |
+| `_phylogeny_matrix`'s radius ball | `d .<= dmax` |
+| `phylogeny_features`'s loop | `duv <= dmax` |
+
+`isfinite` is `true` for every `Integer`, so the first admits `HopCount`'s `typemax(Int)`. It was
+**latent, not live**: `separation_budget`'s `PathLength` method is the only caller and a `PathLength`
+matrix carries `Inf`, so the two travel together today. The file already said which spelling was
+wrong, forty-six lines below the wrong one.
+
+`is_reachable(sep, d)` and `is_related(sep, d, dmax)` are now the two spellings, both single generic
+methods on `AbstractSeparationAlgorithm`:
+
+- **One body covers both sentinels.** `isfinite(d) && d != typemax(typeof(d))` — the second clause
+  catches `typemax(Int)`, and it *is* `Inf` for a `Float64`, so the first is left only to reject a
+  `NaN` no shipped path produces.
+- **Reachability is tested before the budget**, so the predicate is right independently of what the
+  budget happens to be. `d <= dmax` alone rejects both shipped sentinels only because a `PathLength`
+  budget is clamped to the observed finite diameter and a hop budget is capped far below
+  `typemax(Int)`; that is a property of the budgets, not of the comparison.
+- **A generic method rather than one per member.** A member whose routine reports an exotic sentinel
+  overrides `is_reachable` alone and inherits `is_related`.
+- **The predicate owns the rule; the call site still owns the laziness.** `phylogeny_features` keeps
+  its short-circuiting `?:`, because what must not be evaluated is the *decay* —
+  `ReciprocalDecay` overflows `1 + d` at `typemax(Int)`, and a fractional `power` turns that into a
+  `DomainError`. A predicate cannot make a caller lazy; it can only stop the caller from spelling
+  the test itself.
+
+`separation_quantile` gains the separation as its first argument, since it is the population's
+sentinel test that it needed. Both predicates are unexported, like `assert_separation_decay` and
+like every graph builder in this family; the api pages document them under their qualified names.

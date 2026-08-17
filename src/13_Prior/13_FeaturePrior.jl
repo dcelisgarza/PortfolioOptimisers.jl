@@ -227,8 +227,10 @@ The inert surface is `alg` alone. `sep` lives on [`NetworkEstimator`](@ref), whi
   - [`PhylogenyFeatures`](@ref)
   - [`AbstractPhylogenyFeatureAlgorithm`](@ref)
   - [`Proximity`](@ref)
+  - [`separation_graph`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
+  - [`is_related`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_features end
@@ -239,14 +241,40 @@ function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
     return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
            LinearAlgebra.I
 end
-function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::MatNum;
-                            kwargs...)::Matrix
-    # A rule in the budget field is answered here, where the data is in hand.
-    # `separation_budget` below cannot do it: it takes `d` rather than `X` by design.
-    sep = resolve_separation(pl.sep, pl, X; dims = 1, kwargs...)
-    d = separation_matrix(sep, pl, X; dims = 1, kwargs...)
-    dmax = separation_budget(sep, pl, d)
-    et = eltype(X)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Score a separation matrix under a decay, inside a budget.
+
+The loop behind [`phylogeny_features`](@ref)'s [`Proximity`](@ref) method, split out because it is a
+function of the **separations** alone: the structure, the estimator and the data are all spent by the
+time it runs. Handing it a matrix is how the unreachable branch is tested — every structure a shipped
+estimator builds is connected, so a disconnected one arrives as an argument rather than through a
+test double that answers [`calc_adjacency`](@ref).
+
+# Arguments
+
+  - `alg`: Proximity algorithm carrying the decay.
+  - `sep`: Separation algorithm the matrix was measured under, forwarded to [`is_related`](@ref).
+  - `d`: Separation matrix from [`separation_matrix`](@ref).
+  - `dmax`: Separation budget from [`separation_budget`](@ref).
+  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that
+    [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+
+# Returns
+
+  - `Z::Matrix`: Square `assets × assets` feature matrix.
+
+# Related
+
+  - [`phylogeny_features`](@ref)
+  - [`Proximity`](@ref)
+  - [`is_related`](@ref)
+  - [`separation_decay`](@ref)
+  - [`assert_separation_decay`](@ref)
+"""
+function _proximity_features(alg::Proximity, sep::AbstractSeparationAlgorithm, d::MatNum,
+                             dmax::Number, et::Type)::Matrix
     dk = alg.decay
     # Under `HopCount` a separation only ever takes values in `0:dmax` here, so probing that
     # range is exhaustive rather than a spot check -- `dmax + 1` evaluations before an
@@ -257,12 +285,24 @@ function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::Mat
     Z = zeros(et, size(d))
     for v in axes(d, 2), u in axes(d, 1)
         duv = @inbounds d[u, v]
-        # `separation_matrix` reports a sentinel for an unreachable pair, so the budget
-        # comparison also guards the decay call and must short-circuit -- `ifelse` would
+        # `is_related` is the budget rule and the sentinel test at once -- `separation_matrix`
+        # reports a sentinel for an unreachable pair, and both are unrelated. The branch stays
+        # a short-circuiting `?:` because it also guards the decay call: `ifelse` would
         # evaluate it, and `ReciprocalDecay` overflows `1 + d` at `typemax`.
-        @inbounds Z[u, v] = duv <= dmax ? et(separation_decay(dk, duv, dmax)) : zero(et)
+        rel = is_related(sep, duv, dmax)
+        @inbounds Z[u, v] = rel ? et(separation_decay(dk, duv, dmax)) : zero(et)
     end
     return Z
+end
+function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::MatNum;
+                            kwargs...)::Matrix
+    # One structure per call. A rule in the budget field is answered against it, here, where
+    # the data is in hand: `separation_budget` below cannot do it, because it takes `d`
+    # rather than the structure by design.
+    g = separation_graph(pl.sep, pl, X; dims = 1, kwargs...)
+    sep = resolve_separation(pl.sep, pl, X, g; dims = 1, kwargs...)
+    d = separation_matrix(sep, g)
+    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d), eltype(X))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -703,6 +743,10 @@ function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims:
     # This estimator only attaches a feature matrix, so `Z` is the single deviation from the
     # wrapped result and everything else forwards untouched (see [`forward_prior`](@ref)).
     return forward_prior(pr; Z = Z)
+end
+
+function factor_residual_config(pe::FeaturePrior)
+    return factor_residual_config(pe.pe)
 end
 
 export AbstractFeatureMatrixEstimator, RegressionFeatures, FeaturePrior, feature_matrix,

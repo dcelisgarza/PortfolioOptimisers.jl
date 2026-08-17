@@ -174,10 +174,12 @@ refits the graph on a different slice, and a meta optimiser such as [`NestedClus
 [`SubsetResampling`](@ref) refits it on a different *universe* — so a `dmax` you tuned once is
 being applied to graphs it was never tuned for.
 
-Both budget fields therefore also take a **rule**: a callable that is handed the estimator and the
-data and returns the budget. `n` takes a [`HopCountAlgorithm`](@ref), `dmax` takes a
-[`PathLengthAlgorithm`](@ref), and either takes a bare function of the same shape.
-[`resolve_separation`](@ref) calls it at the point of use, and one rule of each ships:
+Both budget fields therefore also take a **rule**: a callable that is handed the estimator, the
+data, and the graph already built from them, and returns the budget. `n` takes a
+[`HopCountAlgorithm`](@ref), `dmax` takes a [`PathLengthAlgorithm`](@ref), and either takes a bare
+function of the same shape. [`resolve_separation`](@ref) calls it at the point of use — over the one
+structure its consumer built, so a rule costs a traversal and never a second graph — and one rule of
+each ships:
 [`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref), which place the budget at a quantile
 of the observed separations.
 
@@ -243,14 +245,15 @@ quantiles through `PathLength` when you think in cardinality.
     matrix-power count — and a [`PathLengthAlgorithm`](@ref) must return a `Number`.
     A functor's return type is not part of its signature, so the check happens in
     [`resolve_separation`](@ref), the first time the rule is actually asked. Writing your own is
-    two definitions:
+    two definitions, and the third argument is the structure the consumer already built — read it
+    rather than deriving one:
 
     ```julia
     struct AssetScaledHops <: PortfolioOptimisers.HopCountAlgorithm
         frac::Float64
     end
-    function (r::AssetScaledHops)(nte, X; dims::Int = 1, kwargs...)
-        return max(1, round(Int, r.frac * size(X, dims == 1 ? 2 : 1)))
+    function (r::AssetScaledHops)(nte, X, g; dims::Int = 1, kwargs...)
+        return max(1, round(Int, r.frac * PortfolioOptimisers.Graphs.nv(g)))
     end
     ```
 

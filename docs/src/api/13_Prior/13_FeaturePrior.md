@@ -8,6 +8,7 @@ feature_matrix
 RegressionFeatures
 AbstractPhylogenyFeatureAlgorithm
 Proximity
+PortfolioOptimisers._proximity_features
 phylogeny_features
 PhylogenyFeatures
 AssetSetsFeatures

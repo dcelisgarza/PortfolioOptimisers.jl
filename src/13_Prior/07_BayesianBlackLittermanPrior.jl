@@ -359,4 +359,8 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
                          chol = nothing, fpr = posterior_fpr)
 end
 
+function factor_residual_config(pe::BayesianBlackLittermanPrior)
+    return factor_residual_config(pe.pe)
+end
+
 export BayesianBlackLittermanPrior

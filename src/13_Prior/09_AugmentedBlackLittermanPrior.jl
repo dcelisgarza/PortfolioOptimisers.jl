@@ -393,10 +393,10 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # Factor prior.
     f_prior = prior(pe.f_pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
-    # Black litterman on the factors.
-    rr = regression(pe.re, X, F)
+    # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
+    # the asset moments here come out of the augmented system, not out of a lift.
+    rr, posterior_X = factor_reconstruction(pe.re, X, F)
     (; b, M) = rr
-    posterior_X = F * transpose(M) .+ transpose(b)
     dt = eltype(posterior_X)
     T = size(X, 1)
     # One sets, two keys: the asset views take the default (`xkey`), the factor views `fkey`.

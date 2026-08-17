@@ -602,3 +602,73 @@ already the caller's returns.
 No fixture moved. No test or example of the factor-risk-contribution or risk-budgeting families
 uses `FactorPrior`, `FactorBlackLittermanPrior` or `AugmentedBlackLittermanPrior`, so every one has
 `pr.rr === nothing` and `original_X === X`.
+
+## Amendment (2026-08-17) — the factor lift gets a home, from candidate F of the 2026-08-16 architecture review
+
+The section *Where the helper does not apply* stands. `forward_prior` is still the wrong shape for
+the three factor-axis sites, for the reason recorded there: almost every field changes meaning
+across the hop, so there is nothing to forward by default.
+
+What that section did not say is that the hop itself is one algorithm, and that it had no owner.
+The same ~22 lines were written three times — a regression, a reconstruction of `X`, a projection of
+the factor moments through the loadings, and an optional diagonal residual block. Three copies is
+three chances to drift, and one had already drifted.
+
+### The lift is now two functions
+
+The lift splits where [`FactorBlackLittermanPrior`](../../src/13_Prior/08_FactorBlackLittermanPrior.jl)
+needs it to split. Its views land on the *factor* distribution, so it must reconstruct `X` before it
+has the moments to project.
+
+- `factor_reconstruction(re, X, F)` fits the loadings and returns `(rr, F * transpose(M) .+
+  transpose(b))`. All three sites call it.
+- `factor_lift(mp, ve, rsd, rr, f_mu, f_sigma, X, posterior_X; kwargs...)` projects the moments,
+  processes the covariance, adds the residual block when `rsd` is `true`, and returns
+  `(; mu, sigma, chol)`. [`FactorPrior`](../../src/13_Prior/03_FactorPrior.jl) and
+  `FactorBlackLittermanPrior` call it. Which factor moments arrive is the only thing that differs
+  between them: the wrapped prior's, or the Black-Litterman posterior's.
+
+[`AugmentedBlackLittermanPrior`](../../src/13_Prior/09_AugmentedBlackLittermanPrior.jl) calls the
+first and not the second. Its asset moments come out of the augmented system, not out of a
+projection, which is the same reason it merges rather than forwards.
+
+### `factor_residual_config` replaces a reach past a type bound
+
+[`HighOrderFactorPriorEstimator`](../../src/13_Prior/12_HighOrderFactorPriorEstimator.jl) needs the
+*systematic* covariance for its residual cokurtosis correction, so a residual block the wrapped
+estimator added has to come back off. It used to read `pe.pe.ve` and `pe.pe.mp.pdm` directly. Its
+`pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and
+`FactorBlackLittermanPrior` carry those fields, so the read was a live `FieldError` for every other
+member of the bound:
+
+```julia
+prior(HighOrderFactorPriorEstimator(; pe = FeaturePrior(; pe = FactorPrior(),
+                                                        ze = RegressionFeatures())), X, F)
+# FieldError: type FeaturePrior has no field `ve`
+```
+
+`factor_residual_config(pe)` is a per-type declaration that every prior estimator answers. The two
+estimators that own a residual block report `(; ve, pdm, rsd)`; a wrapper over one of them
+(`BlackLittermanPrior`, `BayesianBlackLittermanPrior`, `EntropyPoolingPrior`, `FeaturePrior`)
+forwards the declaration; everything else — including `OpinionPoolingPrior`, which pools several
+priors and has no single one — reports `nothing`. The type bound now guarantees an answer.
+
+### One behaviour change, deliberate
+
+The old guard was `isnothing(pr.chol)`, which is a proxy for "this is `AugmentedBlackLittermanPrior`"
+rather than for "a residual block was added". It is wrong whenever the wrapped estimator sets
+`rsd = false`: the block was never added, and the correction subtracted it anyway, feeding
+`cokurtosis_residuals` a covariance too small by the residual variances. `factor_residual_config`
+reports `rsd`, so the correction now leaves the covariance alone. With `FactorPrior(; rsd = false)`
+underneath, the posterior cokurtosis changes; it is now identical to the `rsd = true` case, which is
+the point — the systematic covariance is the same either way.
+
+### The drifted copy
+
+`FactorPrior`'s `prior` called `prior(pe.pe, F)` and dropped `strict`, while
+`FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` both passed `strict = strict`.
+`FactorPrior.pe` admits `BlackLittermanPrior` and `EntropyPoolingPrior`, both of which resolve view
+names against a universe and honour `strict`, so the flag was silently inert on that one route.
+`prior(pe::FactorPrior, …)` now declares `strict::Bool = false` and passes it down, which also stops
+`strict` from reaching `matrix_processing!` in the `kwargs...` bag — the behaviour the other two
+sites already had.

@@ -537,4 +537,8 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
                          chol = nothing)
 end
 
+function factor_residual_config(pe::BlackLittermanPrior)
+    return factor_residual_config(pe.pe)
+end
+
 export BlackLittermanPrior

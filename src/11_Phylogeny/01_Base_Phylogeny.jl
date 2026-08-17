@@ -87,13 +87,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all separation algorithms.
 
-A separation algorithm is the rule saying **how far apart** two assets sit in a network, and **how far is too far**. It answers two questions with one object, through two kernels: [`separation_matrix`](@ref) produces the dense `assets × assets` separations, and [`separation_budget`](@ref) resolves the budget beyond which a pair counts as unrelated. The family is open: a new member is a struct and one method of each.
+A separation algorithm is the rule saying **how far apart** two assets sit in a network, and **how far is too far**. It answers two questions with one object, through three kernels: [`separation_graph`](@ref) builds the structure the member measures over, [`separation_matrix`](@ref) reads the dense `assets × assets` separations off that structure, and [`separation_budget`](@ref) resolves the budget beyond which a pair counts as unrelated. The family is open: a new member is a struct and one method of each.
 
 The two questions travel together because they share a unit. A hop count is budgeted in hops and a weighted path length in the distance estimator's units, so a budget stated apart from the rule that measures it would be a number nobody could interpret — which is why the budget lives on the member rather than on [`NetworkEstimator`](@ref).
 
-# A third kernel, and why it is not a third question
+# Building the structure is a separate kernel from measuring it
+
+The measuring kernel takes **the structure**, not the estimator that produces one: `separation_matrix(sep, g)` is the interface, and `separation_matrix(sep, nte, X)` is a wrapper that calls [`separation_graph`](@ref) first. The split is [`calc_weighted_adjacency_graph`](@ref)'s two-entry-point shape, for the same reason — the structure is expensive and a caller often holds one already. Under [`VariationInfoDistance`](@ref) building it is `98%` of [`clusterise`](@ref)'s runtime, so a consumer that resolves a budget rule *and* measures the separations must build once and pass the graph, not call two estimator-taking kernels.
+
+It is also the seam a test or an extension enters through. Every structure a shipped estimator can build is connected — a spanning tree or a PMFG — so a disconnected graph, and with it the unreachable sentinel below, is reachable only by handing one in.
+
+# Two more kernels, and why neither is a third question
 
 [`resolve_separation`](@ref) turns a member whose budget is a **rule** into one whose budget is a value, and is called by every consumer before the other two kernels. It is not a third question about the network: a member whose budget is already a number is returned unchanged by the fallback on this type, so an extension inherits the kernel and never writes one.
+
+[`is_related`](@ref) applies the budget to one entry of the separation matrix, over [`is_reachable`](@ref)'s sentinel test. Both are single generic methods on this type rather than per-member ones, because the rule — *not the sentinel, and no further than the budget* — is the same rule whatever the unit; a member whose underlying routine reports an exotic sentinel overrides [`is_reachable`](@ref) alone. Every consumer applying a budget calls them instead of open-coding the comparison, which is what keeps the ordering obligation of [`separation_matrix`](@ref)'s "the unreachable sentinel" inside an interface.
 
 The two shipped members widen their budget field to admit a rule — [`HopCountValue`](@ref) and [`PathLengthValue`](@ref) — so a caller who cannot state the budget in advance states what would produce it instead. The resolution happens where the data is in hand, which is the only place a rule can be answered, and it is why [`separation_budget`](@ref) refuses an unresolved member rather than returning a function.
 
@@ -109,9 +117,12 @@ The name says nothing about graphs. A taxonomy depth is a separation too, so the
 
   - [`HopCount`](@ref)
   - [`PathLength`](@ref)
+  - [`separation_graph`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
   - [`resolve_separation`](@ref)
+  - [`is_reachable`](@ref)
+  - [`is_related`](@ref)
   - [`HopCountAlgorithm`](@ref)
   - [`PathLengthAlgorithm`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
@@ -130,10 +141,12 @@ A [`HopCount`](@ref) budget is usually a number the caller states. It does not h
 
 A subtype defines one method, the functor:
 
-    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
-                      kwargs...) -> Integer
+    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum, g::Graphs.AbstractGraph;
+                      dims::Int = 1, kwargs...) -> Integer
 
-`nte` owns the separation and `X` is the data the network is about to be built from, so a rule may build the structure itself — through [`calc_adjacency`](@ref) or [`separation_matrix`](@ref) — and read whatever it needs off it. It pays for that traversal; see [`resolve_separation`](@ref).
+`g` is the structure [`separation_graph`](@ref) built for the separation the rule stands in, so a rule reads what it needs off a graph it did **not** pay to build — through [`separation_matrix`](@ref), which takes `g` directly. It still pays for the all-pairs traversal; see [`resolve_separation`](@ref).
+
+`nte` owns the separation and `X` is the data `g` was built from. Both are inert for the shipped rule, and are the channel through which an extension reaches what the graph does not carry — the distance estimator, the observation count, a covariance.
 
 **The return value must be an `Integer`, and this is checked rather than bounded.** A functor's return type is not part of its signature, so the family cannot state the requirement in the type system. [`resolve_separation`](@ref) checks it instead, and the check is not a formality: three readers use `0:n` as a **matrix-power count**, where `0:1.5` silently drops a power rather than failing.
 
@@ -154,7 +167,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rules computing a path-length budget from the network and the data.
 
-The [`PathLength`](@ref) counterpart of [`HopCountAlgorithm`](@ref): a **callable struct** standing in the `dmax` field, called by [`resolve_separation`](@ref) with the network estimator and the data matrix in hand.
+The [`PathLength`](@ref) counterpart of [`HopCountAlgorithm`](@ref): a **callable struct** standing in the `dmax` field, called by [`resolve_separation`](@ref) with the network estimator, the data matrix, and the structure already built from them in hand.
 
 The two families are separate because their return obligations differ, and the split is what lets one of them be checked. A hop count must be an `Integer`; a path-length budget is stated in the distance estimator's units, so it is any `Number` — or `nothing`, which resolves to the observed diameter exactly as a stated `nothing` does.
 
@@ -162,10 +175,10 @@ The two families are separate because their return obligations differ, and the s
 
 A subtype defines one method, the functor:
 
-    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
-                      kwargs...) -> Number
+    (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum, g::Graphs.AbstractGraph;
+                      dims::Int = 1, kwargs...) -> Number
 
-A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction.
+`g` is [`separation_graph`](@ref)'s structure, weighted by distance on both branches under a [`PathLength`](@ref). A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction.
 
 **A rule must return a `Number`, and `nothing` is not one.** `nothing` in the `dmax` field means the observed diameter, which is a statement the caller makes *instead of* stating a rule. A rule that meant to ask for the diameter is asking for something the field already spells, and a rule that returned `nothing` by accident would silently get the maximal ball. So [`PathLengthValue`](@ref) covers the rules and the numbers, and the field is an `Option` of it.
 
@@ -251,7 +264,7 @@ The budget is a **field** rather than an argument because it is stated in hops, 
 
 # The budget may be a rule instead of a number
 
-`n` also takes a [`HopCountAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `n(nte, X; dims = dims, kwargs...)` at the point of use. A caller who cannot state the budget in advance — because the universe is a cross-validation fold or a subproblem of a meta optimiser — states the *rule* that produces it instead of a number that was right for one universe. [`HopCountQuantile`](@ref) is the shipped rule.
+`n` also takes a [`HopCountAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `n(nte, X, g; dims = dims, kwargs...)` at the point of use, `g` being the structure the consumer already built. A caller who cannot state the budget in advance — because the universe is a cross-validation fold or a subproblem of a meta optimiser — states the *rule* that produces it instead of a number that was right for one universe. [`HopCountQuantile`](@ref) is the shipped rule.
 
 `n` is still an `Integer` **once resolved**, and never a `Real`. Three readers use `0:(nte.sep.n)` as a **matrix-power count**, where `0:1.5` silently drops a power instead of failing, so [`resolve_separation`](@ref) checks the rule's return value rather than trusting it.
 
@@ -347,7 +360,7 @@ The default reads very differently through [`phylogeny_matrix`](@ref), which **s
 
 # The budget may be a rule instead of a number
 
-`dmax` also takes a [`PathLengthAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `dmax(nte, X; dims = dims, kwargs...)` at the point of use. This is the answer to the paragraph above for a caller who *cannot* state a number: [`PathLengthQuantile`](@ref) asks for the budget that relates a stated **fraction of the reachable pairs**, which is a quantity a caller does have an intuition for, and which means the same thing on every fold of a cross-validation and in every subproblem of a meta optimiser.
+`dmax` also takes a [`PathLengthAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `dmax(nte, X, g; dims = dims, kwargs...)` at the point of use, `g` being the structure the consumer already built. This is the answer to the paragraph above for a caller who *cannot* state a number: [`PathLengthQuantile`](@ref) asks for the budget that relates a stated **fraction of the reachable pairs**, which is a quantity a caller does have an intuition for, and which means the same thing on every fold of a cross-validation and in every subproblem of a meta optimiser.
 
 A fixed `dmax` and a rule buy different things, and the difference is the whole point. A fixed `dmax` holds the **radius** still and lets the related-pair count move with the graph. A quantile rule holds the **count** still and lets the radius move. Neither is fold-stable in both senses at once, because the graph is refitted either way.
 
@@ -414,6 +427,77 @@ PathLength
 end
 function PathLength(; dmax::Option{PathLengthValue} = nothing)::PathLength
     return PathLength(dmax)
+end
+"""
+    is_reachable(sep::AbstractSeparationAlgorithm, d::Number)
+
+Is `d` a separation at all, or the sentinel an unreachable pair carries?
+
+[`separation_matrix`](@ref) passes the underlying routine's sentinel through **unrepaired**, so this is the test that tells a measured separation from a missing one. It is one generic method on [`AbstractSeparationAlgorithm`](@ref) rather than one per member, because the two shipped sentinels are both covered by the same expression; a member whose routine reports something else overrides this method, and inherits [`is_related`](@ref) unchanged.
+
+# The test is not `isfinite` alone, and not `typemax` alone
+
+Both clauses carry a sentinel of their own.
+
+  - `isfinite` is `true` for every `Integer`, so on its own it admits [`HopCount`](@ref)'s `typemax(Int)` — which [`ReciprocalDecay`](@ref) then overflows.
+  - `typemax` of a `Float64` *is* `Inf`, so the comparison covers [`PathLength`](@ref)'s sentinel as well; `isfinite` stays to reject a `NaN`, which no shipped path produces and which would compare `false` against every budget anyway.
+
+# Arguments
+
+  - `sep`: Separation algorithm. Inert for the shipped members, and the dispatch channel for an extension whose routine reports a different sentinel.
+  - `d`: One entry of a separation matrix from [`separation_matrix`](@ref).
+
+# Returns
+
+  - `reachable::Bool`: `true` when `d` is a measured separation.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`is_related`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`separation_quantile`](@ref)
+  - [`separation_budget`](@ref)
+"""
+function is_reachable(::AbstractSeparationAlgorithm, d::Number)::Bool
+    return isfinite(d) && d != typemax(typeof(d))
+end
+"""
+    is_related(sep::AbstractSeparationAlgorithm, d::Number, dmax::Number)
+
+Does a separation of `d` count as related under a budget of `dmax`?
+
+The one place the budget is applied to an entry of a separation matrix: reachable, and no further than `dmax`. Every consumer that selects on a budget calls this instead of writing the comparison out, so the rule has one spelling — [`phylogeny_matrix`](@ref) and [`phylogeny_features`](@ref) had two, and one of them was a budget test with no sentinel test behind it.
+
+# The reachability test comes first
+
+`d <= dmax` is not sufficient on its own. It happens to reject both shipped sentinels, because [`separation_budget`](@ref) clamps a [`PathLength`](@ref) budget to the observed **finite** diameter and a [`HopCount`](@ref) budget is capped far below `typemax(Int)` — but that is a property of the two shipped budgets, not of the comparison. [`is_reachable`](@ref) makes the rejection the predicate's own, so a budget that reached its unit's ceiling would still exclude an unreachable pair.
+
+# It does not remove the caller's obligation to short-circuit
+
+A consumer that scores the separation must still keep the *evaluation* of the score inside a short-circuiting branch — `is_related(...) ? separation_decay(...) : zero(...)`, never `ifelse` — because an `ifelse` evaluates both arms and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError`. The predicate owns the rule; the call site owns the laziness.
+
+# Arguments
+
+  - `sep`: Separation algorithm, forwarded to [`is_reachable`](@ref).
+  - `d`: One entry of a separation matrix from [`separation_matrix`](@ref).
+  - `dmax`: Separation budget in scope, from [`separation_budget`](@ref). In the units `sep` measures in, which is why the two arrive together.
+
+# Returns
+
+  - `related::Bool`: `true` when the pair is reachable and inside the budget.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`is_reachable`](@ref)
+  - [`separation_budget`](@ref)
+  - [`separation_decay`](@ref)
+  - [`phylogeny_matrix`](@ref)
+  - [`phylogeny_features`](@ref)
+"""
+function is_related(sep::AbstractSeparationAlgorithm, d::Number, dmax::Number)::Bool
+    return is_reachable(sep, d) && d <= dmax
 end
 """
 $(DocStringExtensions.TYPEDEF)

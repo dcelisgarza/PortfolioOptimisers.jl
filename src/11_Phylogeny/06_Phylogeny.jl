@@ -1747,6 +1747,7 @@ function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                          distance_to_similarity(nte.alg; S = S, D = D))
 end
 """
+    calc_weighted_adjacency(G::Graphs.AbstractGraph)
     calc_weighted_adjacency(alg::Tree_SimMat, W::MatNum)
     calc_weighted_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
@@ -1756,10 +1757,11 @@ Compute the weighted adjacency matrix of the network structure.
 
 The sparsity pattern is the structure itself, so it is identical to [`calc_adjacency`](@ref)'s on the same input. Only the stored values differ.
 
-The two entry points are [`calc_weighted_adjacency_graph`](@ref)'s two entry points, one `Graphs.adjacency_matrix` call further on. `W` is the selecting quantity — the distance on the tree branch, the similarity on the PMFG branch — and [`clusterise`](@ref) supplies it directly, having already paid for it.
+The entry points are [`calc_weighted_adjacency_graph`](@ref)'s, one `Graphs.adjacency_matrix` call further on, plus one for a caller that already holds the graph itself. `W` is the selecting quantity — the distance on the tree branch, the similarity on the PMFG branch — and [`clusterise`](@ref) supplies it directly, having already paid for it; it then reads the matrix off the graph it keeps, through the one-argument form, because it needs that graph again to answer a budget **rule**.
 
 # Arguments
 
+  - `G`: Network structure a caller already holds, from [`calc_weighted_adjacency_graph`](@ref).
   - `alg`: Tree or similarity matrix algorithm.
   - `W`: Selecting quantity of `alg`'s branch: a distance matrix under an [`AbstractTreeType`](@ref), a similarity matrix under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref).
   - $(arg_dict[:nte])
@@ -1779,6 +1781,9 @@ The two entry points are [`calc_weighted_adjacency_graph`](@ref)'s two entry poi
   - [`Tree_SimMat`](@ref)
   - [`clusterise`](@ref)
 """
+function calc_weighted_adjacency(G::Graphs.AbstractGraph)
+    return Graphs.adjacency_matrix(G)
+end
 function calc_weighted_adjacency(alg::Tree_SimMat, W::MatNum)
     return Graphs.adjacency_matrix(calc_weighted_adjacency_graph(alg, W))
 end
@@ -1875,27 +1880,94 @@ function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                                         size(W)...))
 end
 """
-    separation_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
-                      dims::Int = 1, kwargs...)
-    separation_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
-                      dims::Int = 1, kwargs...)
+    separation_graph(sep::HopCount, G::Graphs.AbstractGraph)
+    separation_graph(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                     dims::Int = 1, kwargs...)
+    separation_graph(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
+                     dims::Int = 1, kwargs...)
 
-Compute the dense `assets × assets` matrix of separations under a separation algorithm.
+Build the structure a separation measures over.
 
-Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_budget`](@ref) is the other half.
+One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_matrix`](@ref) and [`separation_budget`](@ref) are the other two. It exists as a kernel of its own so that **the structure is built once per consumer call**: [`separation_matrix`](@ref) and [`resolve_separation`](@ref) both take the graph, and a consumer that needs the separations *and* a budget rule answered would otherwise build the same structure twice, through two estimator-taking kernels that each derive it privately.
 
-# The unreachable sentinel
+# What each member measures over
 
-An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref), and `Graphs.floyd_warshall_shortest_paths` reports `typemax(T)` for [`PathLength`](@ref), which on the `Float64` weights it is handed is `Inf`. Callers must compare against the budget before doing anything else with the entry, and that comparison has to **short-circuit** — an `ifelse` evaluates both branches, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+  - [`HopCount`](@ref): [`calc_adjacency`](@ref)'s structure as a `Graphs.SimpleGraph`. Binary, because a hop count ignores the weights and its consumers do not — [`_phylogeny_matrix`](@ref) reads `Graphs.adjacency_matrix` off this graph for a power sum, where a weight would make `A^i` sum *products of distances* instead of counting walks.
+  - [`PathLength`](@ref): [`calc_distance_weighted_graph`](@ref)'s structure. The same edge set, weighted by **distance** on either branch, because a shortest path over the PMFG's similarities seeks the route through the weakest links.
 
-# The two shipped members read the same structure differently
+# Two entry points, and why only the hop count gets the graph-taking one
 
-[`HopCount`](@ref) counts the edges of [`calc_adjacency`](@ref); [`PathLength`](@ref) sums the distances along them, over [`calc_distance_weighted_graph`](@ref). All-pairs shortest paths come from one `floyd_warshall_shortest_paths` call rather than a Dijkstra per vertex — measured about **7 times faster** on this shape, and within about `1.3` times of the breadth-first loop the hop count uses.
+The estimator-taking methods derive the structure from `X`. The graph-taking method is for a caller that already holds it: both [`clusterise`](@ref) methods build the structure from the selecting quantity they already paid for, through [`calc_weighted_adjacency_graph`](@ref)'s own two-argument entry point, and would otherwise re-derive the distance — `98%` of `clusterise`'s runtime under [`VariationInfoDistance`](@ref) — to answer a budget rule.
+
+[`PathLength`](@ref) has **no** graph-taking method, and cannot: a graph carries no polarity tag, so `G` is a distance-weighted structure on the tree branch and a similarity-weighted one on the PMFG branch, and nothing in the argument distinguishes them. Handing the PMFG's similarities to a shortest path returns an answer instead of raising — see [`calc_distance_weighted_graph`](@ref). The hop count is exempt because it discards the weights.
 
 # Arguments
 
-  - `sep`: Separation algorithm.
-  - `nte`: Network estimator. The graph is rebuilt from `X` on every call, through [`calc_adjacency`](@ref) or [`calc_distance_weighted_graph`](@ref).
+  - `sep`: Separation algorithm. Dispatched on, and its budget is not read — a member whose budget is still a **rule** measures over the same structure as one whose budget is a number, which is what lets [`resolve_separation`](@ref) be handed this graph.
+  - `G`: Network structure a caller already holds, in either polarity.
+  - $(arg_dict[:nte])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `g::Graphs.AbstractGraph`: The structure `sep` measures over.
+
+# Related
+
+  - [`AbstractSeparationAlgorithm`](@ref)
+  - [`HopCount`](@ref)
+  - [`PathLength`](@ref)
+  - [`separation_matrix`](@ref)
+  - [`resolve_separation`](@ref)
+  - [`calc_adjacency`](@ref)
+  - [`calc_distance_weighted_graph`](@ref)
+  - [`calc_weighted_adjacency_graph`](@ref)
+"""
+function separation_graph end
+function separation_graph(::HopCount, G::Graphs.AbstractGraph)
+    # A hop count ignores the weights, but `_phylogeny_matrix`'s power sum does not, so the
+    # structure is handed on binarised rather than as it arrived.
+    return Graphs.SimpleGraph(G)
+end
+function separation_graph(::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    return Graphs.SimpleGraph(calc_adjacency(nte, X; dims = dims, kwargs...))
+end
+function separation_graph(::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
+                          dims::Int = 1, kwargs...)
+    return calc_distance_weighted_graph(nte, X; dims = dims, kwargs...)
+end
+"""
+    separation_matrix(sep::HopCount, g::Graphs.AbstractGraph)
+    separation_matrix(sep::PathLength, g::Graphs.AbstractGraph)
+    separation_matrix(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
+                      X::MatNum; dims::Int = 1, kwargs...)
+
+Compute the dense `assets × assets` matrix of separations under a separation algorithm.
+
+One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_graph`](@ref) and [`separation_budget`](@ref) are the other two.
+
+# The graph-taking form is the interface
+
+The separations depend on the structure alone, so `separation_matrix(sep, g)` is where each member's method lives and the estimator-taking form is a wrapper that calls [`separation_graph`](@ref) first. A consumer holding a graph — because it built one for [`resolve_separation`](@ref), or because a test chose one — enters at the graph, and pays for one structure rather than two.
+
+The wrapper is generic rather than per-member: it is [`separation_graph`](@ref) that knows which structure the member reads, so there is nothing left for a member to say here.
+
+# The unreachable sentinel
+
+An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref), and `Graphs.floyd_warshall_shortest_paths` reports `typemax(T)` for [`PathLength`](@ref), which on the `Float64` weights it is handed is `Inf`. A consumer therefore reads an entry through [`is_related`](@ref) rather than comparing it against the budget itself, and keeps the *evaluation* of anything it scores the entry with inside a short-circuiting branch — an `ifelse` evaluates both arms, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+
+# The two shipped members read the same structure differently
+
+[`HopCount`](@ref) counts the edges of the binarised structure; [`PathLength`](@ref) sums the distances along them. Which structure each reads is [`separation_graph`](@ref)'s answer, not this function's. All-pairs shortest paths come from one `floyd_warshall_shortest_paths` call rather than a Dijkstra per vertex — measured about **7 times faster** on this shape, and within about `1.3` times of the breadth-first loop the hop count uses.
+
+# Arguments
+
+  - `sep`: Separation algorithm. Its budget is not read; a member whose budget is still a rule measures the same separations.
+  - `g`: Structure to measure over, from [`separation_graph`](@ref).
+  - `nte`: Network estimator. On the wrapper only, where the structure is derived from `X` on every call.
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments forwarded to the underlying phylogeny routines.
@@ -1909,25 +1981,27 @@ An unreachable pair carries whatever sentinel the underlying routine uses, **not
   - [`AbstractSeparationAlgorithm`](@ref)
   - [`HopCount`](@ref)
   - [`PathLength`](@ref)
+  - [`separation_graph`](@ref)
   - [`separation_budget`](@ref)
-  - [`calc_adjacency`](@ref)
-  - [`calc_distance_weighted_graph`](@ref)
+  - [`is_related`](@ref)
   - [`Proximity`](@ref)
 """
 function separation_matrix end
-function separation_matrix(::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
-                           dims::Int = 1, kwargs...)
-    g = Graphs.SimpleGraph(calc_adjacency(nte, X; dims = dims, kwargs...))
+function separation_matrix(::HopCount, g::Graphs.AbstractGraph)
     d = Matrix{Int}(undef, Graphs.nv(g), Graphs.nv(g))
     for v in Graphs.vertices(g)
         @inbounds d[:, v] = Graphs.gdistances(g, v)
     end
     return d
 end
-function separation_matrix(::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
-                           dims::Int = 1, kwargs...)
-    g = calc_distance_weighted_graph(nte, X; dims = dims, kwargs...)
+function separation_matrix(::PathLength, g::Graphs.AbstractGraph)
     return Graphs.floyd_warshall_shortest_paths(g).dists
+end
+# One wrapper for the whole family: which structure the member measures over is
+# `separation_graph`'s answer, so there is nothing per-member left to say here.
+function separation_matrix(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
+                           X::MatNum; dims::Int = 1, kwargs...)
+    return separation_matrix(sep, separation_graph(sep, nte, X; dims = dims, kwargs...))
 end
 """
     separation_budget(sep::HopCount, nte::AbstractNetworkEstimator, d::MatNum)
@@ -1935,7 +2009,7 @@ end
 
 Resolve the separation budget in scope: the separation beyond which a pair counts as unrelated.
 
-Half of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_matrix`](@ref) is the other half. Split from `separation_matrix` because a consumer needs the budget on its own — to probe a decay before entering the `assets × assets` loop, or to threshold a matrix it already holds.
+One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_graph`](@ref) and [`separation_matrix`](@ref) are the other two. Split from `separation_matrix` because a consumer needs the budget on its own — to probe a decay before entering the `assets × assets` loop, or to threshold a matrix it already holds.
 
 # The separations are passed in, not recomputed
 
@@ -1973,10 +2047,12 @@ end
 function separation_budget(sep::PathLength, ::AbstractNetworkEstimator, d::MatNum)::Number
     # The diameter of what the graph turned out to be. The sentinel is excluded rather than
     # repaired: an unreachable pair is not a long one, and taking it as the diameter would
-    # make the budget `Inf`, which `LinearDecay` scores `Inf` at every separation.
+    # make the budget `Inf`, which `LinearDecay` scores `Inf` at every separation. The
+    # exclusion is `is_reachable`'s and not an inline `isfinite`, which is true of every
+    # `Integer` and would take a `typemax(Int)` sentinel for the diameter.
     delta = zero(eltype(d))
     for dij in d
-        if isfinite(dij) && dij > delta
+        if is_reachable(sep, dij) && dij > delta
             delta = dij
         end
     end
@@ -2000,12 +2076,13 @@ Quantile of the reachable off-diagonal entries of a separation matrix.
 
 The population is the pairs a budget can be *about*: the diagonal is zero by construction and an unreachable pair carries [`separation_matrix`](@ref)'s sentinel, so neither is a separation. It is also the population [`phylogeny_matrix`](@ref) selects from, which is what makes `q` read as the fraction of pairs the resulting budget relates.
 
-# The sentinel test is not `isfinite` alone
+# The sentinel test is the family's
 
-`isfinite` is `true` for every `Integer`, so it does not exclude [`HopCount`](@ref)'s `typemax(Int)`. The test is against `typemax` of the element type, which excludes both sentinels; `isfinite` stays to reject a `NaN` that no shipped path produces.
+The population excludes an unreachable pair through [`is_reachable`](@ref) rather than through a test written out here. `isfinite` alone would not do it: it is `true` for every `Integer`, so it admits [`HopCount`](@ref)'s `typemax(Int)`.
 
 # Arguments
 
+  - `sep`: Separation algorithm the matrix was measured under, forwarded to [`is_reachable`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `q`: Quantile in `[0, 1]`.
 
@@ -2018,11 +2095,11 @@ The population is the pairs a budget can be *about*: the diagonal is zero by con
   - [`HopCountQuantile`](@ref)
   - [`PathLengthQuantile`](@ref)
   - [`separation_matrix`](@ref)
+  - [`is_reachable`](@ref)
 """
-function separation_quantile(d::MatNum, q::Number)::Number
-    T = eltype(d)
+function separation_quantile(sep::AbstractSeparationAlgorithm, d::MatNum, q::Number)::Number
     v = [d[i, j] for j in axes(d, 2)
-         for i in axes(d, 1) if i != j && isfinite(d[i, j]) && d[i, j] != typemax(T)]
+         for i in axes(d, 1) if i != j && is_reachable(sep, d[i, j])]
     @argcheck(!isempty(v),
               ArgumentError("a separation quantile needs at least one reachable pair of distinct assets, and this $(size(d, 1))-asset structure has none."))
     return Statistics.quantile(v, q)
@@ -2042,9 +2119,11 @@ A stated `n` holds the **number of hops** still and lets the related-pair count 
 
 A hop count is an `Integer` and the quantile is not, so the budget is rounded to the nearest hop. The related-pair count therefore lands *near* `q` rather than on it, and on a small graph the shells are coarse enough that it can miss by a lot — a hop budget can only ever select one of a handful of cardinalities. [`PathLengthQuantile`](@ref) has no such step and hits `q` closely; that is the sharpest practical difference between the two separations.
 
-# It pays for a traversal
+# It pays for a traversal, but not for a structure
 
 Resolving this rule runs [`separation_matrix`](@ref) once, which the hop-ball branch of [`_phylogeny_matrix`](@ref) does not otherwise do — it walks matrix powers instead. A dynamic budget costs one all-pairs traversal that a stated one does not.
+
+It does **not** cost a second structure. The rule is handed the graph its consumer already built, through [`separation_graph`](@ref), so the distance derivation — `98%` of [`clusterise`](@ref)'s runtime under [`VariationInfoDistance`](@ref) — is paid once per consumer call whether the budget is a rule or a number.
 
 # Fields
 
@@ -2091,14 +2170,15 @@ end
 function HopCountQuantile(; q::Number = 0.25)::HopCountQuantile
     return HopCountQuantile(q)
 end
-function (alg::HopCountQuantile)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
-                                 kwargs...)::Integer
+function (alg::HopCountQuantile)(::AbstractNetworkEstimator, ::MatNum,
+                                 g::Graphs.AbstractGraph; kwargs...)::Integer
     # `separation_matrix` dispatches on the separation's *type* and reads no field of it, so
-    # a bare `HopCount()` here is a probe saying "measure in hops" rather than a budget.
-    d = separation_matrix(HopCount(), nte, X; dims = dims, kwargs...)
+    # a bare `HopCount()` here is a probe saying "measure in hops" rather than a budget. `g`
+    # is already the structure a hop count measures over, so nothing is rebuilt.
+    d = separation_matrix(HopCount(), g)
     # The smallest off-diagonal hop separation is `1`, so the quantile never falls below one
     # and the round never has to be clamped up to `HopCount`'s floor.
-    return round(Int, separation_quantile(d, alg.q))
+    return round(Int, separation_quantile(HopCount(), d, alg.q))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2160,29 +2240,40 @@ end
 function PathLengthQuantile(; q::Number = 0.25)::PathLengthQuantile
     return PathLengthQuantile(q)
 end
-function (alg::PathLengthQuantile)(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
-                                   kwargs...)::Number
+function (alg::PathLengthQuantile)(::AbstractNetworkEstimator, ::MatNum,
+                                   g::Graphs.AbstractGraph; kwargs...)::Number
     # A bare `PathLength()` is the probe here, for the same reason as on the hop rule.
-    d = separation_matrix(PathLength(), nte, X; dims = dims, kwargs...)
-    return separation_quantile(d, alg.q)
+    d = separation_matrix(PathLength(), g)
+    return separation_quantile(PathLength(), d, alg.q)
 end
 """
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
-                       X::MatNum; dims::Int = 1, kwargs...)
+                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
     resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
-                       X::MatNum; dims::Int = 1, kwargs...)
+                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
     resolve_separation(sep::PathLength{<:PathLengthRule}, nte::AbstractNetworkEstimator,
+                       X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
+    resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                        X::MatNum; dims::Int = 1, kwargs...)
+    resolve_separation(sep::Union{<:HopCount{<:HopCountRule},
+                                  <:PathLength{<:PathLengthRule}},
+                       nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Replace a separation whose budget is a **rule** by one whose budget is a value.
 
-The third kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one an extension does not have to write: the fallback on the abstract type returns `sep` unchanged, so a member whose budget is already a number passes through at no cost and gains nothing to maintain.
+The fourth kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one an extension does not have to write: the fallback on the abstract type returns `sep` unchanged, so a member whose budget is already a number passes through at no cost and gains nothing to maintain.
 
 # It is called by the consumer, not by the other kernels
 
 Every shipped consumer of a network resolves `nte.sep` **first** and passes the resolved separation to [`separation_matrix`](@ref) and [`separation_budget`](@ref) — [`phylogeny_matrix`](@ref), both [`clusterise`](@ref) methods, and [`phylogeny_features`](@ref) for [`Proximity`](@ref).
 
-The alternative was to resolve inside [`separation_budget`](@ref), and it does not work: that kernel takes the separation **matrix** rather than the data, deliberately, so that [`HopCount`](@ref) never pays for a diameter reduction it ignores. A rule needs `X`, which is the one thing the budget kernel does not have. So `separation_budget` refuses an unresolved separation instead, and this kernel is where `X` is still in hand.
+The alternative was to resolve inside [`separation_budget`](@ref), and it does not work: that kernel takes the separation **matrix** rather than the data, deliberately, so that [`HopCount`](@ref) never pays for a diameter reduction it ignores. A rule needs the structure, which is the one thing the budget kernel does not have. So `separation_budget` refuses an unresolved separation instead, and this kernel is where the structure is still in hand.
+
+# The rule is handed the structure, not asked to build one
+
+`g` is [`separation_graph`](@ref)'s structure, and the graph-taking methods are the interface: a consumer builds once, resolves the rule against that graph, and measures the separations over the same graph. The rule reads what it needs through `separation_matrix(sep, g)`.
+
+The estimator-taking methods are wrappers, and the resolved case has one of its own so that **a stated budget builds nothing at all**. Dispatching the wrapper on the rule-carrying parameterisation is what keeps that true — a single generic wrapper would derive a structure before discovering that the fallback ignores it.
 
 # The return check is a run-time one, and it has to be
 
@@ -2193,8 +2284,9 @@ Resolution goes back through the ordinary constructor, so the rule's answer meet
 # Arguments
 
   - `sep`: Separation algorithm, resolved or not.
-  - `nte`: Network estimator that owns `sep`, handed to the rule so it can build the structure itself.
+  - `nte`: Network estimator that owns `sep`, handed to the rule as the channel to anything the graph does not carry.
   - `X`: Data matrix (observations × assets).
+  - `g`: Structure the rule measures over, from [`separation_graph`](@ref). Derived from `X` by the wrappers.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments, forwarded to the rule.
 
@@ -2216,30 +2308,47 @@ Resolution goes back through the ordinary constructor, so the rule's answer meet
   - [`PathLengthAlgorithm`](@ref)
   - [`HopCountQuantile`](@ref)
   - [`PathLengthQuantile`](@ref)
+  - [`separation_graph`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
 """
 function resolve_separation end
 function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkEstimator,
-                            ::MatNum; kwargs...)::AbstractSeparationAlgorithm
+                            ::MatNum, ::Graphs.AbstractGraph;
+                            kwargs...)::AbstractSeparationAlgorithm
     return sep
 end
 function resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
-                            X::MatNum; dims::Int = 1, kwargs...)::HopCount
-    n = sep.n(nte, X; dims = dims, kwargs...)
+                            X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1,
+                            kwargs...)::HopCount
+    n = sep.n(nte, X, g; dims = dims, kwargs...)
     @argcheck(isa(n, Integer),
               ArgumentError("a hop count rule must return an Integer, because three readers use `0:n` as a matrix-power count.\nGot $(n)::$(typeof(n)) from $(typeof(sep.n))."))
     return HopCount(n)
 end
 function resolve_separation(sep::PathLength{<:PathLengthRule},
-                            nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
-                            kwargs...)::PathLength
-    dmax = sep.dmax(nte, X; dims = dims, kwargs...)
+                            nte::AbstractNetworkEstimator, X::MatNum,
+                            g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)::PathLength
+    dmax = sep.dmax(nte, X, g; dims = dims, kwargs...)
     # `nothing` is a stated budget rather than a computed one, so it is not an admissible
     # answer here -- see `PathLengthValue`.
     @argcheck(isa(dmax, Number),
               ArgumentError("a path length rule must return a Number.\nGot $(dmax)::$(typeof(dmax)) from $(typeof(sep.dmax))."))
     return PathLength(dmax)
+end
+# The resolved case takes the wrapper too, and builds nothing: a stated budget must not pay
+# for a structure to be told that it is already a value.
+function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkEstimator,
+                            ::MatNum; kwargs...)::AbstractSeparationAlgorithm
+    return sep
+end
+function resolve_separation(sep::Union{<:HopCount{<:HopCountRule},
+                                       <:PathLength{<:PathLengthRule}},
+                            nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                            kwargs...)::AbstractSeparationAlgorithm
+    return resolve_separation(sep, nte, X,
+                              separation_graph(sep, nte, X; dims = dims, kwargs...);
+                              dims = dims, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2307,7 +2416,7 @@ Cluster assets using a minimum spanning tree (MST) network structure and return 
 
 Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
 
-``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s, so this method reads the same structure as every other consumer of a network and carries **weights**, not `0`/`1` — the tree branch's polarity is the distance, which is what ``\\mathbf{D}^i - \\mathbf{A}^i`` subtracts a like quantity from. The two-argument entry point is the one used, because `D` is already in hand.
+``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s matrix, read off [`calc_weighted_adjacency_graph`](@ref)'s graph through its one-argument form, so this method reads the same structure as every other consumer of a network and carries **weights**, not `0`/`1` — the tree branch's polarity is the distance, which is what ``\\mathbf{D}^i - \\mathbf{A}^i`` subtracts a like quantity from. The two-argument entry point is the one used, because `D` is already in hand, and the graph is kept rather than discarded so that a budget **rule** is answered over it instead of re-deriving the distance.
 
 # Only a hop count is admitted
 
@@ -2343,12 +2452,19 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     P = zeros(eltype(D), size(D))
     # The distance is the tree branch's selecting quantity, and it is in hand already for
     # the power sum below, so the shared routine is entered at its two-argument form.
-    A = calc_weighted_adjacency(nte.nte.alg, D)
+    G = calc_weighted_adjacency_graph(nte.nte.alg, D)
+    A = calc_weighted_adjacency(G)
     # `n` is read as a matrix-power count rather than as a budget: a separation member that
     # measures something other than hops has no `n`, and fails here rather than silently
     # truncating a power sum it cannot index. `resolve_separation` is what makes a rule in
     # that field safe to index by -- it checks that the rule answered with an `Integer`.
-    n = resolve_separation(nte.nte.sep, nte.nte, X; dims = dims, kwargs...).n
+    #
+    # It is handed the structure above rather than `X` alone. A rule asked to derive its own
+    # would repeat this method's `cor_and_dist`, which is 98% of its runtime under
+    # `VariationInfoDistance`; the binarisation `separation_graph` does instead is one pass
+    # over the edges. That is the whole reason the two-argument entry point exists.
+    n = resolve_separation(nte.nte.sep, nte.nte, X, separation_graph(nte.nte.sep, G);
+                           dims = dims, kwargs...).n
     for i in 0:n
         P .+= D^i - A^i
     end
@@ -2366,7 +2482,7 @@ Cluster assets using a Planar Maximally Filtered Graph (PMFG) network structure 
 
 Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
 
-``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s, as on the tree method, and this branch's polarity is the **similarity** — so ``\\mathbf{S}^i - \\mathbf{A}^i`` again subtracts a like quantity. The two-argument entry point is the one used, because `S` is already in hand.
+``\\mathbf{A}`` is [`calc_weighted_adjacency`](@ref)'s matrix, read off the graph as on the tree method, and this branch's polarity is the **similarity** — so ``\\mathbf{S}^i - \\mathbf{A}^i`` again subtracts a like quantity. The two-argument entry point is the one used, because `S` is already in hand, and the graph is kept for the same reason.
 
 # Only a hop count is admitted
 
@@ -2404,10 +2520,12 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)
     # The similarity is the PMFG branch's selecting quantity. See the tree method.
-    Rpm = calc_weighted_adjacency(nte.nte.alg, S)
-    # See the tree method: a matrix-power count, not a budget, and resolved before it is
-    # indexed by.
-    n = resolve_separation(nte.nte.sep, nte.nte, X; dims = dims, kwargs...).n
+    G = calc_weighted_adjacency_graph(nte.nte.alg, S)
+    Rpm = calc_weighted_adjacency(G)
+    # See the tree method: a matrix-power count, not a budget, resolved before it is indexed
+    # by, and resolved against the structure this method already built.
+    n = resolve_separation(nte.nte.sep, nte.nte, X, separation_graph(nte.nte.sep, G);
+                           dims = dims, kwargs...).n
     for i in 0:n
         P .+= S^i - Rpm^i
     end
@@ -2441,27 +2559,29 @@ const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                        <:NetworkClustersEstimator{<:Any,
                                                   <:AbstractHierarchicalClusteringAlgorithm}}
 """
-    _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
-                      dims::Int = 1, kwargs...)
-    _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
-                      dims::Int = 1, kwargs...)
+    _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator,
+                      g::Graphs.AbstractGraph)
+    _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator,
+                      g::Graphs.AbstractGraph)
 
 Internal dispatch helper carrying [`phylogeny_matrix`](@ref)'s per-separation body.
 
 The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the separation, not about the estimator, so the split lives here rather than on the public method's argument. Dispatching on the estimator instead would pin the choice to `NetworkEstimator` and leave every other [`AbstractNetworkEstimator`](@ref) on one branch — and this family's other kernels, [`separation_matrix`](@ref) and [`separation_budget`](@ref), already take the separation first for the same reason.
 
+# The structure arrives built
+
+`g` is [`separation_graph`](@ref)'s, built once by the public method and shared with [`resolve_separation`](@ref), so neither branch derives a distance of its own. `nte` stays for [`separation_budget`](@ref)'s estimator channel and is otherwise inert here.
+
 # The two balls
 
-  - [`HopCount`](@ref): the **hop ball**, `sum(A^i for i in 0:n)` clamped to `0` or `1`. `sep.n` is read directly as a **matrix-power count** rather than through [`separation_budget`](@ref), which is what makes it a power count and not a budget.
+  - [`HopCount`](@ref): the **hop ball**, `sum(A^i for i in 0:n)` clamped to `0` or `1`, over `Graphs.adjacency_matrix(g)` — binary, because [`separation_graph`](@ref) hands a hop count a binarised structure and a power of a weighted matrix would sum products of distances. `sep.n` is read directly as a **matrix-power count** rather than through [`separation_budget`](@ref), which is what makes it a power count and not a budget.
   - [`PathLength`](@ref): the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref). No second traversal.
 
 # Arguments
 
-  - `sep`: Separation algorithm, taken from `nte.sep` by the public method.
+  - `sep`: Separation algorithm, taken from `nte.sep` by the public method and resolved.
   - $(arg_dict[:nte])
-  - `X`: Data matrix (observations × assets).
-  - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments.
+  - `g`: Structure to read, from [`separation_graph`](@ref).
 
 # Returns
 
@@ -2472,14 +2592,15 @@ The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the sep
   - [`phylogeny_matrix`](@ref)
   - [`HopCount`](@ref)
   - [`PathLength`](@ref)
-  - [`calc_adjacency`](@ref)
+  - [`separation_graph`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
+  - [`is_related`](@ref)
 """
 function _phylogeny_matrix end
-function _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatNum;
-                           dims::Int = 1, kwargs...)
-    A = calc_adjacency(nte, X; dims = dims, kwargs...)
+function _phylogeny_matrix(sep::HopCount, ::AbstractNetworkEstimator,
+                           g::Graphs.AbstractGraph)
+    A = Graphs.adjacency_matrix(g)
     P = zeros(Int, size(A))
     # A matrix-power count, hence `sep.n` directly rather than `separation_budget`: this is
     # the hop branch, and a separation measuring anything else needs its own method.
@@ -2489,14 +2610,14 @@ function _phylogeny_matrix(sep::HopCount, nte::AbstractNetworkEstimator, X::MatN
     P .= clamp!(P, 0, 1) - LinearAlgebra.I
     return P
 end
-function _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator, X::MatNum;
-                           dims::Int = 1, kwargs...)
-    d = separation_matrix(sep, nte, X; dims = dims, kwargs...)
+function _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator,
+                           g::Graphs.AbstractGraph)
+    d = separation_matrix(sep, g)
     dmax = separation_budget(sep, nte, d)
-    # An unreachable pair carries `separation_matrix`'s `Inf` sentinel, so the same
-    # comparison that applies the budget also rejects it. The diagonal is zero and therefore
-    # always inside the budget, which `- I` then clears, matching the hop branch exactly.
-    return Int.(d .<= dmax) - LinearAlgebra.I
+    # `is_related` carries both halves of the rule -- the budget and the unreachable sentinel
+    # `separation_matrix` passes through unrepaired. The diagonal is zero and therefore always
+    # inside the budget, which `- I` then clears, matching the hop branch exactly.
+    return Int.(is_related.(Ref(sep), d, dmax)) - LinearAlgebra.I
 end
 """
     phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
@@ -2542,10 +2663,12 @@ What it buys is **intermediate cardinalities between the shells**. Over the same
 """
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
-    # The data is in hand here and nowhere below, so a rule in the separation's budget field
-    # is answered here. A member whose budget is already a value passes through untouched.
-    sep = resolve_separation(nte.sep, nte, X; dims = dims, kwargs...)
-    return PhylogenyResult(; X = _phylogeny_matrix(sep, nte, X; dims = dims, kwargs...))
+    # One structure per call, built here and handed to both readers below. A rule in the
+    # separation's budget field is answered against that structure rather than deriving a
+    # second one; a member whose budget is already a value passes through untouched.
+    g = separation_graph(nte.sep, nte, X; dims = dims, kwargs...)
+    sep = resolve_separation(nte.sep, nte, X, g; dims = dims, kwargs...)
+    return PhylogenyResult(; X = _phylogeny_matrix(sep, nte, g))
 end
 """
     phylogeny_matrix(cle::ClE_Cl,
