@@ -45,40 +45,79 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 
 # Related
 
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    return set_conditional_risk_constraints!(model, i, r, opt, pr, series, T,
+                                             (; var = :var_, z = :z_cvar_,
+                                              risk = :cvar_risk_, exceedance = :ccvar_);
+                                             prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Encode the Rockafellar-Uryasev programme of `series` and register it under the names in
+`keys`.
+
+This is the shared body of `ConditionalValueatRisk` and `ConditionalDrawdownatRisk`. The two
+are one linearisation over different series, so [`risk_series`](@ref) chooses the series and
+this function writes the exceedance constraint once.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The conditional risk measure, read for `alpha`, `w` and `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `T::Int`: The number of observations.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The conditional risk expression added to the model.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                           opt::RiskJuMPOptimisationEstimator,
+                                           pr::AbstractPriorResult, series, T::Int,
+                                           keys::NamedTuple; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    T = length(net_X)
-    var, z_cvar = JuMP.@variables(model, begin
-                                      ()
-                                      [1:T], (lower_bound = 0)
-                                  end)
-    state_set!(model, prefix, :var_, i, var)
-    state_set!(model, prefix, :z_cvar_, i, z_cvar)
+    var, z = JuMP.@variables(model, begin
+                                 ()
+                                 [1:T], (lower_bound = 0)
+                             end)
+    state_set!(model, prefix, keys.var, i, var)
+    state_set!(model, prefix, keys.z, i, z)
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    cvar_risk = if isnothing(wi)
+    wi = get_observation_weights(wi, pr.X)
+    risk = if isnothing(wi)
         iat = inv(r.alpha * T)
-        JuMP.@expression(model, var + sum(z_cvar) * iat)
+        JuMP.@expression(model, var + sum(z) * iat)
     else
         iat = inv(r.alpha * sum(wi))
-        JuMP.@expression(model, var + LinearAlgebra.dot(wi, z_cvar) * iat)
+        JuMP.@expression(model, var + LinearAlgebra.dot(wi, z) * iat)
     end
-    state_set!(model, prefix, :cvar_risk_, i, cvar_risk)
-    state_set!(model, prefix, :ccvar_, i,
-               JuMP.@constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0))
-    set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, :cvar_risk_, i;
+    state_set!(model, prefix, keys.risk, i, risk)
+    state_set!(model, prefix, keys.exceedance, i,
+               JuMP.@constraint(model, sc * ((z + series) .+ var) >= 0))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
-    return cvar_risk
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -144,115 +183,126 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
-    sc = get_constraint_scale(model)
     w = get_w(model, prefix)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-        X = -pr.X
-        prefix = nested_prefix(prefix, :gain_)
-    else
-        X = pr.X
-    end
-    Xap1 = set_asset_returns_plus_one!(model, X; prefix = prefix)
-    T, N = size(X)
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    # The gain tail carries its own ambiguity ball, and `:Xap1` is not indexed by measure,
+    # so the tail's entries are namespaced rather than allowed to collide with the loss
+    # tail's.
+    X = loss ? pr.X : -pr.X
+    prefix = loss ? prefix : nested_prefix(prefix, :gain_)
+    ambiguity = set_asset_returns_plus_one!(model, X; prefix = prefix)
+    return set_dr_conditional_risk_constraints!(model, i, r, opt, pr, w, series, ambiguity,
+                                                T,
+                                                (; lb = :lb_drcvar_, tau = :tau_drcvar_,
+                                                 s = :s_drcvar_, tu = :tu_drcvar_,
+                                                 tv = :tv_drcvar_, u = :u_drcvar_,
+                                                 v = :v_drcvar_, cu = :cu_drcvar_,
+                                                 cv = :cv_drcvar_,
+                                                 cu_infnorm = :cu_drcvar_infnorm_,
+                                                 cv_infnorm = :cv_drcvar_infnorm_,
+                                                 cu_lb = :cu_drcvar_lb_,
+                                                 cv_lb = :cv_drcvar_lb_,
+                                                 risk = :drcvar_risk_); prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
 
+Encode the Wasserstein-robust conditional programme of `series` and register it under the
+names in `keys`.
+
+This is the shared body of `DistributionallyRobustConditionalValueatRisk` and
+`DistributionallyRobustConditionalDrawdownatRisk`. The two are one ambiguity-ball programme
+over different series, so [`risk_series`](@ref) chooses the series and this function writes
+the infinity-norm cones once.
+
+`ambiguity` is the per-observation, per-asset matrix the transport cost is measured against:
+gross asset returns for the returns twin, drawdowns-plus-one for the drawdown twin.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The robust conditional risk measure, read for `alpha`, `l`, `r`, `w`
+    and `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `w`: The portfolio weight variables, read under the *outer* prefix.
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `ambiguity`: The `T × N` matrix the ambiguity ball is measured against.
+  - `T::Int`: The number of observations.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The robust conditional risk expression added to the model.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                              opt::RiskJuMPOptimisationEstimator,
+                                              pr::AbstractPriorResult, w, series, ambiguity,
+                                              T::Int, keys::NamedTuple;
+                                              prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    N = size(pr.X, 2)
     alpha = r.alpha
     b1 = r.l
     radius = r.r
-
     a1 = -one(alpha)
     a2 = -one(alpha) - b1 * inv(alpha)
     b2 = b1 * (one(alpha) - inv(alpha))
-    lb, tau, s, tu_drcvar, tv_drcvar, u, v = JuMP.@variables(model,
-                                                             begin
-                                                                 ()
-                                                                 ()
-                                                                 [1:T]
-                                                                 [1:T]
-                                                                 [1:T]
-                                                                 [1:T, 1:N],
-                                                                 (lower_bound = 0)
-                                                                 [1:T, 1:N],
-                                                                 (lower_bound = 0)
-                                                             end)
-    state_set!(model, prefix, :lb_drcvar_, i, lb)
-    state_set!(model, prefix, :tau_drcvar_, i, tau)
-    state_set!(model, prefix, :s_drcvar_, i, s)
-    state_set!(model, prefix, :tu_drcvar_, i, tu_drcvar)
-    state_set!(model, prefix, :tv_drcvar_, i, tv_drcvar)
-    state_set!(model, prefix, :u_drcvar_, i, u)
-    state_set!(model, prefix, :v_drcvar_, i, v)
-    cu_drcvar, cv_drcvar, cu_drcvar_infnorm, cv_drcvar_infnorm, cu_drcvar_lb, cv_drcvar_lb = JuMP.@constraints(model,
-                                                                                                               begin
-                                                                                                                   sc *
-                                                                                                                   (b1 *
-                                                                                                                    tau .+
-                                                                                                                    (a1 *
-                                                                                                                     net_X +
-                                                                                                                     vec(sum(u .*
-                                                                                                                             Xap1;
-                                                                                                                             dims = 2)) -
-                                                                                                                     s)) <=
-                                                                                                                   0
-                                                                                                                   sc *
-                                                                                                                   (b2 *
-                                                                                                                    tau .+
-                                                                                                                    (a2 *
-                                                                                                                     net_X +
-                                                                                                                     vec(sum(v .*
-                                                                                                                             Xap1;
-                                                                                                                             dims = 2)) -
-                                                                                                                     s)) <=
-                                                                                                                   0
-                                                                                                                   [i = 1:T],
-                                                                                                                   [sc *
-                                                                                                                    tu_drcvar[i]
-                                                                                                                    sc *
-                                                                                                                    (-view(u,
-                                                                                                                           i,
-                                                                                                                           :) -
-                                                                                                                     a1 *
-                                                                                                                     w)] in
-                                                                                                                   JuMP.MOI.NormInfinityCone(1 +
-                                                                                                                                             N)
-                                                                                                                   [i = 1:T],
-                                                                                                                   [sc *
-                                                                                                                    tv_drcvar[i]
-                                                                                                                    sc *
-                                                                                                                    (-view(v,
-                                                                                                                           i,
-                                                                                                                           :) -
-                                                                                                                     a2 *
-                                                                                                                     w)] in
-                                                                                                                   JuMP.MOI.NormInfinityCone(1 +
-                                                                                                                                             N)
-                                                                                                                   sc *
-                                                                                                                   (tu_drcvar .-
-                                                                                                                    lb) <=
-                                                                                                                   0
-                                                                                                                   sc *
-                                                                                                                   (tv_drcvar .-
-                                                                                                                    lb) <=
-                                                                                                                   0
-                                                                                                               end)
-    state_set!(model, prefix, :cu_drcvar_, i, cu_drcvar)
-    state_set!(model, prefix, :cv_drcvar_, i, cv_drcvar)
-    state_set!(model, prefix, :cu_drcvar_infnorm_, i, cu_drcvar_infnorm)
-    state_set!(model, prefix, :cv_drcvar_infnorm_, i, cv_drcvar_infnorm)
-    state_set!(model, prefix, :cu_drcvar_lb_, i, cu_drcvar_lb)
-    state_set!(model, prefix, :cv_drcvar_lb_, i, cv_drcvar_lb)
+    lb, tau, s, tu, tv, u, v = JuMP.@variables(model, begin
+                                                   ()
+                                                   ()
+                                                   [1:T]
+                                                   [1:T]
+                                                   [1:T]
+                                                   [1:T, 1:N], (lower_bound = 0)
+                                                   [1:T, 1:N], (lower_bound = 0)
+                                               end)
+    state_set!(model, prefix, keys.lb, i, lb)
+    state_set!(model, prefix, keys.tau, i, tau)
+    state_set!(model, prefix, keys.s, i, s)
+    state_set!(model, prefix, keys.tu, i, tu)
+    state_set!(model, prefix, keys.tv, i, tv)
+    state_set!(model, prefix, keys.u, i, u)
+    state_set!(model, prefix, keys.v, i, v)
+    u_cost = vec(sum(u .* ambiguity; dims = 2))
+    v_cost = vec(sum(v .* ambiguity; dims = 2))
+    state_set!(model, prefix, keys.cu, i,
+               JuMP.@constraint(model, sc * (b1 * tau .+ (a1 * series + u_cost - s)) <= 0))
+    state_set!(model, prefix, keys.cv, i,
+               JuMP.@constraint(model, sc * (b2 * tau .+ (a2 * series + v_cost - s)) <= 0))
+    state_set!(model, prefix, keys.cu_infnorm, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * tu[i]
+                                 sc * (-view(u, i, :) - a1 * w)] in
+                                JuMP.MOI.NormInfinityCone(1 + N)))
+    state_set!(model, prefix, keys.cv_infnorm, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * tv[i]
+                                 sc * (-view(v, i, :) - a2 * w)] in
+                                JuMP.MOI.NormInfinityCone(1 + N)))
+    state_set!(model, prefix, keys.cu_lb, i, JuMP.@constraint(model, sc * (tu .- lb) <= 0))
+    state_set!(model, prefix, keys.cv_lb, i, JuMP.@constraint(model, sc * (tv .- lb) <= 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    drcvar_risk = if isnothing(wi)
+    wi = get_observation_weights(wi, pr.X)
+    risk = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else
         JuMP.@expression(model, radius * lb + Statistics.mean(s, wi))
     end
-    state_set!(model, prefix, :drcvar_risk_, i, drcvar_risk)
-    set_risk_bounds_and_expression!(model, opt, drcvar_risk, r.settings, :drcvar_risk_, i;
+    state_set!(model, prefix, keys.risk, i, risk)
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
-    return drcvar_risk
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -313,37 +363,17 @@ drawdown series. The CDaR risk expression is the expected shortfall over drawdow
 # Related
 
   - [`ConditionalDrawdownatRisk`](@ref)
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    iat = inv(r.alpha * T)
-    dar, z_cdar = JuMP.@variables(model, begin
-                                      ()
-                                      [1:T], (lower_bound = 0)
-                                  end)
-    state_set!(model, prefix, :dar_, i, dar)
-    state_set!(model, prefix, :z_cdar_, i, z_cdar)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    cdar_risk = if isnothing(wi)
-        iat = inv(r.alpha * T)
-        JuMP.@expression(model, dar + sum(z_cdar) * iat)
-    else
-        iat = inv(r.alpha * sum(wi))
-        JuMP.@expression(model, dar + LinearAlgebra.dot(wi, z_cdar) * iat)
-    end
-    state_set!(model, prefix, :cdar_risk_, i, cdar_risk)
-    state_set!(model, prefix, :ccdar_, i,
-               JuMP.@constraint(model, sc * ((z_cdar - view(dd, 2:(T + 1))) .+ dar) >= 0))
-    set_risk_bounds_and_expression!(model, opt, cdar_risk, r.settings, :cdar_risk_, i;
-                                    prefix = prefix)
-    return cdar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    return set_conditional_risk_constraints!(model, i, r, opt, pr, series, T,
+                                             (; var = :dar_, z = :z_cdar_,
+                                              risk = :cdar_risk_, exceedance = :ccdar_);
+                                             prefix = prefix)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -369,116 +399,26 @@ applied to the drawdown series.
 # Related
 
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    sc = get_constraint_scale(model)
     w = get_w(model, prefix)
-    X = pr.X
-    dd = set_drawdown_constraints!(model, X; prefix = prefix)
-    ddap1 = set_portfolio_drawdowns_plus_one!(model, X; prefix = prefix)
-    T, N = size(X)
-
-    alpha = r.alpha
-    b1 = r.l
-    radius = r.r
-
-    a1 = -one(alpha)
-    a2 = -one(alpha) - b1 * inv(alpha)
-    b2 = b1 * (one(alpha) - inv(alpha))
-    lb, tau, s, tu_drcdar, tv_drcdar, u, v = JuMP.@variables(model,
-                                                             begin
-                                                                 ()
-                                                                 ()
-                                                                 [1:T]
-                                                                 [1:T]
-                                                                 [1:T]
-                                                                 [1:T, 1:N],
-                                                                 (lower_bound = 0)
-                                                                 [1:T, 1:N],
-                                                                 (lower_bound = 0)
-                                                             end)
-    state_set!(model, prefix, :lb_drcdar_, i, lb)
-    state_set!(model, prefix, :tau_drcdar_, i, tau)
-    state_set!(model, prefix, :s_drcdar_, i, s)
-    state_set!(model, prefix, :tu_drcdar_, i, tu_drcdar)
-    state_set!(model, prefix, :tv_drcdar_, i, tv_drcdar)
-    state_set!(model, prefix, :u_drcdar_, i, u)
-    state_set!(model, prefix, :v_drcdar_, i, v)
-    cu_drcdar, cv_drcdar, cu_drcdar_infnorm, cv_drcdar_infnorm, cu_drcdar_lb, cv_drcdar_lb = JuMP.@constraints(model,
-                                                                                                               begin
-                                                                                                                   sc *
-                                                                                                                   (b1 *
-                                                                                                                    tau .+
-                                                                                                                    (a1 *
-                                                                                                                     -view(dd,
-                                                                                                                           2:(T + 1)) +
-                                                                                                                     vec(sum(u .*
-                                                                                                                             ddap1;
-                                                                                                                             dims = 2)) -
-                                                                                                                     s)) <=
-                                                                                                                   0
-                                                                                                                   sc *
-                                                                                                                   (b2 *
-                                                                                                                    tau .+
-                                                                                                                    (a2 *
-                                                                                                                     -view(dd,
-                                                                                                                           2:(T + 1)) +
-                                                                                                                     vec(sum(v .*
-                                                                                                                             ddap1;
-                                                                                                                             dims = 2)) -
-                                                                                                                     s)) <=
-                                                                                                                   0
-                                                                                                                   [i = 1:T],
-                                                                                                                   [sc *
-                                                                                                                    tu_drcdar[i]
-                                                                                                                    sc *
-                                                                                                                    (-view(u,
-                                                                                                                           i,
-                                                                                                                           :) -
-                                                                                                                     a1 *
-                                                                                                                     w)] in
-                                                                                                                   JuMP.MOI.NormInfinityCone(1 +
-                                                                                                                                             N)
-                                                                                                                   [i = 1:T],
-                                                                                                                   [sc *
-                                                                                                                    tv_drcdar[i]
-                                                                                                                    sc *
-                                                                                                                    (-view(v,
-                                                                                                                           i,
-                                                                                                                           :) -
-                                                                                                                     a2 *
-                                                                                                                     w)] in
-                                                                                                                   JuMP.MOI.NormInfinityCone(1 +
-                                                                                                                                             N)
-                                                                                                                   sc *
-                                                                                                                   (tu_drcdar .-
-                                                                                                                    lb) <=
-                                                                                                                   0
-                                                                                                                   sc *
-                                                                                                                   (tv_drcdar .-
-                                                                                                                    lb) <=
-                                                                                                                   0
-                                                                                                               end)
-    state_set!(model, prefix, :cu_drcdar_, i, cu_drcdar)
-    state_set!(model, prefix, :cv_drcdar_, i, cv_drcdar)
-    state_set!(model, prefix, :cu_drcdar_infnorm_, i, cu_drcdar_infnorm)
-    state_set!(model, prefix, :cv_drcdar_infnorm_, i, cv_drcdar_infnorm)
-    state_set!(model, prefix, :cu_drcdar_lb_, i, cu_drcdar_lb)
-    state_set!(model, prefix, :cv_drcdar_lb_, i, cv_drcdar_lb)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    drcdar_risk = if isnothing(wi)
-        JuMP.@expression(model, radius * lb + Statistics.mean(s))
-    else
-        JuMP.@expression(model, radius * lb + Statistics.mean(s, wi))
-    end
-    state_set!(model, prefix, :drcdar_risk_, i, drcdar_risk)
-    set_risk_bounds_and_expression!(model, opt, drcdar_risk, r.settings, :drcdar_risk_, i;
-                                    prefix = prefix)
-    return drcdar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    ambiguity = set_portfolio_drawdowns_plus_one!(model, pr.X; prefix = prefix)
+    return set_dr_conditional_risk_constraints!(model, i, r, opt, pr, w, series, ambiguity,
+                                                T,
+                                                (; lb = :lb_drcdar_, tau = :tau_drcdar_,
+                                                 s = :s_drcdar_, tu = :tu_drcdar_,
+                                                 tv = :tv_drcdar_, u = :u_drcdar_,
+                                                 v = :v_drcdar_, cu = :cu_drcdar_,
+                                                 cv = :cv_drcdar_,
+                                                 cu_infnorm = :cu_drcdar_infnorm_,
+                                                 cv_infnorm = :cv_drcdar_infnorm_,
+                                                 cu_lb = :cu_drcdar_lb_,
+                                                 cv_lb = :cv_drcdar_lb_,
+                                                 risk = :drcdar_risk_); prefix = prefix)
 end

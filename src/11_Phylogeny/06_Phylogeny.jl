@@ -664,8 +664,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Pagerank(;
-        alpha::Number = 0.85,
         n::Integer = 100,
+        alpha::Number = 0.85,
         epsilon::Number = 1e-6
     ) -> Pagerank
 

@@ -1665,7 +1665,7 @@ $(DocStringExtensions.FIELDS)
     LoGo(;
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
         sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-        pdm::Option{<:Posdef} = Posdef()
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef()
     ) -> LoGo
 
 Keywords correspond to the struct's fields.
@@ -1709,13 +1709,13 @@ LoGo
     pdm
     function LoGo(de::AbstractDistanceEstimator,
                   sim::AbstractNonNegativeSimilarityMatrixAlgorithm,
-                  pdm::Option{<:Posdef} = Posdef())
+                  pdm::Option{<:AbstractPosdefEstimator} = Posdef())
         return new{typeof(de), typeof(sim), typeof(pdm)}(de, sim, pdm)
     end
 end
 function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-              pdm::Option{<:Posdef} = Posdef())
+              pdm::Option{<:AbstractPosdefEstimator} = Posdef())
     return LoGo(de, sim, pdm)
 end
 """

@@ -127,3 +127,41 @@ through, which is the hole this ADR exists to prevent.
 Behaviour-changing, not API-breaking, on both counts. `ResourceLimits`'s positional constructor takes
 six arguments now; the keyword constructor, which the decision above already made the recommended
 path, is unaffected.
+
+## Amendment (2026-08-17) — a preference file may raise a cap, but not in silence
+
+The tenth security pass (`docs/reports/security-review-20260817.html`, finding 1) asked a question
+this ADR had left open. The decision above accepts that a *caller* resizes a cap:
+`set_resource_limits!` for the session, `with_resource_limits` for one scope. It never decided
+whether a **file** may, at load, with no code run. `__init__` reads eleven Preferences.jl keys of the
+active project and applies them through the same setters, and the only value check is
+`Integer && !Bool && > 0` — so one `LocalPreferences.toml` raises every cap the library has, silently,
+before any user code. That channel is the one an attacker reaches without running code: the file is
+data, it travels with a cloned project or a template, and it is often untracked.
+
+**A load-time preference keeps its full range, and a value that widens a guard is announced with a
+warning.** The ceiling was the alternative and it is rejected. The caps are deliberately far above
+legitimate use — they exist to convert an OOM kill into a typed error, not to second-guess a sizing
+choice — so a project on a machine sized for a genuinely large run has a legitimate reason to raise
+one, and that reason does not disappear because the value lives in a file rather than in a call. A
+ceiling would also need a second number per cap, which is exactly the "two numbers for one cost" the
+frontier amendment above refuses. What the channel actually lacked was not a bound but a **record**:
+nothing distinguished a project that chose a wide cap from a project that inherited one.
+
+Widening is direction-typed, not "any change": a raised `ResourceLimits` or `EquationLimits` cap, and
+a *lowered* `STRING_DISTANCE.min_score` — the info-leak direction of
+[ADR 0026](0026-lenient-constraint-names-with-suggestions.md), since a lower threshold admits more
+candidates. A value that tightens a guard, or that matches the default it replaces, stays silent: a
+project that hardens itself must not be trained to ignore a warning at every `using`. The comparison
+is against the default *in effect when the preference is applied*, which at load is the shipped
+default; `apply_preferences!` therefore needs no second copy of the shipped numbers, which could
+drift from the constructors that own them.
+
+The warning is one message for the whole load, built by `relaxed_preferences_msg`
+(`src/01_Base.jl`), naming each widened guard as `key: default → value` and the file the values came
+from. It names the keys it reports and nothing else — the same info-leak-safe message discipline as
+`unknown_variable_msg`.
+
+The fail-closed behaviour for an *invalid* value is unchanged, and the docstrings that described it
+were corrected: they claimed the load "fails closed rather than silently running with a weaker cap",
+which covered invalid values alone and read as a promise about weak caps in general.

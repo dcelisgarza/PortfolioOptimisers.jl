@@ -115,10 +115,7 @@ julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
            sigma = X * X'
@@ -127,10 +124,7 @@ julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimiser
 
 julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = X * X'
@@ -240,10 +234,7 @@ julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = LinearAlgebra.diag(X * X')
@@ -252,10 +243,7 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = sqrt.(LinearAlgebra.diag(X * X'))
@@ -362,10 +350,7 @@ julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? fill(one(eltype(X)), size(X, 1)) : est.w
            X = X .* w
            mu = sum(X; dims = 1) / sum(w)
@@ -672,6 +657,7 @@ Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `
 """
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
     catch err
@@ -683,6 +669,7 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
 end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
     catch err
@@ -801,6 +788,7 @@ Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `
 """
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
     catch err
@@ -812,6 +800,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
 end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cor(ce, X, w; dims = dims, mean = mean, kwargs...)
     catch err

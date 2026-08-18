@@ -76,6 +76,10 @@ Where:
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - `mu::Matrix{<:Number}`: Median vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
@@ -86,6 +90,7 @@ Where:
 """
 function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::Int = 1,
                          kwargs...)
+    assert_dims(dims)
     return Statistics.median(X; dims = dims)
 end
 """
@@ -95,10 +100,7 @@ Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::I
 """
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
-    @argcheck(dims ∈ (1, 2), DomainError(dims, "dims must be 1 or 2"))
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(me.w, X)
     Y = Vector{eltype(X)}(undef, size(X, 2))
     for i in axes(X, 2)

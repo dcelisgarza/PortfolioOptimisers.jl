@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — PortfolioOptimisers.jl — 2026-08-17</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .lbl { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+      .hatch {
+        background-image: repeating-linear-gradient(45deg, #fecaca 0 6px, #fff1f2 6px 12px);
+      }
+      .ghost { opacity: .35; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- ══════════════ HEADER ══════════════ -->
+      <header class="border-b border-slate-300 pb-8">
+        <p class="text-xs uppercase tracking-widest text-slate-500">Architecture review</p>
+        <h1 class="font-serif text-4xl mt-2">PortfolioOptimisers.jl</h1>
+        <p class="text-slate-600 mt-1 text-sm">2026-08-17 · branch <code class="font-mono">dev</code> · <code class="font-mono">9237475ea</code> · 197 files, 113,131 lines</p>
+
+        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div>
+            <p class="lbl text-slate-500 mb-2">Scope</p>
+            <p class="text-slate-700">Hot spots by commit count over six weeks: the Prior stack (12–15 each), the JuMP optimisation stack (9–14 each), and the base layer (<code class="font-mono">01_Base.jl</code>, 42).</p>
+          </div>
+          <div>
+            <p class="lbl text-slate-500 mb-2">Legend</p>
+            <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
+              <span class="flex items-center gap-1.5"><span class="inline-block w-4 h-3 border border-slate-400 bg-white"></span> module</span>
+              <span class="flex items-center gap-1.5"><svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke="#64748b" stroke-width="2" class="seam"/></svg> seam</span>
+              <span class="flex items-center gap-1.5"><svg width="18" height="6"><line x1="0" y1="3" x2="14" y2="3" stroke="#dc2626" stroke-width="2"/><path d="M14 0 L18 3 L14 6Z" fill="#dc2626"/></svg> leakage</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-4 h-3 deep"></span> deep module</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-2 text-xs">
+          <span class="px-2 py-1 rounded bg-emerald-100 text-emerald-900 font-medium">8 Strong</span>
+          <span class="px-2 py-1 rounded bg-amber-100 text-amber-900 font-medium">7 Worth exploring</span>
+          <span class="px-2 py-1 rounded bg-rose-100 text-rose-900 font-medium">3 produce wrong answers today</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-16">
+
+        <!-- ══════════════ 1 ══════════════ -->
+        <article id="c1" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">01</span>
+            <h2 class="font-serif text-2xl">Declare which optimisers run the Model Assembly middle</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">wrong answer today</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">in-process</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">default path</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/20_Optimisation/13_NearOptimalCentering.jl:1123–1156, 761–768, 148, 331</li>
+            <li>src/20_Optimisation/10_JuMPOptimiser.jl:1240–1244, 1493–1524</li>
+            <li>test/test_03c_custom_jump_hooks.jl:235</li>
+          </ul>
+
+          <!-- before / after -->
+          <div class="grid md:grid-cols-2 gap-4 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — the middle is absent, not declared absent</p>
+              <div class="space-y-1">
+                <div class="h-9 border-l-4 border-slate-700 bg-slate-100 px-3 flex items-center text-xs">head — scales, <code class="font-mono">set_w!</code>, weight bounds</div>
+                <div class="h-24 border-l-4 border-rose-500 hatch px-3 flex flex-col justify-center text-xs">
+                  <p class="font-medium text-rose-900">middle — never called</p>
+                  <p class="text-rose-800 mt-1 leading-snug"><code class="font-mono">lcse cte card scard lt st tn tr l1 l2 linf lp ple ss xbgt ccnt</code></p>
+                  <p class="text-rose-900 mt-1">carried · validated · ignored</p>
+                </div>
+                <div class="h-9 border-l-4 border-slate-700 bg-slate-100 px-3 flex items-center text-xs">tail — <code class="font-mono">solve_noc!</code></div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3 leading-snug">Four builders inlined, then straight to the solve. Nothing in the interface says the middle was skipped.</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — membership is a declaration the head can check</p>
+              <div class="space-y-1">
+                <div class="h-9 border-l-4 border-slate-700 bg-slate-100 px-3 flex items-center text-xs">head — <span class="text-indigo-700 ml-1">+ rejects unhonourable settings</span></div>
+                <div class="h-24 border-l-4 border-indigo-600 bg-indigo-50 px-3 flex flex-col justify-center text-xs">
+                  <p class="font-medium text-indigo-900">formulation declares what it honours</p>
+                  <p class="text-indigo-800 mt-1 leading-snug">runs the middle, or says so and the head raises</p>
+                  <p class="text-indigo-800 mt-1">objective envelope always present</p>
+                </div>
+                <div class="h-9 border-l-4 border-slate-700 bg-slate-100 px-3 flex items-center text-xs">tail — <code class="font-mono">solve_noc!</code></div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3 leading-snug">Adding a <code class="font-mono">JuMPOptimiser</code> field forces a decision at one declaration instead of landing silently in the ignored set.</p>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span><code class="font-mono text-xs">UnconstrainedNearOptimalCentering</code> is the <strong>default</strong> <code class="font-mono">alg</code>, and it is the only one of the five JuMP optimisers that never calls <code class="font-mono">assemble_jump_model!</code> — so about twenty <code class="font-mono">JuMPOptimiser</code> settings are carried, validated and silently dropped.</p>
+            <p><span class="lbl text-slate-500 mr-2">Also</span>Its objective omits <code class="font-mono">add_custom_objective_term!</code> and <code class="font-mono">add_penalty_to_objective!</code>, which its constrained sibling has. The Custom Term still fires on the three corner solves (they run through nested <code class="font-mono">MeanRisk</code>), so a user's term shapes the corners and not the centring solve. The one hook test on this path explicitly selects the <em>constrained</em> variant.</p>
+            <p><span class="lbl text-slate-500 mr-2">Deletion test</span>There is no module to delete — that is the finding. <code class="font-mono">assemble_jump_model!</code> concentrates (one ordering, five callers). What is missing is a membership statement, so opting out happens by omission and no configuration error can be raised.</p>
+            <p><span class="lbl text-slate-500 mr-2">Solution</span>Make "does not run the middle" a declared property of the formulation, and let the head refuse the settings that formulation cannot honour. Route both objectives through the same envelope so the Objective Penalty is structurally present even when empty.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: one place says what is honoured</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: new field forces one decision</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: the drop becomes assertable</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <strong>ADR 0008 §6</strong> scopes unconstrained NOC out — "it has no middle". This does not ask to give it one; it asks that the exclusion live in the interface rather than in silence. <strong>ADR 0036 §7</strong> is contradicted in effect on this path (the typed fallback never runs because the hook is never reached) and warrants an amendment.
+          </div>
+        </article>
+
+        <!-- ══════════════ 2 ══════════════ -->
+        <article id="c2" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">02</span>
+            <h2 class="font-serif text-2xl">Give the Frontier sweep a module</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">drifted copies</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">in-process</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/20_Optimisation/11_MeanRisk.jl:460–471, 671–679, 701–709</li>
+            <li>src/20_Optimisation/13_NearOptimalCentering.jl:1002–1010, 1039–1047</li>
+            <li>test/test_28_seam_lock.jl:84–89</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <p class="lbl text-slate-500 mb-3">Before — one rule, five hand-written emissions, two of them drifted</p>
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+              <div class="border border-slate-300 rounded p-2">
+                <p class="lbl text-slate-500">MeanRisk :466</p>
+                <p class="font-mono mt-1 text-[10px] leading-tight">vals[1] - lb * <span class="bg-emerald-200 px-0.5">k</span></p>
+                <p class="text-slate-500 mt-1">return axis · shared</p>
+              </div>
+              <div class="border border-slate-300 rounded p-2">
+                <p class="lbl text-slate-500">MeanRisk :675</p>
+                <p class="font-mono mt-1 text-[10px] leading-tight">vals[1] - ub * <span class="bg-emerald-200 px-0.5">k</span></p>
+                <p class="text-slate-500 mt-1">risk axis</p>
+              </div>
+              <div class="border border-slate-300 rounded p-2">
+                <p class="lbl text-slate-500">MeanRisk :705</p>
+                <p class="font-mono mt-1 text-[10px] leading-tight">vals[1] - ub * <span class="bg-emerald-200 px-0.5">k</span></p>
+                <p class="text-slate-500 mt-1">risk axis</p>
+              </div>
+              <div class="border-2 border-rose-500 rounded p-2 bg-rose-50">
+                <p class="lbl text-rose-700">NOC :1006</p>
+                <p class="font-mono mt-1 text-[10px] leading-tight">vals[1] - ub<span class="bg-rose-200 px-0.5"> ⟵ no k</span></p>
+                <p class="text-rose-700 mt-1">risk axis · drifted</p>
+              </div>
+              <div class="border-2 border-rose-500 rounded p-2 bg-rose-50">
+                <p class="lbl text-rose-700">NOC :1043</p>
+                <p class="font-mono mt-1 text-[10px] leading-tight">vals[1] - ub<span class="bg-rose-200 px-0.5"> ⟵ no k</span></p>
+                <p class="text-rose-700 mt-1">risk axis · drifted</p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 mt-3 leading-snug">Inside one NOC model the <em>return</em>-frontier bound is homogenised by <code class="font-mono">k</code> (it calls the shared helper) and the <em>risk</em>-frontier bound is not. Latent only because NOC's head pins <code class="font-mono">k</code> to the literal <code class="font-mono">1</code>.</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 mt-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — 9 solve methods, 2×2 <code class="font-mono">Val</code> matrix twice</p>
+              <pre class="mermaid">
+flowchart TB
+  MR["solve_mean_risk!<br/>4 methods"] --> L1["param loop ×2"]
+  MR --> T1["collect tail ×3"]
+  NO["solve_noc!<br/>5 methods"] --> L2["param loop ×2"]
+  NO --> T2["collect tail ×4"]
+  L1 -.drift.-> L2
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class L1,L2 leak
+              </pre>
+            </div>
+            <div class="rounded-lg border-2 border-slate-800 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — one sweep module, per-optimiser hook</p>
+              <pre class="mermaid">
+flowchart TB
+  MR["solve_mean_risk!"] --> S
+  NO["solve_noc!"] --> S
+  S["FrontierSweep<br/>register · product · collect"]
+  S --> H1["hook: set objective"]
+  S --> H2["hook: set noc_rk / noc_rt"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  class S deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span>The sweep is a module — register a parameter and bound per swept entry, iterate the product, collect <code class="font-mono">(retcode, sol)</code> — implemented twice, with the risk axis having no shared fragment at all. The collect tail is written seven times. The shared names are decorative: <code class="font-mono">compute_ret_lbs</code> has two unrelated signatures, so nothing generic can call either.</p>
+            <p><span class="lbl text-slate-500 mr-2">Deletion test</span>Concentrates. Delete a <code class="font-mono">FrontierSweep</code> and the parameter loop, product iterator, collect tail and 2×2 mode dispatch reappear in two files across nine methods.</p>
+            <p><span class="lbl text-slate-500 mr-2">Tell</span><code class="font-mono">test_28_seam_lock.jl:89</code> carries <code class="font-mono">registry_readers = ["11_MeanRisk.jl", "13_NearOptimalCentering.jl"]</code> — a by-file exemption from ADR 0037 rule 3 for exactly these loops. They are exempt because the sweep never got an interface.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: one interface, both axes</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: <code class="font-mono">k</code> and sign <code class="font-mono">d</code> stated once</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: assertable without a solver</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            No ADR contradicted. <strong>ADR 0037</strong>'s amendment records the seam-lock exemption as deliberate; this removes the need for it. <strong>ADR 0008 §3</strong> (head and tail stay per-optimiser) is untouched — the sweep sits inside the tail.
+          </div>
+        </article>
+
+        <!-- ══════════════ 3 ══════════════ -->
+        <article id="c3" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">03</span>
+            <h2 class="font-serif text-2xl">Give the Black-Litterman risk-free rate one meaning</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">wrong answer today</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">in-process</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/13_Prior/06_BlackLittermanPrior.jl:382–390 (the shared kernel)</li>
+            <li>src/13_Prior/07_BayesianBlackLittermanPrior.jl:336</li>
+            <li>src/13_Prior/08_FactorBlackLittermanPrior.jl:334–348</li>
+            <li>src/13_Prior/09_AugmentedBlackLittermanPrior.jl:420–437</li>
+            <li>src/01_Base.jl:207 — the whole documented interface</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <p class="lbl text-slate-500 mb-3">Before — <code class="font-mono">vanilla_posteriors</code> adds <code class="font-mono">rf</code>, then each member adds or subtracts it again</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-left border-b border-slate-300">
+                    <th class="py-2 pr-4 font-medium">member</th>
+                    <th class="py-2 pr-4 font-medium"><code class="font-mono">l === nothing</code></th>
+                    <th class="py-2 font-medium"><code class="font-mono">l</code> set</th>
+                  </tr>
+                </thead>
+                <tbody class="font-mono">
+                  <tr class="border-b border-slate-100"><td class="py-2 pr-4">BlackLittermanPrior</td><td class="py-2 pr-4 text-emerald-700">+rf</td><td class="py-2 text-slate-400">n/a</td></tr>
+                  <tr class="border-b border-slate-100"><td class="py-2 pr-4">BayesianBlackLitterman</td><td class="py-2 pr-4 text-emerald-700">+rf</td><td class="py-2 text-slate-400">n/a</td></tr>
+                  <tr class="border-b border-slate-100"><td class="py-2 pr-4">FactorBlackLitterman</td><td class="py-2 pr-4 text-amber-700">cancels → 0</td><td class="py-2 bg-rose-50 text-rose-800">M * (rf·1) — not a rate</td></tr>
+                  <tr><td class="py-2 pr-4">AugmentedBlackLitterman</td><td class="py-2 pr-4 text-emerald-700">+rf</td><td class="py-2 bg-rose-50 text-rose-800">+2·rf</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-slate-600 mt-3 leading-snug">The <code class="font-mono">l !== nothing</code> branch at <code class="font-mono">09:429</code> omits the <code class="font-mono">.- pe.rf</code> its <code class="font-mono">else</code> branch has, so nothing cancels the kernel's add and line <code class="font-mono">437</code> adds a third time.</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 mt-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — four semantics behind one word</p>
+              <svg viewBox="0 0 300 170" class="w-full">
+                <rect x="105" y="8" width="90" height="26" fill="#0f172a"/>
+                <text x="150" y="25" text-anchor="middle" fill="#fff" class="lbl">rf : Number</text>
+                <line x1="150" y1="34" x2="40" y2="72" stroke="#dc2626" stroke-width="1.5"/>
+                <line x1="150" y1="34" x2="113" y2="72" stroke="#dc2626" stroke-width="1.5"/>
+                <line x1="150" y1="34" x2="187" y2="72" stroke="#dc2626" stroke-width="1.5"/>
+                <line x1="150" y1="34" x2="260" y2="72" stroke="#dc2626" stroke-width="1.5"/>
+                <rect x="8" y="72" width="64" height="24" fill="#fff" stroke="#94a3b8"/><text x="40" y="88" text-anchor="middle" font-size="11" font-family="monospace">+rf</text>
+                <rect x="81" y="72" width="64" height="24" fill="#fff" stroke="#94a3b8"/><text x="113" y="88" text-anchor="middle" font-size="11" font-family="monospace">+rf</text>
+                <rect x="155" y="72" width="64" height="24" fill="#fef2f2" stroke="#dc2626"/><text x="187" y="88" text-anchor="middle" font-size="10" font-family="monospace">M·rf1</text>
+                <rect x="228" y="72" width="64" height="24" fill="#fef2f2" stroke="#dc2626"/><text x="260" y="88" text-anchor="middle" font-size="11" font-family="monospace">+2rf</text>
+                <text x="150" y="125" text-anchor="middle" font-size="10" fill="#64748b">four prior bodies, four conventions</text>
+                <text x="150" y="142" text-anchor="middle" font-size="10" fill="#dc2626">default rf = 0.0 hides all of it</text>
+                <text x="150" y="159" text-anchor="middle" font-size="10" fill="#dc2626">no test sets it nonzero</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border-2 border-slate-800 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — one application site</p>
+              <svg viewBox="0 0 300 170" class="w-full">
+                <rect x="105" y="8" width="90" height="26" fill="#0f172a"/>
+                <text x="150" y="25" text-anchor="middle" fill="#fff" class="lbl">rf : Number</text>
+                <line x1="150" y1="34" x2="150" y2="66" stroke="#4f46e5" stroke-width="2"/>
+                <path d="M146 62 L150 70 L154 62Z" fill="#4f46e5"/>
+                <rect x="80" y="70" width="140" height="30" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
+                <text x="150" y="89" text-anchor="middle" font-size="10" font-family="monospace">apply_rf(axis, mu)</text>
+                <line x1="150" y1="100" x2="55" y2="126" stroke="#94a3b8"/>
+                <line x1="150" y1="100" x2="118" y2="126" stroke="#94a3b8"/>
+                <line x1="150" y1="100" x2="182" y2="126" stroke="#94a3b8"/>
+                <line x1="150" y1="100" x2="245" y2="126" stroke="#94a3b8"/>
+                <rect x="28" y="126" width="54" height="20" fill="#fff" stroke="#cbd5e1"/><text x="55" y="140" text-anchor="middle" font-size="9">BL</text>
+                <rect x="91" y="126" width="54" height="20" fill="#fff" stroke="#cbd5e1"/><text x="118" y="140" text-anchor="middle" font-size="9">BBL</text>
+                <rect x="155" y="126" width="54" height="20" fill="#fff" stroke="#cbd5e1"/><text x="182" y="140" text-anchor="middle" font-size="9">FBL</text>
+                <rect x="218" y="126" width="54" height="20" fill="#fff" stroke="#cbd5e1"/><text x="245" y="140" text-anchor="middle" font-size="9">ABL</text>
+                <text x="150" y="163" text-anchor="middle" font-size="10" fill="#64748b">members pass zero where they mean zero</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Companion finding</span>The equilibrium prior mean <code class="font-mono">λΣw</code> is encoded three times with three fallbacks and three validation regimes. <code class="font-mono">FactorBlackLittermanPrior.w</code> is <strong>missing its <code class="font-mono">@vprop</code> tag</strong> where its two siblings carry it, on the same <code class="font-mono">field_dict[:eqw]</code> field — so a View passes full-universe weights into a subset problem, and the length check either throws or, at equal length, uses the wrong weights silently.</p>
+            <p><span class="lbl text-slate-500 mr-2">Solution</span>Decide once what <code class="font-mono">rf</code> means on a Black-Litterman posterior, apply it in the kernel alone, and give <code class="font-mono">λΣw</code> one owner with one fallback. Tag the missing <code class="font-mono">@vprop</code>.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: learn <code class="font-mono">rf</code> once, not four times</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: convention is one edit</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: <code class="font-mono">rf</code> becomes a family invariant</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            No ADR conflict — <strong>ADR 0046</strong> governs forwarding, not this arithmetic. Worth a new ADR fixing the convention.
+          </div>
+        </article>
+
+        <!-- ══════════════ 4 ══════════════ -->
+        <article id="c4" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">04</span>
+            <h2 class="font-serif text-2xl">Declare the Routing Target on the constraint family</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">always throws</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">in-process</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/23_Pipeline/02_StepExecution.jl:271, 275, 279, 283, 307, 313, 318</li>
+            <li>src/23_Pipeline/03_Pipeline.jl:417–443, 63, 78–92, 118–138</li>
+            <li>src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl:660, 754</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <p class="lbl text-slate-500 mb-3">Before — two hand-maintained enumerations that disagree in both directions</p>
+            <pre class="mermaid">
+flowchart LR
+  subgraph SE["run_step — 6 families steppable"]
+    WB[WeightBoundsEstimator]
+    LC[LinearConstraintEstimator]
+    TH[ThresholdEstimator]
+    RB[RiskBudgetEstimator]
+    EX[ExposureConstraintEstimator]
+    PH[PhylogenyConstraintEstimator]
+  end
+  subgraph CT["constraint_targets — 3 result shapes routable"]
+    T1[":wb — WeightBounds"]
+    T2[":lcse — LinearConstraint"]
+    T3[":ple — phylogeny result"]
+  end
+  CC["CentralityConstraint<br/>routable, not steppable"]
+  WB --> T1
+  LC --> T2
+  EX --> T2
+  PH --> T3
+  TH -.throws.-> X(("throw"))
+  RB -.throws.-> X
+  CC -.no run_step.-> Y(("refused as a step"))
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class TH,RB,X,CC,Y leak
+            </pre>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span>Two families are <strong>steppable but unroutable</strong>. <code class="font-mono">ThresholdEstimator</code> and <code class="font-mono">RiskBudgetEstimator</code> each have a <code class="font-mono">run_step</code> that writes the constraints slot, and neither result shape is a case in <code class="font-mono">constraint_targets</code>. <code class="font-mono">pipe_required_targets</code> returns <code class="font-mono">()</code> for both, so <code class="font-mono">assert_routable</code> passes at construction. The Pipeline therefore fits every earlier step and <em>always</em> throws at injection — under cross-validation, after the first fold has already run.</p>
+            <p><span class="lbl text-slate-500 mr-2">And back</span><code class="font-mono">CentralityConstraint</code> returns a <code class="font-mono">LinearConstraint</code>, which routes cleanly, but has no <code class="font-mono">run_step</code> and is refused as a bare step.</p>
+            <p><span class="lbl text-slate-500 mr-2">Premise check</span>The justification in <code class="font-mono">03_Pipeline.jl:63</code> — "which of the three a step will write cannot be read off its type" — does not hold: every constraint verb carries a <code class="font-mono">::Result</code> return annotation on its estimator method. The target <em>is</em> a property of the family, and it is the same dispatch <code class="font-mono">run_step</code> performs one file earlier.</p>
+            <p><span class="lbl text-slate-500 mr-2">Not a relaxation</span>Refusing <code class="font-mono">Threshold</code> and <code class="font-mono">RiskBudget</code> at the fan-out is <em>correct</em> — <code class="font-mono">JuMPOptimiser</code> has six <code class="font-mono">Threshold</code> homes and a <code class="font-mono">RiskBudget</code> lives at <code class="font-mono">rba.rkb</code>, so the result names no unique target. The friction is that the step is offered anyway.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: one declaration per family</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: refusal moves to construction</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: table-driven over the family</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            Extends <strong>ADR 0038</strong> rather than contradicting it: 0038 inverted the <em>target → field</em> half; this is the unfinished <em>estimator → target</em> half. Amend, no reopening.
+          </div>
+        </article>
+
+        <!-- ══════════════ 5 ══════════════ -->
+        <article id="c5" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">05</span>
+            <h2 class="font-serif text-2xl">Stop the wrapper fallback from answering for types that forgot</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">wrong answer today</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">in-process</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/13_Prior/11_OpinionPoolingPrior.jl:354–396</li>
+            <li>src/13_Prior/03_FactorPrior.jl:255–260 (the fallback and the owner)</li>
+            <li>src/13_Prior/12_HighOrderFactorPriorEstimator.jl:393 (the consumer)</li>
+            <li>docs/adr/0046-…md:650–654</li>
+          </ul>
+
+          <div class="grid md:grid-cols-2 gap-4 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — "forgot to declare" is indistinguishable from "no residual"</p>
+              <pre class="mermaid">
+flowchart TB
+  C["HighOrderFactorPriorEstimator<br/>asks factor_residual_config"]
+  BL[BlackLitterman] --> OK1["forwards ✓"]
+  BBL[BayesianBL] --> OK2["forwards ✓"]
+  EP[EntropyPooling] --> OK3["forwards ✓"]
+  FP[FeaturePrior] --> OK4["forwards ✓"]
+  OP["OpinionPooling<br/>derives all moments from pe2"] --> FB["fallback<br/>::AbstractPriorEstimator = nothing"]
+  FB --> BAD["residual block left in"]
+  C -.-> BL
+  C -.-> OP
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class OP,FB,BAD leak
+              </pre>
+            </div>
+            <div class="rounded-lg border-2 border-slate-800 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — a wrapper cannot fall through</p>
+              <pre class="mermaid">
+flowchart TB
+  W["carries a prior-estimator field?"]
+  W -->|yes| MUST["must declare<br/>— checked at end of module"]
+  W -->|no| LEAF["leaf → nothing"]
+  MUST --> OP2["OpinionPooling → pe2 ✓"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  class W deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span><code class="font-mono">OpinionPoolingPrior</code> declares no <code class="font-mono">factor_residual_config</code>, though its <code class="font-mono">prior</code> body derives <em>every</em> moment from <code class="font-mono">pe2</code> — the pooled <code class="font-mono">pes</code> contribute observation weights only. So the correct declaration is <code class="font-mono">factor_residual_config(pe.pe2)</code>, and it is missing.</p>
+            <p><span class="lbl text-slate-500 mr-2">Premise check</span>ADR 0046 exempts it on the stated grounds that it "pools several priors and has no single one". It has a single one; it is <code class="font-mono">pe2</code>. Since <code class="font-mono">OpinionPoolingPrior</code> sits inside <code class="font-mono">HighOrderFactorPriorEstimator.pe</code>'s bound and <code class="font-mono">pe2 = FactorPrior()</code> is an already-tested configuration, a covariance carrying a residual block keeps it — exactly the class ADR 0046 was written to close.</p>
+            <p><span class="lbl text-slate-500 mr-2">Deletion test</span><code class="font-mono">factor_residual_config</code> itself concentrates. What fails the test is its <em>fallback</em>: it converts "this type forgot" into "this type has no residual". Same shape as the <code class="font-mono">assert_resolved_slots</code> finding fixed last round, where the answer was a type-bound gate rather than a value walk.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: nesting order stops mattering</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: fails at load, not at a distant consumer</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: one parametrised test over wrappers</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <strong>Contradicts ADR 0046 §"the total declaration" — worth reopening.</strong> The stated reason for the exemption does not match the code, and "the type bound now guarantees an answer" guarantees <em>an</em> answer, not a correct one.
+          </div>
+        </article>
+
+        <!-- ══════════════ 6 ══════════════ -->
+        <article id="c6" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">06</span>
+            <h2 class="font-serif text-2xl">Name what a Meta-optimiser's sub-portfolio enumeration varies</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">local-substitutable</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/20_Optimisation/17_NestedClustered.jl:652–703, 749–785</li>
+            <li>src/20_Optimisation/18_Stacking.jl:470–517, 518–548</li>
+            <li>src/20_Optimisation/16_Base_MetaOptimisation.jl:217, 225</li>
+          </ul>
+
+          <div class="grid md:grid-cols-2 gap-4 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — one module, two names, six methods</p>
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="border border-slate-300 rounded overflow-hidden">
+                  <p class="bg-slate-100 px-2 py-1 font-medium">NCO</p>
+                  <div class="p-2 space-y-1 font-mono text-[10px]">
+                    <p class="bg-slate-100 px-1">reset TD</p>
+                    <p class="bg-slate-100 px-1">prior · fees</p>
+                    <p class="bg-slate-100 px-1">parallel inner loop</p>
+                    <p class="bg-rose-100 px-1">cvi = hasfield rng ? …</p>
+                    <p class="bg-rose-100 px-1">cvi = hasfield rng ? …</p>
+                    <p class="bg-amber-100 px-1">cols = cl</p>
+                    <p class="bg-rose-100 px-1">scorer default</p>
+                    <p class="bg-slate-100 px-1">rebuild · finalise</p>
+                  </div>
+                </div>
+                <div class="border border-slate-300 rounded overflow-hidden">
+                  <p class="bg-slate-100 px-2 py-1 font-medium">Stacking</p>
+                  <div class="p-2 space-y-1 font-mono text-[10px]">
+                    <p class="bg-slate-100 px-1">reset TD</p>
+                    <p class="bg-slate-100 px-1">prior · fees</p>
+                    <p class="bg-slate-100 px-1">parallel inner loop</p>
+                    <p class="bg-rose-100 px-1">cvi = hasfield rng ? …</p>
+                    <p class="bg-rose-100 px-1">cvi = hasfield rng ? …</p>
+                    <p class="bg-amber-100 px-1">(no cols)</p>
+                    <p class="bg-rose-100 px-1">scorer default</p>
+                    <p class="bg-slate-100 px-1">rebuild · finalise</p>
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3 leading-snug"><span class="inline-block w-2 h-2 bg-rose-200"></span> duplicated verbatim · <span class="inline-block w-2 h-2 bg-amber-200"></span> the only real difference</p>
+            </div>
+
+            <div class="rounded-lg border-2 border-slate-800 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — one family, one adapter parameter</p>
+              <svg viewBox="0 0 300 190" class="w-full">
+                <rect x="55" y="12" width="190" height="70" fill="#0f172a"/>
+                <text x="150" y="34" text-anchor="middle" fill="#fff" class="lbl">predict_outer_returns</text>
+                <text x="150" y="52" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="monospace">rng copy · scorer · rebuild</text>
+                <text x="150" y="68" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="monospace">one implementation</text>
+                <line x1="150" y1="82" x2="150" y2="104" stroke="#64748b" stroke-width="1.5" class="seam"/>
+                <text x="196" y="97" font-size="9" fill="#64748b">seam</text>
+                <rect x="70" y="104" width="160" height="24" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
+                <text x="150" y="120" text-anchor="middle" font-size="10" font-family="monospace">SubPortfolioUniverse</text>
+                <line x1="110" y1="128" x2="80" y2="150" stroke="#94a3b8"/>
+                <line x1="190" y1="128" x2="220" y2="150" stroke="#94a3b8"/>
+                <rect x="24" y="150" width="112" height="24" fill="#fff" stroke="#cbd5e1"/>
+                <text x="80" y="166" text-anchor="middle" font-size="9">cluster-sliced</text>
+                <rect x="164" y="150" width="112" height="24" fill="#fff" stroke="#cbd5e1"/>
+                <text x="220" y="166" text-anchor="middle" font-size="9">full-universe</text>
+                <text x="150" y="187" text-anchor="middle" font-size="9" fill="#64748b">two adapters — a real seam</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span><code class="font-mono">predict_outer_nco_estimator_returns</code> and <code class="font-mono">predict_outer_st_estimator_returns</code> are the same module under two names, three methods each, near-byte-identical. The only variation is what enumerates a sub-portfolio: NCO enumerates cluster index sets and passes <code class="font-mono">cols = cl</code>; Stacking enumerates optimisers and sees the whole universe. The <code class="font-mono">cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)</code> idiom appears at four sites — every occurrence in <code class="font-mono">src/</code>.</p>
+            <p><span class="lbl text-slate-500 mr-2">Half-done</span><code class="font-mono">16_Base_MetaOptimisation.jl</code> already extracted the parts where the two agree exactly. The extraction stopped where one adapter parameter would have been needed — and <code class="font-mono">fold_weight_matrix</code> already carries that difference one level down as <code class="font-mono">cls::Nothing</code> vs <code class="font-mono">cls::VecVecInt</code>. The seam exists; it was not pulled up.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: a third meta is one adapter</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: rng and scorer are one edit</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: enumeration testable without solving</div>
+          </div>
+        </article>
+
+        <!-- ══════════════ 7 ══════════════ -->
+        <article id="c7" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">07</span>
+            <h2 class="font-serif text-2xl">Split the docstring prose table along the include order</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-700">maintainer's call</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/01_Base.jl:18–27 (<code>unique_key_dict</code>), :56–700 (<code>arg_dict</code>), :701–702 (<code>field_dict</code>)</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <p class="lbl text-slate-500 mb-3">Where the churn in the hottest file actually is — 222 hunks over six weeks</p>
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">docstring prose 1–845</span><div class="h-4 bg-rose-500" style="width:47%"></div><span class="text-slate-500">105 · 47%</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">scoped config 1129–1888</span><div class="h-4 bg-slate-400" style="width:24.7%"></div><span class="text-slate-500">55</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">type aliases 2271–2830</span><div class="h-4 bg-slate-400" style="width:8%"></div><span class="text-slate-500">18</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">taxonomy 846–1128</span><div class="h-4 bg-slate-400" style="width:7.2%"></div><span class="text-slate-500">16</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">assertions 2831–3430</span><div class="h-4 bg-slate-400" style="width:5.4%"></div><span class="text-slate-500">12</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">exceptions 2006–2270</span><div class="h-4 bg-slate-400" style="width:4.9%"></div><span class="text-slate-500">11</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">show helpers 1889–2005</span><div class="h-4 bg-slate-400" style="width:1.8%"></div><span class="text-slate-500">4</span></div>
+              <div class="flex items-center gap-2"><span class="w-40 shrink-0 text-slate-600">NormError 3431–3964</span><div class="h-4 bg-slate-400" style="width:0.5%"></div><span class="text-slate-500">1</span></div>
+            </div>
+            <p class="text-xs text-slate-600 mt-4 leading-snug"><strong>577 keys in <code class="font-mono">arg_dict</code>; exactly one is referenced only by <code class="font-mono">01_Base.jl</code> itself.</strong> The rest belong to 21 subsystems — 223 to <code class="font-mono">20_Optimisation/</code>, 98 to <code class="font-mono">13_Prior/</code>, 85 to <code class="font-mono">19_RiskMeasures/</code>, 79 to <code class="font-mono">08_Moments/</code>.</p>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span>Any change to any estimator's field prose anywhere in <code class="font-mono">src/</code> edits the same 3,964-line file that defines <code class="font-mono">AbstractEstimator</code>. That is a serialisation point, and it is why the file is the repo's hottest.</p>
+            <p><span class="lbl text-slate-500 mr-2">Deletion test</span>The mechanism concentrates and earns its keep — delete <code class="font-mono">arg_dict</code> and the prose duplicates across ~6,144 docstrings. It is the <em>scope</em> that is wrong. Delete the requirement that it be one dict in one file and nothing reappears: <code class="font-mono">unique_key_dict</code> already refuses duplicate keys, so merging per-subsystem tables keeps the exact guarantee.</p>
+            <p><span class="lbl text-slate-500 mr-2">Solution</span>Keep the mechanism, move each subsystem's table beside that subsystem. The numeric include order already puts <code class="font-mono">01_Base.jl</code> first, so a subsystem's table need only precede its own files.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: unchanged — <code class="font-mono">field_dict[:ce]</code> still</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: a moments edit stops touching the base</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: render check scopes per subsystem</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <strong>Contradicts a CLAUDE.md working agreement</strong> ("centralised in <code class="font-mono">field_dict</code>/<code class="font-mono">arg_dict</code> in <code class="font-mono">src/01_Base.jl</code>"). The rule's intent — write prose once, delete dead entries — survives intact; only the location clause changes. Raise before acting.
+          </div>
+        </article>
+
+        <!-- ══════════════ 8 ══════════════ -->
+        <article id="c8" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">08</span>
+            <h2 class="font-serif text-2xl">Make the propagation tag set data</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">Strong</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">silent misclassification</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/02_Tools.jl:918–985, 1003–1011, 1034–1055, 1250–1312, 1328–1401, 1594, 1618–1690</li>
+          </ul>
+
+          <div class="grid md:grid-cols-2 gap-4 mt-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">Before — the tag set spelled out at seven sites, positionally</p>
+              <svg viewBox="0 0 300 210" class="w-full">
+                <text x="6" y="14" font-size="9" fill="#64748b" font-family="monospace">is_fprop_macro / is_vprop / is_pprop / is_cprop / is_wprop</text>
+                <rect x="6" y="20" width="288" height="18" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="150" y="33" text-anchor="middle" font-size="9">5 predicates · 68 lines for 15 lines of logic</text>
+                <rect x="6" y="44" width="288" height="18" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="150" y="57" text-anchor="middle" font-size="9">is_prop_tag_call — five-way ||</text>
+                <rect x="6" y="68" width="288" height="26" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+                <text x="150" y="81" text-anchor="middle" font-size="9" fill="#991b1b">peel_prop_tags — tests four, falls through to the fifth</text>
+                <text x="150" y="91" text-anchor="middle" font-size="9" font-family="monospace" fill="#991b1b">else is_w = true</text>
+                <rect x="6" y="100" width="288" height="18" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="150" y="113" text-anchor="middle" font-size="9" font-family="monospace">_record!(f, is_f, is_v, is_p, is_c, is_w)</text>
+                <rect x="6" y="124" width="288" height="18" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="150" y="137" text-anchor="middle" font-size="9">5 error-only stub macros</text>
+                <rect x="6" y="148" width="140" height="26" fill="#fffbeb" stroke="#f59e0b"/>
+                <text x="76" y="161" text-anchor="middle" font-size="8">factory emission</text>
+                <text x="76" y="170" text-anchor="middle" font-size="8" font-family="monospace">f → w</text>
+                <rect x="154" y="148" width="140" height="26" fill="#fffbeb" stroke="#f59e0b"/>
+                <text x="224" y="161" text-anchor="middle" font-size="8">prior emission</text>
+                <text x="224" y="170" text-anchor="middle" font-size="8" font-family="monospace">p → c → w → f</text>
+                <text x="150" y="190" text-anchor="middle" font-size="9" fill="#b45309">two precedence chains, hand-written, unlinked</text>
+                <text x="150" y="203" text-anchor="middle" font-size="9" fill="#dc2626">a sixth tag silently becomes @wprop</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border-2 border-slate-800 bg-white p-4">
+              <p class="lbl text-slate-500 mb-3">After — one table, everything derived</p>
+              <svg viewBox="0 0 300 210" class="w-full">
+                <rect x="60" y="20" width="180" height="62" fill="#0f172a"/>
+                <text x="150" y="40" text-anchor="middle" fill="#fff" class="lbl">tag table</text>
+                <text x="150" y="56" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="monospace">name → field transform</text>
+                <text x="150" y="70" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="monospace">precedence as data</text>
+                <line x1="150" y1="82" x2="150" y2="100" stroke="#64748b" class="seam" stroke-width="1.5"/>
+                <g font-size="8" fill="#475569">
+                  <rect x="8" y="102" width="80" height="18" fill="#fff" stroke="#cbd5e1"/><text x="48" y="115" text-anchor="middle">prop_tag(x)</text>
+                  <rect x="94" y="102" width="80" height="18" fill="#fff" stroke="#cbd5e1"/><text x="134" y="115" text-anchor="middle">gate</text>
+                  <rect x="180" y="102" width="112" height="18" fill="#fff" stroke="#cbd5e1"/><text x="236" y="115" text-anchor="middle">peel → Set{Symbol}</text>
+                  <rect x="8" y="128" width="80" height="18" fill="#fff" stroke="#cbd5e1"/><text x="48" y="141" text-anchor="middle">parser</text>
+                  <rect x="94" y="128" width="80" height="18" fill="#fff" stroke="#cbd5e1"/><text x="134" y="141" text-anchor="middle">stub macros</text>
+                  <rect x="180" y="128" width="112" height="18" fill="#fff" stroke="#cbd5e1"/><text x="236" y="141" text-anchor="middle">both emissions</text>
+                </g>
+                <text x="150" y="170" text-anchor="middle" font-size="9" fill="#4f46e5">a tag is looked up, never fallen through to</text>
+                <text x="150" y="186" text-anchor="middle" font-size="9" fill="#64748b">new channel = one table row</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Context</span>The macro is genuinely deep at the use site — 332 tag annotations across 145 <code class="font-mono">@propagatable</code> structs generate 231 methods. The shallowness is entirely in the recognition layer.</p>
+            <p><span class="lbl text-slate-500 mr-2">Hazard</span><code class="font-mono">peel_prop_tags</code> tests four tags and lets the fifth fall through. Adding a sixth tag to the gate but not the <code class="font-mono">elseif</code> does not error — every field carrying it silently becomes <code class="font-mono">@wprop</code>, so <code class="font-mono">factory</code> substitutes observation weights into it. Wrong answer, no diagnostic.</p>
+            <p><span class="lbl text-slate-500 mr-2">Measured cost</span><code class="font-mono">@wprop</code> was the last tag added (ADRs 0012/0013), so the seven-site tax is observed, not hypothetical.</p>
+          </div>
+
+          <div class="mt-4 grid sm:grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-100 rounded px-3 py-2">leverage: new channel is one row</div>
+            <div class="bg-slate-100 rounded px-3 py-2">locality: precedence stops being a comment</div>
+            <div class="bg-slate-100 rounded px-3 py-2">tests: tag table directly assertable</div>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <strong>ADRs 0002, 0010, 0013</strong> all decide what the tags <em>mean</em>. This is about how the set is spelled. Nothing contradicted.
+          </div>
+        </article>
+
+        <!-- ══════════════ 9 ══════════════ -->
+        <article id="c9" class="scroll-mt-8">
+          <div class="flex items-baseline gap-3 flex-wrap">
+            <span class="font-mono text-xs text-slate-400">09</span>
+            <h2 class="font-serif text-2xl">Give <code class="font-mono text-xl">Stacking.scale</code> an application site</h2>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-500 text-white">Worth exploring</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-900">inert under cv</span>
+          </div>
+
+          <ul class="font-mono text-xs text-slate-600 mt-4 space-y-0.5">
+            <li>src/20_Optimisation/18_Stacking.jl:539–545, 169–184, 470–517</li>
+            <li>src/20_Optimisation/16_Base_MetaOptimisation.jl:93–121</li>
+            <li>src/20_Optimisation/01_Base_Optimisation.jl:2515–2525, 2571–2586</li>
+          </ul>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 mt-6">
+            <p class="lbl text-slate-500 mb-3">Before — the Combination Weight is applied, then cancelled or ignored at every consumer</p>
+            <pre class="mermaid">
+flowchart LR
+  S["st.scale"] --> SW["swi = wi .* scale'"]
+  SW --> X["synthetic X<br/>calc_net_returns"]
+  SW --> IV["iv / ivpa collapse"]
+  SW --> Z["Z collapse"]
+  SW --> B["B = rd.B * swi"]
+  WI["wi — unscaled"] --> FIN["outer_optimisation_finaliser"]
+  X --> N1["never touches swi"]
+  IV --> N2["synthetic_asset_weights<br/>divides by column sum — cancels"]
+  Z --> N3["same normaliser — cancels"]
+  B --> OK["the one surviving effect"]
+  CV["both cv methods"] --> NEV["wi received, never referenced"]
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class N1,N2,N3,NEV,FIN leak
+            </pre>
+          </div>
+
+          <div class="mt-5 space-y-3 text-sm">
+            <p><span class="lbl text-slate-500 mr-2">Problem</span>ADR 0053 makes <code class="font-mono">scale</code> a <strong>Combination Weight</strong> and enumerates four sites. <code class="font-mono">Stacking.scale</code> is a fifth, and the weight never reaches the combination. Under any <code class="font-mono">cv</code> it is entirely inert; without one, its only observable effect is a tilt of the benchmark column. The documented math <code class="font-mono">w* = opto(Σ s_k W_k)</code> describes something the code does not do.</p>
+            <p><span class="lbl text-slate-500 mr-2">Contrast</span><code class="font-mono">SubsetResampling</code> applies its scale at the combination and divides by <code class="font-mono">sum(scale)</code>; Schur cancels it by renormalisation. Both are named in ADR 0053. Stacking was not measured.</p>
+            <p><span class="lbl text-slate-500 mr-2">Deletion test</span>Delete it today and almost nothing changes — the diagnosis, not the recommendation. A real "apply the weight to the synthetic universe" module would concentrate four consumers that each currently decide independently, three of them by accident.</p>
+          </div>
+
+          <div class="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <strong>ADR 0053</strong> states the rule binds "every site" and enumerates four. This is a site it did not measure — a factual addition, not a reversal. Cheap to amend. The correct semantics is a domain call for the maintainer.
+          </div>
+        </article>
+
+        <!-- ══════════════ ALSO SURFACED ══════════════ -->
+        <article id="also" class="scroll-mt-8">
+          <h2 class="font-serif text-2xl">Also surfaced</h2>
+          <p class="text-sm text-slate-600 mt-1">Real and evidence-backed, below the line on consequence or fan-out.</p>
+
+          <div class="mt-5 grid sm:grid-cols-2 gap-3 text-sm">
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">The <code class="font-mono text-xs">&lt;:Any</code>×16 dispatch</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600 text-white shrink-0">Strong</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug"><code class="font-mono">EntropyPoolingPrior</code>'s staged/one-shot split counts sixteen placeholders to reach the seventeenth field, <code class="font-mono">alg</code> — at three sites including a hand-written docstring. Inserting a field silently unbinds <code class="font-mono">&lt;:StagedEP</code> and the method stops matching. Self-contained fix: dispatch on <code class="font-mono">pe.alg</code>.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">Eight parallel view slots</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug">Same file: a new entropy-pooling view kind costs about a dozen coordinated edits (field, two constructors, <code class="font-mono">field_dict</code>, a <code class="font-mono">Val</code> reader, an installer pair, two orchestration branches, the eight-way <code class="font-mono">isnothing</code> guard). Nothing checks they are all present. Large refactor of a 2,565-line file.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">Scoped Config trios restate their fields</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug"><code class="font-mono">ScopedConfig</code> is deep; the four <code class="font-mono">struct</code>+<code class="font-mono">const</code>+<code class="font-mono">set_X!</code>+<code class="font-mono">with_X</code> quartets on top are not. <code class="font-mono">ResourceLimits</code>' six cap names appear at 14 code sites in one file. <code class="font-mono">PIPELINE_SLOTS = fieldnames(PipelineContext)</code> is the idiom two files over, with a docstring saying exactly why.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium"><code class="font-mono text-xs">args</code>/<code class="font-mono text-xs">kwargs</code> call-through</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug">78 field declarations splat into third-party functions. The interface is the whole upstream signature plus a package-specific prohibition list. The Phylogeny guards are shape <em>blacklists</em> — they close three known holes; six other files carrying the shape have no guard. Where the options are enumerable, named fields make the illegal channel unrepresentable.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">The budget 3×3 product</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug"><code class="font-mono">set_long_short_budget_constraints!</code> spells one algebraic rule as nine methods over <code class="font-mono">{Number, BudgetRange, Nothing}²</code>, with the <em>constraint names</em> varying by branch. One caller, so this is depth rather than fan-out — the interface is nearly as complex as the implementation.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium"><code class="font-mono text-xs">bl_preroll</code>'s axis</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug">The kernel concentrates and earns its keep, but three callers compute the axis key <em>for</em> it with an identical nothing-guard, each under a three-line comment explaining why. Five pre-checks plus one post-check for one invariant. Taking an axis selector instead of a resolved string would absorb them.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">Four drifted <code class="font-mono text-xs">prior</code> signatures</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600 text-white shrink-0">Strong</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug">Four hand-written docstrings document <code class="font-mono">F</code> as a keyword where it is positional. A caller writing <code class="font-mono">prior(pe, X; F = F)</code> has it swallowed into <code class="font-mono">kwargs...</code>; on the entropy-pooling route that yields an asset-only prior with no error. <code class="font-mono">TYPEDSIGNATURES</code> is already used in the same files. Mechanical fix.</p>
+            </div>
+
+            <div class="border border-slate-200 rounded-lg bg-white p-4">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium">The <code class="font-mono text-xs">dims</code> prologue</p>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500 text-white shrink-0">Worth exploring</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-2 leading-snug">Thirteen verbatim copies of the <code class="font-mono">assert_dims</code> + transpose block across <code class="font-mono">13_Prior/</code>. A pass-through: delete them for one orienting step and each body loses six lines and gains one. <code class="font-mono">strict</code> is the opposite — it concentrates nowhere, which is why it drifted at four sites and was fixed at one.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CHECKED, NOT REPORTED ══════════════ -->
+        <article class="border-t border-slate-300 pt-8">
+          <h2 class="font-serif text-xl">Checked and cleared</h2>
+          <ul class="mt-3 space-y-2 text-sm text-slate-700">
+            <li><strong>Type aliases</strong> in <code class="font-mono text-xs">01_Base.jl</code> — suspected shallow, measured instead: <code class="font-mono text-xs">Option</code> 1,932 uses, <code class="font-mono text-xs">MatNum</code> 1,428, <code class="font-mono text-xs">VecNum</code> 1,282. The block earns its size.</li>
+            <li><strong>Model State accessors</strong> (<code class="font-mono text-xs">get_w</code>, <code class="font-mono text-xs">get_k</code>, <code class="font-mono text-xs">state_*</code>) — 53 and ~57 call sites, genuinely deep.</li>
+            <li><strong>The MIP indicator layer</strong> after ADR 0033/0034 — passes the deletion test cleanly; three bundle shapes behind one accessor family.</li>
+            <li><strong>Pipeline Context</strong> (<code class="font-mono text-xs">PIPELINE_SLOTS</code>, <code class="font-mono text-xs">PIPELINE_INVALIDATES</code>) — the deepest machinery in the area; both are derived, not retyped. Candidate 07 is the observation that this idiom was not carried to the config family.</li>
+            <li><strong><code class="font-mono text-xs">estimator_to_val</code></strong> — one interface serving eight consumer families. Only one adapter ships behind its algorithm seam, so the extension seam is hypothetical, but the verb is not.</li>
+            <li><strong><code class="font-mono text-xs">set_ucs_return_constraints!</code></strong> (four adapters, one seam) and <strong><code class="font-mono text-xs">pipe_route</code></strong> — both good seams, nothing new found.</li>
+            <li><strong><code class="font-mono text-xs">NormError</code>'s home</strong> in <code class="font-mono text-xs">01_Base.jl</code> — ADR 0020's explicit decision, and the least-churned section of the file. Correct where it is.</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <!-- ══════════════ TOP RECOMMENDATION ══════════════ -->
+      <section id="top-recommendation">
+        <div class="deep rounded-xl p-8 text-white">
+          <p class="lbl text-slate-400">Top recommendation</p>
+          <h2 class="font-serif text-3xl mt-2">01 — Declare which optimisers run the Model Assembly middle</h2>
+          <p class="mt-4 text-slate-200 leading-relaxed max-w-3xl">It is the default <code class="font-mono text-sm bg-slate-800 px-1 rounded">alg</code>, it is the only one of the five JuMP optimisers that skips <code class="font-mono text-sm bg-slate-800 px-1 rounded">assemble_jump_model!</code>, and every setting it drops was constructed and validated first — so the caller has been told the configuration is good and gets a portfolio that ignores it. The fix is a declaration, not a rewrite: ADR 0008 §6 already decided this formulation has no middle, and stating that in the interface lets the head refuse what it cannot honour.</p>
+          <p class="mt-4 text-slate-400 text-sm max-w-3xl">Take <a href="#c2" class="underline decoration-slate-500 hover:decoration-white">02 (the Frontier sweep)</a> alongside it — the drifted <code class="font-mono text-xs bg-slate-800 px-1 rounded">k</code> lives in the same two files, and both are latent for the same reason.</p>
+          <a href="#c1" class="inline-block mt-6 text-sm px-4 py-2 rounded bg-white text-slate-900 font-medium">Go to candidate 01 ↑</a>
+        </div>
+      </section>
+
+      <footer class="border-t border-slate-300 pt-6 text-xs text-slate-500">
+        <p>Vocabulary per the <code class="font-mono">codebase-design</code> skill: module, interface, implementation, depth, seam, adapter, leverage, locality. Domain nouns per <code class="font-mono">CONTEXT.md</code>.</p>
+        <p class="mt-1">Every claim in candidates 01–06 and 09 was re-verified against the working tree before publication.</p>
+      </footer>
+
+    </main>
+  </body>
+</html>

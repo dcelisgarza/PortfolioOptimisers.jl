@@ -258,7 +258,7 @@ $(DocStringExtensions.FIELDS)
     SmythBrobyCovariance(;
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         c1::Number = 0.5,
         c2::Number = 0.5,
         c3::Number = 4,
@@ -352,8 +352,9 @@ SmythBrobyCovariance
     ex
     function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator,
                                   me::AbstractExpectedReturnsEstimator,
-                                  pdm::Option{<:Posdef}, c1::Number, c2::Number, c3::Number,
-                                  n::Number, alg::SmythBrobyCovarianceAlgorithm,
+                                  pdm::Option{<:AbstractPosdefEstimator}, c1::Number,
+                                  c2::Number, c3::Number, n::Number,
+                                  alg::SmythBrobyCovarianceAlgorithm,
                                   ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c1, :c1)
         assert_nonempty_nonneg_finite_val(c2, :c2)
@@ -365,8 +366,9 @@ SmythBrobyCovariance
 end
 function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                              pdm::Option{<:Posdef} = Posdef(), c1::Number = 0.5,
-                              c2::Number = 0.5, c3::Number = 4, n::Number = 2,
+                              pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+                              c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
+                              n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::SmythBrobyCovariance
     return SmythBrobyCovariance(ve, me, pdm, c1, c2, c3, n, alg, ex)
@@ -904,10 +906,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)
@@ -948,10 +947,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)

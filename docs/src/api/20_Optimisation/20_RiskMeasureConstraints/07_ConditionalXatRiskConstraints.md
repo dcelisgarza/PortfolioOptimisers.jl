@@ -7,4 +7,6 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustCondit
 set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustConditionalValueatRiskRange, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustConditionalDrawdownatRisk, opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...; kwargs...)
+set_conditional_risk_constraints!
+set_dr_conditional_risk_constraints!
 ```

@@ -114,10 +114,7 @@ This method computes the pairwise mutual information correlation matrix for the 
   - [`cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return mutual_info(X, ce.bins, ce.normalise)
 end
 

@@ -329,7 +329,7 @@ $(DocStringExtensions.FIELDS)
     NestedClustered(;
         pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         cle::TD{<:ClE_Cl} = ClustersEstimator(),
-        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         opti::OptE_TD,

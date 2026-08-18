@@ -502,13 +502,7 @@ Where:
 """
 function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     # The axis is checked only by the views that resolve names against it. A `BlackLittermanViews`
     # result carries its own `P` and never touches `sets`, so demanding a universe for it would
     # reject the legitimate precomputed-views configuration, which `assert_bl` deliberately permits

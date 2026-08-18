@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudget(;
-        val::VecNum
+        val::Num_VecNum
     ) -> RiskBudget
 
 Keywords correspond to the struct's fields.
@@ -72,7 +72,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudgetEstimator(;
-        val::EstValType
+        val::EstValType,
+        dval::Option{<:Number} = nothing
     ) -> RiskBudgetEstimator
 
 Keywords correspond to the struct's fields.

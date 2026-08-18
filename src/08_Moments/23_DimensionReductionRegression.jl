@@ -126,7 +126,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PPCA(;
-        kwargs::NamedTuple = (),
+        kwargs::NamedTuple = (;)
     ) -> PPCA
 
 Keywords correspond to the struct's fields.

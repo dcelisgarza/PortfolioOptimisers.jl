@@ -103,6 +103,10 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - $(ret_dict[:mu])
@@ -137,6 +141,7 @@ julia> mean(serw, X)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    assert_dims(dims)
     w = get_observation_weights(me.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         Statistics.mean(X; dims = dims)

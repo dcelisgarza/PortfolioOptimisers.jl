@@ -59,7 +59,7 @@ $(DocStringExtensions.FIELDS)
         kt::Option{<:KtSlot} = nothing,
         N::Option{<:Integer} = nothing,
         alg1::AbstractMomentAlgorithm = FullMoment(),
-        alg2::VarianceFormulation = SOCRiskExpr(),
+        alg2::SecondMomentFormulation = SOCRiskExpr(),
         pe::Option{<:AbstractPriorEstimator} = nothing,
     ) -> Kurtosis
 

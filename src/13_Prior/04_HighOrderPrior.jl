@@ -560,13 +560,7 @@ Where:
 """
 function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     pr = prior(pe.pe, X, F; kwargs...)
     kt = cokurtosis(pe.kte, X; kwargs...)
     D2 = nothing
@@ -580,6 +574,13 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     end
     return HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
+end
+
+function factor_residual_config(pe::HighOrderPriorEstimator)
+    # The low-order block of the result is the wrapped estimator's own, residual block and
+    # all, so this estimator forwards rather than answering for itself (see
+    # [`factor_residual_config`](@ref)).
+    return factor_residual_config(pe.pe)
 end
 
 export HighOrderPriorEstimator

@@ -13,8 +13,8 @@ $(DocStringExtensions.FIELDS)
 
     ThresholdEstimator(;
         val::EstValType,
-        dval::Option{<:Number} = nothing,
-        key::Option{<:AbstractString} = nothing
+        key::Option{<:AbstractString} = nothing,
+        dval::Option{<:Number} = nothing
     ) -> ThresholdEstimator
 
 ## Validation

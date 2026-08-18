@@ -275,18 +275,12 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 """
 function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return variation_info(X, de.alg.bins, de.alg.normalise)
 end
 function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
 end
 """

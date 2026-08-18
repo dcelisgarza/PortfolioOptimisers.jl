@@ -389,10 +389,7 @@ julia> V
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     Y = X .- mu
@@ -400,10 +397,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
 end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     Y = min.(X .- mu, zero(eltype(X)))

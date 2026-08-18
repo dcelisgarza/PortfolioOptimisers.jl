@@ -671,3 +671,43 @@ end
     @test all(res.w .>= 0.01 - 1e-6)
     @test all(res.w .<= 0.2 + 1e-6)
 end
+
+@testset "Name resolution does not edit the caller's Universe Sets" begin
+    # `name_to_val!` used to call `unique!` on the member list it read out of `sets.dict`, so
+    # resolving a group with a repeated member permanently shortened the user's Universe Sets.
+    # Universe Sets are configuration and are reused across folds and optimisers, so the
+    # resolver must leave them untouched. `resolve_axis_name` now returns a copy.
+    dup_sets = UniverseSets(; xkey = "nx",
+                            dict = Dict("nx" => ["A", "B", "C"], "Tech" => ["A", "B", "A"]))
+    val = PortfolioOptimisers.estimator_to_val("Tech" => 0.5, dup_sets)
+    @test val == [0.5, 0.5, 0.0]
+    @test dup_sets.dict["Tech"] == ["A", "B", "A"]
+
+    # The dictionary form takes the same path and must also leave the sets alone.
+    val = PortfolioOptimisers.estimator_to_val(Dict("Tech" => 0.25, "C" => 0.75), dup_sets)
+    @test val == [0.25, 0.25, 0.75]
+    @test dup_sets.dict["Tech"] == ["A", "B", "A"]
+
+    # An asset name takes precedence over a group of the same spelling.
+    clash_sets = UniverseSets(; xkey = "nx",
+                              dict = Dict("nx" => ["A", "B", "C"], "A" => ["B", "C"]))
+    val = PortfolioOptimisers.estimator_to_val("A" => 1.0, clash_sets)
+    @test val == [1.0, 0.0, 0.0]
+
+    # An unknown name warns when `strict` is false and throws when it is true. Both branches
+    # now run through `strict_diagnostic`, so the policy is one function.
+    @test_logs (:warn,) PortfolioOptimisers.estimator_to_val("Nope" => 1.0, dup_sets)
+    @test_throws ArgumentError PortfolioOptimisers.estimator_to_val("Nope" => 1.0, dup_sets;
+                                                                    strict = true)
+
+    # A group whose member is missing from the axis keeps the members it can place, and
+    # reports the rest under the same strictness policy.
+    partial_sets = UniverseSets(; xkey = "nx",
+                                dict = Dict("nx" => ["A", "B", "C"], "Mixed" => ["A", "Z"]))
+    val = @test_logs (:warn,) PortfolioOptimisers.estimator_to_val("Mixed" => 0.3,
+                                                                   partial_sets)
+    @test val == [0.3, 0.0, 0.0]
+    @test_throws ArgumentError PortfolioOptimisers.estimator_to_val("Mixed" => 0.3,
+                                                                    partial_sets;
+                                                                    strict = true)
+end

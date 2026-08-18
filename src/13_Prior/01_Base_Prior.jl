@@ -1155,7 +1155,7 @@ As there, the two reads differ where the block is absent — `pr.f_kt` returns `
         S2::Option{<:MatNum} = nothing,
         sk::Option{<:MatNum} = nothing,
         V::Option{<:MatNum} = nothing,
-        skmp::Option{<:AbstractMatrixProcessingEstimator} = MatrixProcessing(),
+        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
         fpr::Option{<:HighOrderPrior} = nothing
     ) -> HighOrderPrior
 

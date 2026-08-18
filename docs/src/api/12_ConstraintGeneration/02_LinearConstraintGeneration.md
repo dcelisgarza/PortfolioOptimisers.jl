@@ -28,7 +28,7 @@ universe_axis
 constraint_row_length
 constraint_row_term
 AbstractParsingResult
-group_to_val!
+name_to_val!
 _parse_equation
 rethrow_parse_error
 format_term

@@ -759,7 +759,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalRiskMeasureSettings(;
-        scale::Number,
+        scale::Number = 1.0
     ) -> HierarchicalRiskMeasureSettings
 
 Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling factor.

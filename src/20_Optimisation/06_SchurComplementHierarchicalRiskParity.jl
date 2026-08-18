@@ -197,7 +197,7 @@ $(DocStringExtensions.FIELDS)
     SchurComplementParams(;
         r::Sd_Var = Variance(),
         gamma::Number = 0.5,
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
         flag::Bool = true
     ) -> SchurComplementParams
@@ -234,7 +234,8 @@ Keywords correspond to the struct's fields.
     $(field_dict[:flag])
     """
     flag
-    function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
+    function SchurComplementParams(r::Sd_Var, gamma::Number,
+                                   pdm::Option{<:AbstractPosdefEstimator},
                                    alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma),
                   DomainError(gamma, "gamma must be in [0, 1]"))
@@ -246,7 +247,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function SchurComplementParams(; r::Sd_Var = Variance(), gamma::Number = 0.5,
-                               pdm::Option{<:Posdef} = Posdef(),
+                               pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)::SchurComplementParams
     return SchurComplementParams(r, gamma, pdm, alg, flag)
@@ -778,7 +779,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
         end
     end
     msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-    strict ? throw(ArgumentError(msg)) : @warn(msg)
+    strict_diagnostic(msg, strict)
     return w, lgamma
 end
 """

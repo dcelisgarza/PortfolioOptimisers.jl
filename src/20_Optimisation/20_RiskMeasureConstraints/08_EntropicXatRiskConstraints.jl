@@ -53,48 +53,84 @@ Where:
 
 # Related
 
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    return set_entropic_risk_constraints!(model, i, r, opt, pr, series, T,
+                                          (; t = :t_evar_, z = :z_evar_, u = :u_evar_,
+                                           budget = :cevar_, cone = :cevar_exp_cone_,
+                                           risk = :evar_risk_); prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Encode the entropic tail programme of `series` and register it under the names in `keys`.
+
+This is the shared body of `EntropicValueatRisk` and `EntropicDrawdownatRisk`. The two are
+one exponential cone programme over different series, so [`risk_series`](@ref) chooses the
+series and this function writes the cone once.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The entropic risk measure, read for `alpha`, `w` and `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `T::Int`: The number of observations.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The entropic risk expression added to the model.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                        opt::RiskJuMPOptimisationEstimator,
+                                        pr::AbstractPriorResult, series, T::Int,
+                                        keys::NamedTuple; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    T = length(net_X)
-    t_evar, z_evar, u_evar = JuMP.@variables(model, begin
-                                                 ()
-                                                 (), (lower_bound = 0)
-                                                 [1:T]
-                                             end)
-    state_set!(model, prefix, :t_evar_, i, t_evar)
-    state_set!(model, prefix, :z_evar_, i, z_evar)
-    state_set!(model, prefix, :u_evar_, i, u_evar)
+    t, z, u = JuMP.@variables(model, begin
+                                  ()
+                                  (), (lower_bound = 0)
+                                  [1:T]
+                              end)
+    state_set!(model, prefix, keys.t, i, t)
+    state_set!(model, prefix, keys.z, i, z)
+    state_set!(model, prefix, keys.u, i, u)
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = get_observation_weights(wi, pr.X)
     at = if isnothing(wi)
-        state_set!(model, prefix, :cevar_, i,
-                   JuMP.@constraint(model, sc * (sum(u_evar) - z_evar) <= 0))
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (sum(u) - z) <= 0))
         r.alpha * T
     else
-        state_set!(model, prefix, :cevar_, i,
-                   JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(wi, u_evar) - z_evar) <= 0))
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (LinearAlgebra.dot(wi, u) - z) <= 0))
         r.alpha * sum(wi)
     end
-    state_set!(model, prefix, :cevar_exp_cone_, i,
+    state_set!(model, prefix, keys.cone, i,
                JuMP.@constraint(model, [i = 1:T],
-                                [sc * (-net_X[i] - t_evar), sc * z_evar, sc * u_evar[i]] in
+                                [sc * (-series[i] - t), sc * z, sc * u[i]] in
                                 JuMP.MOI.ExponentialCone()))
-    evar_risk = state_set!(model, prefix, :evar_risk_, i,
-                           JuMP.@expression(model, t_evar - z_evar * log(at)))
-    set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, :evar_risk_, i;
+    risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, t - z * log(at)))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
-    return evar_risk
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -152,43 +188,15 @@ drawdown-at-risk at confidence level `r.alpha`.
 # Related
 
   - [`EntropicDrawdownatRisk`](@ref)
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    at = r.alpha * T
-    t_edar, z_edar, u_edar = JuMP.@variables(model, begin
-                                                 ()
-                                                 (), (lower_bound = 0)
-                                                 [1:T]
-                                             end)
-    state_set!(model, prefix, :t_edar_, i, t_edar)
-    state_set!(model, prefix, :z_edar_, i, z_edar)
-    state_set!(model, prefix, :u_edar_, i, u_edar)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    at = if isnothing(wi)
-        state_set!(model, prefix, :cedar_, i,
-                   JuMP.@constraint(model, sc * (sum(u_edar) - z_edar) <= 0))
-        r.alpha * T
-    else
-        state_set!(model, prefix, :cedar_, i,
-                   JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(wi, u_edar) - z_edar) <= 0))
-        r.alpha * sum(wi)
-    end
-    state_set!(model, prefix, :cedar_exp_cone_, i,
-               JuMP.@constraint(model, [i = 1:T],
-                                [sc * (dd[i + 1] - t_edar), sc * z_edar, sc * u_edar[i]] in
-                                JuMP.MOI.ExponentialCone()))
-    edar_risk = state_set!(model, prefix, :edar_risk_, i,
-                           JuMP.@expression(model, t_edar - z_edar * log(at)))
-    set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, :edar_risk_, i;
-                                    prefix = prefix)
-    return edar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    return set_entropic_risk_constraints!(model, i, r, opt, pr, series, T,
+                                          (; t = :t_edar_, z = :z_edar_, u = :u_edar_,
+                                           budget = :cedar_, cone = :cedar_exp_cone_,
+                                           risk = :edar_risk_); prefix = prefix)
 end

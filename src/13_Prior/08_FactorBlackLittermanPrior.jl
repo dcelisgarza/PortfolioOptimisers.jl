@@ -20,7 +20,7 @@ $(DocStringExtensions.FIELDS)
         views::Lc_BLV,
         sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
-        w::Option{<:ObsWeights} = nothing,
+        w::Option{<:VecNum} = nothing,
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
@@ -305,11 +305,7 @@ Where:
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
+    X, F = dims_oriented(dims, X, F)
     # The views land on the *factor* distribution, so they resolve against the declared factor
     # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
     # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own

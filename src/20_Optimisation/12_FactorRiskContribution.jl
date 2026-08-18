@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 # Constructors
 
     FactorRiskContributionResult(;
-        jr::JuMPOptimisationResult, rr::AbstractRegressionResult,
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractRegressionResult,
         frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
     ) -> FactorRiskContributionResult
 

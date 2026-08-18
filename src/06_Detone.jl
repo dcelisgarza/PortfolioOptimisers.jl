@@ -10,7 +10,7 @@ All concrete and/or abstract types representing detoning estimators should be su
 In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `detone!(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: In-place detoning.
-  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional out-of-place detoning.
+  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional out-of-place detoning. A fallback method copies `X` and calls `detone!`, so it is only needed if the copy can be avoided.
 
 ## Arguments
 
@@ -78,7 +78,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Detone(;
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         n::Integer = 1,
     ) -> Detone
 
@@ -117,16 +117,16 @@ Detone
     Number of leading principal components to remove.
     """
     n
-    function Detone(pdm::Option{<:Posdef}, n::Integer)
+    function Detone(pdm::Option{<:AbstractPosdefEstimator}, n::Integer)
         @argcheck(zero(n) < n, DomainError)
         return new{typeof(pdm), typeof(n)}(pdm, n)
     end
 end
-function Detone(; pdm::Option{<:Posdef} = Posdef(), n::Integer = 1)
+function Detone(; pdm::Option{<:AbstractPosdefEstimator} = Posdef(), n::Integer = 1)
     return Detone(pdm, n)
 end
 """
-    detone!(dt::Option{<:Detone}, X::MatNum) -> MatNum
+    detone!(dt::Option{<:AbstractDetoneEstimator}, X::MatNum) -> MatNum
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -242,7 +242,7 @@ function detone!(dt::Detone, X::MatNum)
     return X
 end
 """
-    detone(dt::Option{<:Detone}, X::MatNum) -> MatNum
+    detone(dt::Option{<:AbstractDetoneEstimator}, X::MatNum) -> MatNum
 
 Out-of-place version of [`detone!`](@ref).
 
@@ -288,7 +288,7 @@ julia> size(Xd)
 function detone(::Nothing, X::MatNum)::MatNum
     return X
 end
-function detone(dt::Detone, X::MatNum)
+function detone(dt::AbstractDetoneEstimator, X::MatNum)
     X = copy(X)
     detone!(dt, X)
     return X

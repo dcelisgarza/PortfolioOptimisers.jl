@@ -511,7 +511,8 @@ RelativisticDrawdownatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
+    function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
+                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -526,7 +527,7 @@ RelativisticDrawdownatRisk
                                                                                            w)
     end
 end
-function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
+function RelativisticDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
                                     alpha::Number = 0.05, kappa::Number = 0.3,
                                     w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk

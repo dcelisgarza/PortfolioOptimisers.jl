@@ -386,7 +386,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PipelineStep(;
-        est,
+        est::Union{<:AbstractEstimator, <:Function},
         writes::Symbol,
         reads::Tuple{Vararg{Symbol}} = (),
         target::Option{Symbol} = nothing,

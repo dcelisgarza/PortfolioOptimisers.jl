@@ -353,13 +353,7 @@ Compute opinion pooling prior moments for asset returns.
 """
 function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F; strict = strict, kwargs...).X : X
     T = size(X, 1)
     M = length(pe.pes)
@@ -393,6 +387,12 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
                          ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr, Z = Z)
+end
+
+function factor_residual_config(::OpinionPoolingPrior)
+    # This estimator pools several priors and has no single wrapped one to forward, so it
+    # declares no residual block (see [`factor_residual_config`](@ref)).
+    return nothing
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

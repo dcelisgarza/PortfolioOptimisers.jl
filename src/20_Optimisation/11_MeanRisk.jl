@@ -11,7 +11,9 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
 
 # Constructors
 
-    MeanRiskResult(; jr::JuMPOptimisationResult, fb::Option{<:OptE_Opt}) -> MeanRiskResult
+    MeanRiskResult(;
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, fb::Option{<:OptE_Opt}
+    ) -> MeanRiskResult
 
 Keywords correspond to the struct's fields.
 

@@ -33,7 +33,9 @@ $(DocStringExtensions.FIELDS)
         smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
         slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-        plr::Option{<:AbstractPhylogenyConstraintResult}, ret::JRE_VecJRE
+        plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
+                            <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+        ret::JRE_VecJRE, sca::Scalariser
     ) -> ProcessedJuMPOptimiserAttributes
 
 Keywords correspond to the struct's fields. The field types are the *result* side of the
@@ -1372,9 +1374,11 @@ Add risk-measure constraints and scalarise the combined risk expression in `mode
 
 One step of [`assemble_jump_model!`](@ref), dispatched on `r`: when `r` is `nothing`
 (e.g. [`RelaxedRiskBudgeting`](@ref), whose risk lives in its head) this is a no-op.
-`extra` is the optional trailing-argument tuple — empty for most optimisers, or `(b1,)`
-for [`FactorRiskContribution`](@ref) — splatted into `set_risk_constraints!` so the
-non-factor call signature is reproduced exactly.
+
+This is the one place the fee argument is positional. Every head reaches
+[`set_risk_constraints!`](@ref) through it, so a head cannot mis-order the list and lose the
+fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inlined the step
+(ADR 0008, amendment 2 §3).
 
 # Arguments
 
@@ -1385,7 +1389,7 @@ non-factor call signature is reproduced exactly.
   - `pr`: Prior result passed to risk builders.
   - `pl`: Phylogeny result passed to risk builders.
   - `fees`: Fees result passed to risk builders.
-  - `extra`: Trailing-argument tuple splatted into risk builders (`()` or `(b1,)`).
+  - $(arg_dict[:b1_opt])
   - `rd`: Returns result forwarded as a keyword argument to risk builders.
 
 # Returns
@@ -1400,12 +1404,17 @@ non-factor call signature is reproduced exactly.
   - [`RelaxedRiskBudgeting`](@ref)
   - [`FactorRiskContribution`](@ref)
 """
-function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, args...; kwargs...)
+function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, optimiser, opt, pr, pl,
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
+                                 kwargs...)
+    # The no-op carries the same positional list as the builder below, not an `args...` tail:
+    # a tail is ambiguous with a typed tail on the sibling method, and it accepts a call the
+    # builder would reject.
     return nothing
 end
-function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl, fees,
-                                 args...; rd)
-    set_risk_constraints!(model, r, optimiser, pr, pl, fees, args...; rd = rd)
+function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl,
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd)
+    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     return nothing
 end
@@ -1449,8 +1458,7 @@ and can be capped.
   - `r::Option{<:RiskMeasure} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
-  - `b1::Option{<:MatNum} = nothing`: Factor loading matrix for
-    [`FactorRiskContribution`](@ref); `nothing` for all other optimisers.
+  - $(arg_dict[:b1_opt])
   - `sdp_asset_phylogeny::Bool = true`: Whether to apply the standard asset-space SDP phylogeny
     constraints. [`FactorRiskContribution`](@ref) passes `false` and applies its own
     factor-space variant in its tail instead.

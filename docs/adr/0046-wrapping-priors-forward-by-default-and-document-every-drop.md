@@ -672,3 +672,65 @@ names against a universe and honour `strict`, so the flag was silently inert on 
 `prior(pe::FactorPrior, …)` now declares `strict::Bool = false` and passes it down, which also stops
 `strict` from reaching `matrix_processing!` in the `kwargs...` bag — the behaviour the other two
 sites already had.
+
+## Amendment (2026-08-17) — `factor_residual_config` has no default, from finding 4 of the 2026-08-17 security review
+
+The amendment above made `factor_residual_config` *total* by giving
+`::AbstractPriorEstimator` a fallback that returns `nothing`. The review asked which reading of
+"total" the ADR meant: *answers for every type*, or *throws for an undeclared type*. This amendment
+settles it as the second.
+
+A `nothing` fallback cannot separate the two statements it is asked to carry:
+
+- this estimator adds no residual block, so leave the covariance alone;
+- the author of this estimator forgot the method.
+
+Both read as "leave the covariance alone", so a new estimator that lifts factors and adds a residual
+block silently drops that block out of `HighOrderFactorPriorEstimator`'s systematic covariance. The
+correction then runs on a covariance that is too large by the residual variances, and the result is
+a wrong number rather than an error. Nothing in the codebase notices, because the surface is an
+extension author's, not an untrusted input.
+
+The declaration now has the polarity `range_tails` already uses for a per-type declaration whose
+absence is a defect rather than an answer:
+
+```julia
+function factor_residual_config(pe::AbstractPriorEstimator)
+    return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. …"))
+end
+```
+
+Every one of the eleven concrete prior estimators declares beside its own definition:
+
+| Estimator                       | Declaration          | Why                                        |
+| ------------------------------- | -------------------- | ------------------------------------------ |
+| `FactorPrior`                   | `(; ve, pdm, rsd)`   | owns the residual block                    |
+| `FactorBlackLittermanPrior`     | `(; ve, pdm, rsd)`   | owns the residual block                    |
+| `BlackLittermanPrior`           | forwards `pe.pe`     | wrapper                                    |
+| `BayesianBlackLittermanPrior`   | forwards `pe.pe`     | wrapper                                    |
+| `EntropyPoolingPrior`           | forwards `pe.pe`     | wrapper                                    |
+| `FeaturePrior`                  | forwards `pe.pe`     | wrapper                                    |
+| `HighOrderPriorEstimator`       | forwards `pe.pe`     | wrapper                                    |
+| `HighOrderFactorPriorEstimator` | forwards `pe.pe`     | wrapper                                    |
+| `EmpiricalPrior`                | `nothing`            | no factor lift, so no residual block       |
+| `AugmentedBlackLittermanPrior`  | `nothing`            | moments come out of the augmented system   |
+| `OpinionPoolingPrior`           | `nothing`            | pools several priors, no single wrapped one|
+
+The two high-order estimators declared nothing before this change and reached the old fallback.
+They are wrappers, and the low-order block of the result they build *is* the wrapped estimator's
+own, residual block and all, so they forward. No live call path changes: the one consumer calls
+`factor_residual_config(pe.pe)` with `pe.pe` bounded `AbstractLowOrderPriorEstimator_F_AF`, and no
+high-order estimator is a member of that bound.
+
+### The shape is checked before the property access
+
+The consumer reads `ve`, `pdm` and `rsd` off the answer by property access, which has no shape check
+of its own. `assert_factor_residual_config(pe, cfg)` now checks the two shapes the contract admits —
+`nothing`, or a `NamedTuple` carrying the three keys — and names the estimator that answered, so a
+wrong declaration fails at the declaration rather than as a `FieldError` inside the cokurtosis
+correction.
+
+### What this does not decide
+
+The load-time preferences channel of finding 1 and the `state_key` collision class of finding 3 are
+separate, and are settled in ADR 0041 and ADR 0037 respectively.

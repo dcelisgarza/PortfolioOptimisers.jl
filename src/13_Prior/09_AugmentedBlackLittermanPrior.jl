@@ -367,11 +367,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
 """
 function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
+    X, F = dims_oriented(dims, X, F)
     # Each axis is checked only by the views that resolve names against it. A
     # `BlackLittermanViews` result carries its own `P` and never touches `sets`, so demanding a
     # universe for it would reject the legitimate precomputed-views configuration — which, with
@@ -468,6 +464,13 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
                          sigma = posterior_sigma, w = a_prior.w, ens = a_prior.ens,
                          kld = a_prior.kld, ow = a_prior.ow, rr = rr, fpr = fpr,
                          Z = a_prior.Z)
+end
+
+function factor_residual_config(::AugmentedBlackLittermanPrior)
+    # The augmented system produces the asset moments whole, so this estimator never calls
+    # [`factor_lift`](@ref) and adds no residual block. See
+    # [`factor_residual_config`](@ref).
+    return nothing
 end
 
 export AugmentedBlackLittermanPrior

@@ -55,57 +55,95 @@ Where:
 
 # Related
 
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    T = length(net_X)
-    ip = inv(r.p)
-    pvar_eta, pvar_t, pvar_w, pvar_v = JuMP.@variables(model, begin
-                                                           ()
-                                                           ()
-                                                           [1:T], (lower_bound = 0)
-                                                           [1:T]
-                                                       end)
-    state_set!(model, prefix, :pvar_eta_, i, pvar_eta)
-    state_set!(model, prefix, :pvar_t_, i, pvar_t)
-    state_set!(model, prefix, :pvar_w_, i, pvar_w)
-    state_set!(model, prefix, :pvar_v_, i, pvar_v)
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
+                                            (; eta = :pvar_eta_, t = :pvar_t_,
+                                             slack = :pvar_w_, v = :pvar_v_,
+                                             budget = :cpvar_eq_, exceedance = :cpvar_,
+                                             pcone = :cpvar_pcone_, risk = :pvar_risk_);
+                                            prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
 
+Encode the power-norm tail programme of `series` and register it under the names in `keys`.
+
+This is the shared body of `PowerNormValueatRisk` and `PowerNormDrawdownatRisk`. The two are
+one power cone programme over different series, so [`risk_series`](@ref) chooses the series
+and this function writes the cone once.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The power-norm risk measure, read for `alpha`, `p`, `w` and
+    `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `T::Int`: The number of observations.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The power-norm risk expression added to the model.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                          opt::RiskJuMPOptimisationEstimator,
+                                          pr::AbstractPriorResult, series, T::Int,
+                                          keys::NamedTuple; prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    ip = inv(r.p)
+    eta, t, slack, v = JuMP.@variables(model, begin
+                                           ()
+                                           ()
+                                           [1:T], (lower_bound = 0)
+                                           [1:T]
+                                       end)
+    state_set!(model, prefix, keys.eta, i, eta)
+    state_set!(model, prefix, keys.t, i, t)
+    state_set!(model, prefix, keys.slack, i, slack)
+    state_set!(model, prefix, keys.v, i, v)
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = get_observation_weights(wi, pr.X)
     iaT = if isnothing(wi)
-        state_set!(model, prefix, :cpvar_eq_, i,
-                   JuMP.@constraint(model, sc * (sum(pvar_v) - pvar_t) <= 0))
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (sum(v) - t) <= 0))
         inv(r.alpha * T^ip)
     else
-        state_set!(model, prefix, :cpvar_eq_, i,
-                   JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(wi, pvar_v) - pvar_t) <= 0))
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (LinearAlgebra.dot(wi, v) - t) <= 0))
         inv(r.alpha * sum(wi)^ip)
     end
-    cpvar, cpvar_pcone = JuMP.@constraints(model,
-                                           begin
-                                               sc * ((net_X + pvar_w) .+ pvar_eta) >= 0
-                                               [i = 1:T],
-                                               [sc * pvar_v[i], sc * pvar_t,
-                                                sc * pvar_w[i]] in JuMP.MOI.PowerCone(ip)
-                                           end)
-    state_set!(model, prefix, :cpvar_, i, cpvar)
-    state_set!(model, prefix, :cpvar_pcone_, i, cpvar_pcone)
-    pvar_risk = state_set!(model, prefix, :pvar_risk_, i,
-                           JuMP.@expression(model, pvar_eta + iaT * pvar_t))
-    set_risk_bounds_and_expression!(model, opt, pvar_risk, r.settings, :pvar_risk_, i;
+    exceedance, pcone = JuMP.@constraints(model,
+                                          begin
+                                              sc * ((series + slack) .+ eta) >= 0
+                                              [i = 1:T],
+                                              [sc * v[i], sc * t, sc * slack[i]] in
+                                              JuMP.MOI.PowerCone(ip)
+                                          end)
+    state_set!(model, prefix, keys.exceedance, i, exceedance)
+    state_set!(model, prefix, keys.pcone, i, pcone)
+    risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, eta + iaT * t))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
-    return pvar_risk
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -169,46 +207,11 @@ computed over the drawdown path of portfolio returns.
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    ip = inv(r.p)
-    pdar_eta, pdar_t, pdar_w, pdar_v = JuMP.@variables(model, begin
-                                                           ()
-                                                           ()
-                                                           [1:T], (lower_bound = 0)
-                                                           [1:T]
-                                                       end)
-    state_set!(model, prefix, :pdar_eta_, i, pdar_eta)
-    state_set!(model, prefix, :pdar_t_, i, pdar_t)
-    state_set!(model, prefix, :pdar_w_, i, pdar_w)
-    state_set!(model, prefix, :pdar_v_, i, pdar_v)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    iaT = if isnothing(wi)
-        state_set!(model, prefix, :cpdar_eq_, i,
-                   JuMP.@constraint(model, sc * (sum(pdar_v) - pdar_t) <= 0))
-        inv(r.alpha * T^ip)
-    else
-        state_set!(model, prefix, :cpdar_eq_, i,
-                   JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(wi, pdar_v) - pdar_t) <= 0))
-        inv(r.alpha * sum(wi)^ip)
-    end
-    cpdar, cpdar_pcone = JuMP.@constraints(model,
-                                           begin
-                                               sc *
-                                               ((pdar_w - view(dd, 2:(T + 1))) .+ pdar_eta) >=
-                                               0
-                                               [i = 1:T],
-                                               [sc * pdar_v[i], sc * pdar_t,
-                                                sc * pdar_w[i]] in JuMP.MOI.PowerCone(ip)
-                                           end)
-    state_set!(model, prefix, :cpdar_, i, cpdar)
-    state_set!(model, prefix, :cpdar_pcone_, i, cpdar_pcone)
-    pdar_risk = state_set!(model, prefix, :pdar_risk_, i,
-                           JuMP.@expression(model, pdar_eta + iaT * pdar_t))
-    set_risk_bounds_and_expression!(model, opt, pdar_risk, r.settings, :pdar_risk_, i;
-                                    prefix = prefix)
-    return pdar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
+                                            (; eta = :pdar_eta_, t = :pdar_t_,
+                                             slack = :pdar_w_, v = :pdar_v_,
+                                             budget = :cpdar_eq_, exceedance = :cpdar_,
+                                             pcone = :cpdar_pcone_, risk = :pdar_risk_);
+                                            prefix = prefix)
 end

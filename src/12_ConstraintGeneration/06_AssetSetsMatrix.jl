@@ -537,36 +537,18 @@ function is_feature_factor_key(k, sets::UniverseSets)::Bool
     return isa(k, AbstractString) && (startswith(k, sets.fkey) || startswith(k, sets.ufkey))
 end
 """
-    feature_program_diagnostic(msg::AbstractString, strict::Bool) -> Nothing
-
-Report an unresolvable **name** in a graded feature program: throw under `strict`, warn otherwise, and in both cases the offending term is dropped.
-
-`strict` governs names only. Nothing structural is refused — an all-zero row and a one-column matrix are both legal — and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to.
-
-# Related
-
-  - [`asset_sets_features`](@ref)
-"""
-function feature_program_diagnostic(msg::AbstractString, strict::Bool)::Nothing
-    if strict
-        throw(ArgumentError(msg))
-    end
-    @warn(msg)
-    return nothing
-end
-"""
     feature_grammar_msg(term) -> String
 
 Build the error text for a malformed **term** of a graded feature program — an entry or a target — and print the grammar itself.
 
-A malformed term is a syntax error, so the fastest fix is seeing the production it missed. Unlike the name diagnostics, this one never routes through [`feature_program_diagnostic`](@ref): its callers throw an `ArgumentError` whatever `strict` says, because there is no reading of the term to fall back to.
+A malformed term is a syntax error, so the fastest fix is seeing the production it missed. Unlike the name diagnostics, this one never routes through [`strict_diagnostic`](@ref): its callers throw an `ArgumentError` whatever `strict` says, because there is no reading of the term to fall back to.
 
 # Related
 
   - [`asset_sets_features`](@ref)
   - [`feature_entry!`](@ref)
   - [`feature_target!`](@ref)
-  - [`feature_program_diagnostic`](@ref)
+  - [`strict_diagnostic`](@ref)
 """
 function feature_grammar_msg(term)
     return "`$(term)` is not a well-formed graded feature program term. The grammar is\n" *
@@ -588,7 +570,7 @@ The message names the two prefixes and the reason, and names sizes rather than u
 
   - [`asset_sets_features`](@ref)
   - [`is_feature_factor_key`](@ref)
-  - [`feature_program_diagnostic`](@ref)
+  - [`strict_diagnostic`](@ref)
   - [`unknown_variable_msg`](@ref)
 """
 function feature_factor_key_msg(k, sets::UniverseSets)
@@ -605,7 +587,7 @@ The message names the *count* of distinct values under the key, never the values
 
   - [`asset_sets_features`](@ref)
   - [`feature_diagonal!`](@ref)
-  - [`feature_program_diagnostic`](@ref)
+  - [`strict_diagnostic`](@ref)
   - [`did_you_mean`](@ref)
 """
 function feature_missing_group_value_msg(key, group, col)
@@ -624,7 +606,7 @@ The function wraps [`unknown_variable_msg`](@ref), so it inherits that message's
 
   - [`asset_sets_features`](@ref)
   - [`feature_program_candidates`](@ref)
-  - [`feature_program_diagnostic`](@ref)
+  - [`strict_diagnostic`](@ref)
   - [`unknown_variable_msg`](@ref)
 """
 function feature_unknown_name_msg(name, nx, key, pool; axis::AbstractString = "asset")
@@ -660,15 +642,14 @@ The column is resolved **before** `natural` is ever called, so an unknown node c
 
   - [`asset_sets_features`](@ref)
   - [`resolve_feature_value`](@ref)
-  - [`feature_program_diagnostic`](@ref)
+  - [`strict_diagnostic`](@ref)
 """
 function feature_write!(Z::Matrix{Float64}, rows, node, natural, v, sets::UniverseSets, nz,
                         zidx, pool, strict::Bool)::Nothing
     col = get(zidx, string(node), nothing)
     if isnothing(col)
-        return feature_program_diagnostic(feature_unknown_name_msg(node, nz, sets.zkey,
-                                                                   pool; axis = "feature"),
-                                          strict)
+        return strict_diagnostic(feature_unknown_name_msg(node, nz, sets.zkey, pool;
+                                                          axis = "feature"), strict)
     end
     for i in rows
         Z[i, col] = resolve_feature_value(v, natural(i))
@@ -699,8 +680,8 @@ function feature_diagonal!(Z::Matrix{Float64}, key, group, v, sets::UniverseSets
             findall(x -> isequal(x, group), col)
         end
         if isempty(rows)
-            return feature_program_diagnostic(feature_missing_group_value_msg(key, group,
-                                                                              col), strict)
+            return strict_diagnostic(feature_missing_group_value_msg(key, group, col),
+                                     strict)
         end
         node = chopprefix(key, sets.xkey * "_")
         return feature_write!(Z, rows, node, i -> float(col[i]), v, sets, nz, zidx, pool,
@@ -709,8 +690,8 @@ function feature_diagonal!(Z::Matrix{Float64}, key, group, v, sets::UniverseSets
     if !isnothing(group)
         rows = findall(x -> isequal(x, group), col)
         if isempty(rows)
-            return feature_program_diagnostic(feature_missing_group_value_msg(key, group,
-                                                                              col), strict)
+            return strict_diagnostic(feature_missing_group_value_msg(key, group, col),
+                                     strict)
         end
         return feature_write!(Z, rows, group, i -> 1.0, v, sets, nz, zidx, pool, strict)
     end
@@ -725,37 +706,30 @@ end
 
 Resolve a **non-taxonomy** row selector — an asset or an asset group — to row indices, or `nothing` when the name does not resolve.
 
-Taxonomy keys are handled by the caller, because the `sets.xkey` prefix rule settles them before any lookup. What is left is exactly [`estimator_to_val`](@ref)'s precedence, asset first and then group, with the factor axis refused between them so a factor-length list is diagnosed by name rather than by an eventual length mismatch.
+Taxonomy keys are handled by the caller, because the `sets.xkey` prefix rule settles them before any lookup. What is left is exactly [`estimator_to_val`](@ref)'s precedence, asset first and then group, resolved by the shared [`resolve_axis_name`](@ref), with the factor axis refused between them so a factor-length list is diagnosed by name rather than by an eventual length mismatch. The factor test therefore runs before the resolution, not after: a factor key that is *also* a `sets.dict` key would otherwise expand to factor names and be reported as a group of missing assets.
 
 # Related
 
   - [`asset_sets_features`](@ref)
   - [`estimator_to_val`](@ref)
+  - [`resolve_axis_name`](@ref)
+  - [`axis_name_indices`](@ref)
   - [`missing_group_assets_msg`](@ref)
 """
 function feature_rows(sel, sets::UniverseSets, nx, pool, strict::Bool)
-    if sel in nx
-        return [findfirst(x -> isequal(x, sel), nx)]
-    end
-    if is_feature_factor_key(sel, sets)
-        feature_program_diagnostic(feature_factor_key_msg(sel, sets), strict)
+    if !(sel in nx) && is_feature_factor_key(sel, sets)
+        strict_diagnostic(feature_factor_key_msg(sel, sets), strict)
         return nothing
     end
-    members = get(sets.dict, sel, nothing)
+    members = resolve_axis_name(sel, nx, sets.dict)
     if isnothing(members)
-        feature_program_diagnostic(feature_unknown_name_msg(sel, nx, sets.xkey, pool),
-                                   strict)
+        strict_diagnostic(feature_unknown_name_msg(sel, nx, sets.xkey, pool), strict)
         return nothing
     end
-    members = unique(members)
-    idx = [findfirst(x -> isequal(x, m), nx) for m in members]
-    missing_assets = members[isnothing.(idx)]
-    filter!(!isnothing, idx)
-    if !isempty(missing_assets)
-        feature_program_diagnostic(missing_group_assets_msg(sel, missing_assets, nx,
-                                                            sets.xkey), strict)
-    end
-    return idx
+    return axis_name_indices(members, nx,
+                             m -> strict_diagnostic(missing_group_assets_msg(sel, m, nx,
+                                                                             sets.xkey),
+                                                    strict))
 end
 """
     feature_target!(Z::Matrix{Float64}, rows, target::Union{<:Pair, <:AbstractVector{<:Pair}}, sets::UniverseSets, nx, nz, zidx, pool,
@@ -802,21 +776,18 @@ function feature_target!(Z::Matrix{Float64}, rows, target::Pair, sets::UniverseS
     # shape would otherwise be reported as a syntax error and send the caller looking for a
     # missing bracket instead of a wrong axis.
     if is_feature_factor_key(k, sets)
-        return feature_program_diagnostic(feature_factor_key_msg(k, sets), strict)
+        return strict_diagnostic(feature_factor_key_msg(k, sets), strict)
     end
     if !isa(rest, Num_AFeatVal)
         throw(ArgumentError(feature_grammar_msg(target)))
     end
-    if k in nx
-        return feature_write!(Z, rows, k, i -> ifelse(isequal(nx[i], k), 1.0, 0.0), rest,
-                              sets, nz, zidx, pool, strict)
-    end
-    members = get(sets.dict, k, nothing)
+    # An asset names its own node, a group names one node per member, and `resolve_axis_name`
+    # answers both: an asset resolves to itself, so the two branches are one loop.
+    members = resolve_axis_name(k, nx, sets.dict)
     if isnothing(members)
-        return feature_program_diagnostic(feature_unknown_name_msg(k, nx, sets.xkey, pool),
-                                          strict)
+        return strict_diagnostic(feature_unknown_name_msg(k, nx, sets.xkey, pool), strict)
     end
-    for m in unique(members)
+    for m in members
         feature_write!(Z, rows, m, i -> ifelse(isequal(nx[i], m), 1.0, 0.0), rest, sets, nz,
                        zidx, pool, strict)
     end
@@ -869,9 +840,8 @@ function feature_entry!(Z::Matrix{Float64}, entry::Pair, sets::UniverseSets, nx,
             col = sets.dict[lhs]
             rows = findall(x -> isequal(x, g), col)
             if isempty(rows)
-                return feature_program_diagnostic(feature_missing_group_value_msg(lhs, g,
-                                                                                  col),
-                                                  strict)
+                return strict_diagnostic(feature_missing_group_value_msg(lhs, g, col),
+                                         strict)
             end
             return feature_target!(Z, rows, tail, sets, nx, nz, zidx, pool, strict)
         end

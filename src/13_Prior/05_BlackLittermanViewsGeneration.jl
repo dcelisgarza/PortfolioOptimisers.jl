@@ -167,20 +167,16 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
             Ai = (nx .== v)
             if !any(isone, Ai)
                 msg = unknown_variable_msg(v, nx, k; axis = axis)
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                strict_diagnostic(msg, strict)
                 continue
             end
             At += Ai * c
         end
         if !any(!iszero, At)
             msg = empty_row_msg(lc.eqn, nx, k; noun = "view", axis = axis)
-            if strict
-                throw(ArgumentError(msg))
-            else
-                @warn(msg)
-                push!(excl, i)
-                continue
-            end
+            strict_diagnostic(msg, strict)
+            push!(excl, i)
+            continue
         end
         append!(P, At)
         append!(Q, lc.rhs)

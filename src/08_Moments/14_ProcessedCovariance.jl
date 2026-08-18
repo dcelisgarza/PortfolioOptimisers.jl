@@ -2,13 +2,13 @@
     ProcessedCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
         alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
     ) -> PortfolioOptimisersCovariance
 
     ProcessedCovariance(
         ce::StatsBase.CovarianceEstimator,
         alg::Option{<:AbstractMatrixProcessingAlgorithm},
-        pdm::Option{<:Posdef},
+        pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
 Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
@@ -46,14 +46,14 @@ PortfolioOptimisersCovariance
 """
 function ProcessedCovariance(ce::StatsBase.CovarianceEstimator,
                              alg::Option{<:AbstractMatrixProcessingAlgorithm},
-                             pdm::Option{<:Posdef})::PortfolioOptimisersCovariance
+                             pdm::Option{<:AbstractPosdefEstimator})::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(ce,
                                          MatrixProcessing(; pdm = pdm, alg = alg,
                                                           order = (:pdm, :alg)))
 end
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                             pdm::Option{<:Posdef} = Posdef())::PortfolioOptimisersCovariance
+                             pdm::Option{<:AbstractPosdefEstimator} = Posdef())::PortfolioOptimisersCovariance
     return ProcessedCovariance(ce, alg, pdm)
 end
 

@@ -300,11 +300,7 @@ Where:
 """
 function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
+    X, F = dims_oriented(dims, X, F)
     # The views update the *factor* distribution — the assets are its projection through the
     # loadings — so they resolve against the declared factor axis, not against `xkey`. Only the
     # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own

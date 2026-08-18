@@ -234,7 +234,9 @@ Declare how a prior estimator adds a residual block to the covariance it lifts.
 
 A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and `mp.pdm` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
 
-The declaration closes that gap. Every estimator answers: the two that own a residual block report it, a wrapper reports whatever it wraps, and everything else reports `nothing`. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
+The declaration closes that gap. Every estimator answers, and it answers beside its own definition: the two that own a residual block report it, a wrapper forwards the answer of the estimator it wraps, and an estimator that adds none says so with an explicit `nothing` method. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
+
+There is no default. A silent `nothing` fallback cannot separate *this estimator adds no residual block* from *the author of this estimator forgot the method*, and the second reading drops a residual block the covariance really carries. An undeclared type therefore throws and names itself, which is the polarity [`range_tails`](@ref) already uses for a per-type declaration whose absence is a defect rather than an answer.
 
 # Arguments
 
@@ -245,18 +247,51 @@ The declaration closes that gap. Every estimator answers: the two that own a res
   - `nothing`: The estimator adds no residual block, or pools several priors and has no single one.
   - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
 
+# Validation
+
+  - Throws an `ArgumentError` when the type of `pe` declares no method.
+
 # Related
 
   - [`factor_lift`](@ref)
+  - [`assert_factor_residual_config`](@ref)
+  - [`range_tails`](@ref)
   - [`HighOrderFactorPriorEstimator`](@ref)
   - [`FactorPrior`](@ref)
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
 """
-function factor_residual_config(::AbstractPriorEstimator)
-    return nothing
+function factor_residual_config(pe::AbstractPriorEstimator)
+    return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. Every concrete `AbstractPriorEstimator` must declare its residual block beside its own definition by adding a method returning `(; ve, pdm, rsd)`, forwarding the estimator it wraps, or returning `nothing` when it adds no residual block."))
 end
 function factor_residual_config(pe::FactorPrior)
     return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
+end
+"""
+    assert_factor_residual_config(pe::AbstractPriorEstimator, cfg) -> Nothing
+
+Check the shape of a [`factor_residual_config`](@ref) answer before a consumer reads it.
+
+A consumer reaches `ve`, `pdm` and `rsd` off the returned value by property access, which has no shape check of its own: a declaration that returns the wrong thing surfaces as a `FieldError` deep inside the correction rather than at the declaration that caused it. This checks the two shapes the contract admits, and names the estimator that answered.
+
+# Arguments
+
+  - `pe`: Prior estimator that answered.
+  - `cfg`: The answer of `factor_residual_config(pe)`.
+
+# Validation
+
+  - `cfg` is `nothing`, or a `NamedTuple` carrying `ve`, `pdm` and `rsd`.
+
+# Related
+
+  - [`factor_residual_config`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
+    @argcheck(isnothing(cfg) ||
+              (isa(cfg, NamedTuple) && all(k -> haskey(cfg, k), (:ve, :pdm, :rsd))),
+              ArgumentError("`factor_residual_config(::$(nameof(typeof(pe))))` must return `nothing` or a `NamedTuple` carrying `ve`, `pdm` and `rsd`. Got\ncfg => $(cfg)::$(typeof(cfg))."))
+    return nothing
 end
 """
     prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
@@ -318,11 +353,7 @@ Where:
 """
 function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
+    X, F = dims_oriented(dims, X, F)
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)

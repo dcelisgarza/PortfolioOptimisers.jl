@@ -1120,61 +1120,115 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
                                    noc_opt = noc_retcode))
     end
 end
-function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:UnconstrainedNearOptimalCentering},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
-    noc = reset_time_dependent_estimator(noc)
-    (; w_opt, rk_opt, rt_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
-                                                                                                                         rd;
-                                                                                                                         dims = dims,
-                                                                                                                         kwargs...)
-    model = JuMP.Model()
-    JuMP.set_string_names_on_creation(model, str_names)
-    set_model_scales!(model, opt.sc, opt.so)
-    set_maximum_ratio_factor_variables!(model, MinimumRisk())
-    set_w!(model, opt.pe.X, w_opt)
-    set_weight_constraints!(model, opt.wb, opt)
-    set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
-    scalarise_risk_expression!(model, opt.sca)
+"""
+    assemble_near_optimal_centering_model!(alg, model, noc, setup, rd)
+
+Run the model-assembly middle of the Near Optimal Centering variant `alg`.
+
+The two variants share a head and a Result, and differ only in the middle and in the solve.
+This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
+[`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the three
+steps of that sequence it needs — risk, scalarisation, return — and then the same
+[`assert_frontier_sweep_cap`](@ref) tail (ADR 0008, amendment 2).
+
+The unconstrained variant reads `setup.opt`, which
+[`near_optimal_centering_setup`](@ref) has already replaced with the
+[`no_bounds_optimiser`](@ref) copy. So `opt.ret` is the bound-free return estimator, and
+`opt.pe`, `opt.fees` and `opt.sca` are the processed values `setup.attrs` carries. The
+phylogeny argument is `nothing` because the variant applies no phylogeny constraints.
+
+# Arguments
+
+  - `alg`: NOC algorithm variant ([`UnconstrainedNearOptimalCentering`](@ref) or
+    [`ConstrainedNearOptimalCentering`](@ref)).
+  - $(arg_dict[:model])
+  - `noc::NearOptimalCentering`: Dispatch object for the risk and custom constraint builders.
+  - `setup::NearOptimalSetup`: Setup bundle from [`near_optimal_centering_setup`](@ref).
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - `nothing`. Mutates `model` in place.
+
+# Related
+
+  - [`solve_near_optimal_centering!`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`set_risk_and_scalarise!`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
+function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCentering,
+                                                model::JuMP.Model,
+                                                noc::NearOptimalCentering,
+                                                setup::NearOptimalSetup, rd::ReturnsResult)
+    (; r, opt) = setup
+    set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
-    retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; pa = attrs,
-                                                                  retcode = retcode,
-                                                                  sol = sol,
-                                                                  model = ifelse(save,
-                                                                                 model,
-                                                                                 nothing)),
-                                      r = factory(r, opt.pe, opt.slv),
-                                      w_min_retcode = w_min_retcode,
-                                      w_opt_retcode = w_opt_retcode,
-                                      w_max_retcode = w_max_retcode,
-                                      noc_retcode = noc_retcode, fb = nothing)
+    assert_frontier_sweep_cap(model)
+    return nothing
 end
-function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:ConstrainedNearOptimalCentering},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+function assemble_near_optimal_centering_model!(::ConstrainedNearOptimalCentering,
+                                                model::JuMP.Model,
+                                                noc::NearOptimalCentering,
+                                                setup::NearOptimalSetup, rd::ReturnsResult)
+    (; r, opt, attrs) = setup
+    assemble_jump_model!(model, noc, opt, attrs, rd, r)
+    return nothing
+end
+"""
+    solve_near_optimal_centering!(alg, model, noc, setup)
+
+Run the solve tail of the Near Optimal Centering variant `alg`.
+
+Reads the arguments each [`solve_noc!`](@ref) overload needs off `setup`, so the two variants
+share one `_optimise` head. The constrained variant sweeps both frontier registries, so it
+passes the two `Val` flags that select the sweeping overload; the unconstrained variant
+registers no frontier bound and passes neither.
+
+# Arguments
+
+  - `alg`: NOC algorithm variant ([`UnconstrainedNearOptimalCentering`](@ref) or
+    [`ConstrainedNearOptimalCentering`](@ref)).
+  - $(arg_dict[:model])
+  - `noc::NearOptimalCentering`: NOC estimator configuration.
+  - `setup::NearOptimalSetup`: Setup bundle from [`near_optimal_centering_setup`](@ref).
+
+# Returns
+
+  - `(retcode, sol)` or `(retcodes, sols)`, as [`solve_noc!`](@ref) returns.
+
+# Related
+
+  - [`assemble_near_optimal_centering_model!`](@ref)
+  - [`solve_noc!`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
+function solve_near_optimal_centering!(::UnconstrainedNearOptimalCentering,
+                                       model::JuMP.Model, noc::NearOptimalCentering,
+                                       setup::NearOptimalSetup)
+    (; rk_opt, rt_opt, opt, attrs) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
+end
+function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model::JuMP.Model,
+                                       noc::NearOptimalCentering, setup::NearOptimalSetup)
+    (; rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends,
+                      w_min, w_max, Val(shared_has(model, :ret_frontier)),
+                      Val(shared_has(model, :risk_frontier)))
+end
+function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
+                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    (; w_opt, rk_opt, rt_opt, r, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
-                                                                                                                                                                rd;
-                                                                                                                                                                dims = dims,
-                                                                                                                                                                kwargs...)
+    setup = near_optimal_centering_setup(noc, rd; dims = dims, kwargs...)
+    (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt)
-    assemble_jump_model!(model, noc, opt, attrs, rd, r)
-    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max,
-                                  rt_ends, w_min, w_max,
-                                  Val(shared_has(model, :ret_frontier)),
-                                  Val(shared_has(model, :risk_frontier)))
+    assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd)
+    noc_retcode, sol = solve_near_optimal_centering!(noc.alg, model, noc, setup)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
                                       jr = JuMPOptimisationResult(; pa = attrs,

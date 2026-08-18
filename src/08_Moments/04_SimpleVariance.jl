@@ -90,6 +90,10 @@ Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.
   - `mean = nothing`: Precomputed mean.
   - `kwargs...`: Forwarded to the mean and weight resolution. Matrix methods only.
 
+# Validation
+
+  - $(val_dict[:dims]) Matrix methods only.
+
 # Returns
 
   - `sigma::Union{<:Number, <:ArrNum}`: Dispersion of `X` computed by `f`.
@@ -108,6 +112,7 @@ Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.
 function simple_variance_kernel(f::F, ve::SimpleVariance,
                                 me::AbstractExpectedReturnsEstimator, X::MatNum;
                                 dims::Int = 1, mean = nothing, kwargs...) where {F}
+    assert_dims(dims)
     mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
     return if isnothing(w)

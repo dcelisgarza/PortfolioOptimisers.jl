@@ -537,28 +537,29 @@ function feature_universe(sets::UniverseSets, need::AbstractString)
     return sets.dict[zkey]
 end
 """
-    group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                  arr::VecNum, strict::Bool, nxkey::AbstractString)
+    name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                 arr::VecNum, strict::Bool, nxkey::AbstractString)
 
-Set values in a vector for all assets belonging to a specified group.
+Set values in a vector for the asset or the group of assets that `key` names.
 
-`group_to_val!` maps the assets in group `key` to their corresponding indices in the asset universe `nx`, and sets the corresponding entries in the vector `arr` to the value `val`. If the group is not found, the function either throws an error or issues a warning, depending on the `strict` flag.
+`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag.
 
 # Arguments
 
   - `nx`: Vector of asset names.
   - `sdict`: Dictionary mapping group names to vectors of asset names.
-  - `key`: Name of the group of assets to set values for.
-  - `val`: The value to assign to the assets in the group.
+  - `key`: Name of the asset or the group of assets to set values for.
+  - `val`: The value to assign.
   - `arr`: The array to be modified in-place.
-  - `strict`: If `true`, throws an error if `key` is not found in `sdict`; if `false`, issues a warning.
+  - `strict`: If `true`, throws an error if `key` resolves to nothing; if `false`, issues a warning.
   - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
 
 # Details
 
-  - If `key` is found in `sdict`, all assets in the group are mapped to their indices in `nx`, and the corresponding entries in `arr` are set to `val`.
-  - If `key` is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
-  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `02_Tools.jl`.
+  - An asset name takes precedence over a group name of the same spelling.
+  - Members that miss the universe are dropped and reported once, through [`strict_diagnostic`](@ref).
+  - `sdict` is never modified: [`resolve_axis_name`](@ref) returns a copy of the member list.
+  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `01_Base.jl`.
 
 # Returns
 
@@ -567,29 +568,28 @@ Set values in a vector for all assets belonging to a specified group.
 # Related
 
   - [`estimator_to_val`](@ref)
+  - [`resolve_axis_name`](@ref)
+  - [`axis_name_indices`](@ref)
+  - [`strict_diagnostic`](@ref)
   - [`UniverseSets`](@ref)
   - [`unknown_variable_msg`](@ref)
   - [`missing_group_assets_msg`](@ref)
 """
-function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
-                       strict::Bool, nxkey::AbstractString)::Nothing
-    assets = get(sdict, key, nothing)
-    if isnothing(assets)
+function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
+                      strict::Bool, nxkey::AbstractString)::Nothing
+    members = resolve_axis_name(key, nx, sdict)
+    if isnothing(members)
         # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
         # suggestion pool beyond the raw universe to include the group/set keys.
-        msg = unknown_variable_msg(key, nx, nxkey; candidates = [nx; collect(keys(sdict))])
-        strict ? throw(ArgumentError(msg)) : @warn(msg)
-    else
-        unique!(assets)
-        idx = [findfirst(x -> x == asset, nx) for asset in assets]
-        missing_assets = assets[isnothing.(idx)]
-        filter!(!isnothing, idx)
-        if !isempty(missing_assets)
-            msg = missing_group_assets_msg(key, missing_assets, nx, nxkey)
-            strict ? throw(ArgumentError(msg)) : @warn(msg)
-        end
-        arr[idx] .= val
+        return strict_diagnostic(unknown_variable_msg(key, nx, nxkey;
+                                                      candidates = [nx;
+                                                                    collect(keys(sdict))]),
+                                 strict)
     end
+    idx = axis_name_indices(members, nx,
+                            m -> strict_diagnostic(missing_group_assets_msg(key, m, nx,
+                                                                            nxkey), strict))
+    arr[idx] .= val
     return nothing
 end
 """
@@ -617,7 +617,7 @@ The function creates the vector and sets the values for assets or groups as spec
     If the same asset is found in subsequent iterations, its value will be overwritten in favour of the most recent one. To ensure determinism, use an [`OrderedDict`](https://juliacollections.github.io/OrderedCollections.jl/stable/#OrderedDicts) or a vector of pairs.
 
   - If a key in `dict` matches an asset in the universe, the corresponding entry in `arr` is set to the specified value.
-  - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`group_to_val!`](@ref).
+  - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`name_to_val!`](@ref).
   - If a key is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
   - The operation is performed in-place on `arr`.
 
@@ -627,7 +627,7 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Related
 
-  - [`group_to_val!`](@ref)
+  - [`name_to_val!`](@ref)
   - [`UniverseSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
@@ -640,11 +640,7 @@ function estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     for (key, val) in dict
-        if key in nx
-            arr[findfirst(x -> x == key, nx)] = val
-        else
-            group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
-        end
+        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     end
     return arr
 end
@@ -657,11 +653,7 @@ function estimator_to_val(dict::PairStrNum, sets::UniverseSets,
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
-    if key in nx
-        arr[findfirst(x -> x == key, nx)] = val
-    else
-        group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
-    end
+    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     return arr
 end
 """
@@ -684,7 +676,7 @@ This method returns the input value `val` as-is, without modification or mapping
 # Related
 
   - [`estimator_to_val`](@ref)
-  - [`group_to_val!`](@ref)
+  - [`name_to_val!`](@ref)
   - [`UniverseSets`](@ref)
 """
 function estimator_to_val(val::Option{<:Number}, args...; kwargs...)::Option{<:Number}
@@ -718,7 +710,7 @@ This method checks that the input vector `val` matches the length of the asset u
 
   - [`estimator_to_val`](@ref)
   - [`UniverseSets`](@ref)
-  - [`group_to_val!`](@ref)
+  - [`name_to_val!`](@ref)
 """
 function estimator_to_val(val::VecNum, sets::UniverseSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; kwargs...)
@@ -755,7 +747,7 @@ This method checks that size of `dims` of the input matrix `val` matches the len
 
   - [`estimator_to_val`](@ref)
   - [`UniverseSets`](@ref)
-  - [`group_to_val!`](@ref)
+  - [`name_to_val!`](@ref)
 """
 function estimator_to_val(val::MatNum, sets::UniverseSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
@@ -1617,7 +1609,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             Ai = (nx .== v)
             if !any(isone, Ai)
                 msg = unknown_variable_msg(v, nx, k; axis = axis)
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                strict_diagnostic(msg, strict)
                 continue
             end
             matched = true
@@ -1633,12 +1625,8 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
-            if strict
-                throw(ArgumentError(msg))
-            else
-                @warn(msg)
-                continue
-            end
+            strict_diagnostic(msg, strict)
+            continue
         end
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="

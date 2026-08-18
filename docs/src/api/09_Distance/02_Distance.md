@@ -12,4 +12,5 @@ _absguard
 _dist_from_cor
 RhoDistanceAlgorithm
 assert_dims
+dims_oriented
 ```

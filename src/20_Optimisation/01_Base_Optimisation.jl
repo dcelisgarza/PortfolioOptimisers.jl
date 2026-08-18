@@ -639,7 +639,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TimeDependent(val, bind::Symbol = :outermost; default = NoDefault())
-    TimeDependent(; val, bind::Symbol = :outermost, default = NoDefault())
+    TimeDependent(; val::Union{<:AbstractVector, <:Base.Callable,
+                               <:PreviousWeightsFunction, <:TimeDependentCallable,
+                               <:TimeDependent}, bind::Symbol = :outermost,
+                  default = NoDefault())
 
 ## Validation
 

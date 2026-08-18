@@ -236,6 +236,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
                                  :pl_opt => "`pl`: Optional phylogeny constraints.",
                                  :fees_opt => "`fees`: Optional fees structure.",
+                                 :b1_opt => "`b1::Option{<:MatNum} = nothing`: Factor loading matrix for [`FactorRiskContribution`](@ref); `nothing` for all other optimisers.",
                                  :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
                                  :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
                                  :ignargs => "`args`: Additional positional arguments (ignored).",
@@ -1586,11 +1587,11 @@ end
 
 Build the warning/error text for a constraint or view variable `v` that is absent from the universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
 
-`candidates` is the pool searched for the typo suggestion (default: the universe `nx`). Callers whose valid namespace is broader than the raw universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+`candidates` is the pool searched for the typo suggestion (default: the universe `nx`). Callers whose valid namespace is broader than the raw universe — e.g. [`name_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
 
 `axis` names the universe the variable was looked up in. It defaults to `"asset"` because that is the axis every constraint resolved against before [`ExposureConstraintEstimator`](@ref); a re-based constraint resolves its names against the *factor* universe and passes `"factor"`, so the message names the axis the user actually wrote in.
 
-Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`group_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
+Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`name_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
 
 # Related
 
@@ -1654,6 +1655,35 @@ function gross_budget_bounds_msg(lb, ub)
     return "gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got $(scope) with no negative element in lb or ub."
 end
 """
+    strict_diagnostic(msg::AbstractString, strict::Bool) -> Nothing
+
+Report an unresolvable **name**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
+
+`strict` governs names only. Nothing structural is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every name diagnostic in the library routes through here, so the strictness policy is one edit.
+
+# Arguments
+
+  - `msg`: The diagnostic text, built by [`unknown_variable_msg`](@ref) or one of its siblings.
+  - `strict`: If `true`, throws an `ArgumentError`; if `false`, issues a warning.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+"""
+function strict_diagnostic(msg::AbstractString, strict::Bool)::Nothing
+    if strict
+        throw(ArgumentError(msg))
+    end
+    @warn(msg)
+    return nothing
+end
+"""
     missing_group_assets_msg(group, missing_assets, nx, key) -> String
 
 Build the warning/error text for a `group` that resolves in the asset sets but whose members
@@ -1662,7 +1692,7 @@ offending member names (which are caller input, not internal state), and the uni
 never the full universe or the input value dictionary — and appends a [`did_you_mean`](@ref)
 suggestion for the first missing member.
 
-Shared by [`group_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
+Shared by [`name_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
 alongside [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref).
 
 # Related
@@ -1776,9 +1806,12 @@ The Preferences.jl keys read at package load to seed the global config defaults 
 
 Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load.
 
+A valid value is applied, but a value that *widens* a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)): a preference file is data, it travels with a cloned project, and it applies before any user code runs.
+
 # Related
 
   - [`apply_preferences!`](@ref)
+  - [`relaxed_preferences_msg`](@ref)
 """
 const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim",
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
@@ -1787,9 +1820,42 @@ const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Build the warning text for the load-time preferences that widened a guard (see [`apply_preferences!`](@ref)). One line per key: the key, the default it replaced, and the value the project asked for.
+
+A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, which is the info-leak direction of `docs/adr/0026-lenient-constraint-names-with-suggestions.md`).
+
+# Arguments
+
+  - `relaxations`: One `(key, default, value)` triple per widened guard, in [`PREFERENCE_KEYS`](@ref) order.
+
+# Returns
+
+  - `msg::String`: Multi-line warning text, one line per triple.
+
+Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
+function relaxed_preferences_msg(relaxations::AbstractVector)
+    msg = "$(length(relaxations)) load-time preference(s) of the active project widened a PortfolioOptimisers guard. Preferences apply at `using PortfolioOptimisers`, before any user code runs, so these values hold for the whole session:"
+    for (key, default, val) in relaxations
+        msg *= "\n  $(key): $(repr(default)) → $(repr(val))"
+    end
+    return msg *
+           "\nThe values come from the `[PortfolioOptimisers]` section of the active project's `LocalPreferences.toml`. Delete a key there to restore the default, or widen the guard for one call only with `with_equation_limits`, `with_resource_limits` or `with_string_distance`."
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
-Fails closed: an invalid value throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a weaker cap than the one the project requested. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
+Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
+
+A *valid* value is applied whatever its size — the caps exist to turn an OOM kill into a typed error, not to second-guess a sizing choice, and a project on a large machine may legitimately raise one. A value that widens a guard is announced with a `@warn` built by [`relaxed_preferences_msg`](@ref), because the channel needs no code: a `LocalPreferences.toml` is data, it travels with a cloned project, and it applies before any user code runs. Widening means a raised [`RESOURCE_LIMITS`](@ref) or [`EQUATION_LIMITS`](@ref) cap, or a lowered [`STRING_DISTANCE`](@ref) suggestion threshold. A value that tightens a guard, or that equals the default it replaces, is silent. The comparison is against the default *in effect when the preference is applied*, which at load is the shipped default. See the amendment of `docs/adr/0041-one-resource-cap-per-sink.md`.
 
 To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
 
@@ -1816,8 +1882,10 @@ compact_show = 4
   - [`set_resource_limits!`](@ref)
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
+  - [`relaxed_preferences_msg`](@ref)
 """
 function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    relaxations = Vector{Tuple{String, Any, Any}}()
     ml = get(prefs, "equation_max_length", nothing)
     md = get(prefs, "equation_max_depth", nothing)
     if !(isnothing(ml) && isnothing(md))
@@ -1826,6 +1894,12 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                       ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
         end
         lim = @atomic EQUATION_LIMITS.default
+        for (key, val, default) in (("equation_max_length", ml, lim.max_length),
+                                    ("equation_max_depth", md, lim.max_depth))
+            if !isnothing(val) && val > default
+                push!(relaxations, (key, default, val))
+            end
+        end
         set_equation_limits!(; max_length = something(ml, lim.max_length),
                              max_depth = something(md, lim.max_depth))
     end
@@ -1842,6 +1916,15 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                       ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
         end
         rlim = @atomic RESOURCE_LIMITS.default
+        for (key, val, default) in
+            (("max_n_sim", xs, rlim.max_n_sim), ("max_n_subsets", xb, rlim.max_n_subsets),
+             ("max_frontier", xf, rlim.max_frontier), ("max_bins", xn, rlim.max_bins),
+             ("max_hop_count", xh, rlim.max_hop_count),
+             ("max_search_grid", xg, rlim.max_search_grid))
+            if !isnothing(val) && val > default
+                push!(relaxations, (key, default, val))
+            end
+        end
         set_resource_limits!(; max_n_sim = something(xs, rlim.max_n_sim),
                              max_n_subsets = something(xb, rlim.max_n_subsets),
                              max_frontier = something(xf, rlim.max_frontier),
@@ -1853,6 +1936,10 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
     if !isnothing(ms)
         @argcheck(ms isa Real && !(ms isa Bool),
                   ArgumentError("preference `suggestion_min_score = $(repr(ms))` must be a real number."))
+        msd = (@atomic STRING_DISTANCE.default).min_score
+        if ms < msd
+            push!(relaxations, ("suggestion_min_score", msd, ms))
+        end
         set_string_distance!(; min_score = ms)
     end
     dn = get(prefs, "suggestion_distance", nothing)
@@ -1872,12 +1959,23 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
                   ArgumentError("preference `compact_show = $(repr(cs))` must be a boolean or an integer."))
         set_compact_show!(cs)
     end
+    if !isempty(relaxations)
+        @warn relaxed_preferences_msg(relaxations)
+    end
     return nothing
 end
 """
     __init__()
 
-Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active project via `Preferences.load_preference` and applies them to the global config defaults through [`apply_preferences!`](@ref). An invalid preference value fails closed — the package refuses to load — rather than silently running with a weaker cap than the one the project requested.
+Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active project via `Preferences.load_preference` and applies them to the global config defaults through [`apply_preferences!`](@ref). An invalid preference value fails closed — the package refuses to load — rather than running with a value the project got wrong.
+
+This is the one channel that reaches the guards without running code: a `LocalPreferences.toml` is data, it travels with a cloned project or a template, and it is read here, before any user code. A valid value is therefore applied but not silent — a value that widens a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)).
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`relaxed_preferences_msg`](@ref)
 """
 function __init__()
     return apply_preferences!(Dict{String, Any}(key =>
@@ -3428,6 +3526,45 @@ function assert_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate `dims` and return the matrices with the observations along the rows.
+
+# Arguments
+
+  - `dims`: Dimension along which the observations lie.
+  - `A`, `B`, `Cs...`: Matrices to orient. A `nothing` passes through unchanged, so an optional matrix needs no branch of its own.
+
+# Returns
+
+  - `A`: The oriented matrix, when one matrix is given.
+  - `(A, B, Cs...)`: A tuple of the oriented matrices, when more than one is given.
+
+# Validation
+
+  - `dims in (1, 2)`, by [`assert_dims`](@ref).
+
+# Details
+
+  - `dims == 1` returns the input untouched. `dims == 2` returns its `transpose`.
+  - The guard and the orientation are one call, so a caller cannot orient a matrix without validating `dims`. This is the single decision point: a leaf that spelled the guard and the `transpose` by hand could omit the guard and answer a `dims` of `3` with the raw input.
+
+# Related
+
+  - [`assert_dims`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+"""
+function dims_oriented(dims::Integer, A::Option{<:MatNum})
+    assert_dims(dims)
+    return isnothing(A) || isone(dims) ? A : transpose(A)
+end
+function dims_oriented(dims::Integer, A::Option{<:MatNum}, B::Option{<:MatNum},
+                       Cs::Option{<:MatNum}...)
+    assert_dims(dims)
+    return map(x -> dims_oriented(dims, x), (A, B, Cs...))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Represents a composite result containing a vector and a scalar.
@@ -3877,9 +4014,7 @@ Where:
 
 # Details
 
-  - For `L2Norm`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(T - f.ddof)` if `T` is not `nothing`, else unscaled.
-  - For `SquaredL2Norm`, computes `LinearAlgebra.norm(a - b, 2)^2 / (T - f.ddof)` if `T` is not `nothing`, else unscaled.
-  - For `L1Norm`, computes `LinearAlgebra.norm(a - b, 1) / T` if `T` is not `nothing`, else unscaled.
+  - The norm is divided by [`norm_factor`](@ref), which is `1` when `T` is `nothing`.
 
 # Examples
 
@@ -3897,66 +4032,122 @@ julia> PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2)
   - [`L1Norm`](@ref)
   - [`NormError`](@ref)
   - [`Option`](@ref)
+  - [`norm_factor`](@ref)
 """
+function norm_error end
+"""
+    norm_factor(f::Union{Nothing, <:NormError}, T::Option{<:Number})
+
+Compute the denominator that scales a norm in [`norm_error`](@ref).
+
+The factor is the single place where the optional observation count `T` is turned into a divisor. Each [`NormError`](@ref) declares its own factor, and the `T === nothing` case is a method, not a branch inside one. A branch is what let `ifelse` evaluate `T - f.ddof` on the `nothing` path.
+
+# Arguments
+
+  - `f`: Tracking formulation algorithm. `nothing` means an unweighted L2 norm.
+  - `T`: Optional number of observations.
+
+# Returns
+
+  - `factor::Number`: Divisor for the norm. It is `1` when `T` is `nothing`.
+
+# Details
+
+  - `nothing`: `sqrt(T)`.
+  - [`L2Norm`](@ref): `sqrt(T - f.ddof)`.
+  - [`SquaredL2Norm`](@ref): `T - f.ddof`.
+  - [`L1Norm`](@ref): `T`.
+  - [`LpNorm`](@ref): `(T - f.ddof)^(1/f.p)`, computed with `cbrt` when `f.p == 3`.
+  - [`LInfNorm`](@ref): `T - f.ddof`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.norm_factor(L2Norm(), 4)
+1.7320508075688772
+
+julia> PortfolioOptimisers.norm_factor(LInfNorm(), nothing)
+1
+```
+
+# Related
+
+  - [`norm_error`](@ref)
+  - [`NormError`](@ref)
+  - [`Option`](@ref)
+"""
+function norm_factor(::Union{Nothing, <:NormError}, ::Nothing)
+    return 1
+end
+function norm_factor(::Nothing, T::Number)
+    return sqrt(T)
+end
+function norm_factor(f::L2Norm, T::Number)
+    return sqrt(T - f.ddof)
+end
+function norm_factor(f::SquaredL2Norm, T::Number)
+    return T - f.ddof
+end
+function norm_factor(::L1Norm, T::Number)
+    return T
+end
+function norm_factor(f::LpNorm, T::Number)
+    factor = T - f.ddof
+    return if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+end
+function norm_factor(f::LInfNorm, T::Number)
+    return T - f.ddof
+end
 function norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
-    return LinearAlgebra.norm(a - b, 2) / factor
+    return LinearAlgebra.norm(a - b, 2) / norm_factor(f, T)
 end
 function norm_error(f::L2Norm, a, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
-    return LinearAlgebra.norm(a, 2) / factor
+    return LinearAlgebra.norm(a, 2) / norm_factor(f, T)
 end
-function norm_error(::Nothing, a, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : sqrt(T)
-    return LinearAlgebra.norm(a, 2) / factor
+function norm_error(f::Nothing, a, T::Option{<:Number} = nothing)
+    return LinearAlgebra.norm(a, 2) / norm_factor(f, T)
 end
 function norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : (T - f.ddof)
     val = LinearAlgebra.norm(a - b, 2)
-    return val^2 / factor
+    return val^2 / norm_factor(f, T)
 end
 function norm_error(f::SquaredL2Norm, a, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : (T - f.ddof)
     val = LinearAlgebra.norm(a, 2)
-    return val^2 / factor
+    return val^2 / norm_factor(f, T)
 end
-function norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T)
-    return LinearAlgebra.norm(a - b, 1) / factor
+function norm_error(f::L1Norm, a, b, T::Option{<:Number} = nothing)
+    return LinearAlgebra.norm(a - b, 1) / norm_factor(f, T)
 end
-function norm_error(::L1Norm, a, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T)
-    return LinearAlgebra.norm(a, 1) / factor
+function norm_error(f::L1Norm, a, T::Option{<:Number} = nothing)
+    return LinearAlgebra.norm(a, 1) / norm_factor(f, T)
 end
 function norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
-    factor = if f.p == 3
-        cbrt(factor)
-    else
-        factor^(inv(f.p))
-    end
-    return LinearAlgebra.norm(a - b, f.p) / factor
+    return LinearAlgebra.norm(a - b, f.p) / norm_factor(f, T)
 end
 function norm_error(f::LpNorm, a, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
-    factor = if f.p == 3
-        cbrt(factor)
-    else
-        factor^(inv(f.p))
-    end
-    return LinearAlgebra.norm(a, f.p) / factor
+    return LinearAlgebra.norm(a, f.p) / norm_factor(f, T)
 end
 function norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
     ty = promote_type(eltype(a), eltype(b))
-    p = ifelse(f.pos, typemax(ty), typemin(ty))
-    return LinearAlgebra.norm(a - b, p) / factor
+    p = if f.pos
+        typemax(ty)
+    else
+        typemin(ty)
+    end
+    return LinearAlgebra.norm(a - b, p) / norm_factor(f, T)
 end
 function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
     ty = eltype(a)
-    p = ifelse(f.pos, typemax(ty), typemin(ty))
-    return LinearAlgebra.norm(a, p) / factor
+    p = if f.pos
+        typemax(ty)
+    else
+        typemin(ty)
+    end
+    return LinearAlgebra.norm(a, p) / norm_factor(f, T)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,

@@ -1152,16 +1152,61 @@ Keeping both here is what lets the seam-lock test assert that no emitter builds 
 hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
 [`state_set!`](@ref) and [`state_build!`](@ref). See ADR 0037.
 
+Neither axis carries a delimiter, so composition is **not injective**: `(:te_dr_, 11)` and
+`(:te_dr_1, 1)` both give `:te_dr_11`. The spelling is kept — a delimiter would move every
+top-level key a caller reads — and the collision is caught where it does harm, by
+[`assert_state_key_free`](@ref) at registration.
+
 # Related
 
   - [`state_build!`](@ref)
   - [`nested_prefix`](@ref)
+  - [`assert_state_key_free`](@ref)
 """
 function state_key(prefix::Symbol, name::Symbol)
     return Symbol(prefix, name)
 end
 function state_key(prefix::Symbol, name::Symbol, i)
     return Symbol(prefix, name, i)
+end
+"""
+    assert_state_key_free(model::JuMP.Model, key::Symbol)
+
+Assert Model State key `key` is not registered yet, so a write cannot replace an entry.
+
+Neither axis of [`state_key`](@ref) is separated by a delimiter, so key composition is
+**not injective**: a name that ends in a digit and a low index compose the same `Symbol` as
+a shorter name and a higher index — `state_key(p, :te_dr_, 11) == state_key(p, :te_dr_1, 1)`.
+Without this guard the second write wins, the model carries one entry where the build
+expected two, and a constraint binds the wrong variable. That is a wrong answer, not a
+crash, so the registration verb fails closed instead.
+
+A delimiter was rejected as the fix: it would move every top-level key spelling
+(`state_key(Symbol(""), :ret_, 1)` is `:ret_1`, a key callers read), and it would still let
+one emitter overwrite another's entry under a key both spell correctly. The guard closes
+both. Re-registration under one key has no legitimate reading either: the build-once case
+is [`state_build!`](@ref), which returns the existing entry untouched, and the flag case is
+[`mark_state!`](@ref), which is idempotent. See ADR 0037.
+
+# Returns
+
+  - `nothing`.
+
+# Throws
+
+  - `ArgumentError` if `key` is already registered. The message names the key and the two
+    verbs that do accept a repeat.
+
+# Related
+
+  - [`state_key`](@ref)
+  - [`state_set!`](@ref)
+  - [`state_build!`](@ref)
+"""
+function assert_state_key_free(model::JuMP.Model, key::Symbol)
+    @argcheck(!haskey(model, key),
+              ArgumentError("model[$key] is already registered, so this registration would replace it and lose the earlier entry. Model State keys compose by concatenation and are not injective — state_key(prefix, :te_dr_, 11) and state_key(prefix, :te_dr_1, 1) are both :te_dr_11 — so either two entries composed the same key and one of them must be renamed, or the same entry is registered twice. Use state_build! to build an entry once and reuse it, or mark_state! for an idempotent presence flag."))
+    return nothing
 end
 """
     state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
@@ -1177,17 +1222,30 @@ The indexed method registers per-measure scratch (`:cvar_risk_`, `:z_cvar_`, …
 index `i`, so two instances of the same measure in one build get their own entries. Both
 disambiguators are resolved by [`state_key`](@ref).
 
+Registration is *fresh*: the composed key must be free, because key composition is not
+injective and a replaced entry is a wrong answer rather than an error
+([`assert_state_key_free`](@ref)). Reuse is the other two verbs' job.
+
+# Throws
+
+  - `ArgumentError` if the composed key is already registered.
+
 # Related
 
   - [`state_get`](@ref)
   - [`state_build!`](@ref)
+  - [`assert_state_key_free`](@ref)
 """
 function state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
-    model[state_key(prefix, name)] = val
+    key = state_key(prefix, name)
+    assert_state_key_free(model, key)
+    model[key] = val
     return val
 end
 function state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, i, val)
-    model[state_key(prefix, name, i)] = val
+    key = state_key(prefix, name, i)
+    assert_state_key_free(model, key)
+    model[key] = val
     return val
 end
 """

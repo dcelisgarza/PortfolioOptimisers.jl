@@ -727,13 +727,7 @@ Every moment is the wrapped estimator's, untouched. The only addition is `Z`, pr
 """
 function prior(pe::FeaturePrior, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     if !isnothing(pe.sets)
         @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
                   DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))

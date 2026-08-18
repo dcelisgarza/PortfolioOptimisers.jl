@@ -467,4 +467,46 @@
                   noc_solver_stalled(res2.noc_retcode)
         end
     end
+    @testset "Fees reach the unconstrained risk build" begin
+        # Regression (ADR 0008, amendment 2). The unconstrained head inlined the middle and
+        # passed `opt.fees` one argument late, so `fees` bound `nothing` and every risk
+        # constraint was built fee-free. `RiskTrackingRiskMeasure` under
+        # `DependentVariableTracking` reads the fees into its benchmark constant, so the
+        # assembled model text moves with them and pins the argument position.
+        #
+        # The three anchor portfolios are supplied, so the setup runs no sub-problem solve
+        # and the two models differ in the fees alone.
+        N = size(pr.X, 2)
+        w0 = fill(inv(N), N)
+        rtr = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                      r = ConditionalValueatRisk(),
+                                      alg = DependentVariableTracking())
+        function noc_unconstrained_model(fees)
+            noc = NearOptimalCentering(; r = rtr, w_min = w0, w_opt = w0, w_max = w0,
+                                       opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                           fees = fees))
+            setup = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
+            sopt = setup.opt
+            model = PortfolioOptimisers.JuMP.Model()
+            PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+            PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
+            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
+            PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
+                                                                       model, noc, setup,
+                                                                       rd)
+            return sprint(print, model)
+        end
+        @test noc_unconstrained_model(nothing) != noc_unconstrained_model(Fees(; l = 0.05))
+        # The fee slot is typed, so a `Fees` one argument late is a `MethodError` rather
+        # than a value absorbed by an `args...` tail and lost.
+        @test_throws MethodError PortfolioOptimisers.set_risk_and_scalarise!(PortfolioOptimisers.JuMP.Model(),
+                                                                             rtr, nothing,
+                                                                             nothing, pr,
+                                                                             nothing,
+                                                                             nothing,
+                                                                             Fees(;
+                                                                                  l = 0.05);
+                                                                             rd = rd)
+    end
 end

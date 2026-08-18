@@ -8,6 +8,10 @@ set_risk_expression!
 set_risk_bounds_and_expression!
 set_range_risk_constraints!
 set_drawdown_constraints!
+AbstractRiskSeriesAlgorithm
+NetReturnsRiskSeries
+DrawdownRiskSeries
+risk_series
 prior_high_order_quantity
 assert_high_order_quantity
 dup_elim_sum_selector

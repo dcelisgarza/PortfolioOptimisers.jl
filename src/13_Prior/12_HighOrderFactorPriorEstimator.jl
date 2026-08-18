@@ -312,7 +312,7 @@ Where:
 
 The factor co-moments are computed from `F` directly and nested as a [`HighOrderPrior`](@ref) over the wrapped prior's own factor block, so `fpr.pr === pr.fpr` — the co-moments and the low order factor moments describe one distribution, reachable by either route.
 
-The residual cokurtosis correction is defined on the **systematic** covariance, so a residual block the wrapped estimator added has to come back off first. Which estimator added one, and with what variance estimator, is a declaration the wrapped estimator makes through [`factor_residual_config`](@ref) rather than a field read — `pe` is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry the fields. A wrapper over either forwards the declaration; everything else answers `nothing`, and a `nothing` answer — like an answer whose `rsd` is `false` — leaves the covariance alone.
+The residual cokurtosis correction is defined on the **systematic** covariance, so a residual block the wrapped estimator added has to come back off first. Which estimator added one, and with what variance estimator, is a declaration the wrapped estimator makes through [`factor_residual_config`](@ref) rather than a field read — `pe` is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry the fields. A wrapper over either forwards the declaration; everything else declares `nothing` in an explicit method, and a `nothing` answer — like an answer whose `rsd` is `false` — leaves the covariance alone. There is no default, so a type that declares nothing throws rather than reading as *no residual block*.
 
 !!! note
 
@@ -336,11 +336,7 @@ The residual cokurtosis correction is defined on the **systematic** covariance, 
 """
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
+    X, F = dims_oriented(dims, X, F)
     kM = nothing
     D2 = nothing
     L2 = nothing
@@ -388,9 +384,12 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             # and with what variance estimator, is a declaration rather than a field read: the
             # `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior`
             # and `FactorBlackLittermanPrior` carry `ve` and `mp.pdm` — a wrapper over either
-            # forwards the declaration, everything else answers `nothing` (see
-            # [`factor_residual_config`](@ref)).
+            # forwards the declaration, everything else declares `nothing` (see
+            # [`factor_residual_config`](@ref)). The shape is checked before the property
+            # access, so a wrong declaration names itself here instead of surfacing as a
+            # `FieldError` below.
             rsd_cfg = factor_residual_config(pe.pe)
+            assert_factor_residual_config(pe.pe, rsd_cfg)
             sigma = if isnothing(rsd_cfg) || !rsd_cfg.rsd
                 pr.sigma
             else
@@ -425,6 +424,13 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     return HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
                           sk = posterior_sk, V = posterior_V,
                           skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
+end
+
+function factor_residual_config(pe::HighOrderFactorPriorEstimator)
+    # `pe.rsd` governs the co-moment corrections, not the covariance: the low-order block of
+    # the result is the wrapped estimator's own, so this estimator forwards the wrapped
+    # declaration (see [`factor_residual_config`](@ref)).
+    return factor_residual_config(pe.pe)
 end
 
 export HighOrderFactorPriorEstimator

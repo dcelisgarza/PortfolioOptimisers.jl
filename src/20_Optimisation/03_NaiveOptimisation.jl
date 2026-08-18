@@ -139,7 +139,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NaiveOptimisationResult(;
-        pr::Option{<:AbstractPriorResult},
+        pr::Option{<:Pr_RR},
         wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
         fb::Option{<:OptE_Opt}
     ) -> NaiveOptimisationResult

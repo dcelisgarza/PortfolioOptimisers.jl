@@ -187,10 +187,7 @@ julia> cor(ce, X)
 """
 function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return lower_tail_dependence(X, ce.alpha, ce.ex)
 end
 

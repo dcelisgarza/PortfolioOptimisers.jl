@@ -61,7 +61,7 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 
   - [`compute_value_at_risk_z`](@ref)
   - [`compute_value_at_risk_cz`](@ref)
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -71,39 +71,87 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
+                                              (; risk = :var_risk_, z = :z_var_,
+                                               cardinality = :csvar_, exceedance = :cvar_);
+                                              loss = loss, prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Encode the big-M empirical quantile of `series` and register it under the names in `keys`.
+
+This is the shared body of the MIP `ValueatRisk` and `DrawdownatRisk`. The two are one
+big-M programme over different series, so [`risk_series`](@ref) chooses the series and this
+function writes the indicator block once.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The quantile risk measure, read for `alpha`, `w` and `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `T::Int`: The number of observations.
+  - `b::Number`: Big-M constant.
+  - `s::Number`: Cardinality slack.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `loss::Bool`: `true` builds the loss tail, `false` the gain tail. The indicators are
+    negated with the series, so the two tails describe opposite sides.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The quantile risk variable added to the model.
+
+# Throws
+
+  - `DomainError`: if `b <= s`.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                            opt::RiskJuMPOptimisationEstimator,
+                                            pr::AbstractPriorResult, series, T::Int,
+                                            b::Number, s::Number, keys::NamedTuple;
+                                            loss::Bool = true, prefix::Symbol = Symbol(""))
     @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    T = length(net_X)
-    var_risk, z_var = JuMP.@variables(model, begin
-                                          ()
-                                          [1:T], (binary = true)
-                                      end)
-    state_set!(model, prefix, :var_risk_, i, var_risk)
-    state_set!(model, prefix, :z_var_, i, z_var)
+    risk, z = JuMP.@variables(model, begin
+                                  ()
+                                  [1:T], (binary = true)
+                              end)
+    state_set!(model, prefix, keys.risk, i, risk)
+    state_set!(model, prefix, keys.z, i, z)
     if !loss
-        net_X = -net_X
-        z_var = -z_var
+        z = -z
     end
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = get_observation_weights(wi, pr.X)
     if isnothing(wi)
-        state_set!(model, prefix, :csvar_, i,
-                   JuMP.@constraint(model, sc * (sum(z_var) - alpha * T + s * T) <= 0))
+        state_set!(model, prefix, keys.cardinality, i,
+                   JuMP.@constraint(model, sc * (sum(z) - alpha * T + s * T) <= 0))
     else
         sw = sum(wi)
-        state_set!(model, prefix, :csvar_, i,
+        state_set!(model, prefix, keys.cardinality, i,
                    JuMP.@constraint(model,
-                                    sc *
-                                    (LinearAlgebra.dot(wi, z_var) - alpha * sw + s * sw) <=
+                                    sc * (LinearAlgebra.dot(wi, z) - alpha * sw + s * sw) <=
                                     0))
     end
-    state_set!(model, prefix, :cvar_, i,
-               JuMP.@constraint(model, sc * ((net_X + b * z_var) .+ var_risk) >= 0))
-    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, :var_risk_, i;
+    state_set!(model, prefix, keys.exceedance, i,
+               JuMP.@constraint(model, sc * ((series + b * z) .+ risk) >= 0))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
-    return var_risk
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -351,7 +399,7 @@ the empirical drawdown quantile at confidence level `r.alpha`.
 # Related
 
   - [`DrawdownatRisk`](@ref)
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
@@ -359,34 +407,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.b), r.b, 1e3)
     s = ifelse(!isnothing(r.s), r.s, 1e-5)
-    @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    dar_risk, z_dar = JuMP.@variables(model, begin
-                                          ()
-                                          [1:T], (binary = true)
-                                      end)
-    state_set!(model, prefix, :dar_risk_, i, dar_risk)
-    state_set!(model, prefix, :z_dar_, i, z_dar)
-    alpha = r.alpha
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    if isnothing(wi)
-        state_set!(model, prefix, :csdar_, i,
-                   JuMP.@constraint(model, sc * (sum(z_dar) - alpha * T + s * T) <= 0))
-    else
-        sw = sum(wi)
-        state_set!(model, prefix, :csdar_, i,
-                   JuMP.@constraint(model,
-                                    sc *
-                                    (LinearAlgebra.dot(wi, z_dar) - alpha * sw + s * sw) <=
-                                    0))
-    end
-    state_set!(model, prefix, :cdar_, i,
-               JuMP.@constraint(model,
-                                sc * ((-view(dd, 2:(T + 1)) + b * z_dar) .+ dar_risk) >= 0))
-    set_risk_bounds_and_expression!(model, opt, dar_risk, r.settings, :dar_risk_, i;
-                                    prefix = prefix)
-    return dar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
+                                              (; risk = :dar_risk_, z = :z_dar_,
+                                               cardinality = :csdar_, exceedance = :cdar_);
+                                              prefix = prefix)
 end

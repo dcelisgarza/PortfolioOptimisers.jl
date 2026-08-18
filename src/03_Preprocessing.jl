@@ -1534,10 +1534,7 @@ Int64[]
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     N = size(X, 2)
     to_remove = Vector{Int}(undef, 0)
     for i in axes(X, 2)

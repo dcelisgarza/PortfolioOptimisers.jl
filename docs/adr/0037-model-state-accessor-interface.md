@@ -233,3 +233,92 @@ Neither was reachable in the test suite; both are the class the rule exists to p
 - `arg_dict[:key_sym]` lost its last user and is deleted.
 - Rule 3 reports **zero** violations, so the migration is provably complete rather than
   believed complete — the same standard §6 set for rules 1 and 2.
+
+## Amendment (2026-08-17, second) — registration is fresh, because composition is not injective
+
+The amendment above brought the index axis inside the seam. It left one property of the
+composition unstated, and the property is load-bearing: **`state_key` is not injective.**
+Neither axis carries a delimiter, so a name that ends in a digit at a low index composes the
+same `Symbol` as a shorter name at a higher index —
+
+```julia
+state_key(prefix, :te_dr_, 11) == state_key(prefix, :te_dr_1, 1) == :te_dr_11
+```
+
+That is not a spelling curiosity. §4 above records it as a defect that shipped:
+`set_tracking_error_constraints!` put entry 1 at `:te_dr_11`, which is the key `te_dr` itself
+takes at entry 11. **The three rules could not have caught it** — each key is spelled through
+the interface, each access goes through an accessor, and the collision exists only in the
+composed result. What caught it was a person reading the code during the index migration.
+
+The consequence of a collision is a **wrong answer, not a crash**. `state_set!` wrote through
+`model[key] = val`, so the second registration replaced the first, the object dictionary
+carried one entry where the build needed two, and a later `state_get` handed a constraint the
+wrong variable. Nothing warns.
+
+### 1. `state_set!` refuses a key that is already registered
+
+`assert_state_key_free(model, key)` guards both `state_set!` methods. A repeat throws an
+`ArgumentError` that names the key, states the non-injectivity, and names the two verbs that
+*do* accept a repeat.
+
+Re-registration has no legitimate reading, which is what makes the guard affordable rather
+than a behaviour change. The interface already carries both reuse cases in their own verbs:
+`state_build!` builds an entry once and returns the existing one untouched, and `mark_state!`
+is an idempotent presence flag built on it. `state_set!` is the *fresh registration* verb and
+now says so at run time.
+
+The guard closes more than the composition collision. Two emitters that each spell a
+perfectly correct key, and happen to spell the *same* one, now fail where one silently
+replaced the other's entry.
+
+### 2. A delimiter was rejected as the fix
+
+Making the composition injective — `Symbol(prefix, name, :_, i)` — was considered and
+rejected on two grounds.
+
+- It moves **every** top-level key spelling. `state_key(Symbol(""), :ret_, 1)` is `:ret_1`
+  today, and that is the one caller-facing surface the amendment above went out of its way to
+  hold still.
+- It closes only half the class. Two emitters that pick the same *correct* key still collide,
+  and a delimiter cannot see that. The guard sees both.
+
+The spelling is therefore kept, the non-injectivity is documented on `state_key` itself, and
+the collision is caught where it does harm: at registration.
+
+### 3. The rule is a run-time rule, not a fourth lint
+
+A fourth seam-lock rule was the cheaper alternative: run a census over the shipped name tags
+and fail CI on a pair whose composition collides. It was rejected for the polarity §6 argues
+for throughout. A census can only see the tags that exist when it runs, and a Model State key
+is composed from a `prefix` and an `i` that are **values**, not literals — so a census would
+have to enumerate the builds as well as the tags. The run-time guard names no tag and covers
+the entry added tomorrow.
+
+A census was still run, as evidence and not as the mechanism: over the **236** literal name
+tags the emitters pass to the six `state_*` verbs, **no pair collides** — no tag is another
+tag followed only by digits. The defect §4 records was the only instance, and it was already
+fixed. The guard exists for the next one.
+
+### 4. Verified
+
+The guard is only affordable if no shipped build re-registers a key, and that is a claim about
+**run time**, not about the source. It was measured by building models rather than by reading
+code: 14 targeted test files, **1,287 passes and 0 failures**, covering the paths that register
+the most Model State entries — `test_27_prefix_registration.jl` (251, every nested tracking
+build), `test_18g`/`test_18h` (the two tracking algorithms, 137 + 94),
+`test_16a_asset_risk_budgeting.jl` (235), `test_18j_formulations.jl` (113),
+`test_18k_constraints.jl` (117), `test_18m` (97), `test_18o` (63), `test_20` (near-optimal
+centering, 39), `test_03b` (35), `test_18n` (32), `test_19` (26), `test_22b` (10) and
+`test_28_seam_lock.jl` (38). Not one build hit the guard.
+
+`test_28_seam_lock.jl` gains the run-time half of the rule, next to the `SHARED_STATE` check
+that plays the same part for rule 2: it asserts the two composed keys are equal, that the
+second registration throws, that the first entry survives, and that `state_build!` and
+`mark_state!` keep their idempotence.
+
+Two reference-weight drifts surfaced while running the census and are **unrelated to the
+guard** — they reproduce with it bypassed. `MeanRiskIT.csv.gz` columns 16
+(`EntropicValueatRiskRange`) and 25 (`Kurtosis`) had drifted by 6.1e-6 and 1.6e-6 in absolute
+weight, past their own `rtol`, against the range and index reworks recorded in ADR 0057 and in
+the amendment above. Both columns were regenerated; the other 46 were left byte-identical.

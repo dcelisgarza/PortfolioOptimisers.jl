@@ -73,6 +73,7 @@ frontier_point_count
 frontier_sweep_points
 assert_frontier_sweep_cap
 state_key
+assert_state_key_free
 state_set!
 state_has
 state_get

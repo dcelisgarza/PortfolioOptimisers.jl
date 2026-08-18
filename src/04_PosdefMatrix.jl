@@ -10,7 +10,7 @@ All concrete and/or abstract types that implement positive definite matrix proje
 In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: In-place projection of a matrix to the nearest positive definite matrix.
-  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional out-of-place projection of a matrix to the nearest positive definite matrix. A fallback method copies `X` and calls `posdef!`, so it is only needed if the copy can be avoided.
 
 ## Arguments
 
@@ -117,7 +117,7 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton,
     return Posdef(alg, kwargs)
 end
 """
-    posdef!(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
+    posdef!(pdm::Option{<:AbstractPosdefEstimator}, X::MatNum) -> MatNum
 
 In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
@@ -219,7 +219,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     return X
 end
 """
-    posdef(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
+    posdef(pdm::Option{<:AbstractPosdefEstimator}, X::MatNum) -> MatNum
 
 Out-of-place version of [`posdef!`](@ref).
 
@@ -254,7 +254,7 @@ true
 function posdef(::Nothing, X::MatNum)::MatNum
     return X
 end
-function posdef(pdm::Posdef, X::MatNum)
+function posdef(pdm::AbstractPosdefEstimator, X::MatNum)
     X = copy(X)
     posdef!(pdm, X)
     return X

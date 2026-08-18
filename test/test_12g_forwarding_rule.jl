@@ -9,7 +9,7 @@ built it, asserted to show the old behaviour. That is what makes "this test fail
 before the fix" checkable from here rather than from a git archaeology session.
 =#
 include(joinpath(@__DIR__, "test12_setup.jl"))
-using StableRNGs, LinearAlgebra
+using StableRNGs, LinearAlgebra, InteractiveUtils
 
 const PO = PortfolioOptimisers
 
@@ -338,4 +338,69 @@ end
     @test isnothing(plain.fpr)
     @test isnothing(plain.f_mu)
     @test_throws Exception plain.fpr.mu
+end
+
+#=
+The per-type declaration of ADR 0046's 2026-08-17 amendment. `factor_residual_config`
+has no default: a silent `nothing` fallback cannot separate "this estimator adds no
+residual block" from "the author forgot the method", and the second reading drops a
+residual block the covariance really carries.
+=#
+struct UndeclaredResidualPrior <: PO.AbstractLowOrderPriorEstimator_F end
+struct WrongShapeResidualPrior <: PO.AbstractLowOrderPriorEstimator_F end
+function PO.factor_residual_config(::WrongShapeResidualPrior)
+    return (; ve = SimpleVariance())
+end
+
+@testset "`factor_residual_config` is declared per type, with no default" begin
+    # The census. Every concrete prior estimator the package ships declares beside its own
+    # definition, so a new estimator that forgets the method fails here rather than silently
+    # reporting "no residual block". `UndeclaredResidualPrior` above is the falsification
+    # witness: it is the shape of that forgotten method. The census is scoped to
+    # `PortfolioOptimisers` so the witnesses — and any estimator another test file defines —
+    # stay out of it.
+    tn(T) = Base.typename(Base.unwrap_unionall(T))
+    function concrete_estimators(T, acc = Any[])
+        for S in InteractiveUtils.subtypes(T)
+            isabstracttype(S) ? concrete_estimators(S, acc) : push!(acc, S)
+        end
+        return acc
+    end
+    declared = Set(tn(m.sig.parameters[2]) for m in methods(PO.factor_residual_config))
+    census = filter(T -> parentmodule(T) === PO,
+                    concrete_estimators(PO.AbstractPriorEstimator))
+    @test length(census) == 11
+    for T in census
+        @test tn(T) in declared
+    end
+
+    # There is no default: an undeclared type throws, and the message names it.
+    @test_throws ArgumentError PO.factor_residual_config(UndeclaredResidualPrior())
+    msg = try
+        PO.factor_residual_config(UndeclaredResidualPrior())
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("UndeclaredResidualPrior", msg)
+
+    # The two shapes the contract admits, and the one it does not. The shape is checked
+    # before the consumer reads `ve`/`pdm`/`rsd`, so a wrong declaration names itself
+    # instead of surfacing as a `FieldError` inside the cokurtosis correction.
+    fp = FactorPrior()
+    @test isnothing(PO.assert_factor_residual_config(fp, nothing))
+    @test isnothing(PO.assert_factor_residual_config(fp, PO.factor_residual_config(fp)))
+    @test_throws ArgumentError PO.assert_factor_residual_config(WrongShapeResidualPrior(),
+                                                                PO.factor_residual_config(WrongShapeResidualPrior()))
+
+    # The two owners report the block; every wrapper forwards it, so a wrapped
+    # `FactorPrior` is still reachable through any depth of wrapping.
+    cfg = PO.factor_residual_config(fp)
+    @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, fp.mp.pdm, fp.rsd)
+    @test PO.factor_residual_config(HighOrderPriorEstimator(; pe = fp)) === cfg
+    @test PO.factor_residual_config(FeaturePrior(; pe = fp, ze = RegressionFeatures())) ===
+          cfg
+
+    # And the estimators that add none say so explicitly, rather than by omission.
+    @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
+    @test isnothing(PO.factor_residual_config(HighOrderPriorEstimator()))
 end

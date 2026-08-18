@@ -292,10 +292,7 @@ julia> cor(ce, X)
   - [`cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(ce.w, X)
     return cor_distance(ce, X, w)
 end
@@ -447,10 +444,7 @@ julia> cov(ce, X)
   - [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(ce.w, X)
     return cov_distance(ce, X, w)
 end

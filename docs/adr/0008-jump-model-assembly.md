@@ -226,3 +226,75 @@ argument lists, and they had drifted. This amendment records the seam that close
    There is deliberately no inverse remap helper: the bundle is never reconstructed, it is kept.
 
 §6 still holds — unconstrained NOC has no middle, and this amendment does not give it one.
+
+## Amendment 2 (2026-08-17)
+
+The maintainability review of 2026-08-17 (finding 5) found that §6 is wrong on its own terms,
+and that the exclusion had cost a defect. §6 is withdrawn. The amendment above ends with the
+sentence "§6 still holds"; that sentence is superseded here, and the rest of that amendment is
+untouched.
+
+### The finding
+
+Unconstrained NOC does not "skip straight from head to solve". It ran three steps of the
+shared middle inline — `set_risk_constraints!` → `scalarise_risk_expression!` →
+`set_return_constraints!` — and its argument list had drifted from the sequence it copied:
+
+```julia
+set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
+```
+
+The dispatched signature is `(model, r, opt, pr, pl, fees, args...)`. So `nothing` bound
+`fees`, and `opt.fees` fell into `args...`. Unconstrained NOC built every risk constraint
+fee-free from `4cd418494` — the commit that appended `opt.fees` to a call that already carried
+two `nothing`s — until this amendment. The intent never took effect, and nothing raised,
+because the callee's `args...` tail absorbed the overshoot. This is the second instance of the
+failure §2 of the first amendment records, and the second one found in this file.
+
+### Decision
+
+1. **Unconstrained NOC has a middle.** It is not `assemble_jump_model!`'s middle: the variant
+   applies no linear, cardinality, turnover, tracking, norm, regularisation, phylogeny or
+   custom constraint, and that omission is what "unconstrained" names. So the middle is named
+   and dispatched instead of excluded. `assemble_near_optimal_centering_model!(alg, model,
+   noc, setup, rd)` has one method per variant: the constrained one delegates to
+   `assemble_jump_model!`, the unconstrained one runs risk + scalarise + return and the same
+   `assert_frontier_sweep_cap` tail.
+
+2. **One head, one Result.** The two `_optimise` methods differed in 6 of 34 lines. They are
+   now one method that dispatches the middle through
+   `assemble_near_optimal_centering_model!` and the solve through
+   `solve_near_optimal_centering!(alg, model, noc, setup)`, which reads each `solve_noc!`
+   overload's arguments off the `NearOptimalSetup`. The 12-line Result block is written once.
+
+3. **The fee argument is positional in one place.** The unconstrained middle reaches
+   `set_risk_constraints!` through `set_risk_and_scalarise!`, as every other head does. A head
+   can no longer order that list for itself.
+
+4. **The absorber is removed.** Both generic `set_risk_constraints!` methods and both
+   `set_risk_and_scalarise!` methods take a named, typed `b1::Option{<:MatNum} = nothing` in
+   place of the `args...` tail. `b1` is the only trailing value the middle has ever passed, and
+   every caller already passed exactly one, so no call site changes arity. A `Fees` in that
+   slot is now a `MethodError` instead of a silent loss. The `::Nothing` no-op method carries
+   the same positional list rather than an `args...` tail — a tail is ambiguous against a typed
+   one, and it accepts calls its sibling would reject.
+
+5. **The unconstrained middle ends at `assert_frontier_sweep_cap` too.** The call is a no-op
+   there today: `near_optimal_centering_setup` hands the variant the `no_bounds_risk_measure`
+   and `no_bounds_optimiser` copies, so neither frontier registry can be populated. The sweep
+   the variant does run is parameterised over the `rk_opt`/`rt_opt` vectors its sub-problem
+   solves produce, and the cap applies inside those sub-problems. Making the call keeps the
+   invariant structural instead of resting on an argument about which bounds survive.
+
+§3 of the first amendment still holds: the head keeps `set_weight_constraints!`, and the two
+variants share it.
+
+### Verification
+
+`test_20_near_optimal_centering_optimisation.jl`, `test_03b_jump_model_assembly.jl`,
+`test_19_factor_risk_contribution.jl`, `test_18n_frontier_sweep_cap.jl`,
+`test_18m_return_multiplicity.jl`, `test_18o_no_return.jl`,
+`test_15_relaxed_risk_budgetting_optimisation.jl` (the `r = nothing` no-op),
+`test_16a_asset_risk_budgeting.jl`, `test_18a_mean_risk_1.jl` and `test_28_seam_lock.jl` all
+pass. No CSV baseline moved: no test configures fees on a `NearOptimalCentering`, which is why
+the dropped fees went unnoticed.

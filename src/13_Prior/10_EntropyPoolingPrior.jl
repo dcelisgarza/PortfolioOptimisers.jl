@@ -250,7 +250,7 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
         sc1::Number = 1,
         sc2::Number = 1e3,
-        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling(),
         err::Option{<:NormError} = nothing
     ) -> OptimEntropyPooling
 
@@ -454,8 +454,8 @@ $(DocStringExtensions.FIELDS)
         kt_views::Option{<:LinearConstraintEstimator} = nothing,
         cov_views::Option{<:LinearConstraintEstimator} = nothing,
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
-        var_alpha::Number = 0.05,
-        cvar_alpha::Number = 0.05,
+        var_alpha::Option{<:Number} = nothing,
+        cvar_alpha::Option{<:Number} = nothing,
         sets::Option{<:UniverseSets} = nothing,
         ds_opt::Option{<:CVaREntropyPooling} = nothing,
         dm_opt::Option{<:OptimEntropyPooling} = nothing,
@@ -818,7 +818,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
         j = findfirst(x -> x == m.captures[1], nx)
         if isnothing(j)
             msg = unknown_variable_msg(m.captures[1], nx, sets.xkey)
-            strict ? throw(ArgumentError(msg)) : @warn(msg)
+            strict_diagnostic(msg, strict)
             push!(idx_rm, i)
             continue
         end
@@ -1819,11 +1819,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
                 k = findfirst(x -> x == asset2, nx)
                 if isnothing(j)
                     msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                    strict ? throw(ArgumentError(msg)) : @warn(msg)
+                    strict_diagnostic(msg, strict)
                 end
                 if isnothing(k)
                     msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                    strict ? throw(ArgumentError(msg)) : @warn(msg)
+                    strict_diagnostic(msg, strict)
                 end
                 if isnothing(j) || isnothing(k)
                     push!(idx_rm, i)
@@ -1848,11 +1848,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
             k = findfirst(x -> x == asset2, nx)
             if isnothing(j)
                 msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                strict_diagnostic(msg, strict)
             end
             if isnothing(k)
                 msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                strict_diagnostic(msg, strict)
             end
             if isnothing(j) || isnothing(k)
                 push!(idx_rm, i)
@@ -2330,13 +2330,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:StagedEP}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -2490,13 +2484,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:H0_EntropyPooling}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
+    X, F = dims_oriented(dims, X, F)
     T = size(X, 1)
     w0 = if isnothing(pe.w)
         iT = inv(T)

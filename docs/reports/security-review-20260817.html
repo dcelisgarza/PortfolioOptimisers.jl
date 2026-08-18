@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Security review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .boundary { stroke-dasharray: 5 4; stroke: #d97706; }
+      .taint    { stroke: #dc2626; stroke-width: 2px; }
+      .sink     { background: #7f1d1d; color: #fff; }
+      pre.code  { white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Security review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-08-17 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Tenth pass, scoped to the 110 files and 4,583 added lines that the architecture-review
+          fixes (A–I) put into <code>src/</code> since the ninth pass. The refactor itself is clean:
+          no guard was dropped, the two cone-parameter asymmetries are gone, and all six resource
+          caps still reach their sinks. The four findings below sit at the edges of that work — a
+          new load-time config channel that can disarm every cap, and three fail-open defaults.
+          Every finding was reproduced live; two were reproduced in a fresh process.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">2 Medium</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">2 Low</span>
+          <span class="text-slate-400">·</span>
+          <span class="inline-flex items-center gap-1.5 text-slate-600"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="boundary" stroke-width="2"/></svg> trust boundary</span>
+          <span class="inline-flex items-center gap-1.5 text-slate-600"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="taint"/></svg> taint flow</span>
+          <span class="inline-flex items-center gap-1.5 text-slate-600"><span class="sink px-1.5 py-0.5 rounded text-[0.6rem]">sink</span></span>
+        </div>
+      </header>
+
+      <section id="findings" class="space-y-10">
+
+        <!-- ================= FINDING 1 ================= -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">1 · A config file disarms every resource cap at load</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/01_Base.jl:1783 <span class="text-slate-300">·</span> :1820–1876 <span class="text-slate-300">·</span> :1882–1888
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["LocalPreferences.toml<br/>(data, ships with a project)"] -->|untrusted| B["__init__()<br/>load_preference × 11 keys"]
+  B --> C["apply_preferences!<br/>checks: Integer, not Bool, &gt; 0"]
+  C -.no ceiling.-> D["RESOURCE_LIMITS[]<br/>EQUATION_LIMITS[]"]
+  D --> E["bins × bins histogram"]
+  D --> F["recursive AST walk"]
+  D --> G["N² · n_sim draws"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  class B,C,D taint
+  class E,F,G sink
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — measured in a fresh process</div>
+              <pre class="code"># $PROJECT/LocalPreferences.toml
+[PortfolioOptimisers]
+max_bins             = 1000000000000
+equation_max_depth   = 1000000000
+suggestion_min_score = 1.0e-9
+
+julia&gt; using PortfolioOptimisers        # no warning of any kind
+julia&gt; RESOURCE_LIMITS[].max_bins       → 1000000000000
+julia&gt; EQUATION_LIMITS[].max_depth      → 1000000000
+julia&gt; MutualInfoCovariance(; bins = 50_000)   → ACCEPTED
+       # at the shipped cap this is: DomainError, bins exceeds max_bins = 10000</pre>
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — a ceiling, and the change is announced</div>
+              <pre class="code">@argcheck(val &lt;= SHIPPED_LIMITS.max_bins || allow_raise,
+          ArgumentError("preference `max_bins = $(val)` raises the shipped cap …"))
+# or, at minimum:
+@warn "preference raised a resource cap" key val shipped</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>__init__</code> reads eleven
+              Preferences.jl keys from the active project and applies them to the global caps. The
+              value check is <code>Integer &amp;&amp; !Bool &amp;&amp; &gt; 0</code>, so there is no
+              ceiling: a file raises every cap the library has, silently, before any user code runs.
+              Reachable — reproduced in a fresh process, not only through the function.</p>
+            <p><span class="font-semibold">Direction.</span> Bound the load-time channel against the
+              shipped defaults, or announce with a warning each cap a file changed, and correct the
+              docstring, whose fail-closed claim covers invalid values alone.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>caps: unbounded raise → bounded</li>
+            <li>a load-time raise is announced</li>
+            <li>docstring matches the behaviour</li>
+            <li>blast radius: one function, 11 keys</li>
+            <li>no caller loses a runtime setter</li>
+            <li>closes a code-free attack path</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0041 (one resource cap per sink).</span> The ADR accepts
+            that a caller may resize a cap. It does not decide whether a <em>file</em> may, silently,
+            at load. That is the new surface, and it is the part to settle.
+          </div>
+        </article>
+
+        <!-- ================= FINDING 2 ================= -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">2 · The suggestion guard does not defend the property its own message names</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">info-leak</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/01_Base.jl:1273–1281 <span class="text-slate-300">·</span> :1555–1563
+            <span class="text-slate-300">·</span> src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl:1620
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the threshold sits at 0</div>
+              <pre class="code">@argcheck(min_score &gt; 0,
+  "… a zero or negative threshold admits
+   every candidate with any nonzero
+   similarity, making `did_you_mean` echo
+   a real asset name … (ADR 0026).")
+
+min_score = 1e-9   → ACCEPTED</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — the threshold sits where the property holds</div>
+              <pre class="code">const MIN_SUGGESTION_SCORE = 0.5
+@argcheck(min_score &gt;= MIN_SUGGESTION_SCORE, …)
+
+min_score = 1e-9   → ArgumentError
+# 0.5 is the value the library already
+# picks for suggest_declared_key</pre>
+            </div>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — measured at a public entry point</div>
+              <pre class="code">set_string_distance!(; min_score = 1e-9)      # or the preference of finding 1
+get_linear_constraints(parse_equation("ZZZQX &lt;= 1"), sets)
+
+┌ Warning: variable `ZZZQX` not in asset universe (7 assets under key `nx`);
+│ term dropped (did you mean `AMZN`?)                ← a real holding, echoed</pre>
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — the shipped default already behaves this way</div>
+              <pre class="code">min_score = 0.7 (shipped)
+┌ Warning: variable `ZZZQX` not in asset universe (7 assets under key `nx`);
+│ term dropped                                       ← count only, no name</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The guard rejects <code>0</code>,
+              a negative value and <code>NaN</code>, but <code>1e-9</code> is positive and admits
+              every candidate — exactly the failure the message describes. An unknown-name probe in
+              an untrusted constraint string then echoes a real asset name back to the caller.
+              Reachable, and reachable without code through finding 1.</p>
+            <p><span class="font-semibold">Direction.</span> Move the floor from
+              <code>&gt; 0</code> to the lowest score at which a near-miss probe still fails to
+              match. The library already names that value: <code>suggest_declared_key</code> calls
+              <code>0.5</code> the loose setting, for candidates with nothing to leak.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed on a leaking threshold</li>
+            <li>guard matches its own rationale</li>
+            <li>the shipped default is unaffected</li>
+            <li>blast radius: one <code>@argcheck</code></li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0026 (lenient constraint names with suggestions).</span>
+            The ADR sets the info-leak-safe boundary this guard exists to hold. The finding is that
+            the guard is placed below the boundary, not that the boundary is wrong.
+          </div>
+        </article>
+
+        <!-- ================= FINDING 3 ================= -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">3 · Model State key composition is not injective, and a collision is silent</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/20_Optimisation/08_Base_JuMPOptimisation.jl:1160–1192
+            <span class="text-slate-300">·</span> test/test_28_seam_lock.jl
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["name = :te_dr_<br/>i = 11"] --> K["Symbol(prefix, name, i)"]
+  B["name = :te_dr_1<br/>i = 1"] --> K
+  K --> C[":te_dr_11"]
+  C -.second write wins.-> D["model[key] = val<br/>1 entry, not 2"]
+  D --> E["a constraint binds<br/>the wrong variable"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  class K,C,D taint
+  class E sink
+            </pre>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — measured</div>
+              <pre class="code">state_key(p, :te_dr_,  11) == :te_dr_11
+state_key(p, :te_dr_1,  1) == :te_dr_11   # equal
+
+state_set!(m, p, :te_dr_,  11, v1)
+state_set!(m, p, :te_dr_1,  1, v2)
+length(object_dictionary(m))  → 1
+m[:te_dr_11]                  → v2
+# v1 is gone. No warning, no error.</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — re-registration fails closed</div>
+              <pre class="code">function state_set!(model, prefix, name, i, val)
+    key = state_key(prefix, name, i)
+    @argcheck(!haskey(model, key),
+      ArgumentError("Model State key `$key` is \
+       already registered …"))
+    model[key] = val
+    return val
+end</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>Symbol(prefix, name, i)</code>
+              concatenates, so a name that ends in a digit and a smaller index compose the same key
+              as a shorter name and a larger index. <code>state_set!</code> then overwrites without
+              a warning, and a constraint binds the wrong variable — a silent wrong result, not a
+              crash. This is how <code>:te_dr_11</code> was born. <span class="font-semibold">Latent:</span>
+              I checked all 240 shipped name tags for every prefix pair whose remainder is digits, and
+              no pair collides today. Nothing stops the next tag.</p>
+            <p><span class="font-semibold">Direction.</span> Make <code>state_set!</code> refuse a
+              key that is already registered. The interface already carries the idempotent case in a
+              separate verb — <code>state_build!</code> returns an existing entry untouched, and
+              <code>mark_state!</code> is documented as idempotent — so a repeated
+              <code>state_set!</code> has no legitimate reading. The cheaper alternative is a fourth
+              seam-lock rule that runs the 240-tag census in CI.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed on a duplicate key</li>
+            <li>closes the class, not the instance</li>
+            <li>silent wrong result → typed error</li>
+            <li>blast radius: two methods</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0037 (Model State accessor interface).</span> The
+            seam-lock rules police the spelling of a key and the access to one. Neither can see that
+            two well-spelled keys compose the same Symbol, so the collision class stays open.
+            <span class="font-semibold">Confirm first:</span> no build was run against a solver —
+            none is installed in the test environment — so a build-time census of duplicate
+            registrations is the step that proves the guard breaks nothing.
+          </div>
+        </article>
+
+        <!-- ================= FINDING 4 ================= -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <h2 class="text-xl font-semibold">4 · Two new total functions, opposite default polarity</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/13_Prior/03_FactorPrior.jl:255–257
+            <span class="text-slate-300">·</span> src/19_RiskMeasures/01_Base_RiskMeasures.jl:227–229
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">range_tails — fails closed</div>
+              <pre class="code">function range_tails(r::AbstractBaseRiskMeasure)
+    return throw(ArgumentError(
+      "`range_tails` is not defined for \
+       `$(typeof(r))`. …"))
+end
+
+range_tails(Variance())
+→ ArgumentError, and it names the type</pre>
+            </div>
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">factor_residual_config — fails open</div>
+              <pre class="code">function factor_residual_config(
+             ::AbstractPriorEstimator)
+    return nothing
+end
+
+factor_residual_config(EmpiricalPrior())
+→ nothing        # correct: no residual block
+factor_residual_config(MyNewFactorPrior())
+→ nothing        # a forgotten method reads
+                 # the same as a correct answer</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The same delta added two per-type total
+              functions with opposite defaults. <code>factor_residual_config</code> cannot separate
+              "this estimator has no residual block" from "the author forgot the method", so an
+              extension silently drops its residual block. The consumer then reads
+              <code>.rsd</code> / <code>.ve</code> / <code>.pdm</code> off the returned value with no
+              shape check. <span class="font-semibold">Latent:</span> no untrusted input reaches
+              this — it is an extension-author surface, and every shipped type declares correctly.</p>
+            <p><span class="font-semibold">Direction.</span> Give the fallback the same polarity as
+              <code>range_tails</code>: throw and name the type, and let a type that genuinely has no
+              residual block say so with an explicit method. Check the returned shape before the
+              property access.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>one default polarity, not two</li>
+            <li>a forgotten method fails closed</li>
+            <li>shape checked before property access</li>
+            <li>blast radius: one method, plus declarations</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0046 (wrapping priors forward by default).</span> The
+            amendment made <code>factor_residual_config</code> total. Whether "total" here means
+            "answers for every type" or "throws for an undeclared type" is the open question, and it
+            is the maintainer's call.
+          </div>
+        </article>
+
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-red-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-red-800">Top recommendation — bound the load-time preferences channel</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          Close <a href="#c1" class="text-red-700 underline font-semibold">finding 1</a> first. It is
+          the only finding in this pass that an attacker reaches without running code: a
+          <code>LocalPreferences.toml</code> is data, it travels with a cloned project or a template,
+          it is often untracked, and it is applied at <code>using PortfolioOptimisers</code> with no
+          warning. One file disarms every guard the last three passes installed — the six
+          <code>ResourceLimits</code> caps that turn an OOM kill into a typed error, the two
+          <code>EquationLimits</code> caps that hold the string→AST boundary, and the ADR 0026
+          info-leak boundary of <a href="#c2" class="text-red-700 underline">finding 2</a>. The fix
+          is local to one function and costs no caller a runtime setter.
+          <a href="#c3" class="text-red-700 underline">Finding 3</a> has the worse blast radius — a
+          silent wrong result — but it is latent, so it is second.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-08-17 · <code>/improve-security</code> · tenth pass, scoped to
+        <code>3efb13d80..HEAD</code> (110 files, +4,583/−3,667 in <code>src/</code> and
+        <code>ext/</code>); all four findings reproduced live, findings 1 and 2 in a fresh process.
+      </footer>
+
+    </main>
+  </body>
+</html>

@@ -237,3 +237,66 @@ const PO = PortfolioOptimisers
         end
     end
 end
+#=
+The conic tail measures resolve their observation weights on both sides of the
+returns/drawdown twin.
+
+A tail measure and its drawdown twin are one programme under the substitution
+`net_X -> -dd[2:T+1]` (`risk_series`). They used to disagree about what they handed
+`get_observation_weights`: the returns tails passed `net_X`, a vector of JuMP expressions
+that matches neither documented arity, so a `DynamicAbstractWeights` ALWAYS raised there;
+the drawdown twins passed `pr.X` and resolved. One substitution, two answers. Both sides now
+pass `pr.X`, which is the documented `MatNum` arity.
+=#
+@testset "Observation weights resolve on both sides of the returns/drawdown twin" begin
+    using Test, PortfolioOptimisers, StableRNGs, StatsBase, Clarabel
+
+    rng = StableRNG(987654321)
+    X = randn(rng, 40, 5) ./ 100
+    rd = ReturnsResult(; nx = string.('A':'E'), X = X)
+    cw = CompleteObsWeights(8)
+    sw = PO.get_observation_weights(cw, X; dims = 1)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = "verbose" => false)
+
+    # Build the model without solving it: the resolved weights are visible in the
+    # constraints, and a solve would only add tolerance to the comparison.
+    function build(r)
+        mr = MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv))
+        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd; dims = 1)
+        model = PO.JuMP.Model()
+        PO.JuMP.set_string_names_on_creation(model, false)
+        PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_maximum_ratio_factor_variables!(model, mr.obj)
+        PO.set_w!(model, attrs.pr.X, mr.wi)
+        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+        return sprint(print, model)
+    end
+
+    # Resolving the weights is all the dynamic type buys: the model is the one the measure
+    # builds when it is handed the same weights directly.
+    for (dyn, sta) in ((ValueatRisk(; w = cw, alg = MIPValueatRisk()),
+                        ValueatRisk(; w = sw, alg = MIPValueatRisk())),
+                       (DrawdownatRisk(; w = cw), DrawdownatRisk(; w = sw)),
+                       (ConditionalValueatRisk(; w = cw), ConditionalValueatRisk(; w = sw)),
+                       (ConditionalDrawdownatRisk(; w = cw), ConditionalDrawdownatRisk(; w = sw)),
+                       (DistributionallyRobustConditionalValueatRisk(; w = cw),
+                        DistributionallyRobustConditionalValueatRisk(; w = sw)),
+                       (DistributionallyRobustConditionalDrawdownatRisk(; w = cw),
+                        DistributionallyRobustConditionalDrawdownatRisk(; w = sw)),
+                       (EntropicValueatRisk(; w = cw), EntropicValueatRisk(; w = sw)),
+                       (EntropicDrawdownatRisk(; w = cw), EntropicDrawdownatRisk(; w = sw)),
+                       (RelativisticValueatRisk(; w = cw), RelativisticValueatRisk(; w = sw)),
+                       (RelativisticDrawdownatRisk(; w = cw), RelativisticDrawdownatRisk(; w = sw)),
+                       (PowerNormValueatRisk(; w = cw), PowerNormValueatRisk(; w = sw)),
+                       (PowerNormDrawdownatRisk(; w = cw), PowerNormDrawdownatRisk(; w = sw)))
+        @test build(dyn) == build(sta)
+    end
+
+    # A type that cannot resolve the matrix arity still raises rather than going quietly
+    # unweighted, and it now raises on both sides rather than only one.
+    vw = VectorOnlyObsWeights()
+    @test_throws PO.ObservationWeightsError build(ConditionalValueatRisk(; w = vw))
+    @test_throws PO.ObservationWeightsError build(ConditionalDrawdownatRisk(; w = vw))
+end

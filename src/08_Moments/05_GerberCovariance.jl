@@ -142,7 +142,7 @@ $(DocStringExtensions.FIELDS)
     GerberCovariance(;
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         t::Number = 0.5,
         alg::GerberCovarianceAlgorithm = Gerber1()
     ) -> GerberCovariance
@@ -209,8 +209,9 @@ GerberCovariance
     """
     @fprop alg
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
-                              me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
-                              t::Number, alg::GerberCovarianceAlgorithm)
+                              me::AbstractExpectedReturnsEstimator,
+                              pdm::Option{<:AbstractPosdefEstimator}, t::Number,
+                              alg::GerberCovarianceAlgorithm)
         assert_nonempty_nonneg_finite_val(t, :t)
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(alg)}(ve, me, pdm,
                                                                                 t, alg)
@@ -218,7 +219,8 @@ GerberCovariance
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
+                          pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+                          t::Number = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())::GerberCovariance
     return GerberCovariance(ve, me, pdm, t, alg)
 end
@@ -566,10 +568,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
@@ -621,10 +620,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)

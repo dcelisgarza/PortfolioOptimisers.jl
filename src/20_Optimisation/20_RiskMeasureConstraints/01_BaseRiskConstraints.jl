@@ -124,6 +124,7 @@ overload keeps every element's `scale`.
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
+  - $(arg_dict[:b1_opt])
 
 # Returns
 
@@ -136,8 +137,8 @@ overload keeps every element's `scale`.
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
+                               b1::Option{<:MatNum} = nothing; kwargs...)
     # A `JuMP` model builder reads the measure's slots directly and never calls `factory`,
     # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
     # alone; each builder's own prior fallback is untouched.
@@ -145,17 +146,22 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # `scale` is a combination weight, so it is dropped here: a lone measure is not an
     # aggregate and the weight has nothing to weigh. The vector method below keeps it,
     # because there the measures really do combine.
+    #
+    # `b1` is typed and named, not absorbed by an `args...` tail. The tail let a caller pass
+    # a `Fees` in the slot after `fees` and lose it silently — which is exactly what
+    # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
     set_risk_constraints!(model, 1,
                           unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
-                          pr, pl, fees, args...; kwargs...)
+                          pr, pl, fees, b1; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
-                               fees::Option{<:Fees}, args...; kwargs...)
+                               fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
+                               kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr), opt, pr, pl,
-                              fees, args...; kwargs...)
+                              fees, b1; kwargs...)
     end
     return nothing
 end
@@ -504,4 +510,144 @@ function set_range_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
                                     prefix = prefix)
     return range_risk
+end
+"""
+    abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for the series a conic risk measure reduces.
+
+A conic tail measure is written once against a per-observation series of *returns*. The
+returns family reduces the net portfolio returns; the drawdown family reduces the negated
+drawdown path, which is the same series with one substitution. [`risk_series`](@ref) is the
+one place that substitution is made, so a builder is written once and each twin selects its
+series by passing the marker.
+
+# Related
+
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+"""
+abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
+"""
+    struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
+
+Marker selecting the net portfolio returns as the series a risk measure reduces.
+
+This is the series of every returns-tail measure, and the only one that can be
+range-composed: the gain tail is the same series negated, which is what `loss = false` means
+in [`risk_series`](@ref).
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+"""
+struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
+"""
+    struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
+
+Marker selecting the negated drawdown path as the series a risk measure reduces.
+
+`-dd[2:T+1]` is the return-signed drawdown series, so a builder written against net returns
+encodes the drawdown twin without a single sign written by hand.
+
+The drawdown series has no gain tail. A run-up is a different recurrence, not the negation
+of this one, so [`risk_series`](@ref) takes no `loss` keyword for this marker and no drawdown
+measure can be range-composed.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+"""
+struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the per-observation series a conic risk measure reduces, and its length.
+
+The returns twin and the drawdown twin of a conic tail measure are one programme under the
+substitution `net_X -> -dd[2:T+1]`. This function is the one place that substitution is
+written, so each builder takes `(series, T)` and encodes both twins.
+
+The series is signed as a *return*: a loss is a negative entry, on both markers. That is why
+the drawdown branch negates — `dd` is a non-negative loss path — and it is what lets one
+builder body serve both.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg::NetReturnsRiskSeries`: Reduce the net portfolio returns.
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `loss::Bool`: `true` builds the loss tail on the net portfolio returns, `false` the gain
+    tail on their negation.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `series`: The per-observation return series, length `T`.
+  - `T::Int`: The number of observations.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
+"""
+function risk_series(model::JuMP.Model, ::NetReturnsRiskSeries, pr::AbstractPriorResult;
+                     loss::Bool = true, prefix::Symbol = Symbol(""))
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
+    return net_X, length(net_X)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the negated drawdown path a drawdown risk measure reduces, and its length.
+
+Registers the drawdown variables through [`set_drawdown_constraints!`](@ref), then returns
+`-dd[2:T+1]`. The negation is what makes the drawdown path a *return* series, so a builder
+written against net portfolio returns encodes the drawdown twin unchanged.
+
+There is no `loss` keyword. A drawdown has no gain tail, so a caller that tries to compose a
+range from this series fails at the call site rather than silently building the loss tail
+twice.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg::DrawdownRiskSeries`: Reduce the negated drawdown path.
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `series`: The negated drawdown path `-dd[2:T+1]`, length `T`.
+  - `T::Int`: The number of observations.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+"""
+function risk_series(model::JuMP.Model, ::DrawdownRiskSeries, pr::AbstractPriorResult;
+                     prefix::Symbol = Symbol(""))
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
+    T = length(dd) - 1
+    return -view(dd, 2:(T + 1)), T
 end

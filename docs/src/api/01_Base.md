@@ -69,6 +69,7 @@ L1Norm
 LpNorm
 LInfNorm
 norm_error
+norm_factor
 resolve_rng
 ```
 
@@ -85,11 +86,13 @@ did_you_mean
 suggest_declared_key
 unknown_variable_msg
 misaligned_axis_msg
+strict_diagnostic
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg
 gross_budget_bounds_msg
 failed_solve_msg
+relaxed_preferences_msg
 first_error_line
 EquationLimits
 EQUATION_LIMITS
