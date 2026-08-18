@@ -326,11 +326,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     # Black litterman on the factors.
     rr, posterior_X = factor_reconstruction(pe.re, X, F)
     M = rr.M
-    # Precomputed views ignore both the sets and the key, and are the one shape that reaches here
-    # with `pe.sets === nothing`, so the key is read only when there is a sets to read it from.
-    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict, f_key)
+                                      size(X, 1), eltype(posterior_X), strict, :fkey)
     # `pe.l` replaces the factor prior's own mean with an equilibrium one implied by the asset
     # weights `pe.w`. The expression and its equal-weight fallback belong to
     # [`equilibrium_mu`](@ref).

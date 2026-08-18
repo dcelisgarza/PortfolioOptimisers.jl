@@ -307,9 +307,8 @@ function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     return StatsBase.pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::MatNum;
-          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
 
@@ -319,7 +318,7 @@ Compute opinion pooling prior moments for asset returns.
 
   - `pe`: Opinion pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `F`: Optional factor matrix (default: `nothing`).
+  - `F`: Optional factor matrix.
   - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.

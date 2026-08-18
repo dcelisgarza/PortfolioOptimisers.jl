@@ -200,7 +200,9 @@ Pre-compute shared Black-Litterman inputs from views, prior covariance, and blen
 
 Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
 
-`key` is the axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) leaves it `nothing` (the asset axis), while a member whose views update the **factor** distribution passes `sets.fkey`. It is the last argument because it is the only one an asset-space caller never supplies. A caller that admits `sets === nothing` passes `nothing` here too — reading `sets.fkey` to describe a universe that does not exist is the same error as reading the universe itself.
+`axis` names the declared axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) takes the default `:xkey` (the asset axis), while a member whose views update the **factor** distribution passes `:fkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+
+The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved from one, so a caller states its axis and nothing else. Resolving the key is this function's work, and it happens only when there is a `sets` to read it from — reading `sets.fkey` to describe a universe that does not exist is the same error as reading the universe itself. Views supplied as a [`BlackLittermanViews`](@ref) result are the one shape that arrives with no `sets` at all: they resolve no names and ignore both the sets and the axis.
 
 This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
 
@@ -218,7 +220,7 @@ This is also where `P` meets the distribution it updates, so it is where their w
   - `T::Integer`: Number of observations used to compute the default `tau = 1/T`.
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
-  - $(arg_dict[:ekey])
+  - $(arg_dict[:bl_axis])
 
 # Returns
 
@@ -238,7 +240,14 @@ This is also where `P` meets the distribution it updates, so it is where their w
   - [`vanilla_posteriors`](@ref)
 """
 function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict,
-                    key::Option{<:AbstractString} = nothing)
+                    axis::Symbol = :xkey)
+    @argcheck(axis in (:xkey, :fkey),
+              DomainError(axis,
+                          "axis must name a declared axis a view can land on, :xkey or :fkey"))
+    # The caller states the axis; resolving it to a key is this function's work. That is what
+    # lets a caller which admits `sets === nothing` — precomputed views resolve no names —
+    # say which distribution its views update without guarding the sets it may not have.
+    key = isnothing(sets) ? nothing : getproperty(sets, axis)
     (; P, Q, excl) = black_litterman_views(views, sets, key; datatype = datatype,
                                            strict = strict)
     # A `P` assembled from names is the right width by construction — the universe it resolved
@@ -497,9 +506,8 @@ function remove_excl_views(views_conf::VecNum, excl::VecInt)
     return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
 end
 """
-    prior(pe::BlackLittermanPrior, X::MatNum;
-          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
 
@@ -534,7 +542,7 @@ Where:
 
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `F{Nothing, <:MatNum}`: Optional factor matrix (default: `nothing`).
+  - `F`: Optional factor matrix.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.

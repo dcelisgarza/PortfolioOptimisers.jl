@@ -398,16 +398,12 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     (; b, M) = rr
     dt = eltype(posterior_X)
     T = size(X, 1)
-    # One sets, two keys: the asset views take the default (`xkey`), the factor views `fkey`.
-    # Precomputed views ignore both the sets and the key, and are the one shape that reaches
-    # here with `pe.sets === nothing`, so the key is read only when there is a sets to read it
-    # from.
-    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
+    # One sets, two axes: the asset views take the default `:xkey`, the factor views `:fkey`.
     (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.sets, pe.a_views_conf, a_prior_sigma,
                                       pe.tau, T, dt, strict)
     a_omega = omega
     f_result = bl_preroll(pe.f_views, pe.sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
-                          dt, strict, f_key)
+                          dt, strict, :fkey)
     f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))

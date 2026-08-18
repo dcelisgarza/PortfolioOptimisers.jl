@@ -562,7 +562,7 @@ end
 
 Fit and predict along a sequence of (train, test, asset) triples, respecting sequential constraints.
 
-Handles sequential and parallel execution. If the optimiser requires previous weights or is time-dependent, runs sequentially and passes weights/state between periods. Otherwise, runs in parallel using the provided executor.
+The path runs through [`fold_loop`](@ref), which takes each fold's asset-subset view of `(opt, rd)` and resolves the fold's time-dependent entries. The path runs sequentially when the optimiser needs the previous fold's weights, and in parallel over `ex` otherwise. A time-dependent optimiser alone does not force sequential execution, because its per-fold values are known upfront.
 
 # Arguments
 
@@ -581,6 +581,7 @@ Handles sequential and parallel execution. If the optimiser requires previous we
 # Related
 
   - [`fit_and_predict`](@ref)
+  - [`fold_loop`](@ref)
   - [`needs_previous_weights`](@ref)
   - [`is_time_dependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
@@ -588,31 +589,17 @@ Handles sequential and parallel execution. If the optimiser requires previous we
 function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
     # `i` is the fold's position in the path's split enumeration — no ordering is imposed
     # on time-dependent entries (predictions are sorted for reporting only, after the
     # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
-    predictions = run_folds(opt, n, ex) do i, prev
-        col = cols[i]
-        rdi = port_opt_view(rd, col)
-        opti = port_opt_view(opt, col, rdi.X)
-        # Resolve time-dependent constraints first so freshly swapped-in per-fold
-        # constraints also receive the previous weights from the factory pass below.
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
-                                       test_idx = test_idx,
-                                       w_prev = isnothing(prev) ? nothing : prev.res.w,
-                                       path_id = id)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        if !isnothing(prev) && needs_previous_weights(opt)
-            opti = factory(opti, prev.res.w)
-        end
-        return fit_and_predict(opti, rdi; train_idx = train_idx[i], test_idx = test_idx[i])
+    function asset_view(i)
+        rdi = port_opt_view(rd, cols[i])
+        return (port_opt_view(opt, cols[i], rdi.X), rdi)
+    end
+    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                            test_idx = test_idx, path_id = id, fold_view = asset_view
+                            ) do i, opti, rdi, tr, te
+        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
@@ -621,6 +608,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+    assert_unshuffled_folds(cv, train_idx)
     unique_ids = unique(path_ids)
     dict = [Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}(undef, 0)
             for _ in unique_ids]

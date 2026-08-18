@@ -317,11 +317,8 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_X, prior_sigma, fpr, rr = prior_result.X, prior_result.sigma,
                                         prior_result.fpr, prior_result.rr
     f_mu, f_sigma = fpr.mu, fpr.sigma
-    # Precomputed views ignore both the sets and the key, and are the one shape that reaches here
-    # with `pe.sets === nothing`, so the key is read only when there is a sets to read it from.
-    f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
     (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                 size(F, 1), eltype(posterior_X), strict, f_key)
+                                 size(F, 1), eltype(posterior_X), strict, :fkey)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))

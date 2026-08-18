@@ -997,8 +997,7 @@ processing — their per-fold values are known upfront.
   - [`fit_and_predict`](@ref)
 """
 function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
-                   ElT = PredictionResult)
-    prev_w_flag = needs_previous_weights(opt)
+                   ElT = PredictionResult, prev_w_flag::Bool = needs_previous_weights(opt))
     if prev_w_flag
         @info(cv_sequential_info(prev_w_flag))
         predictions = Vector{ElT}(undef, n)
@@ -1009,29 +1008,113 @@ function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
     end
     return parallel_folds(i -> fit_fold(i, nothing), n, ex; ElT = ElT)
 end
+"""
+    assert_unshuffled_folds(cv, train_idx)
+
+Assert that the cross-validation scheme `cv` enumerates unshuffled folds.
+
+Two checks, applied to every scheme:
+
+ 1. `cv` must not declare a set `shuffle` field. The check is by `hasfield`, so it holds
+    for a user-defined scheme too — no scheme in this package has such a field.
+ 2. Every fold's training indices must increase strictly. A scheme may leave gaps (purging,
+    embargoing and the combinatorial splits all do), but it must never reorder rows.
+
+A shuffled fold breaks the timeline that the fold loop, the [`TimeDependentContext`](@ref)
+schedules and the rolling transforms all read the fold's rows in.
+
+# Related
+
+  - [`fold_loop`](@ref)
+  - [`fit_and_predict`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+function assert_unshuffled_folds(cv, train_idx)
+    @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),
+              "Cross validation estimator must not be shuffled.")
+    @argcheck(all(x -> all(>(zero(eltype(x))), diff(x)), train_idx),
+              "Cross validation estimator must not be shuffled.")
+    return nothing
+end
+"""
+    fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor; rd,
+              train_idx, test_idx, path_id = nothing, ElT = PredictionResult,
+              time_ordered::Bool = true, fold_view = nothing)
+
+Run the `n` folds of a cross-validation scheme over `est`, and resolve each fold's estimator
+before the callback sees it.
+
+This is the fold loop of the package. Every cross-validation entry point goes through
+it: the optimiser-level schemes and the [`Pipeline`](@ref) ones alike. For fold `i` it
+does four steps.
+
+ 1. It takes the fold's view of `(est, rd)` through `fold_view`. An asset-resampling scheme
+    gives one; the other schemes do not.
+ 2. It swaps every [`TimeDependent`](@ref) schedule for its fold-`i` value against a
+    [`TimeDependentContext`](@ref), if `est` [`is_time_dependent`](@ref). The swap runs
+    first, so a freshly swapped-in per-fold entry also gets the weights of step 3.
+ 3. It threads the previous fold's weights in through [`factory`](@ref), if `est`
+    [`needs_previous_weights`](@ref).
+ 4. It calls `fit_fold(i, esti, rdi, train_idx[i], test_idx[i])`.
+
+[`assert_time_dependent_fold_count`](@ref) runs once, before the loop.
+
+`time_ordered` states whether the fold enumeration of the scheme is a timeline. `true`
+routes through [`run_folds`](@ref), so an optimiser that needs the previous weights runs
+sequentially. `false` routes through [`parallel_folds`](@ref), because a scheme whose
+folds are not a timeline has no previous fold to thread. `ElT` is the per-fold result
+element type: a single
+[`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
+multi-path combinatorial scheme.
+
+# Related
+
+  - [`run_folds`](@ref)
+  - [`parallel_folds`](@ref)
+  - [`assert_unshuffled_folds`](@ref)
+  - [`fit_and_predict`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor; rd,
+                   train_idx, test_idx, path_id = nothing, ElT = PredictionResult,
+                   time_ordered::Bool = true, fold_view = nothing)
+    td_flag = is_time_dependent(est)
+    if td_flag
+        assert_time_dependent_fold_count(est, n)
+    end
+    prev_w_flag = needs_previous_weights(est)
+    function fold(i, prev)
+        w_prev = isnothing(prev) ? nothing : prev.res.w
+        (esti, rdi) = isnothing(fold_view) ? (est, rd) : fold_view(i)
+        # Resolve time-dependent entries first, so a freshly swapped-in per-fold entry also
+        # receives the previous weights from the factory pass below.
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
+                                       test_idx = test_idx, w_prev = w_prev,
+                                       path_id = path_id)
+            esti = update_time_dependent_estimator(esti, ctx)
+        end
+        if !isnothing(w_prev) && prev_w_flag
+            esti = factory(esti, w_prev)
+        end
+        return fit_fold(i, esti, rdi, train_idx[i], test_idx[i])
+    end
+    return if time_ordered
+        run_folds(fold, est, n, ex; ElT = ElT, prev_w_flag = prev_w_flag)
+    else
+        parallel_folds(i -> fold(i, nothing), n, ex; ElT = ElT)
+    end
+end
 function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),
-              "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    @argcheck(all(map(x -> x > zero(x), map(x -> diff(x), train_idx))),
-              "Cross validation estimator must not be shuffled.")
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
-    predictions = parallel_folds(n, ex) do i
-        opti = opt
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                       test_idx = test_idx)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
-                               cols = cols)
+    assert_unshuffled_folds(cv, train_idx)
+    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                            test_idx = test_idx, time_ordered = false
+                            ) do i, opti, rdi, tr, te
+        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te, cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

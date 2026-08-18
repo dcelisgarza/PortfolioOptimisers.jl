@@ -508,23 +508,14 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
+    assert_unshuffled_folds(cv, train_idx)
     # A fold is a train/test split and `i` is its position in the split enumeration —
     # no ordering is imposed on time-dependent entries; the user keys them off the
     # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
-    predictions = parallel_folds(n, ex; ElT = Vector{PredictionResult}) do i
-        opti = opt
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                       test_idx = test_idx)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
-                               cols = cols)
+    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                            test_idx = test_idx, ElT = Vector{PredictionResult},
+                            time_ordered = false) do i, opti, rdi, tr, te
+        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te, cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -533,6 +524,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
+    assert_unshuffled_folds(cv, cv_res.train_idx)
     predictions = parallel_folds(length(test_idx), ex; ElT = Vector{PredictionResult}) do i
         return StatsAPI.predict(res, rd, test_idx[i])
     end

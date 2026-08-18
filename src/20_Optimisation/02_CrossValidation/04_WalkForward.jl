@@ -729,26 +729,10 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
-    predictions = run_folds(opt, n, ex) do i, prev
-        opti = opt
-        # Resolve time-dependent constraints first so freshly swapped-in per-fold
-        # constraints also receive the previous weights from the factory pass below.
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                       test_idx = test_idx,
-                                       w_prev = isnothing(prev) ? nothing : prev.res.w)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        if !isnothing(prev) && needs_previous_weights(opt)
-            opti = factory(opti, prev.res.w)
-        end
-        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
-                               cols = cols)
+    assert_unshuffled_folds(cv, train_idx)
+    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                            test_idx = test_idx) do i, opti, rdi, tr, te
+        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te, cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
@@ -757,6 +741,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
+    assert_unshuffled_folds(cv, cv_res.train_idx)
     predictions = parallel_folds(length(test_idx), ex) do i
         return StatsAPI.predict(res, rd, test_idx[i])
     end
