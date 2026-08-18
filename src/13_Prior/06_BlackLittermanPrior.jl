@@ -145,7 +145,7 @@ BlackLittermanPrior
     """
     views_conf
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -323,13 +323,14 @@ function calc_omega(views_conf::VecNum, P::MatNum, sigma::MatNum)
     return LinearAlgebra.Diagonal(alphas .* P * sigma * transpose(P))
 end
 """
-    vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum,
-                       prior_sigma::MatNum, omega::MatNum, P::MatNum,
-                       Q::VecNum)
+    vanilla_posteriors(tau::Number, prior_mu::VecNum, prior_sigma::MatNum,
+                       omega::MatNum, P::MatNum, Q::VecNum)
 
 Compute the Black-Litterman posterior mean and covariance for asset returns.
 
-`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, risk-free rate `rf`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+
+The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, to the posterior asset expected returns, through [`apply_rf`](@ref).
 
 # Mathematical definition
 
@@ -337,7 +338,7 @@ Let ``\\boldsymbol{\\Pi}`` be the prior mean, ``\\mathbf{\\Sigma}`` the prior co
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}}_{BL} &= \\boldsymbol{\\Pi} + \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi}) + r_f\\,.
+\\hat{\\boldsymbol{\\mu}}_{BL} &= \\boldsymbol{\\Pi} + \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})\\,.
 \\end{align}
 ```
 
@@ -357,12 +358,10 @@ Where:
   - ``\\mathbf{P}``: ``K \\times N`` views matrix.
   - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
   - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
-  - ``r_f``: Risk-free rate.
 
 # Arguments
 
   - `tau`: Scalar blending parameter for prior and views.
-  - `rf`: Risk-free rate to add to the posterior mean.
   - `prior_mu`: Prior mean vector of asset returns.
   - `prior_sigma`: Prior covariance matrix of asset returns.
   - `omega`: View uncertainty matrix.
@@ -378,15 +377,82 @@ Where:
 
   - [`BlackLittermanPrior`](@ref)
   - [`calc_omega`](@ref)
+  - [`apply_rf`](@ref)
 """
-function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sigma::MatNum,
+function vanilla_posteriors(tau::Number, prior_mu::VecNum, prior_sigma::MatNum,
                             omega::MatNum, P::MatNum, Q::VecNum)
     v1 = tau * prior_sigma * transpose(P)
     v2 = P * v1 + omega
     v3 = Q - P * prior_mu
-    posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ rf
+    posterior_mu = prior_mu + v1 * (v2 \ v3)
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
+end
+"""
+    apply_rf(rf::Number, mu::VecNum)
+
+Shift a Black-Litterman posterior asset mean by the risk-free rate.
+
+`apply_rf` is the **single site that adds** the `rf` field of a Black-Litterman prior estimator. The four families -- [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) -- each call it once, on the asset expected returns they return, and nowhere else. [`remove_rf`](@ref) is its inverse and the only site that takes the rate off.
+
+Three properties follow, and all three are contracts of the family:
+
+  - **The rate is added once.** No body adds it twice.
+  - **The update runs on excess returns.** A prior mean that arrives as a total return loses the rate first, through [`remove_rf`](@ref), so the rate `apply_rf` puts back is the one that came off. A mean that is an excess return already -- the equilibrium mean of [`equilibrium_mu`](@ref) -- is used as it stands.
+  - **A prior is isolated.** The rate applies to the posterior this estimator computes. A wrapped prior estimator is never re-fitted, and the scale conversion around the update is a round trip, so a risk-free rate one of them applied internally stays where it is.
+
+The rate is a property of the asset axis, so the factor block of a result never carries it. Where [`remove_rf`](@ref) took the rate off a factor mean, nothing puts it back: the factor posterior is reported on the excess scale the update ran on, which is `pe.rf` below the scale the factor prior was supplied on. `FactorBlackLittermanPrior` is therefore not a plain round trip -- it takes the rate off the factor axis and adds it on the asset axis, and the two moves reach the assets differently. Writing `s` for the row sums of the loadings, its answer moves by `rf * (1 - s)`, and cancels only where an asset's loadings sum to one.
+
+# Arguments
+
+  - `rf`: Risk-free rate.
+  - `mu`: Posterior asset expected returns vector.
+
+# Returns
+
+  - `mu::VecNum`: `mu` shifted by `rf`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
+function apply_rf(rf::Number, mu::VecNum)
+    return mu .+ rf
+end
+"""
+    remove_rf(rf::Number, mu::VecNum)
+
+Convert a total-return mean to an excess-return mean.
+
+`remove_rf` is the **single site that subtracts** the `rf` field of a Black-Litterman prior estimator. It is the inverse of [`apply_rf`](@ref), and the two act as a pair: a mean goes onto the excess scale before the Black-Litterman update, and comes off it after.
+
+The update is written in excess returns. The view returns in `Q` are excess returns, and the equilibrium mean [`equilibrium_mu`](@ref) computes is an excess return by construction, because `l * sigma * w` is the risk premium that reverse optimisation implies. A mean taken from a wrapped prior estimator is a total return, so it must lose the rate before it can blend against either of them.
+
+Only [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it, and only where `l` is `nothing`. Those two are the members that can build the equilibrium mean themselves, so they are the two whose prior mean must reach [`vanilla_posteriors`](@ref) on one known scale either way. [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch, and take the wrapped mean as it stands.
+
+# Arguments
+
+  - `rf`: Risk-free rate.
+  - `mu`: Prior asset or factor expected returns vector, as a total return.
+
+# Returns
+
+  - `mu::VecNum`: `mu` less `rf`.
+
+# Related
+
+  - [`apply_rf`](@ref)
+  - [`equilibrium_mu`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
+function remove_rf(rf::Number, mu::VecNum)
+    return mu .- rf
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -490,6 +556,7 @@ Where:
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
   - The posterior mean and covariance are computed using [`vanilla_posteriors`](@ref).
+  - `pe.rf` is added to the posterior mean once, by [`apply_rf`](@ref).
   - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
 
 # Related
@@ -515,8 +582,12 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
                                       size(X, 1), eltype(posterior_X), strict)
-    posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
-                                                       omega, P, Q)
+    posterior_mu, posterior_sigma = vanilla_posteriors(tau, prior_mu, prior_sigma, omega, P,
+                                                       Q)
+    # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns. `prior_model.mu` is the wrapped prior's own
+    # answer and is used as it stands, so a rate that prior applied internally is left alone.
+    posterior_mu = apply_rf(pe.rf, posterior_mu)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
     # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.

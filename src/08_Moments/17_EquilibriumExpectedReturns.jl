@@ -96,11 +96,65 @@ function EquilibriumExpectedReturns(;
     return EquilibriumExpectedReturns(ce, w, l)
 end
 """
+    equilibrium_mu(l::Number, sigma::MatNum, w::Option{<:VecNum})
+
+Compute equilibrium expected returns from a risk aversion parameter, a covariance block, and equilibrium weights.
+
+`equilibrium_mu` is the **single owner** of the ``\\lambda \\mathbf{\\Sigma} \\boldsymbol{w}`` expression and of its equal-weight fallback. [`EquilibriumExpectedReturns`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reach it, so the fallback and the length check are stated once.
+
+The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it. This is why the Black-Litterman members apply [`remove_rf`](@ref) only on the branch where they do *not* call this function.
+
+`sigma` is a covariance **block**, not necessarily a square covariance matrix. Its columns are the assets the weights are written over, so `size(sigma, 2)` is the length `w` must have. A square covariance gives the plain equilibrium returns. A rectangular block gives the equilibrium returns of the rows it spans, which is how the factor Black-Litterman members build a prior mean over factors from asset weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{\\text{eq}} &= \\lambda \\, \\mathbf{\\Sigma} \\, \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda``: Risk aversion parameter.
+  - ``\\mathbf{\\Sigma}``: ``M \\times N`` covariance block.
+  - ``\\boldsymbol{w}``: ``N \\times 1`` equilibrium portfolio weights.
+
+# Arguments
+
+  - `l`: Risk aversion parameter.
+  - `sigma`: Covariance block whose columns are the assets.
+  - `w`: Equilibrium weights, or `nothing` for equal weights.
+
+# Validation
+
+  - If `w` is a vector, `length(w) == size(sigma, 2)`.
+
+# Returns
+
+  - `mu::VecNum`: Equilibrium expected returns vector of length `size(sigma, 1)`.
+
+# Related
+
+  - [`EquilibriumExpectedReturns`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+"""
+function equilibrium_mu(l::Number, sigma::MatNum, w::Nothing)
+    N = size(sigma, 2)
+    return l * sigma * fill(inv(N), N)
+end
+function equilibrium_mu(l::Number, sigma::MatNum, w::VecNum)
+    @argcheck(length(w) == size(sigma, 2),
+              DimensionMismatch("length(w) ($(length(w))) must match the number of assets, size(sigma, 2) ($(size(sigma, 2)))"))
+    return l * sigma * w
+end
+"""
     Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
-This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used.
+This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used. The expression and the fallback belong to [`equilibrium_mu`](@ref).
 
 # Mathematical definition
 
@@ -130,12 +184,12 @@ Where:
 # Related
 
   - [`EquilibriumExpectedReturns`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
 function Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
-    return me.l * sigma * w
+    return equilibrium_mu(me.l, sigma, me.w)
 end
 
 export EquilibriumExpectedReturns

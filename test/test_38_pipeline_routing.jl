@@ -1,5 +1,5 @@
 @testset "Pipeline routing targets" begin
-    using Test, PortfolioOptimisers
+    using Test, PortfolioOptimisers, InteractiveUtils
 
     #=
     Solver-free by construction: every assertion here is a struct rebuild, so the seam
@@ -38,18 +38,20 @@
         Reading the rows: the two configurations route into their own fields; the six
         estimators that hold a configuration forward to it (and the five carrying risk
         measures additionally accept :sigma_ucs into their own `r`); the naive and meta
-        optimisers carry the target fields themselves.
+        optimisers carry the target fields themselves. `:rkb` is the one target that is
+        neither derived nor universal — it lands at `rba.rkb`, so only the two optimisers
+        carrying a risk-budgeting algorithm accept it.
         =#
-        expected = Dict("JuMPOptimiser" => [:pe, :wb, :lcse, :ple, :mu_ucs],
+        jump = [:pe, :wb, :lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx,
+                :sgmtx]
+        expected = Dict("JuMPOptimiser" => [jump; :mu_ucs],
                         "HierarchicalOptimiser" => [:pe, :cle, :wb],
-                        "MeanRisk" => [:pe, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs],
-                        "RiskBudgeting" => [:pe, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs],
-                        "NearOptimalCentering" =>
-                            [:pe, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs],
-                        "FactorRiskContribution" =>
-                            [:pe, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs],
+                        "MeanRisk" => [jump; :mu_ucs; :sigma_ucs],
+                        "RiskBudgeting" => [jump; :rkb; :mu_ucs; :sigma_ucs],
+                        "NearOptimalCentering" => [jump; :mu_ucs; :sigma_ucs],
+                        "FactorRiskContribution" => [jump; :mu_ucs; :sigma_ucs],
                         # No `r` field, so no covariance uncertainty set.
-                        "RelaxedRiskBudgeting" => [:pe, :wb, :lcse, :ple, :mu_ucs],
+                        "RelaxedRiskBudgeting" => [jump; :rkb; :mu_ucs],
                         "HierarchicalRiskParity" => [:pe, :cle, :wb, :sigma_ucs],
                         # Meta-optimisers carry `pe`/`cle`/`wb` themselves.
                         "NestedClustered" => [:pe, :cle, :wb], "Stacking" => [:pe, :wb],
@@ -118,7 +120,9 @@
         j = jo()
         @test PO.pipe_route(j, Val(:cle), nothing) === j
         # Everything else would silently change the solved portfolio, so it throws.
-        for t in (:lcse, :ple, :mu_ucs, :sigma_ucs)
+        for t in
+            (:lcse, :cte, :ple, :lt, :st, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx, :rkb,
+             :mu_ucs, :sigma_ucs)
             @test_throws ArgumentError PO.pipe_route(ew, Val(t), nothing)
         end
         @test_throws ArgumentError PO.pipe_route(HierarchicalOptimiser(), Val(:lcse),
@@ -183,21 +187,272 @@
                                                            ret = LogarithmicReturn())),
                               Val(:mu_ucs))
 
-        # Targets are only known statically for uncertainty steps.
+        # Targets are known statically for uncertainty steps and for constraint steps.
         @test PO.pipe_required_targets(ucs_step(:both)) == (:mu_ucs, :sigma_ucs)
         @test PO.pipe_required_targets(ucs_step(:sigma)) == (:sigma_ucs,)
         @test PO.pipe_required_targets(EmpiricalPrior()) == ()
+        @test PO.pipe_required_targets(WeightBoundsEstimator()) == (:wb,)
+        @test PO.pipe_required_targets(CentralityConstraint()) == (:cte,)
     end
 
-    @testset "constraint slot fans out by result type" begin
+    @testset "constraint slot fans out by carried target, then by result type" begin
         wb = WeightBounds(; lb = fill(0.1, 3), ub = fill(0.9, 3))
+        lc = LinearConstraint(;
+                              ineq = PartialLinearConstraint(; A = [1.0 0.0 0.0],
+                                                             B = [0.5]))
+        thr = Threshold(0.05)
+        rkb = PO.risk_budget_constraints(nothing; N = 5)
         @test PO.constraint_targets(nothing) == []
         @test PO.constraint_targets(wb) == [:wb => wb]
+        # A RiskBudget names exactly one field, so its type alone places it.
+        @test PO.constraint_targets(rkb) == [:rkb => rkb]
         #=
-        A constraint result with no target at all is rejected at the fan-out, before any
-        optimiser sees it — there is no field it could ever land in.
+        A Threshold names six fields, so its type cannot place it. A step declares the
+        target and the declaration travels with the value.
         =#
-        @test_throws ArgumentError PO.constraint_targets(PO.risk_budget_constraints(nothing;
-                                                                                    N = 5))
+        @test_throws ArgumentError PO.constraint_targets(thr)
+        @test PO.constraint_targets(PO.TargetedConstraint(:sglt, thr)) == [:sglt => thr]
+        #=
+        An accumulating target packs; a single-valued one refuses the second write rather
+        than letting it overwrite the first.
+        =#
+        pair = PO.constraint_targets(PO.AbstractConstraintResult[lc, lc])
+        @test only(pair).first === :lcse
+        @test only(pair).second == [lc, lc]
+        @test_throws ArgumentError PO.constraint_targets(PO.AbstractConstraintResult[wb,
+                                                                                     wb])
+        @test_throws ArgumentError PO.constraint_targets(PO.AbstractConstraintResult[PO.TargetedConstraint(:lt,
+                                                                                                           thr),
+                                                                                     PO.TargetedConstraint(:lt,
+                                                                                                           thr)])
+        # A result of a type no target exists for is still rejected at the fan-out.
+        @test_throws ArgumentError PO.constraint_targets(PartialLinearConstraint(;
+                                                                                 A = [1.0 0.0 0.0],
+                                                                                 B = [0.5]))
+    end
+
+    @testset "a target accumulates exactly when its field takes a vector of results" begin
+        #=
+        `PIPELINE_ACCUMULATING_TARGETS` is a claim about the *receiving fields*, so it is
+        checked against them rather than restated. Each row puts a two-element vector of
+        computed results in one target and asserts the optimiser takes it; the scenario and
+        group rows carry the membership matrices their lengths are validated against, which
+        is the check that makes packing them safe.
+        =#
+        wb = WeightBounds(; lb = fill(0.1, 3), ub = fill(0.9, 3))
+        lc = LinearConstraint(;
+                              ineq = PartialLinearConstraint(; A = [1.0 0.0 0.0],
+                                                             B = [0.5]))
+        thr = Threshold(0.05)
+        ple = SemiDefinitePhylogeny(; A = [0 1 0; 1 0 0; 0 0 0], p = 0.05)
+        mtx = [1 0 0; 0 1 1]
+        packed = (:lcse => (; lcse = [lc, lc]), :ple => (; ple = [ple, ple]),
+                  :slt => (; slt = [thr, thr], smtx = [mtx, mtx]),
+                  :sst => (; sst = [thr, thr], smtx = [mtx, mtx]),
+                  :sglt => (; sglt = [thr, thr], sgmtx = [mtx, mtx]),
+                  :sgst => (; sgst = [thr, thr], sgmtx = [mtx, mtx]),
+                  :smtx => (; smtx = [mtx, mtx]), :sgmtx => (; sgmtx = [mtx, mtx]))
+        for (target, kwargs) in packed
+            @test JuMPOptimiser(; slv = slv, kwargs...) isa JuMPOptimiser
+            @test target in PO.PIPELINE_ACCUMULATING_TARGETS
+        end
+        #=
+        `:cte` accumulates by *folding*, not packing, so it is the one member whose field
+        does not take a vector of results. Its vector form is a vector of estimators, and
+        generation appends their rows into one constraint — which is the value the fold
+        produces, so that is what the field must accept.
+        =#
+        @test :cte in PO.PIPELINE_ACCUMULATING_TARGETS
+        @test_throws TypeError JuMPOptimiser(; slv = slv, cte = [lc, lc])
+        @test JuMPOptimiser(; slv = slv, cte = PO.merge_linear_constraints([lc, lc])) isa
+              JuMPOptimiser
+        @test Set([first.(packed)...; :cte]) == Set(PO.PIPELINE_ACCUMULATING_TARGETS)
+
+        # The complement: fields that hold exactly one value, and refuse a vector.
+        single = (:wb => (; wb = [wb, wb]), :lt => (; lt = [thr, thr]),
+                  :st => (; st = [thr, thr]))
+        for (target, kwargs) in single
+            @test_throws TypeError JuMPOptimiser(; slv = slv, kwargs...)
+            @test !(target in PO.PIPELINE_ACCUMULATING_TARGETS)
+        end
+        # `:rkb` lives on the risk-budgeting algorithm, and is single-valued there.
+        rkb = PO.risk_budget_constraints(nothing; N = 3)
+        @test_throws TypeError AssetRiskBudgeting(; rkb = [rkb, rkb])
+        @test !(:rkb in PO.PIPELINE_ACCUMULATING_TARGETS)
+
+        #=
+        The fan-out follows the table in both directions: two writes combine for an
+        accumulating target and throw for every other one.
+        =#
+        for target in PO.PIPELINE_ACCUMULATING_TARGETS
+            if target === :cte
+                continue
+            end
+            two = PO.AbstractConstraintResult[PO.TargetedConstraint(target, thr),
+                                              PO.TargetedConstraint(target, thr)]
+            @test only(PO.constraint_targets(two)).second == [thr, thr]
+        end
+        for target in (:wb, :lt, :st, :rkb)
+            two = PO.AbstractConstraintResult[PO.TargetedConstraint(target, thr),
+                                              PO.TargetedConstraint(target, thr)]
+            @test_throws ArgumentError PO.constraint_targets(two)
+        end
+        # Two writes to `:cte` fold into one constraint carrying both blocks of rows.
+        two_cte = PO.AbstractConstraintResult[PO.TargetedConstraint(:cte, lc),
+                                              PO.TargetedConstraint(:cte, lc)]
+        folded = only(PO.constraint_targets(two_cte)).second
+        @test folded isa LinearConstraint
+        @test folded.ineq.A == [lc.ineq.A; lc.ineq.A]
+        @test folded.ineq.B == [lc.ineq.B; lc.ineq.B]
+        # A value that is not a LinearConstraint cannot be folded, and says so.
+        @test_throws ArgumentError PO.constraint_targets(PO.AbstractConstraintResult[PO.TargetedConstraint(:cte,
+                                                                                                           thr),
+                                                                                     PO.TargetedConstraint(:cte,
+                                                                                                           thr)])
+    end
+
+    @testset "n centrality steps equal one cte field holding n estimators" begin
+        #=
+        The equivalence the fold exists to preserve. `centrality_constraints` over a vector
+        of estimators appends every row into one result, so a pipeline running one step per
+        estimator must reach the optimiser with that same constraint — otherwise the two
+        ways of writing the same mandate would build different models.
+        =#
+        rd = ReturnsResult(; nx = string.("A", 1:5),
+                           X = randn(StableRNG(987654321), 60, 5) / 100)
+        cc1 = CentralityConstraint(; B = MinValue(), comp = <=)
+        cc2 = CentralityConstraint(; B = MaxValue(), comp = >=)
+        cc3 = CentralityConstraint(; B = MinValue(), comp = ==)
+        manual = PO.centrality_constraints([cc1, cc2, cc3], rd)
+
+        ctx = PO.PipelineContext(; returns = rd)
+        for cc in (cc1, cc2, cc3)
+            _, ctx = PO.run_step(cc, ctx)
+        end
+        target, stepped = only(PO.constraint_targets(ctx.constraints))
+        @test target === :cte
+        @test stepped isa LinearConstraint
+        @test stepped.ineq.A == manual.ineq.A
+        @test stepped.ineq.B == manual.ineq.B
+        @test stepped.eq.A == manual.eq.A
+        @test stepped.eq.B == manual.eq.B
+        #=
+        And the merged constraint is what the optimiser actually receives. The fold builds
+        a fresh constraint per call, so this is an equality of rows rather than of objects
+        — unlike a packed target, which routes the very results the steps produced.
+        =#
+        routed = PO.inject_context(MeanRisk(; opt = jo()), ctx)
+        @test routed.opt.cte.ineq.A == manual.ineq.A
+        @test routed.opt.cte.ineq.B == manual.ineq.B
+        @test routed.opt.cte.eq.A == manual.eq.A
+        @test routed.opt.cte.eq.B == manual.eq.B
+    end
+
+    @testset "every constraint family declares where its step lands" begin
+        #=
+        The finding this locks: a family with a run_step but no routing target computed a
+        result the injection seam could not place, so the Pipeline fitted every earlier
+        step and then always threw — under cross_val_predict, after the first fold. One
+        declaration now drives the step, the construction check and the fan-out, so a new
+        family cannot be half-wired.
+        =#
+        function concrete_subtypes(T)
+            out = Any[]
+            for S in subtypes(T)
+                isabstracttype(S) ? append!(out, concrete_subtypes(S)) : push!(out, S)
+            end
+            return out
+        end
+        families = [S
+                    for S in concrete_subtypes(PO.AbstractConstraintEstimator)
+                    if parentmodule(S) === PO && !(S <: PO.JuMPConstraintEstimator)]
+        @test !isempty(families)
+        #=
+        Asked of the type rather than of an instance: a family declares by defining a
+        method more specific than the empty fallback, and that is exactly what the
+        fallback's own signature tests for.
+        =#
+        fallback = which(PO.pipe_constraint_targets, Tuple{PO.AbstractConstraintEstimator})
+        for S in families
+            @test which(PO.pipe_constraint_targets, Tuple{S}) !== fallback
+        end
+        # Every declared target is a real one, and every choice is a legal annotation.
+        @test all(t -> t in PO.PIPELINE_ROUTING_TARGETS, PO.PIPELINE_THRESHOLD_TARGETS)
+        @test all(t -> t in PO.PIPELINE_STEP_TARGETS, PO.PIPELINE_THRESHOLD_TARGETS)
+        @test all(t -> t in PO.PIPELINE_ROUTING_TARGETS,
+                  PO.PIPELINE_ASSET_SETS_MATRIX_TARGETS)
+        @test all(t -> t in PO.PIPELINE_STEP_TARGETS, PO.PIPELINE_ASSET_SETS_MATRIX_TARGETS)
+        @test all(t -> t in PO.PIPELINE_ROUTING_TARGETS, PO.PIPELINE_ACCUMULATING_TARGETS)
+    end
+
+    @testset "each family computes a value and pairs it with its target" begin
+        #=
+        The end-to-end half of the finding: a family with a step but no target computed a
+        result and then always threw at injection. Running each family's step here and
+        routing what it produced is what shows the two halves meet.
+        =#
+        rd = ReturnsResult(; nx = string.("A", 1:5),
+                           X = randn(StableRNG(987654321), 60, 5) / 100)
+        ctx0 = PO.PipelineContext(; returns = rd)
+        steps = ["WeightBoundsEstimator" =>
+                     (WeightBoundsEstimator(; lb = 0.05, ub = 0.5), nothing, :wb),
+                 "LinearConstraintEstimator" =>
+                     (LinearConstraintEstimator(; val = "A1 <= 0.3"), nothing, :lcse),
+                 "ThresholdEstimator" => (ThresholdEstimator(; val = 0.05), :st, :st),
+                 "RiskBudgetEstimator" => (RiskBudgetEstimator(; val = 0.2), nothing, :rkb),
+                 "CentralityConstraint" => (CentralityConstraint(), nothing, :cte),
+                 "IntegerPhylogenyEstimator" =>
+                     (IntegerPhylogenyEstimator(; B = 1), nothing, :ple)]
+        for (name, (est, declared, target)) in steps
+            step = if isnothing(declared)
+                est
+            else
+                PipelineStep(; est = est, reads = (:returns,), writes = :constraints,
+                             target = declared)
+            end
+            _, ctx = PO.run_step(step, ctx0)
+            @test PO.constraint_targets(ctx.constraints)[1].first === target
+        end
+        # An unwrapped uncertainty step still refuses; the constraint rule did not widen it.
+        @test_throws ArgumentError PO.run_step(NormalUncertaintySet(), ctx0)
+    end
+
+    @testset "a constraint step is refused when the optimiser cannot receive it" begin
+        thr_step(t) = PipelineStep(; est = ThresholdEstimator(; val = 0.05),
+                                   reads = (:returns,), writes = :constraints, target = t)
+        #=
+        A ThresholdEstimator names six fields, so an unwrapped step cannot be placed and
+        the Pipeline says so at construction rather than at injection.
+        =#
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (ThresholdEstimator(; val = 0.05),
+                                                     MeanRisk(; opt = jo())))
+        # A target that belongs to another family is refused where it is written.
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (thr_step(:smtx),
+                                                     MeanRisk(; opt = jo())))
+        # Declared correctly, it constructs; in front of an optimiser with no such field,
+        # it does not.
+        @test length(Pipeline(; steps = (thr_step(:lt), MeanRisk(; opt = jo()))).steps) == 2
+        @test_throws ArgumentError Pipeline(; steps = (thr_step(:lt), EqualWeighted()))
+        #=
+        A risk budget names one field, so it needs no annotation — and only the two
+        optimisers carrying a risk-budgeting algorithm can receive it.
+        =#
+        rkb_est = RiskBudgetEstimator(; val = 0.2)
+        @test length(Pipeline(; steps = (rkb_est, RiskBudgeting(; opt = jo()))).steps) == 2
+        @test_throws ArgumentError Pipeline(; steps = (rkb_est, MeanRisk(; opt = jo())))
+        #=
+        A CentralityConstraint produces a LinearConstraint, which would fan out to :lcse
+        by type; the family declares :cte instead, so the constraint keeps its own model
+        keys rather than being merged into the general linear block.
+        =#
+        @test PO.pipe_constraint_targets(CentralityConstraint()) == (:cte,)
+        @test length(Pipeline(; steps = (CentralityConstraint(), MeanRisk(; opt = jo()))).steps) ==
+              2
+        # A JuMP-model constraint is configuration, not a step, and is refused as one.
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (BudgetRange(; lb = 0.9, ub = 1.1),
+                                                     MeanRisk(; opt = jo())))
     end
 end

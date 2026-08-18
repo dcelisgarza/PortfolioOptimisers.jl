@@ -734,3 +734,60 @@ correction.
 
 The load-time preferences channel of finding 1 and the `state_key` collision class of finding 3 are
 separate, and are settled in ADR 0041 and ADR 0037 respectively.
+
+## Amendment (2026-08-18) — `OpinionPoolingPrior` forwards `pe2`, from finding 5 of the 2026-08-17 architecture review
+
+The table in the amendment above puts `OpinionPoolingPrior` in the `nothing` row, on the stated
+grounds that it "pools several priors, no single wrapped one". The second half of that sentence does
+not match the code. `prior(pe::OpinionPoolingPrior, …)` takes **every** moment of its result from the
+refit `pe.pe2`:
+
+```julia
+pe2 = factory(pe.pe2, w)
+(; X, o_X, mu, sigma, chol, rr, fpr, Z) = prior(pe2, X, F; strict = strict, kwargs...)
+```
+
+The pooled `pe.pes` contribute observation weights alone — the loop over them reads `pr.w` and
+nothing else. So there **is** a single wrapped estimator, it is `pe2`, and the correct declaration is
+`factor_residual_config(pe.pe2)`.
+
+The row is corrected to:
+
+| Estimator             | Declaration           | Why                                            |
+| --------------------- | --------------------- | ---------------------------------------------- |
+| `OpinionPoolingPrior` | forwards `pe.pe2`     | every moment comes from the refit `pe2`        |
+
+### This one changed a live number
+
+`pe2` is bounded `AbstractLowOrderPriorEstimator_A_F_AF`, which admits `FactorPrior`, and
+`OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF` is itself a member of
+`HighOrderFactorPriorEstimator.pe`'s bound `AbstractLowOrderPriorEstimator_F_AF`. Both ends of the
+call path are reachable, so the exemption was the class ADR 0046 exists to close: a covariance
+carrying a residual block kept it, and the residual cokurtosis correction ran on a covariance too
+large by the residual variances.
+
+The witness, on a 200×8 sample lifted off three factors, with
+`HighOrderFactorPriorEstimator(; pe = OpinionPoolingPrior(; pes = [EntropyPoolingPrior(), EntropyPoolingPrior()], pe2 = FactorPrior()), rsd = true)`:
+
+| Quantity              | Before      | After       |
+| --------------------- | ----------- | ----------- |
+| `sum(abs, pr.kt)`     | 8904.51     | 6161.93     |
+| largest element moved | —           | 190.78      |
+| `pr.sigma`            | unchanged   | unchanged   |
+
+Only the cokurtosis moves. The correction is the sole consumer of the declaration, and it writes
+`kt` alone.
+
+### The lesson is about the word *wrapper*
+
+A pooling estimator is a wrapper for this purpose. The count of estimators it *pools* is not the
+count of estimators it *wraps*, and the declaration follows the second. The general rule, restated:
+an estimator forwards the declaration of whichever estimator its moments come from, however many
+priors it also consults for something else.
+
+The load-time half of the review's finding is already closed. `factor_residual_config` throws for an
+undeclared type (the 2026-08-17 amendment above), and the census at the end of
+`test/test_12g_forwarding_rule.jl` enumerates every concrete `AbstractPriorEstimator` the package
+ships and asserts that each declares. What the census cannot catch is a declaration that is present
+and wrong, which is what this amendment corrects; that failure mode needs a per-type assertion, and
+the file now carries one for `OpinionPoolingPrior`.

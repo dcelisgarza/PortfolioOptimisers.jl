@@ -389,10 +389,11 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
                          ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr, Z = Z)
 end
 
-function factor_residual_config(::OpinionPoolingPrior)
-    # This estimator pools several priors and has no single wrapped one to forward, so it
-    # declares no residual block (see [`factor_residual_config`](@ref)).
-    return nothing
+function factor_residual_config(pe::OpinionPoolingPrior)
+    # The pooled `pe.pes` contribute observation weights alone; every moment of the result
+    # comes from the refit `pe.pe2`, so the residual block is `pe.pe2`'s and this estimator
+    # forwards it (see [`factor_residual_config`](@ref)).
+    return factor_residual_config(pe.pe2)
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

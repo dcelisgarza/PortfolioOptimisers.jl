@@ -463,68 +463,6 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)
 end
-"""
-    predict_outer_st_estimator_returns(
-        st::Option{<:Stacking},
-        rd::ReturnsResult,
-        pr::AbstractPriorResult,
-        fees::Option{<:Fees},
-        wi::MatNum,
-        resi::VecOpt
-    )
-
-Predict outer portfolio returns for [`Stacking`](@ref) optimisation. Overload this using `st.cv` for custom cross-validation prediction.
-
-`wi` holds the inner optimisers' own weights. `st.scale` is **not** applied to them and must not be applied here: a Combination Weight acts at the combination, after the outer solve, so that an overload cannot drop it and a cross-validated run cannot disagree with a fold-less one on what it means (see [`combination_weights`](@ref)).
-"""
-function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
-                                            pr::AbstractPriorResult, fees::Option{<:Fees},
-                                            wi::MatNum, resi::VecOpt)
-    nb, B, iv, ivpa, nz, Z, X = prepare_outer_rd(rd, wi)
-    for (i, res) in enumerate(resi)
-        X[:, i] = calc_net_returns(res, pr, fees)
-    end
-    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
-end
-function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any,
-                                                         <:OptimisationCrossValidation{<:NonCombOptCV}},
-                                            rd::ReturnsResult, pr::AbstractPriorResult,
-                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
-    (; opti, cv, ex) = st
-    cv = cv.cv
-    predictions = Vector{MultiPeriodPredictionResult}(undef, length(opti))
-    let cv = cv
-        FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
-        end
-    end
-    # `nothing`: Stacking's inner optimisers see the whole universe, so their weight vectors
-    # need no padding at the feature-collapse seam.
-    return rebuild_returns_result(rd, predictions, nothing)
-end
-function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any,
-                                                         <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
-                                            rd::ReturnsResult, pr::AbstractPriorResult,
-                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
-    (; opti, cv, ex) = st
-    (; cv, scorer) = cv
-    predictions = Vector{PopulationPredictionResult}(undef, length(opti))
-    let cv = cv
-        FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
-        end
-    end
-    if isnothing(scorer)
-        scorer = NearestQuantilePrediction()
-    end
-    best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions, nothing)
-end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -546,7 +484,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, wi, resi)
+    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, fees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,

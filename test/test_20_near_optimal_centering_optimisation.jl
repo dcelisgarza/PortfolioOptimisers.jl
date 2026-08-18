@@ -509,4 +509,41 @@
                                                                                   l = 0.05);
                                                                              rd = rd)
     end
+    @testset "Unconstrained NOC return expression is net of fees" begin
+        # Regression (ADR 0008, amendment 3). `near_optimal_centering_setup` computes the
+        # `noc_rt` target with `expected_return(ret, w, pr, fees)`, so the target is net of
+        # fees. The unconstrained middle did not run `set_non_fixed_fees!`, so no `:fees`
+        # expression was registered and `add_fees_to_ret!` left the model's return
+        # expression gross. The barrier's `ret - rt` slack was then biased by the whole fee.
+        #
+        # The three anchor portfolios are supplied, so the setup runs no sub-problem solve
+        # and the two return expressions differ in the fees alone.
+        N = size(pr.X, 2)
+        w0 = fill(inv(N), N)
+        function noc_unconstrained_ret(fees)
+            noc = NearOptimalCentering(; w_min = w0, w_opt = w0, w_max = w0,
+                                       opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                           fees = fees))
+            setup = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
+            sopt = setup.opt
+            model = PortfolioOptimisers.JuMP.Model()
+            PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+            PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
+            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
+            PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
+                                                                       model, noc, setup,
+                                                                       rd)
+            return (sprint(print, PortfolioOptimisers.get_ret(model)), setup.rt_opt)
+        end
+        gross, rt_gross = noc_unconstrained_ret(nothing)
+        net, rt_net = noc_unconstrained_ret(Fees(; l = 0.05))
+        # Both halves of the `ret - rt` comparison move with the fees, not just the target.
+        @test gross != net
+        @test rt_gross != rt_net
+        # A fixed fee needs the cardinality binaries, which this variant never builds, so it
+        # reaches neither half and the model is unchanged.
+        fixed, rt_fixed = noc_unconstrained_ret(Fees(; fl = 0.001))
+        @test fixed == gross
+    end
 end

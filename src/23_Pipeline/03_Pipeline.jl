@@ -56,11 +56,49 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Validate that every constraint step of a [`Pipeline`](@ref) resolves to exactly one [routing target](@ref PIPELINE_ROUTING_TARGETS).
+
+Runs [`resolve_constraint_target`](@ref) on each constraint step, which is the same call [`run_constraint_step`](@ref) makes when the step runs. Doing it here moves three failures from the fold loop to the constructor: a family that computes nothing for the `constraints` slot and is therefore not a step, a family that names several targets and was not told which, and a declared target that belongs to another family.
+
+## Validation
+
+  - Each constraint step's family declares at least one target (see [`pipe_constraint_targets`](@ref)).
+  - A family declaring several has a [`PipelineStep`](@ref) `target` naming one of them.
+
+# Arguments
+
+  - `ests`: The step estimators.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`resolve_constraint_target`](@ref)
+  - [`pipe_constraint_targets`](@ref)
+  - [`assert_routable`](@ref)
+"""
+function assert_constraint_targets(ests)::Nothing
+    for e in ests
+        est = isa(e, PipelineStep) ? e.est : e
+        if !isa(est, AbstractConstraintEstimator) || !(pipe_writes(e) === :constraints)
+            continue
+        end
+        resolve_constraint_target(est, isa(e, PipelineStep) ? e.target : nothing)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a step is *known at construction* to produce.
 
-Only the `uncertainty` slot qualifies. An uncertainty-set step must declare which parameters it bounds through its [`PipelineStep`](@ref) wrapper, and that declaration is a field of the step rather than a property of a computed result, so the targets it will write are known before anything runs.
+An uncertainty-set step qualifies. It must declare which parameters it bounds through its [`PipelineStep`](@ref) wrapper, and that declaration is a field of the step rather than a property of a computed result, so the targets it will write are known before anything runs.
 
-The other fail-closed targets are not: `:wb`, `:lcse` and `:ple` are chosen by the *result type* each constraint estimator produces, and every constraint estimator writes the same `constraints` slot, so which of the three a step will write cannot be read off its type. Those stay checked at injection time.
+A constraint step qualifies for the same reason, one step removed: its target is declared by its *family* through [`pipe_constraint_targets`](@ref), and where the family names several, by the step's own `target` field. Both are known before anything runs, and [`run_constraint_step`](@ref) resolves the destination from the same declaration, so the target checked here is the target the step will write.
+
+Everything else returns an empty tuple. A callable step writing `:constraints` declares no family, and a precomputed result carried in by the pipeline input names its target only by its type.
 
 # Arguments
 
@@ -73,21 +111,28 @@ The other fail-closed targets are not: `:wb`, `:lcse` and `:ple` are chosen by t
 # Related
 
   - [`assert_routable`](@ref)
+  - [`pipe_constraint_targets`](@ref)
   - [`PIPELINE_ROUTING_TARGETS`](@ref)
 """
 function pipe_required_targets(ps::PipelineStep)
-    if !(pipe_writes(ps) === :uncertainty)
-        return ()
+    if pipe_writes(ps) === :uncertainty
+        return if ps.target === :mu
+            (:mu_ucs,)
+        elseif ps.target === :sigma
+            (:sigma_ucs,)
+        elseif ps.target === :both
+            (:mu_ucs, :sigma_ucs)
+        else
+            ()
+        end
     end
-    return if ps.target === :mu
-        (:mu_ucs,)
-    elseif ps.target === :sigma
-        (:sigma_ucs,)
-    elseif ps.target === :both
-        (:mu_ucs, :sigma_ucs)
-    else
-        ()
+    if isa(ps.est, AbstractConstraintEstimator) && pipe_writes(ps) === :constraints
+        return (resolve_constraint_target(ps.est, ps.target),)
     end
+    return ()
+end
+function pipe_required_targets(ce::AbstractConstraintEstimator)
+    return (resolve_constraint_target(ce, nothing),)
 end
 pipe_required_targets(::Any) = ()
 """
@@ -131,7 +176,7 @@ function assert_routable(ests)::Nothing
     for i in 1:(n - 1)
         for target in pipe_required_targets(ests[i])
             @argcheck(pipe_accepts(opt, Val(target)),
-                      ArgumentError("step $i of $n writes the :$target target, which the terminal $(Base.typename(typeof(opt)).wrapper) cannot receive; a computed uncertainty set that reaches no optimiser field would be silently dropped, so narrow the step's target, drop it, or use an optimiser that accepts it"))
+                      ArgumentError("step $i of $n writes the :$target target, which the terminal $(Base.typename(typeof(opt)).wrapper) cannot receive; a computed value that reaches no optimiser field would be silently dropped, so change the step's target, drop the step, or use an optimiser that accepts it"))
         end
     end
     return nothing
@@ -243,6 +288,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
     end
     assert_split_position(ests)
     assert_opt_last(ests)
+    assert_constraint_targets(ests)
     assert_routable(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
@@ -397,9 +443,127 @@ constraint_results(c::AbstractVector{<:AbstractConstraintResult}) = c
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fan the `constraints` slot out into [routing targets](@ref PIPELINE_ROUTING_TARGETS) by result type.
+The [routing target](@ref PIPELINE_ROUTING_TARGETS) a constraint result names by its type alone, or `nothing`.
 
-[`WeightBounds`](@ref) become `:wb`, [`LinearConstraint`](@ref)s become `:lcse` and phylogeny constraint results become `:ple`. The latter two accumulate, and a group of one is unwrapped, matching the scalar-or-vector shape those fields accept everywhere else. A result of any other type is rejected here rather than at an optimiser, because no target exists for it at all.
+Four result types name exactly one optimiser field, so a value of one of those types places itself: a [`WeightBounds`](@ref) can only be `:wb`, a [`LinearConstraint`](@ref) only `:lcse`, a phylogeny constraint result only `:ple`, a [`RiskBudget`](@ref) only `:rkb`. Everything else answers `nothing`, and needs a target carried alongside it — see [`TargetedConstraint`](@ref).
+
+This is the *only* type-driven half of the fan-out, and it is also what decides whether a step's value needs a wrapper at all: [`add_constraint_result`](@ref) wraps exactly when the value cannot name its own destination, so the `constraints` slot holds a bare result wherever it can.
+
+# Arguments
+
+  - `c`: A constraint result.
+
+# Returns
+
+  - `target::Union{Nothing, Symbol}`: One of [`PIPELINE_ROUTING_TARGETS`](@ref), or `nothing`.
+
+# Related
+
+  - [`constraint_target_of`](@ref)
+  - [`TargetedConstraint`](@ref)
+"""
+implicit_constraint_target(::WeightBounds) = :wb
+implicit_constraint_target(::LinearConstraint) = :lcse
+implicit_constraint_target(::AbstractPhylogenyConstraintResult) = :ple
+implicit_constraint_target(::RiskBudget) = :rkb
+implicit_constraint_target(::Any) = nothing
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The [routing target](@ref PIPELINE_ROUTING_TARGETS) one element of the `constraints` slot lands in.
+
+An element a constraint step could not place by type carries its target — [`run_constraint_step`](@ref) paired the two — and it is read straight off. Everything else is placed by [`implicit_constraint_target`](@ref).
+
+Two cases throw. A [`Threshold`](@ref) names six optimiser fields, so its type cannot place it; the error names the declaration that would. A result of any other unplaceable type has no target at all, and is rejected here rather than at an optimiser.
+
+# Arguments
+
+  - `c`: One element of the `constraints` slot.
+
+# Returns
+
+  - `target::Symbol`: One of [`PIPELINE_ROUTING_TARGETS`](@ref).
+
+# Related
+
+  - [`constraint_targets`](@ref)
+  - [`implicit_constraint_target`](@ref)
+  - [`constraint_value_of`](@ref)
+  - [`TargetedConstraint`](@ref)
+"""
+function constraint_target_of(c)::Symbol
+    target = implicit_constraint_target(c)
+    if !isnothing(target)
+        return target
+    end
+    return throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into any optimiser; supported: WeightBounds, LinearConstraint, RiskBudget, phylogeny constraint results, and any value a constraint step paired with a routing target"))
+end
+function constraint_target_of(c::TargetedConstraint)::Symbol
+    return c.target
+end
+function constraint_target_of(::Threshold)::Symbol
+    return throw(ArgumentError("cannot route a Threshold constraint result on its own: it names $(length(PIPELINE_THRESHOLD_TARGETS)) optimiser fields, $PIPELINE_THRESHOLD_TARGETS, and the result does not say which is meant. Wrap the step in a PipelineStep with target = one of them, or pass the Threshold to the optimiser field directly."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The value one element of the `constraints` slot delivers, with the routing wrapper removed.
+
+# Arguments
+
+  - `c`: One element of the `constraints` slot.
+
+# Returns
+
+  - The value to route.
+
+# Related
+
+  - [`constraint_target_of`](@ref)
+  - [`TargetedConstraint`](@ref)
+"""
+constraint_value_of(c) = c
+constraint_value_of(c::TargetedConstraint) = c.res
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Combine the several values that reached one [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) routing target.
+
+The default packs them into a vector in write order, which is the shape every field holding one result per estimator expects.
+
+`:cte` is the exception, and it is what this seam exists for. Its field takes a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into **one** [`LinearConstraint`](@ref). Separate steps therefore merge rather than pack, so *n* centrality steps in a [`Pipeline`](@ref) reach the optimiser with the value one `cte` field holding *n* estimators would have produced.
+
+Only ever called with more than one value; a single value is unwrapped by [`constraint_targets`](@ref) before it gets here.
+
+# Arguments
+
+  - `::Val{target}`: The routing target the values reached.
+  - `vals`: The values, in write order.
+
+# Returns
+
+  - The combined value.
+
+# Related
+
+  - [`constraint_targets`](@ref)
+  - [`PIPELINE_ACCUMULATING_TARGETS`](@ref)
+  - [`merge_linear_constraints`](@ref)
+"""
+function accumulate_constraint_values(::Val, vals)
+    return identity.(vals)
+end
+function accumulate_constraint_values(::Val{:cte}, vals)
+    @argcheck(all(v -> isa(v, LinearConstraint), vals),
+              ArgumentError("every value routed to :cte must be a LinearConstraint so that separate steps can be merged into the single constraint the field holds, got $(unique(Base.typename(typeof(v)).wrapper for v in vals))"))
+    return merge_linear_constraints(identity.(vals))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fan the `constraints` slot out into [routing targets](@ref PIPELINE_ROUTING_TARGETS).
+
+Each element is placed by [`constraint_target_of`](@ref) and unwrapped by [`constraint_value_of`](@ref). Several results reaching one [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) target are combined by [`accumulate_constraint_values`](@ref) — packed into a vector in write order, or, for `:cte`, merged into the one constraint that holds all their rows. A group of one is unwrapped, matching the scalar-or-vector shape those fields accept everywhere else. A second result reaching any other target is refused, because that field holds one value and the second would silently replace the first.
 
 # Arguments
 
@@ -407,39 +571,35 @@ Fan the `constraints` slot out into [routing targets](@ref PIPELINE_ROUTING_TARG
 
 # Returns
 
-  - A vector of `target => value` pairs, in `:wb`, `:lcse`, `:ple` order.
+  - A vector of `target => value` pairs, in the order the results were written.
 
 # Related
 
   - [`inject_context`](@ref)
   - [`constraint_results`](@ref)
+  - [`constraint_target_of`](@ref)
+  - [`accumulate_constraint_values`](@ref)
+  - [`PIPELINE_ACCUMULATING_TARGETS`](@ref)
 """
 function constraint_targets(cs)
-    wb = nothing
-    lcs = LinearConstraint[]
-    ples = AbstractPhylogenyConstraintResult[]
-    for c in constraint_results(cs)
-        if isa(c, WeightBounds)
-            wb = c
-        elseif isa(c, LinearConstraint)
-            push!(lcs, c)
-        elseif isa(c, AbstractPhylogenyConstraintResult)
-            push!(ples, c)
-        else
-            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into any optimiser; supported: WeightBounds, LinearConstraint, and phylogeny constraint results"))
-        end
-    end
     out = Pair{Symbol, Any}[]
-    if !(isnothing(wb))
-        push!(out, :wb => wb)
+    for c in constraint_results(cs)
+        target = constraint_target_of(c)
+        val = constraint_value_of(c)
+        i = findfirst(p -> p.first === target, out)
+        if isnothing(i)
+            push!(out, target => Any[val])
+            continue
+        end
+        @argcheck(target in PIPELINE_ACCUMULATING_TARGETS,
+                  ArgumentError("two constraint steps write the :$target routing target, which holds one value; the second would silently replace the first. Drop one of the steps, or combine them into the single value the field expects."))
+        push!(out[i].second, val)
     end
-    if !(isempty(lcs))
-        push!(out, :lcse => length(lcs) == 1 ? lcs[1] : lcs)
-    end
-    if !(isempty(ples))
-        push!(out, :ple => length(ples) == 1 ? ples[1] : identity.(ples))
-    end
-    return out
+    return Pair{Symbol, Any}[p.first => (if length(p.second) == 1
+                                             p.second[1]
+                                         else
+                                             accumulate_constraint_values(Val(p.first), p.second)
+                                         end) for p in out]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

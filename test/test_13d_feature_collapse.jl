@@ -216,7 +216,7 @@ end
         @test size(Z_3) == (T, k, K)
 
         #=
-        `predict_outer_*` is a documented overload point, so extending the tuple is a
+        `predict_outer_returns` is a documented overload point, so extending the tuple is a
         deliberate break. `nz`/`Z` are returned *before* `X` precisely so the break bites:
         Julia's destructuring discards trailing values without complaint, so appending them
         would have let a stale overload keep building a feature-less result in silence.
@@ -417,10 +417,11 @@ end
                     for cl in cls]
         nobs_st = [length(p.mrd.X) for p in preds_st]
         for (rd, sq) in ((rd_r, false), (rd_sq, true), (rd_3d, false))
-            for (predictions, clsi) in ((preds_st, nothing), (preds_nc, cls))
-                Ws = [PO.fold_weight_matrix(predictions, clsi, f, N)
+            for (predictions, u) in
+                ((preds_st, PO.FullUniverse()), (preds_nc, PO.ClusterUniverse(cls)))
+                Ws = [PO.fold_weight_matrix(predictions, u, f, N)
                       for f in eachindex(test_idx)]
-                rdo = PO.rebuild_returns_result(rd, predictions, clsi)
+                rdo = PO.rebuild_returns_result(rd, predictions, u)
                 @test size(rdo.Z, 1) == size(rdo.X, 1) == T
                 @test size(rdo.Z, 2) == length(rdo.nx)
                 @test PO.features_are_assets(rdo.nz, rdo.nx) == sq
@@ -462,9 +463,9 @@ end
                                                    opt = HierarchicalOptimiser(; slv = slv))
         predictions = [PO.cross_val_predict(o, rd_3d, cvwf; ex = seq)
                        for o in (plain_hrp(), herc())]
-        Ws = [PO.fold_weight_matrix(predictions, nothing, f, N)
+        Ws = [PO.fold_weight_matrix(predictions, PO.FullUniverse(), f, N)
               for f in eachindex(test_idx)]
-        rdo = PO.rebuild_returns_result(rd_3d, predictions, nothing)
+        rdo = PO.rebuild_returns_result(rd_3d, predictions, PO.FullUniverse())
         # The folds cover fewer rows than the clock has, which is the point: a cumulative
         # count would have started at row 1 and run out before the last fold.
         @test size(rdo.Z, 1) == sum(length, test_idx) < T
@@ -491,7 +492,7 @@ end
         preds = [PO.cross_val_predict(o, rd_3d_nots, cv; ex = seq)
                  for o in (plain_hrp(), herc())]
         e = try
-            PO.rebuild_returns_result(rd_3d_nots, preds, nothing)
+            PO.rebuild_returns_result(rd_3d_nots, preds, PO.FullUniverse())
         catch err
             err
         end
@@ -504,7 +505,8 @@ end
                                   nz = ["z$i" for i in 1:K], Z = Zr)
         preds_r = [PO.cross_val_predict(o, rd_r_nots, cv; ex = seq)
                    for o in (plain_hrp(), herc())]
-        @test size(PO.rebuild_returns_result(rd_r_nots, preds_r, nothing).Z) == (T, 2, K)
+        @test size(PO.rebuild_returns_result(rd_r_nots, preds_r, PO.FullUniverse()).Z) ==
+              (T, 2, K)
 
         # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
         # now refuses a repeated timestamp outright.
@@ -522,12 +524,14 @@ end
         =#
         p3 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 3); ex = seq)
         p4 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 4); ex = seq)
-        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [p3, p4], nothing)
+        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [p3, p4],
+                                                                 PO.FullUniverse())
 
         # Same number of folds, different rows in them.
         pw = PO.cross_val_predict(plain_hrp(), rd_r, IndexWalkForward(60, 63); ex = seq)
         pk = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = length(pw.pred)); ex = seq)
-        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [pw, pk], nothing)
+        @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [pw, pk],
+                                                                 PO.FullUniverse())
     end
 
     @testset "The transport carrier is gone" begin

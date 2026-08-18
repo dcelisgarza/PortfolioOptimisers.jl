@@ -34,7 +34,7 @@ Keywords correspond to the struct's fields.
 This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
 
   - The factor block `fpr` is the **posterior** factor distribution, processed by `f_mp`, with `chol` dropped because the posterior covariance supersedes the one it factorises. Its `w` and that weighting's diagnostics forward untouched.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds by construction, and at the default `rf = 0.0` that is the plain identity. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence.
   - No `Z` is carried: the only wrapped prior is fit on factors, so its feature matrix would be factors × features and would not describe the asset axis. The drop is a *relocation* rather than a destruction — the factor block is forwarded, so a feature matrix the factor prior carried is still reachable at `pr.fpr.Z`. Wrap this estimator from the *outside* with [`FeaturePrior`](@ref) if an asset-axis feature matrix is wanted.
 
@@ -51,7 +51,7 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
-  - If `w` is not `nothing`, `length(w) == size(X, 2)`.
+  - If `l` and `w` are not `nothing`, `length(w) == size(X, 2)`.
 
 # Examples
 
@@ -174,9 +174,9 @@ FactorBlackLittermanPrior
     """
     $(field_dict[:eqw])
     """
-    w
+    @vprop w
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -288,10 +288,11 @@ Where:
   - Views are extracted using [`black_litterman_views`](@ref) **at `pe.sets.fkey`**, which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
-  - If leverage is specified, the prior mean is adjusted accordingly.
+  - The prior mean handed to the update is an **excess** return. If `pe.l` is specified it is the equilibrium mean [`equilibrium_mu`](@ref) computes, which is a risk premium already. Otherwise it is the factor prior's own mean less `pe.rf`, by [`remove_rf`](@ref).
   - The Black-Litterman posterior mean and covariance for factors are computed using [`vanilla_posteriors`](@ref).
   - Matrix processing is applied to the factor and asset posterior covariance matrices.
   - The asset posterior mean and covariance are reconstructed using the factor loadings.
+  - `pe.rf` is added back to the reconstructed asset mean once, by [`apply_rf`](@ref), and the factor block stays on the excess scale the update ran on. The rate comes off the factor axis and goes on the asset axis, so where `pe.l` is `nothing` the two moves are not inverses: writing `s` for the row sums of `rr.M`, the answer moves by `pe.rf * (1 - s)` against the same estimator at `rf = 0`, and cancels only for an asset whose loadings sum to one.
   - If `rsd` is `true`, residual variance is added to the posterior covariance and Cholesky factor.
   - The result includes asset returns, posterior mean, posterior covariance, Cholesky factor, weights, regression result, and factor prior details.
 
@@ -302,6 +303,9 @@ Where:
   - [`prior`](@ref)
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
+  - [`apply_rf`](@ref)
+  - [`remove_rf`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
@@ -327,26 +331,32 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     f_key = isnothing(pe.sets) ? nothing : pe.sets.fkey
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
                                       size(X, 1), eltype(posterior_X), strict, f_key)
-    prior_mu = if !isnothing(pe.l)
-        w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2),
-                      DimensionMismatch("length(pe.w) ($(length(pe.w))) must match size(X, 2) ($(size(X, 2)))"))
-            pe.w
-        else
-            iN = inv(size(X, 2))
-            range(iN, iN; length = size(X, 2))
-        end
-        pe.l * (prior_sigma * transpose(M)) * w
+    # `pe.l` replaces the factor prior's own mean with an equilibrium one implied by the asset
+    # weights `pe.w`. The expression and its equal-weight fallback belong to
+    # [`equilibrium_mu`](@ref).
+    #
+    # Both branches must leave an *excess* return, because that is the scale the view returns
+    # in `Q` are written on, and the scale [`apply_rf`](@ref) undoes at the end. The
+    # equilibrium mean is one already — it is the risk premium reverse optimisation implies.
+    # The factor prior's own mean is a total return, so [`remove_rf`](@ref) takes the rate off
+    # it first.
+    prior_excess_mu = if !isnothing(pe.l)
+        equilibrium_mu(pe.l, prior_sigma * transpose(M), pe.w)
     else
-        prior_mu .- pe.rf
+        remove_rf(pe.rf, prior_mu)
     end
-    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu,
+    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, prior_excess_mu,
                                                            prior_sigma, omega, P, Q)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
     (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_posterior_mu,
                                       f_posterior_sigma, X, posterior_X; kwargs...)
+    # `pe.rf` goes back on here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns. `f_posterior_mu` is an excess return and stays
+    # one — putting the rate back before the lift would carry it through the loadings as
+    # `M * (rf * 1)`, which is a projection of the rate rather than the rate.
+    mu = apply_rf(pe.rf, mu)
     # No `Z` is forwarded: the only wrapped prior here is `f_prior`, fit on the factors, so
     # its feature matrix would be factors × features and would not describe the asset axis.
     #

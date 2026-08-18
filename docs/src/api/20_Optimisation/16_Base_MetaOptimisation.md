@@ -1,6 +1,13 @@
 # Meta optimisation
 
 ```@docs
+SubPortfolioUniverse
+FullUniverse
+ClusterUniverse
+sub_portfolio_count
+sub_portfolio_predict
+sub_portfolio_view
+sub_portfolio_cv
 outer_optimisation_finaliser
 combination_weights
 prepare_outer_rd
@@ -11,4 +18,6 @@ fold_feature_matrix
 fold_feature_anchors
 rebuild_feature_matrix
 rebuild_returns_result
+sub_portfolio_predictions
+predict_outer_returns
 ```

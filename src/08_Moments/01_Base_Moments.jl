@@ -566,6 +566,33 @@ function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 
                               Statistics.std(ce.ve, X; dims = dims, kwargs...))
 end
 """
+    densify(X::MatNum) -> MatNum
+
+Materialise a lazy or sparse observation matrix as a dense `Matrix`.
+
+`StatsBase`'s weighted moment API is typed on `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match it. Without a `mean` the call raises a `MethodError`, which is recoverable. With a `mean` it is not: `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`, and when the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)` — the **cross-covariance of `X` against the weight vector**. It returns an `N × 1` matrix in place of an `N × N` one and raises nothing. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify before every weighted call so that neither outcome is reachable.
+
+# Arguments
+
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `X::MatNum`: `X` itself when it is already a dense `Matrix`, and `Matrix(X)` otherwise.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`robust_cor`](@ref)
+"""
+function densify(X::DenseMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}})
+    return X
+end
+function densify(X::MatNum)
+    return Matrix(X)
+end
+"""
     compat_cov(
         ce::StatsBase.CovarianceEstimator,
         X::MatNum,
@@ -629,7 +656,7 @@ end
         kwargs...
     ) -> MatNum
 
-Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Arguments
 
@@ -647,11 +674,13 @@ Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `
 # Details
 
   - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-covariance there without raising.
 
 # Related
 
   - [`MatNum`](@ref)
+  - [`densify`](@ref)
   - [`compat_cov`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
@@ -670,14 +699,7 @@ end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     assert_dims(dims)
-    return try
-        compat_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cov(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
-    end
+    return compat_cov(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
 end
 """
     compat_cor(
@@ -760,7 +782,7 @@ end
         kwargs...
     ) -> MatNum
 
-Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Arguments
 
@@ -778,11 +800,13 @@ Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `
 # Details
 
   - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-correlation there without raising.
 
 # Related
 
   - [`MatNum`](@ref)
+  - [`densify`](@ref)
   - [`compat_cor`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cor/)
 """
@@ -801,14 +825,7 @@ end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     assert_dims(dims)
-    return try
-        compat_cor(ce, X, w; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cor(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
-    end
+    return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
 end
 """
     moment_window_and_weights(

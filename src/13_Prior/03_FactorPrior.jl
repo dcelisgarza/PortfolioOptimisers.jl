@@ -234,7 +234,7 @@ Declare how a prior estimator adds a residual block to the covariance it lifts.
 
 A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and `mp.pdm` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
 
-The declaration closes that gap. Every estimator answers, and it answers beside its own definition: the two that own a residual block report it, a wrapper forwards the answer of the estimator it wraps, and an estimator that adds none says so with an explicit `nothing` method. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
+The declaration closes that gap. Every estimator answers, and it answers beside its own definition: the two that own a residual block report it, a wrapper forwards the answer of the estimator it wraps, and an estimator that adds none says so with an explicit `nothing` method. A pooling estimator is a wrapper for this purpose. It forwards the one estimator its moments come from, however many priors it pools. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
 
 There is no default. A silent `nothing` fallback cannot separate *this estimator adds no residual block* from *the author of this estimator forgot the method*, and the second reading drops a residual block the covariance really carries. An undeclared type therefore throws and names itself, which is the polarity [`range_tails`](@ref) already uses for a per-type declaration whose absence is a defect rather than an answer.
 
@@ -244,7 +244,7 @@ There is no default. A silent `nothing` fallback cannot separate *this estimator
 
 # Returns
 
-  - `nothing`: The estimator adds no residual block, or pools several priors and has no single one.
+  - `nothing`: The estimator adds no residual block.
   - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
 
 # Validation

@@ -298,3 +298,80 @@ variants share it.
 `test_16a_asset_risk_budgeting.jl`, `test_18a_mean_risk_1.jl` and `test_28_seam_lock.jl` all
 pass. No CSV baseline moved: no test configures fees on a `NearOptimalCentering`, which is why
 the dropped fees went unnoticed.
+
+## Amendment 3 (2026-08-18)
+
+The architecture review of 2026-08-17 (finding 1) revisits the same seam from the caller's
+side. Amendment 2 gave unconstrained NOC a named middle; this amendment says what that middle
+reads, fixes the one setting it read inconsistently, and records why the rest is documented
+rather than refused.
+
+### The census
+
+Every `JuMPOptimiser` setting was set one at a time on a default
+[`NearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl) with the three
+anchor portfolios supplied, and the assembled centring model was compared byte for byte
+against the same model without the setting. `lcse`, `card`, `l1`, `linf`, `lp`, `l2c`,
+`linfc`, `tn`, `tr` and `ss` all leave the model identical. They are carried and validated,
+and the builder each one drives belongs to the middle this variant does not run.
+
+They are **not** inert, which is why "carried and dropped" overstates the case. The three
+anchor portfolios are `MeanRisk` sub-problems that run the whole `assemble_jump_model!`, so an
+omitted setting shapes the anchors and, through them, the centring target. It reaches no model
+at all only when `w_min`, `w_opt` and `w_max` are all supplied and no sub-problem is solved.
+
+### The defect: the return expression was gross, the target net
+
+`near_optimal_centering_setup` computes `rt_min`, `rt_opt` and `rt_max` with
+`expected_return(ret, w, pr, fees)` — net of fees. The barrier constrains `ret - rt`, where
+`ret` is the model's return expression. `add_fees_to_ret!` subtracts the model's `:fees`
+expression only when one is registered, and `set_non_fixed_fees!` is what registers it. The
+unconstrained middle did not run it, so the two halves of one comparison used different units
+whenever a fee was set: with `Fees(; l = 0.05)` on a five-asset problem the model's return
+expression was unchanged from the fee-free one, while every coefficient should have moved by
+`0.05` — about fifty times the gross expected return itself.
+
+`set_non_fixed_fees!(model, opt.fees)` now runs first in the unconstrained middle, in the same
+position it holds in `assemble_jump_model!`. A **fixed** fee still does not apply on this path
+and cannot: it is charged per position held, so it needs the cardinality binaries
+`set_mip_constraints!` produces, and that builder is part of the omitted middle. The fee shapes
+`l`, `s`, `tn`, `fl` were each checked to build without error on the unconstrained path, under
+long-only and long-short bounds.
+
+This is the third fee defect on this one path, after amendment 2's argument-position drift. All
+three had the same shape: a value that the setup computes one way and the model consumes
+another, with nothing comparing the two.
+
+### What is documented rather than refused
+
+The review asks for a membership declaration that the head checks, so that a setting the
+formulation cannot honour raises instead of being ignored. That half is **not** done, and the
+exclusion is stated in the docstrings instead —
+[`UnconstrainedNearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl)
+now lists every setting the centring model reads and every setting it does not, and the `alg`
+field text names the choice as the thing that selects between them.
+
+Three reasons:
+
+1. **The settings are meaningful on this variant.** They bind on the anchors. A head that
+   raised on them would refuse configurations that produce a correct answer today, and would
+   force a user who wants a constrained anchor and an unconstrained centring to give up one of
+   the two.
+2. **It is breaking on the default path.** `UnconstrainedNearOptimalCentering` is the default
+   `alg`, so every `NearOptimalCentering` that sets one of these fields and solves today would
+   start throwing, with no migration but a change of `alg` that changes the answer.
+3. **The gap the review names is a documentation gap first.** "No configuration error can be
+   raised" was true, but the reader had no way to learn the exclusion either. One of those two
+   is cheap to close and reversible.
+
+The declaration remains a reasonable future step, and this amendment does not argue against
+it. It belongs with a decision about what the raise should be — an error, a warning, or a
+`strict`-gated pair — and that is a wider change than one path.
+
+### Verification
+
+`test_20_near_optimal_centering_optimisation.jl`, "Unconstrained NOC return expression is net
+of fees": builds the head and the middle with the three anchors supplied, so no solve runs, and
+asserts that the model's return expression and the `rt_opt` target both move with the fees, and
+that a fixed fee moves neither. Proved to discriminate — before the fix the two return
+expressions are byte-identical.

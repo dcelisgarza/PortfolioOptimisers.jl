@@ -167,6 +167,90 @@ const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
     compute(B_eq, obj -> isnothing(obj.eq) ? nothing : obj.eq.B)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Concatenate the rows of the same half of several [`PartialLinearConstraint`](@ref)s, skipping the absent ones.
+
+# Arguments
+
+  - `ps`: The halves to concatenate, each a [`PartialLinearConstraint`](@ref) or `nothing`.
+
+# Returns
+
+  - A [`PartialLinearConstraint`](@ref), or `nothing` when every input was absent.
+
+# Related
+
+  - [`merge_linear_constraints`](@ref)
+  - [`PartialLinearConstraint`](@ref)
+"""
+function merge_partial_linear_constraints(ps)
+    kept = [p for p in ps if !isnothing(p)]
+    if isempty(kept)
+        return nothing
+    end
+    N = size(kept[1].A, 2)
+    @argcheck(all(p -> size(p.A, 2) == N, kept),
+              DimensionMismatch("every constraint being merged must be written over the same variables, but the row widths differ: $(unique(size(p.A, 2) for p in kept))"))
+    return PartialLinearConstraint(; A = reduce(vcat, (p.A for p in kept)),
+                                   B = reduce(vcat, (p.B for p in kept)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Combine several [`LinearConstraint`](@ref)s into the single one that holds all their rows.
+
+A `LinearConstraint` is a block of rows, and applying two blocks is the same as applying the block that stacks them — the inequality halves concatenate, the equality halves concatenate, and an absent half contributes nothing. This is exactly what generation already does when it is handed several estimators at once: [`centrality_constraints`](@ref) over a vector of [`CentralityConstraint`](@ref)s appends every row into one result rather than returning one result per estimator.
+
+That equivalence is what this function exists to preserve. A caller that computes its constraints separately — a [`Pipeline`](@ref) running one step per estimator — can merge them here and reach the optimiser with the value it would have had from the vector form.
+
+# Arguments
+
+  - `lcs`: The constraints to merge.
+
+# Returns
+
+  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
+
+# Validation
+
+  - `lcs` is non-empty.
+  - Every merged half is written over the same number of variables.
+
+# Examples
+
+```jldoctest
+julia> lc1 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [1.0 0.0], B = [0.5]));
+
+julia> lc2 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [0.0 1.0], B = [0.25]));
+
+julia> PortfolioOptimisers.merge_linear_constraints([lc1, lc2])
+LinearConstraint
+  ineq ┼ PartialLinearConstraint
+       │   A ┼ 2×2 Matrix{Float64}
+       │   B ┴ Vector{Float64}: [0.5, 0.25]
+    eq ┴ nothing
+```
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`merge_partial_linear_constraints`](@ref)
+  - [`centrality_constraints`](@ref)
+"""
+function merge_linear_constraints(lcs::AbstractVector{<:LinearConstraint})::LinearConstraint
+    @argcheck(!isempty(lcs), IsEmptyError("lcs cannot be empty"))
+    if length(lcs) == 1
+        return lcs[1]
+    end
+    return LinearConstraint(;
+                            ineq = merge_partial_linear_constraints(lc.ineq for lc in lcs),
+                            eq = merge_partial_linear_constraints(lc.eq for lc in lcs))
+end
+function merge_linear_constraints(lc::LinearConstraint)::LinearConstraint
+    return lc
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all equation parsing result types.

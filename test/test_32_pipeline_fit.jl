@@ -348,10 +348,20 @@
         res_none = (@test_logs (:warn,) (:warn,) fit(Pipeline(;
                                                               steps = (FactorPrior(),
                                                                        ece_none,
-                                                                       EqualWeighted())),
+                                                                       MeanRisk(;
+                                                                                opt = jopt()))),
                                                      rd))
         @test isnothing(res_none.ctx.constraints)
-        @test res_none.w ≈ fill(1 / length(rd.nx), length(rd.nx))
+        @test isapprox(sum(res_none.w), 1)
+        #=
+        The same step in front of an optimiser with no `lcse` field is refused when the
+        Pipeline is built, not when it runs. The step declares that it writes :lcse and
+        nothing on an EqualWeighted can receive one; that this particular row happened to
+        resolve away is a run-time accident, and the next row would not.
+        =#
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (FactorPrior(), ece_none,
+                                                     EqualWeighted()))
 
         #=
         Two ordinary linear-constraint steps route into `lcse` as a vector of

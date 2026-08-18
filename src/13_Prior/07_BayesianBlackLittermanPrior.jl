@@ -190,7 +190,7 @@ BayesianBlackLittermanPrior
     """
     views_conf
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -289,7 +289,8 @@ Where:
   - The view uncertainty matrix `f_omega` is computed using [`calc_omega`](@ref).
   - Bayesian posterior mean and covariance are computed via the model's update equations.
   - Matrix processing is applied to the asset posterior covariance using `pe.mp`, and to the factor posterior covariance using `pe.f_mp`.
-  - The result's factor block holds the **posterior** factor moments, so `pr.mu == pr.rr.M * pr.fpr.mu + pr.rr.b` holds exactly.
+  - `pe.rf` is added to the asset posterior mean once, by [`apply_rf`](@ref). The factor block never carries it.
+  - The result's factor block holds the **posterior** factor moments, so `pr.mu == pr.rr.M * pr.fpr.mu + pr.rr.b + pe.rf` holds exactly. At the default `rf = 0.0` that is the plain identity.
 
 # Related
 
@@ -329,7 +330,10 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     v3 = prior_sigma \ LinearAlgebra.I
     posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
+    # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns. The wrapped prior's moments are used as they
+    # stand, so a rate that prior applied internally is left alone.
+    posterior_mu = apply_rf(pe.rf, posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b)
     # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
     # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
     # inverse. Reporting them rather than the prior ones is what makes this carrier internally

@@ -252,6 +252,36 @@ macro pipe_route_sigma_ucs(T)
                end)
 end
 """
+    @pipe_route_rkb T
+
+Declare that optimiser type `T` absorbs the `:rkb` [Routing Target](@ref PIPELINE_ROUTING_TARGETS) into the `rkb` field of its risk-budgeting algorithm.
+
+`:rkb` is the one target named after a field an optimiser does not carry directly. A risk budget belongs to the *algorithm* — `AssetRiskBudgeting` budgets assets, `FactorRiskBudgeting` budgets factors — so it lands one level down, at `rba.rkb`, and the derived `hasfield` rule cannot reach it.
+
+Acceptance is not a constant: it asks the algorithm the optimiser is actually carrying. A [`TimeDependent`](@ref) schedule in `rba` has no `rkb` to write, so such an optimiser declines the target and a pipeline computing a budget for it is refused at construction rather than failing in the fold loop.
+
+Declared per concrete type, for the same reason as [`@pipe_route_sigma_ucs`](@ref): it must out-specialise the [`@pipe_delegates`](@ref) forwarder on the same type.
+
+# Related
+
+  - [`@pipe_delegates`](@ref)
+  - [`pipe_route`](@ref)
+"""
+macro pipe_route_rkb(T)
+    #! Escaped whole, for the same reason as `@pipe_delegates`.
+    return esc(quote
+                   function pipe_route(x::$T, ::Val{:rkb}, v)
+                       @argcheck(hasfield(typeof(x.rba), :rkb),
+                                 ArgumentError("cannot route a risk budget into a $(Base.typename(typeof(x)).wrapper): its rba field holds a $(Base.typename(typeof(x.rba)).wrapper), which has no rkb field to receive it"))
+                       rba = Accessors.set(x.rba, Accessors.PropertyLens{:rkb}(), v)
+                       return Accessors.set(x, Accessors.PropertyLens{:rba}(), rba)
+                   end
+                   function pipe_accepts(x::$T, ::Val{:rkb})::Bool
+                       return hasfield(typeof(x.rba), :rkb)
+                   end
+               end)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation algorithms used by portfolio optimisers.

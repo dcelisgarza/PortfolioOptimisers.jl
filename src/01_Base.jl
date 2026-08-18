@@ -205,6 +205,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :beta => "`beta`: Quantile level for the upper tail.",#
                                  :l => "`l`: Risk aversion parameter.",#
                                  :rf => "`rf`: Risk-free rate.",#
+                                 :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update runs on excess returns, so a prior mean that arrives as a total return loses the rate first. The rate is added back exactly once, to the posterior asset expected returns. That round trip leaves the wrapped prior estimators alone, so a risk-free rate one of them applied internally stays where it is.",#
                                  # Errors
                                  :msg => "`msg`: Error message describing the condition that triggered the exception.",#
                                  # Solver

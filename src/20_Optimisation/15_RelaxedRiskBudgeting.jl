@@ -518,6 +518,7 @@ function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}
 end
 
 @pipe_delegates RelaxedRiskBudgeting opt
+@pipe_route_rkb RelaxedRiskBudgeting
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,
        RegularisedPenalisedRelaxedRiskBudgeting, RelaxedRiskBudgeting,
        RelaxedRiskBudgetingResult

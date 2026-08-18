@@ -248,7 +248,7 @@ AugmentedBlackLittermanPrior
     """
     @vprop w
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -341,7 +341,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `dims in (1, 2)`.
   - If `pe.a_views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
   - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
-  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
+  - If `pe.l` and `pe.w` are not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
 
@@ -351,10 +351,10 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - Asset and factor views are extracted using [`black_litterman_views`](@ref), which returns the view matrices and view returns vectors. The asset views resolve at `pe.sets.xkey` and the factor views **at `pe.sets.fkey`**, out of the one dual-axis sets.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - View uncertainty matrices for assets and factors are computed using `calc_omega`.
-  - The augmented prior mean and covariance are constructed by combining asset and factor priors and regression loadings.
+  - The augmented prior mean and covariance are constructed by combining asset and factor priors and regression loadings. The mean handed to the update is an **excess** return. If `pe.l` is specified it is the equilibrium mean [`equilibrium_mu`](@ref) computes, which is a risk premium already. Otherwise it is the stacked wrapped means less `pe.rf`, by [`remove_rf`](@ref).
   - The augmented Black-Litterman posterior mean and covariance are computed using `vanilla_posteriors`.
   - Matrix processing is applied to the augmented posterior covariance.
-  - The final asset posterior mean and covariance are extracted from the augmented results and adjusted for regression intercepts and risk-free rate.
+  - The final asset posterior mean and covariance are extracted from the augmented results and adjusted for regression intercepts. `pe.rf` is added back to the asset mean once, by [`apply_rf`](@ref).
   - The factor block is the **factor half** of the same augmented posterior, so both halves are posterior. It takes no intercept and no risk-free adjustment (the intercept is the regression's, hence asset-only) and no second matrix processing pass, since the augmented covariance was processed as a whole and a principal submatrix of it is already processed.
 
 # Related
@@ -364,6 +364,9 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - [`prior`](@ref)
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
+  - [`apply_rf`](@ref)
+  - [`remove_rf`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
 function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
@@ -413,30 +416,35 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     aug_Q = vcat(Q, f_Q)
     aug_omega = hcat(vcat(a_omega, zeros(size(f_omega, 1), size(a_omega, 1))),
                      vcat(zeros(size(a_omega, 1), size(f_omega, 1)), f_omega))
-    aug_prior_mu = if !isnothing(pe.l)
-        w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2),
-                      DimensionMismatch("length(pe.w) ($(length(pe.w))) must match size(X, 2) ($(size(X, 2)))"))
-            pe.w
-        else
-            iN = inv(size(X, 2))
-            range(iN, iN; length = size(X, 2))
-        end
-        pe.l * (vcat(a_prior_sigma, f_prior_sigma * transpose(M))) * w
+    # `pe.l` replaces the two priors' own means with one equilibrium mean implied by the asset
+    # weights `pe.w`. The expression and its equal-weight fallback belong to
+    # [`equilibrium_mu`](@ref).
+    #
+    # Both branches must leave an *excess* return, because that is the scale the view returns
+    # in `aug_Q` are written on, and the scale [`apply_rf`](@ref) undoes at the end. The
+    # equilibrium mean is one already — it is the risk premium reverse optimisation implies.
+    # The two wrapped means are total returns, so [`remove_rf`](@ref) takes the rate off the
+    # stack first.
+    aug_prior_excess_mu = if !isnothing(pe.l)
+        equilibrium_mu(pe.l, vcat(a_prior_sigma, f_prior_sigma * transpose(M)), pe.w)
     else
-        vcat(a_prior_mu, f_prior_mu) .- pe.rf
+        remove_rf(pe.rf, vcat(a_prior_mu, f_prior_mu))
     end
-    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, pe.rf, aug_prior_mu,
+    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, aug_prior_excess_mu,
                                                                aug_prior_sigma, aug_omega,
                                                                aug_P, aug_Q)
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
-    posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
+    # `pe.rf` goes back on here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns, and on the same rows [`remove_rf`](@ref) took
+    # it off. The two moves are therefore exact inverses on the asset half. The factor half
+    # below keeps the excess scale the augmented update ran on.
+    posterior_mu = apply_rf(pe.rf, aug_posterior_mu[1:size(X, 2)] + b)
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     # The augmented system is jointly posterior over `[assets; factors]`, so truncating it to
     # the asset half discards a factor half that *is* the posterior factor distribution. The
-    # factor block reports that half rather than `f_prior`'s prior moments. No `rf` shift and
-    # no `b`: the intercept is the regression's, hence asset-only, and `vanilla_posteriors`
-    # already returns the factor half on the same scale `f_prior.mu` was supplied on. No second
+    # factor block reports that half rather than `f_prior`'s prior moments. No `rf` shift back
+    # and no `b`: the intercept is the regression's, hence asset-only, and the update returns
+    # the factor half on the excess scale it ran on, which is where the rate belongs. No second
     # `matrix_processing!` either — `aug_posterior_sigma` was processed as a whole above, and a
     # principal submatrix of the result is already processed.
     f_idx = (size(X, 2) + 1):length(aug_posterior_mu)

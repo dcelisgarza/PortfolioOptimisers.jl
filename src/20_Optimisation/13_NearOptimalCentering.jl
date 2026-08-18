@@ -14,25 +14,64 @@ $(DocStringExtensions.TYPEDEF)
 
 Constrained Near Optimal Centering algorithm.
 
-Applies Near Optimal Centering within the feasible region defined by the portfolio constraints.
+Centres inside the feasible region the portfolio constraints define. Its middle is the
+shared [`assemble_jump_model!`](@ref), so every [`JuMPOptimiser`](@ref) setting reaches the
+centring model. Use this variant when a setting must bind on the centring solve itself. See
+[`UnconstrainedNearOptimalCentering`](@ref) for what the default variant does not read.
 
 # Related Types
 
   - [`NearOptimalCenteringAlgorithm`](@ref)
   - [`UnconstrainedNearOptimalCentering`](@ref)
+
+# Related
+
+  - [`assemble_near_optimal_centering_model!`](@ref)
 """
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Unconstrained Near Optimal Centering algorithm.
+Unconstrained Near Optimal Centering algorithm. This is the default `alg` of
+[`NearOptimalCentering`](@ref).
 
-Applies Near Optimal Centering ignoring feasibility constraints (weights may temporarily violate bounds).
+Centres inside the near-optimal region of the *unconstrained* problem. The centring model
+carries the weight bounds and the budgets its head applies, the risk expression, the return
+expression and the non-fixed fees, and nothing else — the constraint and penalty builders of
+the shared middle do not run (ADR 0008, amendment 2). "Unconstrained" names that omission.
+
+The omitted settings are **carried and validated, not rejected**. They are not inert: the
+three anchor portfolios are solved as [`MeanRisk`](@ref) sub-problems that do run the whole
+middle, so an omitted setting still shapes the anchors and, through them, the centring
+target. The one configuration in which such a setting reaches no model at all is `w_min`,
+`w_opt` and `w_max` all supplied, because then no sub-problem is solved.
+
+# Settings the centring model reads
+
+`pe`, `slv`, `wb`, `bgt`, `sbgt`, `gbgt`, `sc`, `so`, `sca`, `ret` — the bound-free copy,
+see [`no_bounds_optimiser`](@ref) — and the non-fixed part of `fees`.
+
+# Settings the centring model does not read
+
+`lcse`, `cte`, `card`, `gcarde`, `scard`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`,
+`sglt`, `sgst`, `lt`, `st`, `xbgt`, `ss`, `tn`, `tr`, `ple`, `l2c`, `lpc`, `linfc`, `l1`,
+`l2`, `linf`, `lp`, `ccnt`, `cobj`, and the fixed part of `fees` — a fixed fee is charged
+per position held, so it needs the cardinality binaries `set_mip_constraints!` produces.
+
+`cobj` is the one omission a user can observe on the objective rather than on the feasible
+set: [`set_near_optimal_objective_function!`](@ref) folds no Objective Penalty into the
+barrier, so a Custom Objective Term prices the anchor sub-problems, not the centring solve.
 
 # Related Types
 
   - [`NearOptimalCenteringAlgorithm`](@ref)
   - [`ConstrainedNearOptimalCentering`](@ref)
+
+# Related
+
+  - [`assemble_near_optimal_centering_model!`](@ref)
+  - [`set_near_optimal_objective_function!`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
 """
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 """
@@ -247,7 +286,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     ucs_flag
     """
-    Near Optimal Centering algorithm variant.
+    Near Optimal Centering algorithm variant. It selects the middle the centring model runs, so it also selects which `opt` settings that model reads: [`ConstrainedNearOptimalCentering`](@ref) reads all of them, the default [`UnconstrainedNearOptimalCentering`](@ref) reads the subset its docstring lists.
     """
     alg
     """
@@ -741,6 +780,8 @@ Formulates the NOC objective based on the algorithm variant. For `UnconstrainedN
 
 The centring problem is a *distance minimisation*, so the objective it reports to a custom term is [`MinimumRisk`](@ref) — the objective actually being built, not `noc.obj`, which describes the reference-point sub-problems (ADR 0036).
 
+The unconstrained variant reaches neither [`add_custom_objective_term!`](@ref) nor [`add_penalty_to_objective!`](@ref), so `opt.cobj` prices the anchor sub-problems and not the centring solve. No builder on that path contributes to the [Objective Penalty](@ref add_to_objective_penalty!) either, so the accumulator is empty and the omitted fold changes no number today. The one case a user can observe is a Custom Objective Term that names itself and supplies no builder: it raises on the anchor solve, and raises nowhere when `w_min`, `w_opt` and `w_max` are all supplied and no anchor solve runs (ADR 0036, amendment).
+
 # Arguments
 
   - `alg`: NOC algorithm variant ([`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref)).
@@ -816,19 +857,79 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, args...)
-    retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
-    sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
+    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    return frontier_sweep!(model, noc, eltype(opt.pe.X), length(rk_opts)) do i
+        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+    end
+end
+"""
+    set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+
+Register the two anchor parameters the centring barrier reads, and set the objective.
+
+`noc_rk` and `noc_rt` are the risk and return of the near-optimal anchor the barrier centres
+on. A sweep moves them from point to point, so they are parameters rather than expressions —
+the model is assembled once and only their values change between solves.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `noc::NearOptimalCentering`: Dispatch object for the objective.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed bundle.
+  - `rk_opts::VecNum`: The anchor risks, one per sweep point.
+  - `rt_opts::VecNum`: The anchor returns, one per sweep point.
+
+# Returns
+
+  - `(noc_rk, noc_rt)`: The two parameter references.
+
+# Related
+
+  - [`set_noc_anchor!`](@ref)
+  - [`set_near_optimal_objective_function!`](@ref)
+  - [`solve_noc!`](@ref)
+"""
+function set_noc_anchor_parameters!(model::JuMP.Model, noc::NearOptimalCentering,
+                                    attrs::ProcessedJuMPOptimiserAttributes,
+                                    rk_opts::VecNum, rt_opts::VecNum)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
     set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
-        JuMP.set_parameter_value(noc_rk, rk_opt)
-        JuMP.set_parameter_value(noc_rt, rt_opt)
-        retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
-        push!(retcodes, retcode)
-        push!(sols, sol)
-    end
-    return retcodes, sols
+    return noc_rk, noc_rt
+end
+"""
+    set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+
+Move the centring anchor onto sweep point `i`.
+
+The [`frontier_sweep!`](@ref) hook of every swept `NearOptimalCentering` solve. The anchors are
+the [`MeanRisk`](@ref) solutions of the **same** sweep, computed by
+[`near_optimal_centering_setup`](@ref), so anchor `i` belongs to sweep point `i` and the index
+is the flat one [`frontier_sweep_axes`](@ref) counts. This is the pairing that makes a swept
+centring solve centre on its own point rather than on some other point's optimum.
+
+# Arguments
+
+  - `noc_rk`: The anchor-risk parameter.
+  - `noc_rt`: The anchor-return parameter.
+  - `rk_opts::VecNum`: The anchor risks, in flat sweep order.
+  - `rt_opts::VecNum`: The anchor returns, in flat sweep order.
+  - `i::Integer`: The flat index of the sweep point.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_noc_anchor_parameters!`](@ref)
+  - [`frontier_sweep!`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
+function set_noc_anchor!(noc_rk, noc_rt, rk_opts::VecNum, rt_opts::VecNum, i::Integer)
+    JuMP.set_parameter_value(noc_rk, rk_opts[i])
+    JuMP.set_parameter_value(noc_rt, rt_opts[i])
+    return nothing
 end
 """
     compute_ret_lbs(ret_frontier::VecPair, ::Nothing)
@@ -905,24 +1006,12 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     rt_ends::Option{<:VecPair}, ::Any, ::Any, ::Val{true}, ::Val{false},
                     args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
-    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
-    retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
-    sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
-    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
-    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for (i, (rk_opt, rt_opt, rkeys, lbs)) in
-        enumerate(zip(rk_opts, rt_opts, rpitrs[1], rpitrs[2]))
-        for (rkey, lb) in zip(rkeys, lbs)
-            JuMP.set_parameter_value(model[rkey], lb)
-        end
-        JuMP.set_parameter_value(noc_rk, rk_opt)
-        JuMP.set_parameter_value(noc_rt, rt_opt)
-        retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
-        retcodes[i] = retcode
-        sols[i] = sol
+    ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
+    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    return frontier_sweep!(model, noc, eltype(opt.pe.X),
+                           frontier_sweep_axes(ret_axis, nothing)) do i
+        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
     end
-    return retcodes, sols
 end
 function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -948,7 +1037,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                args...)
     risk_frontier = copy(risk_frontier)
     r = factory(noc.r, pr, noc.opt.slv)
-    return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max),)
+    return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
 end
 """
     compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum, args...)
@@ -998,32 +1087,12 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, ::Any,
                     w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
-    sc = get_constraint_scale(model)
-    for (keys, vals) in risk_frontier
-        ub = model[keys[1]] = JuMP.@variable(model,
-                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
-        d = ifelse(vals[3], 1, -1)
-        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub) <= 0)
+    risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
+    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    return frontier_sweep!(model, noc, eltype(opt.pe.X),
+                           frontier_sweep_axes(nothing, risk_axis)) do i
+        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
     end
-    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
-            for rkf in risk_frontier]
-    pitrs = Iterators.product.(itrs...)
-    retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
-    sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
-    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
-    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
-        for (key, ub) in zip(keys, ubs)
-            JuMP.set_parameter_value(model[key], ub)
-        end
-        JuMP.set_parameter_value(noc_rk, rk_opt)
-        JuMP.set_parameter_value(noc_rt, rt_opt)
-        retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
-        push!(retcodes, retcode)
-        push!(sols, sol)
-    end
-    return retcodes, sols
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1035,38 +1104,13 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     ::Val{true}, args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
-    sc = get_constraint_scale(model)
-    for (keys, vals) in risk_frontier
-        ub = model[keys[1]] = JuMP.@variable(model,
-                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
-        d = ifelse(vals[3], 1, -1)
-        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub) <= 0)
+    risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
+    ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
+    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    return frontier_sweep!(model, noc, eltype(opt.pe.X),
+                           frontier_sweep_axes(ret_axis, risk_axis)) do i
+        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
     end
-    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
-            for rkf in risk_frontier]
-    pitrs = Iterators.product.(itrs...)
-    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
-    retcodes = sizehint!(OptimisationReturnCode[], length(rt_opts) * length(rk_opts))
-    sols = sizehint!(JuMPOptimisationSolution[], length(rt_opts) * length(rk_opts))
-    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
-    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
-    for (rkeys, lbs) in zip(rpitrs[1], rpitrs[2])
-        for (rkey, lb) in zip(rkeys, lbs)
-            JuMP.set_parameter_value(model[rkey], lb)
-        end
-        for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
-            for (key, ub) in zip(keys, ubs)
-                JuMP.set_parameter_value(model[key], ub)
-            end
-            JuMP.set_parameter_value(noc_rk, rk_opt)
-            JuMP.set_parameter_value(noc_rt, rt_opt)
-            retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
-            push!(retcodes, retcode)
-            push!(sols, sol)
-        end
-    end
-    return retcodes, sols
 end
 """
     get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
@@ -1127,9 +1171,19 @@ Run the model-assembly middle of the Near Optimal Centering variant `alg`.
 
 The two variants share a head and a Result, and differ only in the middle and in the solve.
 This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
-[`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the three
-steps of that sequence it needs — risk, scalarisation, return — and then the same
-[`assert_frontier_sweep_cap`](@ref) tail (ADR 0008, amendment 2).
+[`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the four
+steps of that sequence it needs — non-fixed fees, risk, scalarisation, return — and then the
+same [`assert_frontier_sweep_cap`](@ref) tail (ADR 0008, amendments 2 and 3).
+
+[`set_non_fixed_fees!`](@ref) runs before the risk build, as it does in
+[`assemble_jump_model!`](@ref). It is what makes the model's return expression net of fees,
+and the barrier compares that expression against the `noc_rt` target, which
+[`near_optimal_centering_setup`](@ref) computes net of fees as well (ADR 0008, amendment 3).
+A fixed fee still does not apply: it needs the cardinality binaries `set_mip_constraints!`
+produces, and that builder belongs to the middle this variant does not run.
+
+[`UnconstrainedNearOptimalCentering`](@ref) lists every `opt` setting the resulting model
+reads and every setting it does not.
 
 The unconstrained variant reads `setup.opt`, which
 [`near_optimal_centering_setup`](@ref) has already replaced with the
@@ -1154,6 +1208,7 @@ phylogeny argument is `nothing` because the variant applies no phylogeny constra
 
   - [`solve_near_optimal_centering!`](@ref)
   - [`assemble_jump_model!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
   - [`NearOptimalCentering`](@ref)
 """
@@ -1162,6 +1217,7 @@ function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCenter
                                                 noc::NearOptimalCentering,
                                                 setup::NearOptimalSetup, rd::ReturnsResult)
     (; r, opt) = setup
+    set_non_fixed_fees!(model, opt.fees)
     set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     assert_frontier_sweep_cap(model)

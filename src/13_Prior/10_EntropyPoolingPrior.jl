@@ -2249,15 +2249,48 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
     return to_fix
 end
 """
-    prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:StagedEP},
-          X::MatNum; F::Option{<:MatNum} = nothing, dims::Int = 1,
-          strict::Bool = false, kwargs...)
+    prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
+
+Compute entropy pooling prior moments for asset returns.
+
+`prior` orients the data with respect to `dims` and delegates to [`ep_prior`](@ref), which dispatches on the entropy pooling algorithm `pe.alg`. [`H0_EntropyPooling`](@ref) enforces every view in a single optimisation. [`StagedEP`](@ref), the union of [`H1_EntropyPooling`](@ref) and [`H2_EntropyPooling`](@ref), enforces the views in stages, from lower to higher moments.
+
+# Arguments
+
+  - `pe`: Entropy pooling prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Optional factor matrix.
+  - $(arg_dict[:dims])
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`ep_prior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
+    X, F = dims_oriented(dims, X, F)
+    return ep_prior(pe.alg, pe, X, F; strict = strict, kwargs...)
+end
+"""
+    ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
+             strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
 
-`prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
+`ep_prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
 
 # Mathematical definition
 
@@ -2281,11 +2314,11 @@ Posterior moments are then computed as probability-weighted sample statistics us
 
 # Arguments
 
-  - `pe`: Entropy pooling prior estimator with iterative algorithm .
-  - `X`: Asset returns matrix (observations × assets).
-  - `F`: Optional factor matrix (default: `nothing`).
-  - $(arg_dict[:dims])
-  - If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `alg`: Staged entropy pooling algorithm, taken from `pe.alg` by [`prior`](@ref).
+  - `pe`: Entropy pooling prior estimator.
+  - `X`: Asset returns matrix (observations × assets), oriented by [`prior`](@ref).
+  - `F`: Optional factor matrix, oriented by [`prior`](@ref).
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
 # Returns
@@ -2294,7 +2327,6 @@ Posterior moments are then computed as probability-weighted sample statistics us
 
 # Validation
 
-  - `dims in (1, 2)`.
   - If any view constraint is not `nothing`, `!isnothing(sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations.
 
@@ -2311,7 +2343,9 @@ Posterior moments are then computed as probability-weighted sample statistics us
 # Related
 
   - [`EntropyPoolingPrior`](@ref)
+  - [`prior`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`StagedEP`](@ref)
   - [`H1_EntropyPooling`](@ref)
   - [`H2_EntropyPooling`](@ref)
   - [`ep_mu_views!`](@ref)
@@ -2325,12 +2359,8 @@ Posterior moments are then computed as probability-weighted sample statistics us
   - [`fix_mu!`](@ref)
   - [`fix_sigma!`](@ref)
 """
-function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:StagedEP}, X::MatNum,
-               F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
-               kwargs...)
-    X, F = dims_oriented(dims, X, F)
+function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
+                  strict::Bool = false, kwargs...)
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
         iT = inv(T)
@@ -2365,7 +2395,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
             fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
         end
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
-                                  ifelse(isa(pe.alg, H1_EntropyPooling), w0, w1), pe.opt,
+                                  ifelse(isa(alg, H1_EntropyPooling), w0, w1), pe.opt,
                                   pe.ds_opt, pe.dm_opt; strict = strict)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
@@ -2390,7 +2420,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
             fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
         end
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
-                                  ifelse(isa(pe.alg, H1_EntropyPooling), w0, w1), pe.opt,
+                                  ifelse(isa(alg, H1_EntropyPooling), w0, w1), pe.opt,
                                   pe.ds_opt, pe.dm_opt; strict = strict)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
@@ -2411,15 +2441,12 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                          ens = ens, kld = kld, rr = rr, fpr = fpr, Z = Z)
 end
 """
-    prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:H0_EntropyPooling}, X::MatNum;
-          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
+             F::Option{<:MatNum}; strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
 
-`prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
+`ep_prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
 
 # Mathematical definition
 
@@ -2441,10 +2468,10 @@ Where:
 
 # Arguments
 
-  - `pe`: Entropy pooling prior estimator with single-shot algorithm.
-  - `X`: Asset returns matrix (observations × assets).
-  - `F`: Optional factor matrix.
-  - $(arg_dict[:dims])
+  - `alg`: Single-shot entropy pooling algorithm, taken from `pe.alg` by [`prior`](@ref).
+  - `pe`: Entropy pooling prior estimator.
+  - `X`: Asset returns matrix (observations × assets), oriented by [`prior`](@ref).
+  - `F`: Optional factor matrix, oriented by [`prior`](@ref).
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
@@ -2454,7 +2481,6 @@ Where:
 
 # Validation
 
-  - `dims in (1, 2)`.
   - If any view constraint is not `nothing`, `!isnothing(pe.sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations
 
@@ -2468,6 +2494,7 @@ Where:
 # Related
 
   - [`EntropyPoolingPrior`](@ref)
+  - [`prior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`H0_EntropyPooling`](@ref)
   - [`ep_mu_views!`](@ref)
@@ -2479,12 +2506,8 @@ Where:
   - [`ep_cov_views!`](@ref)
   - [`ep_rho_views!`](@ref)
 """
-function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:H0_EntropyPooling}, X::MatNum,
-               F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
-               kwargs...)
-    X, F = dims_oriented(dims, X, F)
+function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
+                  F::Option{<:MatNum}; strict::Bool = false, kwargs...)
     T = size(X, 1)
     w0 = if isnothing(pe.w)
         iT = inv(T)

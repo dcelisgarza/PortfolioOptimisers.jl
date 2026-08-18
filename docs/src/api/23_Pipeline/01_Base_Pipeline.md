@@ -20,11 +20,16 @@ PIPELINE_SLOTS
 PIPELINE_INVALIDATES
 PIPELINE_ROUTING_TARGETS
 PIPELINE_OPTIONAL_TARGETS
+PIPELINE_ACCUMULATING_TARGETS
 PIPELINE_STEP_TARGETS
+PIPELINE_THRESHOLD_TARGETS
+PIPELINE_ASSET_SETS_MATRIX_TARGETS
+TargetedConstraint
 unroutable_target
 assert_opt_last
 pipe_reads
 pipe_writes
+pipe_constraint_targets
 PipelineStep
 PipelineUncertaintySets
 TD_OptE_Opt_Inferable

@@ -637,71 +637,6 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
                            strict = nco.strict)
 end
 """
-    predict_outer_nco_estimator_returns(
-        nco::NestedClustered,
-        rd::ReturnsResult,
-        pr::AbstractPriorResult,
-        fees::Option{<:Fees},
-        wi::MatNum,
-        resi::VecOpt,
-        cls::VecVecInt
-    )
-
-Predict outer portfolio returns for [`NestedClustered`](@ref) optimisation. Overload this using `nco.cv` for custom cross-validation prediction.
-"""
-function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
-                                             pr::AbstractPriorResult, fees::Option{<:Fees},
-                                             wi::MatNum, resi::VecOpt, cls::VecVecInt)
-    nb, B, iv, ivpa, nz, Z, X = prepare_outer_rd(rd, wi)
-    for (i, (res, cl)) in enumerate(zip(resi, cls))
-        pri = port_opt_view(pr, cl)
-        feesi = port_opt_view(fees, cl)
-        X[:, i] = calc_net_returns(res, pri, feesi)
-    end
-    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
-end
-function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:Any, <:Any,
-                                                                  <:Any,
-                                                                  <:OptimisationCrossValidation{<:NonCombOptCV}},
-                                             rd::ReturnsResult, pr::AbstractPriorResult,
-                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
-                                             cls::VecVecInt)
-    (; opti, cv, ex) = nco
-    cv = cv.cv
-    predictions = Vector{MultiPeriodPredictionResult}(undef, length(cls))
-    let cv = cv
-        FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
-        end
-    end
-    return rebuild_returns_result(rd, predictions, cls)
-end
-function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:Any, <:Any,
-                                                                  <:Any,
-                                                                  <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
-                                             rd::ReturnsResult, pr::AbstractPriorResult,
-                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
-                                             cls::VecVecInt)
-    (; opti, cv, ex) = nco
-    (; cv, scorer) = cv
-    predictions = Vector{PopulationPredictionResult}(undef, length(cls))
-    let cv = cv
-        FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
-        end
-    end
-    if isnothing(scorer)
-        scorer = NearestQuantilePrediction()
-    end
-    best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions, cls)
-end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Align the outer optimiser's asset sets with the synthetic universe produced by the inner optimisations.
@@ -726,7 +661,7 @@ The outer optimiser of a [`NestedClustered`](@ref) does not see the original ass
 
   - [`NestedClustered`](@ref)
   - [`UniverseSets`](@ref)
-  - [`predict_outer_nco_estimator_returns`](@ref)
+  - [`predict_outer_returns`](@ref)
 """
 function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
     return if (hasproperty(nco.opto, :opt) &&
@@ -772,7 +707,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         wi[cl, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_nco_estimator_returns(nco, rd, pr, fees, wi, resi, cls)
+    rdo = predict_outer_returns(nco.cv, nco, ClusterUniverse(cls), rd, pr, fees, wi, resi)
     nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)

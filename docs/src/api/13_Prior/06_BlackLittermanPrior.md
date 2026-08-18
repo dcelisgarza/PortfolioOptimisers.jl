@@ -8,5 +8,7 @@ prior(pe::BlackLittermanPrior, X::MatNum,
 calc_omega
 bl_preroll
 vanilla_posteriors
+apply_rf
+remove_rf
 remove_excl_views
 ```

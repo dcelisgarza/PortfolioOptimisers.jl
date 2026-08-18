@@ -1,4 +1,179 @@
 """
+    abstract type SubPortfolioUniverse end
+
+Abstract supertype for a meta-optimiser's *sub-portfolio enumeration*: what a sub-portfolio is, and what it sees.
+
+A meta-optimiser solves one inner problem per sub-portfolio, predicts each sub-portfolio's returns, and hands the outer optimiser a synthetic universe with one asset per sub-portfolio. That is one module, and the two shipped meta-optimisers differ in exactly one respect, which this type names:
+
+  - [`NestedClustered`](@ref) enumerates **cluster index sets**. One inner optimiser is viewed onto each cluster, and every full-universe quantity — the Prior Result, the Fees — is viewed onto it too.
+  - [`Stacking`](@ref) enumerates **inner optimisers**. Each one sees the whole universe, so nothing is viewed.
+
+[`FullUniverse`](@ref) and [`ClusterUniverse`](@ref) declare the two. The module reads them back through [`sub_portfolio_predict`](@ref), [`sub_portfolio_view`](@ref) and [`fold_weight_matrix`](@ref), and a third meta-optimiser is a third declaration rather than a third copy of the module.
+
+# Related
+
+  - [`FullUniverse`](@ref)
+  - [`ClusterUniverse`](@ref)
+  - [`sub_portfolio_predict`](@ref)
+  - [`sub_portfolio_view`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+abstract type SubPortfolioUniverse end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Sub-portfolios are the inner optimisers, and each sees the whole universe. [`Stacking`](@ref)'s enumeration.
+
+Nothing is viewed onto a sub-portfolio, and an inner weight vector is already full length — which is why the outer collapse pads nothing (see [`fold_weight_matrix`](@ref)).
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`ClusterUniverse`](@ref)
+  - [`Stacking`](@ref)
+"""
+struct FullUniverse <: SubPortfolioUniverse end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Sub-portfolios are cluster index sets, and each sees its own cluster. [`NestedClustered`](@ref)'s enumeration.
+
+One inner optimiser serves every sub-portfolio, viewed onto that sub-portfolio's assets, and an inner weight vector is as long as its cluster — which is why the outer collapse zero-pads it onto the full asset axis (see [`fold_weight_matrix`](@ref)).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`FullUniverse`](@ref)
+  - [`NestedClustered`](@ref)
+"""
+struct ClusterUniverse{T <: VecVecInt} <: SubPortfolioUniverse
+    """
+    Asset indices of each sub-portfolio. They partition the universe, so a zero-padded column is the sub-portfolio's real weight on the full asset axis.
+    """
+    cls::T
+end
+"""
+    sub_portfolio_count(u::FullUniverse, opti)
+    sub_portfolio_count(u::ClusterUniverse, opti)
+
+Count the sub-portfolios.
+
+A [`FullUniverse`](@ref) enumerates the inner optimisers, so it has as many sub-portfolios as `opti` holds. A [`ClusterUniverse`](@ref) enumerates the clusters, and one inner optimiser serves them all.
+
+# Arguments
+
+  - `u`: Sub-portfolio enumeration.
+  - `opti`: The meta-optimiser's inner optimiser field — a vector of optimisers for [`FullUniverse`](@ref), one optimiser for [`ClusterUniverse`](@ref).
+
+# Returns
+
+  - The number of sub-portfolios.
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`sub_portfolio_predict`](@ref)
+"""
+function sub_portfolio_count(::FullUniverse, opti)
+    return length(opti)
+end
+function sub_portfolio_count(u::ClusterUniverse, ::Any)
+    return length(u.cls)
+end
+"""
+    sub_portfolio_predict(u::FullUniverse, opti, i, rd, cv, ex)
+    sub_portfolio_predict(u::ClusterUniverse, opti, i, rd, cv, ex)
+
+Cross-validate sub-portfolio `i`.
+
+One [`cross_val_predict`](@ref) call, and the enumeration says which optimiser it runs and on which assets. A [`FullUniverse`](@ref) runs `opti[i]` and passes **no** `cols`: the sub-portfolio is the whole universe, and the arity that takes a precomputed [`OptimisationResult`](@ref) has no `cols` keyword at all, so a colon would be a `MethodError` rather than a no-op. A [`ClusterUniverse`](@ref) runs the one inner optimiser on `u.cls[i]`.
+
+# Arguments
+
+  - `u`: Sub-portfolio enumeration.
+  - `opti`: The meta-optimiser's inner optimiser field.
+  - `i`: Sub-portfolio index.
+  - `rd`: Returns data.
+  - `cv`: Cross-validation scheme, already copied for this sub-portfolio.
+  - `ex`: FLoops executor controlling parallelism.
+
+# Returns
+
+  - Sub-portfolio `i`'s cross-validation prediction result.
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`sub_portfolio_count`](@ref)
+  - [`sub_portfolio_cv`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+function sub_portfolio_predict(::FullUniverse, opti, i::Integer, rd::ReturnsResult, cv,
+                               ex::FLoops.Transducers.Executor)
+    return cross_val_predict(opti[i], rd, cv; ex = ex)
+end
+function sub_portfolio_predict(u::ClusterUniverse, opti, i::Integer, rd::ReturnsResult, cv,
+                               ex::FLoops.Transducers.Executor)
+    return cross_val_predict(opti, rd, cv; cols = u.cls[i], ex = ex)
+end
+"""
+    sub_portfolio_view(u::FullUniverse, x, i::Integer)
+    sub_portfolio_view(u::ClusterUniverse, x, i::Integer)
+
+View a full-universe quantity onto sub-portfolio `i`.
+
+The quantities are the ones a sub-portfolio's predicted returns are computed from: the Prior Result and the Fees. A [`FullUniverse`](@ref) sub-portfolio holds the whole universe, so `x` is returned unchanged; a [`ClusterUniverse`](@ref) one restricts it through [`port_opt_view`](@ref).
+
+# Arguments
+
+  - `u`: Sub-portfolio enumeration.
+  - `x`: Full-universe quantity, or `nothing`.
+  - `i`: Sub-portfolio index.
+
+# Returns
+
+  - `x`, viewed onto sub-portfolio `i`.
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`predict_outer_returns`](@ref)
+"""
+function sub_portfolio_view(::FullUniverse, x, ::Integer)
+    return x
+end
+function sub_portfolio_view(u::ClusterUniverse, x, i::Integer)
+    return port_opt_view(x, u.cls[i])
+end
+"""
+    sub_portfolio_cv(cv)
+
+Give one sub-portfolio its own copy of the cross-validation scheme.
+
+The sub-portfolios are cross-validated in parallel, so a scheme that draws its splits from a random number generator must not be shared: the generator is mutable state, and two sub-portfolios advancing it at once would neither reproduce nor agree on their folds. A scheme with no `rng` field carries no such state and is passed through.
+
+# Arguments
+
+  - `cv`: Cross-validation scheme.
+
+# Returns
+
+  - `cv`, copied when it holds an `rng`.
+
+# Related
+
+  - [`predict_outer_returns`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+function sub_portfolio_cv(cv)
+    return !hasfield(typeof(cv), :rng) ? cv : copy(cv)
+end
+"""
     outer_optimisation_finaliser(wb, wf, w_inner, w_outer)
 
 Finalise outer optimisation weights for the NCO algorithm.
@@ -80,7 +255,7 @@ Only the ratios between the entries of a Combination Weight carry meaning (ADR 0
 Scaling the synthetic return columns instead would break the weight on two counts:
 
   - A uniform weight would stop being neutral. A common rescale of every column moves [`MaximumUtility`](@ref)'s trade-off between return and risk, so the neutral setting would not be neutral.
-  - Every [`predict_outer_st_estimator_returns`](@ref) overload would have to re-apply it. A custom one would drop it silently, and the two cross-validation methods already did — so a cross-validated run would disagree with a fold-less one on what the weight means. `cv` is execution control and stays that way.
+  - Every [`predict_outer_returns`](@ref) overload would have to re-apply it. A custom one would drop it silently, and the two cross-validation methods already did — so a cross-validated run would disagree with a fold-less one on what the weight means. `cv` is execution control and stays that way.
 
 ## Degenerate combinations
 
@@ -123,7 +298,7 @@ Prepares the ReturnsResult for outer optimisation, applying the inner cluster we
 
 !!! warning
 
-    This function returns `nz` and `Z` in addition to the five values it returned before the feature matrix was collapsed onto the synthetic universe, and it returns them **before** the returns buffer `X`. A custom [`predict_outer_nco_estimator_returns`](@ref) or [`predict_outer_st_estimator_returns`](@ref) overload written against the old tuple therefore breaks loudly — it binds `nz` where it expects `X` and fails on the first write — rather than silently continuing to build an outer [`ReturnsResult`](@ref) with no feature matrix and never learning that it should have one. Appending the pair would not have done this: Julia's destructuring discards trailing values without complaint.
+    This function returns `nz` and `Z` in addition to the five values it returned before the feature matrix was collapsed onto the synthetic universe, and it returns them **before** the returns buffer `X`. A custom [`predict_outer_returns`](@ref) overload written against the old tuple therefore breaks loudly — it binds `nz` where it expects `X` and fails on the first write — rather than silently continuing to build an outer [`ReturnsResult`](@ref) with no feature matrix and never learning that it should have one. Appending the pair would not have done this: Julia's destructuring discards trailing values without complaint.
 
 # Arguments
 
@@ -249,17 +424,17 @@ function fold_row_indices(rd::ReturnsResult, pred::VecPredRes)
     return [feature_row_indices(rd.Z, p.rd.ts, rd.ts) for p in pred]
 end
 """
-    fold_weight_matrix(predictions, cls::Nothing, f, na)
-    fold_weight_matrix(predictions, cls::VecVecInt, f, na)
+    fold_weight_matrix(predictions, u::FullUniverse, f, na)
+    fold_weight_matrix(predictions, u::ClusterUniverse, f, na)
 
 Lay fold `f`'s sub-portfolio weights out as the `assets × sub-portfolios` matrix the outer collapse contracts against.
 
-[`Stacking`](@ref)'s inner optimisers see the whole universe, so their weight vectors are already full length and `cls` is `nothing`. [`NestedClustered`](@ref)'s see one cluster each, so sub-portfolio `i`'s weights are zero-padded onto `cls[i]`. The padding invents nothing: `cls` partitions the universe, so a padded column *is* the sub-portfolio's real weight on the full asset axis.
+The sub-portfolio enumeration says which. A [`FullUniverse`](@ref)'s inner optimisers see the whole universe, so their weight vectors are already full length. A [`ClusterUniverse`](@ref)'s see one cluster each, so sub-portfolio `i`'s weights are zero-padded onto `u.cls[i]`. The padding invents nothing: the clusters partition the universe, so a padded column *is* the sub-portfolio's real weight on the full asset axis.
 
 # Arguments
 
   - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
-  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
+  - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
   - `f`: Fold index.
   - `na`: Number of real assets.
 
@@ -269,10 +444,12 @@ Lay fold `f`'s sub-portfolio weights out as the `assets × sub-portfolios` matri
 
 # Related
 
+  - [`SubPortfolioUniverse`](@ref)
   - [`rebuild_returns_result`](@ref)
   - [`collapse_feature_matrix`](@ref)
 """
-function fold_weight_matrix(predictions::VecMPredRes, ::Nothing, f::Integer, na::Integer)
+function fold_weight_matrix(predictions::VecMPredRes, ::FullUniverse, f::Integer,
+                            na::Integer)
     ws = [prediction.pred[f].res.w for prediction in predictions]
     W = Matrix{mapreduce(eltype, promote_type, ws)}(undef, na, length(ws))
     @inbounds for (i, w) in enumerate(ws)
@@ -280,11 +457,11 @@ function fold_weight_matrix(predictions::VecMPredRes, ::Nothing, f::Integer, na:
     end
     return W
 end
-function fold_weight_matrix(predictions::VecMPredRes, cls::VecVecInt, f::Integer,
+function fold_weight_matrix(predictions::VecMPredRes, u::ClusterUniverse, f::Integer,
                             na::Integer)
     ws = [prediction.pred[f].res.w for prediction in predictions]
     W = zeros(mapreduce(eltype, promote_type, ws), na, length(ws))
-    @inbounds for (i, (w, cl)) in enumerate(zip(ws, cls))
+    @inbounds for (i, (w, cl)) in enumerate(zip(ws, u.cls))
         W[cl, i] = w
     end
     return W
@@ -359,7 +536,7 @@ function fold_feature_anchors(rd::ReturnsResult, pred::VecPredRes)
     return isa(rd.Z, Arr3Num) ? fold_row_indices(rd, pred) : [length(p.rd.X) for p in pred]
 end
 """
-    rebuild_feature_matrix(rd, predictions, cls, pred1)
+    rebuild_feature_matrix(rd, predictions, u, pred1)
 
 Recompute the outer problem's feature matrix at the cross-validation assembly seam.
 
@@ -369,7 +546,7 @@ Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare
 
   - `rd`: Original [`ReturnsResult`](@ref), whose `nz`/`Z` are read unsliced.
   - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects, one per sub-portfolio.
-  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
+  - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
   - `pred1`: The first sub-portfolio's folds, from [`assert_fold_alignment`](@ref) — every sub-portfolio agrees with them, so they define the fold boundaries.
 
 # Returns
@@ -378,13 +555,14 @@ Per fold, this makes the *same* [`collapse_feature_matrix`](@ref) call [`prepare
 
 # Related
 
+  - [`SubPortfolioUniverse`](@ref)
   - [`rebuild_returns_result`](@ref)
   - [`prepare_outer_rd`](@ref)
   - [`fold_feature_matrix`](@ref)
   - [`fold_feature_anchors`](@ref)
 """
 function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
-                                cls::Option{<:VecVecInt}, pred1::VecPredRes)
+                                u::SubPortfolioUniverse, pred1::VecPredRes)
     if isnothing(rd.Z)
         return nothing, nothing
     end
@@ -393,8 +571,7 @@ function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
     # Identical to `prepare_outer_rd`: square indexes both trailing axes precisely because
     # they are the same axis, so there is no square branch here either.
     sq = features_are_assets(rd.nz, rd.nx)
-    Zs = [fold_feature_matrix(rd.Z, sq, fold_weight_matrix(predictions, cls, f, na),
-                              anchor)
+    Zs = [fold_feature_matrix(rd.Z, sq, fold_weight_matrix(predictions, u, f, na), anchor)
           for (f, anchor) in enumerate(fold_feature_anchors(rd, pred1))]
     Z = Array{eltype(Zs[1])}(undef, sum(x -> size(x, 1), Zs), size(Zs[1], 2),
                              size(Zs[1], 3))
@@ -407,15 +584,15 @@ function rebuild_feature_matrix(rd::ReturnsResult, predictions::VecMPredRes,
     return sq ? ["_$(i)" for i in 1:N] : rd.nz, Z
 end
 """
-    rebuild_returns_result(rd, predictions, cls)
+    rebuild_returns_result(rd, predictions, u)
 
 Reconstruct a returns result from cross-validation predictions.
 
-Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout. `cls` is the asset index set of each sub-portfolio — [`NestedClustered`](@ref)'s clusters — or `nothing` when the sub-portfolios are full-universe, as [`Stacking`](@ref)'s are.
+Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout. `u` is the sub-portfolio enumeration — a [`ClusterUniverse`](@ref) for [`NestedClustered`](@ref), a [`FullUniverse`](@ref) for [`Stacking`](@ref) — and it is what says whether a fold's weight vectors need padding onto the full asset axis.
 
 !!! warning
 
-    `cls` is **positional**, not a keyword with a full-universe default. A default would let a stale two-argument call keep working: correct for [`Stacking`](@ref), and for [`NestedClustered`](@ref) silently writing every cluster's weights to the wrong rows — which yields not an error but a plausible-looking feature matrix. The one configuration that most needs the argument is the one a default would mis-serve, so the break is arranged to be loud.
+    `u` is **positional and required**, not a keyword with a full-universe default. A default would let a stale two-argument call keep working: correct for [`Stacking`](@ref), and for [`NestedClustered`](@ref) silently writing every cluster's weights to the wrong rows — which yields not an error but a plausible-looking feature matrix. The one configuration that most needs the argument is the one a default would mis-serve, so the break is arranged to be loud.
 
 ## The feature matrix
 
@@ -427,7 +604,7 @@ The inner solves are untouched: each still sees its own cluster-sliced feature m
 
   - `rd`: Original [`ReturnsResult`](@ref).
   - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects from cross-validation, one per sub-portfolio.
-  - `cls`: Asset indices per sub-portfolio, or `nothing` when they are full-universe.
+  - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
 
 # Returns
 
@@ -435,6 +612,7 @@ The inner solves are untouched: each still sees its own cluster-sliced feature m
 
 # Related
 
+  - [`SubPortfolioUniverse`](@ref)
   - [`NestedClustered`](@ref)
   - [`Stacking`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
@@ -443,7 +621,7 @@ The inner solves are untouched: each still sees its own cluster-sliced feature m
   - [`prepare_outer_rd`](@ref)
 """
 function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
-                                cls::Option{<:VecVecInt})
+                                u::SubPortfolioUniverse)
     N = length(predictions)
     nb = rd.nb
     B_flag = !isnothing(rd.B)
@@ -480,7 +658,7 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
     nobs = sum(p -> length(p.rd.X), pred1)
     @argcheck(nobs == size(X, 1),
               DimensionMismatch("the stacked sub-portfolio returns must have one row per cross-validated observation, but the folds cover $(nobs) observations and the stacked returns have $(size(X, 1))"))
-    nz, Z = rebuild_feature_matrix(rd, predictions, cls, pred1)
+    nz, Z = rebuild_feature_matrix(rd, predictions, u, pred1)
     if B_flag
         B = reshape(B, :, N)
         nb = ["_b$(i)" for i in 1:N]
@@ -488,4 +666,120 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
                          nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
+end
+"""
+    sub_portfolio_predictions(::Type{T}, opti, u, rd, cv, ex) where {T}
+
+Cross-validate every sub-portfolio, in parallel, over the same returns result.
+
+One [`sub_portfolio_predict`](@ref) call per sub-portfolio, each on its own copy of the scheme (see [`sub_portfolio_cv`](@ref)). Every sub-portfolio therefore runs the *same* cross-validation over the *same* returns result, which is the invariant [`assert_fold_alignment`](@ref) states one level down.
+
+# Arguments
+
+  - `T`: Element type of the prediction vector — a [`MultiPeriodPredictionResult`](@ref) per sub-portfolio on the non-combinatorial path, a [`PopulationPredictionResult`](@ref) on the combinatorial one.
+  - `opti`: The meta-optimiser's inner optimiser field.
+  - `u`: Sub-portfolio enumeration, a [`SubPortfolioUniverse`](@ref).
+  - `rd`: Returns data.
+  - `cv`: Cross-validation scheme.
+  - `ex`: FLoops executor controlling parallelism.
+
+# Returns
+
+  - One prediction result per sub-portfolio.
+
+# Related
+
+  - [`predict_outer_returns`](@ref)
+  - [`sub_portfolio_predict`](@ref)
+  - [`sub_portfolio_cv`](@ref)
+"""
+function sub_portfolio_predictions(::Type{T}, opti, u::SubPortfolioUniverse,
+                                   rd::ReturnsResult, cv,
+                                   ex::FLoops.Transducers.Executor) where {T}
+    predictions = Vector{T}(undef, sub_portfolio_count(u, opti))
+    FLoops.@floop ex for i in eachindex(predictions)
+        predictions[i] = sub_portfolio_predict(u, opti, i, rd, sub_portfolio_cv(cv), ex)
+    end
+    return predictions
+end
+"""
+    predict_outer_returns(cv::Option{<:OptimisationCrossValidation}, opt,
+                          u::SubPortfolioUniverse, rd::ReturnsResult,
+                          pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
+                          resi::VecOpt)
+    predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
+                          u::SubPortfolioUniverse, rd::ReturnsResult,
+                          pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
+                          resi::VecOpt)
+    predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCrossValidation},
+                          opt, u::SubPortfolioUniverse, rd::ReturnsResult,
+                          pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
+                          resi::VecOpt)
+
+Predict a meta-optimiser's sub-portfolio returns as the outer problem's [`ReturnsResult`](@ref).
+
+One module serves every meta-optimiser that owns an outer optimiser. What varies between them is the sub-portfolio enumeration, which arrives as a [`SubPortfolioUniverse`](@ref) — [`NestedClustered`](@ref) passes a [`ClusterUniverse`](@ref), [`Stacking`](@ref) a [`FullUniverse`](@ref) — and nothing else here reads the meta-optimiser's own type.
+
+**Dispatch is on `cv`**, which is what chooses the prediction, and a custom cross-validation scheme is therefore an overload on that first argument:
+
+  - Fold-less. The sub-portfolios' own solves are already in `resi`, so each column of the synthetic universe is that solve's net returns, on the Prior Result and Fees viewed onto the sub-portfolio ([`sub_portfolio_view`](@ref)).
+  - Non-combinatorial cross-validation. Each sub-portfolio is cross-validated and the folds are stacked ([`rebuild_returns_result`](@ref)), so the outer problem is measured out of sample.
+  - Combinatorial cross-validation. As above, then each sub-portfolio's `scorer` selects one path from its population. The default is [`NearestQuantilePrediction`](@ref).
+
+`wi` holds the inner optimisers' own weights, and a Combination Weight is **not** applied to them and must not be applied here: it acts at the combination, after the outer solve, so that an overload cannot drop it and a cross-validated run cannot disagree with a fold-less one on what it means (see [`combination_weights`](@ref)).
+
+!!! warning
+
+    A meta-optimiser calls this with its `cv` **first** and its sub-portfolio enumeration **third**. The two verbs this replaces — `predict_outer_nco_estimator_returns` and `predict_outer_st_estimator_returns` — were the same module written twice, and an overload of either is now a method of nothing. Rewrite it as a method of this verb, dispatching on the scheme rather than on the meta-optimiser's type parameters.
+
+# Arguments
+
+  - `cv`: The meta-optimiser's cross-validation scheme.
+  - `opt`: The meta-optimiser. Read for its inner optimisers and its executor.
+  - `u`: Sub-portfolio enumeration.
+  - `rd`: Returns data.
+  - `pr`: Prior Result over the whole universe.
+  - `fees`: Fees over the whole universe.
+  - `wi`: Inner weights, assets × sub-portfolios.
+  - `resi`: The sub-portfolios' own optimisation results.
+
+# Returns
+
+  - The outer problem's [`ReturnsResult`](@ref), one synthetic asset per sub-portfolio.
+
+# Related
+
+  - [`SubPortfolioUniverse`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`rebuild_returns_result`](@ref)
+  - [`sub_portfolio_predictions`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+"""
+function predict_outer_returns(::Option{<:OptimisationCrossValidation}, ::Any,
+                               u::SubPortfolioUniverse, rd::ReturnsResult,
+                               pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
+                               resi::VecOpt)
+    nb, B, iv, ivpa, nz, Z, X = prepare_outer_rd(rd, wi)
+    for (i, res) in enumerate(resi)
+        X[:, i] = calc_net_returns(res, sub_portfolio_view(u, pr, i),
+                                   sub_portfolio_view(u, fees, i))
+    end
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, nz = nz, Z = Z)
+end
+function predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
+                               u::SubPortfolioUniverse, rd::ReturnsResult,
+                               ::AbstractPriorResult, ::Option{<:Fees}, ::MatNum, ::VecOpt)
+    predictions = sub_portfolio_predictions(MultiPeriodPredictionResult, opt.opti, u, rd,
+                                            cv.cv, opt.ex)
+    return rebuild_returns_result(rd, predictions, u)
+end
+function predict_outer_returns(cv::OptimisationCrossValidation{<:CombinatorialCrossValidation},
+                               opt, u::SubPortfolioUniverse, rd::ReturnsResult,
+                               ::AbstractPriorResult, ::Option{<:Fees}, ::MatNum, ::VecOpt)
+    predictions = sub_portfolio_predictions(PopulationPredictionResult, opt.opti, u, rd,
+                                            cv.cv, opt.ex)
+    scorer = isnothing(cv.scorer) ? NearestQuantilePrediction() : cv.scorer
+    return rebuild_returns_result(rd, [scorer(prediction) for prediction in predictions], u)
 end

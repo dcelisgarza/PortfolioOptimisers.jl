@@ -403,4 +403,18 @@ end
     # And the estimators that add none say so explicitly, rather than by omission.
     @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
     @test isnothing(PO.factor_residual_config(HighOrderPriorEstimator()))
+
+    # A pooling estimator is a wrapper for this purpose. `OpinionPoolingPrior` takes every
+    # moment of its result from the refit `pe2` — the pooled `pes` contribute observation
+    # weights alone — so `pe2` is the single wrapped estimator, and the count of pooled
+    # opinions does not change that. `OpinionPoolingPrior` sits inside
+    # `HighOrderFactorPriorEstimator.pe`'s bound, so a `nothing` here left a residual block
+    # in the covariance the cokurtosis correction is defined on.
+    op1 = OpinionPoolingPrior(; pes = [EntropyPoolingPrior()], pe2 = fp)
+    op2 = OpinionPoolingPrior(; pes = [EntropyPoolingPrior(), EntropyPoolingPrior()],
+                              pe2 = FeaturePrior(; pe = fp, ze = RegressionFeatures()))
+    op3 = OpinionPoolingPrior(; pes = [EntropyPoolingPrior()])
+    @test PO.factor_residual_config(op1) === cfg
+    @test PO.factor_residual_config(op2) === cfg
+    @test isnothing(PO.factor_residual_config(op3))
 end

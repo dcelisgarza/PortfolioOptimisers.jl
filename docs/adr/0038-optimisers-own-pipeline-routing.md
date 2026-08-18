@@ -226,3 +226,120 @@ of the one quantity it was calibrated on (ADR 0050), so routing one set into *k*
 broadcast it across quantities it never bounded. The guard already refused anything that is not
 an `ArithmeticReturn`; it now says which of the two failures happened, and points the caller at
 the `ucs` field of the term the set belongs to.
+
+## Amendment (2026-08-18): a constraint family declares its Routing Target
+
+§7 above scoped the construction-time routability check to the `uncertainty` slot, and the
+*Deferred* note gave the reason: "Extending the construction-time check to constraints would
+need a per-estimator target trait, reintroducing a declaration that can drift from the
+results the estimator actually produces."
+
+That reasoning left a hole, and the 2026-08-17 architecture review found it. Two constraint
+families were **steppable but unroutable**. `ThresholdEstimator` and `RiskBudgetEstimator`
+each had a `run_step` that computed a result and wrote it to the `constraints` slot, and
+neither result shape was a case in `constraint_targets`. `pipe_required_targets` returned `()`
+for both, so `assert_routable` passed. A pipeline carrying one therefore fitted every earlier
+step and then **always** threw at injection — under `cross_val_predict`, after the first fold
+had already run. The gap ran the other way too: `CentralityConstraint` produces a
+`LinearConstraint`, which routes, but had no `run_step` and was refused as a bare step.
+
+### 1. Every constraint family that computes a value is a step, and declares where it lands
+
+`pipe_constraint_targets(ce)` gives the routing targets a family's step can write. The
+tuple's length is the contract: one target means the step needs no annotation, several mean
+the step must name one through its `PipelineStep` wrapper, none means the family computes
+nothing for the slot and is not a step.
+
+```
+WeightBoundsEstimator                  → (:wb,)
+LinearConstraintEstimator              → (:lcse,)
+ExposureConstraintEstimator            → (:lcse,)
+AbstractCentralityConstraint           → (:cte,)
+AbstractPhylogenyConstraintEstimator   → (:ple,)
+RiskBudgetEstimator                    → (:rkb,)
+ThresholdEstimator                     → (:lt, :st, :slt, :sst, :sglt, :sgst)
+AssetSetsMatrixEstimator               → (:smtx, :sgmtx)
+JuMPConstraintEstimator                → ()
+```
+
+`PIPELINE_ROUTING_TARGETS` grows to seventeen accordingly. All but `:mu_ucs`, `:sigma_ucs`
+and `:rkb` remain derived — they are `JuMPOptimiser` field names, so §3's rule places them
+with no per-optimiser declaration.
+
+### 2. The declaration cannot drift, because it is the only encoding
+
+The deferred note feared a trait that disagrees with what the estimator produces. The fix is
+that there is nothing left for it to disagree with. `run_constraint_step` resolves the target
+from `pipe_constraint_targets` and pairs it with the computed value as a `TargetedConstraint`,
+which `constraint_targets` reads straight off. The construction check reads the same
+function. One declaration, three readers, no second encoding of the same fact.
+
+Routing by result type survives only for values that arrive **without** a declaration — a
+callable step writing `:constraints`, or a precomputed result. That path gained a `RiskBudget`
+case (one field names it) and keeps refusing a bare `Threshold`, now with an error that says
+which six fields it could mean and how to declare one.
+
+### 3. `:rkb` is the one target that names a field an optimiser does not carry
+
+A risk budget belongs to the risk-budgeting *algorithm*, at `rba.rkb`, so the derived
+`hasfield` rule cannot reach it. `@pipe_route_rkb` declares it on `RiskBudgeting` and
+`RelaxedRiskBudgeting`, in the same per-concrete-type shape and for the same reason as
+`@pipe_route_sigma_ucs` (§4). Acceptance asks the algorithm the optimiser is actually
+carrying, so an optimiser whose `rba` holds a `TimeDependent` schedule declines the target.
+
+### 4. Refusing Threshold and RiskBudget at the fan-out was never the answer
+
+The review's own reading was that refusing them is *correct*, because a `Threshold` names no
+unique field. That is true of the **result** and false of the **step**. Six homes is a choice
+the user makes, not an ambiguity the library must resolve, and `PipelineStep`'s `target` field
+already existed to record exactly that kind of choice for uncertainty sets. `PIPELINE_STEP_TARGETS`
+is extended with the eight declarable constraint targets, and the check that a declared target
+belongs to the family runs at construction.
+
+### 5. Two behaviour changes worth naming
+
+**A second write to a single-valued target is now an error.** `constraint_targets` accumulates
+into `PIPELINE_ACCUMULATING_TARGETS` and refuses a second write anywhere else, where it would
+have silently replaced the first — `:wb` previously did exactly that.
+
+Membership is decided by what generation does with several estimators, and checking that rather
+than reasoning about the type aliases corrected two claims made earlier in this amendment's
+drafting. The set is `(:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx)`. `:lcse` and `:ple` hold order-free
+blocks. The other six hold a *positional* list, entry `i` belonging to scenario or group block
+`i` and paired with `scard`/`sgcarde` — so write order is block order, and a count that does
+not match is **not** a silent mis-pairing: `JuMPOptimiser` validates those lengths against each
+other when the routed value is absorbed, so it fails at injection with a `DimensionMismatch`.
+That check is what makes packing them safe.
+
+`:cte` accumulates too, but by **folding** rather than packing, and that distinction is the
+rule rather than an exception to it. What a target accepts is read off what constraint
+generation does when handed several estimators at once: for the packed targets that is one
+result per estimator, and for `cte` it is one result *total* — `centrality_constraints` over a
+vector of `CentralityConstraint`s appends every row of every estimator into a single
+`LinearConstraint`. Verified: three estimators passed together give one constraint whose rows
+are exactly the row-concatenation of the three computed separately.
+
+So `accumulate_constraint_values` carries the shape. The default packs; `Val{:cte}` merges via
+`merge_linear_constraints`. That is what makes *n* centrality steps in a pipeline agree with one
+`cte` field holding *n* estimators — without it, the two ways of writing the same mandate would
+build different models, which is precisely the failure this ADR's seam exists to prevent.
+
+`Lc_CC_VecCC` is left alone. It never needed widening: the fold produces the single
+`LinearConstraint` the field already accepts.
+
+**Refusal moves earlier for the families that already routed.** `Pipeline(steps = (LinearConstraintEstimator(…), EqualWeighted()))`
+was constructible and threw at injection; it is now refused at construction. The one case this
+newly rejects rather than merely rejecting sooner is a step whose generation returns `nothing`
+— a non-`strict` run whose names were all unknown — in front of an optimiser with no such
+field. Refusing it is consistent with the declaration: the step says it writes `:lcse`, and
+nothing there can receive it.
+
+**Verified.** test_30 87/87, test_31 50/50, test_32 94/94, test_33 117/117, test_37 66/66,
+test_38 180/180 — 594 passes over the pipeline, plus test_02 175/175 and test_18k 127/127 for
+the constraint generation the fold reuses. 896 passes, 0 failures, all cold-loaded. Two censuses in test_38 keep the
+declarations honest: every concrete constraint estimator outside the `JuMPConstraintEstimator`
+branch declares a target rather than inheriting the empty fallback, and every member of
+`PIPELINE_ACCUMULATING_TARGETS` is checked against the field that receives it, and the `:cte`
+fold is checked against the equivalence it exists for — three centrality steps in a pipeline
+against one `cte` field holding three estimators — so the set is asserted rather than
+restated.

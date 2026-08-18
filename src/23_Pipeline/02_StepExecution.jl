@@ -131,6 +131,9 @@ function run_step(ps::PipelineStep, ctx::PipelineContext)
     if isa(ps.est, AbstractUncertaintySetEstimator)
         return run_uncertainty_step(ps.est, ps.target, ctx)
     end
+    if isa(ps.est, AbstractConstraintEstimator)
+        return run_constraint_step(ps.est, ps.target, ctx)
+    end
     return run_step(ps.est, ctx)
 end
 function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext)
@@ -235,7 +238,8 @@ Two shapes constraint generation can return are absorbed rather than rejected, b
 # Arguments
 
   - `ctx`: The pipeline context.
-  - `res`: The constraint result to append, `nothing`, or a vector of either.
+  - `target`: The [routing target](@ref PIPELINE_ROUTING_TARGETS) the value must land in. The value is paired with it as a [`TargetedConstraint`](@ref) only when its own type does not already name that target (see [`implicit_constraint_target`](@ref)).
+  - `res`: The computed value to append, `nothing`, or a vector of either.
 
 # Returns
 
@@ -243,7 +247,8 @@ Two shapes constraint generation can return are absorbed rather than rejected, b
 
 # Related
 
-  - [`run_step`](@ref)
+  - [`run_constraint_step`](@ref)
+  - [`TargetedConstraint`](@ref)
   - [`PipelineContext`](@ref)
   - [`constraint_targets`](@ref)
 """
@@ -259,35 +264,133 @@ function add_constraint_result(ctx::PipelineContext,
     end
     return set_slot(ctx, :constraints, val)
 end
-function add_constraint_result(ctx::PipelineContext, ::Nothing)::PipelineContext
+function add_constraint_result(ctx::PipelineContext, target::Symbol, res)::PipelineContext
+    #! A value whose own type names the target needs no wrapper, so the slot keeps the
+    #! bare result wherever it can and a reader of the slot sees what generation returned.
+    tagged = if implicit_constraint_target(res) === target
+        res
+    else
+        TargetedConstraint(target, res)
+    end
+    return add_constraint_result(ctx, tagged)
+end
+function add_constraint_result(ctx::PipelineContext, ::Symbol, ::Nothing)::PipelineContext
     return ctx
 end
-function add_constraint_result(ctx::PipelineContext, res::AbstractVector)::PipelineContext
+function add_constraint_result(ctx::PipelineContext, target::Symbol,
+                               res::AbstractVector)::PipelineContext
     for r in res
-        ctx = add_constraint_result(ctx, r)
+        ctx = add_constraint_result(ctx, target, r)
     end
     return ctx
-end
-function run_step(ce::WeightBoundsEstimator, ctx::PipelineContext)
-    res = weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce))
-    return res, add_constraint_result(ctx, res)
-end
-function run_step(ce::LinearConstraintEstimator, ctx::PipelineContext)
-    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce))
-    return res, add_constraint_result(ctx, res)
-end
-function run_step(ce::ThresholdEstimator, ctx::PipelineContext)
-    res = threshold_constraints(ce, pipeline_asset_sets(ctx, ce))
-    return res, add_constraint_result(ctx, res)
-end
-function run_step(ce::RiskBudgetEstimator, ctx::PipelineContext)
-    res = risk_budget_constraints(ce, pipeline_asset_sets(ctx, ce))
-    return res, add_constraint_result(ctx, res)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Execute an [`ExposureConstraintEstimator`](@ref) step: re-base its rows through the loadings of the *pipeline's* prior and append the resulting asset-space [`LinearConstraint`](@ref) to the `constraints` slot.
+Compute the value a constraint step contributes to the `constraints` slot.
+
+One method per constraint family, each calling that family's constraint-generation verb. The value is paired with its [routing target](@ref PIPELINE_ROUTING_TARGETS) by [`run_constraint_step`](@ref); this method decides only *what* is computed, never where it lands.
+
+# Arguments
+
+  - `ce`: The constraint estimator.
+  - `ctx`: The pipeline context.
+
+# Returns
+
+  - The computed value, `nothing`, or a vector of either.
+
+# Related
+
+  - [`run_constraint_step`](@ref)
+  - [`pipe_constraint_targets`](@ref)
+  - [`pipeline_asset_sets`](@ref)
+"""
+function constraint_step_value(ce::WeightBoundsEstimator, ctx::PipelineContext)
+    return weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce))
+end
+function constraint_step_value(ce::LinearConstraintEstimator, ctx::PipelineContext)
+    return linear_constraints(ce, pipeline_asset_sets(ctx, ce))
+end
+function constraint_step_value(ce::ThresholdEstimator, ctx::PipelineContext)
+    return threshold_constraints(ce, pipeline_asset_sets(ctx, ce))
+end
+function constraint_step_value(ce::RiskBudgetEstimator, ctx::PipelineContext)
+    return risk_budget_constraints(ce, pipeline_asset_sets(ctx, ce))
+end
+function constraint_step_value(ce::AssetSetsMatrixEstimator, ctx::PipelineContext)
+    return asset_sets_matrix(ce, pipeline_asset_sets(ctx, ce))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the [routing target](@ref PIPELINE_ROUTING_TARGETS) a constraint step writes.
+
+The family declares its targets through [`pipe_constraint_targets`](@ref) and the step's [`PipelineStep`](@ref) wrapper supplies `target`. The three outcomes are the three tuple lengths that declaration can have — no target means the family is not a step, one means the step needs no annotation, several mean it must carry one.
+
+# Arguments
+
+  - `ce`: The constraint estimator.
+  - `target`: The step's declared target, or `nothing` when it carries no annotation.
+
+# Returns
+
+  - `target::Symbol`: The resolved routing target.
+
+# Related
+
+  - [`pipe_constraint_targets`](@ref)
+  - [`run_constraint_step`](@ref)
+"""
+function resolve_constraint_target(ce::AbstractConstraintEstimator,
+                                   target::Option{Symbol})::Symbol
+    ts = pipe_constraint_targets(ce)
+    name = Base.typename(typeof(ce)).wrapper
+    @argcheck(!isempty(ts),
+              ArgumentError("a $name computes no value for the constraints slot, so it is not a pipeline step; precompute its result and pass it to the optimiser, or wrap a callable in a PipelineStep that writes :constraints"))
+    if isnothing(target)
+        @argcheck(length(ts) == 1,
+                  ArgumentError("a $name step must declare which routing target it writes, because its result names $(length(ts)) of them; wrap it in a PipelineStep with target = one of $ts"))
+        return ts[1]
+    end
+    @argcheck(target in ts,
+              ArgumentError("the PipelineStep target of a $name step must be one of $ts, got :$target"))
+    return target
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute a constraint step and append its value, paired with its [routing target](@ref PIPELINE_ROUTING_TARGETS), to the `constraints` slot.
+
+Every constraint family that computes a value is a step, and every value it computes has a declared destination — that is the whole of the rule, and [`pipe_constraint_targets`](@ref) is where it is written down. The destination travels with the value as a [`TargetedConstraint`](@ref) rather than being re-derived from the result type at injection, so a family whose result type names no unique field (a [`Threshold`](@ref), a centrality [`LinearConstraint`](@ref), an asset-sets matrix) routes as cleanly as one whose does.
+
+# Arguments
+
+  - `ce`: The constraint estimator.
+  - `target`: The [`PipelineStep`](@ref) target, or `nothing` for an unwrapped step.
+  - `ctx`: The pipeline context.
+
+# Returns
+
+  - `(res, ctx′)`: The computed value and the updated context. `res` is the bare value, so what a fitted pipeline reports is the constraint result itself rather than the routing wrapper.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`resolve_constraint_target`](@ref)
+  - [`constraint_step_value`](@ref)
+  - [`add_constraint_result`](@ref)
+"""
+function run_constraint_step(ce::AbstractConstraintEstimator, target::Option{Symbol},
+                             ctx::PipelineContext)
+    target = resolve_constraint_target(ce, target)
+    res = constraint_step_value(ce, ctx)
+    return res, add_constraint_result(ctx, target, res)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute an [`ExposureConstraintEstimator`](@ref) step's value: re-base its rows through the loadings of the *pipeline's* prior into an asset-space [`LinearConstraint`](@ref).
 
 This is the one constraint step that reads a computed slot other than `:returns`. The basis is `ctx.prior.rr`, so a prior step must come earlier; a prior that carries no regression makes [`constraint_space_basis`](@ref) throw, which is the intended failure — see [`ExposureConstraintEstimator`](@ref).
 
@@ -299,24 +402,27 @@ This is the one constraint step that reads a computed slot other than `:returns`
 
 # Related
 
-  - [`run_step`](@ref)
+  - [`run_constraint_step`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
   - [`linear_constraints`](@ref)
   - [`pipeline_asset_sets`](@ref)
 """
-function run_step(ce::ExposureConstraintEstimator, ctx::PipelineContext)
+function constraint_step_value(ce::ExposureConstraintEstimator, ctx::PipelineContext)
     require_slot(ctx, :prior, ce)
-    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr,
-                             rd = ctx.returns)
-    return res, add_constraint_result(ctx, res)
+    return linear_constraints(ce, pipeline_asset_sets(ctx, ce); rr = ctx.prior.rr,
+                              rd = ctx.returns)
 end
-function run_step(ce::AbstractPhylogenyConstraintEstimator, ctx::PipelineContext)
+function constraint_step_value(ce::AbstractPhylogenyConstraintEstimator,
+                               ctx::PipelineContext)
     require_slot(ctx, :returns, ce)
-    res = phylogeny_constraints(ce, ctx.returns)
-    return res, add_constraint_result(ctx, res)
+    return phylogeny_constraints(ce, ctx.returns)
 end
-function run_step(ce::AbstractConstraintEstimator, ::PipelineContext)
-    return throw(ArgumentError("a $(typeof(ce)) is not supported as a bare pipeline step; precompute its result and pass it to the optimiser, or wrap a callable in a PipelineStep that writes :constraints"))
+function constraint_step_value(ce::AbstractCentralityConstraint, ctx::PipelineContext)
+    require_slot(ctx, :returns, ce)
+    return centrality_constraints(ce, ctx.returns)
+end
+function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext)
+    return run_constraint_step(ce, nothing, ctx)
 end
 pipe_reads(::PricesToReturns) = (:prices,)
 pipe_writes(::PricesToReturns) = :returns

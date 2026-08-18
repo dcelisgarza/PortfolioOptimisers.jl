@@ -3,6 +3,8 @@
 ```@docs
 PartialLinearConstraint
 LinearConstraint
+merge_partial_linear_constraints
+merge_linear_constraints
 VecLc
 Lc_VecLc
 LinearConstraintEstimator

@@ -81,12 +81,15 @@
         return out
     end
 
-    # Files that read back a key the interface itself minted and handed to them. The
-    # frontier registry stores `(bound_var_key, bound_key)` pairs built by
-    # `set_risk_upper_bound!`; the sweep loops later create the parameter and constraint
-    # under exactly those keys. They compose nothing — the key arrives already resolved —
-    # so rule 3 exempts them by FILE, with this reason, and still names no key.
-    registry_readers = ["11_MeanRisk.jl", "13_NearOptimalCentering.jl"]
+    # No file is exempt from rule 3. The frontier sweep used to be: the registry stores
+    # `(bound_var_key, bound_key)` pairs built by `set_risk_upper_bound!` and
+    # `set_return_bounds!`, and the sweep loops in `11_MeanRisk.jl` and
+    # `13_NearOptimalCentering.jl` created the parameter and constraint under exactly those
+    # keys, so both files were exempted by name. The exemption was the tell that the sweep
+    # had no interface (ADR 0062): `set_ret_frontier_parameters!`,
+    # `set_risk_frontier_parameters!` and `set_frontier_point!` are now the sweep's own seam
+    # and live in the interface, so the two optimisers reach for no key at all.
+    registry_readers = String[]
 
     construction = Regex("Symbol\\(\\s*prefix\\b")
     bare = Regex("(?:model\\[|haskey\\(\\s*model\\s*,\\s*):([A-Za-z_][A-Za-z_0-9]*)")

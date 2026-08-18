@@ -442,53 +442,13 @@ function compute_ret_lbs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResul
     end
     return ret_frontier
 end
-"""
-    set_ret_frontier_parameters!(model, ret_frontier)
-
-Register one parameter and one lower-bound constraint per swept return term.
-
-The twin of the risk side's parameter loop. Each term's bound binds on that term's **own**
-expression, so the sweep is a product across terms rather than a single ladder.
-
-# Returns
-
-  - `pitrs`: The `(keys, bounds)` product iterators over every swept term.
-
-# Related
-
-  - [`compute_ret_lbs`](@ref)
-  - [`solve_mean_risk!`](@ref)
-"""
-function set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
-    sc = get_constraint_scale(model)
-    k = get_k(model)
-    for (keys, vals) in ret_frontier
-        lb = model[keys[1]] = JuMP.@variable(model,
-                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - lb * k) >= 0)
-    end
-    itrs = [(Iterators.repeated(rtf[1][1], length(rtf[2][2])), rtf[2][2])
-            for rtf in ret_frontier]
-    return Iterators.product.(itrs...)
-end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{true}, ::Val{false}, fees::Option{<:Fees},
                           attrs::ProcessedJuMPOptimiserAttributes)
-    X = pr.X
     ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
-    pitrs = set_ret_frontier_parameters!(model, ret_frontier)
-    retcodes = sizehint!(OptimisationReturnCode[], length(pitrs[1]))
-    sols = sizehint!(JuMPOptimisationSolution[], length(pitrs[1]))
+    ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
-    for (keys, lbs) in zip(pitrs[1], pitrs[2])
-        for (key, lb) in zip(keys, lbs)
-            JuMP.set_parameter_value(model[key], lb)
-        end
-        retcode, sol = optimise_JuMP_model!(model, mr, eltype(X))
-        push!(retcodes, retcode)
-        push!(sols, sol)
-    end
-    return retcodes, sols
+    return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(ret_axis, nothing))
 end
 """
     _rebuild_risk_frontier(pr, fees, ...)
@@ -595,7 +555,7 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
               ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     r = factory(mr.r, pr, mr.opt.slv)
-    return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)
+    return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w)]
 end
 """
     unresolved_risk_frontier(model::JuMP.Model)
@@ -666,67 +626,21 @@ end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{false}, ::Val{true}, fees::Option{<:Fees},
                           attrs::ProcessedJuMPOptimiserAttributes)
-    X = pr.X
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    for (keys, vals) in risk_frontier
-        ub = model[keys[1]] = JuMP.@variable(model,
-                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
-        d = ifelse(vals[3], 1, -1)
-        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
-    end
-    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
-            for rkf in risk_frontier]
-    pitrs = Iterators.product.(itrs...)
-    retcodes = sizehint!(OptimisationReturnCode[], length(pitrs))
-    sols = sizehint!(JuMPOptimisationSolution[], length(pitrs))
+    risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
-    for (keys, ubs) in zip(pitrs[1], pitrs[2])
-        for (key, ub) in zip(keys, ubs)
-            JuMP.set_parameter_value(model[key], ub)
-        end
-        retcode, sol = optimise_JuMP_model!(model, mr, eltype(X))
-        push!(retcodes, retcode)
-        push!(sols, sol)
-    end
-    return retcodes, sols
+    return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(nothing, risk_axis))
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{true}, ::Val{true}, fees::Option{<:Fees},
                           attrs::ProcessedJuMPOptimiserAttributes)
-    X = pr.X
     ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
-    sc = get_constraint_scale(model)
-    k = get_k(model)
-    for (keys, vals) in risk_frontier
-        ub = model[keys[1]] = JuMP.@variable(model,
-                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
-        d = ifelse(vals[3], 1, -1)
-        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
-    end
-    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
-            for rkf in risk_frontier]
-    pitrs = Iterators.product.(itrs...)
-    rpitrs = set_ret_frontier_parameters!(model, ret_frontier)
-    retcodes = sizehint!(OptimisationReturnCode[], length(rpitrs[1]) * length(pitrs))
-    sols = sizehint!(JuMPOptimisationSolution[], length(rpitrs[1]) * length(pitrs))
+    risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
+    ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
-    for (rkeys, lbs) in zip(rpitrs[1], rpitrs[2])
-        for (rkey, lb) in zip(rkeys, lbs)
-            JuMP.set_parameter_value(model[rkey], lb)
-        end
-        for (keys, ubs) in zip(pitrs[1], pitrs[2])
-            for (key, ub) in zip(keys, ubs)
-                JuMP.set_parameter_value(model[key], ub)
-            end
-            retcode, sol = optimise_JuMP_model!(model, mr, eltype(X))
-            push!(retcodes, retcode)
-            push!(sols, sol)
-        end
-    end
-    return retcodes, sols
+    return frontier_sweep!(model, mr, eltype(pr.X),
+                           frontier_sweep_axes(ret_axis, risk_axis))
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)

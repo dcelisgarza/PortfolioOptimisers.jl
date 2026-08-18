@@ -782,6 +782,7 @@ function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
 end
 
 @pipe_delegates RiskBudgeting opt
+@pipe_route_rkb RiskBudgeting
 @pipe_route_sigma_ucs RiskBudgeting
 export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting, RiskBudgetingResult,
        LogRiskBudgeting, MixedIntegerRiskBudgeting

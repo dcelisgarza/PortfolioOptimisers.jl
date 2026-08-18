@@ -14,16 +14,12 @@ JuMPEntropyPooling
 NonCVaREP
 EntropyPoolingPrior
 VecEP
-prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:Any, <:Any, <:StagedEP},
-               X::MatNum, F::Option{<:MatNum} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
-prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:H0_EntropyPooling}, X::MatNum,
-      F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
-      kwargs...)
+prior(pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+      dims::Int = 1, strict::Bool = false, kwargs...)
+ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum};
+         strict::Bool = false, kwargs...)
+ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
+         F::Option{<:MatNum}; strict::Bool = false, kwargs...)
 AbstractEntropyPoolingOptimiser
 AbstractEntropyPoolingAlgorithm
 AbstractEntropyPoolingOptAlgorithm
