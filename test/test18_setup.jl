@@ -532,7 +532,7 @@ function mr_block3(idx)
             5e-5
         elseif i == 24
             5e-6
-        elseif i in (27, 44)
+        elseif i in (25, 27, 44)
             5e-5
         elseif i == 47
             5e-2

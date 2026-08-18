@@ -2,6 +2,7 @@
 
 ```@docs
 outer_optimisation_finaliser
+combination_weights
 prepare_outer_rd
 assert_fold_alignment
 fold_row_indices

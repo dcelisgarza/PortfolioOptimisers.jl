@@ -52,8 +52,6 @@
     opt = SubsetResampling(; subset_size = 1, n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
     @test isapprox(res.w, w0)
-    @test isapprox(optimise(SubsetResampling(; subset_size = 1, n_subsets = 20, pe = pr,
-                                             opt = mr, scale = ones(20)), rd).w, w0)
 
     opt = SubsetResampling(; subset_size = 19, n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
@@ -65,8 +63,6 @@
                     3.49130827153516e-7, 0.09504168533155483, 5.62731575232341e-5,
                     0.02915541034806286, 2.0091277189574918e-7, 9.176942286216526e-7,
                     0.09036630694773816, 0.04710655301037257], rtol = 1e-6)
-    @test isapprox(optimise(SubsetResampling(; subset_size = 19, n_subsets = 20, pe = pr,
-                                             opt = mr, scale = ones(20)), rd).w, res.w)
 
     mr_res = optimise(mr, rd)
     @test isapprox(res.w, mr_res.w, rtol = 0.05)
@@ -80,8 +76,6 @@
     opt = SubsetResampling(; subset_size = eps(), n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
     @test all(x -> isapprox(x, w0), res.w)
-    @test isapprox(optimise(SubsetResampling(; subset_size = eps(), n_subsets = 20, pe = pr,
-                                             opt = mr, scale = ones(20)), rd).w, res.w)
 
     opt = SubsetResampling(; subset_size = 0.95, n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
@@ -91,8 +85,6 @@
         find_tol(Matrix(df), reduce(hcat, res.w))
     end
     @test success
-    @test isapprox(optimise(SubsetResampling(; subset_size = 0.95, n_subsets = 20, pe = pr,
-                                             opt = mr, scale = ones(20)), rd).w, res.w)
 
     mr_res = optimise(mr, rd)
     success = isapprox(res.w, mr_res.w; rtol = 0.1)

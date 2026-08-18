@@ -93,13 +93,33 @@ function -- cannot host.
             required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
                                                  leaf_types(PO.AbstractAlgorithm)))))
             filter!(n -> !contains(string(n), "_test"), required)
-            uncatalogued = sort(collect(setdiff(required, catalogued)))
+            # A type the library constructs for itself is not a choice, so it is
+            # exempt by name and with a reason -- see `NOT_A_CHOICE`.
+            uncatalogued = sort(collect(setdiff(required, catalogued, keys(NOT_A_CHOICE))))
             if !isempty(uncatalogued)
                 @warn """$(length(uncatalogued)) estimator(s)/algorithm(s) are missing from the
                          Capability Catalogue. Add each to `docs/capability_catalogue.jl` under
-                         the group it belongs to:\n  $(join(uncatalogued, "\n  "))"""
+                         the group it belongs to, or list it in `NOT_A_CHOICE` with a reason
+                         (`:internal`):\n  $(join(uncatalogued, "\n  "))"""
             end
             @test isempty(uncatalogued)
+
+            # The other direction, as for `NOT_A_FEATURE`: an exemption for a type
+            # that is no longer a leaf estimator or algorithm is stale, and would
+            # silently exempt whatever later takes that name.
+            stale = sort([n for n in keys(NOT_A_CHOICE) if !(n in required)])
+            if !isempty(stale)
+                @warn "Stale `NOT_A_CHOICE` entries (no longer a leaf estimator/algorithm): $(join(stale, ", "))"
+            end
+            @test isempty(stale)
+
+            # An exempt type is still catalogued nowhere, so nothing else states
+            # that it is absent on purpose. A name in both places is a contradiction.
+            contradictory = sort([n for n in keys(NOT_A_CHOICE) if n in catalogued])
+            if !isempty(contradictory)
+                @warn "Names both catalogued and listed in `NOT_A_CHOICE`: $(join(contradictory, ", "))"
+            end
+            @test isempty(contradictory)
         end
 
         @testset "every exported function is accounted for" begin

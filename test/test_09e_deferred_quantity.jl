@@ -1619,7 +1619,5 @@ end
         end
     end
     @test isempty(undeclared)
-    # One field in the two families is unbounded, and every sibling writes
-    # `settings::RiskMeasureSettings`. A new one must be bounded or added here deliberately.
-    @test unbounded == ["RelativisticDrawdownatRisk.settings"]
+    @test isempty(unbounded)
 end

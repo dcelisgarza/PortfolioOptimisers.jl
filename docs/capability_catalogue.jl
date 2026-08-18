@@ -17,8 +17,9 @@
 # COVERAGE
 #
 # Every concrete leaf subtype of `AbstractEstimator` / `AbstractAlgorithm` must
-# appear in at least one `Cap`. Adding a new estimator therefore forces a
-# placement decision here rather than letting the page quietly fall behind.
+# appear in at least one `Cap`, or be listed in `NOT_A_CHOICE` with a reason.
+# Adding a new estimator therefore forces a placement decision here rather than
+# letting the page quietly fall behind.
 
 """
     Cap(names...; label = nothing)
@@ -146,6 +147,33 @@ const NOT_A_FEATURE = Dict{Symbol, Symbol}(
                                            :unit_scale_risk_measure => :trait,
                                            # Extension-author plumbing.
                                            :concrete_typed_array => :internal)
+
+"""
+    NOT_A_CHOICE
+
+Estimator and Algorithm leaf types that deliberately have no catalogue entry,
+each with the reason it is off the choice surface.
+
+The coverage rule is that every leaf `AbstractEstimator` / `AbstractAlgorithm`
+is catalogued, because those two families *are* what a user chooses (CONTEXT.md).
+A type the library constructs for itself is not a choice, so listing it here is
+a statement about the domain, not a hole cut in the check.
+
+Checked in both directions, like `NOT_A_FEATURE`: a name here that is no longer
+a leaf estimator or algorithm fails just as loudly as an uncatalogued one, so an
+exemption cannot outlive the type it was written for.
+
+  - `:internal` -- constructed inside the library, never by a caller. It is
+    documented on its API page like any other type; it is simply not a
+    capability a reader can reach for.
+"""
+const NOT_A_CHOICE = Dict{Symbol, Symbol}(
+                                          # Series markers a conic risk builder passes to
+                                          # `risk_series` (ADR 0059). The capability is the
+                                          # risk measure; the marker is how one builder body
+                                          # serves both twins.
+                                          :NetReturnsRiskSeries => :internal,
+                                          :DrawdownRiskSeries => :internal)
 
 """
     CATALOGUE

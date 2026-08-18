@@ -3555,12 +3555,12 @@ Validate `dims` and return the matrices with the observations along the rows.
   - [`MatNum`](@ref)
   - [`Option`](@ref)
 """
-function dims_oriented(dims::Integer, A::Option{<:MatNum})
+function dims_oriented(dims::Integer, A::Option{<:AbstractMatrix})
     assert_dims(dims)
     return isnothing(A) || isone(dims) ? A : transpose(A)
 end
-function dims_oriented(dims::Integer, A::Option{<:MatNum}, B::Option{<:MatNum},
-                       Cs::Option{<:MatNum}...)
+function dims_oriented(dims::Integer, A::Option{<:AbstractMatrix},
+                       B::Option{<:AbstractMatrix}, Cs::Option{<:AbstractMatrix}...)
     assert_dims(dims)
     return map(x -> dims_oriented(dims, x), (A, B, Cs...))
 end

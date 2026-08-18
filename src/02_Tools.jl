@@ -903,155 +903,282 @@ resolve_deferred_quantities(x, ::Any) = x
 # --- private AST helpers ----------------------------------------------------
 
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    PROP_TAG_NAMES
 
-Return `true` if `x` is a reference to the [`@fprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+The propagation tag set of [`@propagatable`](@ref), as data.
 
-Used by [`propagatable_parse_body`](@ref) to detect `@fprop`-tagged fields in a struct body.
+One entry per field tag. The recognition layer is derived from this tuple rather than
+spelled out per tag: the macro names ([`PROP_TAG_MACRO_NAMES`](@ref)), the lookup
+([`prop_tag`](@ref)), the gate ([`is_prop_tag_call`](@ref)), the peeler
+([`peel_prop_tags`](@ref)) and the parser ([`propagatable_parse_body`](@ref)) all read it.
+A new propagation channel is one row here, one branch in [`prop_tag_expr`](@ref), one entry
+in [`PROP_TAG_CHANNELS`](@ref) and one stub macro; [`check_prop_tag_macros`](@ref) refuses
+to load the module when a row lacks any of the three.
 
 # Related
 
-  - [`@fprop`](@ref)
-  - [`propagatable_parse_body`](@ref)
+  - [`PROP_TAG_MACRO_NAMES`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_tag`](@ref)
+  - [`prop_tag_expr`](@ref)
+  - [`check_prop_tag_macros`](@ref)
   - [`@propagatable`](@ref)
 """
-function is_fprop_macro(x)
-    return x == Symbol("@fprop") || (x isa GlobalRef && x.name == Symbol("@fprop"))
+const PROP_TAG_NAMES = (:fprop, :vprop, :pprop, :cprop, :wprop)
+
+"""
+    PROP_TAG_MACRO_NAMES
+
+The macro name of every tag of [`PROP_TAG_NAMES`](@ref), in the same order.
+
+Derived from the tag names, so a row of the table carries no second spelling.
+[`prop_tag`](@ref) matches a `:macrocall` head against this tuple.
+
+# Related
+
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`prop_tag`](@ref)
+"""
+const PROP_TAG_MACRO_NAMES = map(tag -> Symbol("@", tag), PROP_TAG_NAMES)
+
+"""
+    PROP_TAG_CHANNELS
+
+The propagation channels of [`@propagatable`](@ref), with their tag precedence as data.
+
+One entry per generated method. Each entry has two tuples of tags:
+
+  - `gate`: the tags that make [`@propagatable`](@ref) emit the method at all.
+  - `precedence`: the order in which a field's tags are consulted. The first tag of this
+    tuple that the field carries decides the field's transform; the rest are ignored for
+    that channel.
+
+The `factory` channel prefers `@fprop` over `@wprop`. The `prior` channel prefers `@pprop`,
+then `@cprop`, then `@wprop`, then `@fprop`, so `@pprop` wins over `@fprop` on one field
+(ADR 0012). The precedence used to live in two hand-written `if`/`elseif` chains that no
+comment linked; it is now read by [`prop_channel_pairs`](@ref) for every channel.
+
+# Related
+
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`prop_channel_pairs`](@ref)
+  - [`prop_channel_active`](@ref)
+  - [`@propagatable`](@ref)
+"""
+const PROP_TAG_CHANNELS = (factory = (gate = (:fprop, :wprop),
+                                      precedence = (:fprop, :wprop)),
+                           view = (gate = (:vprop,), precedence = (:vprop,)),
+                           prior = (gate = (:pprop, :cprop),
+                                    precedence = (:pprop, :cprop, :wprop, :fprop)))
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the tag of [`PROP_TAG_NAMES`](@ref) that `x` names, or `nothing`.
+
+`x` is the head of a `:macrocall` node. It is a bare `Symbol` in a struct body written by
+hand, and a `GlobalRef` once another macro has expanded around it, so both spellings
+resolve. A name outside [`PROP_TAG_MACRO_NAMES`](@ref) gives `nothing`, which is how the
+callers tell a tag from any other macro; no tag falls through to another tag.
+
+# Arguments
+
+  - `x`: The first argument of a `:macrocall` expression.
+
+# Returns
+
+  - `tag::Symbol`: The tag name, without the `@`.
+  - `nothing`: If `x` names no tag.
+
+# Related
+
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`is_prop_tag_call`](@ref)
+  - [`peel_prop_tags`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function prop_tag(x)
+    name = if x isa GlobalRef
+        x.name
+    elseif x isa Symbol
+        x
+    else
+        return nothing
+    end
+    for (tag, macro_name) in zip(PROP_TAG_NAMES, PROP_TAG_MACRO_NAMES)
+        if name === macro_name
+            return tag
+        end
+    end
+    return nothing
 end
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if `x` is a reference to the [`@vprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+Return `true` if `x` is a macro call to any tag of [`PROP_TAG_NAMES`](@ref).
 
-Used by [`propagatable_parse_body`](@ref) to detect `@vprop`-tagged fields in a struct body.
+Used by [`peel_prop_tags`](@ref) and [`propagatable_parse_body`](@ref) to detect tagged
+fields in a struct body.
 
-# Related
+# Arguments
 
-  - [`@vprop`](@ref)
-  - [`propagatable_parse_body`](@ref)
-  - [`@propagatable`](@ref)
-"""
-function is_vprop_macro(x)
-    return x == Symbol("@vprop") || (x isa GlobalRef && x.name == Symbol("@vprop"))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` if `x` is a reference to the [`@pprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
-
-Used by [`propagatable_parse_body`](@ref) to detect `@pprop`-tagged fields in a struct body.
+  - `x`: Any expression appearing in a struct body.
 
 # Related
 
-  - [`@pprop`](@ref)
-  - [`propagatable_parse_body`](@ref)
-  - [`@propagatable`](@ref)
-"""
-function is_pprop_macro(x)
-    return x == Symbol("@pprop") || (x isa GlobalRef && x.name == Symbol("@pprop"))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` if `x` is a reference to the [`@cprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
-
-Used by [`propagatable_parse_body`](@ref) to detect `@cprop`-tagged fields in a struct body.
-
-# Related
-
-  - [`@cprop`](@ref)
-  - [`propagatable_parse_body`](@ref)
-  - [`@propagatable`](@ref)
-"""
-function is_cprop_macro(x)
-    return x == Symbol("@cprop") || (x isa GlobalRef && x.name == Symbol("@cprop"))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` if `x` is a reference to the [`@wprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
-
-Used by [`propagatable_parse_body`](@ref) to detect `@wprop`-tagged fields in a struct body.
-
-# Related
-
-  - [`@wprop`](@ref)
-  - [`propagatable_parse_body`](@ref)
-  - [`@propagatable`](@ref)
-"""
-function is_wprop_macro(x)
-    return x == Symbol("@wprop") || (x isa GlobalRef && x.name == Symbol("@wprop"))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` if `x` is a macro call to any of [`@fprop`](@ref), [`@vprop`](@ref),
-[`@pprop`](@ref) or [`@cprop`](@ref).
-
-Used by [`propagatable_parse_body`](@ref) to detect tagged fields in a struct body.
-
-# Related
-
-  - [`@fprop`](@ref)
-  - [`@vprop`](@ref)
-  - [`@pprop`](@ref)
-  - [`@cprop`](@ref)
+  - [`prop_tag`](@ref)
+  - [`peel_prop_tags`](@ref)
   - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
 function is_prop_tag_call(x)
-    return x isa Expr &&
-           x.head == :macrocall &&
-           (is_fprop_macro(x.args[1]) ||
-            is_vprop_macro(x.args[1]) ||
-            is_pprop_macro(x.args[1]) ||
-            is_cprop_macro(x.args[1]) ||
-            is_wprop_macro(x.args[1]))
+    return x isa Expr && x.head == :macrocall && prop_tag(x.args[1]) !== nothing
 end
+
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Peel any stack of [`@fprop`](@ref)/[`@vprop`](@ref)/[`@pprop`](@ref)/[`@cprop`](@ref) tag
-macrocalls off a field expression, recording which tags were present.
+Peel any stack of tag macrocalls off a field expression, recording which tags were present.
 
 Tags may be stacked in either order (`@pprop @fprop field`), which parses as nested
-`:macrocall` nodes; this unwraps them all and returns the bare field expression.
+`:macrocall` nodes; this unwraps them all and returns the bare field expression. Each tag
+is looked up with [`prop_tag`](@ref), so an untagged macro stops the peel and no tag is
+reached by falling through the others.
+
+# Arguments
+
+  - `expr`: A field expression, with or without tag macrocalls around it.
 
 # Returns
 
-  - `is_f::Bool`: whether an [`@fprop`](@ref) tag was present.
-  - `is_v::Bool`: whether a [`@vprop`](@ref) tag was present.
-  - `is_p::Bool`: whether a [`@pprop`](@ref) tag was present.
-  - `is_c::Bool`: whether a [`@cprop`](@ref) tag was present.
-  - `is_w::Bool`: whether a [`@wprop`](@ref) tag was present.
-  - `stripped`: the field expression with all tags removed.
+  - `tags::Set{Symbol}`: The tags of [`PROP_TAG_NAMES`](@ref) that `expr` carries.
+  - `stripped`: The field expression with all tags removed.
 
 # Related
 
+  - [`prop_tag`](@ref)
+  - [`is_prop_tag_call`](@ref)
   - [`propagatable_parse_body`](@ref)
 """
 function peel_prop_tags(expr)
-    is_f = false
-    is_v = false
-    is_p = false
-    is_c = false
-    is_w = false
+    tags = Set{Symbol}()
     while is_prop_tag_call(expr)
-        if is_fprop_macro(expr.args[1])
-            is_f = true
-        elseif is_vprop_macro(expr.args[1])
-            is_v = true
-        elseif is_pprop_macro(expr.args[1])
-            is_p = true
-        elseif is_cprop_macro(expr.args[1])
-            is_c = true
-        else
-            is_w = true
-        end
+        push!(tags, prop_tag(expr.args[1]))
         expr = expr.args[end]
     end
-    return is_f, is_v, is_p, is_c, is_w, expr
+    return tags, expr
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the expression that a tag substitutes for one field, inside a generated method.
+
+This is the `name → field transform` half of the tag table: one branch per tag of
+[`PROP_TAG_NAMES`](@ref), read by [`prop_channel_pairs`](@ref) for every channel. A tag of
+the table with no branch here errors, so it cannot silently take another tag's transform.
+
+# Arguments
+
+  - `tag::Symbol`: A tag of [`PROP_TAG_NAMES`](@ref).
+  - `fname::Symbol`: The field name, needed by `@pprop` to name the prior property.
+  - `xf`: The expression that reads the field off the incoming struct.
+  - `mod::Module`: The module that defines [`@propagatable`](@ref). Every emitted name is
+    qualified against it, because the expansion is escaped into the caller.
+  - `thread`: Extra positional arguments the channel threads before `args...`.
+
+# Returns
+
+  - `expr::Expr`: The value of the field in the generated constructor call.
+
+# Related
+
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_channel_pairs`](@ref)
+  - [`check_prop_tag_macros`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function prop_tag_expr(tag::Symbol, fname::Symbol, xf, mod::Module, thread)
+    if tag === :fprop
+        return :($mod.factory_child($xf, $(thread...), args...; kwargs...))
+    elseif tag === :vprop
+        return :($mod.port_opt_view($xf, $(thread...), args...))
+    elseif tag === :pprop
+        return :($mod.sel($xf, getproperty(pr, $(QuoteNode(fname)))))
+    elseif tag === :cprop
+        return :($mod.sel($xf, $mod._ctx(args...)))
+    elseif tag === :wprop
+        return :($mod._wprop($xf, args...; kwargs...))
+    end
+    return error("@propagatable: tag `@$(tag)` has no field transform. Add a branch to " *
+                 "`prop_tag_expr`.")
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if a channel of [`PROP_TAG_CHANNELS`](@ref) must emit a method.
+
+A channel is active when at least one field carries a tag of the channel's `gate`.
+
+# Arguments
+
+  - `channel::Symbol`: A channel name of [`PROP_TAG_CHANNELS`](@ref).
+  - `tagged::AbstractDict`: Tag name to the field names that carry it, from
+    [`propagatable_parse_body`](@ref).
+
+# Related
+
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_channel_pairs`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function prop_channel_active(channel::Symbol, tagged::AbstractDict)
+    return any(tag -> !isempty(tagged[tag]), getproperty(PROP_TAG_CHANNELS, channel).gate)
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the keyword pairs of the constructor call that one channel generates.
+
+Every declared field gets one pair, in declaration order. The field's tags are consulted in
+the channel's `precedence` order; the first match gives the value through
+[`prop_tag_expr`](@ref), and a field carrying no tag of the channel is passed through
+unchanged.
+
+# Arguments
+
+  - `channel::Symbol`: A channel name of [`PROP_TAG_CHANNELS`](@ref).
+  - `tagged::AbstractDict`: Tag name to the field names that carry it.
+  - `all_fields::AbstractVector{Symbol}`: Every declared field, in declaration order.
+  - `obj::Symbol`: The struct the generated method reads the fields off.
+  - `mod::Module`: The module that defines [`@propagatable`](@ref).
+  - `thread`: Extra positional arguments the channel threads before `args...`.
+
+# Returns
+
+  - `pairs::Vector{Any}`: One `Expr(:kw, field, value)` per declared field.
+
+# Related
+
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_tag_expr`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function prop_channel_pairs(channel::Symbol, tagged::AbstractDict,
+                            all_fields::AbstractVector{Symbol}, obj::Symbol, mod::Module,
+                            thread)
+    precedence = getproperty(PROP_TAG_CHANNELS, channel).precedence
+    pairs      = Any[]
+    for fname in all_fields
+        xf  = Expr(:., obj, QuoteNode(fname))
+        idx = findfirst(tag -> fname in tagged[tag], precedence)
+        val = isnothing(idx) ? xf : prop_tag_expr(precedence[idx], fname, xf, mod, thread)
+        push!(pairs, Expr(:kw, fname, val))
+    end
+    return pairs
 end
 
 """
@@ -1215,14 +1342,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Walk a struct body, collecting [`@fprop`](@ref)-, [`@vprop`](@ref)-, [`@pprop`](@ref)- and
-[`@cprop`](@ref)-tagged field names (and all field names) and stripping the tags from the
-body.
+Walk a struct body, collecting the tagged field names (and all field names) and stripping
+the tags from the body.
 
 Handles bare tagged fields (`@fprop field`, …), stacked tags
 (`@pprop @fprop field`, in any order), and docstring-prefixed forms
 (`"doc" \\n @fprop field`). Non-field nodes (line numbers, inner constructors) are carried
-through unchanged.
+through unchanged. The tags are the rows of [`PROP_TAG_NAMES`](@ref), so a new tag needs no
+change here.
 
 # Arguments
 
@@ -1230,46 +1357,27 @@ through unchanged.
 
 # Returns
 
-  - `fprop_fields::Vector{Symbol}`: Names of [`@fprop`](@ref)-tagged fields.
-  - `vprop_fields::Vector{Symbol}`: Names of [`@vprop`](@ref)-tagged fields.
-  - `pprop_fields::Vector{Symbol}`: Names of [`@pprop`](@ref)-tagged fields.
-  - `cprop_fields::Vector{Symbol}`: Names of [`@cprop`](@ref)-tagged fields.
-  - `wprop_fields::Vector{Symbol}`: Names of [`@wprop`](@ref)-tagged fields.
+  - `tagged::Dict{Symbol, Vector{Symbol}}`: One entry per tag of [`PROP_TAG_NAMES`](@ref),
+    holding the names of the fields that carry it, in declaration order.
   - `all_fields::Vector{Symbol}`: Names of every declared field (tagged or not).
   - `new_body::Expr`: The struct body with all tags stripped.
 
 # Related
 
-  - [`is_fprop_macro`](@ref)
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`peel_prop_tags`](@ref)
   - [`is_doc_macro`](@ref)
   - [`extract_field_name`](@ref)
   - [`try_field_name`](@ref)
-  - [`@fprop`](@ref)
   - [`@propagatable`](@ref)
 """
 function propagatable_parse_body(body)
-    fprop_fields = Symbol[]
-    vprop_fields = Symbol[]
-    pprop_fields = Symbol[]
-    cprop_fields = Symbol[]
-    wprop_fields = Symbol[]
-    all_fields   = Symbol[]
-    new_args     = Any[]
-    function _record!(fname, is_f, is_v, is_p, is_c, is_w)
-        if is_f
-            push!(fprop_fields, fname)
-        end
-        if is_v
-            push!(vprop_fields, fname)
-        end
-        if is_p
-            push!(pprop_fields, fname)
-        end
-        if is_c
-            push!(cprop_fields, fname)
-        end
-        if is_w
-            push!(wprop_fields, fname)
+    tagged     = Dict{Symbol, Vector{Symbol}}(tag => Symbol[] for tag in PROP_TAG_NAMES)
+    all_fields = Symbol[]
+    new_args   = Any[]
+    function _record!(fname, tags)
+        for tag in tags
+            push!(tagged[tag], fname)
         end
         push!(all_fields, fname)
         return nothing
@@ -1278,10 +1386,9 @@ function propagatable_parse_body(body)
         if arg isa Expr && arg.head == :macrocall && is_doc_macro(arg.args[1])
             # Core.@doc "doc" (field or tagged field)
             inner = arg.args[end]
-            is_f, is_v, is_p, is_c, is_w, stripped = peel_prop_tags(inner)
-            if is_f || is_v || is_p || is_c || is_w
-                fname = extract_field_name(stripped)
-                _record!(fname, is_f, is_v, is_p, is_c, is_w)
+            tags, stripped = peel_prop_tags(inner)
+            if !isempty(tags)
+                _record!(extract_field_name(stripped), tags)
                 # Rebuild @doc node with tags stripped: replace last arg with bare field
                 push!(new_args, Expr(:macrocall, arg.args[1:(end - 1)]..., stripped))
             else
@@ -1293,10 +1400,9 @@ function propagatable_parse_body(body)
                 push!(new_args, arg)
             end
         elseif is_prop_tag_call(arg)
-            # Bare @fprop/@vprop/@pprop/@cprop/@wprop field (tags may be stacked) — no docstring
-            is_f, is_v, is_p, is_c, is_w, stripped = peel_prop_tags(arg)
-            fname = extract_field_name(stripped)
-            _record!(fname, is_f, is_v, is_p, is_c, is_w)
+            # Bare tagged field (tags may be stacked) — no docstring
+            tags, stripped = peel_prop_tags(arg)
+            _record!(extract_field_name(stripped), tags)
             push!(new_args, stripped)               # strip tags, keep field expr
         else
             # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
@@ -1307,8 +1413,7 @@ function propagatable_parse_body(body)
             push!(new_args, arg)
         end
     end
-    return fprop_fields, vprop_fields, pprop_fields, cprop_fields, wprop_fields, all_fields,
-           Expr(:block, new_args...)
+    return tagged, all_fields, Expr(:block, new_args...)
 end
 
 # ---------------------------------------------------------------------------
@@ -1398,6 +1503,50 @@ Raises an error if used outside a `@propagatable` struct body.
 """
 macro wprop(expr)
     return error("@wprop may only appear inside a @propagatable struct body")
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check that every tag of [`PROP_TAG_NAMES`](@ref) is complete.
+
+A tag row is complete when it has a stub macro, a field transform in
+[`prop_tag_expr`](@ref), and a channel of [`PROP_TAG_CHANNELS`](@ref) that names it. A row
+that lacks one of the three is a tag that parses but never propagates, which is the failure
+the table exists to stop. All the violations are collected and reported together.
+
+Runs once at the end of the module. Throws an
+[`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) listing
+every violation, so the package refuses to precompile rather than shipping a dead tag.
+
+# Related
+
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_tag_expr`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function check_prop_tag_macros()
+    violations = String[]
+    for (tag, macro_name) in zip(PROP_TAG_NAMES, PROP_TAG_MACRO_NAMES)
+        if !isdefined(@__MODULE__, macro_name)
+            push!(violations, "`:$(tag)` declares no `$(macro_name)` stub macro.")
+        end
+        if !any(tag in channel.precedence for channel in PROP_TAG_CHANNELS)
+            push!(violations, "`:$(tag)` appears in no channel of `PROP_TAG_CHANNELS`.")
+        end
+        try
+            prop_tag_expr(tag, :probe, :probe, @__MODULE__, ())
+        catch
+            push!(violations, "`:$(tag)` has no field transform in `prop_tag_expr`.")
+        end
+    end
+    if !isempty(violations)
+        throw(ArgumentError("Incomplete `PROP_TAG_NAMES` rows:\n" *
+                            join("  - " .* violations, "\n")))
+    end
+    return nothing
 end
 
 # ---------------------------------------------------------------------------
@@ -1562,6 +1711,11 @@ A mistyped field name therefore fails at precompilation with a
 [`suggest_declared_key`](@ref) suggestion, rather than surfacing as a `MethodError` at the
 first [`factory`](@ref) call. [`forward_prior`](@ref) leans on the same contract (ADR 0046).
 
+The tag set itself is data. [`PROP_TAG_NAMES`](@ref) holds the rows,
+[`prop_tag_expr`](@ref) holds each tag's field transform, and [`PROP_TAG_CHANNELS`](@ref)
+holds each channel's gate and tag precedence, so a new propagation channel is a table row
+rather than an edit at seven sites (ADR 0061).
+
 Composes with `@concrete` (put `@propagatable` outermost):
 
 ```julia
@@ -1591,49 +1745,39 @@ macro propagatable(expr)
     body        = struct_node.args[3]
     struct_name = propagatable_bare_name(type_head)
 
-    fprop_fields, vprop_fields, pprop_fields, cprop_fields, wprop_fields, all_fields, new_body = propagatable_parse_body(body)
+    tagged, all_fields, new_body = propagatable_parse_body(body)
 
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
 
-    # Every name below is qualified against the module that *defines* the macro, because the
-    # emitted block is escaped and a bare name resolves where the struct is declared. `factory`
-    # is exported, which does not help: `using PortfolioOptimisers` binds it implicitly, so
-    # `function factory(...)` in the caller declares a **new** function of the caller's own and
-    # `PortfolioOptimisers.factory` never gains the method. That failure is silent -- the
-    # declaration compiles, the contract registers, and the type simply never joins the
-    # propagation chain. `@__MODULE__` in a macro body is the defining module, and interpolating
-    # the module object needs no binding in the caller at all (ADR 0002, decision 4).
+    # Every name the expansion emits is qualified against the module that *defines* the
+    # macro, because the emitted block is escaped and a bare name resolves where the struct
+    # is declared. `factory` is exported, which does not help: `using PortfolioOptimisers`
+    # binds it implicitly, so `function factory(...)` in the caller declares a **new**
+    # function of the caller's own, and `PortfolioOptimisers.factory` never gains the
+    # method. That failure is silent -- the declaration compiles, the contract registers,
+    # and the type simply never joins the propagation chain. `@__MODULE__` in a macro body
+    # is the defining module, and interpolating the module object needs no binding in the
+    # caller at all (ADR 0002, decision 4). `prop_tag_expr` qualifies the names it emits the
+    # same way.
     POMOD = @__MODULE__
     _factory = :($POMOD.factory)
-    _factory_child = :($POMOD.factory_child)
     _port_opt_view = :($POMOD.port_opt_view)
-    _wprop_fn = :($POMOD._wprop)
-    _sel_fn = :($POMOD.sel)
-    _ctx_fn = :($POMOD._ctx)
     _resolve_fn = :($POMOD.resolve_deferred_quantities)
     _prior_result = :($POMOD.AbstractPriorResult)
     _register_fn = :($POMOD.propagatable_register!)
 
-    # --- factory propagation (@fprop recurses sub-estimators, @wprop replaces weights) ---
-    if isempty(fprop_fields) && isempty(wprop_fields)
-        factory_body = :x
-    else
-        factory_pairs = Any[]
-        for f in all_fields
-            xf = Expr(:., :x, QuoteNode(f))
-            if f in fprop_fields
-                push!(factory_pairs,
-                      Expr(:kw, f, :($_factory_child($xf, args...; kwargs...))))
-            elseif f in wprop_fields
-                push!(factory_pairs, Expr(:kw, f, :($_wprop_fn($xf, args...; kwargs...))))
-            else
-                push!(factory_pairs, Expr(:kw, f, xf))
-            end
-        end
-        factory_body = Expr(:call, struct_name, Expr(:parameters, factory_pairs...))
-    end
+    # Every channel below reads its tag precedence off `PROP_TAG_CHANNELS`. The emission
+    # differs only in the method head and in the arguments the channel threads.
 
+    # --- factory propagation (@fprop recurses sub-estimators, @wprop replaces weights) ---
+    factory_body = if prop_channel_active(:factory, tagged)
+        Expr(:call, struct_name,
+             Expr(:parameters,
+                  prop_channel_pairs(:factory, tagged, all_fields, :x, POMOD, ())...))
+    else
+        :x
+    end
     factory_def = quote
         function $_factory(x::$struct_name, args...; kwargs...)
             return $factory_body
@@ -1643,14 +1787,11 @@ macro propagatable(expr)
     defs = Any[factory_def]
 
     # --- view propagation (@vprop) — emit only when a field opts in ---
-    if !isempty(vprop_fields)
-        vpass = [f for f in all_fields if !(f in vprop_fields)]
-        view_prop_pairs = [Expr(:kw, f,
-                                :($_port_opt_view($(Expr(:., :x, QuoteNode(f))), i,
-                                                  args...))) for f in vprop_fields]
-        view_pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f))) for f in vpass]
+    if prop_channel_active(:view, tagged)
         view_body = Expr(:call, struct_name,
-                         Expr(:parameters, view_prop_pairs..., view_pass_pairs...))
+                         Expr(:parameters,
+                              prop_channel_pairs(:view, tagged, all_fields, :x, POMOD,
+                                                 (:i,))...))
         view_def = quote
             function $_port_opt_view(x::$struct_name, i, args...)
                 return $view_body
@@ -1660,26 +1801,12 @@ macro propagatable(expr)
     end
 
     # --- prior/context selection (@pprop / @cprop) — emit only when a field opts in ---
-    if !isempty(pprop_fields) || !isempty(cprop_fields)
-        sel_pairs = Any[]
-        for f in all_fields
-            # Read every field off the Deferred-Quantity-resolved struct, not the argument.
-            xf = Expr(:., :xr, QuoteNode(f))
-            if f in pprop_fields            # @pprop wins over @fprop in the prior method
-                push!(sel_pairs,
-                      Expr(:kw, f, :($_sel_fn($xf, getproperty(pr, $(QuoteNode(f)))))))
-            elseif f in cprop_fields
-                push!(sel_pairs, Expr(:kw, f, :($_sel_fn($xf, $_ctx_fn(args...)))))
-            elseif f in wprop_fields
-                push!(sel_pairs, Expr(:kw, f, :($_wprop_fn($xf, args...; kwargs...))))
-            elseif f in fprop_fields
-                push!(sel_pairs,
-                      Expr(:kw, f, :($_factory_child($xf, pr, args...; kwargs...))))
-            else
-                push!(sel_pairs, Expr(:kw, f, xf))
-            end
-        end
-        prior_body = Expr(:call, struct_name, Expr(:parameters, sel_pairs...))
+    if prop_channel_active(:prior, tagged)
+        # Every field is read off the Deferred-Quantity-resolved struct, not the argument.
+        prior_body = Expr(:call, struct_name,
+                          Expr(:parameters,
+                               prop_channel_pairs(:prior, tagged, all_fields, :xr, POMOD,
+                                                  (:pr,))...))
         prior_def = quote
             function $_factory(x::$struct_name, pr::$_prior_result, args...; kwargs...)
                 xr = $_resolve_fn(x, pr)
@@ -1689,7 +1816,7 @@ macro propagatable(expr)
         push!(defs, prior_def)
     end
 
-    pprop_tuple = Expr(:tuple, QuoteNode.(pprop_fields)...)
+    pprop_tuple = Expr(:tuple, QuoteNode.(tagged[:pprop])...)
 
     return esc(quote
                    Base.@__doc__ $chain

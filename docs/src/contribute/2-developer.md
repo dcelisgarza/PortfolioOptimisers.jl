@@ -146,6 +146,7 @@ The [capability catalogue](@ref capability-catalogue) is the user-facing invento
 - Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
 - Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
 - A function that is not a user-facing capability goes in `NOT_A_FEATURE` with a reason (`:alias`, `:base_overload`, `:trait`, `:internal`) instead. Removing an export means removing its entry there too; the check runs in both directions.
+- A type the library constructs for itself, and no caller ever writes, goes in `NOT_A_CHOICE` with a reason (`:internal`) instead. It keeps its docstring and its API page; it is simply not a choice. Like `NOT_A_FEATURE`, this list is checked in both directions, so an exemption cannot outlive its type.
 
 Because descriptions come from docstrings, a type's **first sentence** has to stand alone in a bullet list. See the summary-sentence rules in `.github/instructions/julia-docstrings.instructions.md`.
 

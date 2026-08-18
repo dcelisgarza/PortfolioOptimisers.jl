@@ -257,6 +257,9 @@ For the same types arranged by subtyping rather than by capability, see the
 
 Refuse to render a catalogue that is missing an estimator or algorithm.
 
+A type listed in `NOT_A_CHOICE` is exempt: the library constructs it for itself,
+so it is not a capability a reader can reach for.
+
 `test/test_26_docs.jl` is the authoritative check and fires far sooner, on the
 PR that added the type. This one exists because the generator's failure mode is
 worse than a red test: a page that quietly omits a capability *looks* complete,
@@ -288,11 +291,13 @@ function assert_complete()
 
     required = Set(nameof.(collect(union(leaf_types(PortfolioOptimisers.AbstractEstimator),
                                          leaf_types(PortfolioOptimisers.AbstractAlgorithm)))))
+    setdiff!(required, keys(NOT_A_CHOICE))
     missed = sort(collect(setdiff(required, catalogued)))
     if !isempty(missed)
         error("""capability_catalogue: $(length(missed)) estimator(s)/algorithm(s) are not
                  catalogued, so the page would be rendered incomplete. Add each to
-                 `docs/capability_catalogue.jl`:\n  $(join(missed, "\n  "))""")
+                 `docs/capability_catalogue.jl`, or list it in `NOT_A_CHOICE` with a
+                 reason:\n  $(join(missed, "\n  "))""")
     end
     return nothing
 end

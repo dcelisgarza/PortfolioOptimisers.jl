@@ -151,3 +151,24 @@ the check would need a ~200-name denylist — the drifting list again, relocated
 Ranging over concrete leaf Estimators and Algorithms instead gives a boundary
 derived from the domain model in `CONTEXT.md`, which a contributor can apply
 without consulting a list.
+
+## Amendment (2026-08-18)
+
+Decision 4 ranged the type check over every concrete leaf `AbstractEstimator` or
+`AbstractAlgorithm` with no exemption, because at the time every such leaf was a
+choice a user makes. ADR 0059 broke that: `NetReturnsRiskSeries` and
+`DrawdownRiskSeries` are `AbstractAlgorithm` leaves, but they are markers a conic
+risk builder passes to `risk_series`. The library constructs them for itself, and
+a caller never writes one.
+
+The check now subtracts `NOT_A_CHOICE`, a second dictionary in
+`docs/capability_catalogue.jl` mapping such a type to its reason (`:internal`).
+It obeys the same rules as `NOT_A_FEATURE`: an entry carries a reason, and it is
+checked in **both** directions, so an exemption for a type that is no longer a
+leaf estimator or algorithm fails. A third check refuses a name that is both
+catalogued and exempt, because the two statements contradict each other.
+`assert_complete` in the generator subtracts the same set, so the docs build does
+not fail on a type the page omits on purpose.
+
+The exemption is about the *page*, not about visibility. An exempt type keeps its
+docstring and its API-page entry, and `Base.undocumented_names` still covers it.

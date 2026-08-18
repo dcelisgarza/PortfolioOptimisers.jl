@@ -116,3 +116,73 @@ end
     allmsgs = PO.propagatable_contract_violations(m.KwMismatch, (:sgima, :muu), pool)
     @test length(allmsgs) == 3
 end
+@testset "propagation tag table" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    # The shipped guarantee: every row of the tag table has a stub macro, a field transform
+    # and a channel, so a tag cannot parse and then never propagate (ADR 0061).
+    @test isnothing(PO.check_prop_tag_macros())
+    @test PO.PROP_TAG_MACRO_NAMES == map(tag -> Symbol("@", tag), PO.PROP_TAG_NAMES)
+    # A tag is looked up in the table, in both spellings a `:macrocall` head takes: a bare
+    # `Symbol` in a hand-written struct body, and a `GlobalRef` once another macro expanded
+    # around it.
+    for tag in PO.PROP_TAG_NAMES
+        @test PO.prop_tag(Symbol("@", tag)) === tag
+        @test PO.prop_tag(GlobalRef(PO, Symbol("@", tag))) === tag
+        @test PO.is_prop_tag_call(Expr(:macrocall, Symbol("@", tag), nothing, :a))
+    end
+    # A macro outside the table is not a tag. It used to fall through to `@wprop`, which
+    # substituted observation weights into the field with no diagnostic.
+    @test isnothing(PO.prop_tag(Symbol("@sixth")))
+    @test isnothing(PO.prop_tag(:a))
+    @test isnothing(PO.prop_tag(1))
+    @test !PO.is_prop_tag_call(Expr(:macrocall, Symbol("@sixth"), nothing, :a))
+    sixth = Expr(:macrocall, Symbol("@sixth"), nothing, :a)
+    @test PO.peel_prop_tags(sixth) == (Set{Symbol}(), sixth)
+    # Stacked tags peel in either order, and the whole stack is recorded.
+    stacked = Expr(:macrocall, Symbol("@pprop"), nothing,
+                   Expr(:macrocall, Symbol("@wprop"), nothing, :(w::T1)))
+    @test PO.peel_prop_tags(stacked) == (Set([:pprop, :wprop]), :(w::T1))
+    # The parser answers one entry per table row, and every declared field.
+    tagged, all_fields, new_body = PO.propagatable_parse_body(quote
+                                                                  @fprop @vprop a
+                                                                  @pprop @wprop w
+                                                                  @cprop slv
+                                                                  plain
+                                                              end)
+    @test issetequal(keys(tagged), PO.PROP_TAG_NAMES)
+    @test tagged[:fprop] == [:a]
+    @test tagged[:vprop] == [:a]
+    @test tagged[:pprop] == [:w]
+    @test tagged[:wprop] == [:w]
+    @test tagged[:cprop] == [:slv]
+    @test all_fields == [:a, :w, :slv, :plain]
+    @test !any(PO.is_prop_tag_call, new_body.args)
+    # The gate decides whether a channel emits a method at all.
+    @test PO.prop_channel_active(:factory, tagged)
+    @test PO.prop_channel_active(:view, tagged)
+    @test PO.prop_channel_active(:prior, tagged)
+    untagged = Dict{Symbol, Vector{Symbol}}(tag => Symbol[] for tag in PO.PROP_TAG_NAMES)
+    @test !PO.prop_channel_active(:factory, untagged)
+    @test !PO.prop_channel_active(:view, untagged)
+    @test !PO.prop_channel_active(:prior, untagged)
+    # `@wprop` alone opens the factory channel and neither of the others.
+    wonly = merge(untagged, Dict(:wprop => [:w]))
+    @test PO.prop_channel_active(:factory, wonly)
+    @test !PO.prop_channel_active(:view, wonly)
+    @test !PO.prop_channel_active(:prior, wonly)
+    # The precedence is data, and the prior channel puts `@pprop` above `@fprop` (ADR 0012).
+    pairs = PO.prop_channel_pairs(:prior, tagged, all_fields, :xr, PO, (:pr,))
+    @test [p.args[1] for p in pairs] == all_fields
+    @test pairs[2].args[2] == :($(PO).sel(xr.w, getproperty(pr, :w)))
+    @test pairs[3].args[2] == :($(PO).sel(xr.slv, $(PO)._ctx(args...)))
+    @test pairs[4].args[2] == :(xr.plain)
+    both = merge(untagged, Dict(:pprop => [:a], :fprop => [:a]))
+    prior_pair = only(PO.prop_channel_pairs(:prior, both, [:a], :xr, PO, (:pr,)))
+    @test prior_pair.args[2] == :($(PO).sel(xr.a, getproperty(pr, :a)))
+    # The factory channel does not know `@pprop`, so the same field recurses there instead.
+    factory_pair = only(PO.prop_channel_pairs(:factory, both, [:a], :x, PO, ()))
+    @test factory_pair.args[2] == :($(PO).factory_child(x.a, args...; kwargs...))
+    # A table row with no field transform errors rather than taking another tag's transform.
+    @test_throws ErrorException PO.prop_tag_expr(:sixth, :a, :(x.a), PO, ())
+end

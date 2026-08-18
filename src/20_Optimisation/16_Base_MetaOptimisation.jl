@@ -59,6 +59,64 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end
 """
+    combination_weights(scale::Nothing, w::VecNum_VecVecNum)
+    combination_weights(scale::VecNum, w::VecNum)
+    combination_weights(scale::VecNum, w::VecVecNum)
+
+Apply a Combination Weight to a meta-optimiser's outer weights.
+
+The outer optimiser decides how much of each sub-portfolio to hold. A Combination Weight is a *fixed* belief about the same quantity, so the two multiply: sub-portfolio `k` carries the coefficient `sₖ·vₖ`, and the coefficients are rescaled to the total the outer optimiser chose. Schur Complement Hierarchical Risk Parity blends its parameter bundles the same way; this is that shape, placed where a meta-optimiser that owns an *outer optimiser* can use it.
+
+## What the rescale buys
+
+Only the ratios between the entries of a Combination Weight carry meaning (ADR 0053), and the rescale is what makes that true here — a common factor cancels, so the weight needs no normalised form of its own. Three cases are then exactly inert:
+
+  - A **uniform** weight gives back `w`, whatever it sums to.
+  - A **lone** sub-portfolio gives back `w`. One element is not a combination, which is ADR 0053's rule.
+  - An outer optimiser that chose a total other than one keeps it. Rescaling to one instead would silently overrule a `bgt` of `0.9`.
+
+## Why the outer problem never sees the weight
+
+Scaling the synthetic return columns instead would break the weight on two counts:
+
+  - A uniform weight would stop being neutral. A common rescale of every column moves [`MaximumUtility`](@ref)'s trade-off between return and risk, so the neutral setting would not be neutral.
+  - Every [`predict_outer_st_estimator_returns`](@ref) overload would have to re-apply it. A custom one would drop it silently, and the two cross-validation methods already did — so a cross-validated run would disagree with a fold-less one on what the weight means. `cv` is execution control and stays that way.
+
+## Degenerate combinations
+
+The rescale factor is `sum(w) / sum(scale .* w)`, and it does not always exist. A zero denominator — a tilt that cancels a long-short outer allocation — makes it infinite or `NaN`; a zero numerator — a dollar-neutral outer allocation — makes it zero, which would collapse the portfolio. One test covers all three, and the tilted coefficients then stand unrescaled: finite, with their ratios intact. No scalar rescale can hold a zero total while tilting, so there is nothing better to return.
+
+A denominator that is merely *near* zero is not degenerate. The large factor is the answer: the tilt genuinely rebalances a combination that nearly cancels. Should it overflow, [`finalise_weight_bounds`](@ref) reports an [`OptimisationFailure`](@ref) rather than a plausible-looking portfolio.
+
+# Arguments
+
+  - `scale`: Combination Weight, one entry per sub-portfolio, or `nothing`.
+  - `w`: Outer optimiser weights, one entry per sub-portfolio; a vector of them on an efficient frontier.
+
+# Returns
+
+  - `w` unchanged when `scale` is `nothing`, otherwise the rescaled coefficients.
+
+# Related
+
+  - [`outer_optimisation_finaliser`](@ref)
+  - [`Stacking`](@ref)
+"""
+function combination_weights(::Nothing, w::VecNum_VecVecNum)
+    return w
+end
+function combination_weights(scale::VecNum, w::VecNum)
+    c = scale .* w
+    f = sum(w) / sum(c)
+    # A zero, infinite or NaN factor is every way the rescale can fail to exist: a
+    # zero-total combination, a zero-total outer allocation, and the `0/0` of both at
+    # once. The tilt stands unrescaled in each, which is finite and keeps its ratios.
+    return iszero(f) || !isfinite(f) ? c : c * f
+end
+function combination_weights(scale::VecNum, w::VecVecNum)
+    return [combination_weights(scale, wi) for wi in w]
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Prepares the ReturnsResult for outer optimisation, applying the inner cluster weights `wi` to the returns matrix `rd.B`, and adjusting the independent variable matrices `rd.iv` and `rd.ivpa`, and the feature matrix `rd.Z`, accordingly.

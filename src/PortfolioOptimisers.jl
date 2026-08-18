@@ -259,4 +259,8 @@ include("25_Aliases.jl")
 # constructor, so the contract behind the generated `factory`/`port_opt_view` methods is
 # checked at the declaration instead of at the first call. Runs at precompile time only.
 check_propagatable_contracts()
+# The propagation tag set is data. A row of `PROP_TAG_NAMES` that lacks a stub macro, a
+# field transform, or a channel is a tag that parses and never propagates, so it is refused
+# here rather than at the first `factory` call. Runs at precompile time only.
+check_prop_tag_macros()
 end
