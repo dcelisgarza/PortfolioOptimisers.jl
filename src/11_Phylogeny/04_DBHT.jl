@@ -111,6 +111,11 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
   - No entry in `W` is `NaN`.
   - All entries in `W` are non-negative.
 
+An entry that is exactly zero passes all three and still costs the graph an edge, because `A` carries
+the structure in its sparsity pattern and this function declines no edge on the way in. That is
+[`assert_pmfg_weights`](@ref)'s check, and it runs in the callers that consume the weighted structure
+rather than here, because [`logo!`](@ref) reads only the cliques and is unaffected by a zero.
+
 # The checks are a backstop, not the enforcement
 
 Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or at the seam, with a message that names the configuration rather than `W`.
@@ -242,6 +247,51 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     end
 
     return A, tri, clique3, cliques, cliqueTree
+end
+"""
+    assert_pmfg_weights(A::MatNum)
+
+Check that the weights did not delete an edge from the graph [`PMFG_T2s`](@ref) built.
+
+A maximal planar graph on `N >= 3` vertices has exactly `3N - 6` edges, and [`PMFG_T2s`](@ref) returns the structure and the weights in one matrix, `A = W ⊙ ((A + A') .== 1)`. An **exactly zero** weight is therefore an *absent* edge rather than a weak one, and what reaches the consumer is no longer a PMFG. This function counts the stored edges and refuses the difference.
+
+# The zero is admissible input and an unusable structure
+
+[`PMFG_T2s`](@ref)'s own check is `>= 0` and stays that way, because a zero is an honest similarity. [`ExponentialSimilarity`](@ref) maps the infinite distance [`LogDistance`](@ref) returns at an exactly zero correlation to `exp(-Inf)`, which is `0` exactly, and [`ComplementSimilarity`](@ref) maps `D = 1` to `0`. The value is right. What it cannot do is carry an edge.
+
+Without this check the failure is a `BoundsError` about a matrix index, raised much later inside [`turn_into_Hclust_merges`](@ref), because [`HierarchyConstruct4s`](@ref) then builds fewer merges than the dendrogram needs.
+
+# Where it runs, and where it deliberately does not
+
+At the three sites that consume the **weighted** structure: [`DBHTs`](@ref), [`calc_weighted_adjacency_graph`](@ref) and [`calc_distance_weighted_graph`](@ref).
+
+[`logo!`](@ref) is the fourth [`PMFG_T2s`](@ref) caller and is **not** guarded. It reads separators and cliques, which [`PMFG_T2s`](@ref) derives from the insertion order rather than from `A`, so a zero weight does not change its answer and refusing it would refuse a configuration that works.
+
+# Arguments
+
+  - `A`: `N × N` weighted adjacency matrix, the first output of [`PMFG_T2s`](@ref).
+
+# Validation
+
+  - The number of stored edges is `3N - 6`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PMFG_T2s`](@ref)
+  - [`DBHTs`](@ref)
+  - [`assert_similarity_domain`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
+"""
+function assert_pmfg_weights(A::MatNum)
+    N = size(A, 1)
+    edges = count(!iszero, A) ÷ 2
+    @argcheck(edges == 3 * N - 6,
+              DomainError("count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold. Got\nedges => $edges\n3 * N - 6 => $(3 * N - 6)\nAn exactly zero weight is an absent edge rather than a weak one, so $(3 * N - 6 - edges) of the PMFG's edges are missing and the structure is not a PMFG. Use a similarity that is strictly positive on this path."))
+    return nothing
 end
 """
     distance_wei(L::MatNum)
@@ -1447,6 +1497,7 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
     @argcheck(!isempty(D), IsEmptyError)
     @argcheck(size(S) == size(D), DimensionMismatch)
     Rpm = PMFG_T2s(S)[1]
+    assert_pmfg_weights(Rpm)
     Apm = copy(Rpm)
     Apm[Apm .!= 0] = D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]

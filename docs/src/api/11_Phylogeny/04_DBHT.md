@@ -11,6 +11,7 @@ clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any},
 DBHTRootMethod
 InverseMatrixSparsificationAlgorithm
 PMFG_T2s
+assert_pmfg_weights
 distance_wei
 clique3
 breadth

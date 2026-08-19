@@ -1697,7 +1697,7 @@ The two-argument form exists for a caller that already holds that matrix. [`clus
 # The weights
 
   - Tree branch: strictly positive, and finite or `Inf`. [`graph_weight_matrix`](@ref) moves every zero distance off the value the representation reserves for *absent*, and rejects a negative or a `NaN`. `Inf` is legal — it is the honest [`LogDistance`](@ref) between two uncorrelated assets.
-  - PMFG branch: non-negative and finite. [`PMFG_T2s`](@ref) checks its input for non-negativity, and declines an edge whose gain is zero, so no stored zero reaches the graph.
+  - PMFG branch: strictly positive and finite. [`PMFG_T2s`](@ref) checks its input for non-negativity, and it inserts every remaining vertex whatever the gain, so it declines no edge. A zero weight would therefore be stored as an *absent* edge and silently shrink the structure, which is why [`assert_pmfg_weights`](@ref) refuses one here.
 
 # Arguments
 
@@ -1729,7 +1729,9 @@ function calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
 end
 function calc_weighted_adjacency_graph(::AbstractNonNegativeSimilarityMatrixAlgorithm,
                                        S::MatNum)
-    return SimpleWeightedGraphs.SimpleWeightedGraph(PMFG_T2s(S)[1])
+    A = PMFG_T2s(S)[1]
+    assert_pmfg_weights(A)
+    return SimpleWeightedGraphs.SimpleWeightedGraph(A)
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                              <:AbstractTreeType}, X::MatNum;
@@ -1874,7 +1876,9 @@ function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
     # repair is `calc_weighted_adjacency_graph`'s tree-branch one, needed here for the same
     # reason -- a zero distance is the value the representation reserves for *absent*.
     W = graph_weight_matrix(D)
-    r, c, _ = SparseArrays.findnz(PMFG_T2s(S)[1])
+    A = PMFG_T2s(S)[1]
+    assert_pmfg_weights(A)
+    r, c, _ = SparseArrays.findnz(A)
     v = [W[i, j] for (i, j) in zip(r, c)]
     return SimpleWeightedGraphs.SimpleWeightedGraph(SparseArrays.sparse(r, c, v,
                                                                         size(W)...))

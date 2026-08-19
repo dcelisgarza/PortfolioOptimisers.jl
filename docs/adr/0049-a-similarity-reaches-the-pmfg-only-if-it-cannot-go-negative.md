@@ -71,6 +71,14 @@ failures are **silent**: the caller gets wrong clusters and no error.
 - **`BubbleCluster8s` (`04_DBHT.jl:1022-1024`) is safe.** `all_cont = 3 * (size - 2)` is an edge
   **count**, so the ratio is a mean and stays comparable across bubble sizes.
 
+Neither unsafe aggregation can see a negative in the shipped library, and that is worth stating
+plainly. `DBHTs` is the only caller of the bubble machinery, its `Rpm` is `PMFG_T2s(S)[1]`, and
+`PMFG_T2s` refuses a negative and a `NaN` before it returns. So `PMFG_T2s`'s own check is what makes
+the aggregations safe, and the type bound with `assert_similarity_domain` buys the **message**. That
+is the same division of labour as *Open by declaration, not by proof* below, seen from the other end.
+`BubbleMember` does fail on zeros alone — an all-zero bubble makes `0/0`, and `argmax` selects the
+`NaN` — which is one more reason the zero is refused in the next section.
+
 The type bound binds **all four** `PMFG_T2s` callers, which is wider than that provenance.
 `calc_adjacency` binarises the graph, `clusterise` takes matrix powers of it, and `logo!` reads
 separators and cliques — structure only. None of them reaches the bubble machinery.
@@ -85,11 +93,39 @@ its own destination.
 A future reader who finds only the type bound will reasonably conclude that a PMFG needs
 non-negative weights. It does not. That is why this section exists.
 
-### Non-negative, not positive
+### Non-negative reaches the check, positive reaches the graph
 
 `exp(-Inf)` is `0` exactly, and that route is live: `LogDistance` maps an exactly zero correlation
-to an infinite distance. A zero similarity is admissible. `PMFG_T2s`'s check is `>= 0`, and the
-interface's name and docstring say **non-negative** for the same reason.
+to an infinite distance. A zero similarity is an admissible **value**, so `PMFG_T2s`'s input check
+stays `>= 0` and the interface keeps the name **non-negative**.
+
+It is not an admissible **edge weight**. `PMFG_T2s` returns the structure and the weights in one
+matrix — `A = W ⊙ ((A + A') .== 1)` — so a zero weight is an *absent* edge rather than a weak one.
+Nothing upstream declines it either: every remaining vertex is inserted whatever the gain, so the
+algorithm selects an edge and then the weight deletes it. A maximal planar graph on `N` vertices has
+`3N - 6` edges, and each zero on a selected edge silently removes one.
+
+Measured on 12 assets built from a Hadamard matrix, so that many sample correlations are exactly
+zero: `LogDistance` with `ExponentialSimilarity` leaves **21 of the 30** edges, and the run then dies
+inside `turn_into_Hclust_merges` with a `BoundsError` about a matrix index, because
+`HierarchyConstruct4s` builds fewer merges than the dendrogram needs. The zero is the cause and the
+infinity is not: replacing the infinite distances with `20.0` still crashes, and replacing the zero
+similarities with `exp(-20)` runs clean.
+
+`assert_pmfg_weights` counts the stored edges and refuses the shortfall. It runs at the three sites
+that consume the **weighted** structure — `DBHTs`, `calc_weighted_adjacency_graph` and
+`calc_distance_weighted_graph`. `logo!` is the fourth `PMFG_T2s` caller and is deliberately **not**
+guarded: it reads separators and cliques, which `PMFG_T2s` derives from the insertion order rather
+than from `A`, so a zero weight does not shrink them and refusing it would refuse a configuration
+that works.
+
+**This is breaking, a fourth time, and the configuration it breaks was returning an empty network.**
+`NetworkEstimator(; ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise())),
+de = Distance(; alg = LogDistance()), alg = ExponentialSimilarity())` on noise denoises to the
+identity correlation, so every off-diagonal similarity is exactly zero and the PMFG came back with
+**0 of its 54** edges. That empty structure was returned as an answer, and `test_13_phylogeny.jl`
+asserted it. It is now a `DomainError` naming the missing edges. The old behaviour was the silent
+wrong answer this ADR exists to remove, one level lower down.
 
 ### The guarantee is per member, so it carries a domain
 
@@ -228,10 +264,15 @@ membership and does not keep it.
 
 ## Consequences
 
-**Breaking, three times.** `NetworkEstimator(; alg = AngularSimilarity())`, `DBHT(; sim = ...)` and
-`LoGo(; sim = ...)` now fail at construction. `@concrete`'s bounded-field syntax `alg <: Tree_SimMat`
-puts the bound on the generated type parameter, so **every** construction route refuses — the
-positional constructor is a `MethodError`, not only the keyword one.
+**Breaking, three times at construction.** `NetworkEstimator(; alg = AngularSimilarity())`,
+`DBHT(; sim = ...)` and `LoGo(; sim = ...)` now fail at construction. `@concrete`'s bounded-field
+syntax `alg <: Tree_SimMat` puts the bound on the generated type parameter, so **every** construction
+route refuses. The keyword route raises a `TypeError` naming the bound and the positional route a
+`MethodError`; neither is reachable.
+
+**Breaking a fourth time, at run time.** `assert_pmfg_weights` refuses an exactly zero edge weight,
+which takes one configuration that returned an empty network into a `DomainError`. *Non-negative
+reaches the check, positive reaches the graph* above carries the measurement and the reason.
 
 **One inverse-claiming member stays inside the interface, and the residue is documented rather than
 fixed.** `ComplementSimilarity` against `SimpleDistance` type-checks, satisfies `D <= 1`, is

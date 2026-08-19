@@ -241,10 +241,17 @@
             @test any(isinf, PortfolioOptimisers.distance(de, ce, Xn))
             nte = NetworkEstimator(; ce = ce, de = de, alg = MaximumDistanceSimilarity())
             @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)
-            # `ExponentialSimilarity` declares no domain and is right not to: `exp(-Inf)`
-            # is `0` exactly, so an infinite distance is a legal zero similarity.
+            #=
+            `ExponentialSimilarity` declares no domain and is right not to: `exp(-Inf)` is
+            `0` exactly, so an infinite distance is a legal similarity *value*. It is not a
+            legal edge *weight*. `PMFG_T2s` stores the structure and the weights in one
+            matrix, so a zero weight is an absent edge, and the denoised correlation of
+            pure noise is the identity -- every off-diagonal similarity is zero and the
+            PMFG comes back with `0` of its `54` edges. That empty structure used to be
+            returned as an answer. `assert_pmfg_weights` names it instead.
+            =#
             nte = NetworkEstimator(; ce = ce, de = de, alg = ExponentialSimilarity())
-            @test PortfolioOptimisers.calc_adjacency(nte, Xn) isa SparseMatrixCSC{Int, Int}
+            @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)
         end
         @testset "`PMFG_T2s`' backstop" begin
             #=
@@ -2610,4 +2617,83 @@ end
                                                                            zeros(Int, 1, 1),
                                                                            0.5)
     end
+end
+@testset "A zero similarity is an absent edge, not a weak one" begin
+    using PortfolioOptimisers, Test, LinearAlgebra, StatsBase
+    #=
+    ADR 0049 admits an exactly zero similarity on the PMFG path, on the ground that
+    `PMFG_T2s`'s gain argmax is shift-invariant. That holds for the argmax and fails for
+    the graph: `PMFG_T2s` ends with `A = W ⊙ ((A + A') .== 1)`, so a zero weight is an
+    *absent* edge rather than a weak one, and it inserts every remaining vertex whatever
+    the gain, so it declines none. Before `assert_pmfg_weights` the run carried the
+    shrunken graph as far as `turn_into_Hclust_merges` and died there with a `BoundsError`
+    about a matrix index.
+
+    The fixture is 12 assets over 16 observations, built from a Hadamard matrix so that
+    many sample correlations are *exactly* zero. No random number is involved: the zeros
+    are structural. `LogDistance` maps them to `Inf`, and `ExponentialSimilarity` maps an
+    `Inf` to `exp(-Inf)`, which is `0` exactly.
+    =#
+    H = [1 1 1 1 1 1 1 1; 1 -1 1 -1 1 -1 1 -1; 1 1 -1 -1 1 1 -1 -1; 1 -1 -1 1 1 -1 -1 1;
+         1 1 1 1 -1 -1 -1 -1; 1 -1 1 -1 -1 1 -1 1; 1 1 -1 -1 -1 -1 1 1;
+         1 -1 -1 1 -1 1 1 -1]
+    Xa = Float64.(vcat(H, H))
+    Xz = hcat(Xa[:, 2:8], [Xa[:, 2] .* 0.9 .+ 0.05 .* Xa[:, k] for k in 3:7]...)
+    rho = cor(Xz)
+    Dz = max.(-log.(abs.(rho)), zero(eltype(rho)))
+    Sz = exp.(-Dz)
+    N = size(Xz, 2)
+    @test count(isinf, Dz) == 80
+    @test count(iszero, Sz) == 80
+
+    # The same distances with the infinities finite, so the similarity stays strictly
+    # positive. This is the isolation: the zero is the cause, not the `Inf`.
+    Dp = copy(Dz)
+    Dp[isinf.(Dp)] .= 20.0
+    Sp = exp.(-Dp)
+    @test all(>(0), Sp)
+
+    # A PMFG on `N` vertices has `3N - 6` edges. The zeros cost this one nine of its
+    # thirty, and the shortfall is what the guard reports.
+    @test count(!iszero, PortfolioOptimisers.PMFG_T2s(Sz)[1]) ÷ 2 == 21
+    @test count(!iszero, PortfolioOptimisers.PMFG_T2s(Sp)[1]) ÷ 2 == 3 * N - 6
+
+    # Every site that consumes the weighted structure refuses it.
+    nte = NetworkEstimator(; de = Distance(; alg = LogDistance()),
+                           alg = ExponentialSimilarity())
+    cle = ClustersEstimator(; de = Distance(; alg = LogDistance()),
+                            alg = DBHT(; sim = ExponentialSimilarity()))
+    @test_throws DomainError PortfolioOptimisers.DBHTs(Dz, Sz)
+    @test_throws DomainError clusterise(cle, Xz)
+    @test_throws DomainError PortfolioOptimisers.calc_weighted_adjacency_graph(ExponentialSimilarity(),
+                                                                               Sz)
+    @test_throws DomainError PortfolioOptimisers.calc_weighted_adjacency_graph(nte, Xz)
+    @test_throws DomainError PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)
+
+    # The message names the shortfall, not the symptom.
+    err = try
+        PortfolioOptimisers.DBHTs(Dz, Sz)
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    msg = sprint(showerror, err)
+    @test occursin("edges => 21", msg)
+    @test occursin("3 * N - 6 => 30", msg)
+
+    # The strictly positive counterpart runs, with the infinite distances left in place.
+    @test PortfolioOptimisers.DBHTs(Dp, Sp) isa Tuple
+    @test PortfolioOptimisers.DBHTs(Dz, Sp) isa Tuple
+
+    #=
+    `logo!` is the fourth `PMFG_T2s` caller and is deliberately not guarded. It reads
+    separators and cliques, which `PMFG_T2s` derives from the insertion order rather than
+    from `A`, so a zero weight does not shrink them and refusing it would refuse a
+    configuration that works.
+    =#
+    c3z, cqz = PortfolioOptimisers.PMFG_T2s(Sz, 4)[3:4]
+    c3p, cqp = PortfolioOptimisers.PMFG_T2s(Sp, 4)[3:4]
+    @test size(c3z) == size(c3p) == (N - 4, 3)
+    @test size(cqz) == size(cqp) == (N - 3, 4)
 end
