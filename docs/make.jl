@@ -120,12 +120,12 @@ function generate_files(source::String, build::String, diff_flag::Bool)
         # (or never generated) `.md` stays missing and `makedocs` fails on the absent page,
         # and a deleted `.ipynb` is never restored.
         unchanged = diff_flag && isempty(String(read(Cmd(`git diff $DIFF_REF -- $jlp`))))
-        # if !unchanged || !isfile(md_out) || !isfile(nb_out)
-        #     Literate.markdown(jlp, out_build_abs; preprocess = pre_process_content_md,
-        #                       postprocess = postprocess, documenter = true, credit = true)
-        #     Literate.notebook(jlp, src_dir_abs; preprocess = pre_process_content_nb,
-        #                       documenter = true, credit = true)
-        # end
+        if !unchanged || !isfile(md_out) || !isfile(nb_out)
+            Literate.markdown(jlp, out_build_abs; preprocess = pre_process_content_md,
+                              postprocess = postprocess, documenter = true, credit = true)
+            Literate.notebook(jlp, src_dir_abs; preprocess = pre_process_content_nb,
+                              documenter = true, credit = true)
+        end
         return joinpath(rel_build, fix_suffix_md(jl))
     end
 
