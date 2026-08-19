@@ -8,7 +8,9 @@ hero:
   text: Quantitative portfolio construction
   tagline: Democratising, demystifying, and derisking investing
   image:
-    src: logo.svg
+    # Root-relative: DocumenterLandingPage remaps a bare filename under `/` into the site's
+    # `assets/` directory. DocumenterVitepress wants the bare `logo.svg` instead.
+    src: /logo.svg
     alt: PortfolioOptimisers
   actions:
     - theme: brand
@@ -68,11 +70,9 @@ CurrentModule = PortfolioOptimisers
 
 # Welcome to PortfolioOptimisers.jl
 
-::: danger
+!!! danger
 
-Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
-
-:::
+    Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
 Portfolio optimisation is the science of either:
 

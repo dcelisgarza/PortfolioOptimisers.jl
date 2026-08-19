@@ -203,9 +203,14 @@ Two things make this work without any plumbing:
     writes `:prior`; a phylogeny-constraint estimator writes `:constraints`.
 - **Injection.** Immediately before the optimisation step runs, the computed slots
     override the optimiser's *internal* configuration. The pipeline's prior replaces the
-    optimiser's default `pe`; the constraint results are routed by type into `wb`, `lcse`,
-    and `ple`. Every stage is optional — an absent step simply lets the optimiser compute
-    that quantity internally, exactly as it does today.
+    optimiser's default `pe`; each constraint result is routed into the optimiser field its
+    family names — `wb`, `lcse`, `cte`, `ple`, `rkb`, and the threshold fields. Where a
+    family names several fields, the step says which one: a buy-in threshold can be the long
+    or the short bound, so a [`ThresholdEstimator`](@ref) step is wrapped in a
+    [`PipelineStep`](@ref) carrying `target = :lt` or `target = :st`. An optimiser that
+    cannot receive what a step writes is refused when the pipeline is built. Every stage is
+    optional — an absent step simply lets the optimiser compute that quantity internally,
+    exactly as it does today.
 
 ````@example 03_Pipelines
 pipe = Pipeline(;
@@ -409,7 +414,7 @@ fitted, tunable part of the model.
 - Preprocessing steps have a fit/apply contract: the training window learns the universe
     and the imputation parameters, and unseen windows replay them.
 - Computed slots are injected into the optimiser's configuration, so a prior is computed
-    once and shared, and constraints are routed by result type.
+    once and shared, and each constraint lands in the optimiser field its family declares.
 - Cross-validation splits the *input* rows, so the cleaning steps are refitted inside every
     fold — which is precisely the leakage the pipeline exists to remove.
 - Hyperparameters of the preprocessing and of the optimiser are searched in one grid, and

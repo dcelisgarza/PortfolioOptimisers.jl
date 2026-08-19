@@ -173,6 +173,96 @@ that path and the trap above on this one. The two knobs live on two different ob
 follows the other: setting `sep` does not imply a `decay`, and setting `decay` does not imply a
 `sep`.
 
+### 2.3 When you cannot state the budget in advance
+
+Everything above assumes you can name the budget. Sometimes you cannot. A cross-validation fold
+refits the graph on a different slice, and a meta optimiser such as [`NestedClustered`](@ref) or
+[`SubsetResampling`](@ref) refits it on a different *universe* — so a `dmax` you tuned once is
+being applied to graphs it was never tuned for.
+
+Both budget fields therefore also take a **rule**: a callable that is handed the estimator, the
+data, and the graph already built from them, and returns the budget. `n` takes a
+[`HopCountAlgorithm`](@ref), `dmax` takes a [`PathLengthAlgorithm`](@ref), and either takes a bare
+function of the same shape. [`resolve_separation`](@ref) calls it at the point of use — over the one
+structure its consumer built, so a rule costs a traversal and never a second graph — and one rule of
+each ships:
+[`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref), which place the budget at a quantile
+of the observed separations.
+
+That changes *which* quantity stays put. A fixed `dmax` holds the **radius** still and lets the
+related-pair count move with the graph; a quantile rule holds the **count** still and lets the
+radius move. Since the count is what a constraint's strength is made of, the second is usually
+what you meant:
+
+````@example 04_Phylogeny_Centrality
+folds = [1:63, 64:126, 127:189, 190:252]
+function fold_sep(sep, f)
+    return count(!iszero, phylogeny_matrix(NetworkEstimator(; sep = sep), pr.X[f, :]).X)
+end
+q_rule = PathLengthQuantile(; q = 0.25)
+function resolved_dmax(f)
+    return resolve_separation(PathLength(; dmax = q_rule), NetworkEstimator(), pr.X[f, :]).dmax
+end
+
+pretty_table(DataFrame("Fold" => ["$(first(f))–$(last(f))" for f in folds],
+                       "Fixed dmax = 1.0107" =>
+                           [fold_sep(PathLength(; dmax = 1.0107), f) for f in folds],
+                       "Rule: resolved dmax" =>
+                           [round(resolved_dmax(f); digits = 4) for f in folds],
+                       "Rule: related pairs" =>
+                           [fold_sep(PathLength(; dmax = q_rule), f) for f in folds]);
+             title = "A fixed radius against a quantile rule, over four folds of the same year")
+````
+
+`dmax = 1.0107` is the quarter-quantile of the whole year, where it relates `94` of the `380`
+pairs. Applied fold by fold it relates `84`, `110`, `96` and `110` — the constraint is a different
+strength in each fold, and nothing says so. The rule relates `96` in **every** fold, and pays for
+it by moving the radius between `1.2055` and `0.8574`. Neither column is stable in both senses,
+because the graph is refitted either way; the rule just lets you choose which sense you care
+about.
+
+The two quantile rules are not equally good at this, and the reason is the unit. `q` is
+continuous, but a hop count is an integer, so [`HopCountQuantile`](@ref) has to round — and the
+hop shells of §2.2 are coarse enough that the rounding dominates:
+
+````@example 04_Phylogeny_Centrality
+q_grid = [0.1, 0.2, 0.25, 0.3, 0.5, 0.75]
+pretty_table(DataFrame("q" => q_grid,
+                       "HopCountQuantile: n" =>
+                           [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)),
+                                               NetworkEstimator(), pr.X).n for q in q_grid],
+                       "HopCountQuantile: share" =>
+                           [related_pairs(HopCount(; n = HopCountQuantile(; q = q))) /
+                            n_pairs for q in q_grid],
+                       "PathLengthQuantile: share" =>
+                           [related_pairs(PathLength(; dmax = PathLengthQuantile(; q = q))) /
+                            n_pairs for q in q_grid]);
+             formatters = [(v, i, j) -> j in (3, 4) ? "$(round(v*100, digits=1)) %" : v],
+             title = "Asking for a share of the pairs, in two units")
+````
+
+[`PathLengthQuantile`](@ref) delivers what you asked for to within a rounding of the pair count.
+[`HopCountQuantile`](@ref) cannot: three different values of `q` all land on `n = 2`, because
+there is no hop budget between `2` and `3`. Ask in hops when you think in hops, and ask in
+quantiles through `PathLength` when you think in cardinality.
+
+!!! tip "A rule is checked when it runs, not when it is stored"
+    A [`HopCountAlgorithm`](@ref) must return an `Integer` — three readers use `0:n` as a
+    matrix-power count — and a [`PathLengthAlgorithm`](@ref) must return a `Number`.
+    A functor's return type is not part of its signature, so the check happens in
+    [`resolve_separation`](@ref), the first time the rule is actually asked. Writing your own is
+    two definitions, and the third argument is the structure the consumer already built — read it
+    rather than deriving one:
+
+    ```julia
+    struct AssetScaledHops <: PortfolioOptimisers.HopCountAlgorithm
+        frac::Float64
+    end
+    function (r::AssetScaledHops)(nte, X, g; dims::Int = 1, kwargs...)
+        return max(1, round(Int, r.frac * PortfolioOptimisers.Graphs.nv(g)))
+    end
+    ```
+
 ## 3. Phylogeny constraints
 
 A [`SemiDefinitePhylogenyEstimator`](@ref) adds a semidefinite constraint that discourages
@@ -208,6 +298,7 @@ sep_sweep = ["HopCount(; n = 1)" => HopCount(; n = 1),
              "HopCount(; n = 3)" => HopCount(; n = 3),
              "PathLength(; dmax = 0.5)" => PathLength(; dmax = 0.5),
              "PathLength(; dmax = 1.5)" => PathLength(; dmax = 1.5),
+             "PathLengthQuantile(; q = 0.25)" => PathLength(; dmax = q_rule),
              "PathLength()" => PathLength()]
 res_sweep = [optimise(MeanRisk(; obj = MinimumRisk(),
                                opt = JuMPOptimiser(; pe = pr, slv = slv,
@@ -290,7 +381,8 @@ shortest-path measures, similarities for [`EigenvectorCentrality`](@ref) — and
 to match. Five cases run on the plain unweighted graph and none of them raises: a clustering
 source, [`DegreeCentrality`](@ref) (the default used above), [`Pagerank`](@ref),
 [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. The warning on
-[`CentralityEstimator`](@ref) has the details.
+[`CentralityEstimator`](@ref) has the details. §4.2 covers the one thing you can say back to it:
+[`TopologyOnly`](@ref), which withdraws a declaration and asks for the topology alone.
 
 ### 4.1 Where `sep` bites, and where it is inert
 
@@ -326,8 +418,7 @@ function sep_moves(ct)
     return maximum(abs, c3 .- c1) > 1e-8
 end
 
-pretty_table(DataFrame("Algorithm" => first.(cts),
-                       "Declared polarity" => polarity_name.(last.(cts)),
+pretty_table(DataFrame("Algorithm" => first.(cts), "Polarity" => polarity_name.(last.(cts)),
                        "n = 1 → n = 3 moves the score" =>
                            [sep_moves(ct) ? "yes" : "no" for (_, ct) in cts]);
              title = "Which centralities read the weights, and which read sep")
@@ -337,20 +428,80 @@ On this minimum-spanning-tree source the split is four and four: the four distan
 algorithms get a weighted graph and ignore `sep`, and the other four run unweighted and respond to
 it. So raising `n` moves a degree centrality and leaves a closeness one exactly where it was.
 
-The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) *declares* a
+The column to read is the last one, not the polarity. [`EigenvectorCentrality`](@ref) declares a
 similarity polarity and still lands on the unweighted side here, because a tree carries no
 similarity for it to read — so the declaration alone does not tell you which side you are on. The
 source decides that jointly with the algorithm.
 
-Two further subtleties are worth stating rather than demonstrating.
+[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) are a second reason not to read the
+polarity column as the answer. They do read the weights, and are nonetheless unchanged by them *on
+a tree*: a tree has exactly one path between any two vertices, so no weighting can change the
+shortest-path set. That is a theorem about the graph, not a limitation of the algorithm, and it
+does not hold on a similarity branch.
 
-- [`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) do read the weights, and are
-    nonetheless unchanged by them *on a tree*: a tree has exactly one path between any two
-    vertices, so no weighting can change the shortest-path set. That is a theorem about the graph,
-    not a limitation of the algorithm, and it does not hold on a similarity branch.
-- Reading the weights at all is recent, and it moved the default answer for **four of the
-    eight** algorithms. A centrality number carried over from an older run will not always
-    reproduce, so re-measure rather than reusing a bound you calibrated earlier.
+### 4.2 Asking for the topology alone
+
+Everything above is decided *for* you, by the algorithm's mathematics and by the branch the source
+builds. There is one thing you can say back. A [`TopologyOnly`](@ref) in an algorithm's `ov` field
+withdraws its declaration, so [`centrality_polarity`](@ref) answers `nothing` and the graph is
+built plain — the same computation the three unweighted algorithms already run:
+
+````@example 04_Phylogeny_Centrality
+(centrality_polarity(ClosenessCentrality()),
+ centrality_polarity(ClosenessCentrality(; ov = TopologyOnly())))
+````
+
+Only the five algorithms that declare a polarity carry the field. [`DegreeCentrality`](@ref),
+[`Pagerank`](@ref) and [`KatzCentrality`](@ref) already read the topology alone, so they have
+nothing to withdraw and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`. How much the
+request changes depends on the source it is made against:
+
+````@example 04_Phylogeny_Centrality
+ovs = Dict("BetweennessCentrality" => BetweennessCentrality(; ov = TopologyOnly()),
+           "ClosenessCentrality" => ClosenessCentrality(; ov = TopologyOnly()),
+           "EigenvectorCentrality" => EigenvectorCentrality(; ov = TopologyOnly()),
+           "RadialityCentrality" => RadialityCentrality(; ov = TopologyOnly()),
+           "StressCentrality" => StressCentrality(; ov = TopologyOnly()))
+function ov_moves(nte, name, ct)
+    if !(haskey(ovs, name))
+        return "no `ov` field"
+    end
+    declared = centrality_vector(CentralityEstimator(; pl = nte, ct = ct), pr).X
+    topology = centrality_vector(CentralityEstimator(; pl = nte, ct = ovs[name]), pr).X
+    return maximum(abs, topology .- declared) > 1e-8 ? "yes" : "no"
+end
+tree_src = NetworkEstimator()
+graph_src = NetworkEstimator(; alg = MaximumDistanceSimilarity())
+
+pretty_table(DataFrame("Algorithm" => first.(cts),
+                       "Tree source" => [ov_moves(tree_src, n, ct) for (n, ct) in cts],
+                       "Graph source" => [ov_moves(graph_src, n, ct) for (n, ct) in cts]);
+             title = "Does asking for the topology alone move the score?")
+````
+
+Two of the eight move on the tree, five of the eight on the triangulated maximally filtered graph.
+That gap is the whole difference between the weighted and the unweighted answer, and it is
+remarkably stable — measured across seven windows, nine universes, seven distance estimators and
+seven network algorithms, it is two on every tree and five on every graph. **Four** is a different
+quantity: it is the split in the first table, and it counts the algorithms that take a weighted
+*route*, not the ones whose answer *moves*. The two coincide only on a graph.
+
+The request runs one way only. It removes the weights and never supplies them, and there is no
+value that forces a polarity onto an algorithm. Forcing one would succeed rather than raise — the
+distance-weighted graph is available on both branches — and the algorithm would read a distance
+where it needs a similarity, reversing its own ordering in silence.
+
+The override also puts `sep` back in play. All five of these algorithms respond to `n = 1` versus
+`n = 3` once they carry `ov = TopologyOnly()`, including the four that were `sep`-inert in the
+first table, because the unweighted route is the one that reads the separation closure.
+
+That is worth knowing before you reach for it as a stabiliser. A topology-only centrality is
+sometimes argued to be the more fold-stable of the two, since it does not move when the estimated
+weights do. It trades them for a second knob rather than removing one, and under a bare
+[`PathLength`](@ref) that knob is the observed diameter — the data-dependent quantity the argument
+set out to avoid. Nothing here defaults to it: [`CentralityEstimator`](@ref)'s `ct` is a
+[`DegreeCentrality`](@ref), which reads the topology already, and the five that declare a polarity
+keep reading the weights their source carries unless you say otherwise.
 
 ## 5. Comparing the structural constraints
 

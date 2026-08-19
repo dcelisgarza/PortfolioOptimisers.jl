@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 `docs/src/api/00_API.md` carried a hand-written **Features** section: 748 of the
-page's 796 lines, 401 distinct `@ref` targets, 113 nested `::: details`
+page's 796 lines, 401 distinct `@ref` targets, 113 nested `!!! details`
 collapsibles. It was the only place in the docs that answered "what can this
 library do?" organised by *capability* rather than by source file, and it had
 drifted badly.

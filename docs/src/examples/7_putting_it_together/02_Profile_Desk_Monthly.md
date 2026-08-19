@@ -74,8 +74,9 @@ books across a sweep of return targets — rather than committing to a single ob
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                  ret = ArithmeticReturn(;
-                                                                        lb = Frontier(;
-                                                                                      N = 15)))))
+                                                                        settings = JuMPReturnsSettings(;
+                                                                                                       lb = Frontier(;
+                                                                                                                     N = 15))))))
 
 plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 ````

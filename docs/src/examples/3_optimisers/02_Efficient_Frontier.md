@@ -102,7 +102,10 @@ giving a 30-point frontier. The lower bound lives on the *return* side, so it is
 
 ````@example 02_Efficient_Frontier
 optA = JuMPOptimiser(; pe = pr, slv = slv,
-                     ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+                     ret = ArithmeticReturn(;
+                                            settings = JuMPReturnsSettings(;
+                                                                           lb = Frontier(;
+                                                                                         N = 30))))
 resA = optimise(MeanRisk(; opt = optA, r = r))
 ````
 
@@ -181,7 +184,7 @@ For an apples-to-apples comparison we build *both* frontiers over the same 15-po
 sweep — only the optimiser changes.
 
 ````@example 02_Efficient_Frontier
-ret15 = ArithmeticReturn(; lb = Frontier(; N = 15))
+ret15 = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 15)))
 resM = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_noc, ret = ret15),
                          r = r))
 resN = optimise(NearOptimalCentering(;

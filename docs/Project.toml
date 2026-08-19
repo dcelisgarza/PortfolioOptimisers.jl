@@ -8,6 +8,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
 DocumenterCodeBlocks = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
+DocumenterLandingPage = "1c52b33b-3e2f-4e99-b3b5-a6ad63f0d6d2"
 DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
 DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
@@ -34,4 +35,5 @@ PortfolioOptimisers = {path = ".."}
 
 [compat]
 Clarabel = "0.11"
-Documenter = "1"
+Documenter = "1.17"
+DocumenterLandingPage = "0.2"

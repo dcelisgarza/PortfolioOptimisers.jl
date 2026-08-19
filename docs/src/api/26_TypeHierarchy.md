@@ -33,9 +33,21 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[RiskBudget](@ref)
 
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[TargetedConstraint](@ref)
+
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[Threshold](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[WeightBounds](@ref)
+
+├──&nbsp;[AbstractEntropyPoolingTailView](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ConicEntropicValueatRiskViewConstraint](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[GridEntropicValueatRiskViewConstraint](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[IntegerConditionalValueatRiskViewConstraint](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[LinearConditionalValueatRiskViewConstraint](@ref)
 
 ├──&nbsp;[AbstractJuMPResult](@ref)
 
@@ -119,6 +131,10 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[SignedL1UncertaintySet](@ref)
 
+├──&nbsp;[BaseHierarchicalOptimisationResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[HierarchicalResult](@ref)
+
 ├──&nbsp;[BaseJuMPOptimisationResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[JuMPOptimisationResult](@ref)
@@ -169,17 +185,25 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[NonJuMPOptimisationResult](@ref)
 
-│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[HierarchicalResult](@ref)
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[HierarchicalOptimisationResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[HierarchicalEqualRiskContributionResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[HierarchicalRiskParityResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[SchurComplementHierarchicalRiskParityResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[NaiveOptimisationResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[NestedClusteredResult](@ref)
 
-│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[SchurComplementHierarchicalRiskParityResult](@ref)
-
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[StackingResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[SubsetResamplingResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[NonRiskJuMPOptimisationResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[RelaxedRiskBudgetingResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[RiskJuMPOptimisationResult](@ref)
 
@@ -196,6 +220,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[OptimisationFailure](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[OptimisationSuccess](@ref)
+
+├──&nbsp;[PerformanceSummaryResult](@ref)
 
 ├──&nbsp;[PipelineContext](@ref)
 
@@ -433,6 +459,16 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[OptimEntropyPooling](@ref)
 
+├──&nbsp;[AbstractEntropyPoolingViewEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractEntropyPoolingTailViewEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[ConditionalValueatRiskView](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[EntropicValueatRiskView](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ValueatRiskView](@ref)
+
 ├──&nbsp;[AbstractExpectedReturnsEstimator](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractShrunkExpectedReturnsEstimator](@ref)
@@ -617,6 +653,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[FeaturePrior](@ref)
 
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[MeucciEntropyPoolingPrior](@ref)
+
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[OpinionPoolingPrior](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractLowOrderPriorEstimator_F](@ref)
@@ -745,7 +783,11 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[ArithmeticReturn](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[LogarithmicReturn](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LogarithmicReturn](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[NoReturn](@ref)
+
+├──&nbsp;[JuMPReturnsSettings](@ref)
 
 ├──&nbsp;[NormError](@ref)
 
@@ -762,6 +804,8 @@ its docstring.
 ├──&nbsp;[NumberSubsetsEstimator](@ref)
 
 ├──&nbsp;[ObjectiveFunction](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[MaximumElementReturn](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[MaximumRatio](@ref)
 
@@ -857,6 +901,10 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[FactorSpace](@ref)
 
+├──&nbsp;[AbstractCustomValue](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[CustomExpectedReturnsValueAlgorithm](@ref)
+
 ├──&nbsp;[AbstractDenoiseAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[FixedDenoise](@ref)
@@ -892,6 +940,20 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[ExpEntropyPooling](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[LogEntropyPooling](@ref)
+
+├──&nbsp;[AbstractEntropyPoolingViewFormulation](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractConditionalValueatRiskViewFormulation](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[IntegerConditionalValueatRiskView](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[LinearConditionalValueatRiskView](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractEntropicValueatRiskViewFormulation](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[ConicEntropicValueatRiskView](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[GridEntropicValueatRiskView](@ref)
 
 ├──&nbsp;[AbstractEstimatorValueAlgorithm](@ref)
 
@@ -1089,6 +1151,12 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[PPCA](@ref)
 
+├──&nbsp;[AbstractRiskSeriesAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[DrawdownRiskSeries](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[NetReturnsRiskSeries](@ref)
+
 ├──&nbsp;[AbstractSearchCrossValidationAlgorithm](@ref)
 
 ├──&nbsp;[AbstractSelectionRule](@ref)
@@ -1117,15 +1185,17 @@ its docstring.
 
 ├──&nbsp;[AbstractSimilarityMatrixAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[AngularSimilarity](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractNonNegativeSimilarityMatrixAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[ComplementSimilarity](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[ComplementSimilarity](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[ExponentialSimilarity](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[ExponentialSimilarity](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[GeneralExponentialSimilarity](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[GeneralExponentialSimilarity](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[MaximumDistanceSimilarity](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[MaximumDistanceSimilarity](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[AngularSimilarity](@ref)
 
 ├──&nbsp;[AbstractTrackingAlgorithm](@ref)
 
@@ -1176,6 +1246,10 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[RelativeEntropy](@ref)
 
 ├──&nbsp;[Frontier](@ref)
+
+├──&nbsp;[HopCountAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[HopCountQuantile](@ref)
 
 ├──&nbsp;[ImpliedVolatilityAlgorithm](@ref)
 
@@ -1265,6 +1339,10 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[ExactOrderedWeightsArray](@ref)
 
+├──&nbsp;[PathLengthAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PathLengthQuantile](@ref)
+
 ├──&nbsp;[PreviousWeightsFunction](@ref)
 
 ├──&nbsp;[RegimeAdjustedTarget](@ref)
@@ -1298,6 +1376,8 @@ its docstring.
 ├──&nbsp;[TimeDependentCallable](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[TimeDependentOptimiserCallable](@ref)
+
+├──&nbsp;[TopologyOnly](@ref)
 
 ├──&nbsp;[TrackingFormulation](@ref)
 

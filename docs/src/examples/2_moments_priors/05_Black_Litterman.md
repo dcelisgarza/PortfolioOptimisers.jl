@@ -212,13 +212,15 @@ the equilibrium prior and the Black–Litterman posterior. The view shifts the w
 fr_eq = optimise(MeanRisk(; obj = MinimumRisk(),
                           opt = JuMPOptimiser(; pe = pr_eq, slv = slv,
                                               ret = ArithmeticReturn(;
-                                                                     lb = Frontier(;
-                                                                                   N = 20)))))
+                                                                     settings = JuMPReturnsSettings(;
+                                                                                                    lb = Frontier(;
+                                                                                                                  N = 20))))))
 fr_bl = optimise(MeanRisk(; obj = MinimumRisk(),
                           opt = JuMPOptimiser(; pe = pr_abs, slv = slv,
                                               ret = ArithmeticReturn(;
-                                                                     lb = Frontier(;
-                                                                                   N = 20)))))
+                                                                     settings = JuMPReturnsSettings(;
+                                                                                                    lb = Frontier(;
+                                                                                                                  N = 20))))))
 
 plot_measures(fr_eq.w, pr_eq; x = Variance(), y = ExpectedReturn(; rt = fr_eq.ret),
               title = "Efficient frontier: equilibrium prior", xlabel = "Variance",

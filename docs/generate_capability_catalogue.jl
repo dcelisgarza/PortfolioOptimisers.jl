@@ -14,7 +14,7 @@
 #
 # Rendering notes (Documenter + DocumenterVitepress) -- see also
 # `generate_type_hierarchy.jl`, which shares this page's constraints:
-#   * `::: details` containers work *inside* a list item: the bullet body becomes
+#   * `!!! details` containers work *inside* a list item: the bullet body becomes
 #     the `<summary>` and the nested sub-list becomes the disclosure body. They
 #     are never explicitly closed; the list nesting closes them.
 #   * `@ref` links must not sit inside a code fence, so everything here is plain
@@ -197,7 +197,7 @@ function render(io::IO, node::Cap, depth::Int, indent::Int)
     return io
 end
 function render(io::IO, node::Group, depth::Int, indent::Int)
-    println(io, " "^indent, "- ::: details ", head_text(node.head))
+    println(io, " "^indent, "- !!! details ", head_text(node.head))
     for child in node.children
         render(io, child, depth, indent + 2)
     end

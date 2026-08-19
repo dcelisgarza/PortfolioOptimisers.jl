@@ -66,7 +66,7 @@ Note(text::String) = Note(text, [])
 """
     Group(head, children)
 
-A collapsible sub-list, rendered as a `::: details` block. `head` is either a
+A collapsible sub-list, rendered as a `!!! details` block. `head` is either a
 `Cap` (the group is itself a capability that contains others) or a plain
 `String` (a pure heading, e.g. "Algorithms").
 """

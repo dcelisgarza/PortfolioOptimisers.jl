@@ -94,19 +94,35 @@ We will use the same small penalty for all regularisations to illustrate how the
 
 ````@example 07_Regularisation
 opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, ret = ArithmeticReturn(; lb = Frontier(; N = 50))),#
+                      bgt = 1,
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50)))),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
-                      l1 = 4e-4),#
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))),
+                      bgt = 1, l1 = 4e-4),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
-                      l2 = L2Regularisation(; val = 4e-4)),#
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))),
+                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
-                      lp = LpRegularisation(; p = 5, val = 4e-4)),#
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))),
+                      bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
-                      linf = 4e-4)]
+                      ret = ArithmeticReturn(;
+                                             settings = JuMPReturnsSettings(;
+                                                                            lb = Frontier(;
+                                                                                          N = 50))),
+                      bgt = 1, linf = 4e-4)]
 nocs = [MeanRisk(; opt = opt) for opt in opts]
 ress = optimise.(nocs)
 ````

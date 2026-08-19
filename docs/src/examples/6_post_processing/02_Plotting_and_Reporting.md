@@ -44,8 +44,9 @@ res_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                  ret = ArithmeticReturn(;
-                                                                        lb = Frontier(;
-                                                                                      N = 15)))))
+                                                                        settings = JuMPReturnsSettings(;
+                                                                                                       lb = Frontier(;
+                                                                                                                     N = 15))))))
 ````
 
 ## 2. Inspecting the inputs
@@ -89,8 +90,7 @@ plot_risk_contribution(factory(Variance(), pr), res_min, rd)
 ## 5. Realised performance
 
 [`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
-behaved over the sample, and [`plot_performance_summary`](@ref) collects the headline performance
-views into one figure.
+behaved over the sample.
 
 ````@example 02_Plotting_and_Reporting
 plot_portfolio_cumulative_returns(res_ratio.w, rd)
@@ -100,6 +100,21 @@ The drawdown profile.
 
 ````@example 02_Plotting_and_Reporting
 plot_drawdowns(res_ratio.w, rd)
+````
+
+[`plot_performance_summary`](@ref) collects the headline performance views into one figure. It
+renders a [`PerformanceSummaryResult`](@ref), which [`performance_summary`](@ref) computes. Call
+that directly when you want the numbers rather than the bars — to tabulate them, to compare two
+books, or to assert on them in a test. It needs no plotting package.
+
+````@example 02_Plotting_and_Reporting
+performance_summary(res_ratio, rd)
+````
+
+The same numbers, drawn.
+
+````@example 02_Plotting_and_Reporting
+plot_performance_summary(res_ratio, rd)
 ````
 
 ## 6. Risk/return geometry

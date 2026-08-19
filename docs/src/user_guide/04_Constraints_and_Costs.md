@@ -87,9 +87,13 @@ the space with [`FactorSpace`](@ref); the names resolve against the factor axis 
 the loadings while the constraint is generated. What the optimiser receives is an ordinary
 asset-space constraint, so this composes with everything else on this page.
 
-It needs a prior that carries a regression — [`FactorPrior`](@ref) here, not
-[`EmpiricalPrior`](@ref) — and factor data, which [`prices_to_returns`](@ref) takes as an optional
-second argument. A prior with no regression is an error, never a silently dropped row.
+It needs loadings from somewhere, and factor data, which [`prices_to_returns`](@ref) takes as an
+optional second argument. By default the loadings come from the prior, so this wants
+[`FactorPrior`](@ref) rather than [`EmpiricalPrior`](@ref) — and a prior with no regression is an
+error, never a silently dropped row. The space can also supply its own:
+`FactorSpace(; re = StepwiseRegression())` fits the loadings itself, which makes the mandate legal
+on any prior, and `FactorSpace(; re = <a fitted Regression>)` pins them. The deep dive covers the
+precedence and when a pinned basis goes stale.
 
 ````@example 04_Constraints_and_Costs
 Fac = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
@@ -121,7 +125,11 @@ every cross-validation fold, against the loadings that fold actually fitted. Thi
 constraint that cannot be precomputed by hand without going stale, and
 [Factor Exposure Constraints](../examples/4_constraints_costs/10_Factor_Exposure_Constraints.md)
 measures how far a hand-written row drifts. It also covers factor groups, mixing factor- and
-asset-space rows, and why cardinality, thresholds and weight bounds have no factor form.
+asset-space rows, and which constraints have no factor form — the rule is that a constraint is
+re-based only if it *is* a linear row in `w`, so cardinality, thresholds, weight bounds, turnover,
+tracking error and fees all stay out, each for its own reason. Tracking a *factor* is the case
+that looks like a gap and is not: [`ReturnsTracking`](@ref) takes a benchmark return series, and a
+factor's return series is a column of the factor matrix, so it needs no re-basis at all.
 
 ## 4. Turnover
 
