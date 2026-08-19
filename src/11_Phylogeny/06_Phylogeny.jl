@@ -1727,10 +1727,10 @@ function calc_weighted_adjacency_graph(alg::AbstractTreeType, D::MatNum)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(graph_weight_matrix(D))
     return G[calc_mst(alg, G)]
 end
-function calc_weighted_adjacency_graph(::AbstractNonNegativeSimilarityMatrixAlgorithm,
+function calc_weighted_adjacency_graph(alg::AbstractNonNegativeSimilarityMatrixAlgorithm,
                                        S::MatNum)
     A = PMFG_T2s(S)[1]
-    assert_pmfg_weights(A)
+    assert_pmfg_weights(A, alg)
     return SimpleWeightedGraphs.SimpleWeightedGraph(A)
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
@@ -1877,7 +1877,7 @@ function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
     # reason -- a zero distance is the value the representation reserves for *absent*.
     W = graph_weight_matrix(D)
     A = PMFG_T2s(S)[1]
-    assert_pmfg_weights(A)
+    assert_pmfg_weights(A, nte.alg, nte.de)
     r, c, _ = SparseArrays.findnz(A)
     v = [W[i, j] for (i, j) in zip(r, c)]
     return SimpleWeightedGraphs.SimpleWeightedGraph(SparseArrays.sparse(r, c, v,
@@ -2400,7 +2400,7 @@ function _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEst
 end
 function _clusterise(alg::DBHT, onc::AbstractOptimalNumberClustersEstimator, S::MatNum,
                      D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
-    res = DBHTs(P, S; branchorder = branchorder, root = alg.root)[end]
+    res = DBHTs(P, S; branchorder = branchorder, root = alg.root, sim = alg.sim)[end]
     k = optimal_number_clusters(onc, res, P)
     return Clusters(; res = res, S = S, D = D, P = P, k = k)
 end

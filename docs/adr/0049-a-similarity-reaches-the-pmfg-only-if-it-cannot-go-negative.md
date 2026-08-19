@@ -119,6 +119,13 @@ guarded: it reads separators and cliques, which `PMFG_T2s` derives from the inse
 than from `A`, so a zero weight does not shrink them and refusing it would refuse a configuration
 that works.
 
+The message names the configuration, not only the count, for the reason
+`assert_similarity_domain` names both halves: the guard fires one transformation after the mistake
+is made. Each caller passes what it holds and nothing more. `calc_distance_weighted_graph` holds
+the distance estimator and the similarity, `calc_weighted_adjacency_graph` and `DBHTs` hold the
+similarity, and a caller that holds only the matrices names neither. `DBHTs` gains a `sim` keyword
+for this and reads it for nothing else.
+
 **This is breaking, a fourth time, and the configuration it breaks was returning an empty network.**
 `NetworkEstimator(; ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise())),
 de = Distance(; alg = LogDistance()), alg = ExponentialSimilarity())` on noise denoises to the

@@ -2671,16 +2671,31 @@ end
     @test_throws DomainError PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)
 
     # The message names the shortfall, not the symptom.
-    err = try
-        PortfolioOptimisers.DBHTs(Dz, Sz)
-        nothing
-    catch e
-        e
-    end
+    raised(f) =
+        try
+            f()
+            nothing
+        catch e
+            e
+        end
+    err = raised(() -> PortfolioOptimisers.DBHTs(Dz, Sz))
     @test err isa DomainError
     msg = sprint(showerror, err)
     @test occursin("edges => 21", msg)
     @test occursin("3 * N - 6 => 30", msg)
+
+    #=
+    It also names as much of the configuration as the site holds, which is what
+    `assert_similarity_domain` does one step earlier. `DBHTs` called with the matrices
+    alone knows neither half, `clusterise` forwards the similarity, and
+    `calc_distance_weighted_graph` holds both.
+    =#
+    @test !occursin("must hold for", msg)
+    @test occursin("must hold for ExponentialSimilarity. Got",
+                   sprint(showerror, raised(() -> clusterise(cle, Xz))))
+    both = sprint(showerror,
+                  raised(() -> PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)))
+    @test occursin("for ExponentialSimilarity, from Distance{Nothing, LogDistance}", both)
 
     # The strictly positive counterpart runs, with the infinite distances left in place.
     @test PortfolioOptimisers.DBHTs(Dp, Sp) isa Tuple

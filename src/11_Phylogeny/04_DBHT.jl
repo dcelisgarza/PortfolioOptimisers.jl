@@ -249,7 +249,9 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     return A, tri, clique3, cliques, cliqueTree
 end
 """
-    assert_pmfg_weights(A::MatNum)
+    assert_pmfg_weights(A::MatNum,
+                        sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing,
+                        de::Option{<:AbstractDistanceEstimator} = nothing)
 
 Check that the weights did not delete an edge from the graph [`PMFG_T2s`](@ref) built.
 
@@ -270,6 +272,10 @@ At the three sites that consume the **weighted** structure: [`DBHTs`](@ref), [`c
 # Arguments
 
   - `A`: `N × N` weighted adjacency matrix, the first output of [`PMFG_T2s`](@ref).
+  - `sim`: Similarity matrix algorithm that produced the weights, named in the message. Read for nothing else, as [`assert_similarity_domain`](@ref) reads its `de`.
+  - `de`: Distance estimator the similarity was derived from, named in the message beside `sim`.
+
+Each caller passes what it holds, so the message names as much of the configuration as the site knows. [`calc_distance_weighted_graph`](@ref) holds both halves, [`calc_weighted_adjacency_graph`](@ref) and [`DBHTs`](@ref) hold the similarity, and a caller that holds only the matrices names neither.
 
 # Validation
 
@@ -286,11 +292,22 @@ At the three sites that consume the **weighted** structure: [`DBHTs`](@ref), [`c
   - [`assert_similarity_domain`](@ref)
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
 """
-function assert_pmfg_weights(A::MatNum)
+function assert_pmfg_weights(A::MatNum,
+                             sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing,
+                             de::Option{<:AbstractDistanceEstimator} = nothing)::Nothing
     N = size(A, 1)
     edges = count(!iszero, A) ÷ 2
-    @argcheck(edges == 3 * N - 6,
-              DomainError("count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold. Got\nedges => $edges\n3 * N - 6 => $(3 * N - 6)\nAn exactly zero weight is an absent edge rather than a weak one, so $(3 * N - 6 - edges) of the PMFG's edges are missing and the structure is not a PMFG. Use a similarity that is strictly positive on this path."))
+    expected = 3 * N - 6
+    source = if isnothing(sim)
+        ""
+    elseif isnothing(de)
+        " for $(nameof(typeof(sim)))"
+    else
+        " for $(nameof(typeof(sim))), from $(typeof(de))"
+    end
+    @argcheck(edges == expected,
+              DomainError(edges,
+                          "count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold$source. Got\nedges => $edges\n3 * N - 6 => $expected\nAn exactly zero weight is an absent edge rather than a weak one, so $(expected - edges) of the PMFG's edges are missing and the structure is not a PMFG. Use a similarity that is strictly positive over this data."))
     return nothing
 end
 """
@@ -1443,7 +1460,8 @@ function turn_into_Hclust_merges(Z::MatNum)
 end
 """
     DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
-          root::DBHTRootMethod = UniqueRoot())
+          root::DBHTRootMethod = UniqueRoot(),
+          sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
 
 Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG).
 
@@ -1455,12 +1473,14 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - `S`: `N × N` non-negative similarity matrix. Must be symmetric and non-empty.
   - `branchorder`: Ordering method for the dendrogram branches. Accepts `:optimal`, `:barjoseph`, or `:r`.
   - `root`: Root selection method for the clique hierarchy.
+  - `sim`: Similarity matrix algorithm that produced `S`. It is forwarded to [`assert_pmfg_weights`](@ref) and read for nothing else, so that a refusal names the configuration rather than the matrix. A caller that holds only the matrices leaves it `nothing`.
 
 # Validation
 
   - `!isempty(D) && LinearAlgebra.issymmetric(D)`.
   - `!isempty(S) && LinearAlgebra.issymmetric(S)`.
   - `size(D) == size(S)`.
+  - The PMFG built from `S` keeps its `3N - 6` edges, by [`assert_pmfg_weights`](@ref). An exactly zero similarity is an absent edge.
 
 # Details
 
@@ -1492,12 +1512,13 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
 function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
-               root::DBHTRootMethod = UniqueRoot())
+               root::DBHTRootMethod = UniqueRoot(),
+               sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
     @argcheck(!isempty(S), IsEmptyError)
     @argcheck(!isempty(D), IsEmptyError)
     @argcheck(size(S) == size(D), DimensionMismatch)
     Rpm = PMFG_T2s(S)[1]
-    assert_pmfg_weights(Rpm)
+    assert_pmfg_weights(Rpm, sim)
     Apm = copy(Rpm)
     Apm[Apm .!= 0] = D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
@@ -1672,7 +1693,7 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatN
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     assert_similarity_domain(cle.alg.sim, cle.de, D)
     S = distance_to_similarity(cle.alg.sim; S = S, D = D)
-    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
+    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root, sim = cle.alg.sim)[end]
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
