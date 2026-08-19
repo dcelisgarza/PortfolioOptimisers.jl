@@ -69,10 +69,17 @@ function -- cannot host.
     # A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
     # than `isconcretetype`: nearly every struct here is `@concrete`, so the bare
     # name is a `UnionAll` and `isconcretetype` is false for every one of them.
+    #
+    # The runner gives each test file its own module, but not its own process. An
+    # estimator that another file declares therefore stays in the worker, and
+    # `subtypes` finds it here. The catalogue is about the shipped universe, so a
+    # leaf from another module is not one of its members: keep only what
+    # `PortfolioOptimisers` itself declares. Which files share a worker changes
+    # from run to run, so without this filter the test is a scheduling flake.
     function leaf_types(T, acc = Set{Type}())
         subs = subtypes(T)
         if isempty(subs)
-            if !isabstracttype(T)
+            if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
                 push!(acc, T)
             else
                 false

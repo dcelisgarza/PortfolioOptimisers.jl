@@ -35,4 +35,5 @@ PortfolioOptimisers = {path = ".."}
 [compat]
 Clarabel = "0.11"
 Documenter = "1.17"
+DocumenterCodeBlocks = "1.3"
 DocumenterLandingPage = "0.2"

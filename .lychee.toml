@@ -5,6 +5,11 @@ timeout = 45
 max_retries = 3
 retry_wait_time = 2
 
+# A host that throttles an automated client answers 429 or 503. juliastats.org answered 503
+# to one run and 200 to the sibling run of the same commit. Accept the two throttle codes, so
+# a momentary refusal cannot turn the branch red. A dead link answers 404, which stays fatal.
+accept = ["200..=299", "429", "503"]
+
 exclude = [
   "@ref",
   "@cite",
