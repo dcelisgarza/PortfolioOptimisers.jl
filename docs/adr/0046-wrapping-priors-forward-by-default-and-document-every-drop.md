@@ -9,9 +9,9 @@ status: accepted
 Most prior estimators wrap another one. [`BlackLittermanPrior`](../../src/13_Prior/06_BlackLittermanPrior.jl)
 takes a `pe`, fits it, and returns a carrier built from the result; so do
 [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl),
-[`EntropyPoolingPrior`](../../src/13_Prior/10_EntropyPoolingPrior.jl),
-[`OpinionPoolingPrior`](../../src/13_Prior/11_OpinionPoolingPrior.jl) and
-[`FeaturePrior`](../../src/13_Prior/13_FeaturePrior.jl). Each one decides, field by field, which of
+[`EntropyPoolingPrior`](../../src/13_Prior/12_EntropyPoolingPrior.jl),
+[`OpinionPoolingPrior`](../../src/13_Prior/13_OpinionPoolingPrior.jl) and
+[`FeaturePrior`](../../src/13_Prior/15_FeaturePrior.jl). Each one decides, field by field, which of
 the wrapped carrier's thirteen fields to carry across — and each one decided independently, by
 writing out a `LowOrderPrior(; …)` call with whichever keywords its author thought applied.
 
@@ -269,7 +269,7 @@ only the asset moments:
 - [`BayesianBlackLittermanPrior`](../../src/13_Prior/07_BayesianBlackLittermanPrior.jl) — same, and
   it was already forwarding `rr` and the factor block.
 
-[`FeaturePrior`](../../src/13_Prior/13_FeaturePrior.jl) also collapses to one, with `Z` as the single
+[`FeaturePrior`](../../src/13_Prior/15_FeaturePrior.jl) also collapses to one, with `Z` as the single
 deviation; it was already forwarding everything by hand, so the change is that the hand-written list
 can no longer drift from the carrier's field list.
 
@@ -634,7 +634,7 @@ projection, which is the same reason it merges rather than forwards.
 
 ### `factor_residual_config` replaces a reach past a type bound
 
-[`HighOrderFactorPriorEstimator`](../../src/13_Prior/12_HighOrderFactorPriorEstimator.jl) needs the
+[`HighOrderFactorPriorEstimator`](../../src/13_Prior/14_HighOrderFactorPriorEstimator.jl) needs the
 *systematic* covariance for its residual cokurtosis correction, so a residual block the wrapped
 estimator added has to come back off. It used to read `pe.pe.ve` and `pe.pe.mp.pdm` directly. Its
 `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and

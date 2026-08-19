@@ -112,7 +112,7 @@ recoverable from the other.
 Which one a consumer wants is therefore not a matter of taste but of what it is doing.
 [`FactorRiskContribution`](../../src/20_Optimisation/12_FactorRiskContribution.jl),
 [`FactorRiskBudgeting`](../../src/20_Optimisation/14_RiskBudgeting.jl) and
-[`RegressionFeatures`](../../src/13_Prior/13_FeaturePrior.jl) want **`L`**, because risk must be
+[`RegressionFeatures`](../../src/13_Prior/15_FeaturePrior.jl) want **`L`**, because risk must be
 attributed in the basis its covariance was actually estimated in — the orthogonal reduced one. A
 constraint wants **`M`**, because a constraint is *written*, and only `M`'s columns carry names a
 user can put in an equation; `L`'s are principal components. The divergence is correct in both

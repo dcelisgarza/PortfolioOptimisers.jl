@@ -12,14 +12,46 @@ hero:
     alt: PortfolioOptimisers
   actions:
     - theme: brand
-      text: User Guide
+      text: Get started
       link: user_guide/00_User_Guide
-    - theme: brand
+    - theme: alt
       text: Examples
       link: examples/00_Examples
     - theme: alt
       text: API
       link: api/00_API
+
+features:
+  - icon: 🔮
+    title: Priors and views
+    details: Empirical, factor, and high-order priors. Impose views with the Black-Litterman family, entropy pooling, or opinion pooling. Swapping the prior leaves the optimiser untouched.
+    link: user_guide/01_Data_and_Priors
+    linkText: Data and priors
+  - icon: 🧮
+    title: Robust moment estimation
+    details: Gerber, Gerber-IQ, and Smyth-Broby covariances, mutual information and distance covariance, denoising, detoning, regime adjustment, coskewness, and cokurtosis.
+    link: examples/2_moments_priors/02_Covariance_Estimation
+    linkText: Covariance estimation
+  - icon: 📉
+    title: Over 50 risk measures
+    details: Variance, semi-moments, mean absolute deviation, VaR, CVaR, EVaR, RLVaR, drawdowns, ordered weights arrays, and tail ranges. Combine several in one objective, and/or use them as a limit.
+    link: user_guide/03_Risk_Measures
+    linkText: Risk measures
+  - icon: ⚖️
+    title: An optimiser for every mandate
+    details: Mean-risk, risk budgeting, near-optimal centering, hierarchical risk parity, HERC, Schur complement, naïve, and the meta-optimisers that nest, stack, and resample them.
+    link: user_guide/02_Optimisers
+    linkText: Optimisers
+  - icon: 🔗
+    title: Constraints and costs
+    details: Budget, group, factor exposure, cardinality, turnover, tracking, phylogeny, and centrality constraints, plus fees and market impact. Add your own JuMP expressions.
+    link: user_guide/04_Constraints_and_Costs
+    linkText: Constraints and costs
+  - icon: 🔁
+    title: Validation and tuning
+    details: Walk-forward and combinatorial cross-validation, grid and randomised hyperparameter search, pipelines, and time-dependent constraints.
+    link: user_guide/05_Validation_and_Tuning
+    linkText: Validation and tuning
 
 authors:
   - name: Daniel Celis Garza
@@ -53,7 +85,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API) for details.
+The cards above are the highlights. The [capability catalogue](@ref capability-catalogue) lists every estimator, risk measure, constraint, and optimiser the library ships, each one linked to its docstring.
 
 ## Caveat emptor
 
