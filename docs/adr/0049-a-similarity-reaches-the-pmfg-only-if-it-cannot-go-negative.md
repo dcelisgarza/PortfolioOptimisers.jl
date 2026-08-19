@@ -280,28 +280,3 @@ mechanism for a question that no longer concerns a refusal.
 precondition was justified by `LogDistance` mapping an exactly zero correlation to `Inf`, and that
 arithmetic holds. Reproducing it needs a noise matrix: `Denoise()` on the shipped `SP500` fixture
 produces **no** exact zero.
-
-## Amendment (2026-08-19): both abstract types are unexported
-
-The decision above calls `AbstractNonNegativeSimilarityMatrixAlgorithm` "a new **exported** abstract
-subtype". That word no longer holds. Neither it nor `AbstractSimilarityMatrixAlgorithm` is exported.
-
-The export was one of six that PR #261 added across its blocks, none of them asked for. `CLAUDE.md`
-states the convention: an abstract type stays unexported unless the maintainer asks for it, because
-an export is public API. All six are withdrawn.
-
-Nothing else in this ADR moves. The bound is still a type bound, the placement is still narrow for
-`Tree_SimMat`, `DBHT.sim` and `LoGo.sim` and wide for the rest, and
-`NetworkEstimator(; alg = AngularSimilarity())` is still a `MethodError` at construction.
-
-Two consequences for a reader:
-
- 1. An extension declares membership by writing
-    `<: PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm`. The module prefix is the
-    ordinary route to every other open family here, so the claim is made the same way as before.
- 2. Unexported is not undocumented. Both types keep their docstring and their entry in
-    `docs/src/api/09_Distance/04_Similarity.md`. A bare name in a `@docs` block resolves for an
-    unexported type, so no documentation page changes.
-
-`test/test_43_exported_abstract_type_census.jl` holds the whole exported abstract surface to an
-allow-list, so the export cannot come back by accident.
