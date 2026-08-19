@@ -238,11 +238,11 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR,
     cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
-    predictions = fold_loop(pipe, length(train_idx), ex; rd = data, train_idx = train_idx,
-                            test_idx = test_idx, ElT = Vector{PredictionResult},
-                            time_ordered = false) do i, pipei, datai, tr, te
-        res = StatsAPI.fit(pipei, pipeline_data_view(datai, tr))
-        return [StatsAPI.predict(res, datai, group) for group in te]
+    predictions = fold_loop(pipe, length(train_idx), ex, Vector{PredictionResult};
+                            rd = data, train_idx = train_idx, test_idx = test_idx,
+                            time_ordered = false) do fold
+        res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
+        return [StatsAPI.predict(res, fold.rd, group) for group in fold.test]
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -265,9 +265,9 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, p
     asset_view(i) = (pipe, pipeline_asset_view(data, folds[i][3]))
     predictions = fold_loop(pipe, length(folds), ex; rd = data, train_idx = train_idx,
                             test_idx = test_idx, path_id = path_id, fold_view = asset_view
-                            ) do i, pipei, rdi, tr, te
-        res = StatsAPI.fit(pipei, pipeline_data_view(rdi, tr))
-        return StatsAPI.predict(res, rdi, te)
+                            ) do fold
+        res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
+        return StatsAPI.predict(res, fold.rd, fold.test)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = path_id)
@@ -298,8 +298,7 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomis
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    predictions = parallel_folds(length(unique_ids), ex; ElT = MultiPeriodPredictionResult
-                                 ) do i
+    predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
         return pipeline_path_fit_and_predict(pipe, data, dict[i], i; ex = ex)
     end
     return PopulationPredictionResult(; pred = predictions)
@@ -357,9 +356,9 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
     # @argcheck(isa(test_idx[1], VecInt),
     #           ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
     predictions = fold_loop(pipe, length(train_idx), ex; rd = data, train_idx = train_idx,
-                            test_idx = test_idx) do i, pipei, datai, tr, te
-        res = StatsAPI.fit(pipei, pipeline_data_view(datai, tr))
-        return StatsAPI.predict(res, datai, te)
+                            test_idx = test_idx) do fold
+        res = StatsAPI.fit(fold.est, pipeline_data_view(fold.rd, fold.train))
+        return StatsAPI.predict(res, fold.rd, fold.test)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

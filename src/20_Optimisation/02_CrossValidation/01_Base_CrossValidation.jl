@@ -961,19 +961,26 @@ function cv_sequential_info(prev_w_flag::Bool)
     return "Running cross-validation sequentially because the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."
 end
 """
-    parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor; ElT = PredictionResult)
+    parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
+                   ::Type{ElT} = PredictionResult)
 
 Run `n` cross-validation folds in parallel, filling `predictions[i] = fit_fold(i)` for `i in 1:n`
 over executor `ex`. `ElT` is the per-fold result element type (a single [`PredictionResult`](@ref)
 for time-ordered schemes, a `Vector{PredictionResult}` for the multi-path combinatorial scheme).
 
+`ElT` is a *positional* `::Type{ElT}` argument, not a keyword, so a method always
+specialises on it and `Vector{ElT}(undef, n)` stays a compile-time construction. As a
+keyword its value only survives constant propagation, which one forwarding hop is enough
+to lose — see the amendment of ADR 0067.
+
 # Related
 
   - [`run_folds`](@ref)
+  - [`fold_loop`](@ref)
   - [`fit_and_predict`](@ref)
 """
-function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor;
-                        ElT = PredictionResult)
+function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor,
+                        ::Type{ElT} = PredictionResult) where {ElT}
     predictions = Vector{ElT}(undef, n)
     FLoops.@floop ex for i in 1:n
         predictions[i] = fit_fold(i)
@@ -981,7 +988,9 @@ function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor;
     return predictions
 end
 """
-    run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor; ElT = PredictionResult)
+    run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor,
+              ::Type{ElT} = PredictionResult,
+              ::Val{PW} = Val(needs_previous_weights(opt)))
 
 Run `n` cross-validation folds, either in parallel or — when `opt` needs the previous fold's
 weights (`needs_previous_weights`) — sequentially, emitting [`cv_sequential_info`](@ref).
@@ -990,23 +999,31 @@ mode or the previous fold's prediction in sequential mode; the caller uses `prev
 previous weights into fold `i`. Time-dependent constraints alone do not force sequential
 processing — their per-fold values are known upfront.
 
+`ElT` is a *positional* `::Type{ElT}` argument for the reason given in
+[`parallel_folds`](@ref). The previous-weights flag is a `Val` for the same reason applied
+to a branch: as a run-time `Bool` the sequential branch is *inferred* even when it can
+never run, and it reads an abstractly-typed `predictions[i - 1]`, which is a runtime
+dispatch. As a type parameter the branch is eliminated.
+
 # Related
 
   - [`parallel_folds`](@ref)
+  - [`fold_loop`](@ref)
   - [`cv_sequential_info`](@ref)
   - [`fit_and_predict`](@ref)
 """
-function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
-                   ElT = PredictionResult, prev_w_flag::Bool = needs_previous_weights(opt))
-    if prev_w_flag
-        @info(cv_sequential_info(prev_w_flag))
+function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor,
+                   ::Type{ElT} = PredictionResult,
+                   ::Val{PW} = Val(needs_previous_weights(opt))) where {ElT, PW}
+    if PW
+        @info(cv_sequential_info(PW))
         predictions = Vector{ElT}(undef, n)
         for i in 1:n
             predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing)
         end
         return predictions
     end
-    return parallel_folds(i -> fit_fold(i, nothing), n, ex; ElT = ElT)
+    return parallel_folds(i -> fit_fold(i, nothing), n, ex, ElT)
 end
 """
     assert_unshuffled_folds(cv, train_idx)
@@ -1037,9 +1054,59 @@ function assert_unshuffled_folds(cv, train_idx)
     return nothing
 end
 """
-    fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor; rd,
-              train_idx, test_idx, path_id = nothing, ElT = PredictionResult,
-              time_ordered::Bool = true, fold_view = nothing)
+$(DocStringExtensions.TYPEDEF)
+
+One fold of a cross-validation scheme, as [`fold_loop`](@ref) hands it to its callback.
+
+The record is the fold loop's whole hand-off. `est` and `rd` are already resolved: the
+asset view is taken, every [`TimeDependent`](@ref) schedule is swapped for its fold-`i`
+value, and the previous fold's weights are threaded in. `train` and `test` are this fold's
+own windows, so a callback never indexes `train_idx`/`test_idx` itself.
+
+The type is immutable and every field is concretely typed at the construction site, so the
+record costs nothing at run time. [`fold_loop`](@ref) is the only site that builds one,
+which is why there is no keyword constructor.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`fold_loop`](@ref)
+  - [`TimeDependentContext`](@ref)
+  - [`fit_and_predict`](@ref)
+"""
+struct Fold{T1, T2, T3, T4, T5, T6}
+    """
+    Index of the fold within the scheme's `split` enumeration (1-based).
+    """
+    i::T1
+    """
+    Number of folds in the enumeration.
+    """
+    n::T2
+    """
+    The fold's resolved estimator: asset-viewed, schedule-swapped, weights-threaded.
+    """
+    est::T3
+    """
+    The fold's (possibly asset-viewed) input data.
+    """
+    rd::T4
+    """
+    The fold's training indices.
+    """
+    train::T5
+    """
+    The fold's test indices.
+    """
+    test::T6
+end
+"""
+    fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
+              ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
+              path_id = nothing, time_ordered::Bool = true, fold_view = nothing)
 
 Run the `n` folds of a cross-validation scheme over `est`, and resolve each fold's estimator
 before the callback sees it.
@@ -1055,7 +1122,10 @@ does four steps.
     first, so a freshly swapped-in per-fold entry also gets the weights of step 3.
  3. It threads the previous fold's weights in through [`factory`](@ref), if `est`
     [`needs_previous_weights`](@ref).
- 4. It calls `fit_fold(i, esti, rdi, train_idx[i], test_idx[i])`.
+ 4. It calls `fit_fold(fold)`, with `fold` a [`Fold`](@ref).
+
+The callback takes the one [`Fold`](@ref) record, so a call site names what it reads
+(`fold.est`, `fold.train`) instead of relying on the position of an argument.
 
 [`assert_time_dependent_fold_count`](@ref) runs once, before the loop.
 
@@ -1065,19 +1135,22 @@ sequentially. `false` routes through [`parallel_folds`](@ref), because a scheme 
 folds are not a timeline has no previous fold to thread. `ElT` is the per-fold result
 element type: a single
 [`PredictionResult`](@ref) for a time-ordered scheme, a `Vector{PredictionResult}` for the
-multi-path combinatorial scheme.
+multi-path combinatorial scheme. It is positional for the reason given in
+[`parallel_folds`](@ref).
 
 # Related
 
+  - [`Fold`](@ref)
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
   - [`fit_and_predict`](@ref)
   - [`cross_val_predict`](@ref)
 """
-function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor; rd,
-                   train_idx, test_idx, path_id = nothing, ElT = PredictionResult,
-                   time_ordered::Bool = true, fold_view = nothing)
+function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
+                   ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
+                   path_id = nothing, time_ordered::Bool = true,
+                   fold_view = nothing) where {ElT}
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
@@ -1097,12 +1170,17 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor; r
         if !isnothing(w_prev) && prev_w_flag
             esti = factory(esti, w_prev)
         end
-        return fit_fold(i, esti, rdi, train_idx[i], test_idx[i])
+        return fit_fold(Fold(i, n, esti, rdi, train_idx[i], test_idx[i]))
     end
+    # The previous-weights flag crosses into `run_folds` as a `Val`, not a `Bool`. As a
+    # value it is a run-time argument, so the sequential branch is inferred even for an
+    # optimiser that never takes it, and that branch reads an abstractly-typed
+    # `predictions[i - 1]`, which is a runtime dispatch. As a type parameter the branch is
+    # eliminated instead. See the ADR 0067 amendment.
     return if time_ordered
-        run_folds(fold, est, n, ex; ElT = ElT, prev_w_flag = prev_w_flag)
+        run_folds(fold, est, n, ex, ElT, Val(prev_w_flag))
     else
-        parallel_folds(i -> fold(i, nothing), n, ex; ElT = ElT)
+        parallel_folds(i -> fold(i, nothing), n, ex, ElT)
     end
 end
 function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
@@ -1112,9 +1190,9 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, time_ordered = false
-                            ) do i, opti, rdi, tr, te
-        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te, cols = cols)
+                            test_idx = test_idx, time_ordered = false) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test, cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

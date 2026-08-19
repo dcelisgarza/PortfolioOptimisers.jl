@@ -512,10 +512,11 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     # A fold is a train/test split and `i` is its position in the split enumeration —
     # no ordering is imposed on time-dependent entries; the user keys them off the
     # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
-    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
-                            test_idx = test_idx, ElT = Vector{PredictionResult},
-                            time_ordered = false) do i, opti, rdi, tr, te
-        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te, cols = cols)
+    predictions = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult}; rd = rd,
+                            train_idx = train_idx, test_idx = test_idx, time_ordered = false
+                            ) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test, cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -525,7 +526,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
-    predictions = parallel_folds(length(test_idx), ex; ElT = Vector{PredictionResult}) do i
+    predictions = parallel_folds(length(test_idx), ex, Vector{PredictionResult}) do i
         return StatsAPI.predict(res, rd, test_idx[i])
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))

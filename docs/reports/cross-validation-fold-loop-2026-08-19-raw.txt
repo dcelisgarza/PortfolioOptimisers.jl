@@ -1,0 +1,214 @@
+########## measure.jl — version A
+### VERSION A  (PortfolioOptimisers 0.23.2, julia 1.12.7)
+
+## warmup
+  ok   EqualWeighted      KFold              -> MultiPeriodPredictionResult
+  ok   EqualWeighted      WalkForward        -> MultiPeriodPredictionResult
+  ok   EqualWeighted      Combinatorial      -> PopulationPredictionResult
+  ok   EqualWeighted      MultipleRandomised -> PopulationPredictionResult
+  ok   InverseVolatility  KFold              -> MultiPeriodPredictionResult
+  ok   InverseVolatility  WalkForward        -> MultiPeriodPredictionResult
+  ok   InverseVolatility  Combinatorial      -> PopulationPredictionResult
+  ok   InverseVolatility  MultipleRandomised -> PopulationPredictionResult
+
+## return_types(cross_val_predict, ...)
+  EqualWeighted      KFold              n=1  concrete=false  Any[Any]
+  EqualWeighted      WalkForward        n=1  concrete=false  Any[Any]
+  EqualWeighted      Combinatorial      n=1  concrete=false  Any[Any]
+  EqualWeighted      MultipleRandomised n=1  concrete=false  Any[Any]
+  InverseVolatility  KFold              n=1  concrete=false  Any[Any]
+  InverseVolatility  WalkForward        n=1  concrete=false  Any[Any]
+  InverseVolatility  Combinatorial      n=1  concrete=false  Any[Any]
+  InverseVolatility  MultipleRandomised n=1  concrete=false  Any[Any]
+
+## code_typed of the fold-loop entry (fit_and_predict(opt, rd, cv))
+  EqualWeighted      KFold              stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+  EqualWeighted      WalkForward        stmts=  47 ssa=  47 concrete=  23 Any= 18 Core.Box= 0 rt=Any
+  EqualWeighted      Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+  EqualWeighted      MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+  InverseVolatility  KFold              stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+  InverseVolatility  WalkForward        stmts=  47 ssa=  47 concrete=  23 Any= 18 Core.Box= 0 rt=Any
+  InverseVolatility  Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+  InverseVolatility  MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  2 Core.Box= 0 rt=Any
+
+## JET @report_opt (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              opt_reports=   27
+  EqualWeighted      WalkForward        opt_reports=   27
+  EqualWeighted      Combinatorial      opt_reports=   28
+  EqualWeighted      MultipleRandomised opt_reports=   38
+  InverseVolatility  KFold              opt_reports=   29
+  InverseVolatility  WalkForward        opt_reports=   29
+  InverseVolatility  Combinatorial      opt_reports=   30
+  InverseVolatility  MultipleRandomised opt_reports=   40
+
+## JET @report_call (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              call_reports=    0
+  EqualWeighted      WalkForward        call_reports=    0
+  EqualWeighted      Combinatorial      call_reports=    0
+  EqualWeighted      MultipleRandomised call_reports=    0
+  InverseVolatility  KFold              call_reports=    0
+  InverseVolatility  WalkForward        call_reports=    0
+  InverseVolatility  Combinatorial      call_reports=    0
+  InverseVolatility  MultipleRandomised call_reports=    0
+
+## Chairmarks @be cross_val_predict (single thread)
+  EqualWeighted      KFold              min=    0.0802 ms  allocs=      550  bytes=      303984  samples=18651
+  EqualWeighted      WalkForward        min=    0.0241 ms  allocs=      183  bytes=       37376  samples=76078
+  EqualWeighted      Combinatorial      min=    0.6122 ms  allocs=     1526  bytes=      693280  samples=3455
+  EqualWeighted      MultipleRandomised min=    0.1158 ms  allocs=      753  bytes=      120912  samples=17871
+  InverseVolatility  KFold              min=    0.8948 ms  allocs=     1070  bytes=     1853952  samples=2231
+  InverseVolatility  WalkForward        min=    0.1453 ms  allocs=      443  bytes=      189176  samples=13716
+  InverseVolatility  Combinatorial      min=    1.5934 ms  allocs=     2306  bytes=     2416968  samples=1303
+  InverseVolatility  MultipleRandomised min=    0.3839 ms  allocs=     1503  bytes=      247896  samples=5742
+
+### DONE A
+########## measure.jl — version B
+### VERSION B  (PortfolioOptimisers 0.27.0, julia 1.12.7)
+
+## warmup
+  ok   EqualWeighted      KFold              -> MultiPeriodPredictionResult
+  ok   EqualWeighted      WalkForward        -> MultiPeriodPredictionResult
+  ok   EqualWeighted      Combinatorial      -> PopulationPredictionResult
+  ok   EqualWeighted      MultipleRandomised -> PopulationPredictionResult
+  ok   InverseVolatility  KFold              -> MultiPeriodPredictionResult
+  ok   InverseVolatility  WalkForward        -> MultiPeriodPredictionResult
+  ok   InverseVolatility  Combinatorial      -> PopulationPredictionResult
+  ok   InverseVolatility  MultipleRandomised -> PopulationPredictionResult
+
+## return_types(cross_val_predict, ...)
+  EqualWeighted      KFold              n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  EqualWeighted      WalkForward        n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  EqualWeighted      Combinatorial      n=1  concrete=false  Any[PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})]
+  EqualWeighted      MultipleRandomised n=1  concrete=false  Any[PopulationPredictionResult{<:AbstractVector{var"#s2277"}} where var"#s2277"<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})]
+  InverseVolatility  KFold              n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  InverseVolatility  WalkForward        n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  InverseVolatility  Combinatorial      n=1  concrete=false  Any[PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})]
+  InverseVolatility  MultipleRandomised n=1  concrete=false  Any[PopulationPredictionResult{<:AbstractVector{var"#s2277"}} where var"#s2277"<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})]
+
+## code_typed of the fold-loop entry (fit_and_predict(opt, rd, cv))
+  EqualWeighted      KFold              stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  EqualWeighted      WalkForward        stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  EqualWeighted      Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})
+  EqualWeighted      MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{<:AbstractVector{var"#s2277"}} where var"#s2277"<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})
+  InverseVolatility  KFold              stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  InverseVolatility  WalkForward        stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s2277"<:PredictionResult, var"#s179"<:AbstractVector{var"#s2277"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  InverseVolatility  Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})
+  InverseVolatility  MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{<:AbstractVector{var"#s2277"}} where var"#s2277"<:(Union{var"#s2277", var"#s2276"} where {var"#s2277"<:PredictionResult, var"#s2276"<:MultiPeriodPredictionResult})
+
+## JET @report_opt (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              opt_reports=    5
+  EqualWeighted      WalkForward        opt_reports=    5
+  EqualWeighted      Combinatorial      opt_reports=   29
+  EqualWeighted      MultipleRandomised opt_reports=   13
+  InverseVolatility  KFold              opt_reports=    7
+  InverseVolatility  WalkForward        opt_reports=    7
+  InverseVolatility  Combinatorial      opt_reports=   31
+  InverseVolatility  MultipleRandomised opt_reports=   13
+
+## JET @report_call (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              call_reports=    0
+  EqualWeighted      WalkForward        call_reports=    0
+  EqualWeighted      Combinatorial      call_reports=    0
+  EqualWeighted      MultipleRandomised call_reports=    0
+  InverseVolatility  KFold              call_reports=    0
+  InverseVolatility  WalkForward        call_reports=    0
+  InverseVolatility  Combinatorial      call_reports=    0
+  InverseVolatility  MultipleRandomised call_reports=    0
+
+## Chairmarks @be cross_val_predict (single thread)
+  EqualWeighted      KFold              min=    0.1021 ms  allocs=      522  bytes=      305680  samples=16399
+  EqualWeighted      WalkForward        min=    0.0399 ms  allocs=      185  bytes=       39264  samples=50757
+  EqualWeighted      Combinatorial      min=    0.6660 ms  allocs=     1482  bytes=      701936  samples=3222
+  EqualWeighted      MultipleRandomised min=    0.1345 ms  allocs=      952  bytes=      136704  samples=15696
+  InverseVolatility  KFold              min=    0.8409 ms  allocs=     1052  bytes=     1853024  samples=2234
+  InverseVolatility  WalkForward        min=    0.1307 ms  allocs=      450  bytes=      189400  samples=14661
+  InverseVolatility  Combinatorial      min=    1.5391 ms  allocs=     2277  bytes=     2414920  samples=1362
+  InverseVolatility  MultipleRandomised min=    0.2927 ms  allocs=     1822  bytes=      265560  samples=7273
+
+### DONE B
+########## measure.jl — version C
+### VERSION C  (PortfolioOptimisers 0.28.0, julia 1.12.7)
+
+## warmup
+  ok   EqualWeighted      KFold              -> MultiPeriodPredictionResult
+  ok   EqualWeighted      WalkForward        -> MultiPeriodPredictionResult
+  ok   EqualWeighted      Combinatorial      -> PopulationPredictionResult
+  ok   EqualWeighted      MultipleRandomised -> PopulationPredictionResult
+  ok   InverseVolatility  KFold              -> MultiPeriodPredictionResult
+  ok   InverseVolatility  WalkForward        -> MultiPeriodPredictionResult
+  ok   InverseVolatility  Combinatorial      -> PopulationPredictionResult
+  ok   InverseVolatility  MultipleRandomised -> PopulationPredictionResult
+
+## return_types(cross_val_predict, ...)
+  EqualWeighted      KFold              n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  EqualWeighted      WalkForward        n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  EqualWeighted      Combinatorial      n=1  concrete=false  Any[PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})]
+  EqualWeighted      MultipleRandomised n=1  concrete=false  Any[PopulationPredictionResult{<:AbstractVector{var"#s915"}} where var"#s915"<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})]
+  InverseVolatility  KFold              n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  InverseVolatility  WalkForward        n=1  concrete=false  Any[MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}]
+  InverseVolatility  Combinatorial      n=1  concrete=false  Any[PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})]
+  InverseVolatility  MultipleRandomised n=1  concrete=false  Any[PopulationPredictionResult{<:AbstractVector{var"#s915"}} where var"#s915"<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})]
+
+## code_typed of the fold-loop entry (fit_and_predict(opt, rd, cv))
+  EqualWeighted      KFold              stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  EqualWeighted      WalkForward        stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  EqualWeighted      Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})
+  EqualWeighted      MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{<:AbstractVector{var"#s915"}} where var"#s915"<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})
+  InverseVolatility  KFold              stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  InverseVolatility  WalkForward        stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=MultiPeriodPredictionResult{var"#s179", PredictionReturnsResult{__T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}, Nothing} where {var"#s915"<:PredictionResult, var"#s179"<:AbstractVector{var"#s915"}, __T_nx, __T_X, __T_nf, __T_F, __T_nb, __T_B, __T_ts, __T_iv, __T_ivpa}
+  InverseVolatility  Combinatorial      stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{Vector{T}} where T<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})
+  InverseVolatility  MultipleRandomised stmts=   2 ssa=   2 concrete=   0 Any=  1 Core.Box= 0 rt=PopulationPredictionResult{<:AbstractVector{var"#s915"}} where var"#s915"<:(Union{var"#s915", var"#s914"} where {var"#s915"<:PredictionResult, var"#s914"<:MultiPeriodPredictionResult})
+
+## JET @report_opt (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              opt_reports=    5
+  EqualWeighted      WalkForward        opt_reports=    7
+  EqualWeighted      Combinatorial      opt_reports=   30
+  EqualWeighted      MultipleRandomised opt_reports=   17
+  InverseVolatility  KFold              opt_reports=    7
+  InverseVolatility  WalkForward        opt_reports=   10
+  InverseVolatility  Combinatorial      opt_reports=   32
+  InverseVolatility  MultipleRandomised opt_reports=   20
+
+## JET @report_call (target_modules = (PortfolioOptimisers,))
+  EqualWeighted      KFold              call_reports=    0
+  EqualWeighted      WalkForward        call_reports=    0
+  EqualWeighted      Combinatorial      call_reports=    0
+  EqualWeighted      MultipleRandomised call_reports=    0
+  InverseVolatility  KFold              call_reports=    0
+  InverseVolatility  WalkForward        call_reports=    0
+  InverseVolatility  Combinatorial      call_reports=    0
+  InverseVolatility  MultipleRandomised call_reports=    0
+
+## Chairmarks @be cross_val_predict (single thread)
+  EqualWeighted      KFold              min=    0.0980 ms  allocs=      497  bytes=      232000  samples=17832
+  EqualWeighted      WalkForward        min=    0.0420 ms  allocs=      193  bytes=       44720  samples=48798
+  EqualWeighted      Combinatorial      min=    0.6823 ms  allocs=     1528  bytes=      782088  samples=3115
+  EqualWeighted      MultipleRandomised min=    0.1399 ms  allocs=      982  bytes=      154080  samples=15609
+  InverseVolatility  KFold              min=    0.8097 ms  allocs=     1027  bytes=     1779296  samples=2346
+  InverseVolatility  WalkForward        min=    0.1312 ms  allocs=      458  bytes=      194760  samples=14511
+  InverseVolatility  Combinatorial      min=    1.5203 ms  allocs=     2323  bytes=     2495120  samples=1370
+  InverseVolatility  MultipleRandomised min=    0.2945 ms  allocs=     1852  bytes=      283512  samples=7154
+
+### DONE C
+########## harness_micro.jl (const, valid run)
+### harness micro-benchmark (n = 60 folds, SequentialEx, 1 thread)
+julia 1.12.7, PortfolioOptimisers 0.28.0
+  A explicit   returns Array len=60
+  B run_folds  returns Array len=60
+  C fold_loop  returns Array len=60
+
+## inferrability of each shape (per-fold work k = 0)
+  A explicit   return_types=Any[Vector{Float64}]   @inferred=true  Core.Box=0 stmts=17
+  B run_folds  return_types=Any[Vector{Float64}]   @inferred=true  Core.Box=0 stmts=10
+  C fold_loop  return_types=Any[Vector{Float64}]   @inferred=true  Core.Box=0 stmts=12
+
+## Chairmarks: total loop time for 60 folds, by per-fold work size k
+  k        A explicit     B run_folds    C fold_loop
+  0        0.105 us/2 a   0.058 us/2 a   0.095 us/2 a
+  10       1.235 us/2 a   1.232 us/2 a   1.238 us/2 a
+  100      12.636 us/2 a  12.636 us/2 a  12.641 us/2 a
+  1000     127.798 us/2 a 127.798 us/2 a 127.798 us/2 a
+  10000    1283.112 us/2 a 1282.922 us/2 a 1283.062 us/2 a
+  100000   14537.240 us/2 a 14294.094 us/2 a 14591.863 us/2 a
+
+### DONE micro

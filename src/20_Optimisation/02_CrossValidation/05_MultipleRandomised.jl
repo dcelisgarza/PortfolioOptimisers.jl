@@ -598,8 +598,9 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
     end
     predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                             test_idx = test_idx, path_id = id, fold_view = asset_view
-                            ) do i, opti, rdi, tr, te
-        return fit_and_predict(opti, rdi; train_idx = tr, test_idx = te)
+                            ) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
@@ -615,8 +616,7 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    predictions = parallel_folds(length(unique_ids), ex; ElT = MultiPeriodPredictionResult
-                                 ) do i
+    predictions = parallel_folds(length(unique_ids), ex, MultiPeriodPredictionResult) do i
         vals = dict[i]
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
