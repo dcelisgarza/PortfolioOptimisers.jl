@@ -1,6 +1,26 @@
-PUBLIC API LEDGER — PR #261 · base c975293745 -> HEAD 30407a2b57
+PUBLIC API LEDGER — PR #261
 ------------------------------------------------------------------------------
-Exported names: 705 -> 768
+Regenerate with:  python3 .review/gen_api_ledger.py > .review/api_ledger.txt
+
+Two bases, because they answer different questions.
+
+  * v0.28.0 -> HEAD is the RELEASE-NOTES base. v0.28.0 is the last released
+    version, so this is what a user upgrading actually faces.
+  * c975293745 -> HEAD is the REVIEW base, the branch point. c975293745 is an
+    ancestor of the v0.28.0 tag, so part of this diff is already released and is
+    NOT a 0.29.0 break -- `cle_pr` -> `x_src` is the clear case.
+
+The generator parses every `export` statement and every `struct` declaration at
+each ref. A multi-line export is read as one statement. A field declaration is
+read whether it is bare, `::`-bounded, `<:`-bounded (@concrete), or carries a
+propagation macro (@fprop, @vprop, @pprop, @wprop, @cprop). The FIRST ledger
+missed the macro-prefixed form, which is why it reported four field removals
+that never happened -- FactorBlackLittermanPrior `sets` and `w`,
+FactorRiskBudgeting `sets`, BayesianBlackLittermanPrior `sets` -- and missed
+that AugmentedBlackLittermanPrior collapses `a_sets`/`f_sets` into one `sets`.
+
+=== RELEASE NOTES BASE: v0.28.0 -> HEAD ===
+Exported names: 706 -> 762
 
 REMOVED EXPORTS (6):
    - AssetSets
@@ -10,41 +30,39 @@ REMOVED EXPORTS (6):
    - RVaR_RG
    - R_RDaR
 
-EXPORTED TYPES THAT NO LONGER EXIST: ['AssetSets', 'CVaREntropyPooling']
+EXPORTED TYPES THAT NO LONGER EXIST (2): ['AssetSets', 'CVaREntropyPooling']
 
-ADDED EXPORTS (69):
-   AbstractConstraintSpace, AbstractFeatureMatrixEstimator, AbstractFeatureValue, AbstractNonNegativeSimilarityMatrixAlgorithm, AbstractPhylogenyFeatureAlgorithm, AbstractSimilarityMatrixAlgorithm, AggregateDistances, AggregateFeatures, AngularDist, AngularSimilarity, AssetSetsFeatures, ComplementSimilarity, ConditionalValueatRiskEntropyPooling, ConditionalValueatRiskView, ConicEntropicValueatRiskView, DistancePolarity, ECE, EntropicValueatRiskView, ExponentialDecay, ExposureConstraintEstimator, FactorSpace, FeatureDistance, FeaturePrior, GridEntropicValueatRiskView, HierarchicalEqualRiskContributionResult, HierarchicalRiskParityResult, HopCount, HopCountQuantile, IntegerConditionalValueatRiskView, JuMPReturnsSettings, LastObservation, LinearConditionalValueatRiskView, LinearDecay, MaxRa, MeanCollapse, MedianCollapse, MeucciEntropyPoolingPrior, NoDecay, NoReturn, ObservationWeightsError, PathLength, PathLengthQuantile, PerformanceSummaryResult, PhylogenyFeatures, Proximity, RLVaR, RLVaR_RG, R_RLDaR, ReciprocalDecay, RegressionFeatures, RelaxedRiskBudgetingResult, Scale, SimilarityPolarity, StackObservations, TopologyOnly, UniverseSets, ValueatRiskView, asset_sets_feature_names, asset_sets_features, centrality_polarity, feature_matrix, performance_summary, phylogeny_features, resolve_feature_value, resolve_separation, separation_budget, separation_decay, separation_matrix, unit_scale_risk_measure
+ADDED EXPORTS (62):
+   AggregateDistances, AggregateFeatures, AngularDist, AngularSimilarity, AssetSetsFeatures, ComplementSimilarity, ConditionalValueatRiskEntropyPooling, ConditionalValueatRiskView, ConicEntropicValueatRiskView, DistancePolarity, ECE, EntropicValueatRiskView, ExponentialDecay, ExposureConstraintEstimator, FactorSpace, FeatureDistance, FeaturePrior, GridEntropicValueatRiskView, HierarchicalEqualRiskContributionResult, HierarchicalRiskParityResult, HopCount, HopCountQuantile, IntegerConditionalValueatRiskView, JuMPReturnsSettings, LastObservation, LinearConditionalValueatRiskView, LinearDecay, MaxRa, MeanCollapse, MedianCollapse, MeucciEntropyPoolingPrior, NoDecay, NoReturn, PathLength, PathLengthQuantile, PerformanceSummaryResult, PhylogenyFeatures, Proximity, RLVaR, RLVaR_RG, R_RLDaR, ReciprocalDecay, RegressionFeatures, RelaxedRiskBudgetingResult, Scale, SimilarityPolarity, StackObservations, TopologyOnly, UniverseSets, ValueatRiskView, asset_sets_feature_names, asset_sets_features, centrality_polarity, feature_matrix, performance_summary, phylogeny_features, resolve_feature_value, resolve_separation, separation_budget, separation_decay, separation_matrix, unit_scale_risk_measure
 
-FIELD CHANGES ON EXPORTED TYPES:
-   ArithmeticReturn: removed=['lb']  added=['settings']
-   AugmentedBlackLittermanPrior: removed=['f_sets']  added=-
-   BayesianBlackLittermanPrior: removed=['sets']  added=['f_mp']
+FIELD CHANGES ON EXPORTED TYPES (40; 9 lose a field):
+   ArithmeticReturn: removed=['lb']  added=['settings']  <-- LOSES A FIELD
+   AugmentedBlackLittermanPrior: removed=['a_sets', 'f_sets']  added=['sets']  <-- LOSES A FIELD
+   BayesianBlackLittermanPrior: removed=-  added=['f_mp']
    BetweennessCentrality: removed=-  added=['ov']
    BoxUncertaintySet: removed=-  added=['val']
    ClosenessCentrality: removed=-  added=['ov']
-   DistributionValueatRisk: removed=-  added=['mu', 'sigma', 'chol', 'pe']
+   DistributionValueatRisk: removed=-  added=['pe']
    EigenvectorCentrality: removed=-  added=['ov']
    EllipsoidalUncertaintySet: removed=-  added=['val']
-   EntropyPoolingPrior: removed=['var_alpha', 'cvar_alpha', 'ds_opt', 'dm_opt']  added=['evar_views']
+   EntropyPoolingPrior: removed=['var_alpha', 'cvar_alpha', 'ds_opt', 'dm_opt']  added=['evar_views']  <-- LOSES A FIELD
    ExpectedReturn: removed=-  added=['settings']
    ExpectedReturnRiskRatio: removed=-  added=['settings', 'sca']
-   FactorBlackLittermanPrior: removed=['sets', 'w']  added=-
-   FactorRiskBudgeting: removed=['sets']  added=-
    FactorRiskContributionResult: removed=-  added=['r']
-   HierarchicalOptimiser: removed=['cle_pr']  added=['x_src', 'z_src']
-   HierarchicalResult: removed=['fb']  added=-
-   HighOrderPrior: removed=['f_kt', 'f_sk', 'f_V']  added=['fpr']
-   JuMPOptimiser: removed=['cle_pr']  added=['x_src', 'z_src']
+   HierarchicalOptimiser: removed=-  added=['z_src']
+   HierarchicalResult: removed=['fb']  added=-  <-- LOSES A FIELD
+   HighOrderPrior: removed=['f_kt', 'f_sk', 'f_V']  added=['fpr']  <-- LOSES A FIELD
+   JuMPOptimiser: removed=-  added=['z_src']
    Kurtosis: removed=-  added=['pe']
    L1UncertaintySet: removed=-  added=['mu']
-   LogarithmicReturn: removed=['lb']  added=['settings']
-   LowOrderPrior: removed=['f_mu', 'f_sigma', 'f_w']  added=['o_X', 'fpr', 'Z']
+   LogarithmicReturn: removed=['lb']  added=['settings']  <-- LOSES A FIELD
+   LowOrderPrior: removed=['f_mu', 'f_sigma', 'f_w']  added=['o_X', 'fpr', 'Z']  <-- LOSES A FIELD
    MeanReturn: removed=-  added=['settings']
    MeanReturnRiskRatio: removed=-  added=['settings', 'sca']
    MeanRiskResult: removed=-  added=['r']
    NearOptimalCenteringResult: removed=-  added=['r']
-   NestedClustered: removed=['cle_pr']  added=['x_src', 'z_src']
-   NetworkEstimator: removed=['n']  added=['sep']
+   NestedClustered: removed=-  added=['z_src']
+   NetworkEstimator: removed=['n']  added=['sep']  <-- LOSES A FIELD
    NonOptimisationRiskRatio: removed=-  added=['settings', 'sca1', 'sca2']
    PricesResult: removed=-  added=['nz', 'Z']
    ProcessedJuMPOptimiserAttributes: removed=-  added=['sca']
@@ -54,11 +72,65 @@ FIELD CHANGES ON EXPORTED TYPES:
    SchurComplementHierarchicalRiskParityResult: removed=-  added=['r']
    SignedL1UncertaintySet: removed=-  added=['mu']
    Skewness: removed=-  added=['pe']
-   StandardDeviation: removed=-  added=['sigma', 'chol']
    StressCentrality: removed=-  added=['ov']
-   SubsetResampling: removed=['scale']  added=-
+   SubsetResampling: removed=['scale']  added=-  <-- LOSES A FIELD
    ThirdCentralMoment: removed=-  added=['settings']
-   Variance: removed=-  added=['sigma', 'chol']
    VarianceSkewKurtosis: removed=-  added=['pe']
 
-   (44 exported types changed fields)
+=== REVIEW BASE: c975293745 -> HEAD ===
+Exported names: 705 -> 762
+
+REMOVED EXPORTS (6):
+   - AssetSets
+   - CVaREntropyPooling
+   - MaxSR
+   - RVaR
+   - RVaR_RG
+   - R_RDaR
+
+EXPORTED TYPES THAT NO LONGER EXIST (2): ['AssetSets', 'CVaREntropyPooling']
+
+ADDED EXPORTS (63):
+   AggregateDistances, AggregateFeatures, AngularDist, AngularSimilarity, AssetSetsFeatures, ComplementSimilarity, ConditionalValueatRiskEntropyPooling, ConditionalValueatRiskView, ConicEntropicValueatRiskView, DistancePolarity, ECE, EntropicValueatRiskView, ExponentialDecay, ExposureConstraintEstimator, FactorSpace, FeatureDistance, FeaturePrior, GridEntropicValueatRiskView, HierarchicalEqualRiskContributionResult, HierarchicalRiskParityResult, HopCount, HopCountQuantile, IntegerConditionalValueatRiskView, JuMPReturnsSettings, LastObservation, LinearConditionalValueatRiskView, LinearDecay, MaxRa, MeanCollapse, MedianCollapse, MeucciEntropyPoolingPrior, NoDecay, NoReturn, ObservationWeightsError, PathLength, PathLengthQuantile, PerformanceSummaryResult, PhylogenyFeatures, Proximity, RLVaR, RLVaR_RG, R_RLDaR, ReciprocalDecay, RegressionFeatures, RelaxedRiskBudgetingResult, Scale, SimilarityPolarity, StackObservations, TopologyOnly, UniverseSets, ValueatRiskView, asset_sets_feature_names, asset_sets_features, centrality_polarity, feature_matrix, performance_summary, phylogeny_features, resolve_feature_value, resolve_separation, separation_budget, separation_decay, separation_matrix, unit_scale_risk_measure
+
+FIELD CHANGES ON EXPORTED TYPES (40; 12 lose a field):
+   ArithmeticReturn: removed=['lb']  added=['settings']  <-- LOSES A FIELD
+   AugmentedBlackLittermanPrior: removed=['a_sets', 'f_sets']  added=['sets']  <-- LOSES A FIELD
+   BayesianBlackLittermanPrior: removed=-  added=['f_mp']
+   BetweennessCentrality: removed=-  added=['ov']
+   BoxUncertaintySet: removed=-  added=['val']
+   ClosenessCentrality: removed=-  added=['ov']
+   DistributionValueatRisk: removed=-  added=['pe']
+   EigenvectorCentrality: removed=-  added=['ov']
+   EllipsoidalUncertaintySet: removed=-  added=['val']
+   EntropyPoolingPrior: removed=['var_alpha', 'cvar_alpha', 'ds_opt', 'dm_opt']  added=['evar_views']  <-- LOSES A FIELD
+   ExpectedReturn: removed=-  added=['settings']
+   ExpectedReturnRiskRatio: removed=-  added=['settings', 'sca']
+   FactorRiskContributionResult: removed=-  added=['r']
+   HierarchicalOptimiser: removed=['cle_pr']  added=['x_src', 'z_src']  <-- LOSES A FIELD
+   HierarchicalResult: removed=['fb']  added=-  <-- LOSES A FIELD
+   HighOrderPrior: removed=['f_kt', 'f_sk', 'f_V']  added=['fpr']  <-- LOSES A FIELD
+   JuMPOptimiser: removed=['cle_pr']  added=['x_src', 'z_src']  <-- LOSES A FIELD
+   Kurtosis: removed=-  added=['pe']
+   L1UncertaintySet: removed=-  added=['mu']
+   LogarithmicReturn: removed=['lb']  added=['settings']  <-- LOSES A FIELD
+   LowOrderPrior: removed=['f_mu', 'f_sigma', 'f_w']  added=['o_X', 'fpr', 'Z']  <-- LOSES A FIELD
+   MeanReturn: removed=-  added=['settings']
+   MeanReturnRiskRatio: removed=-  added=['settings', 'sca']
+   MeanRiskResult: removed=-  added=['r']
+   NearOptimalCenteringResult: removed=-  added=['r']
+   NestedClustered: removed=['cle_pr']  added=['x_src', 'z_src']  <-- LOSES A FIELD
+   NetworkEstimator: removed=['n']  added=['sep']  <-- LOSES A FIELD
+   NonOptimisationRiskRatio: removed=-  added=['settings', 'sca1', 'sca2']
+   PricesResult: removed=-  added=['nz', 'Z']
+   ProcessedJuMPOptimiserAttributes: removed=-  added=['sca']
+   RadialityCentrality: removed=-  added=['ov']
+   ReturnsResult: removed=-  added=['nz', 'Z']
+   RiskBudgetingResult: removed=-  added=['r']
+   SchurComplementHierarchicalRiskParityResult: removed=-  added=['r']
+   SignedL1UncertaintySet: removed=-  added=['mu']
+   Skewness: removed=-  added=['pe']
+   StressCentrality: removed=-  added=['ov']
+   SubsetResampling: removed=['scale']  added=-  <-- LOSES A FIELD
+   ThirdCentralMoment: removed=-  added=['settings']
+   VarianceSkewKurtosis: removed=-  added=['pe']
