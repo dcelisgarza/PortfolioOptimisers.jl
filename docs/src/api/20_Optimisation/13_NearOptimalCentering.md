@@ -20,6 +20,8 @@ return_term_ends
 set_near_optimal_centering_constraints!
 set_near_optimal_objective_function!
 solve_noc!
+assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCentering, model::JuMP.Model, noc::NearOptimalCentering, setup::NearOptimalSetup, rd::ReturnsResult)
+solve_near_optimal_centering!(::UnconstrainedNearOptimalCentering, model::JuMP.Model, noc::NearOptimalCentering, setup::NearOptimalSetup)
 set_noc_anchor_parameters!
 set_noc_anchor!
 get_overall_retcode

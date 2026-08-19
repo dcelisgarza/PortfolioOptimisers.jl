@@ -15,10 +15,11 @@ views into one.
 
 In `PortfolioOptimisers`, [`EntropyPoolingPrior`](@ref) accepts a separate
 [`LinearConstraintEstimator`](@ref) per quantity. Mind the naming: `mu_views` is the mean,
-`sigma_views` is the **variance**, `var_views` is the **Value at Risk** and `cvar_views` the
-**Conditional VaR** (tail-risk views), `sk_views`/`kt_views` are skewness/kurtosis, and
-`cov_views`/`rho_views` target covariances/correlations. Each is a list of string constraints
-over the [`UniverseSets`](@ref) names.
+`sigma_views` is the **variance**, `var_views` is the **Value at Risk**, `cvar_views` the
+**Conditional VaR** and `evar_views` the **Entropic VaR** (tail-risk views),
+`sk_views`/`kt_views` are skewness/kurtosis, and `cov_views`/`rho_views` target
+covariances/correlations. Each is a list of string constraints over the
+[`UniverseSets`](@ref) names.
 
 !!! tip "When to reach for this"
     Reach for entropy pooling when your views are richer than "the mean will be x": views on
@@ -75,9 +76,28 @@ Entropy-pooling views are also plain strings, but they can target different quan
 state a **mean** view (Apple returns 8 bps) via `mu_views`, a **relative mean** view (tech
 outperforms energy), and a **variance** view (pin Apple's variance) via `sigma_views`. The
 comparison operators a view accepts depend on the moment: `mu_views`, `sigma_views`,
-`sk_views`, `kt_views`, `cov_views` and `rho_views` take `==`, `>=` and `<=`; `var_views` (VaR)
-takes only `==` and `>=`; and `cvar_views` (CVaR) takes only `==`. An unsupported operator
-raises a `ParseError` listing the ones allowed for that view.
+`sk_views`, `kt_views`, `cov_views`, `rho_views`, `cvar_views` and `evar_views` take `==`,
+`>=` and `<=`; `var_views` (VaR) takes only `==` and `>=`. An unsupported operator raises a
+`ParseError` listing the ones allowed for that view.
+
+A significance level belongs to the view rather than to the estimator: the CVaR at 1% and at
+10% are different statistics of the same series. So `var_views`, `cvar_views` and `evar_views`
+each take a [`ValueatRiskView`](@ref), a [`ConditionalValueatRiskView`](@ref) or an
+[`EntropicValueatRiskView`](@ref) — each pairing a group of view equations with the `alpha` it
+is read under — or a vector of them for views stated at several levels. A `prior(...)`
+reference inside a group resolves at that group's level.
+
+A tail view is not a linear function of the posterior probabilities, so it needs auxiliary
+variables and therefore a [`JuMPEntropyPooling`](@ref) in `opt`. The `alg` field of a tail view
+group picks how each view is written; left at `nothing` each takes the cheapest formulation
+that expresses it exactly — [`LinearConditionalValueatRiskView`](@ref) and
+[`ConicEntropicValueatRiskView`](@ref) for a lower bound or an equality at or above the prior
+value, and [`IntegerConditionalValueatRiskView`](@ref) or
+[`GridEntropicValueatRiskView`](@ref) otherwise, which need a mixed-integer conic solver. For an
+[`EntropicValueatRiskView`](@ref) the `alg` field is also where the grid of dual variables and
+the big-M constant live, so one group can take its own [`GridEntropicValueatRiskView`](@ref).
+[`ValueatRiskView`](@ref) has no `alg`: a VaR view is linear in the posterior probabilities, so
+there is no formulation to choose.
 =#
 
 mu_views = LinearConstraintEstimator(; val = ["AAPL == 0.0008", "tech >= energy"])

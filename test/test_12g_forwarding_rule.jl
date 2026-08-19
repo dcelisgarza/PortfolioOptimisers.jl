@@ -369,7 +369,7 @@ end
     declared = Set(tn(m.sig.parameters[2]) for m in methods(PO.factor_residual_config))
     census = filter(T -> parentmodule(T) === PO,
                     concrete_estimators(PO.AbstractPriorEstimator))
-    @test length(census) == 11
+    @test length(census) == 12
     for T in census
         @test tn(T) in declared
     end

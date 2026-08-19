@@ -699,34 +699,46 @@ end
                                              mu_views = mu_views), rd).w, rtol = 5e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.03264496113282452")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == ValueatRisk(;)(rd.X[:, 1])
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             var_views = var_views), rd).w, rtol = 1e-6)
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL >= 1.15*prior(AAPL)")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= 1.15 * ValueatRisk(;)(rd.X[:, 1])
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             var_views = var_views), rd).w, rtol = 1e-6)
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.12865204867438676")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, var_views = var_views,
-                                             opt = jopt), rd).w, rtol = 5e-6)
+                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 5e-6)
 
     var_views = LinearConstraintEstimator(; val = ["AAPL == 0.028", "XOM >= 0.027"])
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_alpha = 0.07, var_views = var_views,
-                                   opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; alpha = 0.07,
+                                                               views = var_views)), rd)
     @test isapprox(ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, 1]), 0.028, rtol = 7e-3)
     @test ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, end]) >= 0.027
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt, var_alpha = 0.07,
-                                             var_views = var_views), rd).w, rtol = 1e-4)
+                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                             var_views = ValueatRiskView(; alpha = 0.07,
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-4)
 
     sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0007")
     pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt), rd)
@@ -861,33 +873,47 @@ end
     @test isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35, rtol = 1e-3)
 
     cvar_views = LinearConstraintEstimator(; val = "AAPL == 0.07")
-    pr = prior(EntropyPoolingPrior(; sets = sets, cvar_views = cvar_views, opt = opt), rd)
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = opt,
+                                         cvar_views = ConditionalValueatRiskView(;
+                                                                                 views = cvar_views)),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-6)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             cvar_views = cvar_views), rd).w, rtol = 5e-5)
+                   prior(MeucciEntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                   cvar_views = ConditionalValueatRiskView(;
+                                                                                           views = cvar_views)),
+                         rd).w, rtol = 5e-5)
 
     cvar_views = LinearConstraintEstimator(; val = "AAPL == prior(AAPL)*1.37")
-    pr = prior(EntropyPoolingPrior(; sets = sets, cvar_views = cvar_views, opt = opt), rd)
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = opt,
+                                         cvar_views = ConditionalValueatRiskView(;
+                                                                                 views = cvar_views)),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]),
                    ConditionalValueatRisk(;)(rd.X[:, 1]) * 1.37, rtol = 1e-6)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             cvar_views = cvar_views), rd).w, rtol = 1e-5)
+                   prior(MeucciEntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                   cvar_views = ConditionalValueatRiskView(;
+                                                                                           views = cvar_views)),
+                         rd).w, rtol = 1e-5)
 
     cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.053", "XOM==0.045"])
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = EntropyPoolingPrior(; sets = sets,
-                                                                alg = H2_EntropyPooling(),
-                                                                cvar_views = cvar_views,
-                                                                opt = opt)), rd)
+                                       pe = MeucciEntropyPoolingPrior(; sets = sets,
+                                                                      alg = H2_EntropyPooling(),
+                                                                      opt = opt,
+                                                                      cvar_views = ConditionalValueatRiskView(;
+                                                                                                              views = cvar_views))),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.053, rtol = 5e-5)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.045, rtol = 1e-4)
     @test isapprox(pr.w,
                    prior(HighOrderPriorEstimator(;
-                                                 pe = EntropyPoolingPrior(; sets = sets,
-                                                                          alg = H1_EntropyPooling(),
-                                                                          cvar_views = cvar_views)),
+                                                 pe = MeucciEntropyPoolingPrior(;
+                                                                                sets = sets,
+                                                                                alg = H1_EntropyPooling(),
+                                                                                cvar_views = ConditionalValueatRiskView(;
+                                                                                                                        views = cvar_views))),
                          rd).w, rtol = 5e-3)
 
     mu_views = LinearConstraintEstimator(;

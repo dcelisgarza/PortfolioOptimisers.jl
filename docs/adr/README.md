@@ -1,0 +1,97 @@
+# Architecture decision records — index
+
+This page is the map of `docs/adr/`. Each row names one decision in one line, so you can find the
+ADR you need without reading the directory.
+
+How to use it:
+
+1. Find the row for the area that you touch.
+2. Open that ADR before you change the behaviour it fixes.
+3. An ADR is **amended, never rewritten**. Append a `## Amendment (YYYY-MM-DD)` section. An ADR
+   that describes superseded behaviour is correct history, not a defect.
+4. Add a row here when you add an ADR. The row is one line: the number, the title, and what the
+   decision settles.
+
+The **Am.** column counts the amendments and gives the date of the last one. A high count marks a
+decision that moved many times, so read the amendments as well as the body.
+
+## The decisions
+
+| # | Decision | Am. | What it settles |
+| ---- | -------- | --- | --------------- |
+| 0001 | [Generalise the pure-propagation `factory` methods](0001-generalise-factory-methods.md) | | One generic `factory` recurses into the fields of an eligible struct. Leaf injectors and logic-bearing methods stay explicit. The mechanism is the `@propagatable` macro. |
+| 0002 | [`@propagatable` macro design](0002-propagatable-macro-design.md) | 1 · 2026-08-17 | A field joins propagation only if a tag marks it. Runtime type dispatch alone is not enough. |
+| 0003 | [Parallelise the test suite with ParallelTestRunner.jl](0003-parallelise-test-suite.md) | 1 · 2026-08-17 | The runner auto-discovers `test/*.jl` and runs each file in an isolated worker module. |
+| 0004 | [Give the JuMP model a typed state interface](0004-typed-jump-model-state.md) | | Category A state is reached through a named, checked accessor interface. Category B keeps the `(expr, key)` convention. |
+| 0005 | [Namespace nested risk state by key prefix](0005-prefix-namespaced-risk-state.md) | | A nested risk expression is built under a key prefix. Nothing is saved, unregistered, or restored. |
+| 0006 | [Classify the expected-risk input shape with a trait](0006-risk-input-kind-trait.md) | | Each measure answers `risk_input_kind` at its definition site. The routing unions are gone. |
+| 0007 | [Feed a reduced return series through `r(x::VecNum)`](0007-precomputed-returns-functor-contract.md) | | The single-argument functor is the canonical "expected risk of the net-return series". No sentinel vector. |
+| 0008 | [Extract the JuMP model-assembly pipeline into one deep module](0008-jump-model-assembly.md) | 3 · 2026-08-18 | The invariant middle is one mutating builder. The per-optimiser head and tail stay in place. |
+| 0009 | [Matrix-processing order is a sequence of step symbols](0009-matrix-processing-order-as-step-symbols.md) | | The `order` field holds a tuple of step symbols. The other fields do not change. |
+| 0010 | [Unify the `*_view` family; split the propagation tags](0010-unify-view-family-and-split-propagation-tags.md) | 2 · 2026-08-17 | One `port_opt_view` verb. `@prop` splits into `@fprop` (factory) and `@vprop` (view). |
+| 0011 | [One deep optimisation Result](0011-deep-optimisation-result.md) | 1 · 2026-08-16 | The result side mirrors the JuMP estimator structure. The change is additive. |
+| 0012 | [Deepen the prior→measure moment binding with `@pprop`/`@cprop`](0012-prior-measure-binding-tags.md) | | A tag names either a mechanism or a source. The family grows from two axes to five. |
+| 0013 | [Generate property forwarding with `@forward_properties`](0013-property-forwarding-macro.md) | | A standalone macro beside the struct emits `getproperty` and `propertynames` from explicit rules. |
+| 0014 | [Group the user guide and the examples by pipeline stage](0014-group-docs-by-pipeline-stage.md) | | Both narrative halves follow the `CONTEXT.md` pipeline spine, one subdirectory per group. |
+| 0015 | [A role suffix is for disambiguation](0015-disambiguation-suffix-naming.md) | | A type takes the bare concept word when that word is unambiguous. A suffix is added only to earn the bare name back. |
+| 0016 | [Uncertainty sets own their posdef and moment configuration](0016-uncertainty-sets-own-their-posdef-and-moment-config.md) | | An uncertainty-set estimator carries its own configuration. It never reaches into the prior instance. |
+| 0017 | [`FiniteAllocationInput` is an Estimator, not a Result](0017-finite-allocation-input-is-an-estimator.md) | | The allocation input is one struct on the Estimator tree. The deviation from the Result precedent is deliberate. |
+| 0018 | [Risk-measure ↔ optimiser compatibility is a type-derived trait](0018-risk-measure-optimiser-compatibility-trait.md) | | `supported_risk_measures(::Type{<:Opt})` is the single primitive. The predicate and the docs table derive from it. |
+| 0019 | [Drop the Python dependency](0019-drop-python-dependency-native-statistics.md) | | Histogram binning and the block bootstrap are native Julia. `PythonCall` and `CondaPkg.toml` are removed. |
+| 0020 | [`NormError` is a shared Base primitive](0020-normerror-shared-base-primitive.md) | | The norm family is Base vocabulary. The `Lx*Tracking` types are renamed `Lx*Norm`. |
+| 0021 | [One MIP constraint family over an `AbstractMIPSpace`](0021-unify-mip-constraints-over-mip-space.md) | | The three points of difference become a small interface. The builders are written once. |
+| 0022 | [A data-carrying `SmythBrobyKernel` folds the Gerber markers into one algorithm](0022-smythbroby-kernel-unifies-gerber-markers.md) | 1 · 2026-08-17 | The two axes separate into dispatch. One comovement loop drives the per-run scoring state. |
+| 0023 | [Nested optimisers propagate structured failure diagnostics](0023-structured-optimisation-failure-diagnostics.md) | | `OptimisationFailure.res` is a named tuple that names each sub-problem and its return code. |
+| 0024 | [One `scalarise` seam](0024-single-scalarise-seam.md) | | One generic `scalarise(f, ::Scalariser, itr; by)`. The per-optimiser copies are deleted. |
+| 0025 | [Enumerate the equation parser's callable functions](0025-enumerated-parser-allowlist.md) | 1 · 2026-07-06 | An explicit `Symbol => Function` table is the only source of what the parser can call. No lookup in `Base`. |
+| 0026 | [Keep the lenient constraint-name default](0026-lenient-constraint-names-with-suggestions.md) | 1 · 2026-07-06 | `strict = false` stays the default. The diagnostic improves instead. |
+| 0027 | [Cap the equation parser's length and depth](0027-cap-equation-parser-recursion.md) | 1 · 2026-07-06 | Two static, overridable caps at the trust boundary. The parser fails closed with a typed error. |
+| 0028 | [`Pipeline` is a root workflow Estimator](0028-pipeline-workflow-estimator.md) | 5 | A linear step list over an accumulating context. The whole workflow becomes the unit that is fitted per fold. |
+| 0029 | [Asset selection is returns preprocessing](0029-asset-selection-is-returns-preprocessing.md) | | A selector is a preprocessing subfamily. The fitted universe is state on one shared result. |
+| 0030 | [Time-dependent inputs are in-field wrappers](0030-time-dependent-constraints.md) | | `TimeDependent(val; default)` is consumed by whichever fold loop processes it. |
+| 0031 | [The holdout split is a pipeline step](0031-holdout-split-as-a-pipeline-step.md) | | `TrainTestSplit` is pinned to the first position, and it excludes cross-validation. |
+| 0032 | [Quintile portfolios are an uncertainty set](0032-quintile-portfolios-are-an-uncertainty-set.md) | 1 · 2026-08-16 | There is deliberately no `QuintilePortfolio` type. The recipe is an uncertainty-set shape. |
+| 0033 | [Split the MIP file into an indicator layer and topical emitters](0033-split-mip-file-into-indicator-layer-and-emitters.md) | | The MIP file keeps only the indicator layer. Each consumer moves to a file named for its feature. |
+| 0034 | [The MIP indicator bundle lives in Model State](0034-mip-indicator-bundle-lives-in-model-state.md) | | The bundle is a first-class state entry, read back through the typed accessors. |
+| 0035 | [The `ucs` extraction shares post-sampling kernels](0035-ucs-extraction-is-post-sampling-not-halves.md) | | Prior, seeding, and sampling stay in each public body. Only the pure post-sampling construction is shared. |
+| 0036 | [A custom objective term is a penalty contribution](0036-custom-objective-terms-are-penalty-contributions.md) | 1 · 2026-08-18 | The hook adds to the penalty accumulator. It never touches the objective expression. |
+| 0037 | [Model State is reached only through typed accessors](0037-model-state-accessor-interface.md) | 2 · 2026-08-17 | One memoise combinator, not per-key accessors. The seam lock fails closed. |
+| 0038 | [Optimisers own pipeline routing](0038-optimisers-own-pipeline-routing.md) | 2 · 2026-08-18 | The optimiser decides which field a target lands in. The `Pipeline` owns only the fan-out. |
+| 0039 | [A windowed estimator is generated from one declaration](0039-windowed-estimators-are-generated-from-one-declaration.md) | | `@windowed_estimator` emits a whole family member from one block. The types do not merge. |
+| 0040 | [The capability catalogue curates grouping, not descriptions](0040-capability-catalogue-curates-grouping-not-descriptions.md) | 1 · 2026-08-18 | The page is generated. The declaration curates the tree only. |
+| 0041 | [One `RESOURCE_LIMITS` cap per sink](0041-one-resource-cap-per-sink.md) | 3 · 2026-08-17 | Every sizing sink gets its own field. A cap is never reused, and it is named after the field it guards. |
+| 0042 | [`Impute` is a weak dependency](0042-impute-is-a-weak-dependency.md) | | One seam, `apply_impute_method`, which the extension extends. |
+| 0043 | [A `nothing` observation weight means unweighted](0043-nothing-observation-weights-means-unweighted-not-unavailable.md) | | `nothing` means that no weights were asked for. A weight that cannot be resolved throws. |
+| 0044 | [A matrix source is named, not flagged](0044-matrix-sources-are-named-not-flagged.md) | | `cle_pr::Bool` becomes `x_src::Symbol`. A clean break, no deprecation path. |
+| 0045 | [A feature matrix is data, not estimator configuration](0045-a-feature-matrix-is-data-not-estimator-configuration.md) | 6 · 2026-08-06 | The matrix rides on the result beside the returns. The estimator holds only configuration. |
+| 0046 | [Wrapping priors forward by default](0046-wrapping-priors-forward-by-default-and-document-every-drop.md) | 12 · 2026-08-18 | Forward when forwarding is correct. Drop only where forwarding states something false, and document every drop. |
+| 0047 | [A constraint is re-based only if it is linear in `w`](0047-a-constraint-is-re-based-only-if-it-is-linear-in-w.md) | 4 · 2026-08-16 | A wrapper type declares the re-basis, so a constraint that is not a linear form cannot state one. |
+| 0048 | [A network relates by its separation](0048-a-network-relates-by-its-separation-and-weights-by-what-selected-it.md) | 6 · 2026-08-17 | Truncation and decay are two knobs, and only one of them cuts. A weight comes from what selected the edge. |
+| 0049 | [A similarity reaches the PMFG only if it cannot go negative](0049-a-similarity-reaches-the-pmfg-only-if-it-cannot-go-negative.md) | | The non-negativity is a type bound, not a runtime check. |
+| 0050 | [An uncertainty set carries the quantity it bounds](0050-an-uncertainty-set-carries-the-quantity-it-bounds.md) | | Each result gains one optional field for the quantity it is a neighbourhood of, and that quantity wins. |
+| 0051 | [A prior-derived slot may hold the method instead of the value](0051-a-prior-derived-slot-may-hold-the-method-instead-of-the-value.md) | 3 · 2026-08-17 | The noun is a Deferred Quantity. Four quantities defer: `mu`, `sigma`, `kt`, `sk`. |
+| 0052 | [A return expression is a weighted sum of terms](0052-a-return-expression-is-a-weighted-sum-of-terms.md) | 1 · 2026-08-16 | The plural noun is the term, not the characteristic. |
+| 0053 | [`scale` is a combination weight](0053-scale-is-a-combination-weight.md) | 2 · 2026-08-18 | The weight an element carries inside a combination. One element is not a combination, so the weight is inert. |
+| 0054 | [A degeneracy guard tests the expression](0054-a-degeneracy-guard-tests-the-expression-not-the-term-type.md) | | The expression is degenerate when it is identically zero, by whichever route it got there. |
+| 0055 | [Recursive bisection owns its branch order](0055-recursive-bisection-owns-its-branch-order.md) | | An optimiser declares `branchorder` only if the leaf permutation is optional for its allocation. |
+| 0056 | [The Julia setup action floats on `@latest`](0056-the-julia-setup-action-floats-on-latest.md) | | Every `setup-julia` step uses `@latest`. A setup action is a toolchain installer. |
+| 0057 | [A range risk measure is its base measure applied twice](0057-a-range-risk-measure-is-its-base-measure-applied-twice.md) | | `range_tails(r)` returns the two point measures. Each tail builds through the single-tail seam. |
+| 0058 | [The `dims` guard and the orientation are one call](0058-the-dims-guard-and-the-orientation-are-one-call.md) | | `dims_oriented(dims, A)` validates and orients, so a caller cannot orient without validating. |
+| 0059 | [A drawdown tail measure is its returns twin on another series](0059-a-drawdown-tail-measure-is-its-returns-twin-on-another-series.md) | | `risk_series` is the one place the substitution is made. Each builder is written once. |
+| 0060 | [A constructor docstring block is a copy, and a census gates it](0060-a-constructor-docstring-block-is-a-copy-and-a-census-gates-it.md) | | The block stays hand-written. A test parses the source text and makes the drift loud. |
+| 0061 | [The propagation tag set is data](0061-the-propagation-tag-set-is-data.md) | | `PROP_TAG_NAMES` is the table. The recognition layer derives from it. |
+| 0062 | [The frontier sweep is one seam](0062-the-frontier-sweep-is-one-seam.md) | | The sweep lives in the Model State interface, beside the two frontier readers. |
+| 0063 | [The risk-free rate is added once per prior](0063-the-risk-free-rate-is-added-once-per-prior.md) | | One round trip: `remove_rf` before the update, `apply_rf` after it. Nothing else touches the field. |
+| 0064 | [The entropy pooling prior dispatches on its algorithm](0064-the-entropy-pooling-prior-dispatches-on-its-algorithm.md) | | `prior` has one method on the bare estimator, which forwards the algorithm as a value. |
+| 0065 | [The weighted moment seam densifies its observations](0065-the-weighted-moment-seam-densifies-its-observations.md) | | The weighted methods materialise the observation matrix before the call. |
+| 0066 | [A sub-portfolio enumeration is an adapter](0066-the-sub-portfolio-enumeration-is-an-adapter.md) | | `SubPortfolioUniverse` is the adapter, and the module is written once. |
+| 0067 | [The cross-validation fold loop is one seam](0067-the-cross-validation-fold-loop-is-one-seam.md) | 1 · 2026-08-19 | One `fold_loop`, beside `parallel_folds` and `run_folds`. |
+| 0068 | [A Black-Litterman caller states its axis, not its key](0068-a-black-litterman-caller-states-its-axis-not-its-key.md) | | The last argument of `bl_preroll` names the axis. The callee resolves the key. |
+| 0069 | [A tail view carries its own level and formulation](0069-a-tail-view-carries-its-own-level-and-formulation.md) | | The group holds `alpha` and `alg`. `nothing` picks the cheapest exact formulation. |
+
+ADRs 0017, 0018, and 0028 carry no `status` frontmatter. Every other ADR is `accepted`.
+
+## Not an ADR
+
+[`examples-coverage.md`](examples-coverage.md) is a living inventory of which pipeline-stage
+topics have an example or a user-guide page. ADR 0014 records the decision behind its grouping.

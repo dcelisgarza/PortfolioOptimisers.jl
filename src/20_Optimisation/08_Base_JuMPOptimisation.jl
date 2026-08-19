@@ -1249,7 +1249,8 @@ The risk axis varies **fastest**, so the flat order is return-outer and risk-inn
 is load-bearing rather than cosmetic: [`NearOptimalCentering`](@ref) solves its anchor
 portfolios as one [`MeanRisk`](@ref) sweep over the same two frontiers, and pairs anchor `i`
 with sweep point `i`. Stating the order once here is what keeps the two sweeps aligned. Either
-axis may be `nothing`, which means that side is not swept.
+axis may be `nothing`, which means that side is not swept. If both axes are `nothing`, the
+sweep is one point that writes nothing.
 
 # Arguments
 
@@ -1275,6 +1276,9 @@ function frontier_sweep_axes(::Nothing, risk_axis)
 end
 function frontier_sweep_axes(ret_axis, ::Nothing)
     return Iterators.product(zip(ret_axis...))
+end
+function frontier_sweep_axes(::Nothing, ::Nothing)
+    return Iterators.product()
 end
 """
     set_frontier_point!(model::JuMP.Model, point::Tuple)

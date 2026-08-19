@@ -963,6 +963,6 @@ plot_portfolio_cumulative_returns(bt_fea)
 #src   sample, (252,20,2) on a 252-row fit, and cross_val_predict runs all folds under
 #src   z_src = :prior. So the refusal is only about matrices computed IN ADVANCE, and CV cannot
 #src   take precomputed quantities anyway. §6.1 and §8.1 now say so, and
-#src   feature_matrix(::Arr3Num, …) in src/13_Prior/13_FeaturePrior.jl carries a three-remedy
+#src   feature_matrix(::Arr3Num, …) in src/13_Prior/15_FeaturePrior.jl carries a three-remedy
 #src   message. A TimestampedFeatures producer (a literal plus its clock, rows recovered by
 #src   feature_row_indices) was written and DELIBERATELY DROPPED as useless complexity.

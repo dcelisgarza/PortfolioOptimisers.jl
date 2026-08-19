@@ -427,7 +427,7 @@ its docstring.
 
 ├──&nbsp;[AbstractEntropyPoolingOptimiser](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[CVaREntropyPooling](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ConditionalValueatRiskEntropyPooling](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[JuMPEntropyPooling](@ref)
 

@@ -22,11 +22,20 @@ using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, Interacti
 
 const PO = PortfolioOptimisers
 
-# Every concrete subtype of `T`, at any depth.
+# Every concrete subtype of `T`, at any depth, that `PortfolioOptimisers` itself declares.
+#
+# The suite gives each file its own module but not its own process, so `subtypes` also
+# answers with the probe estimators the files that ran before it declare. The census is
+# about the shipped universe, so a leaf from another module is not one of its members, and
+# the count below is stable whatever else the worker ran first.
 function concrete_leaves(T::Type)
     out = Type[]
     for S in subtypes(T)
-        isabstracttype(S) ? append!(out, concrete_leaves(S)) : push!(out, S)
+        if isabstracttype(S)
+            append!(out, concrete_leaves(S))
+        elseif parentmodule(S) === PO
+            push!(out, S)
+        end
     end
     return out
 end
