@@ -9,7 +9,7 @@ hero:
   tagline: Democratising, demystifying, and derisking investing
   image:
     # Root-relative: DocumenterLandingPage remaps a bare filename under `/` into the site's
-    # `assets/` directory. DocumenterVitepress wants the bare `logo.svg` instead.
+    # `assets/` directory.
     src: /logo.svg
     alt: PortfolioOptimisers
   actions:
@@ -54,14 +54,7 @@ features:
     details: Walk-forward and combinatorial cross-validation, grid and randomised hyperparameter search, pipelines, and time-dependent constraints.
     link: user_guide/05_Validation_and_Tuning
     linkText: Validation and tuning
-
-authors:
-  - name: Daniel Celis Garza
-    platform: github
-    link: https://github.com/dcelisgarza
 ---
-
-<Authors />
 ```
 
 ```@meta

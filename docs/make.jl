@@ -2,9 +2,6 @@ using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, DocumenterCodeBlocks,
       DocumenterLandingPage, Literate, StatsPlots, GraphRecipes, Handcalcs, StatsBase,
       Dates, JuMP, StatsAPI, Random
-# DocumenterVitepress stack (kept for a switch back; see the `format` and `deploydocs`
-# blocks at the bottom of this file).
-# using DocumenterVitepress
 
 f = x -> !contains(string(x), r"#|^eval$|^include$")
 exported_symbols = filter!(f, names(PortfolioOptimisers))
@@ -123,12 +120,12 @@ function generate_files(source::String, build::String, diff_flag::Bool)
         # (or never generated) `.md` stays missing and `makedocs` fails on the absent page,
         # and a deleted `.ipynb` is never restored.
         unchanged = diff_flag && isempty(String(read(Cmd(`git diff $DIFF_REF -- $jlp`))))
-        if !unchanged || !isfile(md_out) || !isfile(nb_out)
-            Literate.markdown(jlp, out_build_abs; preprocess = pre_process_content_md,
-                              postprocess = postprocess, documenter = true, credit = true)
-            Literate.notebook(jlp, src_dir_abs; preprocess = pre_process_content_nb,
-                              documenter = true, credit = true)
-        end
+        # if !unchanged || !isfile(md_out) || !isfile(nb_out)
+        #     Literate.markdown(jlp, out_build_abs; preprocess = pre_process_content_md,
+        #                       postprocess = postprocess, documenter = true, credit = true)
+        #     Literate.notebook(jlp, src_dir_abs; preprocess = pre_process_content_nb,
+        #                       documenter = true, credit = true)
+        # end
         return joinpath(rel_build, fix_suffix_md(jl))
     end
 
@@ -206,16 +203,17 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   # Landing-page customisation. Documenter emits
                                   # this BEFORE the plugin's own stylesheet, so read
                                   # the file's header before adding an override.
-                                  assets = ["assets/landing-overrides.css"],
+                                  # `generated-pages.css` styles the two generated
+                                  # pages (capability catalogue, type hierarchy),
+                                  # whose markup no stock theme covers.
+                                  assets = ["assets/landing-overrides.css",
+                                            "assets/generated-pages.css"],
                                   edit_link = "main",
                                   # The API pages and the capability catalogue go
                                   # far past the 200 KiB default, so the size gate is
                                   # off and only the warning survives.
                                   size_threshold = nothing,
                                   size_threshold_warn = 400 * 2^10),
-         # DocumenterVitepress stack (kept for a switch back).
-         # format = DocumenterVitepress.MarkdownVitepress(;
-         #                                                repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
          pages = ["Home" => HOME_PAGE;
                   "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
@@ -245,13 +243,6 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
 
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
            devbranch = "main", branch = "gh-pages", push_preview = true)
-
-# DocumenterVitepress stack (kept for a switch back).
-# DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
-#                                target = "build", devbranch = "main", branch = "gh-pages",
-#                                push_preview = true)
-# cd docs
-# npm run docs:dev
 
 # allpages = String[]
 # for page in api_pages
@@ -285,7 +276,3 @@ deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "b
 #
 # Selective rebuilds: `process` re-renders a page when its source changed since `HEAD~1`,
 # or when its `.md` or `.ipynb` output is missing. Delete an output to force one page.
-#
-# Under the DocumenterVitepress stack the second step was instead:
-#
-#        cd docs && npm run docs:dev

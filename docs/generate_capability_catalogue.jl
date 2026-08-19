@@ -12,13 +12,25 @@
 # `Markdown.Paragraph` in the rendered docstring is the summary. Reading the raw
 # string would instead hand back the uninterpolated `$(...)` expressions.
 #
-# Rendering notes (Documenter + DocumenterVitepress) -- see also
+# Rendering notes (Documenter's HTML writer) -- see also
 # `generate_type_hierarchy.jl`, which shares this page's constraints:
-#   * `!!! details` containers work *inside* a list item: the bullet body becomes
-#     the `<summary>` and the nested sub-list becomes the disclosure body. They
-#     are never explicitly closed; the list nesting closes them.
-#   * `@ref` links must not sit inside a code fence, so everything here is plain
-#     markdown.
+#   * A collapsible group is a raw-HTML `<details>`, NOT a `!!! details`
+#     admonition. Two reasons. The Markdown parser accepts a quoted title only
+#     (`!!! details "Title"`), and it renders that title as plain text, so the
+#     head would lose its `@ref` links. Writing the `<details>` / `<summary>`
+#     tags in `@raw html` blocks and leaving the head and the body as ordinary
+#     markdown between them keeps every link live. The page used the unquoted
+#     `- !!! details <head>` form before, which Documenter renders as literal
+#     prose rather than a disclosure.
+#   * A `@raw html` block is a fence, so it cannot sit inside a list item. Each
+#     group therefore breaks out of the enclosing list, and the list nesting is
+#     restored with `margin-left`. The value is `(indent + 2)em`, because the
+#     theme gives `.content ul` a 2em margin per nesting level and `indent`
+#     counts two spaces per level. The group's own children then restart at
+#     indent 0 inside the `<details>`, so the margins compose. See
+#     `docs/src/assets/generated-pages.css`.
+#   * `@ref` links must not sit inside a code fence, so everything else here is
+#     plain markdown.
 
 using PortfolioOptimisers, Markdown, InteractiveUtils
 
@@ -161,7 +173,9 @@ head_text(h::Cap) = cap_text(h)
 head_text(h::String) = h
 
 # `depth` counts Section nesting; `indent` counts list nesting. They advance
-# independently: a Section resets the list, a Group extends it.
+# independently. A Section resets the list. A Group also resets it, because a
+# `<details>` starts a fresh list inside the disclosure; the group carries the
+# level it broke out of in its own `margin-left`.
 function render(io::IO, node::Section, depth::Int, indent::Int)
     println(io, "\n", "#"^depth, " ", node.title, "\n")
     for child in node.children
@@ -196,11 +210,34 @@ function render(io::IO, node::Cap, depth::Int, indent::Int)
     println(io, " "^indent, "- ", cap_text(node))
     return io
 end
+
+"""
+    raw_html(io, html)
+
+Emit `html` verbatim through a `@raw html` block.
+
+A blank line goes on each side. A fence that touches the paragraph above it is
+read as part of that paragraph. A fence that touches a list above it is read as
+a lazy continuation of the last item.
+"""
+function raw_html(io::IO, html::AbstractString)
+    println(io, "\n```@raw html\n", html, "\n```\n")
+    return io
+end
+
 function render(io::IO, node::Group, depth::Int, indent::Int)
-    println(io, " "^indent, "- !!! details ", head_text(node.head))
+    # The head and the body stay markdown, between raw blocks, so their `@ref`
+    # links resolve. See the header note for the `margin-left` arithmetic.
+    raw_html(io,
+             string("<details class=\"cap-group\" style=\"margin-left: ", indent + 2,
+                    "em\">\n<summary>"))
+    println(io, "\n", head_text(node.head), "\n")
+    raw_html(io, "</summary>")
+    # A fresh list starts inside the disclosure, so the child indent restarts.
     for child in node.children
-        render(io, child, depth, indent + 2)
+        render(io, child, depth, 0)
     end
+    raw_html(io, "</details>")
     return io
 end
 
