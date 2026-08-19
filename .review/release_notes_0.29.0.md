@@ -64,3 +64,37 @@ the reason behind every dropped field.
 
 `LowOrderPrior.z_sq` is not readable at `HEAD` — it is neither a field nor a forwarded property.
 It needs no note, because it was added and removed inside this PR. No release ever carried it.
+
+## A PMFG weight must be strictly positive
+
+`PMFG_T2s` carries the graph's structure and its weights in one matrix, so an exactly zero weight is
+an **absent edge** rather than a weak one. `assert_pmfg_weights` now counts the stored edges against
+the `3N - 6` a maximal planar graph has, and raises a `DomainError` naming the shortfall. It runs at
+`DBHTs`, `calc_weighted_adjacency_graph` and `calc_distance_weighted_graph`. `logo!` reads only the
+cliques and is deliberately unguarded.
+
+### What breaks
+
+A similarity that returns an exact zero on the PMFG path. Two shipped routes reach one:
+
+- `ExponentialSimilarity` or `GeneralExponentialSimilarity` under `LogDistance`, which maps an
+  exactly zero correlation to `Inf`, and `exp(-Inf)` is `0` exactly.
+- `ComplementSimilarity` or `MaximumDistanceSimilarity` at `D = 1`, which is a correlation of `-1`.
+
+An exactly zero sample correlation is not an everyday event, but `Denoise()` makes one. The measured
+case is `NetworkEstimator(; ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn =
+Denoise())), de = Distance(; alg = LogDistance()), alg = ExponentialSimilarity())` over noise, which
+denoises to the identity correlation. It used to return a network of `0` of its `54` edges. It now
+raises.
+
+```text
+DomainError with count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold. Got
+edges => 0
+3 * N - 6 => 54
+```
+
+The replacement is a similarity that stays strictly positive on the data at hand. Nothing that
+worked and returned a full graph changes: the refusal is exactly the set of inputs whose graph was
+already missing edges. Before this change the same inputs died later, in `turn_into_Hclust_merges`,
+with a `BoundsError` about a matrix index. See ADR 0049, *Non-negative reaches the check, positive
+reaches the graph*.
