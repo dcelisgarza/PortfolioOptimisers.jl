@@ -1089,4 +1089,4 @@ function port_opt_view(smtx::AbstractVector{<:AssetSetsMatrixEstimator}, i, args
 end
 
 export AssetSetsMatrixEstimator, asset_sets_matrix, asset_sets_features,
-       asset_sets_feature_names, AbstractFeatureValue, Scale, resolve_feature_value
+       asset_sets_feature_names, Scale, resolve_feature_value

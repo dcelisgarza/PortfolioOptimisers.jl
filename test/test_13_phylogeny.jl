@@ -41,7 +41,8 @@
                        PortfolioOptimisers.Distances.Euclidean())
             @test PortfolioOptimisers.default_similarity(metric) === ComplementSimilarity()
         end
-        # Both new members are on the exported API and in the family.
+        # Both new members are on the exported API and in the family. The family's
+        # abstract types are unexported, so the members reach them by the module prefix.
         @test ComplementSimilarity() isa
               PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
         @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
@@ -52,20 +53,23 @@
         # Four of the five members are in the interface; `AngularSimilarity` is out, and
         # stays in the wider family it was always in.
         for sim in nonneg
-            @test sim isa AbstractNonNegativeSimilarityMatrixAlgorithm
-            @test sim isa AbstractSimilarityMatrixAlgorithm
+            @test sim isa PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm
+            @test sim isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
             @test sim isa PortfolioOptimisers.Tree_SimMat
         end
-        @test !isa(AngularSimilarity(), AbstractNonNegativeSimilarityMatrixAlgorithm)
-        @test AngularSimilarity() isa AbstractSimilarityMatrixAlgorithm
+        @test !isa(AngularSimilarity(),
+                   PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm)
+        @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
         @test !isa(AngularSimilarity(), PortfolioOptimisers.Tree_SimMat)
-        @test AbstractNonNegativeSimilarityMatrixAlgorithm <:
-              AbstractSimilarityMatrixAlgorithm
-        # Both abstract types are exported, so an extension can subtype the interface
-        # without reaching through the module prefix.
+        @test PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm <:
+              PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+        # Both abstract types are unexported, per the repository convention. An extension
+        # subtypes the interface through the module prefix. `test_43` is the census that
+        # holds the whole exported abstract surface to its allow-list.
         for T in (:AbstractSimilarityMatrixAlgorithm,
                   :AbstractNonNegativeSimilarityMatrixAlgorithm)
-            @test T in names(PortfolioOptimisers)
+            @test T ∉ names(PortfolioOptimisers)
+            @test isdefined(PortfolioOptimisers, T)
         end
         #=
         Issue #239's own reproduction. It reported `NetworkEstimator`, but the blast radius

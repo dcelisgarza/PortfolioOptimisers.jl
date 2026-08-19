@@ -41,10 +41,15 @@ The negative quantity is only ever the **similarity**.
 **A similarity matrix algorithm reaches the PMFG path if and only if it declares that it cannot
 return a negative entry, and the declaration is a type bound rather than a runtime check.**
 
-`AbstractNonNegativeSimilarityMatrixAlgorithm` is a new exported abstract subtype of
+`AbstractNonNegativeSimilarityMatrixAlgorithm` is a new abstract subtype of
 `AbstractSimilarityMatrixAlgorithm`. `Tree_SimMat`, `DBHT.sim` and `LoGo.sim` are bounded by it, so
 `NetworkEstimator(; alg = AngularSimilarity())` is a `MethodError` at **construction**. Four of the
 five shipped members join; `AngularSimilarity` does not.
+
+Both are **unexported**, per the repository convention that abstract types stay unexported unless
+asked for. An extension names either through the module prefix, and both keep their docstring and
+their `docs/src/api/09_Distance/04_Similarity.md` entry, so unexported is not undocumented.
+`test/test_43_exported_abstract_type_census.jl` gates the convention.
 
 ### The requirement is DBHT's, not the PMFG's, and the bound is deliberately wider
 
@@ -195,7 +200,9 @@ allocates a `BitArray`.
 
 ### Open by declaration, not by proof
 
-Membership is a **claim a subtype makes**, not one the library verifies. A probe cannot check it:
+Membership is a **claim a subtype makes**, not one the library verifies. The claim is made by
+writing `<: PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm`, which is the ordinary
+route to every other open family in this library. A probe cannot check the claim:
 the contract quantifies over every admissible distance matrix, so a probe that passes
 `ComplementSimilarity` at `D = 0.5` still misses its failure at `D = 7`. `PMFG_T2s`'s own
 non-negativity check is therefore **kept** as the backstop against an extension that claims
@@ -273,3 +280,28 @@ mechanism for a question that no longer concerns a refusal.
 precondition was justified by `LogDistance` mapping an exactly zero correlation to `Inf`, and that
 arithmetic holds. Reproducing it needs a noise matrix: `Denoise()` on the shipped `SP500` fixture
 produces **no** exact zero.
+
+## Amendment (2026-08-19): both abstract types are unexported
+
+The decision above calls `AbstractNonNegativeSimilarityMatrixAlgorithm` "a new **exported** abstract
+subtype". That word no longer holds. Neither it nor `AbstractSimilarityMatrixAlgorithm` is exported.
+
+The export was one of six that PR #261 added across its blocks, none of them asked for. `CLAUDE.md`
+states the convention: an abstract type stays unexported unless the maintainer asks for it, because
+an export is public API. All six are withdrawn.
+
+Nothing else in this ADR moves. The bound is still a type bound, the placement is still narrow for
+`Tree_SimMat`, `DBHT.sim` and `LoGo.sim` and wide for the rest, and
+`NetworkEstimator(; alg = AngularSimilarity())` is still a `MethodError` at construction.
+
+Two consequences for a reader:
+
+ 1. An extension declares membership by writing
+    `<: PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm`. The module prefix is the
+    ordinary route to every other open family here, so the claim is made the same way as before.
+ 2. Unexported is not undocumented. Both types keep their docstring and their entry in
+    `docs/src/api/09_Distance/04_Similarity.md`. A bare name in a `@docs` block resolves for an
+    unexported type, so no documentation page changes.
+
+`test/test_43_exported_abstract_type_census.jl` holds the whole exported abstract surface to an
+allow-list, so the export cannot come back by accident.

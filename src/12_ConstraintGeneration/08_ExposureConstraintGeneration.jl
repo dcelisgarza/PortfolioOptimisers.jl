@@ -432,4 +432,4 @@ function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
                                bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 
-export AbstractConstraintSpace, FactorSpace, ExposureConstraintEstimator
+export FactorSpace, ExposureConstraintEstimator

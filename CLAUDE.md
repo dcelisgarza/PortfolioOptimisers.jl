@@ -8,9 +8,11 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
 - **`CONTEXT.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
   Universe Sets, Feature Matrix, Objective Penalty, …) and is hand-written. When you introduce or
   rename a concept, update it in the same change.
-- **`docs/adr/` records decisions.** ADRs are **amended, never rewritten**: append a
-  `## Amendment (YYYY-MM-DD)` section. An ADR describing superseded behaviour is correct history,
-  not a bug.
+- **`docs/adr/` records decisions.** An ADR whose decision reached `main` is **amended, never
+  rewritten**: append a `## Amendment (YYYY-MM-DD)` section. Such an ADR describes released
+  behaviour, so an ADR describing superseded behaviour is correct history, not a bug. An ADR whose
+  decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
+  outside the branch ever saw the text you would be amending.
 - To find code, prefer kaimon's `search_code` (semantic) when you can only *describe* what you
   want, and `grep_code` when you already hold an exact token. `/graphify` builds a queryable graph
   for larger architectural questions.
@@ -34,10 +36,10 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   `docs/src/capability_catalogue.md`, `docs/src/api/*_TypeHierarchy.md`.
   Their sources are `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl`.
   `docs/src/api/**` (except the type hierarchy) is hand-written.
-- **Do not run JuliaFormatter directly over `src/`** — it has corrupted escaped quotes inside
-  jldoctest blocks. Safe pattern when a change needs reflowing: copy the changed files to a scratch
-  directory with `.JuliaFormatter.toml`, format *there*, diff, and copy back only if the diff is
-  clean. `test/`, `examples/` and `user_guide/` can be formatted in place.
+- **JuliaFormatter can run over `src/`.** It escapes a quote inside a jldoctest block as `\"`.
+  This is normal formatter output, not corruption: inside a `"""` docstring `\"` renders as `"`,
+  and the doctests pass. Do not revert the escaping. `test/`, `examples/` and `user_guide/` are
+  formatted in place too.
 - Margin is 92 (`.JuliaFormatter.toml`, `yas` style). Long string literals and docstring prose are
   exempt in practice; code lines are not.
 
@@ -53,10 +55,12 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`. Add an entry
   there rather than inlining prose, and delete entries that lose their last user.
-- **Never export an abstract type unless explicitly told to.** 221 of 226 abstract types in `src/`
+- **Never export an abstract type unless explicitly told to.** 233 of 240 abstract types in `src/`
   are unexported, so unexported is the convention. An open family, a sibling family that exports its
   supertype, and an existing API-page entry are none of them a reason to add one in passing — an
   export is public API, and widening it is the maintainer's call. Ask instead.
+  `test/test_43_exported_abstract_type_census.jl` gates the rule against an allow-list of the seven
+  exported names, so an export is a deliberate edit to that list.
 
 ## Repo etiquette
 

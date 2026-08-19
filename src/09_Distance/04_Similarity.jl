@@ -484,6 +484,5 @@ function default_similarity(::Distances.SemiMetric)::ComplementSimilarity
     return ComplementSimilarity()
 end
 
-export AbstractSimilarityMatrixAlgorithm, AbstractNonNegativeSimilarityMatrixAlgorithm,
-       MaximumDistanceSimilarity, ExponentialSimilarity, GeneralExponentialSimilarity,
+export MaximumDistanceSimilarity, ExponentialSimilarity, GeneralExponentialSimilarity,
        ComplementSimilarity, AngularSimilarity

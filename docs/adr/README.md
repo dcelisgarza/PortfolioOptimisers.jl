@@ -7,8 +7,10 @@ How to use it:
 
 1. Find the row for the area that you touch.
 2. Open that ADR before you change the behaviour it fixes.
-3. An ADR is **amended, never rewritten**. Append a `## Amendment (YYYY-MM-DD)` section. An ADR
-   that describes superseded behaviour is correct history, not a defect.
+3. An ADR whose decision reached `main` is **amended, never rewritten**. Append a
+   `## Amendment (YYYY-MM-DD)` section. Such an ADR describes released behaviour, so one that
+   describes superseded behaviour is correct history, not a defect. An ADR whose decision has not
+   reached `main` is still a draft. Rewrite it in place.
 4. Add a row here when you add an ADR. The row is one line: the number, the title, and what the
    decision settles.
 
