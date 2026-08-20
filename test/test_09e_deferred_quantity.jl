@@ -10,22 +10,21 @@ Quantity crosses unresolved and computes on the subset.
 const PO = PortfolioOptimisers
 
 # Counts the fits, so "one estimator, one fit" is asserted rather than assumed.
-mutable struct _test_CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
+mutable struct CountingPriorEstimator{T} <: PO.AbstractPriorEstimator
     pe::T
     n::Int
 end
-function PortfolioOptimisers.prior(c::_test_CountingPriorEstimator, X, F = nothing;
-                                   kwargs...)
+function PortfolioOptimisers.prior(c::CountingPriorEstimator, X, F = nothing; kwargs...)
     c.n += 1
     return prior(c.pe, X, F; kwargs...)
 end
 
 # Declares a deferrable slot and writes no resolver, which is the half of ADR 0051's pair that
 # the derived recursion cannot supply. Nothing in `src/` may look like this.
-struct _test_DeclaresWithoutResolving{T}
+struct DeclaresWithoutResolving{T}
     mu::T
 end
-PortfolioOptimisers.deferred_slots(x::_test_DeclaresWithoutResolving) = (; mu = x.mu)
+PortfolioOptimisers.deferred_slots(x::DeclaresWithoutResolving) = (; mu = x.mu)
 
 @testset "Deferred Quantity: the slot aliases" begin
     # The dynamic half answers "is this slot deferred?" for all four quantity families and
@@ -567,14 +566,14 @@ end
     X = randn(rng, 200, 5)
     hop = prior(HighOrderPriorEstimator(), X)
 
-    c = _test_CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
     k = factory(Kurtosis(; pe = c), hop)
     @test k.mu ≈ hop.mu && k.kt ≈ hop.kt
     @test c.n == 1
 
     # Five slots across three children, still one fit. The container resolves the whole
     # measure, not one field at a time, which is what makes this expressible.
-    c = _test_CountingPriorEstimator(HighOrderPriorEstimator(), 0)
+    c = CountingPriorEstimator(HighOrderPriorEstimator(), 0)
     v = PO.resolve_deferred_quantities(VarianceSkewKurtosis(; pe = c), hop)
     @test v.kt.kt ≈ hop.kt && v.sk.sk ≈ hop.sk && v.vr.sigma ≈ hop.sigma
     @test c.n == 1
@@ -1345,22 +1344,22 @@ end
 
     # `risk_contribution` evaluates the measure `2N` times. Resolving inside that loop would
     # refit the covariance once per finite difference, so the seam resolves before it.
-    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
     rc = risk_contribution(Variance(; sigma = c), w, pr)
     @test c.n == 1
     @test rc ≈ risk_contribution(factory(Variance(; sigma = EmpiricalPrior()), pr), w, X)
 
-    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
     expected_risk(Variance(; sigma = c), w, pr)
     @test c.n == 1
 
-    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
     expected_risk(Variance(; sigma = c), [w, w, w], pr)
     @test c.n == 1
 
     # A factor decomposition goes through `risk_contribution`, so it inherits the same rule.
     rd = ReturnsResult(; X = X, nx = string.(1:5), F = X[:, 1:2], nf = string.(1:2))
-    c = _test_CountingPriorEstimator(EmpiricalPrior(), 0)
+    c = CountingPriorEstimator(EmpiricalPrior(), 0)
     frc = factor_risk_contribution(Variance(; sigma = c), w, pr; rd = rd)
     @test c.n == 1
     @test frc ≈
@@ -1476,19 +1475,19 @@ end
     # and writes no resolver would let the Estimator reach a model builder and be multiplied
     # as though it were a matrix, so the derived method refuses it by name.
     err = try
-        PO.resolve_deferred_quantities(_test_DeclaresWithoutResolving(SimpleExpectedReturns()),
+        PO.resolve_deferred_quantities(DeclaresWithoutResolving(SimpleExpectedReturns()),
                                        lop)
     catch e
         e
     end
     @test isa(err, ArgumentError)
     msg = sprint(showerror, err)
-    @test occursin("`_test_DeclaresWithoutResolving.mu`", msg)
+    @test occursin("`DeclaresWithoutResolving.mu`", msg)
     @test occursin("`SimpleExpectedReturns`", msg)
     @test occursin("declares no `resolve_deferred_quantities` method", msg)
 
     # A declared slot holding a plain value is not refused.
-    @test PO.resolve_deferred_quantities(_test_DeclaresWithoutResolving(lop.mu), lop).mu ===
+    @test PO.resolve_deferred_quantities(DeclaresWithoutResolving(lop.mu), lop).mu ===
           lop.mu
 end
 

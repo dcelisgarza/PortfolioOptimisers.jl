@@ -9,34 +9,34 @@ a fold unsliced still produces a finite, symmetric, plausible distance matrix --
 over the wrong universe. Asserting that nothing threw would pass on exactly that bug, so
 every test below asserts on the *value* of the matrix that reached the kernel.
 
-`_test_RecordingDistance` is the instrument. It wraps a real `FeatureDistance` and records the
+`RecordingDistance` is the instrument. It wraps a real `FeatureDistance` and records the
 `Z` handed to it through the routed three-argument methods, so a test can compare that
 matrix against the slice it should be, rather than inferring it from a weight vector.
 It is deliberately mutable and passes through `port_opt_view` unchanged (the universal
 estimator fallback), so one recorder accumulates every fold and every cluster of a run.
 =#
-mutable struct _test_RecordingDistance{T} <: PO.AbstractDistanceEstimator
+mutable struct RecordingDistance{T} <: PO.AbstractDistanceEstimator
     de::T
     seen::Vector{Any}
     lock::ReentrantLock
 end
-_test_RecordingDistance(de) = _test_RecordingDistance(de, Any[], ReentrantLock())
-function record!(de::_test_RecordingDistance, Z)
+RecordingDistance(de) = RecordingDistance(de, Any[], ReentrantLock())
+function record!(de::RecordingDistance, Z)
     lock(de.lock) do
         return push!(de.seen, Z)
     end
     return nothing
 end
-function PO.distance(de::_test_RecordingDistance, ce, X; Z = nothing, kwargs...)
+function PO.distance(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
     record!(de, Z)
     return PO.distance(de.de, ce, X; Z = Z, kwargs...)
 end
-function PO.cor_and_dist(de::_test_RecordingDistance, ce, X; Z = nothing, kwargs...)
+function PO.cor_and_dist(de::RecordingDistance, ce, X; Z = nothing, kwargs...)
     record!(de, Z)
     return PO.cor_and_dist(de.de, ce, X; Z = Z, kwargs...)
 end
-PO.distance(de::_test_RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
-function PO.cor_and_dist(de::_test_RecordingDistance, Z; kwargs...)
+PO.distance(de::RecordingDistance, Z; kwargs...) = PO.distance(de.de, Z; kwargs...)
+function PO.cor_and_dist(de::RecordingDistance, Z; kwargs...)
     return PO.cor_and_dist(de.de, Z; kwargs...)
 end
 
@@ -95,8 +95,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # the assets, missing the feature axis leaves each cluster measured against the
         # full universe's columns -- finite, plausible, wrong.
         function run_nco(rd)
-            ri, ro = _test_RecordingDistance(FeatureDistance()),
-                     _test_RecordingDistance(FeatureDistance())
+            ri, ro = RecordingDistance(FeatureDistance()),
+                     RecordingDistance(FeatureDistance())
             nco = NestedClustered(; cle = ClustersEstimator(; de = ro),
                                   opti = HierarchicalRiskParity(; opt = hopt(ri)),
                                   opto = plain_hrp(), ex = seq)
@@ -144,7 +144,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # A rectangular carrier commutes with the asset view: only the asset axis moves,
         # and a time-varying one keeps every observation this arity never indexes.
-        ri_3 = _test_RecordingDistance(FeatureDistance())
+        ri_3 = RecordingDistance(FeatureDistance())
         nco_3 = NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
                                 opti = HierarchicalRiskParity(; opt = hopt(ri_3)),
                                 opto = plain_hrp(), ex = seq)
@@ -156,7 +156,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
     end
 
     @testset "SubsetResampling subsets both axes, and so does a Stacking nested in it" begin
-        ri = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
         sr = SubsetResampling(; opt = HierarchicalRiskParity(; opt = hopt(ri)),
                               n_subsets = 4, subset_size = 4, seed = 12345, ex = seq)
         res = optimise(sr, rd_sq)
@@ -168,7 +168,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # `port_opt_view(::Stacking, i, X)` slices the inner optimisers, so a Stacking used
         # as the resampled optimiser inherits the subset rather than reaching past it.
-        rs = _test_RecordingDistance(FeatureDistance())
+        rs = RecordingDistance(FeatureDistance())
         st = Stacking(; opti = [HierarchicalRiskParity(; opt = hopt(rs))],
                       opto = plain_hrp(), ex = seq)
         sr2 = SubsetResampling(; opt = st, n_subsets = 3, subset_size = 4, seed = 999,
@@ -180,7 +180,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
     @testset "A meta-optimiser's outer synthetic universe carries collapsed features" begin
         # Stacking's own inner optimisers all see the full universe -- it subsets nothing.
-        ri = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
         st = Stacking(;
                       opti = [HierarchicalRiskParity(; opt = hopt(ri)),
                               HierarchicalEqualRiskContribution(;
@@ -208,7 +208,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                                          opti = plain_hrp(),
                                          opto = HierarchicalRiskParity(; opt = hopt(de)),
                                          ex = seq))
-            ro = _test_RecordingDistance(FeatureDistance())
+            ro = RecordingDistance(FeatureDistance())
             res = optimise(mk(ro), rd_sq)
             @test isapprox(sum(res.w), 1)
             # A square carrier collapses two-sided, so the outer universe is square in its
@@ -224,7 +224,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # slice it gives `X`. A static carrier has no observation axis and passes through.
         for cv in (KFold(; n = 4), IndexWalkForward(80, 40),
                    CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
-            ri = _test_RecordingDistance(FeatureDistance())
+            ri = RecordingDistance(FeatureDistance())
             pred = cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv;
                                      ex = seq)
             sp = split(cv, rd_3d)
@@ -233,7 +233,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                       for i in eachindex(sp.train_idx))
             @test all(size(z, 1) == length(sp.train_idx[i]) for (i, z) in pairs(ri.seen))
 
-            rs = _test_RecordingDistance(FeatureDistance())
+            rs = RecordingDistance(FeatureDistance())
             cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
             @test all(z === Zsq for z in rs.seen)
         end
@@ -249,7 +249,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         cv = MultipleRandomised(IndexWalkForward(80, 40); rng = StableRNG(11), seed = 7,
                                 n_subsets = 2, subset_size = 5)
         # Time-varying: rows by fold, columns by draw, feature axis untouched.
-        ri = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(ri)), rd_3d, cv; ex = seq)
         s3 = split(cv, rd_3d)
         @test length(ri.seen) == length(s3.train_idx)
@@ -258,7 +258,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # Square: the replication's asset draw moves BOTH axes. This is the same
         # silent-wrongness NestedClustered exposes, one subsetting scheme over.
-        rs = _test_RecordingDistance(FeatureDistance())
+        rs = RecordingDistance(FeatureDistance())
         cross_val_predict(HierarchicalRiskParity(; opt = hopt(rs)), rd_sq, cv; ex = seq)
         ss = split(cv, rd_sq)
         @test all(size(z) == (cv.subset_size, cv.subset_size) for z in rs.seen)
@@ -277,7 +277,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # Price-level cross-validation: each fold converts its own window, losing the row
         # the percentage change consumes -- and `Z` must lose exactly that row too.
         prc = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nf, Z = Z3p)
-        ri = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
         pipe = Pipeline(;
                         steps = (PricesToReturns(),
                                  HierarchicalRiskParity(; opt = hopt(ri))))
@@ -295,7 +295,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         Pm[:, 3] .= NaN
         prm = PricesResult(; X = TimeArray(tsp, Pm, nx), nz = nx, Z = Zsqp)
         keep = [1, 2, 4, 5, 6, 7, 8]
-        rf = _test_RecordingDistance(FeatureDistance())
+        rf = RecordingDistance(FeatureDistance())
         pipe_f = Pipeline(;
                           steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns(),
                                    HierarchicalRiskParity(; opt = hopt(rf))))
@@ -305,7 +305,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test rf.seen[1] == Zsqp[keep, keep]
 
         # A clustering step in the pipeline reaches the same bridge, so it is routed too.
-        rc = _test_RecordingDistance(FeatureDistance())
+        rc = RecordingDistance(FeatureDistance())
         pipe_c = Pipeline(;
                           steps = (PricesToReturns(), ClustersEstimator(; de = rc),
                                    plain_hrp()))
@@ -316,7 +316,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # Search cross-validation at price level draws assets *and* windows rows, through
         # `pipeline_asset_view`/`pipeline_data_view` rather than the returns-level arities.
         prs = PricesResult(; X = TimeArray(tsp, Pv, nx), nz = nx, Z = Zsqp)
-        rg = _test_RecordingDistance(FeatureDistance())
+        rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
                                  seed = 42)
         grid = ["opt" => [HierarchicalRiskParity(; opt = hopt(rg))]]
@@ -343,8 +343,8 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         @test size(pr_z.Z) == (N, K)
 
         function run_nco(z_src)
-            ri, ro = _test_RecordingDistance(FeatureDistance()),
-                     _test_RecordingDistance(FeatureDistance())
+            ri, ro = RecordingDistance(FeatureDistance()),
+                     RecordingDistance(FeatureDistance())
             nco = NestedClustered(; pe = fpe, cle = ClustersEstimator(; de = ro),
                                   z_src = z_src,
                                   opti = HierarchicalRiskParity(;
@@ -418,16 +418,16 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
 
         # A clustering source refits per cluster too, and its matrix is square over the
         # cluster -- the shape that would have been wrong had anything been carried through.
-        ric = _test_RecordingDistance(FeatureDistance())
-        resc = optimise(mk_nco(fpe_cle, ric, _test_RecordingDistance(FeatureDistance())),
+        ric = RecordingDistance(FeatureDistance())
+        resc = optimise(mk_nco(fpe_cle, ric, RecordingDistance(FeatureDistance())),
                         rd_plain)
         idxc = assignments(resc.clr)
         clsc = [findall(==(i), idxc) for i in 1:(resc.clr.k)]
         @test [size(z) for z in ric.seen] == [(length(cl), length(cl)) for cl in clsc]
 
         # The network source refits per cluster as well.
-        ri = _test_RecordingDistance(FeatureDistance())
-        ro = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
+        ro = RecordingDistance(FeatureDistance())
         res = optimise(mk_nco(fpe_conf, ri, ro), rd_plain)
         idx = assignments(res.clr)
         cls = [findall(==(i), idx) for i in 1:(res.clr.k)]
@@ -444,7 +444,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
         # its asset axis only: its columns are features and stay whole.
         Zlit = abs.(randn(StableRNG(2468), N, 4))
         fpe_lit = FeaturePrior(; ze = Zlit)
-        rl = _test_RecordingDistance(FeatureDistance())
+        rl = RecordingDistance(FeatureDistance())
         nco_lit = NestedClustered(; pe = fpe_lit,
                                   cle = ClustersEstimator(; de = FeatureDistance()),
                                   z_src = :prior,
@@ -477,7 +477,7 @@ struct UnviewableReturnsResult <: PO.AbstractReturnsResult end
                                                          rd_plain, KFold(; n = 3); ex = seq)
 
         # The same chain under a resampling scheme that draws assets and windows rows.
-        ri = _test_RecordingDistance(FeatureDistance())
+        ri = RecordingDistance(FeatureDistance())
         cv = MultipleRandomised(IndexWalkForward(80, 40); rng = StableRNG(11), seed = 7,
                                 n_subsets = 2, subset_size = 5)
         mk_hrp(fpe, de) = HierarchicalRiskParity(;

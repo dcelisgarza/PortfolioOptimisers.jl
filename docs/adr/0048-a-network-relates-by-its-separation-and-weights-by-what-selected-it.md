@@ -624,7 +624,7 @@ The extension contract is therefore **three** methods where Decision 2 said two:
 `separation_graph`, `separation_matrix`, `separation_budget`. `resolve_separation` and the two
 predicates below still have working fallbacks, so an extension still writes none of them.
 
-**Measured.** A `_test_CountingDistance` fixture counts derivations per consumer call. Over both
+**Measured.** A `CountingDistance` fixture counts derivations per consumer call. Over both
 branches and all four budgets — stated hops, `HopCountQuantile`, unstated radius,
 `PathLengthQuantile` — `phylogeny_matrix` and `phylogeny_features` derive **once**, and so does
 `clusterise` with a rule. Before, the three rule cases derived twice.
@@ -632,7 +632,7 @@ branches and all four budgets — stated hops, `HopCountQuantile`, unstated radi
 **Two of three test doubles are gone, not three.** `FixedAdjacency` and `FixedWeights` in
 `test_12d_phylogeny_features.jl` subtyped `AbstractNetworkEstimator` and overrode `calc_adjacency`
 and `calc_distance_weighted_graph` only to choose a graph; they are now two helpers and a
-`SimpleWeightedGraph`. `_test_FixedDistanceGraph` in `test_13_phylogeny.jl` **stays**: two
+`SimpleWeightedGraph`. `FixedDistanceGraph` in `test_13_phylogeny.jl` **stays**: two
 centrality testsets drive `centrality_vector` and `phylogeny_matrix` through it, and those verbs
 take an estimator, so no graph argument can replace it. The review's count was one too high.
 

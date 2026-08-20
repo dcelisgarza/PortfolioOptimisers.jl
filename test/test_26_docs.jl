@@ -99,7 +99,6 @@ function -- cannot host.
             # Results are outputs nobody constructs, so they are not required here.
             required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
                                                  leaf_types(PO.AbstractAlgorithm)))))
-            filter!(n -> !contains(string(n), "_test"), required)
             # A type the library constructs for itself is not a choice, so it is
             # exempt by name and with a reason -- see `NOT_A_CHOICE`.
             uncatalogued = sort(collect(setdiff(required, catalogued, keys(NOT_A_CHOICE))))

@@ -5,13 +5,13 @@ using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, Stable
 # always matches the collapse's observation axis by construction — which is why it, and not
 # a static `AbstractWeights`, is what cross-fold weighting requires. Declared here because
 # the library ships no concrete subtype.
-struct _test_WindowLengthWeights <: PortfolioOptimisers.DynamicAbstractWeights end
-function PortfolioOptimisers.get_observation_weights(::_test_WindowLengthWeights,
+struct WindowLengthWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::WindowLengthWeights,
                                                      X::PortfolioOptimisers.VecNum;
                                                      kwargs...)
     return aweights(collect(range(1, length(X)) ./ sum(1:length(X))))
 end
-function PortfolioOptimisers.get_observation_weights(::_test_WindowLengthWeights,
+function PortfolioOptimisers.get_observation_weights(::WindowLengthWeights,
                                                      X::PortfolioOptimisers.MatNum;
                                                      dims::Int = 1, kwargs...)
     T = size(X, dims)
@@ -266,7 +266,7 @@ end
         # A `DynamicAbstractWeights` resolves against the window it is handed, so it is
         # fold-local and correct without a length check firing.
         for alg in (AggregateDistances, AggregateFeatures)
-            dw = FeatureDistance(; alg = alg(; w = _test_WindowLengthWeights()))
+            dw = FeatureDistance(; alg = alg(; w = WindowLengthWeights()))
             D6 = distance(dw, Z3)
             D3 = distance(dw, Z3[4:6, :, :])
             @test size(D6) == size(D3) == (5, 5)
