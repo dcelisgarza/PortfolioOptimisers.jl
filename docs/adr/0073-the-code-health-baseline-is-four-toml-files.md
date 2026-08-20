@@ -95,7 +95,8 @@ rather than a parse error.
 
 ### Every file in scope gets a row, so absent means out of scope
 
-All 196 files appear in both baselines, the 128 zeros included.
+All 196 files appear in both baselines, the zeros included. The JET baseline repeats the set in
+every run, so it carries about 588 rows.
 
 The alternative reading — a baseline that lists only files with a finding — makes "absent" mean
 measured-zero, or new, or out of scope, and no rule can tell those apart. It also leaves ADR 0072's
@@ -126,7 +127,8 @@ The attribution does not.
 
 ### The JET baseline is keyed by run and file
 
-Each `report_package` call is a run with its own load set, and each run holds its own rows.
+Each `report_package` call is a run with its own load set, and **each run holds a row for every
+file in scope**, zeros included. That is about 588 rows over the three runs.
 
 ```toml
 [run.main]
@@ -134,14 +136,22 @@ load_set = ["StatsPlots", "GraphRecipes", "Impute"]
 
 [run.main.file]
 "src/01_Base.jl" = { raw = 0, reviewed = 0 }
+"src/19_RiskMeasures/Plotting.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 
 [run.plots_ext]
 load_set = ["StatsPlots", "GraphRecipes"]
 
 [run.plots_ext.file]
-"ext/PortfolioOptimisersPlotsExt.jl" = { raw = 66, reviewed = 0 }
+"src/01_Base.jl" = { raw = 0, reviewed = 0 }
 "src/19_RiskMeasures/Plotting.jl" = { raw = 1, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt.jl" = { raw = 66, reviewed = 0 }
 ```
+
+A sparse run table was rejected by
+[ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md). Set equality
+needs one expected file set per run, and under a sparse table a `src/` file that gains its first
+extension-run report reads as an added row rather than a rise.
 
 **No number is ever summed**, so the double count cannot arise. The rule is chosen because it is
 correct whether or not the 4 re-attributed reports duplicate ones the main run already found, which
@@ -210,13 +220,15 @@ workflow with no version bound. Under the provenance rule that would turn CI red
 JET or CodeComplexity release. The gate's workflow must pin both to an exact version and bump them
 deliberately, in the commit that refreshes the baseline.
 
-**The rule for a file the baseline does not name is now a single question.** Absent means out of
-scope, so what the gate does with an added file is one decision rather than three tangled ones.
+**The rule for a file the baseline does not name became a single question**, and
+[ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md) settled it.
+Absent means out of scope, so the gate compares two file sets rather than inventing a number.
 
 **The JET measuring script makes three calls, not one** — the package with its extension triggers
 loaded, and one call per extension module.
 
-**The JET baseline carries 128 rows of zeros.** That is the price of a total baseline and it is
+**The JET baseline carries mostly zeros.** 128 of the 196 files measure zero in the main run, and
+the two extension runs are nearly all zeros. That is the price of a total baseline and it is
 accepted.
 
 **The vocabulary stays out of `CONTEXT.md`**, for the reason

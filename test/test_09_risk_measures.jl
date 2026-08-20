@@ -470,4 +470,56 @@
             @test collect(ow) == ow_before
         end
     end
+    @testset "A risk measure agrees between the model and the functor (#351)" begin
+        # `VarianceSkewKurtosis`'s functor used to delegate to its children, so it reported
+        # `Skewness`'s **standardised** third moment and, under the default `SOCRiskExpr`,
+        # `Kurtosis`'s **square root** of the fourth. Its own `JuMP` model reads the raw
+        # moments off the relaxation blocks, so the two disagreed in magnitude and in sign:
+        # the functor returned about -0.0721 where the model computed about +1.45e-5.
+        r = factory(VarianceSkewKurtosis(), pr)
+        w2 = kron(w, w)
+        mu2 = dot(w, pr.sigma, w)
+        mu3 = dot(w, pr.sk, w2)
+        mu4 = dot(w2, pr.kt, w2)
+        @test isapprox(r(w, rd.X), mu2 - mu3 + mu4)
+
+        # The scales are the model's per-child weights, applied the same way.
+        r2 = factory(VarianceSkewKurtosis(;
+                                          vr = Variance(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       scale = 2.0)),
+                                          kt = Kurtosis(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       scale = 3.0))),
+                     pr)
+        @test isapprox(r2(w, rd.X), 2 * mu2 - mu3 + 3 * mu4)
+
+        # A central moment does not move when `fees` shifts every observation by the same
+        # per-period constant, and the model carries no fee term either.
+        @test r(w, rd.X, Fees(; l = 0.001)) == r(w, rd.X)
+    end
+    @testset "The weighted even moment weights observations linearly (#351)" begin
+        # `moment_risk` computed `norm(val .* r.w, 2p)`, which raises each observation
+        # weight to the power `2p`. The `JuMP` model attains `(sum w_t d_t^(2p) / T_d)^(1/p)`,
+        # a linear weighting, so the two disagreed by a factor of `T^(2p-1)` at uniform
+        # weights. The suite missed it because every weighted case used uniform weights,
+        # where the error is one constant factor and never moves an argmin.
+        x = rd.X * w
+        ow = StatsBase.pweights(range(0.5, 1.5; length = length(x)))
+        for p in (2, 3), malg in (FullMoment(), SemiMoment())
+            unweighted = LowOrderMoment(; mu = 0, alg = EvenMoment(; p = p, alg = malg))
+            uniform = LowOrderMoment(; mu = 0, w = wt,
+                                     alg = EvenMoment(; p = p, alg = malg))
+            weighted = LowOrderMoment(; mu = 0, w = ow,
+                                      alg = EvenMoment(; p = p, alg = malg))
+
+            # Uniform observation weights must reproduce the unweighted value.
+            @test isapprox(uniform(x), unweighted(x))
+
+            # And a general weight vector must match the value the model attains. `ddof`
+            # defaults to 0, so the effective sample size is `sum(ow)`.
+            d = malg === FullMoment() ? x : min.(x, zero(eltype(x)))
+            @test isapprox(weighted(x), (sum(ow .* d .^ (2p)) / sum(ow))^inv(p))
+        end
+    end
 end

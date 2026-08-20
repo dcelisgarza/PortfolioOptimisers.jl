@@ -80,7 +80,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     state_set!(model, prefix, :kt_risk_, i, kt_risk)
     vr_bound = variance_risk_bounds_val(LinearBound(), r.vr.settings.ub)
     sk_bound = variance_risk_bounds_val(LinearBound(), r.sk.settings.lb)
-    kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg1, QuadSecondMomentFormulations),
+    kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg2, QuadSecondMomentFormulations),
                                                LinearBound(), SquaredBound()),
                                         r.kt.settings.ub)
     set_variance_risk_bounds_and_expression!(model, opt, vr_risk, vr_bound, :vr_risk_, i,

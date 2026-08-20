@@ -165,9 +165,12 @@ figure of about 110 that
 **A new top-level directory turns the gate red.** That is the cost of never being silently
 unmeasured, and it is paid once per directory, by a commit that rules on it.
 
-**[#353](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/353) inherits a sharper
-question.** A file the baseline does not name is now either an Unmeasured Path or a coverage
-failure, and that ticket decides which reading applies where.
+**[#353](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/353) inherited a sharper
+question and settled it.** A file the baseline does not name is either an Unmeasured Path or a
+coverage failure.
+[ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md) makes the second
+reading a set comparison, and it extends the same rule to the Expansion Bound's key set: a new
+Declaration Macro's key is recorded green on arrival, because no threshold measures an addition.
 
 **[#340](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/340) sites two more committed
 files** — the Unmeasured Path list and the Expansion Bound — on top of the threshold configuration

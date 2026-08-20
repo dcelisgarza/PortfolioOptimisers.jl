@@ -138,7 +138,7 @@ Three file-level events behave differently.
 | Event | Gate | Why |
 | --- | --- | --- |
 | The file is deleted | **red**, and the row must be pruned | keeps the baseline honest at no extra cost |
-| The file is renamed | **red** on its own | reports reappear unmatched under the new path |
+| The file is renamed | **red** until the Dismissals name the new path | reports reappear unmatched under the new path |
 | A Dismissal matches nothing, file still present | **green**; the scheduled job prunes it | the class went away because someone improved the code |
 
 The asymmetry is deliberate. A rename already forces an edit to add the new path, so requiring the
@@ -147,7 +147,14 @@ disappears, and the gate must not turn red on exactly the work it exists to enco
 cannot relax the gate either: if the message merely drifted, the reports return unmatched and the
 gate turns red anyway.
 
-The rule for a file the baseline does **not** name is a separate decision and is not settled here.
+The rename row is refined by
+[ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md). The baseline
+row itself no longer needs a hand edit: the refresh pairs the dead row with the new path on the
+**raw** count and carries it. The red stands, because the carried row keeps its old reviewed number
+while the measured one has risen, and it clears when the Dismissals name the new path. The refresh
+prints the exact lines to edit and never writes `rulings.toml` itself.
+
+The rule for a file the baseline does **not** name is settled by ADR 0074.
 
 ### A Julia bump migrates the Dismissals and re-affirms the Rationales
 
@@ -180,6 +187,9 @@ growth as context, which is the role it already had.
 
 **A contributor who meets genuinely new noise is blocked** until a Rationale exists for it, because
 inventing one is the maintainer's call.
+[ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md) confirmed this
+consequence rather than softening it, because its entry test needs a new file to arrive with
+`reviewed = 0`.
 
 **"Verdict", "class", "signature" and "suppression" were all considered and rejected.** "Verdict"
 implies a two-sided judgement, and nothing ever records "this is real". "Class" sits one word from

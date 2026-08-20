@@ -371,6 +371,21 @@ Return-based risk measure.
 
 `ExpectedReturn` is a risk measure that uses the expected portfolio return as its risk metric. This is useful for algorithms or analyses where the risk is defined as the expected return, used in portfolio performance analysis.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ER}(\\boldsymbol{w}) &= \\sum_{j} s_j\\, R_j(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{ER}(\\boldsymbol{w})``: Expected portfolio return, used here as the risk metric.
+  - $(math_dict[:w_port])
+  - ``R_j``: Expected return of the ``j``-th term in `rt`, net of `fees`.
+  - ``s_j``: `settings.scale` of the ``j``-th term. A single `rt` has one term.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -486,6 +501,25 @@ $(DocStringExtensions.TYPEDEF)
 Ratio-based risk measure.
 
 `ExpectedReturnRiskRatio` is a risk measure that computes the risk-adjusted return ratio, such as the Sharpe ratio, for a portfolio. It combines a return estimator, a risk measure, and a risk-free rate to produce a ratio metric, used in portfolio performance analysis.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ERRR}(\\boldsymbol{w}) &= \\frac{\\sum_{j} s_j\\, R_j(\\boldsymbol{w}) - r_f}{\\mathrm{sca}\\left(\\left\\{c_i\\, \\rho_i(\\boldsymbol{w})\\right\\}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{ERRR}(\\boldsymbol{w})``: Expected return to risk ratio.
+  - $(math_dict[:w_port])
+  - ``R_j``: Expected return of the ``j``-th term in `rt`, net of `fees`.
+  - ``s_j``: `settings.scale` of the ``j``-th term of `rt`.
+  - ``r_f``: Risk-free rate, the `rf` field.
+  - ``\\rho_i``: The ``i``-th risk measure in `rk`.
+  - ``c_i``: `settings.scale` of the ``i``-th risk measure.
+  - ``\\mathrm{sca}``: Scalariser held in `sca`, which reduces the risk axis to one number.
 
 # Fields
 

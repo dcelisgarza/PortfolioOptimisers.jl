@@ -136,11 +136,11 @@ Represents the Tracking Error risk measure.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
+Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. With the default [`L2Norm`](@ref), the tracking error is:
 
 ```math
 \\begin{align}
-\\mathrm{TE}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\mathrm{TE}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2}{\\sqrt{N_T - \\nu}}\\,.
 \\end{align}
 ```
 
@@ -151,8 +151,9 @@ Where:
   - ``\\boldsymbol{x}``: Portfolio returns series ``N_T \\times 1``.
   - ``\\boldsymbol{b}``: Benchmark returns series ``N_T \\times 1``.
   - ``N_T``: Number of observations.
+  - ``\\nu``: Delta degrees of freedom, the `ddof` field of the norm. It is `1` by default, so the denominator is the sample one.
 
-Other norms can be selected via the `alg` field.
+The `alg` field selects the norm. It sets both the norm of the deviation vector and the divisor that scales it — see [`norm_error`](@ref) and [`norm_factor`](@ref).
 
 # Fields
 
@@ -167,6 +168,12 @@ $(DocStringExtensions.FIELDS)
     ) -> TrackingRiskMeasure
 
 Keywords correspond to the struct's fields.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Functor
 
@@ -213,6 +220,13 @@ TrackingRiskMeasure
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`NormError`](@ref)
+  - [`norm_error`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025])
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
@@ -394,6 +408,11 @@ RiskTrackingRiskMeasure
   - [`WeightsTracking`](@ref)
   - [`IndependentVariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025])
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
     """

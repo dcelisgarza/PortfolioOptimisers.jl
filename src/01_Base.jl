@@ -904,7 +904,16 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :minimax => "[minimax](@cite) M. R. Young. *A minimax portfolio selection rule with linear programming solution*. Management Science 44, 673–683 (1998).",#
                                  :bdvar => "[bdvar](@cite) D. Cajas. *Portfolio Optimization of Brownian Distance Variance*. Available at SSRN 4561293 (2023).",#
                                  :rousseeuw1993 => "[rousseeuw1993](@cite) P. J. Rousseeuw and C. Croux. *Alternatives to the median absolute deviation*. Journal of the American Statistical Association 88, 1273–1283 (1993).",#
-                                 :szekely2007 => "[szekely2007](@cite) G. J. Székely, M. L. Rizzo and N. K. Bakirov. *Measuring and testing dependence by correlation of distances*. The Annals of Statistics 35, 2769–2794 (2007).")
+                                 :szekely2007 => "[szekely2007](@cite) G. J. Székely, M. L. Rizzo and N. K. Bakirov. *Measuring and testing dependence by correlation of distances*. The Annals of Statistics 35, 2769–2794 (2007).",#
+                                 :pkurt => "[pkurt](@cite) D. Cajas. *Convex Optimization of Portfolio Kurtosis*. Available at SSRN 4202967 (2022).",#
+                                 :pkurtapprox => "[pkurtapprox](@cite) D. Cajas. *Approximation of Portfolio Kurtosis through Sum of Squared Quadratic Forms*. Available at SSRN 4472793 (2023).",#
+                                 :nskew => "[nskew](@cite) D. Cajas. *On the Spectral Decomposition of Portfolio Skewness and its Application to Portfolio Optimization*. Available at SSRN 4540021 (2023).",#
+                                 :robustaa => "[robustaa](@cite) R. H. Tütüncü and M. Koenig. *Robust asset allocation*. Annals of Operations Research 132, 157–187 (2004).",#
+                                 :sdpmom => "[sdpmom](@cite) D. Cajas. *Semidefinite Relaxation of Higher Portfolio Moments*. Available at SSRN 5284483 (2025).",#
+                                 :emom => "[emom](@cite) D. Cajas. *Portfolio Optimization of Even Moments using Power Cone Programming*. Available at SSRN 6518258 (2026).",#
+                                 :mad => "[mad](@cite) H. Konno and H. Yamazaki. *Mean-absolute deviation portfolio optimization model and its applications to Tokyo stock market*. Management Science 37, 519–531 (1991).",#
+                                 :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#
+                                 :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).")
 
 """
 $(DocStringExtensions.TYPEDEF)

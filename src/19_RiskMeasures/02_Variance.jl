@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of second moment risk measures.
 
-# Related Types
+# Related
 
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
@@ -17,7 +17,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of variance-based risk measures.
 
-# Related Types
+# Related
 
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
@@ -56,7 +56,7 @@ Where:
   - ``\\boldsymbol{d}``: `T × 1` deviations vector.
   - ``\\mathcal{S}_{w}``: Scenario set for portfolio `x`.
 
-# Related Types
+# Related
 
   - [`VarianceFormulation`](@ref)
   - [`Variance`](@ref)
@@ -82,7 +82,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
 
-# Related Types
+# Related
 
   - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
@@ -134,6 +134,19 @@ const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExp
 $(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio variance using a covariance matrix.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 # Fields
 
@@ -242,17 +255,23 @@ julia> r(w)
 
 # Related
 
-  - [`set_risk_constraints!`](@ref)
-  - [`set_risk_constraints!`](@ref)
-  - [`scalarise_risk_expression!`](@ref)
+  - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`UncertaintySetVariance`](@ref)
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
   - [`factory`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct Variance <: RiskMeasure
     """
@@ -357,6 +376,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -439,9 +471,16 @@ julia> r(w)
 
 # Related
 
+  - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`Variance`](@ref)
+  - [`UncertaintySetVariance`](@ref)
   - [`factory`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct StandardDeviation <: RiskMeasure
     """
@@ -640,18 +679,25 @@ Where:
 
     (r::UncertaintySetVariance)(w::VecNum)
 
-Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
+Computes the variance risk of a portfolio with weights `w`. The value depends on what `ucs` holds, because the measure is a worst case over a set and an unfitted estimator defines no set.
+
+  - `ucs` holds an [`AbstractUncertaintySetResult`](@ref): the worst-case variance over the fitted set, computed by [`ucs_variance`](@ref). This is the scalar twin of the risk expression the `JuMP` formulations above build.
+  - `ucs` holds an estimator or `nothing`: the nominal variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``.
 
 ```math
 \\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\begin{cases}
+  \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(fitted uncertainty set)} \\\\
+  \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(estimator or nothing)}
+\\end{cases}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - $(math_dict[:w_port])
   - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
 
 ## Arguments
 
@@ -714,8 +760,13 @@ julia> r(w)
   - [`Variance`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`ucs_variance`](@ref)
   - [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:robustaa])
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
     """
