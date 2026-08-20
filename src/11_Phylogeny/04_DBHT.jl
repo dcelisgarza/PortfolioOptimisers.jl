@@ -307,7 +307,7 @@ function assert_pmfg_weights(A::MatNum,
     end
     @argcheck(edges == expected,
               DomainError(edges,
-                          "count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold$source. Got\nedges => $edges\n3 * N - 6 => $expected\nAn exactly zero weight is an absent edge rather than a weak one, so $(expected - edges) of the PMFG's edges are missing and the structure is not a PMFG. Use a similarity that is strictly positive over this data."))
+                          "count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold$source. Got\nedges => $edges\n3 * N - 6 => $expected\nAn exactly zero weight is an absent edge rather than a weak one, so the PMFG is missing $(expected - edges) of its edges and the structure is not a PMFG. Use a similarity that is strictly positive over this data."))
     return nothing
 end
 """

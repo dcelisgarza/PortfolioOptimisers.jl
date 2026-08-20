@@ -40,10 +40,11 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   `docs/src/capability_catalogue.md`, `docs/src/api/*_TypeHierarchy.md`.
   Their sources are `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl`.
   `docs/src/api/**` (except the type hierarchy) is hand-written.
-- **JuliaFormatter can run over `src/`.** It escapes a quote inside a jldoctest block as `\"`.
-  This is normal formatter output, not corruption: inside a `"""` docstring `\"` renders as `"`,
-  and the doctests pass. Do not revert the escaping. `test/`, `examples/` and `user_guide/` are
-  formatted in place too.
+- **JuliaFormatter runs over the whole repository, and every file it reaches is formatted in
+  place.** It escapes a quote inside a jldoctest block as `\"`, which is normal output: inside a
+  `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**
+  The gate is `.github/workflows/FormatCheck.yml`, which runs `format(".")`, and the
+  `julia-formatter` pre-commit hook, which excludes only `.github/`.
 - Margin is 92 (`.JuliaFormatter.toml`, `yas` style). Long string literals and docstring prose are
   exempt in practice; code lines are not.
 

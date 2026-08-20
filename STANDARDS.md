@@ -59,6 +59,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
+| The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
 | Running Julia or the test suite | [`CLAUDE.md`](CLAUDE.md) § Running Julia | none — unenforced |
@@ -102,6 +103,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |
+| `.github/workflows/Paper.yml` | the paper's listing still runs against this checkout, and `docs/paper/main-jlyfish.json` is current | the workflow |
 | `.github/workflows/Aqua.yml` | package-quality checks over the dependency graph | the workflow |
 | `.github/workflows/LinkChecker.yml` | links in the built documentation resolve | the workflow |
 

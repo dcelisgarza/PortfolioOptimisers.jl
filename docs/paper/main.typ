@@ -8,6 +8,17 @@
 // drift away from the library. Two halves must run: TypstJlyfish evaluates the
 // Julia and writes main-jlyfish.json, and typst renders the document.
 //
+// CI BUILDS THIS, in .github/workflows/Paper.yml, and that job is the gate on
+// drift. It moves main-jlyfish.json aside before it builds, because the file is
+// committed and `recompute: false` keys a cell on its own text, so a build that
+// kept the cache would render the stored answer and prove nothing. It then fails
+// if any cell reports "failed": true, and fails again if the rebuilt cells
+// disagree with the committed ones.
+//
+// So COMMIT A REBUILT main-jlyfish.json whenever the listing or its answer
+// changes. A stale one fails the job by design. Locally that is the one-shot
+// command below, run from docs/paper.
+//
 // Run both from THIS directory (docs/paper). Inside a cell, pwd() and @__DIR__
 // resolve to the directory Julia was launched from, and the listing reaches the
 // price data through @__DIR__.

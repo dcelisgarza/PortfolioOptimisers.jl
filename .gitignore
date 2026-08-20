@@ -19,3 +19,5 @@ node_modules
 .venv/
 /graphify-out/
 *ipynb
+__pycache__/
+*.pyc

@@ -2717,7 +2717,7 @@ end
     # from the same computation rather than writing a number. `3 * N - 6` is structural.
     @test occursin("edges => $edges_z", msg)
     @test occursin("3 * N - 6 => 30", msg)
-    @test occursin("of the PMFG's edges are missing and the structure is not a PMFG", msg)
+    @test occursin("of its edges and the structure is not a PMFG", msg)
 
     #=
     It also names as much of the configuration as the site holds, which is what
