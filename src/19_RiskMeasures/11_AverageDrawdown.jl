@@ -53,7 +53,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow])
 
 # Functor
 
@@ -86,6 +86,10 @@ AverageDrawdown
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
   - [`average_drawdown`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @propagatable @concrete struct AverageDrawdown <: RiskMeasure
     """
@@ -181,6 +185,8 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:rdt])
 
+For observation-weighted samples, the weighted mean is used instead.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -196,7 +202,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow])
 
 # Functor
 
@@ -225,6 +231,10 @@ RelativeAverageDrawdown
   - [`AverageDrawdown`](@ref)
   - [`RelativeMaximumDrawdown`](@ref)
   - [`average_drawdown`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @propagatable @concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
     """

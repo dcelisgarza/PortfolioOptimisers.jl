@@ -440,9 +440,11 @@ Where:
   - ``\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: Value-at-Risk Range.
   - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail loss quantile.
   - ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail gain quantile.
-  - ``\\boldsymbol{x}``: Portfolio returns vector.
+  - $(math_dict[:xret])
   - ``\\alpha``: Lower-tail significance level.
   - ``\\beta``: Upper-tail significance level.
+
+$(math_dict[:negated_upper_tail])
 
 # Fields
 
@@ -682,6 +684,10 @@ DrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
   - [`drawdown_at_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -845,13 +851,13 @@ The Relative Drawdown-at-Risk at level ``\\alpha`` is:
 
 ```math
 \\begin{align}
-\\mathrm{RLDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
+\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RLDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
+  - ``\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:rdt])
@@ -904,6 +910,10 @@ RelativeDrawdownatRisk
   - [`DrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`drawdown_at_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @propagatable @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     """

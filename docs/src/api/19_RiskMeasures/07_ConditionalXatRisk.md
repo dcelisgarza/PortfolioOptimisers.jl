@@ -13,3 +13,10 @@ RMCDaR
 RelativeConditionalDrawdownatRisk
 conditional_drawdown_at_risk
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

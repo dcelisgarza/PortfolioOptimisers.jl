@@ -255,6 +255,17 @@ The per-asset quantity an ℓ1 uncertainty set is built around, usually the expe
 **Radius Calibration**
 The conversion from "how many assets should I hold?" to the radius that produces it. It is a calibration, not a constraint, so a further constraint may move the realised count.
 
+**Ambiguity Set**
+A neighbourhood of a whole distribution, rather than of one of its moments: Wasserstein (the data moves), Gelbrich (the moments are wrong), or divergence (the probabilities are wrong). It is a **reading of machinery that already exists**, not an object — no estimator constructs one.
+*Avoid*: Uncertainty Set (above), which is an object a caller builds and passes.
+
+**Ambiguity Radius**
+The size of an Ambiguity Set, in the units of the return data. For a Wasserstein or a Gelbrich ball it enters the model as the coefficient of a dual-norm penalty on the weights, so the same number is spelled `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure.
+
+**Calibration Rule**
+A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory so the containing type's constructor validates the result. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
+*Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
+
 ## 4. Optimisation
 
 **Optimisation Estimator**
@@ -418,6 +429,9 @@ The naming convention in which "X" stands for "Value" or "Drawdown", the same fa
 
 **Range Tails**
 The two point measures a Range variant is the sum of: the **loss** tail on the net portfolio returns, and the **gain** tail on their negation at the range's second level.
+
+**Negated Upper Tail**
+The sign convention that lets a Range be a sum. The gain tail is the base measure applied to the *negated* returns, so it is reported on the same sign convention as the loss tail and the two add rather than subtract.
 
 **Risk Series**
 The per-observation series a conic tail measure reduces. Two exist: the net portfolio returns, and the negated drawdown path. Both are signed as returns, so a loss is a negative entry.

@@ -241,6 +241,10 @@ Where:
   - [`MeanRiskResult`](@ref)
   - [`ObjectiveFunction`](@ref)
   - [`RiskMeasure`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     """

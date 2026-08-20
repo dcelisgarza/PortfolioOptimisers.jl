@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for centering functions used in the Median Absolute Deviation risk measure.
 
-# Related Types
+# Related
 
   - [`MedianCentering`](@ref)
   - [`MeanCentering`](@ref)
@@ -15,7 +15,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Centres the returns series using the (weighted) median before computing the Median Absolute Deviation.
 
-# Related Types
+# Related
 
   - [`MedianCenteringFunction`](@ref)
   - [`MeanCentering`](@ref)
@@ -27,7 +27,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Centres the returns series using the (weighted) mean before computing the Median Absolute Deviation.
 
-# Related Types
+# Related
 
   - [`MedianCenteringFunction`](@ref)
   - [`MedianCentering`](@ref)
@@ -99,7 +99,7 @@ Keywords correspond to the struct's fields.
 
   - If `mu` is a `VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
   - If `mu` is a `Number`: `isfinite(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow])
 
 !!! warning
 
@@ -141,6 +141,10 @@ MedianAbsoluteDeviation
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`MedianCentering`](@ref)
   - [`MeanCentering`](@ref)
+
+# References
+
+  - $(ref_dict[:rousseeuw1993])
 """
 @propagatable @concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
     """

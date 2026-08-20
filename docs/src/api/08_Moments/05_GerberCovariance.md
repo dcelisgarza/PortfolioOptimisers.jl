@@ -30,3 +30,10 @@ gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, s
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -74,6 +74,10 @@ DBHT
   - [`GeneralExponentialSimilarity`](@ref)
   - [`UniqueRoot`](@ref)
   - [`EqualRoot`](@ref)
+
+# References
+
+  - $(ref_dict[:DBHTs])
 """
 @concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
     """
@@ -142,6 +146,10 @@ These two checks are kept for the case those cannot cover: that family is open *
   - [`CliqHierarchyTree2s`](@ref)
   - [`DBHT`](@ref)
   - [`LoGo`](@ref)
+
+# References
+
+  - $(ref_dict[:PMFG])
 """
 function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     N = size(W, 1)
@@ -894,6 +902,10 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
   - [`EqualRoot`](@ref)
   - [`DBHT`](@ref)
   - [`PMFG_T2s`](@ref)
+
+# References
+
+  - $(ref_dict[:NHPG])
 """
 function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
     N = size(Apm, 1)
@@ -1765,6 +1777,10 @@ LoGo
   - [`MaximumDistanceSimilarity`](@ref)
   - [`ExponentialSimilarity`](@ref)
   - [`GeneralExponentialSimilarity`](@ref)
+
+# References
+
+  - $(ref_dict[:J_LoGo])
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
     """

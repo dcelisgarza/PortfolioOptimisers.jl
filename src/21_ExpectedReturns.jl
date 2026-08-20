@@ -777,7 +777,7 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
 # References
 
-  - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
+  - $(ref_dict[:brinson_attribution])
 """
 function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
                              asset_classes::DataFrames.DataFrame, col, date0 = nothing,
@@ -975,7 +975,7 @@ A non-normal return series makes a Sharpe ratio less precise than the naive ``\\
 
 # References
 
-  - [sharpe_stderr](@cite) D. H. Bailey and M. Lopez de Prado. *The Sharpe ratio efficient frontier*. Journal of Risk 15, 3–44 (2012).
+  - $(ref_dict[:sharpe_stderr])
 """
 function performance_summary(ret::VecNum; periods_per_year::Number = 252,
                              alpha::Number = 0.05,

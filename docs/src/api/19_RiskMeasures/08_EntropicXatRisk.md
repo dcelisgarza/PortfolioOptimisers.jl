@@ -7,3 +7,10 @@ EntropicDrawdownatRisk
 RelativeEntropicDrawdownatRisk
 ERM
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

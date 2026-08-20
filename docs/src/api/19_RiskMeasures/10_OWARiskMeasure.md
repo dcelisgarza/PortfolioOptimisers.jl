@@ -48,3 +48,10 @@ owa_model_setup
 owa_model_solve
 owa_l_moment_crm_entropy
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

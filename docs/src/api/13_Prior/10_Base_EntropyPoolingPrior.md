@@ -55,3 +55,10 @@ AbstractEntropyPoolingTailView
 VecEPTV
 ep_jump_views!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

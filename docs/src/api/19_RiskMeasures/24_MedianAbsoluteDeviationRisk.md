@@ -15,3 +15,10 @@ calc_deviations_vec(r::MedianAbsoluteDeviation, x::VecNum)
 weight_independent_target(::MedianCenteringFunction)
 supports_precomputed_returns(r::MedianAbsoluteDeviation)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

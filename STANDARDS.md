@@ -49,6 +49,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | Adding an estimator | [`.github/prompts/add-estimator.prompt.md`](.github/prompts/add-estimator.prompt.md) | `test/test_26_docs.jl` |
 | Adding an algorithm | [`.github/prompts/add-algorithm.prompt.md`](.github/prompts/add-algorithm.prompt.md) | `test/test_26_docs.jl` |
 | Adding a result type | [`.github/prompts/add-result.prompt.md`](.github/prompts/add-result.prompt.md) | `test/test_26_docs.jl` |
+| A citation or a bibliography entry | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md), `ref_dict` in [`src/01_Base.jl`](src/01_Base.jl) | `test/test_26_docs.jl` |
 | A new name for a concept | [`CONTEXT.md`](CONTEXT.md) | none — unenforced |
 | An `export` line | [`CLAUDE.md`](CLAUDE.md) § Design rules | `test/test_43_exported_abstract_type_census.jl` |
 | A constructor signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `test/test_41_constructor_docstring_drift.jl` |
@@ -93,7 +94,7 @@ Every Gate below is a real check that fails on a real breach.
 | JuliaFormatter | 92-column margin, `yas` style, from `.JuliaFormatter.toml` | inside `pre-commit`, and `.github/workflows/FormatCheck.yml` |
 | ExplicitImports | no implicit imports or non-public qualified accesses | inside `pre-commit` |
 | markdownlint | markdown structure, from `.markdownlint.json` | inside `pre-commit` |
-| `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions | run the file |
+| `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions; every citation resolves, every `ref_dict` entry has a user, no reference prose is pasted inline, and an API page carries a bibliography block exactly when it cites | run the file |
 | `test/test_41_constructor_docstring_drift.jl` | a `# Constructors` block matches the signature it copies | run the file |
 | `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |

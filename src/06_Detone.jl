@@ -106,7 +106,7 @@ Detone
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - $(ref_dict[:mlp1]) Chapter 2.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
     """
@@ -214,7 +214,7 @@ julia> detone!(Detone(), X)
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - $(ref_dict[:mlp1]) Chapter 2.
 """
 function detone!(::Nothing, X::MatNum)::MatNum
     return X
@@ -283,7 +283,7 @@ julia> size(Xd)
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - $(ref_dict[:mlp1]) Chapter 2.
 """
 function detone(::Nothing, X::MatNum)::MatNum
     return X

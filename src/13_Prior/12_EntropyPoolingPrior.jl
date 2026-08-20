@@ -1136,6 +1136,10 @@ EntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """

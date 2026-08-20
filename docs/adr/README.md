@@ -90,7 +90,10 @@ decision that moved many times, so read the amendments as well as the body.
 | 0067 | [The cross-validation fold loop is one seam](0067-the-cross-validation-fold-loop-is-one-seam.md) | 1 · 2026-08-19 | One `fold_loop`, beside `parallel_folds` and `run_folds`. |
 | 0068 | [A Black-Litterman caller states its axis, not its key](0068-a-black-litterman-caller-states-its-axis-not-its-key.md) | | The last argument of `bl_preroll` names the axis. The callee resolves the key. |
 | 0069 | [A tail view carries its own level and formulation](0069-a-tail-view-carries-its-own-level-and-formulation.md) | | The group holds `alpha` and `alg`. `nothing` picks the cheapest exact formulation. |
+| 0070 | [An ambiguity set is a reading, and what is missing is a calibrated radius](0070-an-ambiguity-set-is-a-reading-and-a-calibrated-radius.md) | | No set family. A radius slot admits the rule that computes it, resolved by Factory. |
 | 0071 | [A dismissed JET report is keyed by file, kind and message](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) | | A Report Fingerprint is the attribution file, the report kind and the message. No line, no stack trace, no signature render. A Dismissal covers the class and cites a shared Rationale. |
+| 0072 | [The complexity gate measures `src/` and `ext/`, and a Declaration Macro is measured at its declaration](0072-the-complexity-gate-measures-src-and-ext.md) | | Scope is `src/` and `ext/`; every other tracked file is a named Unmeasured Path. A Declaration Macro is measured where it is declared, and the Expansion Bound holds what it emits. |
+| 0073 | [The code-health baseline is four TOML files, split on who writes them](0073-the-code-health-baseline-is-four-toml-files.md) | | Four TOML files under `code_health/`, one inline table per line. Every file in scope gets a row, JET is keyed by run and attributed to its deepest repository frame, and a refresh lowers by default. |
 
 ADRs 0017, 0018, and 0028 carry no `status` frontmatter. Every other ADR is `accepted`.
 

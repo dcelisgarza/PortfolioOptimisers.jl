@@ -53,7 +53,7 @@ julia> MyOWAFunction()(4)
  0.25
 ```
 
-## Related
+# Related
 
   - [`LinearMoment`](@ref)
   - [`OWA_Func_VecNum`](@ref)
@@ -76,7 +76,7 @@ All concrete and/or abstract types implementing specific OWA algorithms should b
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 """
@@ -178,7 +178,7 @@ MaximumEntropy
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 @concrete struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm
     """
@@ -305,7 +305,7 @@ The `MinimumSquaredDistance` algorithm can be configured to use different second
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
     """
@@ -381,7 +381,7 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
     """
@@ -455,7 +455,7 @@ NormalisedConstantRelativeRiskAversion
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 @concrete struct NormalisedConstantRelativeRiskAversion <:
                  AbstractOrderedWeightsArrayEstimator
@@ -530,7 +530,7 @@ OWAJuMP
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 @concrete struct OWAJuMP <: AbstractOrderedWeightsArrayEstimator
     """
@@ -628,7 +628,7 @@ julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
@@ -678,7 +678,7 @@ This function sets up a JuMP optimization model for OWA weights, given an `OWAJu
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 function owa_model_setup(method::OWAJuMP, weights::MatNum)
     T, N = size(weights)
@@ -730,7 +730,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     slv = method.slv
@@ -772,7 +772,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+  - $(ref_dict[:owa2])
 """
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
@@ -1001,7 +1001,7 @@ OrderedWeightsArrayConditionalValueatRisk
   alpha ┴ Float64: 0.05
 ```
 
-## Related
+# Related
 
   - [`AbstractOrderedWeightsArrayFunction`](@ref)
   - [`owa_cvar`](@ref)
@@ -1132,7 +1132,7 @@ OrderedWeightsArrayTailGini
     a_sim ┴ Int64: 100
 ```
 
-## Related
+# Related
 
   - [`AbstractOrderedWeightsArrayFunction`](@ref)
   - [`owa_tg`](@ref)
@@ -1276,7 +1276,7 @@ OrderedWeightsArrayConditionalValueatRiskRange
    beta ┴ Float64: 0.05
 ```
 
-## Related
+# Related
 
   - [`AbstractOrderedWeightsArrayFunction`](@ref)
   - [`owa_cvarrg`](@ref)
@@ -1417,7 +1417,7 @@ OrderedWeightsArrayTailGiniRange
     b_sim ┴ Int64: 100
 ```
 
-## Related
+# Related
 
   - [`AbstractOrderedWeightsArrayFunction`](@ref)
   - [`owa_tgrg`](@ref)
@@ -1587,7 +1587,7 @@ LinearMoment
        k ┴ Int64: 2
 ```
 
-## Related
+# Related
 
   - [`AbstractOrderedWeightsArrayEstimator`](@ref)
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
@@ -1677,6 +1677,10 @@ $(DocStringExtensions.FIELDS)
   - [`OrderedWeightsArrayFormulation`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3])
 """
 @concrete struct ApproxOrderedWeightsArray <: OrderedWeightsArrayFormulation
     """
@@ -1699,6 +1703,22 @@ Ordered Weights Array (OWA) risk measure.
 
 Computes portfolio risk as a linear combination of sorted portfolio returns using OWA weights. The OWA weights can be provided directly or computed from an OWA algorithm.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{OWA}_{\\boldsymbol{w}}(\\boldsymbol{x}) &= \\sum_{t=1}^{T} w_{t} x_{(t)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{OWA}_{\\boldsymbol{w}}(\\boldsymbol{x})``: Ordered weights array risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\boldsymbol{w}``: OWA weight vector ``T \\times 1``.
+  - ``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1711,6 +1731,36 @@ $(DocStringExtensions.FIELDS)
         alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()
     ) -> OrderedWeightsArray
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `w` is a `VecNum`: `!isempty(w)`.
+
+# Functor
+
+    (r::OrderedWeightsArray)(x::VecNum)
+
+Computes the OWA risk of a portfolio returns vector `x`. A `w` that is a callable is evaluated at `length(x)` first, so the weight vector always matches the sample.
+
+## Arguments
+
+  - `x::VecNum`: Portfolio returns vector.
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArray()
+OrderedWeightsArray
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ typeof(owa_gmd): PortfolioOptimisers.owa_gmd
+       alg ┼ ApproxOrderedWeightsArray
+           │   p ┴ Vector{Float64}: [2.0, 3.0, 4.0, 10.0, 50.0]
+```
+
 # Related
 
   - [`OrderedWeightsArrayRange`](@ref)
@@ -1718,6 +1768,10 @@ $(DocStringExtensions.FIELDS)
   - [`ExactOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`RiskMeasureSettings`](@ref)
+
+# References
+
+  - $(ref_dict[:owa1])
 """
 @concrete struct OrderedWeightsArray <: RiskMeasure
     """
@@ -1756,7 +1810,24 @@ Ordered Weights Array Range (OWA Range) risk measure.
 
 Computes portfolio risk as the difference between two OWA linear combinations of sorted portfolio returns, providing a range-based risk measure.
 
-The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them.
+The constructor reverses `w2` unless the caller declares that it is already reversed (see `rev`). That reversal is what makes the *difference* of the two weight vectors a *range*: `w1` addresses the lower tail of the sorted returns, and the reversed `w2` addresses the upper tail, so `w1 - w2` sums the two tails rather than cancelling them. It is the weight-space form of the convention [`ValueatRiskRange`](@ref) states on the returns themselves.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{OWARange}_{\\boldsymbol{w}_{1},\\boldsymbol{w}_{2}}(\\boldsymbol{x}) &= \\sum_{t=1}^{T} \\left(w_{1,t} - w_{2,t}\\right) x_{(t)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{OWARange}_{\\boldsymbol{w}_{1},\\boldsymbol{w}_{2}}(\\boldsymbol{x})``: Ordered weights array range.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\boldsymbol{w}_{1}``: Lower-tail OWA weight vector ``T \\times 1``.
+  - ``\\boldsymbol{w}_{2}``: Upper-tail OWA weight vector ``T \\times 1``, held reversed by the constructor.
+  - ``x_{(t)}``: ``t``-th smallest entry of ``\\boldsymbol{x}``, so ``x_{(1)} \\leq \\dots \\leq x_{(T)}``.
 
 # Fields
 
@@ -1772,6 +1843,40 @@ $(DocStringExtensions.FIELDS)
         rev::Bool = false
     ) -> OrderedWeightsArrayRange
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `w1` is a `VecNum`: `!isempty(w1)`.
+  - If `w2` is a `VecNum`: `!isempty(w2)`.
+  - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`.
+
+# Functor
+
+    (r::OrderedWeightsArrayRange)(x::VecNum)
+
+Computes the OWA range of a portfolio returns vector `x`, as the sorted returns weighted by `w1 - w2`. A `w1` or `w2` that is a callable is evaluated at `length(x)` first, so the weight vectors always match the sample.
+
+## Arguments
+
+  - `x::VecNum`: Portfolio returns vector.
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArrayRange()
+OrderedWeightsArrayRange
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+        w1 ┼ typeof(owa_tg): PortfolioOptimisers.owa_tg
+        w2 ┼ ComposedFunction{typeof(reverse), typeof(owa_tg)}: reverse ∘ PortfolioOptimisers.owa_tg
+       alg ┼ ApproxOrderedWeightsArray
+           │   p ┴ Vector{Float64}: [2.0, 3.0, 4.0, 10.0, 50.0]
+       rev ┴ Bool: true
+```
+
 # Related
 
   - [`OrderedWeightsArray`](@ref)
@@ -1779,6 +1884,10 @@ $(DocStringExtensions.FIELDS)
   - [`ExactOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`RiskMeasureSettings`](@ref)
+
+# References
+
+  - $(ref_dict[:owa1])
 """
 @concrete struct OrderedWeightsArrayRange <: RiskMeasure
     """

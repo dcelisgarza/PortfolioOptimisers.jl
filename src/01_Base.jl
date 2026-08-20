@@ -844,7 +844,67 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
-                       :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
+                       :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
+                       # The Range convention (ADR 0057).
+                       :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.")
+"""
+    ref_dict
+
+Maps a key of `docs/src/References.bib` to the formatted `# References` bullet for that
+work, so the reference text is written once here and interpolated wherever a docstring
+cites it.
+
+Each value is a complete bullet body: the citation marker for the key, followed by the
+reference in the style `DocumenterCitations` renders in the bibliography. A citing docstring
+writes the whole bullet as one interpolation of this table and never pastes the reference
+prose inline. A pasted copy drifts from the entry in `References.bib` and from the other
+copies of itself: before this table existed, `gerber2025squeezing` was pasted 31 times and
+`mlp1` 13 times.
+
+The `const` definition below is the single source of truth. A key must appear once:
+[`unique_key_dict`](@ref) builds the table and refuses a repeat.
+
+# Related
+
+  - [`unique_key_dict`](@ref)
+  - [`math_dict`](@ref)
+"""
+const ref_dict = unique_key_dict(:ref_dict,
+                                 :brinson_attribution => "[brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).",#
+                                 :DBHTs => "[DBHTs](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Hierarchical information clustering by means of topologically embedded graphs*. PloS one 7, e31929 (2012).",#
+                                 :drcvar => "[drcvar](@cite) P. Mohajerin Esfahani and D. Kuhn. *Data-driven distributionally robust optimization using the Wasserstein metric: performance guarantees and tractable reformulations*. Mathematical Programming 171, 115–166 (2018).",#
+                                 :freedman1981 => "[freedman1981](@cite) D. Freedman and P. Diaconis. *On the histogram as a density estimator: L2 theory*. Zeitschrift für Wahrscheinlichkeitstheorie und verwandte Gebiete 57, 453–476 (1981).",#
+                                 :gerber => "[gerber](@cite) S. Gerber, H. Markowitz, P. Ernst, Y. Miao, P. Sargen and others. *The Gerber statistic: A robust co-movement measure for portfolio optimization*. Available at SSRN 3880054 (2021).",#
+                                 :gerber_analysis => "[gerber_analysis](@cite) E. Flint and D. Polakow. *Deconstructing the Gerber statistic*. Finance Research Letters 56, 104144 (2023).",#
+                                 :gerber2025squeezing => "[gerber2025squeezing](@cite) S. Gerber, W. Smyth, H. Markowitz, Y. Miao, P. Ernst and P. Sargen. *Squeezing financial noise: A novel approach to covariance matrix estimation*. Available at SSRN 4986939 (2025).",#
+                                 :J_LoGo => "[J_LoGo](@cite) W. Barfuss, G. P. Massara, T. Di Matteo and T. Aste. *Parsimonious modeling with information filtering networks*. Phys. Rev. E 94, 062306 (2016).",#
+                                 :knuth2019 => "[knuth2019](@cite) K. H. Knuth. *Optimal data-based binning for histograms and histogram-based probability density models*. Digital Signal Processing 95, 102581 (2019).",#
+                                 :kunsch1989 => "[kunsch1989](@cite) H. R. Künsch. *The jackknife and the bootstrap for general stationary observations*. The Annals of Statistics 17, 1217–1241 (1989).",#
+                                 :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Modern portfolio theory*. Journal of Finance 7, 77–91 (1952).",#
+                                 :mlp1 => "[mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020).",#
+                                 :mpdist => "[mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).",#
+                                 :NHPG => "[NHPG](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Nested hierarchies in planar graphs*. Discrete Applied Mathematics 159, 2135–2146 (2011).",#
+                                 :owa1 => "[owa1](@cite) D. Cajas. *OWA portfolio optimization: A disciplined convex programming framework*. Available at SSRN 3988927 (2021).",#
+                                 :owa2 => "[owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).",#
+                                 :owa3 => "[owa3](@cite) D. Cajas. *Efficient Gini Mean Difference and Tail Gini Portfolio Optimization based on P-Norms*. Available at SSRN 4711326 (2024).",#
+                                 :PMFG => "[PMFG](@cite) G. P. Massara, T. Di Matteo and T. Aste. *Network Filtering for Big Data: Triangulated Maximally Filtered Graph*. Journal of Complex Networks 5, 161–178 (2016).",#
+                                 :politis1992circular => "[politis1992circular](@cite) D. N. Politis and J. P. Romano. *A circular block-resampling procedure for stationary data*. In: *Exploring the Limits of Bootstrap* (John Wiley & Sons, 1992); pp. 263–270.",#
+                                 :politis1994stationary => "[politis1994stationary](@cite) D. N. Politis and J. P. Romano. *The stationary bootstrap*. Journal of the American Statistical Association 89, 1303–1313 (1994).",#
+                                 :quintile => "[quintile](@cite) R. Zhou and D. P. Palomar. *Understanding the Quintile Portfolio*. IEEE Transactions on Signal Processing 68, 4030–4040 (2020).",#
+                                 :scott1979 => "[scott1979](@cite) D. W. Scott. *On optimal and data-based histograms*. Biometrika 66, 605–610 (1979).",#
+                                 :sharpe_stderr => "[sharpe_stderr](@cite) D. H. Bailey and M. Lopez de Prado. *The Sharpe ratio efficient frontier*. Journal of Risk 15, 3–44 (2012).",#
+                                 :smyth2022enhanced => "[smyth2022enhanced](@cite) W. Smyth and D. Broby. *An enhanced Gerber statistic for portfolio optimization*. Finance Research Letters 49, 103229 (2022).",#
+                                 :EPTail => "[EPTail](@cite) D. Cajas. *Entropy Pooling with CVaR and EVaR Views*. Available at SSRN 7120258 (2026).",#
+                                 :cvar => "[cvar](@cite) R. T. Rockafellar and S. Uryasev. *Optimization of conditional value-at-risk*. Journal of Risk 2, 21–41 (2000).",#
+                                 :evar => "[evar](@cite) A. Ahmadi-Javid. *Entropic value-at-risk: A new coherent risk measure*. Journal of Optimization Theory and Applications 155, 1105–1123 (2012).",#
+                                 :rlvar => "[rlvar](@cite) D. Cajas. *Portfolio Optimization of Relativistic Value at Risk*. Available at SSRN 4378498 (2023).",#
+                                 :cdar => "[cdar](@cite) A. Chekhlov, S. Uryasev and M. Zabarankin. *Drawdown measure in portfolio optimization*. International Journal of Theoretical and Applied Finance 8, 13–58 (2005).",#
+                                 :pnvar => "[pnvar](@cite) P. A. Krokhmal. *Higher moment coherent risk measures*. Quantitative Finance 7, 373–387 (2007).",#
+                                 :ulcer => "[ulcer](@cite) P. G. Martin and B. B. McCann. *The Investor's Guide to Fidelity Funds* (John Wiley & Sons, 1989).",#
+                                 :minimax => "[minimax](@cite) M. R. Young. *A minimax portfolio selection rule with linear programming solution*. Management Science 44, 673–683 (1998).",#
+                                 :bdvar => "[bdvar](@cite) D. Cajas. *Portfolio Optimization of Brownian Distance Variance*. Available at SSRN 4561293 (2023).",#
+                                 :rousseeuw1993 => "[rousseeuw1993](@cite) P. J. Rousseeuw and C. Croux. *Alternatives to the median absolute deviation*. Journal of the American Statistical Association 88, 1273–1283 (1993).",#
+                                 :szekely2007 => "[szekely2007](@cite) G. J. Székely, M. L. Rizzo and N. K. Bakirov. *Measuring and testing dependence by correlation of distances*. The Annals of Statistics 35, 2769–2794 (2007).")
 
 """
 $(DocStringExtensions.TYPEDEF)

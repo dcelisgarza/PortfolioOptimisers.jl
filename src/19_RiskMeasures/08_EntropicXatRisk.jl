@@ -15,7 +15,7 @@ Solves a convex optimisation problem to compute the ERM at confidence level `alp
 
 # Returns
 
-  - ERM value (scalar).
+  - ERM value (scalar), or `NaN` if no solver in `slv` succeeds.
 
 # Related
 
@@ -92,6 +92,8 @@ Where:
   - ``t``, ``z``, ``\\boldsymbol{u}``: Conic optimisation variables.
   - ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
 
+For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the normalisation ``\\alpha T`` becomes ``\\alpha \\sum_{t=1}^{T} w_t`` and the budget constraint becomes ``\\boldsymbol{w}^\\intercal \\boldsymbol{u} \\leq z``.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -144,6 +146,10 @@ EntropicValueatRisk
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:evar])
 """
 @propagatable @concrete struct EntropicValueatRisk <: RiskMeasure
     """
@@ -203,6 +209,8 @@ Where:
   - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail entropic risk at level ``\\alpha``.
   - ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail entropic risk at level ``\\beta``.
 
+$(math_dict[:negated_upper_tail])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -230,6 +238,10 @@ Keywords correspond to the struct's fields.
   - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`EntropicValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:evar])
 """
 @propagatable @concrete struct EntropicValueatRiskRange <: RiskMeasure
     """
@@ -377,6 +389,11 @@ EntropicDrawdownatRisk
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:evar])
 """
 @propagatable @concrete struct EntropicDrawdownatRisk <: RiskMeasure
     """
@@ -503,6 +520,11 @@ RelativeEntropicDrawdownatRisk
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:evar])
 """
 @propagatable @concrete struct RelativeEntropicDrawdownatRisk <: HierarchicalRiskMeasure
     """

@@ -170,8 +170,8 @@ SpectralDenoise()
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -215,8 +215,8 @@ FixedDenoise()
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -274,8 +274,8 @@ ShrunkDenoise
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
     """
@@ -362,8 +362,8 @@ Denoise
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
     """
@@ -453,8 +453,8 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -544,7 +544,7 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # References
 
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mpdist])
 """
 function find_max_eval(vals::VecNum, q::Number,
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -661,8 +661,8 @@ julia> denoise!(Denoise(), X, 10 / 5)
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 function denoise!(::Nothing, X::MatNum, args...)::MatNum
     return X
@@ -732,8 +732,8 @@ julia> size(Xd)
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 function denoise(::Nothing, X::MatNum, args...)::MatNum
     return X

@@ -210,3 +210,142 @@ function -- cannot host.
         end
     end
 end
+
+#=
+References (issue #351). The bibliography is the one part of a docstring whose text is
+long, repeated, and easy to let drift: before `ref_dict` existed, `gerber2025squeezing`
+was pasted 31 times and `mlp1` 13 times, and only 16 of the 193 files in `src/` cited
+anything at all.
+
+The four checks below are what a ticked box on #351 means. They run here rather than in
+`docs/make.jl` for the reason the catalogue tests give: a full docs build is slow and run
+by hand, so a gap found only there is a gap found months late. Check 4 is the one that
+would otherwise be a *build error* -- a `Pages = [@__FILE__]` block on a page that cites
+nothing raises `@error "File exists but no references were collected"` in
+`DocumenterCitations`, so it fails the build rather than warning.
+=#
+@testset "References" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    SRC = joinpath(@__DIR__, "..", "src")
+    BIB = joinpath(@__DIR__, "..", "docs", "src", "References.bib")
+    API = joinpath(@__DIR__, "..", "docs", "src", "api")
+
+    function files_under(dir, ext)
+        acc = String[]
+        for (root, _, files) in walkdir(dir), f in files
+            endswith(f, ext) && push!(acc, joinpath(root, f))
+        end
+        return sort!(acc)
+    end
+
+    src_files = files_under(SRC, ".jl")
+    # `ref_dict` itself names every key it defines, so it is not evidence that anything
+    # cites the work. Exclude the file that holds the table when looking for users.
+    dict_file = joinpath(SRC, "01_Base.jl")
+
+    bib_keys = Set(m.captures[1]
+                   for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
+
+    # A citation is `[key](@cite)` or `[key1,key2](@cite)`.
+    function cited_keys(text)
+        acc = Set{String}()
+        for m in eachmatch(r"\[([A-Za-z0-9_][A-Za-z0-9_,\s]*)\]\(@cite\)", text)
+            foreach(k -> push!(acc, strip(k)), split(m.captures[1], ','))
+        end
+        return acc
+    end
+
+    @testset "every citation resolves in References.bib" begin
+        for f in src_files
+            for key in cited_keys(read(f, String))
+                @test key in bib_keys
+            end
+        end
+    end
+
+    @testset "every ref_dict entry has a user" begin
+        for key in keys(PO.ref_dict)
+            @test string(key) in bib_keys
+        end
+        users = Set{Symbol}()
+        for f in src_files
+            f == dict_file && continue
+            for m in eachmatch(r"ref_dict\[:([A-Za-z0-9_]+)\]", read(f, String))
+                push!(users, Symbol(m.captures[1]))
+            end
+        end
+        for key in keys(PO.ref_dict)
+            @test key in users
+        end
+    end
+
+    # A bullet under `# References` must be one interpolation of `ref_dict`, optionally
+    # followed by a locator such as `Chapter 2.`. Anything else is a pasted copy of the
+    # reference prose, which is what this table exists to stop.
+    @testset "no # References bullet carries inline reference prose" begin
+        bullet = r"^\s*- \$\(ref_dict\[:[A-Za-z0-9_]+\]\)"
+        for f in src_files
+            lines = split(read(f, String), '\n')
+            i = 1
+            while i <= length(lines)
+                if strip(lines[i]) == "# References"
+                    j = i + 1
+                    while j <= length(lines) && isempty(strip(lines[j]))
+                        j += 1
+                    end
+                    while j <= length(lines) && startswith(strip(lines[j]), "- ")
+                        @test occursin(bullet, lines[j])
+                        j += 1
+                    end
+                    i = j
+                else
+                    i += 1
+                end
+            end
+        end
+    end
+
+    # A page cites either in its own prose or through a docstring it pulls in with a
+    # `@docs` block, and it needs a non-canonical bibliography block exactly then.
+    @testset "an API page carries a bibliography block iff it cites" begin
+        function docs_block_names(text)
+            acc, inside = String[], false
+            for line in split(text, '\n')
+                if startswith(line, "```@docs")
+                    inside = true
+                elseif inside && startswith(line, "```")
+                    inside = false
+                elseif inside && !isempty(strip(line))
+                    push!(acc, strip(line))
+                end
+            end
+            return acc
+        end
+        function docstring_text(name)
+            sym = Symbol(first(split(replace(name, "PortfolioOptimisers." => ""), '(')))
+            isdefined(PO, sym) || return ""
+            return try
+                string(Base.Docs.doc(Base.Docs.Binding(PO, sym)))
+            catch
+                ""
+            end
+        end
+        # Collect rather than assert per page: a bare `false == true` does not say which
+        # page is wrong, and the fix is always "add (or remove) the block on that page".
+        missing_block, stray_block = String[], String[]
+        for p in files_under(API, ".md")
+            text = read(p, String)
+            has_block = occursin("```@bibliography", text)
+            cites = occursin("(@cite)", text) ||
+                    any(n -> occursin("(@cite)", docstring_text(n)), docs_block_names(text))
+            if cites && !has_block
+                push!(missing_block, relpath(p, API))
+            elseif !cites && has_block
+                push!(stray_block, relpath(p, API))
+            end
+        end
+        @test missing_block == String[]
+        @test stray_block == String[]
+    end
+end

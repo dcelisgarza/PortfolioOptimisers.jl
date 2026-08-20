@@ -71,6 +71,10 @@ Knuth
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:knuth2019])
 """
 @concrete struct Knuth <: BinWidthBins
     args
@@ -106,6 +110,10 @@ FreedmanDiaconis()
   - [`Knuth`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:freedman1981])
 """
 struct FreedmanDiaconis <: BinWidthBins end
 """
@@ -132,6 +140,10 @@ Scott()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:scott1979])
 """
 struct Scott <: BinWidthBins end
 """

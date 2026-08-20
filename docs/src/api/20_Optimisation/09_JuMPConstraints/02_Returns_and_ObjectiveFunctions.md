@@ -40,3 +40,10 @@ add_to_objective_penalty!
 add_penalty_to_objective!
 set_portfolio_objective_function!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

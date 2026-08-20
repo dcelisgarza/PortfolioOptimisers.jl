@@ -252,8 +252,8 @@ MatrixProcessing
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 @concrete struct MatrixProcessing <: AbstractMatrixProcessingEstimator
     """
@@ -388,8 +388,8 @@ julia> matrix_processing!(MatrixProcessing(; dt = Detone()), sigma, X)
 
 # References
 
-  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mpdist])
 """
 function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)::MatNum
     return sigma

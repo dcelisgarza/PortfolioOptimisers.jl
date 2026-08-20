@@ -127,7 +127,7 @@ julia> struct MyConcreteType <: PortfolioOptimisers.MyAbstractType end
 ...
 ```
 
-## Related
+# Related
 
   - [`ConcreteSubtype1`](@ref)
   - [`related_function`](@ref)
@@ -171,7 +171,7 @@ MyType
   field1 ┴ default1
 ```
 
-## Related
+# Related
 
   - [`AbstractMyType`](@ref)
   - [`related_function`](@ref)
@@ -330,7 +330,7 @@ julia> function_name(...)
 ...
 ```
 
-## Related
+# Related
 
   - [`RelatedType`](@ref)
   - [`related_function`](@ref)
@@ -349,6 +349,39 @@ Internal/private functions may use `$(DocStringExtensions.TYPEDSIGNATURES)` as t
 - Include a `## Validation` sub-section in struct docstrings and a `# Validation` section in function docstrings whenever the function or constructor enforces preconditions.
 - Use `val_dict` entries for common validation rules.
 - For custom validation, describe the condition clearly: `` `x > 0` ``.
+
+---
+
+## The `# References` Section
+
+A docstring that rests on a published source names it. The section is **last**, after `# Related`, and it holds one bullet per work.
+
+- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base.jl`), which holds a single copy of each reference text:
+
+  ```julia
+  # References
+
+    - $(ref_dict[:mlp1]) Chapter 2.
+  ```
+
+  A locator such as `Chapter 2.` may follow the interpolation. Nothing else may.
+- **If the work has no key**, add the BibTeX entry to `docs/src/References.bib`, then add the matching `ref_dict` entry. The `ref_dict` value is the citation marker followed by the reference formatted as `DocumenterCitations` renders it in the bibliography.
+- **If the type has no source**, write no section. A `ref_dict` entry with no user is a test failure, and so is a citation whose key is not in `References.bib`.
+- **Add the page's bibliography block.** An API page whose prose or whose included docstrings cite anything carries this block, and a page that cites nothing must not:
+
+  ````markdown
+  ## References
+
+  ```@bibliography
+  Pages = [@__FILE__]
+  Canonical = false
+  ```
+  ````
+
+  `Canonical = false` is load-bearing. `docs/src/99_references.md` holds the one canonical block; a second canonical block silently skips every entry the first claimed. A `Pages` block on a page that cites nothing is a docs-**build error**, not a warning.
+- An inline citation in prose — `as described in [DBHTs](@cite)` — needs no bullet of its own, but the work still needs a `# References` bullet on the type that owns it.
+
+The four rules above are checked by the `"References"` testset in `test/test_26_docs.jl`.
 
 ---
 

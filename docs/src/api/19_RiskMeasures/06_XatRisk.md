@@ -17,3 +17,10 @@ absolute_drawdown_vec
 relative_drawdown_vec(x::VecNum)
 drawdown_at_risk
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

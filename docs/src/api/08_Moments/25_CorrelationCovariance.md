@@ -7,3 +7,10 @@ cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
 cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

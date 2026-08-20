@@ -34,6 +34,10 @@ Bootstrap algorithm for constructing uncertainty sets using a stationary bootstr
   - [`ARCHBootstrapSet`](@ref)
   - [`CircularBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:politis1994stationary])
 """
 struct StationaryBootstrap <: ARCHBootstrapSet end
 """
@@ -46,6 +50,10 @@ Bootstrap algorithm for constructing uncertainty sets using a circular block boo
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:politis1992circular])
 """
 struct CircularBootstrap <: ARCHBootstrapSet end
 """
@@ -58,6 +66,10 @@ Bootstrap algorithm for constructing uncertainty sets using a moving block boots
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
   - [`CircularBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:kunsch1989])
 """
 struct MovingBootstrap <: ARCHBootstrapSet end
 """

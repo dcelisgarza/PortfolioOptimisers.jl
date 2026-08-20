@@ -9,6 +9,10 @@ All concrete and/or abstract types implementing Smyth-Broby covariance estimatio
 
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 """
