@@ -90,6 +90,7 @@ decision that moved many times, so read the amendments as well as the body.
 | 0067 | [The cross-validation fold loop is one seam](0067-the-cross-validation-fold-loop-is-one-seam.md) | 1 · 2026-08-19 | One `fold_loop`, beside `parallel_folds` and `run_folds`. |
 | 0068 | [A Black-Litterman caller states its axis, not its key](0068-a-black-litterman-caller-states-its-axis-not-its-key.md) | | The last argument of `bl_preroll` names the axis. The callee resolves the key. |
 | 0069 | [A tail view carries its own level and formulation](0069-a-tail-view-carries-its-own-level-and-formulation.md) | | The group holds `alpha` and `alg`. `nothing` picks the cheapest exact formulation. |
+| 0071 | [A dismissed JET report is keyed by file, kind and message](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) | | A Report Fingerprint is the attribution file, the report kind and the message. No line, no stack trace, no signature render. A Dismissal covers the class and cites a shared Rationale. |
 
 ADRs 0017, 0018, and 0028 carry no `status` frontmatter. Every other ADR is `accepted`.
 
