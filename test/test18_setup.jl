@@ -318,6 +318,28 @@ tr = WeightsTracking(; w = w0)
 # See issues #332 (mr_block1, TrackingRiskMeasure + LpNorm) and #333 (mr_block2 weights).
 const JULIA_NUMERICS_DRIFT = VERSION >= v"1.12.7"
 
+# The ratio `mr_block2` maximises, evaluated at a given weight vector. It is what a marginal
+# model's fallback vertex can still be held to when its weights cannot be compared.
+#
+# The prior is fitted once and cached, because only the fallback branch reads it and that
+# branch is rare. `factory` is what binds the solver into a measure that needs one to
+# evaluate -- `PowerNormValueatRiskRange`, case 42's measure, is one of them, and calling the
+# bare measure raises a `MethodError` rather than answering.
+const MR_PRIOR = Ref{Any}(nothing)
+function mr_prior()
+    if isnothing(MR_PRIOR[])
+        MR_PRIOR[] = PortfolioOptimisers.prior(pr, rd.X)
+    end
+    return MR_PRIOR[]
+end
+function mr_ratio(r, w)
+    prr = mr_prior()
+    risk = PortfolioOptimisers.expected_risk(PortfolioOptimisers.factory(r, prr, slv), w,
+                                             prr.X)
+    ret = PortfolioOptimisers.expected_return(ArithmeticReturn(), w, prr)
+    return (ret - rf) / risk
+end
+
 function mr_block1(idx)
     df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
     i = (first(idx) - 1) * 6 + 1
@@ -475,8 +497,24 @@ function mr_block2(idx)
         # reproduce on a developer machine at the tolerances below them and disagree on the CI
         # runner, at every Julia version tried. Regenerating their references cannot help,
         # since the figure differs by host, so each carries the tolerance the runner actually
-        # needs. 42 needs the widest of them because its model is marginal: the runner logs a
-        # solve failure and falls back, and the fallback lands on a different vertex.
+        # needs.
+        #
+        # 42 is the marginal one: on the CI runner a solver fails and the answer comes from a
+        # later one in `slv`, which lands on a different vertex. Its tolerance is NOT a
+        # constant, because a constant one has to cover the worst host and then asserts
+        # nothing anywhere else -- at `rtol = 0.5` the case could not fail on anything short
+        # of a gross error.
+        #
+        # So key on the OUTCOME rather than on the index, which is what the
+        # `JULIA_NUMERICS_DRIFT` gate above already does for its own family:
+        # `optimise_JuMP_model!` records a trial ONLY for a solver that failed, and `break`s
+        # before recording the one that succeeded. An empty `res.retcode.res` therefore means
+        # the first solver answered cleanly, and a non-empty one means the answer came from a
+        # fallback. Where the first solver answers, the weights reproduce and are held to the
+        # tolerance this host actually needs -- measured at 1e-3, five hundred times tighter
+        # than the fallback branch. Where it does not, the weights are not the right thing to
+        # compare and the objective is asserted instead, below.
+        fell_back = i == 42 && !isempty(res.retcode.res)
         rtol = if i == 12
             1e-3
         elseif i == 15
@@ -484,7 +522,7 @@ function mr_block2(idx)
         elseif i == 27
             5e-3
         elseif i == 42
-            0.5
+            fell_back ? 0.5 : 1e-3
         elseif i == 46
             5e-6
         elseif i in (14, 30)
@@ -515,6 +553,19 @@ function mr_block2(idx)
             display([res.w df[!, "$i"]])
         end
         @test success
+        # A fallback vertex is a different point of the same problem, so its weights are not
+        # comparable and its OBJECTIVE is. The bound is one-sided: the reference is the
+        # optimum the first solver reaches, and a fallback can only be worse, so a fallback
+        # that scored higher would mean the reference is wrong rather than that the run is
+        # fine. `MaximumRatio(; rf = rf)` is what this block maximises.
+        #
+        # This branch does not run on a host where the first solver answers, so the margin
+        # below is set from the shape of the claim and not from a measurement: 25% off the
+        # optimal ratio is a real statement about the fallback, where 50% on a weight vector
+        # is not. CI is what exercises it.
+        if fell_back
+            @test mr_ratio(r1, res.w) >= mr_ratio(r1, df[!, "$i"]) * (1 - 0.25)
+        end
         i += 1
     end
 end
