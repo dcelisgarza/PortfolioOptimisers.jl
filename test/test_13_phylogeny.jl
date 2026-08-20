@@ -2695,8 +2695,16 @@ end
                    sprint(showerror, raised(() -> clusterise(cle, Xz))))
     both = sprint(showerror,
                   raised(() -> PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)))
-    @test occursin("for ExponentialSimilarity, from PortfolioOptimisers.Distance{Nothing, LogDistance}",
-                   both)
+    #=
+    Julia decides at `show` time whether a type name is qualified. It reads visibility
+    from `Base.active_module()`, and it applies the one decision to every name in the
+    type. So the message reads `Distance{Nothing, LogDistance}` where both names are
+    visible, and `PortfolioOptimisers.Distance{Nothing, PortfolioOptimisers.LogDistance}`
+    where neither is. Neither spelling is a substring of the other, so do not write one.
+    Render the expectation with the same renderer that wrote the message.
+    =#
+    @test occursin("for ExponentialSimilarity, from", both)
+    @test occursin(string(typeof(nte.de)), both)
 
     # The strictly positive counterpart runs, with the infinite distances left in place.
     @test PortfolioOptimisers.DBHTs(Dp, Sp) isa Tuple
