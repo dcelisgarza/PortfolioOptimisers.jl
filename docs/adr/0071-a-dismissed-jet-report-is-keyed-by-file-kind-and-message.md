@@ -112,6 +112,16 @@ one is a claim that some code is correct.
 
 The rule is mechanically enforceable, because a diff that adds a rationale block is easy to detect.
 
+**An Exemption cites a Rationale in the same namespace.** The complexity side of the gate has the
+same shape of problem: a class of definitions whose number cannot fall, and one sentence that
+explains all of them. [ADR 0073](0073-the-code-health-baseline-is-four-toml-files.md) writes 17
+Exemptions for the struct inner constructors, all of one class, so a free-text reason on each entry
+would copy one paragraph 17 times. Reusing the Rationale gives the Exemption the approval gate it
+otherwise lacks, where any contributor could write any prose and no rule asked anybody to read it.
+
+One namespace was chosen over two. A Rationale is a named, approved paragraph that many keyed
+entries cite, and what cites it is evident from where the citation sits.
+
 ### The record is a committed data file, never an annotation in the source
 
 Dismissals and Rationales live in a committed file outside `src/`, in a standard machine-parseable
@@ -161,9 +171,16 @@ The rule for a file the baseline does **not** name is settled by ADR 0074.
 Dismissals carry over untouched. The subtraction already turns the gate red wherever a message
 actually changed, so the bump commit fixes exactly what moved.
 
-Each Rationale records the Julia version it was last affirmed against, and the gate stays red until
-every Rationale names the new pin. A new inference engine can invalidate a claim that some code is
-correct without changing one character of source, and only the Rationale layer carries such claims.
+Each Rationale a Dismissal cites records the Julia version it was last affirmed against, and the
+gate stays red until every such Rationale names the new pin. A new inference engine can invalidate a
+claim that some code is correct without changing one character of source, and only the Rationale
+layer carries such claims.
+
+**Re-affirmation binds the JET side alone.** A Rationale cited only by Exemptions records no pin. It
+claims a syntactic fact — an inner constructor takes one argument per field — and no analyser bump
+can falsify it. A CodeComplexity release that changed the counting is already caught by the
+provenance comparison, which fails the gate and forces a refresh. Making every Rationale re-affirm
+was rejected as a ritual that can never fail.
 
 The counts make this affordable. Dismissals will number in the hundreds. Rationales will number
 under ten, so a bump costs a human under ten paragraphs to re-read.

@@ -16,9 +16,9 @@ one.
 | The JET raw and reviewed count per file | a generator | the JET measurement |
 | The Expansion Bound, about 21 rows | a generator | [ADR 0072](0072-the-complexity-gate-measures-src-and-ext.md) |
 | Dismissals and Rationales | a human | [ADR 0071](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) |
-| Exemptions, keyed `(path, definition, metric)` | a human | the scheduled job's rules |
+| Exemptions, keyed `(path, definition, metric)`, each citing a Rationale | a human | this ADR, and [ADR 0071](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) |
 | Unmeasured Paths | a human | [ADR 0072](0072-the-complexity-gate-measures-src-and-ext.md) |
-| The thresholds, 10 / 15 / 5 / 1 | a human | the scheduled job's rules |
+| The thresholds, 10 / 15 / 10 / 1 | a human | this ADR |
 
 Four measurements constrain the answer.
 
@@ -61,6 +61,76 @@ The directory is neither source nor test. `.github/` was rejected because the re
 locally, so GitHub does not own the data. A hidden `.code_health/` was rejected because
 `rulings.toml` is hand-edited often. A `.toml` file adds nothing to ADR 0072's coverage assertion,
 which counts tracked `.jl` files alone.
+
+### The thresholds sit at a cliff in this repository's own distribution
+
+The four thresholds are **cyclomatic 10, cognitive 15, argument count 10, JET at least 1
+reviewed-real**. They are frozen data in `rulings.toml`, and they gate issue candidacy and,
+through [ADR 0074](0074-the-baseline-row-set-is-total-and-a-rename-pairs-by-measurement.md), the
+entry test for an added file. They never bind the ratchet, which compares a number against its own
+baseline row.
+
+Argument count was 5, the Ruff `PLR0913` default that `ArgumentCountComplexity` documents itself
+against. At 5 it stood above **101 of the 196 files in scope**, against 21 for each of the other
+two. More than half of all added files would therefore have met the gate as an argument-count
+rejection, and the scheduled job's queue would have been one metric.
+
+Two independent readings put the line at 10, measured per file as the max over definitions.
+
+| Threshold | Files above it | Share |
+| --- | --- | --- |
+| 5 | 101 | 52% |
+| 8 | 43 | 22% |
+| 9 | 25 | 13% |
+| **10** | **21** | **11%** |
+| 12 | 13 | 7% |
+
+The distribution has a cliff. Counting files by their max argument count gives 18 at 6, 18 at 7,
+22 at 8, 18 at 9, and then **4 at 10**, 6 at 11, 2 at 12. The body of the codebase sits in the 4 to
+9 band and the count collapses above it. The other two metrics break in the same place: cyclomatic
+holds 13 files at 9 and 4 at 10, cognitive holds 7 at 14 and 2 at 15. So all three numbers sit
+where this repository thins, and all three report the same 21 files.
+
+That second reading matters beyond tidiness. The scheduled job ranks by `max(value / threshold)`
+descending, and a ratio is only comparable across metrics when a ratio of 1 means the same share of
+the codebase for each. At 5 an argument-count ratio was inflated against the other two by a factor
+of about two.
+
+**The cliff is why the number was chosen once. It is not a rule to re-run.** A threshold derived
+from the live distribution at every measurement never terminates, which is why a percentile was
+rejected when the thresholds were first frozen.
+
+Two narrower rules were rejected because measurement showed that neither reaches the problem.
+Counting **positional slots alone** leaves 86 of the 196 files above 5, so keyword arguments are not
+what puts the codebase over the line, and `ArgumentCountComplexity` has no positional-only mode to
+call. **Dropping every struct constructor** leaves 87 above 5, so the estimator constructors own the
+extreme tail and not the bulk. Splitting the number, one for the scheduled job and a higher one for
+the entry test, was rejected because at 10 the metric rejects the same 11% the other two do, so no
+metric-specific split is left to justify.
+
+### The 17 constructor Exemptions are written before the job first runs
+
+A struct's inner constructor takes one argument per field, because Julia gives it no other form.
+`JuMPOptimiser` scores 44, `FullGerberIQ` 25, `MeucciEntropyPoolingPrior` 15. Eleven of the 21
+argument-count offenders are such a constructor, and each would cost an issue that can only ever be
+closed by a ruling.
+
+So `rulings.toml` carries them from the start. The set is **every struct inner constructor scoring
+above 10**, which is 19 definitions over **17 keys** — a key holds no line, so one key covers the two
+`FullGerberIQ` constructors at lines 1194 and 1238 and the two `NestedClustered` constructors at
+450 and 500. Taking only the file-driving constructor was rejected: `10_JuMPOptimiser.jl` holds
+`JuMPOptimiser` at 44 and `ProcessedJuMPOptimiserAttributes` at 19, so the file would return as a
+candidate on the second.
+
+**The Exemption covers argument count alone.** The same constructors also stand above the other two
+thresholds — `JuMPOptimiser` scores cyclomatic 100 and cognitive 96 — but those numbers come from
+validation branches written inside the constructor, and a branch is extractable where an argument
+per field is not. Those files stay candidates.
+
+Excluding a constructor from the **metric** was rejected twice over. It would change the measured
+value, so it would move the baseline, where an Exemption binds candidacy alone. And it needs the
+gate to recognise an inner constructor by parsing, a heuristic that misses every macro-prefixed
+`struct` declaration unless it is written for them.
 
 ### TOML, one inline table per line, printed by the generator
 
@@ -214,6 +284,17 @@ merging. One committed file per source file was rejected because two branches ch
 source file still collide, so it buys nothing and costs 196 paths.
 
 ## Consequences
+
+**The scheduled job's lifetime shrinks from about 110 issues to about 30.** The union of the three
+metrics over the 196 files falls from 108 to 38 at the new threshold, and to **30** once the 17
+constructor Exemptions are dropped before each file's max. Argument count contributes 10 candidate
+files where it contributed 101. JET's few reviewed-real files are on top of that.
+
+**An added file now meets the gate at the same rate on every metric.** The entry test rejects about
+11% of files on each of the three, where argument count alone rejected 52%. A contributor who adds
+a new estimator file and trips argument count on its constructor can also finish the ruling alone,
+because the constructor Rationale already exists and citing an approved Rationale needs no
+maintainer.
 
 **The tools cannot float behind a bare `Pkg.add`.** `Aqua.yml`'s precedent installs its tool in the
 workflow with no version bound. Under the provenance rule that would turn CI red on every routine
