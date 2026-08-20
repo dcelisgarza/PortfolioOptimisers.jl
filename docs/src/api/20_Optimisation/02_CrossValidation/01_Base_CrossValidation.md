@@ -42,6 +42,9 @@ VecPredRes_MultiPredRes
 cv_sequential_info
 parallel_folds
 run_folds
+Fold
+fold_loop
+assert_unshuffled_folds
 cv_nobs
 cv_timestamps
 ```

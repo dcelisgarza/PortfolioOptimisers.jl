@@ -8,7 +8,7 @@ Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
 FactorRiskContribution
 needs_previous_weights(opt::FactorRiskContribution)
 port_opt_view(frc::FactorRiskContribution, i, X::MatNum, args...)
-set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg, rd::ReturnsResult, flag::Bool, wi::Option{<:VecNum})
+set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg, rd::ReturnsResult, pr::Option{<:AbstractPriorResult}, flag::Bool, wi::Option{<:VecNum})
 optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

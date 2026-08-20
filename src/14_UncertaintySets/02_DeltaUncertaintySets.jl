@@ -86,7 +86,8 @@ end
 
 Box uncertainty set for expected returns from delta bounds: zero lower bound and
 `2 * dmu * abs.(pr.mu)` upper bound. Shared by the delta [`ucs`](@ref)/[`mu_ucs`](@ref)
-constructions.
+constructions. The set carries `pr.mu`, the characteristic vector its bounds are calibrated
+on.
 
 # Related
 
@@ -96,13 +97,15 @@ constructions.
 function mu_delta_box_set(pr, dmu::Number)
     return BoxUncertaintySet(;
                              lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
-                                        length = length(pr.mu)), ub = dmu * abs.(pr.mu) * 2)
+                                        length = length(pr.mu)), ub = dmu * abs.(pr.mu) * 2,
+                             val = pr.mu)
 end
 """
     sigma_delta_box_set(pr, dsigma::Number)
 
 Box uncertainty set for covariance from delta bounds: `pr.sigma ± dsigma * abs.(pr.sigma)`.
-Shared by the delta [`ucs`](@ref)/[`sigma_ucs`](@ref) constructions.
+Shared by the delta [`ucs`](@ref)/[`sigma_ucs`](@ref) constructions. The set carries
+`pr.sigma`, the covariance its bounds are calibrated on.
 
 # Related
 
@@ -111,7 +114,8 @@ Shared by the delta [`ucs`](@ref)/[`sigma_ucs`](@ref) constructions.
 """
 function sigma_delta_box_set(pr, dsigma::Number)
     d_sigma = dsigma * abs.(pr.sigma)
-    return BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
+    return BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma,
+                             val = pr.sigma)
 end
 """
     ucs(ue::DeltaUncertaintySet, X::MatNum,

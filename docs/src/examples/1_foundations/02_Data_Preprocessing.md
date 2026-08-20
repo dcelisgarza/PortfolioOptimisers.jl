@@ -30,7 +30,11 @@ returns.
 
 !!! note "Impute.jl imputors"
     Imputation methods are [`Impute.jl`](https://github.com/invenia/Impute.jl) imputors passed via
-    `impute_method`, so bring in `using Impute`. The two most useful for prices are
+    `impute_method`. `Impute` is an *optional* dependency of PortfolioOptimisers — add it to your
+    project and `using Impute` to load `PortfolioOptimisersImputeExt`, which is what teaches
+    `prices_to_returns` to accept an imputor; without it, passing one is an error. Note that this
+    is unrelated to [`Imputer`](@ref), PortfolioOptimisers' own imputation *estimator* for
+    pipelines. The two most useful imputors for prices are
     `Impute.LOCF()` (last observation carried forward — the right model for a halt or stale quote,
     since it holds the last traded price) and `Impute.Interpolate()` (linear interpolation —
     natural for short gaps between two good prices).

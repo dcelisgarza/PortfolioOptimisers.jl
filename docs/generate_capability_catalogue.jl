@@ -12,13 +12,25 @@
 # `Markdown.Paragraph` in the rendered docstring is the summary. Reading the raw
 # string would instead hand back the uninterpolated `$(...)` expressions.
 #
-# Rendering notes (Documenter + DocumenterVitepress) -- see also
+# Rendering notes (Documenter's HTML writer) -- see also
 # `generate_type_hierarchy.jl`, which shares this page's constraints:
-#   * `::: details` containers work *inside* a list item: the bullet body becomes
-#     the `<summary>` and the nested sub-list becomes the disclosure body. They
-#     are never explicitly closed; the list nesting closes them.
-#   * `@ref` links must not sit inside a code fence, so everything here is plain
-#     markdown.
+#   * A collapsible group is a raw-HTML `<details>`, NOT a `!!! details`
+#     admonition. Two reasons. The Markdown parser accepts a quoted title only
+#     (`!!! details "Title"`), and it renders that title as plain text, so the
+#     head would lose its `@ref` links. Writing the `<details>` / `<summary>`
+#     tags in `@raw html` blocks and leaving the head and the body as ordinary
+#     markdown between them keeps every link live. The page used the unquoted
+#     `- !!! details <head>` form before, which Documenter renders as literal
+#     prose rather than a disclosure.
+#   * A `@raw html` block is a fence, so it cannot sit inside a list item. Each
+#     group therefore breaks out of the enclosing list, and the list nesting is
+#     restored with `margin-left`. The value is `(indent + 2)em`, because the
+#     theme gives `.content ul` a 2em margin per nesting level and `indent`
+#     counts two spaces per level. The group's own children then restart at
+#     indent 0 inside the `<details>`, so the margins compose. See
+#     `docs/src/assets/generated-pages.css`.
+#   * `@ref` links must not sit inside a code fence, so everything else here is
+#     plain markdown.
 
 using PortfolioOptimisers, Markdown, InteractiveUtils
 
@@ -161,7 +173,9 @@ head_text(h::Cap) = cap_text(h)
 head_text(h::String) = h
 
 # `depth` counts Section nesting; `indent` counts list nesting. They advance
-# independently: a Section resets the list, a Group extends it.
+# independently. A Section resets the list. A Group also resets it, because a
+# `<details>` starts a fresh list inside the disclosure; the group carries the
+# level it broke out of in its own `margin-left`.
 function render(io::IO, node::Section, depth::Int, indent::Int)
     println(io, "\n", "#"^depth, " ", node.title, "\n")
     for child in node.children
@@ -196,11 +210,34 @@ function render(io::IO, node::Cap, depth::Int, indent::Int)
     println(io, " "^indent, "- ", cap_text(node))
     return io
 end
+
+"""
+    raw_html(io, html)
+
+Emit `html` verbatim through a `@raw html` block.
+
+A blank line goes on each side. A fence that touches the paragraph above it is
+read as part of that paragraph. A fence that touches a list above it is read as
+a lazy continuation of the last item.
+"""
+function raw_html(io::IO, html::AbstractString)
+    println(io, "\n```@raw html\n", html, "\n```\n")
+    return io
+end
+
 function render(io::IO, node::Group, depth::Int, indent::Int)
-    println(io, " "^indent, "- ::: details ", head_text(node.head))
+    # The head and the body stay markdown, between raw blocks, so their `@ref`
+    # links resolve. See the header note for the `margin-left` arithmetic.
+    raw_html(io,
+             string("<details class=\"cap-group\" style=\"margin-left: ", indent + 2,
+                    "em\">\n<summary>"))
+    println(io, "\n", head_text(node.head), "\n")
+    raw_html(io, "</summary>")
+    # A fresh list starts inside the disclosure, so the child indent restarts.
     for child in node.children
-        render(io, child, depth, indent + 2)
+        render(io, child, depth, 0)
     end
+    raw_html(io, "</details>")
     return io
 end
 
@@ -216,10 +253,23 @@ function render_catalogue(io::IO = IOBuffer(); base_level::Int = 2)
     for node in CATALOGUE
         render(buf, node, base_level, 0)
     end
-    # Blocks emit their own separators without knowing what precedes them, so
-    # collapse the resulting runs to a single blank line.
-    print(io, replace(String(take!(buf)), r"\n{3,}" => "\n\n"))
+    print(io, collapse_blank_runs(String(take!(buf))))
     return io
+end
+
+"""
+    collapse_blank_runs(md) -> String
+
+Collapse every run of blank lines in `md` to a single one.
+
+Blocks emit their own separators without knowing what precedes them, so a run is
+the normal outcome of concatenating two of them. It must be applied to whatever
+text is *finally written* — collapsing the rendered body alone leaves the seam
+where the preamble meets it, which is one such concatenation and produced a
+double blank line that `markdownlint` then stripped back out on every commit.
+"""
+function collapse_blank_runs(md::AbstractString)::String
+    return replace(md, r"\n{3,}" => "\n\n")
 end
 
 const _PREAMBLE = """
@@ -243,6 +293,9 @@ For the same types arranged by subtyping rather than by capability, see the
     assert_complete()
 
 Refuse to render a catalogue that is missing an estimator or algorithm.
+
+A type listed in `NOT_A_CHOICE` is exempt: the library constructs it for itself,
+so it is not a capability a reader can reach for.
 
 `test/test_26_docs.jl` is the authoritative check and fires far sooner, on the
 PR that added the type. This one exists because the generator's failure mode is
@@ -275,11 +328,13 @@ function assert_complete()
 
     required = Set(nameof.(collect(union(leaf_types(PortfolioOptimisers.AbstractEstimator),
                                          leaf_types(PortfolioOptimisers.AbstractAlgorithm)))))
+    setdiff!(required, keys(NOT_A_CHOICE))
     missed = sort(collect(setdiff(required, catalogued)))
     if !isempty(missed)
         error("""capability_catalogue: $(length(missed)) estimator(s)/algorithm(s) are not
                  catalogued, so the page would be rendered incomplete. Add each to
-                 `docs/capability_catalogue.jl`:\n  $(join(missed, "\n  "))""")
+                 `docs/capability_catalogue.jl`, or list it in `NOT_A_CHOICE` with a
+                 reason:\n  $(join(missed, "\n  "))""")
     end
     return nothing
 end
@@ -365,7 +420,8 @@ end
 function generate_capability_catalogue(path::String = joinpath(@__DIR__, "src",
                                                                "capability_catalogue.md"))
     assert_complete()
-    body = string(_PREAMBLE, "\n", String(take!(render_catalogue(IOBuffer()))))
+    body = collapse_blank_runs(string(_PREAMBLE, "\n",
+                                      String(take!(render_catalogue(IOBuffer())))))
     assert_refs_survive(body)
     write(path, body)
     return path

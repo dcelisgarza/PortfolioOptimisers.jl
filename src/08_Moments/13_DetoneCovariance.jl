@@ -1,14 +1,14 @@
 """
     DetoneCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
-        dt::Detone = Detone(),
-        pdm::Option{<:Posdef} = Posdef(),
+        dt::AbstractDetoneEstimator = Detone(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
     ) -> PortfolioOptimisersCovariance
 
     DetoneCovariance(
         ce::StatsBase.CovarianceEstimator,
-        dt::Detone,
-        pdm::Option{<:Posdef},
+        dt::AbstractDetoneEstimator,
+        pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
 Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
@@ -47,15 +47,15 @@ PortfolioOptimisersCovariance
   - [`Detone`](@ref)
   - [`Posdef`](@ref)
 """
-function DetoneCovariance(ce::StatsBase.CovarianceEstimator, dt::Detone,
-                          pdm::Option{<:Posdef})::PortfolioOptimisersCovariance
+function DetoneCovariance(ce::StatsBase.CovarianceEstimator, dt::AbstractDetoneEstimator,
+                          pdm::Option{<:AbstractPosdefEstimator})::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(; ce = ce,
                                          mp = MatrixProcessing(; pdm = pdm, dt = dt,
                                                                order = (:pdm, :dt)))
 end
 function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                          dt::Detone = Detone(),
-                          pdm::Option{<:Posdef} = Posdef())::PortfolioOptimisersCovariance
+                          dt::AbstractDetoneEstimator = Detone(),
+                          pdm::Option{<:AbstractPosdefEstimator} = Posdef())::PortfolioOptimisersCovariance
     return DetoneCovariance(ce, dt, pdm)
 end
 

@@ -13,6 +13,7 @@ pipe_config_field
 @pipe_delegates
 route_sigma_ucs
 @pipe_route_sigma_ucs
+@pipe_route_rkb
 OptimisationAlgorithm
 OptimisationResult
 NonFiniteAllocationOptimisationResult
@@ -46,6 +47,7 @@ TimeDependent
 factory(td::TimeDependent, args...)
 TimeDependentContext
 TimeDependentCallable
+TimeDependentConstraintCallable
 TimeDependentOptimiserCallable
 PreviousWeightsFunction
 NoDefault
@@ -57,7 +59,6 @@ TDO_Option
 OptE_TD
 OptE_Opt_TD
 VecOptE_Opt_TD
-factory(opt::VecOptE_Opt_TD, args...)
 TD_VecOptE_Opt
 TDO_OptE_Opt
 assert_nearest_optimiser_schedule
@@ -95,15 +96,12 @@ set_clustering_weight_finaliser_alg!
 opt_weight_bounds
 finalise_weight_bounds
 port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
-port_opt_view(opt::VecOptE, ::Any, args...)
-port_opt_view(opt::Union{<:VecOptE, <:VecOptE_Opt_TD}, i, args...)
 port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args...)
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_special_nco_requirements
 factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
 factory(opt::OptE_Opt, ::Any)
-factory(opt::VecOptE_Opt, args...)
 assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
 entitled
 OptE_Opt
@@ -112,4 +110,6 @@ VecOpt
 VecOptE
 extract_fees
 extract_pr
+synthetic_asset_weights
+collapse_feature_matrix
 ```

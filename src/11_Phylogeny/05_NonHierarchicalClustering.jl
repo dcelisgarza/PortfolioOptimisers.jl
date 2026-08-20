@@ -56,7 +56,8 @@ KMeansAlgorithm
     function KMeansAlgorithm(rng::Random.AbstractRNG, seed::Option{<:Integer},
                              kwargs::NamedTuple)
         if haskey(kwargs, :weights)
-            @argcheck(isa(kwargs.weights, AbstractVector), TypeError)
+            @argcheck(isa(kwargs.weights, AbstractVector),
+                      ArgumentError("kwargs.weights must be an AbstractVector of observation weights, one element per observation. Got\nkwargs.weights => $(typeof(kwargs.weights))"))
             @argcheck(!isempty(kwargs.weights), IsEmptyError)
         end
         return new{typeof(rng), typeof(seed), typeof(kwargs)}(rng, seed, kwargs)

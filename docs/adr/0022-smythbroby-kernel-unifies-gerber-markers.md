@@ -64,3 +64,37 @@ be replicated a dozen times. (This is the refactor flagged speculatively as "arc
   `comovement_ratio` method; a new scoring family is a `sb_add_*` triple. This is the concrete
   realisation of the arch-review "one data-carrying algorithm" idea, applied conservatively (a
   kernel plus family aliases) rather than as a public-API type-parameter overhaul.
+
+## Amendment (2026-08-17): the fold now reaches `05_GerberCovariance.jl`
+
+The Context above names only [06_SmythBrobyCovariance.jl](../../src/08_Moments/06_SmythBrobyCovariance.jl)
+and [35_GerberIQCovariance.jl](../../src/08_Moments/35_GerberIQCovariance.jl). The plain Gerber
+estimator in [05_GerberCovariance.jl](../../src/08_Moments/05_GerberCovariance.jl) kept its own three
+loops, so `Gerber0`, `Gerber1` and `Gerber2` were members of the `GerberComovementZero/One/Two`
+unions that nothing in their own file ever dispatched on. The fold was incomplete, not superseded.
+
+That gap had a cost. The `05_` copies divided without a guard, while the shared
+`comovement_ratio` / `standardise_comovement!` pair guards every denominator:
+
+- `Gerber0` divided by `(U + D)' * (U + D)`, which is zero for a pair that never crosses a threshold
+  together.
+- `Gerber1` divided by `T .- N' * N`, which is zero for a pair that is always neutral.
+- `Gerber2` divided by an **unclamped** `sqrt.(diag(H))`, which is zero for an asset that never
+  crosses its own threshold.
+
+One constant column in `X` is enough to reach all three. The estimator returned a `NaN` row, and
+`posdef!` then threw `ArgumentError: matrix contains Infs or NaNs`. The Smyth-Broby path returned
+finite values on the same input. The three methods also repeated the `U` / `D` preamble and an
+identical three-line commented-out block verbatim.
+
+**The `05_` methods now route through the shared reduction.** The preamble is one `gerber_updown`
+call. `Gerber2` calls `standardise_comovement!` directly, so it inherits the clamp. `Gerber0` and
+`Gerber1` recover the concordant and discordant counts from the matrix products with
+`concordance_counts` and reduce them with `comovement_ratio`, so the denominator policy is written
+once for the whole family. The split is exact and the reduction is bit-identical to the old matrix
+formulas wherever the denominator is non-zero; only the previously-`NaN` entries change, and they
+become the guarded zero that the Smyth-Broby path already returned.
+
+`concordance_counts` exists so that the counts cost two matrix products rather than four: the
+matrix formulation delivers `nconc - ndisc` and `nconc + ndisc` directly, and the two counts follow
+from those by elementwise arithmetic on an `N x N` matrix.

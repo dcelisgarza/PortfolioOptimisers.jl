@@ -186,7 +186,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure.
 
-`EntropicValueatRiskRange` computes the difference between the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
+`EntropicValueatRiskRange` computes the sum of the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
 
 # Mathematical definition
 
@@ -273,6 +273,16 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   beta::Number = 0.05,
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
+end
+# Tail decomposition — see `range_tails`. The functor below is the value-level twin: it is
+# the same two tails, evaluated instead of built.
+function range_tails(r::EntropicValueatRiskRange)
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.alpha,
+                                       w = r.w),
+            gain = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.beta,
+                                       w = r.w))
 end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)

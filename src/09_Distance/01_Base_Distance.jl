@@ -94,7 +94,7 @@ Logarithmic distance algorithm for portfolio optimization.
 
 ```math
 \\begin{align}
-    d_{i,\\,j} &= -\\log{\\lvert\\rho_{i,\\,j}\\rvert}\\,,
+    d_{i,\\,j} &= \\max\\left(-\\log{\\lvert\\rho_{i,\\,j}\\rvert},\\, 0\\right)\\,,
 \\end{align}
 ```
 
@@ -102,6 +102,10 @@ Where:
 
   - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
   - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
+
+The floor at zero is not cosmetic. A covariance estimator that shrinks, denoises or repairs a matrix can return ``\\lvert\\rho_{i,\\,j}\\rvert`` a hair above one, and ``-\\log`` of that is *negative* — unlike the square-root algorithms, which already clamp before taking the root. A negative distance inverts the ordering it is meant to express and is unsound under the shortest-path routines that consume it.
+
+Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone.
 
 # Related
 

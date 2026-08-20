@@ -167,6 +167,90 @@ const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
     compute(B_eq, obj -> isnothing(obj.eq) ? nothing : obj.eq.B)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Concatenate the rows of the same half of several [`PartialLinearConstraint`](@ref)s, skipping the absent ones.
+
+# Arguments
+
+  - `ps`: The halves to concatenate, each a [`PartialLinearConstraint`](@ref) or `nothing`.
+
+# Returns
+
+  - A [`PartialLinearConstraint`](@ref), or `nothing` when every input was absent.
+
+# Related
+
+  - [`merge_linear_constraints`](@ref)
+  - [`PartialLinearConstraint`](@ref)
+"""
+function merge_partial_linear_constraints(ps)
+    kept = [p for p in ps if !isnothing(p)]
+    if isempty(kept)
+        return nothing
+    end
+    N = size(kept[1].A, 2)
+    @argcheck(all(p -> size(p.A, 2) == N, kept),
+              DimensionMismatch("every constraint being merged must be written over the same variables, but the row widths differ: $(unique(size(p.A, 2) for p in kept))"))
+    return PartialLinearConstraint(; A = reduce(vcat, (p.A for p in kept)),
+                                   B = reduce(vcat, (p.B for p in kept)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Combine several [`LinearConstraint`](@ref)s into the single one that holds all their rows.
+
+A `LinearConstraint` is a block of rows, and applying two blocks is the same as applying the block that stacks them — the inequality halves concatenate, the equality halves concatenate, and an absent half contributes nothing. This is exactly what generation already does when it is handed several estimators at once: [`centrality_constraints`](@ref) over a vector of [`CentralityConstraint`](@ref)s appends every row into one result rather than returning one result per estimator.
+
+That equivalence is what this function exists to preserve. A caller that computes its constraints separately — a [`Pipeline`](@ref) running one step per estimator — can merge them here and reach the optimiser with the value it would have had from the vector form.
+
+# Arguments
+
+  - `lcs`: The constraints to merge.
+
+# Returns
+
+  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
+
+# Validation
+
+  - `lcs` is non-empty.
+  - Every merged half is written over the same number of variables.
+
+# Examples
+
+```jldoctest
+julia> lc1 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [1.0 0.0], B = [0.5]));
+
+julia> lc2 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [0.0 1.0], B = [0.25]));
+
+julia> PortfolioOptimisers.merge_linear_constraints([lc1, lc2])
+LinearConstraint
+  ineq ┼ PartialLinearConstraint
+       │   A ┼ 2×2 Matrix{Float64}
+       │   B ┴ Vector{Float64}: [0.5, 0.25]
+    eq ┴ nothing
+```
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`merge_partial_linear_constraints`](@ref)
+  - [`centrality_constraints`](@ref)
+"""
+function merge_linear_constraints(lcs::AbstractVector{<:LinearConstraint})::LinearConstraint
+    @argcheck(!isempty(lcs), IsEmptyError("lcs cannot be empty"))
+    if length(lcs) == 1
+        return lcs[1]
+    end
+    return LinearConstraint(;
+                            ineq = merge_partial_linear_constraints(lc.ineq for lc in lcs),
+                            eq = merge_partial_linear_constraints(lc.eq for lc in lcs))
+end
+function merge_linear_constraints(lc::LinearConstraint)::LinearConstraint
+    return lc
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all equation parsing result types.
@@ -250,15 +334,74 @@ Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
 """
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Collect the `dict` keys that start with `prefix`, as the candidate pool of a [`suggest_declared_key`](@ref) suggestion inside [`UniverseSets`](@ref).
+
+A missing partition key is reported by the *group* that asked for it, so the whole key set is the wrong pool: the nearest neighbour of `nx_sector` in `Dict("ux_sector" => …)` is `ux_sector`, the very key under validation, and the caller would be told to rename the one thing that is correct. Narrowing the pool to the prefix the missing key must carry leaves only keys that could genuinely have been meant.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `prefix`: The axis prefix the missing key must carry, `xkey` or `fkey`.
+
+# Returns
+
+  - `candidates::Vector{String}`: The keys of `dict` that start with `prefix`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`unclaimed_sets_keys`](@ref)
+  - [`suggest_declared_key`](@ref)
+"""
+function prefixed_sets_keys(dict::AbstractDict, prefix::AbstractString)
+    return String[string(k) for k in keys(dict) if startswith(string(k), prefix)]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Collect the `dict` keys that no axis in `claimed` has taken, as the candidate pool of the missing-`xkey` suggestion inside [`UniverseSets`](@ref).
+
+The counterpart of [`prefixed_sets_keys`](@ref) for the one key with no prefix of its own. The asset universe is whichever key holds the asset names, so it cannot be found by a prefix; what *can* be ruled out is every key another declared axis already speaks for. Without that, a dict carrying only a feature axis answers a mistyped `xkey` with the feature key, which is a different axis and never the right fix.
+
+# Arguments
+
+  - `dict`: The [`UniverseSets`](@ref) dictionary being validated.
+  - `claimed`: The other declared axis prefixes, `uxkey`, `fkey`, `ufkey` and `zkey`.
+
+# Returns
+
+  - `candidates::Vector{String}`: The keys of `dict` that start with no entry of `claimed`.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`prefixed_sets_keys`](@ref)
+  - [`suggest_declared_key`](@ref)
+"""
+function unclaimed_sets_keys(dict::AbstractDict, claimed)
+    return String[string(k)
+                  for k in keys(dict) if !any(p -> startswith(string(k), p), claimed)]
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
-Container for asset set and group information used in constraint generation.
+Container for the universe axes and group information used in constraint generation.
 
-`AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
+`UniverseSets` provides a unified interface for specifying the universes a portfolio problem is written against and any groupings or partitions of them. It is used throughout constraint generation and estimator routines to expand group references, map group names to member lists, and validate membership.
 
-If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
+It **declares every axis it carries**: `xkey`/`uxkey` for assets, `fkey`/`ufkey` for factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
 
-If a key in `dict` starts with the same value as `ukey`, it identifies a unique-entry group variant. The corresponding `key`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `ukey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
+If a key in `dict` starts with the same value as `xkey`, it means that the corresponding group must have the same length as the asset universe, `dict[xkey]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
+
+If a key in `dict` starts with the same value as `uxkey`, it identifies a unique-entry group variant. The corresponding `xkey`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `uxkey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
+
+The `fkey`/`ufkey` prefixes mean the same thing on the factor axis, but they buy something different. On the asset side the conventions serve *views*; factors are never sliced by an asset index, so on the factor side they buy length validation at construction and one shared mental model.
+
+`zkey` has **no prefix convention at all**, and that asymmetry is the point. `xkey` and `fkey` each have a unique-entry sibling because each names an axis that *partitions are written over*; nothing is written over the feature axis. A graded feature program's taxonomy keys are `xkey`-prefixed and asset-length, and its column nodes are named directly out of the flat list `dict[zkey]`. So `zkey` carries exactly one rule — `allunique(dict[zkey])`, so [`ReturnsResult`](@ref)'s own uniqueness check cannot be reached with a duplicate — and no length rule whatever.
+
+A key matching none of the four prefixes is a plain group: expanded by name and **axis-blind**, which is why a factor group needs no machinery of its own.
 
 # Fields
 
@@ -266,32 +409,39 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    AssetSets(;
-        key::AbstractString = "nx",
-        ukey::AbstractString = "ux",
+    UniverseSets(;
+        xkey::AbstractString = "nx",
+        uxkey::AbstractString = "ux",
+        fkey::AbstractString = "nf",
+        ufkey::AbstractString = "uf",
+        zkey::AbstractString = "nz",
         dict::AbstractDict{<:AbstractString, <:Any}
-    ) -> AssetSets
+    ) -> UniverseSets
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
   - `!isempty(dict)`.
-  - `haskey(dict, key)`.
-  - `key !== ukey`.
-  - `!startswith(key, ukey)`.
-  - `!startswith(ukey, key)`.
-  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`.
-  - If a key in `dict` starts with the same value as `ukey`, there must be a corresponding key in `dict` where the `ukey` prefix is replaced by the `key` prefix, and `length(dict[replace(k, ukey => key)]) == length(dict[key])`.
+  - `haskey(dict, xkey)`.
+  - No two of `xkey`, `uxkey`, `fkey`, `ufkey`, `zkey` may be a prefix of one another (20 ordered checks, which also rules out any two being equal).
+  - If `haskey(dict, zkey)`, `allunique(dict[zkey])`.
+  - If a key in `dict` starts with the same value as `xkey`, `length(dict[k]) == length(dict[xkey])`.
+  - If a key in `dict` starts with the same value as `uxkey`, there must be a corresponding key in `dict` where the `uxkey` prefix is replaced by the `xkey` prefix, and its length must equal `length(dict[xkey])`.
+  - If a key in `dict` starts with the same value as `fkey`, `haskey(dict, fkey)` and `length(dict[k]) == length(dict[fkey])`.
+  - If a key in `dict` starts with the same value as `ufkey`, there must be a corresponding key in `dict` where the `ufkey` prefix is replaced by the `fkey` prefix, and its length must equal `length(dict[fkey])`.
 
 # Examples
 
 ```jldoctest
-julia> AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]))
-AssetSets
-   key ┼ String: "nx"
-  ukey ┼ String: "ux"
-  dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
+julia> UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]))
+UniverseSets
+   xkey ┼ String: "nx"
+  uxkey ┼ String: "ux"
+   fkey ┼ String: "nf"
+  ufkey ┼ String: "uf"
+   zkey ┼ String: "nz"
+   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
 # Related
@@ -299,94 +449,201 @@ AssetSets
   - [`replace_group_by_assets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
+  - [`factor_universe`](@ref)
+  - [`feature_universe`](@ref)
 """
-@concrete struct AssetSets <: AbstractEstimator
+@concrete struct UniverseSets <: AbstractEstimator
     """
-    $(field_dict[:as_key])
+    $(field_dict[:us_xkey])
     """
-    key
+    xkey
     """
-    $(field_dict[:as_ukey])
+    $(field_dict[:us_uxkey])
     """
-    ukey
+    uxkey
+    """
+    $(field_dict[:us_fkey])
+    """
+    fkey
+    """
+    $(field_dict[:us_ufkey])
+    """
+    ufkey
+    """
+    $(field_dict[:us_zkey])
+    """
+    zkey
     """
     $(field_dict[:dict])
     """
     dict
-    function AssetSets(key::AbstractString, ukey::AbstractString,
-                       dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
+    function UniverseSets(xkey::AbstractString, uxkey::AbstractString, fkey::AbstractString,
+                          ufkey::AbstractString, zkey::AbstractString,
+                          dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
         @argcheck(!isempty(dict), IsEmptyError)
-        @argcheck(haskey(dict, key), KeyError)
-        @argcheck(key !== ukey, ValueError)
-        @argcheck(!startswith(key, ukey),
-                  ArgumentError("key ($key) must not start with ukey ($ukey)"))
-        @argcheck(!startswith(ukey, key),
-                  ArgumentError("ukey ($ukey) must not start with key ($key)"))
-        for k in setdiff(keys(dict), (key,))
-            if startswith(k, key)
-                @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
-            elseif startswith(k, ukey)
-                tmp_key = replace(k, ukey => key)
-                @argcheck(haskey(dict, tmp_key), KeyError)
-                @argcheck(length(dict[tmp_key]) == length(dict[key]), DimensionMismatch)
+        @argcheck(haskey(dict, xkey),
+                  KeyError("$xkey (the asset universe), required by UniverseSets. The asset axis is the one mandatory axis: correct the spelling$(suggest_declared_key(xkey, unclaimed_sets_keys(dict, (uxkey, fkey, ufkey, zkey)))), pass `xkey = <the key you wrote>`, or add `$xkey => <asset names>` to `dict`."))
+        knames = ("xkey", "uxkey", "fkey", "ufkey", "zkey")
+        kvals = (xkey, uxkey, fkey, ufkey, zkey)
+        for i in eachindex(kvals), j in eachindex(kvals)
+            i == j && continue
+            @argcheck(!startswith(kvals[i], kvals[j]),
+                      ArgumentError("$(knames[i]) ($(kvals[i])) must not start with $(knames[j]) ($(kvals[j]))"))
+        end
+        if haskey(dict, zkey)
+            @argcheck(allunique(dict[zkey]),
+                      ArgumentError("the declared feature axis `$zkey` must not repeat a node, because a duplicate would silently merge two columns and would be rejected by `ReturnsResult`'s own `nz` uniqueness check anyway"))
+        end
+        for k in setdiff(keys(dict), (xkey, fkey, zkey))
+            if startswith(k, xkey)
+                @argcheck(length(dict[k]) == length(dict[xkey]),
+                          DimensionMismatch("the asset partition `$k` and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
+            elseif startswith(k, uxkey)
+                tmp_key = xkey * chopprefix(k, uxkey)
+                @argcheck(haskey(dict, tmp_key),
+                          KeyError("$tmp_key (the asset partition), required by the unique-entry asset group $k. Every `$uxkey`-prefixed group names the `$xkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, xkey))), or add `$tmp_key => <one group per asset>` to `dict`."))
+                @argcheck(length(dict[tmp_key]) == length(dict[xkey]),
+                          DimensionMismatch("the asset partition `$tmp_key`, required by the unique-entry asset group `$k`, and the asset universe `$xkey` disagree on how many assets there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$xkey]) => $(length(dict[xkey]))"))
+            elseif startswith(k, fkey)
+                @argcheck(haskey(dict, fkey),
+                          KeyError("$fkey (the factor universe), required by the factor partition $k. A `$fkey`-prefixed key declares a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor partition."))
+                @argcheck(length(dict[k]) == length(dict[fkey]),
+                          DimensionMismatch("the factor partition `$k` and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$k]) => $(length(dict[k]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
+            elseif startswith(k, ufkey)
+                @argcheck(haskey(dict, fkey),
+                          KeyError("$fkey (the factor universe), required by the unique-entry factor group $k. A `$ufkey`-prefixed key summarises a partition of the factor axis, so the axis itself must be declared: add `$fkey => <factor names>` to `dict`, or rename `$k` if it was never meant to be a factor group."))
+                tmp_key = fkey * chopprefix(k, ufkey)
+                @argcheck(haskey(dict, tmp_key),
+                          KeyError("$tmp_key (the factor partition), required by the unique-entry factor group $k. Every `$ufkey`-prefixed group names the `$fkey`-prefixed partition it draws its entries from: correct the spelling$(suggest_declared_key(tmp_key, prefixed_sets_keys(dict, fkey))), or add `$tmp_key => <one group per factor>` to `dict`."))
+                @argcheck(length(dict[tmp_key]) == length(dict[fkey]),
+                          DimensionMismatch("the factor partition `$tmp_key`, required by the unique-entry factor group `$k`, and the factor universe `$fkey` disagree on how many factors there are. Got\nlength(dict[$tmp_key]) => $(length(dict[tmp_key]))\nlength(dict[$fkey]) => $(length(dict[fkey]))"))
             end
         end
-        return new{typeof(key), typeof(ukey), typeof(dict)}(key, ukey, dict)
+        return new{typeof(xkey), typeof(uxkey), typeof(fkey), typeof(ufkey), typeof(zkey),
+                   typeof(dict)}(xkey, uxkey, fkey, ufkey, zkey, dict)
     end
 end
-function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
-                   dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
-    return AssetSets(key, ukey, dict)
+function UniverseSets(; xkey::AbstractString = "nx", uxkey::AbstractString = "ux",
+                      fkey::AbstractString = "nf", ufkey::AbstractString = "uf",
+                      zkey::AbstractString = "nz",
+                      dict::AbstractDict{<:AbstractString, <:Any})::UniverseSets
+    return UniverseSets(xkey, uxkey, fkey, ufkey, zkey, dict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of an [`AssetSets`](@ref) restricted to the assets at index `i`.
+Return a view of a [`UniverseSets`](@ref) restricted to the assets at index `i`.
 
-Slices all `key`-prefixed groups by `i`, and derives unique-entry `ukey`-prefixed groups from the corresponding sliced `key` group.
+Slices all `xkey`-prefixed groups by `i`, and derives unique-entry `uxkey`-prefixed groups from the corresponding sliced `xkey` group.
+
+# The factor axis is left alone
+
+`fkey`- and `ufkey`-prefixed entries come back **bit-identical**: an asset index has no meaning on the factor axis. Declaring the axis is what makes that exemption a property of the *data* — before it, a factor-flavoured sets sitting in a `@vprop` field was sliced by asset indices and failed with a length mismatch, and the only defence was omitting the annotation by hand, per field.
+
+There is deliberately **no factor-index arity**. `port_opt_view(rd, i, j, k)` can slice `rd.nf`, but no internal caller passes a non-colon `k`; a user who slices factors updates their sets themselves.
+
+# The feature axis is left alone too, for a different reason
+
+`zkey`'s entry also comes back bit-identical, but not because an asset index is meaningless on it — some of its nodes *are* assets. It is left alone because the axis is **declared** rather than derived: the caller wrote the node list down, so it is the program's coordinate system and not a summary of the current universe. That is what makes `size(Z, 2)` **fold-invariant** for a graded [`asset_sets_features`](@ref) program — exactly the opposite of the group-name-key path, where the viewed producer rebuilds the axis from the viewed taxonomy and a group with no members left simply disappears.
+
+The consequence is accepted and documented rather than filtered: an asset node whose asset the view dropped survives as an **all-zero column**.
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`asset_sets_features`](@ref)
 """
-function port_opt_view(sets::AssetSets, i, args...)::AssetSets
-    key = sets.key
-    ukey = sets.ukey
+function port_opt_view(sets::UniverseSets, i, args...)::UniverseSets
+    xkey = sets.xkey
+    uxkey = sets.uxkey
     dict = typeof(sets.dict)()
     for (k, v) in sets.dict
-        if startswith(k, key)
+        if startswith(k, xkey)
             v = view(v, i)
-        elseif startswith(k, ukey)
-            tmp_key = replace(k, ukey => key)
-            v = unique(view(sets.dict[tmp_key], i))
+        elseif startswith(k, uxkey)
+            v = unique(view(sets.dict[xkey * chopprefix(k, uxkey)], i))
         end
         push!(dict, k => v)
     end
-    return AssetSets(; key = key, ukey = ukey, dict = dict)
+    return UniverseSets(; xkey = xkey, uxkey = uxkey, fkey = sets.fkey, ufkey = sets.ufkey,
+                        zkey = sets.zkey, dict = dict)
 end
 """
-    group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                  arr::VecNum, strict::Bool, nxkey::AbstractString)
+    factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
+                    source::AbstractString) -> VecStr
 
-Set values in a vector for all assets belonging to a specified group.
+Read the **declared** factor universe, `sets.dict[sets.fkey]`, checking that it exists and that it agrees with `source` — the `observations × factors` matrix whose `K` columns it must name — on how many factors there are.
 
-`group_to_val!` maps the assets in group `key` to their corresponding indices in the asset universe `nx`, and sets the corresponding entries in the vector `arr` to the value `val`. If the group is not found, the function either throws an error or issues a warning, depending on the `strict` flag.
+The factor axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure has to be diagnosed at the point of need. Both messages name `sets.fkey` and the matrix, because the two are what a caller has to reconcile: a user arriving from the pre-declaration shape put the factor names under `xkey` and would otherwise be told about an *asset* universe they never wrote in.
+
+`need` names the consumer ("a `FactorSpace` constraint"), `source` the matrix (`"rr.M"`, `"F"`) — so one helper serves every consumer of the axis without any of them re-encoding the checks.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`constraint_space_basis`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+"""
+function factor_universe(sets::UniverseSets, K::Integer, need::AbstractString,
+                         source::AbstractString)
+    fkey = sets.fkey
+    @argcheck(haskey(sets.dict, fkey),
+              KeyError("$fkey (the factor universe), required by $need. The factor axis is optional on UniverseSets; it is not optional here: add `sets.fkey => <factor names>` to `sets.dict`, in the column order of `$source`."))
+    nf = sets.dict[fkey]
+    @argcheck(length(nf) == K,
+              DimensionMismatch("`$source` and the declared factor axis disagree on how many factors there are. Got\nsize($source, 2) => $K\nlength(sets.dict[$fkey]) => $(length(nf))"))
+    return nf
+end
+"""
+    feature_universe(sets::UniverseSets, need::AbstractString) -> VecStr
+
+Read the **declared** feature axis, `sets.dict[sets.zkey]`, checking that it exists.
+
+The sibling of [`factor_universe`](@ref), written the same way and for the same reason: the axis is optional on [`UniverseSets`](@ref) but is not optional for a consumer written against it, so the failure is diagnosed at the point of need, by one shared helper whose message names the key and says what to add.
+
+# Existence, and nothing to reconcile
+
+The one deliberate difference from [`factor_universe`](@ref) is that there is no arity to check. `factor_universe` reconciles the declared axis against the column count of a matrix that already exists — `rr.M`, `F` — and a mismatch there means the names and the columns describe different universes. The feature axis has no such matrix, because it **defines** the width: [`asset_sets_features`](@ref) allocates `assets × length(nz)` from this list. So existence and a good message is the whole job.
+
+`need` names the consumer, as in [`factor_universe`](@ref).
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`factor_universe`](@ref)
+  - [`asset_sets_features`](@ref)
+  - [`asset_sets_feature_names`](@ref)
+"""
+function feature_universe(sets::UniverseSets, need::AbstractString)
+    zkey = sets.zkey
+    @argcheck(haskey(sets.dict, zkey),
+              KeyError("$zkey (the declared feature axis), required by $need. The feature axis is optional on UniverseSets; it is not optional here: add `sets.zkey => <feature node names>` to `sets.dict`, in the column order the feature matrix is to have."))
+    return sets.dict[zkey]
+end
+"""
+    name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                 arr::VecNum, strict::Bool, nxkey::AbstractString)
+
+Set values in a vector for the asset or the group of assets that `key` names.
+
+`name_to_val!` resolves `key` through [`resolve_axis_name`](@ref) — an asset name resolves to itself, a group name expands to its members — maps the result to indices in the asset universe `nx`, and sets the corresponding entries of `arr` to `val`. If `key` names neither, the function either throws an error or issues a warning, depending on the `strict` flag.
 
 # Arguments
 
   - `nx`: Vector of asset names.
   - `sdict`: Dictionary mapping group names to vectors of asset names.
-  - `key`: Name of the group of assets to set values for.
-  - `val`: The value to assign to the assets in the group.
+  - `key`: Name of the asset or the group of assets to set values for.
+  - `val`: The value to assign.
   - `arr`: The array to be modified in-place.
-  - `strict`: If `true`, throws an error if `key` is not found in `sdict`; if `false`, issues a warning.
+  - `strict`: If `true`, throws an error if `key` resolves to nothing; if `false`, issues a warning.
   - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
 
 # Details
 
-  - If `key` is found in `sdict`, all assets in the group are mapped to their indices in `nx`, and the corresponding entries in `arr` are set to `val`.
-  - If `key` is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
-  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `02_Tools.jl`.
+  - An asset name takes precedence over a group name of the same spelling.
+  - Members that miss the universe are dropped and reported once, through [`strict_diagnostic`](@ref).
+  - `sdict` is never modified: [`resolve_axis_name`](@ref) returns a copy of the member list.
+  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `01_Base.jl`.
 
 # Returns
 
@@ -395,33 +652,32 @@ Set values in a vector for all assets belonging to a specified group.
 # Related
 
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
+  - [`resolve_axis_name`](@ref)
+  - [`axis_name_indices`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`UniverseSets`](@ref)
   - [`unknown_variable_msg`](@ref)
   - [`missing_group_assets_msg`](@ref)
 """
-function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
-                       strict::Bool, nxkey::AbstractString)::Nothing
-    assets = get(sdict, key, nothing)
-    if isnothing(assets)
+function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
+                      strict::Bool, nxkey::AbstractString)::Nothing
+    members = resolve_axis_name(key, nx, sdict)
+    if isnothing(members)
         # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
         # suggestion pool beyond the raw universe to include the group/set keys.
-        msg = unknown_variable_msg(key, nx, nxkey; candidates = [nx; collect(keys(sdict))])
-        strict ? throw(ArgumentError(msg)) : @warn(msg)
-    else
-        unique!(assets)
-        idx = [findfirst(x -> x == asset, nx) for asset in assets]
-        missing_assets = assets[isnothing.(idx)]
-        filter!(!isnothing, idx)
-        if !isempty(missing_assets)
-            msg = missing_group_assets_msg(key, missing_assets, nx, nxkey)
-            strict ? throw(ArgumentError(msg)) : @warn(msg)
-        end
-        arr[idx] .= val
+        return strict_diagnostic(unknown_variable_msg(key, nx, nxkey;
+                                                      candidates = [nx;
+                                                                    collect(keys(sdict))]),
+                                 strict)
     end
+    idx = axis_name_indices(members, nx,
+                            m -> strict_diagnostic(missing_group_assets_msg(key, m, nx,
+                                                                            nxkey), strict))
+    arr[idx] .= val
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -431,9 +687,9 @@ The function creates the vector and sets the values for assets or groups as spec
 
   - `arr`: The array to be modified in-place.
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
-  - `sets`: The [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `sets`: The [`UniverseSets`](@ref) containing the asset universe and group definitions.
   - `val`: The default value to assign to assets not specified in `dict`.
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
 # Details
@@ -445,7 +701,7 @@ The function creates the vector and sets the values for assets or groups as spec
     If the same asset is found in subsequent iterations, its value will be overwritten in favour of the most recent one. To ensure determinism, use an [`OrderedDict`](https://juliacollections.github.io/OrderedCollections.jl/stable/#OrderedDicts) or a vector of pairs.
 
   - If a key in `dict` matches an asset in the universe, the corresponding entry in `arr` is set to the specified value.
-  - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`group_to_val!`](@ref).
+  - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`name_to_val!`](@ref).
   - If a key is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
   - The operation is performed in-place on `arr`.
 
@@ -455,41 +711,33 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Related
 
-  - [`group_to_val!`](@ref)
-  - [`AssetSets`](@ref)
+  - [`name_to_val!`](@ref)
+  - [`UniverseSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
-function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
+function estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
                           val::Option{<:Number} = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nxkey = ifelse(isnothing(key), sets.key, key)
+    nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     for (key, val) in dict
-        if key in nx
-            arr[findfirst(x -> x == key, nx)] = val
-        else
-            group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
-        end
+        name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     end
     return arr
 end
-function estimator_to_val(dict::PairStrNum, sets::AssetSets,
+function estimator_to_val(dict::PairStrNum, sets::UniverseSets,
                           val::Option{<:Number} = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nxkey = ifelse(isnothing(key), sets.key, key)
+    nxkey = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
-    if key in nx
-        arr[findfirst(x -> x == key, nx)] = val
-    else
-        group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
-    end
+    name_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     return arr
 end
 """
@@ -512,14 +760,14 @@ This method returns the input value `val` as-is, without modification or mapping
 # Related
 
   - [`estimator_to_val`](@ref)
-  - [`group_to_val!`](@ref)
-  - [`AssetSets`](@ref)
+  - [`name_to_val!`](@ref)
+  - [`UniverseSets`](@ref)
 """
 function estimator_to_val(val::Option{<:Number}, args...; kwargs...)::Option{<:Number}
     return val
 end
 """
-    estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
+    estimator_to_val(val::VecNum, sets::UniverseSets, ::Any = nothing,
                      key::Option{<:AbstractString} = nothing; kwargs...)
 
 Return a numeric vector for asset/group estimators, validating length against asset universe.
@@ -529,9 +777,9 @@ This method checks that the input vector `val` matches the length of the asset u
 # Arguments
 
   - `val`: Numeric vector to be mapped to assets/groups.
-  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `sets`: [`UniverseSets`](@ref) containing the asset universe and group definitions.
   - `::Any`: Fill value for API consistency (ignored).
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
@@ -540,22 +788,22 @@ This method checks that the input vector `val` matches the length of the asset u
 
 # Validation
 
-  - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
+  - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
 
 # Related
 
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
-  - [`group_to_val!`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`name_to_val!`](@ref)
 """
-function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
+function estimator_to_val(val::VecNum, sets::UniverseSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; kwargs...)
-    @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+    @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]),
               DimensionMismatch)
     return val
 end
 """
-    estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+    estimator_to_val(val::MatNum, sets::UniverseSets, ::Any = nothing,
                      key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
 
 Return a numeric matrix for asset/group estimators, validating length against asset universe.
@@ -565,9 +813,9 @@ This method checks that size of `dims` of the input matrix `val` matches the len
 # Arguments
 
   - `val`: Numeric matrix to be mapped to assets/groups.
-  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `sets`: [`UniverseSets`](@ref) containing the asset universe and group definitions.
   - `::Any`: Fill value for API consistency (ignored).
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
   - `dims`: Dimension along which to validate the matrix size.
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -577,17 +825,17 @@ This method checks that size of `dims` of the input matrix `val` matches the len
 
 # Validation
 
-  - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
+  - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
 
 # Related
 
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
-  - [`group_to_val!`](@ref)
+  - [`UniverseSets`](@ref)
+  - [`name_to_val!`](@ref)
 """
-function estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+function estimator_to_val(val::MatNum, sets::UniverseSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
-    @argcheck(size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+    @argcheck(size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]),
               DimensionMismatch)
     return val
 end
@@ -599,7 +847,7 @@ Custom weight bounds constraint for uniformly distributing asset weights, `1/N` 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> PortfolioOptimisers.estimator_to_val(UniformValues(), sets)
 StepRangeLen(0.3333333333333333, 0.0, 3)
@@ -623,12 +871,12 @@ Each entry equals ``1/N`` where ``N`` is the number of assets.
 
   - [`UniformValues`](@ref)
   - [`estimator_to_val`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
+function estimator_to_val(::UniformValues, sets::UniverseSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, kwargs...)
-    N = length(sets.dict[ifelse(isnothing(key), sets.key, key)])
+    N = length(sets.dict[ifelse(isnothing(key), sets.xkey, key)])
     iN = datatype(inv(N))
     return range(; start = iN, stop = iN, length = N)
 end
@@ -1162,19 +1410,19 @@ function parse_equation(eqn::VecStr_Expr; ops1::Tuple = ("==", "<=", ">="),
 end
 """
     replace_group_by_assets(res::PR_VecPR,
-                            sets::AssetSets; bl_flag::Bool = false, ep_flag::Bool = false,
+                            sets::UniverseSets; bl_flag::Bool = false, ep_flag::Bool = false,
                             rho_flag::Bool = false)
 
 If `res` is a vector of [`ParsingResult`](@ref) objects, this function will be applied to each element of the vector.
 
 Expand group or special variable references in a [`ParsingResult`](@ref) to their corresponding asset names.
 
-This function takes a [`ParsingResult`](@ref) containing variable names (which may include group names, `prior(...)` expressions, or correlation views like `(A, B)`), and replaces these with the actual asset names from the provided [`AssetSets`](@ref). It supports Black-Litterman-style group expansion, entropy pooling prior views, and correlation view parsing for advanced constraint generation.
+This function takes a [`ParsingResult`](@ref) containing variable names (which may include group names, `prior(...)` expressions, or correlation views like `(A, B)`), and replaces these with the actual asset names from the provided [`UniverseSets`](@ref). It supports Black-Litterman-style group expansion, entropy pooling prior views, and correlation view parsing for advanced constraint generation.
 
 # Arguments
 
   - `res`: A [`ParsingResult`](@ref) object containing variables and coefficients to be expanded.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
   - `ep_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
   - `rho_flag`: If `true`, enables expansion of correlation views `(A, B)` for entropy pooling.
@@ -1199,7 +1447,8 @@ This function takes a [`ParsingResult`](@ref) containing variable names (which m
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
 julia> res = parse_equation(\"group1 + 2C == 1\")
 ParsingResult
@@ -1220,12 +1469,12 @@ ParsingResult
 
 # Related
 
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`ParsingResult`](@ref)
   - [`parse_equation`](@ref)
 """
-function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
-                                 ep_flag::Bool = false,
+function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
+                                 bl_flag::Bool = false, ep_flag::Bool = false,
                                  rho_flag::Bool = false)::ParsingResult
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
               ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
@@ -1318,29 +1567,93 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
-function replace_group_by_assets(res::VecPR, sets::AssetSets, args...)
+function replace_group_by_assets(res::VecPR, sets::UniverseSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+    universe_axis(sets::UniverseSets, key::AbstractString) -> String
+
+Name of the axis the universe stored under `key` belongs to, read off the key itself: `"factor"` for anything carrying the `fkey` prefix, `"asset"` otherwise. It exists only so [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref) can name the axis the user wrote in.
+
+The **key** is the evidence, for both callers, and the reason is that both resolve names against `sets.dict[key]` and nothing else: whatever axis that universe belongs to is the axis a failed lookup failed on. [`get_black_litterman_views`](@ref) takes the key from the estimator that owns the views, and [`get_linear_constraints`](@ref) from the constraint space — [`FactorSpace`](@ref) resolving at `sets.fkey`. Reading it off the *re-basis* instead would be a second encoding of the same fact, and a worse one: a wrapped estimator carrying its own `key` overrides the space's, so a re-based row can legitimately resolve against a universe the loadings are not written in, and the message must name the universe that was searched.
+
+The **prefix** rather than equality is what makes a factor group key (`"nf_sector"`) resolve as the factor axis too, and the disjoint-prefix rule [`UniverseSets`](@ref) enforces at construction is what makes that unambiguous.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`get_black_litterman_views`](@ref)
+  - [`UniverseSets`](@ref)
+"""
+function universe_axis(sets::UniverseSets, key::AbstractString)::String
+    return ifelse(startswith(key, sets.fkey), "factor", "asset")
+end
+"""
+    constraint_row_length(rr, nx::VecStr) -> Int
+
+Length of the assembled constraint row. Without a re-basis this is the size of the universe the names resolve against; with one it is the number of *assets* the loadings project onto, because the projection is applied while the row is assembled and what leaves is an ordinary asset-space row.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`constraint_row_term`](@ref)
+"""
+function constraint_row_length(::Nothing, nx::VecStr)::Int
+    return length(nx)
+end
+function constraint_row_length(rr::AbstractRegressionResult, ::VecStr)::Int
+    return size(rr.M, 1)
+end
+"""
+    constraint_row_term(rr, Ai, c)
+
+Contribution of one matched variable to a constraint row.
+
+Without a re-basis this is the indicator `Ai` scaled by the coefficient `c`. With one it is the corresponding columns of the loadings, summed and scaled — which is the identity
+
+```math
+\\boldsymbol{a}^\\intercal \\boldsymbol{w}_f = \\boldsymbol{a}^\\intercal \\mathbf{M}^\\intercal \\boldsymbol{w}_a = (\\mathbf{M} \\boldsymbol{a})^\\intercal \\boldsymbol{w}_a
+```
+
+applied one term at a time. The columns are **summed** rather than indexed by `findfirst`, so a factor universe carrying a duplicated name contributes every column bearing it, matching how the asset path treats a duplicated asset name.
+
+`rr.M` is used, never `rr.L`: `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation. Risk decomposition wants `L` and is right to; see ADR 0047.
+
+# Related
+
+  - [`get_linear_constraints`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function constraint_row_term(::Nothing, Ai, c)
+    return Ai * c
+end
+function constraint_row_term(rr::AbstractRegressionResult, Ai, c)
+    return vec(sum(view(rr.M, :, Ai); dims = 2)) * c
+end
+"""
+    get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                            key::Option{<:AbstractString} = nothing;
-                           datatype::DataType = Float64, strict::Bool = false)
+                           datatype::DataType = Float64, strict::Bool = false,
+                           rr::Option{<:AbstractRegressionResult} = nothing)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
-`get_linear_constraints` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`AssetSets`](@ref), and assembles the corresponding constraint matrices and right-hand side vectors. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
+`get_linear_constraints` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`UniverseSets`](@ref), and assembles the corresponding constraint matrices and right-hand side vectors. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
 
 # Arguments
 
   - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed constraint equations.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
+  - `key`: Key naming the universe the variables resolve against. Defaults to `sets.xkey`; a re-based constraint passes `sets.fkey`.
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
+  - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. See [`ExposureConstraintEstimator`](@ref) — callers do not pass this directly.
 
 # Details
 
-  - For each constraint, variable names are matched to the asset universe in `sets`.
+  - For each constraint, variable names are matched to the universe stored under `key` in `sets`.
   - Coefficient vectors are assembled for each constraint, with entries corresponding to the order of assets in `sets`.
+  - When `rr` is supplied, each matched term is projected through `rr.M` as it is accumulated, so the assembled row is asset-length and what the function returns is an ordinary asset-space [`LinearConstraint`](@ref).
   - Constraints are separated into equality (`==`) and inequality (`<=`, `>=`) types.
   - The function validates that all constraints reference valid assets or groups, using `@argcheck` for defensive programming.
   - Returns `nothing` if no valid constraints are found after processing.
@@ -1355,10 +1668,12 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`LinearConstraint`](@ref)
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
+  - [`constraint_row_term`](@ref)
 """
-function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
-                                datatype::DataType = Float64, strict::Bool = false)
+                                datatype::DataType = Float64, strict::Bool = false,
+                                rr::Option{<:AbstractRegressionResult} = nothing)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -1366,28 +1681,36 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    k = ifelse(isnothing(key), sets.key, key)
+    k = ifelse(isnothing(key), sets.xkey, key)
     nx = sets.dict[k]
-    At = Vector{datatype}(undef, length(nx))
+    axis = universe_axis(sets, k)
+    N = constraint_row_length(rr, nx)
+    At = Vector{datatype}(undef, N)
     for lc in lcs
         fill!(At, zero(eltype(At)))
+        matched = false
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = unknown_variable_msg(v, nx, k)
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                msg = unknown_variable_msg(v, nx, k; axis = axis)
+                strict_diagnostic(msg, strict)
                 continue
             end
-            At += Ai * c
+            matched = true
+            At += constraint_row_term(rr, Ai, c)
         end
         if !any(!iszero, At)
-            msg = empty_row_msg(lc.eqn, nx, k)
-            if strict
-                throw(ArgumentError(msg))
+            # Two distinct failures land here once a re-basis is possible: the names missed the
+            # universe (`matched === false`, the pre-existing diagnosis), or they hit it and the
+            # loadings annihilated them. Reporting the first for the second would send a user
+            # hunting for a typo that is not there.
+            msg = if matched && !isnothing(rr)
+                empty_projected_row_msg(lc.eqn, nx, k, N)
             else
-                @warn(msg)
-                continue
+                empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
+            strict_diagnostic(msg, strict)
+            continue
         end
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
@@ -1406,11 +1729,11 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
     ineq = nothing
     eq = nothing
     if ineq_flag
-        A_ineq = transpose(reshape(A_ineq, length(nx), :))
+        A_ineq = transpose(reshape(A_ineq, N, :))
         ineq = PartialLinearConstraint(; A = A_ineq, B = B_ineq)
     end
     if eq_flag
-        A_eq = transpose(reshape(A_eq, length(nx), :))
+        A_eq = transpose(reshape(A_eq, N, :))
         eq = PartialLinearConstraint(; A = A_eq, B = B_eq)
     end
     return if ineq_flag || eq_flag
@@ -1446,7 +1769,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> lce = LinearConstraintEstimator(; val = [\"w_A + w_B == 1\", \"w_A >= 0.1\"]);
 
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\"]));
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\"]));
 
 julia> linear_constraints(lce, sets)
 LinearConstraint
@@ -1545,20 +1868,23 @@ Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
+    linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)
 
-No-op fallback for returning an existing `LinearConstraint` object or `nothing`.
+No-op fallback for returning an existing `LinearConstraint` object, `nothing`, or a vector of them.
 
 This method is used to pass through an already constructed [`LinearConstraint`](@ref) object or `nothing` without modification. It enables composability and uniform interface handling in constraint generation workflows, allowing functions to accept either raw equations or pre-built constraint objects.
 
+The vector arity is narrowed to a `nothing` universe on purpose. A vector needs no [`UniverseSets`](@ref) precisely because every element is already assembled, and that is the shape a [`Pipeline`](@ref) hands an optimiser when more than one constraint step ran; with a real `UniverseSets` the broader vector methods take over and map this one over the elements.
+
 # Arguments
 
-  - `lcs`: An existing [`LinearConstraint`](@ref) object or `nothing`.
+  - `lcs`: An existing [`LinearConstraint`](@ref) object, `nothing`, or a vector of constraints.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `lcs::Option{<:LinearConstraint}`: The input, unchanged.
+  - `lcs`: The input, unchanged.
 
 # Related
 
@@ -1571,20 +1897,42 @@ function linear_constraints(lcs::Option{<:LinearConstraint}, args...;
     return lcs
 end
 """
+    port_opt_view(lc::LinearConstraint, i, args...) -> LinearConstraint
+
+Return a precomputed [`LinearConstraint`](@ref) unchanged under an asset sub-selection.
+
+The identity is deliberate, and it is **not** the claim that a full-universe row means the same thing over a subset — it does not. It is what the `lcse` slot already did: the slot was passed unviewed until a constraint space gained a basis a view has to follow, and slicing `A` here would change the behaviour of a path this method exists only to leave alone. A [`NestedClustered`](@ref) inner solve refuses a bare precomputed constraint outright for exactly this reason; [`Stacking`](@ref) and [`SubsetResampling`](@ref) carry no such guard, and that gap pre-dates the view.
+
+A constraint reaching a meta-optimiser through an [`ExposureConstraintEstimator`](@ref) is a different case and is handled: its `A` is factor-width and is re-projected against the viewed prior's loadings, so the view it needs is of the *basis*, not of the row.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`LinearConstraint`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function port_opt_view(lc::LinearConstraint, ::Any, args...)::LinearConstraint
+    return lc
+end
+function linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...;
+                            kwargs...)::AbstractVector{<:LinearConstraint}
+    return lcs
+end
+"""
     linear_constraints(eqn::EqnType,
-                       sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+                       sets::UniverseSets; ops1::Tuple = ("==", "<=", ">="),
                        key::Option{<:AbstractString} = nothing;
                        ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false)
 
 Parse and convert one or more linear constraint equations into a [`LinearConstraint`](@ref) object.
 
-This function parses one or more constraint equations (as strings, expressions, or vectors thereof), replaces group or asset references using the provided [`AssetSets`](@ref), and constructs the corresponding constraint matrices. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
+This function parses one or more constraint equations (as strings, expressions, or vectors thereof), replaces group or asset references using the provided [`UniverseSets`](@ref), and constructs the corresponding constraint matrices. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
 
 # Arguments
 
   - `eqn`: A single constraint equation (as `AbstractString` or `Expr`), or a vector of such equations.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
   - `ops1`: Tuple of valid comparison operators as strings.
   - `ops2`: Tuple of valid comparison operators as expression heads.
   - `datatype`: Numeric type for coefficients and right-hand side.
@@ -1606,7 +1954,7 @@ This function parses one or more constraint equations (as strings, expressions, 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\", \"w_C\"]));
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"w_A\", \"w_B\", \"w_C\"]));
 
 julia> linear_constraints([\"w_A + w_B == 1\", \"w_A >= 0.1\"], sets)
 LinearConstraint
@@ -1624,21 +1972,23 @@ LinearConstraint
   - [`replace_group_by_assets`](@ref)
   - [`PartialLinearConstraint`](@ref)
   - [`LinearConstraint`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(eqn::EqnType, sets::AssetSets,
+function linear_constraints(eqn::EqnType, sets::UniverseSets,
                             key::Option{<:AbstractString} = nothing;
                             ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)::Option{<:LinearConstraint}
+                            bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
-    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict,
+                                  rr = rr)
 end
 function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorValueAlgorithm},
-                            sets::AssetSets, key::Option{<:AbstractString} = nothing;
+                            sets::UniverseSets, key::Option{<:AbstractString} = nothing;
                             datatype::DataType = Float64, strict::Bool = false,
                             args...)::Option{<:LinearConstraint}
     return estimator_to_val(lcs.val, sets,
@@ -1647,7 +1997,7 @@ function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorVa
 end
 """
     linear_constraints(lcs::LcE_VecLcE,
-                       sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
+                       sets::UniverseSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 
 If `lcs` is a vector of [`LinearConstraintEstimator`](@ref) objects, this function is broadcast over the vector.
@@ -1658,22 +2008,33 @@ This method is a wrapper calling:
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
 
+# The loadings are accepted and dropped
+
+`rr` is accepted so that a caller holding loadings — [`processed_jump_optimiser_attributes`](@ref) does — can pass them uniformly to whatever sits in `lcse`, without inspecting its type first. A bare [`LinearConstraintEstimator`](@ref) **drops** them: the asset frame is the absence of a re-basis, and an estimator that quietly re-based itself because loadings happened to be available would make the space depend on the prior rather than on what the user wrote. A re-basis is asked for by wrapping in an [`ExposureConstraintEstimator`](@ref) and by nothing else.
+
+`rd` rides along for the same reason and is dropped for a stronger one: only a space can ask for a refit, and a bare estimator has no space.
+
 # Related
 
   - [`linear_constraints`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
 """
-function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
+function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)::Option{<:LinearConstraint}
+                            bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rd::Option{<:ReturnsResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
-function linear_constraints(lcs::VecLcE, sets::AssetSets; datatype::DataType = Float64,
-                            strict::Bool = false, bl_flag::Bool = false)
+function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
+                            strict::Bool = false, bl_flag::Bool = false,
+                            rr::Option{<:AbstractRegressionResult} = nothing,
+                            rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag) for lc in lcs]
+                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 
-export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
+export UniverseSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
        ParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
        linear_constraints, UniformValues

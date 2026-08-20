@@ -105,6 +105,27 @@
         @test PortfolioOptimisers.pipe_writes(EqualWeighted()) == :opt
         @test PortfolioOptimisers.pipe_reads(EqualWeighted()) == (:returns,)
 
+        #=
+        Constraint estimators read :returns, from which the minimal UniverseSets is
+        built. An ExposureConstraintEstimator is the one exception: it also reads
+        :prior, because the basis it re-bases through is the prior's loadings. It is
+        a declaration, not a preference — the reads are checked at construction, so
+        the same pipeline without a prior step is rejected before it runs (see the
+        fit tests).
+        =#
+        ece = ExposureConstraintEstimator(;
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "f1 <= 0.3"),
+                                          space = FactorSpace())
+        @test PortfolioOptimisers.pipe_writes(ece) == :constraints
+        @test PortfolioOptimisers.pipe_reads(ece) == (:returns, :prior)
+        # the estimator it decorates keeps the family default
+        @test PortfolioOptimisers.pipe_writes(LinearConstraintEstimator(;
+                                                                        val = "A1 <= 0.3")) ==
+              :constraints
+        @test PortfolioOptimisers.pipe_reads(LinearConstraintEstimator(; val = "A1 <= 0.3")) ==
+              (:returns,)
+
         # estimators without a steppable family are rejected with guidance
         @test_throws ArgumentError PortfolioOptimisers.pipe_writes(Covariance())
         @test_throws ArgumentError PortfolioOptimisers.pipe_reads(Covariance())
@@ -199,6 +220,16 @@
                                                 writes = :nonsense)
         @test_throws ArgumentError PipelineStep(; est = EmpiricalPrior(),
                                                 reads = (:nonsense,), writes = :prior)
+
+        # The routing annotation is allowlisted here too, so a mistyped target is refused
+        # where it is written rather than by the step that reads it, mid-pipeline.
+        @test_throws ArgumentError PipelineStep(; est = NormalUncertaintySet(),
+                                                reads = (:returns,), writes = :uncertainty,
+                                                target = :nonsense)
+        for t in PortfolioOptimisers.PIPELINE_STEP_TARGETS
+            @test PipelineStep(; est = NormalUncertaintySet(), reads = (:returns,),
+                               writes = :uncertainty, target = t).target === t
+        end
     end
 
     @testset "PipelineContext" begin

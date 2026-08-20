@@ -302,4 +302,37 @@ end
         act = findall(>(1e-6), w)
         @test sort(act) == sort(sortperm(prv.mu; rev = true)[1:length(act)])
     end
+    @testset "The set carries its centre, and that centre wins (ADR 0050)" begin
+        # A set is a neighbourhood of the quantity it was calibrated on. When it names
+        # one, the optimiser bounds *that* vector and not the outer prior's.
+        q = 4
+        eps_q = (g(q) + g(q + 1)) / 2
+        # `pr.mu` is sorted descending, so reversing it is the same multiset under a
+        # reversed ranking: the ladder, and therefore the radius, is unchanged.
+        rev_mu = reverse(pr.mu)
+        w_carried = lo(L1UncertaintySet(; eps = eps_q, mu = rev_mu))
+        @test count(>(1e-6), w_carried) == q
+        @test all(x -> isapprox(x, 1 / q; atol = 1e-6), w_carried[w_carried .> 1e-6])
+        # The carried vector ranks the *last* q assets first, so the fallback's answer
+        # (the first q) is not the one taken.
+        @test sort(findall(>(1e-6), w_carried)) == collect((N - q + 1):N)
+        @test sort(findall(>(1e-6), lo(L1UncertaintySet(; eps = eps_q)))) == collect(1:q)
+        # It also wins over an explicit `ArithmeticReturn.mu`, which is the middle rung of
+        # the precedence: carried, then estimator field, then prior.
+        w_over_field = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
+                                         opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                             bgt = 1.0,
+                                                             wb = WeightBounds(; lb = 0.0,
+                                                                               ub = 1.0),
+                                                             ret = ArithmeticReturn(;
+                                                                                    mu = pr.mu,
+                                                                                    ucs = L1UncertaintySet(;
+                                                                                                           eps = eps_q,
+                                                                                                           mu = rev_mu))))).w
+        @test isapprox(w_over_field, w_carried; atol = 1e-6)
+        # The signed set resolves through its own field the same way.
+        w_signed = quintile(SignedL1UncertaintySet(; ep = 1e-8, en = eps_q, mu = rev_mu);
+                            bgt = 1.0, wb = WeightBounds(; lb = 0.0, ub = 1.0)).w
+        @test sort(findall(>(1e-6), w_signed)) == collect((N - q + 1):N)
+    end
 end

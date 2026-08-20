@@ -5,4 +5,7 @@ no_bounds_risk_measure
 no_bounds_no_risk_expr_risk_measure
 no_risk_expr_risk_measure
 bounds_risk_measure
+unit_scale_risk_measure
+measure_label
+MomentRiskMeasures
 ```

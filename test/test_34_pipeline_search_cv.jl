@@ -50,17 +50,39 @@
         # raw property paths still work (fall through to parse_lens)
         l_raw = PortfolioOptimisers.pipeline_lens(pipe, "steps[1].col_thr")
         @test l_raw(pipe) == pipe.steps[1].col_thr
+        # an indexed string path with no dot is a path too: `Meta.parse` sees the index
+        @test PortfolioOptimisers.pipeline_lens(pipe, "steps[1]")(pipe) === pipe.steps[1]
+        # a symbol never reaches `Meta.parse`, so an index in one is not structure
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     Symbol("steps[1]"))
 
         # integer bounds are checked
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, 0)
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, 99)
 
-        # a bare (undotted) symbol that is not a step name fails closed rather than
+        # a structureless symbol that is not a step name fails closed rather than
         # silently becoming a property access on the pipeline struct
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :impute_typo)
         # genuinely dotted symbols still fall through to parse_lens (no fail-closed throw)
         @test PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr")) isa
               Accessors.PropertyLens
+        # the String arm applies the same rule as its Symbol twin: a structureless key that
+        # misses the step-name table is a typo, not a property access on the Pipeline
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "impute_typo")
+        # including one that collides with a real Pipeline field, which used to be written
+        # into on every fold
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "steps")
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, "names")
+        # and the message names the typo and suggests the step
+        serr = try
+            PortfolioOptimisers.pipeline_lens(pipe, "imputer")
+            nothing
+        catch e
+            e
+        end
+        @test serr isa ArgumentError
+        @test occursin("is not a step name", serr.msg)
+        @test occursin("did you mean `impute`", serr.msg)
     end
 
     @testset "name-addressed == index-addressed" begin

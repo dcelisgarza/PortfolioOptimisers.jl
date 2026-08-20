@@ -8,6 +8,7 @@ needs_previous_weights(r::MeanReturnRiskRatio)
 factory(r::MeanReturnRiskRatio, args...; kwargs...)
 factory(r::MeanReturnRiskRatio, w::VecNum)
 ThirdCentralMoment
+resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult)
 port_opt_view(r::ThirdCentralMoment, i, args...)
 TCM_Sk
 calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)

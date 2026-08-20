@@ -170,3 +170,28 @@ backend (astropy resolved correctly).
   config change, not another test rewrite.
 - Test-file count and split boundaries become a maintenance surface — a new slow
   `@testset` should be added with the ~90 s target in mind.
+
+## Amendment (2026-08-17)
+
+The default logger of each worker drops `@info` and `@warn`, and keeps `@error` and above:
+`global_logger(ConsoleLogger(stderr, Logging.Error))` in the shared `init_code`.
+
+The suite drives the failure and fallback paths on purpose. An unsolvable model, a variable
+outside the universe and a view that matches no asset each emit a warning, so those records
+are the expected output of a **passing** run rather than a signal. Measured on the run of
+2026-08-17, they were 396 warning lines plus 367 source-location lines out of 2407 — about a
+third of the whole job log — and they bury the one line a reader came for.
+
+The decision is safe for every test that asserts on a log record, and that is why the level
+is set on the *default* logger rather than through `Logging.disable_logging`. `@test_logs` and
+`with_logger` install their own logger for the duration of a block, so the 15 `@test_logs` and
+12 `with_logger` sites still see every record. `disable_logging` is process-global and would
+have silenced those too. No test captures `stderr` text directly, so nothing else reads a
+warning as data.
+
+A test that needs the default logger loud again wraps its body in
+`with_logger(ConsoleLogger(stderr, Logging.Debug))`.
+
+The cost is that an *unexpected* warning from a future regression no longer appears in the
+log. That is accepted: a warning was never the thing that turned CI red, and a regression that
+only warns was already invisible among the 212 copies of the loudest expected one.

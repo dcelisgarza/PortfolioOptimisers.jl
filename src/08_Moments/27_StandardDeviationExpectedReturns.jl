@@ -103,6 +103,10 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
@@ -113,6 +117,7 @@ Where:
 """
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
+    assert_dims(dims)
     return Statistics.std(me.ce, X; dims = dims, kwargs...)
 end
 
@@ -205,6 +210,10 @@ This method returns the variance vector of `X` as estimated by the covariance es
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
@@ -214,6 +223,7 @@ This method returns the variance vector of `X` as estimated by the covariance es
   - [`VarianceExpectedReturns`](@ref)
 """
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    assert_dims(dims)
     return Statistics.var(me.ce, X; dims = dims, kwargs...)
 end
 

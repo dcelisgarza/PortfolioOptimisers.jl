@@ -84,4 +84,18 @@
     @test isapprox(rmsd(res.w, res_ga.w), 0.0029764410704340794, rtol = 5e-3)
     @test all(isapprox.(mod.(round.(mod.(abs.(res_ga.shares), 1), sigdigits = 1), ga.unit),
                         0, atol = 1e-10))
+
+    # `DiscreteAllocation` defaults `fb` to a `GreedyAllocation`, so every allocation
+    # above goes through the generic `optimise` and its fallback chain. Only `fb =
+    # nothing` reaches the shortcut method in `22_DiscreteFiniteAllocation.jl`, which
+    # calls `_optimise` directly. The shortcut must agree with the generic exactly: for a
+    # fallback-less estimator the chain runs `_optimise` once and returns it unwrapped.
+    da_nofb = DiscreteAllocation(; slv = mip_slv, fb = nothing)
+    fai = FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])), cash = 4206.9)
+    @test which(optimise, Tuple{typeof(da_nofb), typeof(fai)}) !=
+          which(optimise, Tuple{typeof(da), typeof(fai)})
+    res_shortcut = optimise(da_nofb, fai)
+    @test isa(res_shortcut, DiscreteAllocationResult)
+    @test isnothing(res_shortcut.fb)
+    @test isapprox(res_shortcut.shares .* vec(values(X[end])), res_shortcut.cost)
 end

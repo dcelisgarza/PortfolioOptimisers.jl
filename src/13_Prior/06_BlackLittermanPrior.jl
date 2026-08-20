@@ -17,13 +17,27 @@ $(DocStringExtensions.FIELDS)
         ),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         views::Lc_BLV,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
         tau::Option{<:Number} = nothing
     ) -> BlackLittermanPrior
 
 Keywords correspond to the struct's fields.
+
+## Composition: what this estimator forwards
+
+The views are applied to the **assets**. Under ADR 0046 the wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
+
+!!! warning
+
+    The returned `mu` and `sigma` are the Black-Litterman posterior, but `w` is the **wrapped prior's** observation weighting, forwarded unchanged. Black-Litterman produces no observation-level posterior, so there is no Black-Litterman-consistent alternative to forward — and dropping `w` would substitute the unweighted empirical distribution, which is further from the caller's intent than the weights they computed. A caller reading `pr.w`, `pr.ens`, `pr.kld` or `pr.ow` is therefore reading a property of the prior, not of the posterior.
+
+!!! warning
+
+    When the wrapped prior carries a factor block, `pr.fpr` describes the **prior** factor distribution while `pr.mu` is a **posterior** asset mean, so `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`. The block stays *structurally* true — the regression is over data Black-Litterman does not modify — while becoming *distributionally* inconsistent with the asset block. There is nothing better to report: the views land on the assets, so this estimator never computes a posterior factor distribution at all.
+
+    Its siblings differ, and the difference is worth knowing. [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) apply their views to the factors and report the resulting posterior block, so both satisfy `mu == rr.M * fpr.mu + rr.b` exactly. [`AugmentedBlackLittermanPrior`](@ref) reports a posterior factor block too, but stays inconsistent for a different reason — see its own warning.
 
 ## Validation
 
@@ -34,7 +48,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> BlackLittermanPrior(; sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+julia> BlackLittermanPrior(;
+                           sets = UniverseSets(; xkey = \"nx\",
+                                               dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
                            views = LinearConstraintEstimator(;
                                                              val = [\"A == 0.03\", \"B + C == 0.04\"]))
 BlackLittermanPrior
@@ -86,10 +102,13 @@ BlackLittermanPrior
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
-        sets ┼ AssetSets
-             │    key ┼ String: "nx"
-             │   ukey ┼ String: "ux"
-             │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        sets ┼ UniverseSets
+             │    xkey ┼ String: "nx"
+             │   uxkey ┼ String: "ux"
+             │    fkey ┼ String: "nf"
+             │   ufkey ┼ String: "uf"
+             │    zkey ┼ String: "nz"
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
          tau ┴ nothing
@@ -100,7 +119,7 @@ BlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_AF`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -126,7 +145,7 @@ BlackLittermanPrior
     """
     views_conf
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -135,7 +154,7 @@ BlackLittermanPrior
     tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
-                                 sets::Option{<:AssetSets},
+                                 sets::Option{<:UniverseSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
                                  tau::Option{<:Number})
         assert_bl(views, sets, views_conf, tau)
@@ -147,7 +166,7 @@ function BlackLittermanPrior(;
                              pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                         me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                             views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                             views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
                              tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
@@ -162,7 +181,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that the Black-Litterman prior's views, sets, view confidences, and blending parameter are valid.
 """
-function assert_bl(views::Lc_BLV, sets::Option{<:AssetSets},
+function assert_bl(views::Lc_BLV, sets::Option{<:UniverseSets},
                    views_conf::Option{<:Num_VecNum}, tau::Option{<:Number})
     if isa(views, LinearConstraintEstimator)
         @argcheck(!isnothing(sets),
@@ -181,16 +200,27 @@ Pre-compute shared Black-Litterman inputs from views, prior covariance, and blen
 
 Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
 
+`axis` names the declared axis of the distribution the views land on, and every caller knows it from its own type rather than from the views: [`BlackLittermanPrior`](@ref) takes the default `:xkey` (the asset axis), while a member whose views update the **factor** distribution passes `:fkey`. It is the last argument because it is the only one an asset-space caller never supplies.
+
+The selector is a *field of* [`UniverseSets`](@ref) rather than a key resolved from one, so a caller states its axis and nothing else. Resolving the key is this function's work, and it happens only when there is a `sets` to read it from — reading `sets.fkey` to describe a universe that does not exist is the same error as reading the universe itself. Views supplied as a [`BlackLittermanViews`](@ref) result are the one shape that arrives with no `sets` at all: they resolve no names and ignore both the sets and the axis.
+
+This is also where `P` meets the distribution it updates, so it is where their widths are reconciled. A `P` assembled from names is the right width by construction; a **precomputed** [`BlackLittermanViews`](@ref) resolves no names and is checked nowhere else.
+
+# Validation
+
+  - `size(P, 2) == size(prior_sigma, 1)`.
+
 # Arguments
 
   - $(arg_dict[:views])
   - $(arg_dict[:sets])
   - $(arg_dict[:views_conf])
-  - `prior_sigma::MatNum`: Prior covariance matrix of asset returns `assets × assets`.
+  - `prior_sigma::MatNum`: Prior covariance matrix of the distribution the views update, `n × n` over that axis.
   - `pe_tau::Option{<:Number}`: Optional user-specified blending parameter. If `nothing`, defaults to `1/T`.
   - `T::Integer`: Number of observations used to compute the default `tau = 1/T`.
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
+  - $(arg_dict[:bl_axis])
 
 # Returns
 
@@ -209,9 +239,23 @@ Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from
   - [`remove_excl_views`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict)
-    (; P, Q, excl) = black_litterman_views(views, sets; datatype = datatype,
+function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict,
+                    axis::Symbol = :xkey)
+    @argcheck(axis in (:xkey, :fkey),
+              DomainError(axis,
+                          "axis must name a declared axis a view can land on, :xkey or :fkey"))
+    # The caller states the axis; resolving it to a key is this function's work. That is what
+    # lets a caller which admits `sets === nothing` — precomputed views resolve no names —
+    # say which distribution its views update without guarding the sets it may not have.
+    key = isnothing(sets) ? nothing : getproperty(sets, axis)
+    (; P, Q, excl) = black_litterman_views(views, sets, key; datatype = datatype,
                                            strict = strict)
+    # A `P` assembled from names is the right width by construction — the universe it resolved
+    # against is the one the caller already checked. A **precomputed** `P` resolves no names, so
+    # this is the only thing that sees its width at all, and without it a wrong one surfaces as a
+    # bare `DimensionMismatch` from the multiplication below.
+    @argcheck(size(P, 2) == size(prior_sigma, 1),
+              DimensionMismatch("the view matrix and the distribution the views update disagree on how many variables there are. Got\nsize(P, 2) => $(size(P, 2))\nsize(prior_sigma, 1) => $(size(prior_sigma, 1))"))
     tau = isnothing(pe_tau) ? inv(T) : pe_tau
     views_conf = remove_excl_views(views_conf, excl)
     omega = tau * calc_omega(views_conf, P, prior_sigma)
@@ -288,13 +332,14 @@ function calc_omega(views_conf::VecNum, P::MatNum, sigma::MatNum)
     return LinearAlgebra.Diagonal(alphas .* P * sigma * transpose(P))
 end
 """
-    vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum,
-                       prior_sigma::MatNum, omega::MatNum, P::MatNum,
-                       Q::VecNum)
+    vanilla_posteriors(tau::Number, prior_mu::VecNum, prior_sigma::MatNum,
+                       omega::MatNum, P::MatNum, Q::VecNum)
 
 Compute the Black-Litterman posterior mean and covariance for asset returns.
 
-`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, risk-free rate `rf`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+
+The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, to the posterior asset expected returns, through [`apply_rf`](@ref).
 
 # Mathematical definition
 
@@ -302,7 +347,7 @@ Let ``\\boldsymbol{\\Pi}`` be the prior mean, ``\\mathbf{\\Sigma}`` the prior co
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}}_{BL} &= \\boldsymbol{\\Pi} + \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi}) + r_f\\,.
+\\hat{\\boldsymbol{\\mu}}_{BL} &= \\boldsymbol{\\Pi} + \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})\\,.
 \\end{align}
 ```
 
@@ -322,12 +367,10 @@ Where:
   - ``\\mathbf{P}``: ``K \\times N`` views matrix.
   - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
   - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
-  - ``r_f``: Risk-free rate.
 
 # Arguments
 
   - `tau`: Scalar blending parameter for prior and views.
-  - `rf`: Risk-free rate to add to the posterior mean.
   - `prior_mu`: Prior mean vector of asset returns.
   - `prior_sigma`: Prior covariance matrix of asset returns.
   - `omega`: View uncertainty matrix.
@@ -343,15 +386,82 @@ Where:
 
   - [`BlackLittermanPrior`](@ref)
   - [`calc_omega`](@ref)
+  - [`apply_rf`](@ref)
 """
-function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sigma::MatNum,
+function vanilla_posteriors(tau::Number, prior_mu::VecNum, prior_sigma::MatNum,
                             omega::MatNum, P::MatNum, Q::VecNum)
     v1 = tau * prior_sigma * transpose(P)
     v2 = P * v1 + omega
     v3 = Q - P * prior_mu
-    posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ rf
+    posterior_mu = prior_mu + v1 * (v2 \ v3)
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
+end
+"""
+    apply_rf(rf::Number, mu::VecNum)
+
+Shift a Black-Litterman posterior asset mean by the risk-free rate.
+
+`apply_rf` is the **single site that adds** the `rf` field of a Black-Litterman prior estimator. The four families -- [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) -- each call it once, on the asset expected returns they return, and nowhere else. [`remove_rf`](@ref) is its inverse and the only site that takes the rate off.
+
+Three properties follow, and all three are contracts of the family:
+
+  - **The rate is added once.** No body adds it twice.
+  - **The update runs on excess returns.** A prior mean that arrives as a total return loses the rate first, through [`remove_rf`](@ref), so the rate `apply_rf` puts back is the one that came off. A mean that is an excess return already -- the equilibrium mean of [`equilibrium_mu`](@ref) -- is used as it stands.
+  - **A prior is isolated.** The rate applies to the posterior this estimator computes. A wrapped prior estimator is never re-fitted, and the scale conversion around the update is a round trip, so a risk-free rate one of them applied internally stays where it is.
+
+The rate is a property of the asset axis, so the factor block of a result never carries it. Where [`remove_rf`](@ref) took the rate off a factor mean, nothing puts it back: the factor posterior is reported on the excess scale the update ran on, which is `pe.rf` below the scale the factor prior was supplied on. `FactorBlackLittermanPrior` is therefore not a plain round trip -- it takes the rate off the factor axis and adds it on the asset axis, and the two moves reach the assets differently. Writing `s` for the row sums of the loadings, its answer moves by `rf * (1 - s)`, and cancels only where an asset's loadings sum to one.
+
+# Arguments
+
+  - `rf`: Risk-free rate.
+  - `mu`: Posterior asset expected returns vector.
+
+# Returns
+
+  - `mu::VecNum`: `mu` shifted by `rf`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
+function apply_rf(rf::Number, mu::VecNum)
+    return mu .+ rf
+end
+"""
+    remove_rf(rf::Number, mu::VecNum)
+
+Convert a total-return mean to an excess-return mean.
+
+`remove_rf` is the **single site that subtracts** the `rf` field of a Black-Litterman prior estimator. It is the inverse of [`apply_rf`](@ref), and the two act as a pair: a mean goes onto the excess scale before the Black-Litterman update, and comes off it after.
+
+The update is written in excess returns. The view returns in `Q` are excess returns, and the equilibrium mean [`equilibrium_mu`](@ref) computes is an excess return by construction, because `l * sigma * w` is the risk premium that reverse optimisation implies. A mean taken from a wrapped prior estimator is a total return, so it must lose the rate before it can blend against either of them.
+
+Only [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it, and only where `l` is `nothing`. Those two are the members that can build the equilibrium mean themselves, so they are the two whose prior mean must reach [`vanilla_posteriors`](@ref) on one known scale either way. [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch, and take the wrapped mean as it stands.
+
+# Arguments
+
+  - `rf`: Risk-free rate.
+  - `mu`: Prior asset or factor expected returns vector, as a total return.
+
+# Returns
+
+  - `mu::VecNum`: `mu` less `rf`.
+
+# Related
+
+  - [`apply_rf`](@ref)
+  - [`equilibrium_mu`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
+function remove_rf(rf::Number, mu::VecNum)
+    return mu .- rf
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -396,9 +506,8 @@ function remove_excl_views(views_conf::VecNum, excl::VecInt)
     return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
 end
 """
-    prior(pe::BlackLittermanPrior, X::MatNum;
-          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
 
@@ -433,7 +542,7 @@ Where:
 
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `F{Nothing, <:MatNum}`: Optional factor matrix (default: `nothing`).
+  - `F`: Optional factor matrix.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -445,7 +554,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.key]) == size(X, 2)`.
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
 
 # Details
 
@@ -455,6 +564,7 @@ Where:
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
   - The posterior mean and covariance are computed using [`vanilla_posteriors`](@ref).
+  - `pe.rf` is added to the posterior mean once, by [`apply_rf`](@ref).
   - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
 
 # Related
@@ -467,23 +577,41 @@ Where:
 """
 function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
+    X, F = dims_oriented(dims, X, F)
+    # The axis is checked only by the views that resolve names against it. A `BlackLittermanViews`
+    # result carries its own `P` and never touches `sets`, so demanding a universe for it would
+    # reject the legitimate precomputed-views configuration, which `assert_bl` deliberately permits
+    # to supply no `sets` at all.
+    if isa(pe.views, LinearConstraintEstimator)
+        @argcheck(length(pe.sets.dict[pe.sets.xkey]) == size(X, 2),
+                  DimensionMismatch("length(pe.sets.dict[pe.sets.xkey]) ($(length(pe.sets.dict[pe.sets.xkey]))) must match size(X, 2) ($(size(X, 2)))"))
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
                                       size(X, 1), eltype(posterior_X), strict)
-    posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
-                                                       omega, P, Q)
+    posterior_mu, posterior_sigma = vanilla_posteriors(tau, prior_mu, prior_sigma, omega, P,
+                                                       Q)
+    # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns. `prior_model.mu` is the wrapped prior's own
+    # answer and is used as it stands, so a rate that prior applied internally is left alone.
+    posterior_mu = apply_rf(pe.rf, posterior_mu)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma)
+    # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
+    # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
+    # Black-Litterman leaves the observation axis untouched (`posterior_X === prior_model.X`),
+    # so the wrapped `w` still describes exactly the rows of the returned `X`, its `ens`/`kld`/
+    # `ow` still describe that `w`, and `Z` is still indexed by the axis it was derived from —
+    # which is also why nesting order does not matter: `BlackLittermanPrior(; pe =
+    # FeaturePrior(…))` reaches `distance` with the same feature matrix as the other order.
+    # `rr` is structural — the regression of `X` on `F`, over data Black-Litterman does not
+    # modify — and the factor block `fpr` travels with it.
+    return forward_prior(prior_model; mu = posterior_mu, sigma = posterior_sigma,
+                         chol = nothing)
+end
+
+function factor_residual_config(pe::BlackLittermanPrior)
+    return factor_residual_config(pe.pe)
 end
 
 export BlackLittermanPrior

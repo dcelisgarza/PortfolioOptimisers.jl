@@ -1424,7 +1424,7 @@ $(DocStringExtensions.FIELDS)
 
     GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                          me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                         pdm::Option{<:Posdef} = Posdef(), c::Number = 0.5,
+                         pdm::Option{<:AbstractPosdefEstimator} = Posdef(), c::Number = 0.5,
                          decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
                          sc::Option{<:GerberIQScaler} = nothing,
                          kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
@@ -1491,9 +1491,9 @@ Keywords correspond to the struct's fields.
     """
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
-                                me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
-                                c::Number, decay::GerberIQDecayEstimator,
-                                sc::Option{<:GerberIQScaler},
+                                me::AbstractExpectedReturnsEstimator,
+                                pdm::Option{<:AbstractPosdefEstimator}, c::Number,
+                                decay::GerberIQDecayEstimator, sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
                                 ex::FLoops.Transducers.Executor)
@@ -1507,7 +1507,8 @@ Keywords correspond to the struct's fields.
 end
 function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                            pdm::Option{<:Posdef} = Posdef(), c::Number = 0.5,
+                            pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+                            c::Number = 0.5,
                             decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
                             sc::Option{<:GerberIQScaler} = nothing,
                             kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
@@ -1783,10 +1784,7 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
@@ -1837,10 +1835,7 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)

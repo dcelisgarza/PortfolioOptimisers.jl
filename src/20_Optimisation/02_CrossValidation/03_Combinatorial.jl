@@ -11,13 +11,15 @@ $(DocStringExtensions.FIELDS)
 
     CombinatorialCrossValidation(;
         n_folds::Integer = 10,
-        n_test_folds::Integer = 8,
+        n_test_folds::Integer = 2,
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
         max_comb::Integer = 100_000,
     ) -> CombinatorialCrossValidation
 
 Keyword arguments correspond to the struct's fields.
+
+The default holds out `2` of `10` folds for testing. This gives `binomial(10, 2) = 45` splits, `9` recombined test paths, and an average training set of `80%` of the observations. Because `binomial(n, k) == binomial(n, n - k)`, a transposed pair such as `n_test_folds = 8` produces the same number of splits on a training set of only `20%` of the observations. Choose `n_test_folds` well below `div(n_folds, 2)`, or let [`optimal_number_folds`](@ref) choose the pair.
 
 ## Validation
 
@@ -29,17 +31,19 @@ Keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> CombinatorialCrossValidation(; n_folds = 10, n_test_folds = 8, purged_size = 2,
+julia> CombinatorialCrossValidation(; n_folds = 10, n_test_folds = 2, purged_size = 2,
                                     embargo_size = 1)
 CombinatorialCrossValidation
        n_folds ┼ Int64: 10
-  n_test_folds ┼ Int64: 8
+  n_test_folds ┼ Int64: 2
    purged_size ┼ Int64: 2
   embargo_size ┴ Int64: 1
 ```
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
@@ -75,7 +79,7 @@ CombinatorialCrossValidation
                    typeof(embargo_size)}(n_folds, n_test_folds, purged_size, embargo_size)
     end
 end
-function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
+function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 2,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
                                       max_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
@@ -504,23 +508,15 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
+    assert_unshuffled_folds(cv, train_idx)
     # A fold is a train/test split and `i` is its position in the split enumeration —
     # no ordering is imposed on time-dependent entries; the user keys them off the
     # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
-    predictions = parallel_folds(n, ex; ElT = Vector{PredictionResult}) do i
-        opti = opt
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                       test_idx = test_idx)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
-                               cols = cols)
+    predictions = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult}; rd = rd,
+                            train_idx = train_idx, test_idx = test_idx, time_ordered = false
+                            ) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test, cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -529,7 +525,8 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
-    predictions = parallel_folds(length(test_idx), ex; ElT = Vector{PredictionResult}) do i
+    assert_unshuffled_folds(cv, cv_res.train_idx)
+    predictions = parallel_folds(length(test_idx), ex, Vector{PredictionResult}) do i
         return StatsAPI.predict(res, rd, test_idx[i])
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))

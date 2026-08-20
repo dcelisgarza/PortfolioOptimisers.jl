@@ -22,8 +22,10 @@ VecJuMPOptSol
 JuMPOptSol_VecJuMPOptSol
 BaseJuMPOptimisationResult
 RiskJuMPOptimisationResult
-Base.propertynames(r::RiskJuMPOptimisationResult)
-Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+NonRiskJuMPOptimisationResult
+RJR_NRJR
+Base.propertynames(r::RJR_NRJR)
+Base.getproperty(r::RJR_NRJR, sym::Symbol)
 NonJuMPOptimisationResult
 add_custom_objective_term!
 add_custom_constraint!
@@ -67,11 +69,22 @@ assert_shared_state
 shared_set!
 shared_has
 shared_get
+frontier_point_count
+frontier_sweep_points
+assert_frontier_sweep_cap
+frontier_axis
+set_ret_frontier_parameters!
+set_risk_frontier_parameters!
+frontier_sweep_axes
+set_frontier_point!
+frontier_sweep!
 state_key
+assert_state_key_free
 state_set!
 state_has
 state_get
 state_build!
 mark_state!
 nested_prefix
+nested_index
 ```

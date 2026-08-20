@@ -8,7 +8,7 @@ objective and prior you use. This deep dive works through the linear and group c
 weight bounds, per-member vs group-sum limits, relative and sum constraints — and shows where
 the boundary to mixed-integer constraints (thresholds, cardinality) lies.
 
-The unifying idea is the [`AssetSets`](@ref): you name assets and groups once, then every
+The unifying idea is the [`UniverseSets`](@ref): you name assets and groups once, then every
 constraint refers to those names. The same `"name op value"` string grammar drives both the
 linear constraints here and the views in the [prior examples](../2_moments_priors/07_Entropy_Pooling.md).
 
@@ -49,17 +49,17 @@ rf = 4.2 / 100 / 252
 #=
 ## 2. Naming assets and groups
 
-[`AssetSets`](@ref) maps names to members. The `nx` key holds every asset; the rest are the
+[`UniverseSets`](@ref) maps names to members. The `nx` key holds every asset; the rest are the
 groups — here, sectors — that constraints will reference.
 =#
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "financials" => ["BAC", "JPM"],
-                             "energy" => ["CVX", "XOM", "RRC"],
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"],
-                             "staples" => ["KO", "PEP", "PG", "WMT"],
-                             "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "financials" => ["BAC", "JPM"],
+                                "energy" => ["CVX", "XOM", "RRC"],
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"],
+                                "staples" => ["KO", "PEP", "PG", "WMT"],
+                                "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
 
 #=
 Our baseline is an unconstrained maximum-ratio portfolio. On this one-year slice it is starkly
@@ -95,8 +95,8 @@ res_cap = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 There are **two different things** you might mean by "the staples bound". A
 [`WeightBoundsEstimator`](@ref) with a group key applies the bound to **each member** of the
 group; a [`LinearConstraintEstimator`](@ref) bounds the **group sum**. They are not the same:
-with four staples names, `WeightBoundsEstimator(lb = ["staples" => 0.15])` forces *each* of them
-to at least 15% — 60% in total — whereas `LinearConstraintEstimator(val = ["staples >= 0.15"])`
+with four staples names, `WeightBoundsEstimator(lb = ["staples" => 0.15], ub = nothing)` forces *each*
+of them to at least 15% — 60% in total — whereas `LinearConstraintEstimator(val = ["staples >= 0.15"])`
 asks only that the four *together* reach 15%.
 =#
 
@@ -104,7 +104,8 @@ res_member = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                    wb = WeightBoundsEstimator(;
                                                                               lb = ["staples" =>
-                                                                                        0.15]))))
+                                                                                        0.15],
+                                                                              ub = nothing))))
 res_groupsum = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                      lcse = LinearConstraintEstimator(;
@@ -158,6 +159,11 @@ MIP). Passing a threshold to a continuous-only solver returns a failed `retcode`
 silent wrong answer. See [Budget Constraints](01_Budget_Constraints.md) for the MIP solver
 setup.
 
+Every constraint on this page is written in *asset* names. A mandate written in **factor** names —
+"at most 10% momentum", "market-neutral to value" — is the same linear form in a different basis,
+and is covered in
+[Factor Exposure Constraints](10_Factor_Exposure_Constraints.md).
+
 ## 7. Comparing the constraints
 
 Same prior, same objective — each constraint reshapes the book differently. The baseline's
@@ -178,7 +184,7 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   the real SP500 slice with a MaximumRatio base (concentrates ~66% healthcare / 34% energy,
 #src   so caps/floors on the ignored sectors bite cleanly):
 #src   - WeightBounds ub=0.15: max weight 37%→15%, holdings 2→8.
-#src   - PER-MEMBER vs GROUP-SUM (the teaching highlight): WeightBoundsEstimator(lb=["staples"=>0.15])
+#src   - PER-MEMBER vs GROUP-SUM (the teaching highlight): WeightBoundsEstimator(lb=["staples"=>0.15], ub=nothing))
 #src     → each of 4 staples ≥15% → 60% total; LinearConstraintEstimator("staples >= 0.15") → 15%
 #src     total. Genuinely confusable; documented explicitly in §4.
 #src   - Sum cap "healthcare + energy <= 0.6" binds at 60%, pushes 40% into previously-zero sectors.

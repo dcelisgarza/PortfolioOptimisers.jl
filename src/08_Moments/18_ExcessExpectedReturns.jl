@@ -100,6 +100,10 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
   - `mu::ArrNum`: Excess expected returns vector.
@@ -121,6 +125,7 @@ julia> mean(me, X)
   - [`ExcessExpectedReturns`](@ref)
 """
 function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    assert_dims(dims)
     return Statistics.mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
 

@@ -231,20 +231,28 @@ end
 @testset "Resource caps fail closed" begin
     using PortfolioOptimisers, Test
     pe = PortfolioOptimisers
-    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the four
-    # fields are same-typed and two share the value 100_000.
-    @test pe.RESOURCE_LIMITS[] == pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000)
-    @test pe.ResourceLimits() == pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000)
+    # One cap per sink (ADR 0041); the keyword constructor is the safe path since the six
+    # fields are same-typed and four share the value 100_000.
+    @test pe.RESOURCE_LIMITS[] ==
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
+    @test pe.ResourceLimits() ==
+          pe.ResourceLimits(1_000_000, 100_000, 100_000, 10_000, 100_000, 100_000)
     @test pe.ResourceLimits(; max_bins = 500).max_bins == 500
+    @test pe.ResourceLimits(; max_hop_count = 7).max_hop_count == 7
+    @test pe.ResourceLimits(; max_search_grid = 9).max_search_grid == 9
     # Every field must be positive, like EquationLimits.
     @test_throws ArgumentError pe.ResourceLimits(; max_n_sim = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_n_subsets = -1)
     @test_throws ArgumentError pe.ResourceLimits(; max_frontier = 0)
     @test_throws ArgumentError pe.ResourceLimits(; max_bins = -1)
+    @test_throws ArgumentError pe.ResourceLimits(; max_hop_count = 0)
+    @test_throws ArgumentError pe.ResourceLimits(; max_search_grid = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_sim = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_n_subsets = -1)
     @test_throws ArgumentError pe.set_resource_limits!(max_frontier = 0)
     @test_throws ArgumentError pe.set_resource_limits!(max_bins = -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_hop_count = 0)
+    @test_throws ArgumentError pe.set_resource_limits!(max_search_grid = -1)
     # n_sim sizes an N^2 * n_sim array in both uncertainty-set estimators; the ceiling
     # converts an OOM kill into a typed DomainError naming the knob that raises it.
     @test_throws DomainError NormalUncertaintySet(; n_sim = 10_000_000_000)
@@ -293,6 +301,54 @@ end
     @test occursin("max_bins", berr.msg)
     @test MutualInfoCovariance(; bins = 20).bins == 20
     @test MutualInfoCovariance().bins isa pe.AbstractBins  # HacineGharbiRavier(), uncapped
+    # HopCount.n indexes a sum of matrix powers `0:n`, so the compute cost is linear in n.
+    # The constructor is also where resolve_separation sends a rule's answer, so the same
+    # cap covers a stated hop count and a computed one.
+    @test_throws DomainError HopCount(; n = 10^9)
+    herr = try
+        HopCount(; n = 10^9)
+        nothing
+    catch e
+        e
+    end
+    @test herr isa DomainError
+    @test occursin("max_hop_count", herr.msg)
+    @test HopCount(; n = 3).n == 3
+    @test HopCount(; n = pe.HopCountQuantile()).n isa pe.HopCountQuantile  # a rule, uncapped
+    let nte = NetworkEstimator(), X = randn(50, 4)
+        @test_throws DomainError pe.resolve_separation(HopCount(;
+                                                                n = (args...; kwargs...) -> 10^9),
+                                                       nte, X)
+        @test pe.resolve_separation(HopCount(; n = (args...; kwargs...) -> 2), nte, X).n ==
+              2
+    end
+    # A search grid is an Iterators.product: k parameters of N values are N^k candidates
+    # and N^k full cross-validated fits, so the cap is on the product, not on any one N.
+    @test_throws DomainError pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100),
+                                               "c" => collect(1:100)])
+    gerr = try
+        pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100),
+                          "c" => collect(1:100)])
+        nothing
+    catch e
+        e
+    end
+    @test gerr isa DomainError
+    @test occursin("max_search_grid", gerr.msg)
+    @test occursin("a = 100", gerr.msg)  # the message names the guilty dimensions
+    @test_throws DomainError pe.lens_val_grid(Dict("a" => collect(1:100),
+                                                   "b" => collect(1:100),
+                                                   "c" => collect(1:100)))
+    @test length(pe.lens_val_grid(["a" => collect(1:10), "b" => collect(1:10)])[2]) == 100
+    # Concatenated parameter sets are a sum of products, capped on the way out too.
+    pe.with_resource_limits(; max_search_grid = 150) do
+        @test length(pe.lens_val_grid([["a" => collect(1:10), "b" => collect(1:10)],
+                                       ["a" => collect(1:5)]])[2]) == 105
+        @test_throws DomainError pe.lens_val_grid([["a" => collect(1:10),
+                                                    "b" => collect(1:10)],
+                                                   ["a" => collect(1:10),
+                                                    "b" => collect(1:10)]])
+    end
     # A raised ceiling is honoured, and scoped overrides restore on exit.
     pe.with_resource_limits(; max_n_sim = 20_000_000_000) do
         @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
@@ -303,6 +359,13 @@ end
     pe.with_resource_limits(; max_bins = 20_000_000) do
         @test MutualInfoCovariance(; bins = 10_000_000).bins == 10_000_000
     end
+    pe.with_resource_limits(; max_hop_count = 20_000_000) do
+        @test HopCount(; n = 10_000_000).n == 10_000_000
+    end
+    pe.with_resource_limits(; max_search_grid = 10^7) do
+        @test length(pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100)])[2]) ==
+              10_000
+    end
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000
     # Preferences fail closed at load, like the equation caps.
     pe.apply_preferences!(Dict{String, Any}("max_n_subsets" => 1_234, "max_bins" => 321))
@@ -310,11 +373,54 @@ end
     @test pe.RESOURCE_LIMITS[].max_bins == 321
     @test pe.RESOURCE_LIMITS[].max_n_sim == 1_000_000  # unset key keeps its default
     @test pe.RESOURCE_LIMITS[].max_frontier == 100_000  # unset key keeps its default
+    pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 12, "max_search_grid" => 34))
+    @test pe.RESOURCE_LIMITS[].max_hop_count == 12
+    @test pe.RESOURCE_LIMITS[].max_search_grid == 34
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_hop_count" => 0))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_search_grid" =>
+                                                                           2.5))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_n_sim" => -5))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_n_subsets" =>
                                                                            true))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_frontier" => "1000"))
     @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_bins" => 1.5))
     pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
-                            max_frontier = 100_000, max_bins = 10_000)  # restore
+                            max_frontier = 100_000, max_bins = 10_000,
+                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+end
+@testset "A preference that widens a guard is announced" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # A LocalPreferences.toml is data: it travels with a cloned project and applies
+    # before any user code runs. A widening value keeps its full range (ADR 0041
+    # amendment) but is announced, so nothing distinguishes a chosen wide cap from an
+    # inherited one.
+    logs, = Test.collect_test_logs() do
+        return pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000,
+                                                       "max_n_sim" => 500,
+                                                       "equation_max_depth" => 4096,
+                                                       "suggestion_min_score" => 1.0e-9))
+    end
+    @test length(logs) == 1                    # one message for the whole load
+    @test first(logs).level == Logging.Warn
+    msg = first(logs).message
+    @test occursin("max_bins: 10000 → 50000", msg)
+    @test occursin("equation_max_depth: 256 → 4096", msg)
+    @test occursin("suggestion_min_score: 0.7 → 1.0e-9", msg)  # lower admits more
+    @test !occursin("max_n_sim", msg)          # 500 tightens the cap, so it stays silent
+    @test occursin("LocalPreferences.toml", msg)
+    # Tightening alone is silent: a project that hardens itself must not be trained to
+    # ignore a warning at every `using`. An unchanged value is silent too.
+    logs, = Test.collect_test_logs() do
+        return pe.apply_preferences!(Dict{String, Any}("max_bins" => 100,
+                                                       "suggestion_min_score" => 0.9,
+                                                       "equation_max_length" => 4096))
+    end
+    @test isempty(logs)
+    @test pe.RESOURCE_LIMITS[].max_bins == 100  # the value is applied either way
+    pe.set_resource_limits!(max_n_sim = 1_000_000, max_n_subsets = 100_000,
+                            max_frontier = 100_000, max_bins = 10_000,
+                            max_hop_count = 100_000, max_search_grid = 100_000)  # restore
+    pe.set_equation_limits!(max_length = 4096, max_depth = 256)
+    pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
 end

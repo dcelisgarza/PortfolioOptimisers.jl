@@ -69,6 +69,64 @@ function needs_previous_weights(r::VecBaseRM)::Bool
     return any(needs_previous_weights.(r))
 end
 """
+    const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+
+Argument bound for every value-level reader of a risk measure: one measure or several.
+
+Mirrors [`JRE_VecJRE`](@ref) on the return side. A method bounded here serves a measure and a vector of them with one body, so the value-level surface needs one method per arity rather than two.
+
+A vector is scalarised into **one** number by the `sca` keyword, which defaults to [`SumScalariser`](@ref) and is silently inert on a single measure.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
+  - [`JRE_VecJRE`](@ref)
+  - [`expected_risk`](@ref)
+  - [`Scalariser`](@ref)
+"""
+const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether every element of `rs` shares the same polarity, and throw when they do not.
+
+The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) and [`QuantileRule`](@ref) take counts from each tail, and the flag decides which tail is best.
+
+# Validation
+
+  - Throws an `ArgumentError` when the elements disagree.
+
+# Related
+
+  - [`bigger_is_better`](@ref)
+  - [`VecBaseRM`](@ref)
+"""
+function bigger_is_better(rs::VecBaseRM)::Bool
+    b = bigger_is_better(first(rs))
+    if !all(r -> bigger_is_better(r) == b, rs)
+        got = join(["  $(nameof(typeof(r))) => $(bigger_is_better(r))" for r in rs], "\n")
+        throw(ArgumentError("a vector of risk measures must agree on its polarity, and this one does not. `bigger_is_better` decides which tail of a ranking is best, so a mixed vector has no defined orientation and either answer would be wrong in silence.\nSplit the vector into one group per polarity, or rank on a single measure.\nGot\n$(got)"))
+    end
+    return b
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether every element of `rs` supports evaluation on a precomputed return series.
+
+Answers by `all`, matching the `&&` the two ratio composites already use. Note the polarity against its neighbour: [`needs_previous_weights`](@ref) on the same alias answers by `any`. Both are correct — "does the vector need it" is not "can the vector do it".
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`VecBaseRM`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
+function supports_precomputed_returns(rs::VecBaseRM)::Bool
+    return all(supports_precomputed_returns, rs)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the input-shape classification of a risk measure, used by [`expected_risk`](@ref) to decide what to feed a measure's functor.
@@ -137,6 +195,37 @@ There is no default: every concrete [`AbstractBaseRiskMeasure`](@ref) (other tha
 """
 function risk_input_kind(r::AbstractBaseRiskMeasure)
     return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
+end
+"""
+    range_tails(r::RiskMeasure) -> @NamedTuple{loss, gain}
+
+Decompose a *range* risk measure into the two point measures it is the sum of.
+
+A range measure is its base measure applied twice: once to the losses at level `alpha`, and once to the gains at the second level the range carries (`beta`, `w2`, …). The two point measures are the whole content of that statement, so a range declares them here once and both of its consumers read them from this one place:
+
+  - [`set_range_risk_constraints!`](@ref) builds the model by calling [`set_risk_constraints!`](@ref) on `loss` with `loss = true` and on `gain` with `loss = false`, then sums the two expressions.
+  - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
+
+The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref)) declares no tails, because there are no two sub-models to build.
+
+There is no default. A measure that is not a range, or one that fuses, throws rather than returning a decomposition that does not describe it.
+
+# Arguments
+
+  - `r`: Range risk measure.
+
+# Returns
+
+  - `(; loss, gain)`: The loss-tail and gain-tail point measures.
+
+# Related
+
+  - [`set_range_risk_constraints!`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
+function range_tails(r::AbstractBaseRiskMeasure)
+    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none."))
 end
 """
     (r::AbstractBaseRiskMeasure)(::VecNum)
@@ -492,7 +581,7 @@ Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)).
+  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples
@@ -670,7 +759,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalRiskMeasureSettings(;
-        scale::Number,
+        scale::Number = 1.0
     ) -> HierarchicalRiskMeasureSettings
 
 Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling factor.
@@ -723,28 +812,17 @@ function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new vector of risk measures with [`factory`](@ref) applied element-wise.
-
-# Related
-
-  - [`VecBaseRM`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(rs::VecBaseRM, args...; kwargs...)
-    return [factory(r, args...; kwargs...) for r in rs]
-end
-"""
     port_opt_view(rs, i, X)
 
 Get a view or subset of a risk measure for asset cluster index `i`.
 
 Returns the risk measure sliced for the given cluster or asset index. Used internally in hierarchical optimisation to apply risk measures to each cluster.
 
+A vector of risk measures ([`VecBaseRM`](@ref)) is handled by the generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref), which rebuild and view each measure in turn.
+
 # Arguments
 
-  - `rs`: Risk measure (or vector thereof).
+  - `rs`: Risk measure.
   - `i`: Cluster or asset index.
   - `X`: Data matrix (used for dimension-aware slicing).
 
@@ -755,13 +833,11 @@ Returns the risk measure sliced for the given cluster or asset index. Used inter
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
 """
 function port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any,
                        args...)::AbstractBaseRiskMeasure
     return rs
-end
-function port_opt_view(rs::VecBaseRM, i, X::MatNum, args...)
-    return [port_opt_view(r, i, X) for r in rs]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -769,6 +845,15 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for scalarisation strategies used to combine multiple risk measures into a single scalar value for optimisation.
 
 Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+
+## Two consumers, and only one of them is restricted
+
+A scalariser is read at two levels, and they are not equally permissive.
+
+  - **The model level.** A `JuMP` optimiser builds the aggregation into the model as an expression, so the strategy must have a convex form. This is what [`NonHierarchicalScalariser`](@ref) and [`HierarchicalScalariser`](@ref) separate: the two subtypes name the **consumers** that can build a given strategy, not a property of the resulting number. `JuMPOptimiser.sca` is bounded `NonHierarchicalScalariser` and refuses the hierarchical half; the clustering optimisers compute each cluster's risk separately and accept either.
+  - **The value level.** [`expected_risk`](@ref) and the readers around it evaluate the measures first and combine the resulting **numbers**, so nothing convex is being built and no strategy can be refused on those grounds. Every `sca` keyword and every `sca` result field at this level is bounded [`Scalariser`](@ref), and **all four scalarisers are admitted**, [`MinScalariser`](@ref) included.
+
+So a `HierarchicalScalariser` on a value-level call is not a misuse, and the word "hierarchical" in the subtype name describes which estimators accept it rather than where the number is meaningful.
 
 # Related
 
@@ -779,9 +864,11 @@ abstract type Scalariser <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible with all portfolio optimisation estimators.
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value, and that **every** optimisation estimator can build.
 
-Subtype `NonHierarchicalScalariser` to implement aggregation methods that work with all optimisation estimators.
+Subtype `NonHierarchicalScalariser` when the aggregation has a convex `JuMP` form, so a `JuMP` optimiser can build it into the model as well as a clustering optimiser can compute it per cluster. `JuMPOptimiser.sca` is bounded here.
+
+The split names a **consumer**, not a property of the number. It does not restrict the value-level readers, which admit all four scalarisers — see [`Scalariser`](@ref).
 
 # Related
 
@@ -795,9 +882,11 @@ abstract type NonHierarchicalScalariser <: Scalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible only with hierarchical optimisations.
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value, and that **only the clustering optimisation estimators** can build.
 
-Subtype `HierarchicalScalariser` to implement aggregation methods that only work with hierarchical optimisation estimators.
+Subtype `HierarchicalScalariser` when the aggregation has no convex `JuMP` form. `JuMPOptimiser.sca` is bounded [`NonHierarchicalScalariser`](@ref) and refuses this half; the clustering optimisers compute each cluster's risk separately and accept it.
+
+The split names a **consumer**, not a property of the number. At the value level the measures are evaluated first and the strategy combines plain numbers, so nothing is being built and all four scalarisers are admitted — see [`Scalariser`](@ref).
 
 # Related
 
@@ -869,9 +958,11 @@ struct MaxScalariser <: NonHierarchicalScalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that selects the risk expression whose scaled value is the largest.
+Scalariser that selects the risk expression whose scaled value is the smallest.
 
 `MinScalariser` aggregates a vector of risk measures by selecting the minimum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+
+It is the one [`HierarchicalScalariser`](@ref), because minimising a minimum is not convex and a `JuMP` optimiser cannot build it. That bound is the **model's**: at the value level the measures are already numbers, so `MinScalariser` is admitted by every `sca` keyword and every `sca` result field there, on equal footing with the other three.
 
 ```math
 \\begin{align}
@@ -1183,6 +1274,511 @@ function solver_selector(::Nothing, slv::Slv_VecSlv)
 end
 function solver_selector(::Nothing, ::Nothing)
     return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
+end
+"""
+    const DeferredQuantity = Union{...}
+
+The dynamic half of a **Deferred Quantity**: an Estimator standing in a risk-measure slot where a prior-derived value goes. `isa(x, DeferredQuantity)` answers "is this slot deferred?" — the four moment-estimator families that compute one of the four deferrable quantities, plus [`AbstractPriorEstimator`](@ref), which computes all of them at once.
+
+The union exists because no supertype already answers the question: [`AbstractCovarianceEstimator`](@ref) is a `StatsBase.CovarianceEstimator` and not an [`AbstractEstimator`](@ref).
+
+# Related
+
+  - [`MuSlot`](@ref)
+  - [`SigmaSlot`](@ref)
+  - [`KtSlot`](@ref)
+  - [`SkSlot`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const DeferredQuantity = Union{<:AbstractExpectedReturnsEstimator,
+                               <:StatsBase.CovarianceEstimator, <:CoskewnessEstimator,
+                               <:CokurtosisEstimator, <:AbstractPriorEstimator}
+"""
+    const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+
+Field bound for an expected-returns slot: the value itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator,
+                     <:AbstractPriorEstimator}
+"""
+    const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+
+Field bound for a covariance slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+"""
+    const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+
+Field bound for a cokurtosis slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+"""
+    const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+
+Field bound for a coskewness slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+"""
+    deferred_factors(pr::AbstractPriorResult)
+
+Return the factor returns matrix carried by prior result `pr`, or `nothing` when `pr` has no factor block. This is the only channel through which factors reach a risk-measure slot: no moment estimator takes an `F`, so a slot that must see factors has to hold an [`AbstractPriorEstimator`](@ref).
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function deferred_factors(pr::AbstractPriorResult)
+    return isnothing(pr.fpr) ? nothing : pr.fpr.X
+end
+"""
+    fit_deferred_quantity(dq::DeferredQuantity, pr::AbstractPriorResult)
+
+Run a **Deferred Quantity** against the optimisation's own prior result and return what it produces: a moment estimator gives its quantity, an [`AbstractPriorEstimator`](@ref) gives a whole [`AbstractPriorResult`](@ref).
+
+The estimator sees `pr.original_X` — the returns the **caller** supplied, sliced by any [`port_opt_view`](@ref) the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
+
+`pr.original_X` rather than `pr.X`, because the two differ on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, which spans only the factors: it has rank `size(F, 2)`, and it carries no residual. Fitting a covariance estimator on it returns a **singular** matrix whenever there are more assets than factors, and a prior estimator in a slot could not regress it against those same factors. Off a factor route `original_X === X`, so nothing moves.
+
+A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` together with the matrix-processing estimator that built `V`, as a named tuple — `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref).
+
+`mean` is the centre the higher moment is taken about. [`deferred_centre`](@ref) supplies it, so that the resolved `mu` and the resolved `kt` or `sk` describe one distribution. `nothing` leaves the estimator to centre on its own `me`.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_slot`](@ref)
+  - [`deferred_factors`](@ref)
+  - [`deferred_centre`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`_wprop`](@ref)
+"""
+function fit_deferred_quantity(dq::AbstractExpectedReturnsEstimator,
+                               pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w), pr.original_X))
+end
+function fit_deferred_quantity(dq::StatsBase.CovarianceEstimator, pr::AbstractPriorResult)
+    return Statistics.cov(factory(dq, pr.w), pr.original_X)
+end
+function fit_deferred_quantity(dq::AbstractPriorEstimator, pr::AbstractPriorResult)
+    return prior(factory(dq, pr.w), pr.original_X, deferred_factors(pr))
+end
+function fit_deferred_quantity(dq::CokurtosisEstimator, pr::AbstractPriorResult;
+                               mean = nothing)
+    kte = factory(dq, pr.w)
+    return cokurtosis(kte, pr.original_X; mean = mean)
+end
+function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult;
+                               mean = nothing)
+    ske = factory(dq, pr.w)
+    sk, V = coskewness(ske, pr.original_X; mean = mean)
+    return (; sk = sk, V = V, skmp = coskewness_processor(ske))
+end
+"""
+    coskewness_processor(ske::CoskewnessEstimator)
+
+Return the matrix-processing estimator that a [`CoskewnessEstimator`](@ref) uses to build `V`, or `nothing` when the estimator names none.
+
+`V = negative_spectral_coskewness(sk, X, mp)`, so building `V` always names a processor. When a coskewness estimator stands in a [`NegativeSkewness`](@ref) `sk` slot, **that** estimator's processor is the one that built the `V` it hands back, and the measure records it in place of its own `mp` so that a later rebuild uses the same one. This mirrors [`HighOrderPrior`](@ref)'s `skmp`.
+
+The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one.
+
+# Related
+
+  - [`CoskewnessEstimator`](@ref)
+  - [`Coskewness`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
+"""
+function coskewness_processor(::CoskewnessEstimator)
+    return nothing
+end
+function coskewness_processor(ske::Coskewness)
+    return ske.mp
+end
+"""
+    deferred_centre(dq, pr::AbstractPriorResult)
+
+Return the centre that a **Deferred Quantity** in a `kt` or `sk` slot takes its moment about, or `nothing` when the estimator names none.
+
+A higher moment is a moment **about a centre**, so the tensor and the centre are one pair of quantities out of one object. When the measure leaves `mu` unstated, the centre comes from the co-moment estimator's own `me` run on `pr.original_X`, is threaded back into the fit as `mean =`, and becomes the resolved `mu`. The measure then centres on exactly the vector its tensor was built about.
+
+A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the answer is `nothing` and the centre is read off the prior result it produced instead.
+
+The [`CokurtosisEstimator`](@ref) and [`CoskewnessEstimator`](@ref) interfaces do not require an `me` field, so the default answers `nothing`. Declare a method for an estimator that names one.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`centring_target`](@ref)
+  - [`Kurtosis`](@ref)
+  - [`Skewness`](@ref)
+"""
+function deferred_centre(::Any, ::AbstractPriorResult)
+    return nothing
+end
+function deferred_centre(dq::Cokurtosis, pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
+end
+function deferred_centre(dq::Coskewness, pr::AbstractPriorResult)
+    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
+end
+"""
+    centring_target(mu)
+
+Turn a resolved `mu` into the per-asset centre that [`cokurtosis`](@ref) and [`coskewness`](@ref) take as `mean =`.
+
+Those two subtract the centre from the `T × N` returns matrix before they build the tensor, so the centre is a row rather than a column. A `VecScalar` contributes its scalar to every asset, which is the per-asset image of the portfolio-level target `dot(w, mu.v) + mu.s`. `nothing` leaves the estimator to centre on its own `me`.
+
+# Related
+
+  - [`deferred_centre`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
+function centring_target(::Nothing)
+    return nothing
+end
+function centring_target(mu::Number)
+    return mu
+end
+function centring_target(mu::VecNum)
+    return transpose(mu)
+end
+function centring_target(mu::VecScalar)
+    return transpose(mu.v) .+ mu.s
+end
+"""
+    fit_deferred_moment(dq, pr::AbstractPriorResult, centre)
+
+Run a **Deferred Quantity** that stands in a `kt` or `sk` slot, about the centre `centre`.
+
+A co-moment estimator takes the centre as `mean =` ([`centring_target`](@ref) puts it in the shape the estimator wants), so the tensor is built about exactly the vector the measure will resolve `mu` to.
+
+Every other occupant centres itself and has no channel to take one, so `centre` is dropped. That is the case of an [`AbstractPriorEstimator`](@ref) in the slot: it computes its own `mu` and its own tensor about that `mu`, and the centre is read **back** off the result it produced rather than pushed into it. A `mu` the caller stated alongside such a slot still wins as the measure's centring target, and the docstring's consistency warning is what covers the gap.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_centre`](@ref)
+  - [`centring_target`](@ref)
+"""
+function fit_deferred_moment(dq, pr::AbstractPriorResult, ::Any)
+    return fit_deferred_quantity(dq, pr)
+end
+function fit_deferred_moment(dq::Union{<:CokurtosisEstimator, <:CoskewnessEstimator},
+                             pr::AbstractPriorResult, centre)
+    return fit_deferred_quantity(dq, pr; mean = centring_target(centre))
+end
+"""
+    deferred_quantity(fitted, key::Symbol)
+
+Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
+
+A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a named tuple, because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_derived_quantity`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function deferred_quantity(fitted, ::Symbol)
+    return fitted
+end
+function deferred_quantity(fitted::NamedTuple, key::Symbol)
+    @argcheck(haskey(fitted, key),
+              ArgumentError("The fit in this slot produced no `$key`, so it cannot supply it. Name an estimator that computes `$key`."))
+    return fitted[key]
+end
+function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
+    @argcheck(hasproperty(fitted, key),
+              ArgumentError("A `$(typeof(fitted))` carries no `$key`, so the prior estimator in this slot cannot supply it. Name a prior estimator that computes `$key`."))
+    return getproperty(fitted, key)
+end
+"""
+    fan_out_slot(fitted, slot, key::Symbol)
+
+Fill one slot from a fan-out fit, unless the caller stated it.
+
+A measure that carries **two or more independently deferrable slots** takes a `pe` instead of widening each slot. [`fit_deferred_quantity`](@ref) runs that estimator **once**, and this reads one quantity per slot off the single result it produced.
+
+The precedence is the map's: a stated slot wins, `pe` fills the rest, and a slot that neither names is left `nothing` so the consumer's own prior fallback still applies.
+
+A measure with exactly one deferrable slot takes no `pe`. It widens that slot instead, and a derived companion — `chol` with `sigma`, `V` with `sk` — travels with it out of the same fit rather than being fanned out separately.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function fan_out_slot(fitted, slot, key::Symbol)
+    return isnothing(slot) ? deferred_quantity(fitted, key) : slot
+end
+"""
+    deferred_derived_quantity(fitted, key::Symbol)
+
+Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`; `V`, the negative spectral part that travels with `sk`; `mu`, the centre a higher moment was taken about; `skmp`, the processor that built `V`.
+
+A prior result carries all four. A coskewness estimator produced a named tuple carrying `V` and `skmp` but no centre. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`sigma_chol_selector`](@ref)
+  - [`deferred_centre`](@ref)
+"""
+function deferred_derived_quantity(::Any, ::Symbol)
+    return nothing
+end
+function deferred_derived_quantity(fitted::NamedTuple, key::Symbol)
+    return haskey(fitted, key) ? fitted[key] : nothing
+end
+function deferred_derived_quantity(fitted::AbstractPriorResult, key::Symbol)
+    return hasproperty(fitted, key) ? getproperty(fitted, key) : nothing
+end
+"""
+    resolve_slot(slot, key::Symbol, pr::AbstractPriorResult)
+
+Resolve one risk-measure slot against prior result `pr` and return a plain value.
+
+A slot that holds a **Deferred Quantity** is run against `pr` and the quantity named by `key` is read back. Anything else — a stated value, `nothing`, a centring strategy — is returned unchanged, so the caller can apply the ordinary prior fallback ([`sel`](@ref)) on top.
+
+This is the whole of the third state. The other two are unchanged: `nothing` still falls back to the prior's own field, and a stated value still wins.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`sel`](@ref)
+"""
+function resolve_slot(slot, ::Symbol, ::AbstractPriorResult)
+    return slot
+end
+function resolve_slot(dq::DeferredQuantity, key::Symbol, pr::AbstractPriorResult)
+    return deferred_quantity(fit_deferred_quantity(dq, pr), key)
+end
+"""
+    deferred_slots(x)
+
+Declare the slots of `x` that may hold a **Deferred Quantity**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no deferrable slot needs no method.
+
+This is the declaration both consumers read. [`assert_resolved_slots`](@ref) refuses a slot that a value-level entry point cannot resolve, and [`resolve_deferred_quantities`](@ref) derives its container recursion from it. A type that names its slots here needs no forwarding method of its own.
+
+A slot that holds a child measure is declared here too. Both consumers recurse into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. That matters because a risk measure holds Estimators that are **not** deferred slots — a variance estimator in `ve`, an uncertainty-set estimator in `ucs` — and a blind walk would refuse them.
+
+A type that resolves a quantity of its own — a matrix out of a covariance estimator, a tensor and the centre it was taken about out of a co-moment estimator — declares a [`resolve_deferred_quantities`](@ref) method beside this one. That method is per type because slots that travel together must be resolved together, which no derivation can know. Declaring the slots without the method is refused at the first call rather than passed over.
+
+# Related
+
+  - [`DeferredQuantity`](@ref)
+  - [`assert_resolved_slots`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+deferred_slots(::Any) = (;)
+"""
+    resolve_deferred_child(slot, pr::AbstractPriorResult)
+
+Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
+
+A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory_child`](@ref) already applies on the other path. Anything else — a stated value, `nothing`, a **Deferred Quantity** the enclosing type resolves itself — is returned unchanged.
+
+The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`factory_child`](@ref)
+"""
+function resolve_deferred_child(slot, pr::AbstractPriorResult)
+    return resolve_deferred_quantities(slot, pr)
+end
+function resolve_deferred_child(slot::AbstractArray{<:Union{<:AbstractEstimator,
+                                                            <:AbstractAlgorithm}},
+                                pr::AbstractPriorResult)
+    return [resolve_deferred_child(s, pr) for s in slot]
+end
+"""
+    rebuild_with_slots(x, slots::NamedTuple)
+
+Return a copy of `x` whose fields named by `slots` hold the values in `slots`.
+
+The field list is derived from the type and the constructor is recovered from it, so nothing is written per type. The call is positional, so the inner constructor runs and every guard the type states is re-applied to the rebuilt value.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+function rebuild_with_slots(x, slots::NamedTuple)
+    T = typeof(x)
+    props = NamedTuple{fieldnames(T)}(ntuple(i -> getfield(x, i), Val(fieldcount(T))))
+    return T.name.wrapper(values(merge(props, slots))...)
+end
+"""
+    assert_declared_slot_resolver(x, slots::NamedTuple)
+
+Refuse a type that declares a deferrable slot and no way to resolve it.
+
+`slots` is what the derived recursion produced. A **Deferred Quantity** that survives it names a type that declared the slot in [`deferred_slots`](@ref) and then wrote no [`resolve_deferred_quantities`](@ref) method, so the estimator would reach the model builders and be multiplied as though it were a matrix. ADR 0051 pairs the two declarations; this is where the pair is enforced.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+function assert_declared_slot_resolver(x, slots::NamedTuple)
+    for (key, slot) in pairs(slots)
+        @argcheck(!isa(slot, DeferredQuantity),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and `$(nameof(typeof(x)))` declares no `resolve_deferred_quantities` method to fit it. The derived recursion carries a child measure's own resolution, not a quantity of the enclosing type. Declare `resolve_deferred_quantities(x::$(nameof(typeof(x))), pr::AbstractPriorResult)` beside `deferred_slots`."))
+    end
+    return nothing
+end
+"""
+    resolve_deferred_quantities(x, pr::AbstractPriorResult)
+
+Resolve the children that [`deferred_slots`](@ref) declared, and return `x` itself when none of them changed.
+
+This is the derived half of the resolution rule. A container declares its children once and both entry points follow: [`factory`](@ref) reaches them through [`@fprop`](@ref), and the `JuMP` builders reach them through this method. Neither needs a forwarding method per container.
+
+A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
+
+# Related
+
+  - [`deferred_slots`](@ref)
+  - [`resolve_deferred_child`](@ref)
+  - [`assert_declared_slot_resolver`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function resolve_deferred_quantities(x, pr::AbstractPriorResult)
+    slots = deferred_slots(x)
+    if isempty(slots)
+        return x
+    end
+    resolved = map(slot -> resolve_deferred_child(slot, pr), slots)
+    assert_declared_slot_resolver(x, resolved)
+    # A container whose children resolved to themselves is returned unchanged, so the common
+    # case allocates nothing and the rebuild runs only where a slot really moved.
+    return if all(map(===, values(resolved), values(slots)))
+        x
+    else
+        rebuild_with_slots(x, resolved)
+    end
+end
+"""
+    assert_resolved_slots(x)
+
+Refuse a **Deferred Quantity** that reached a value-level entry point, which has no prior result to resolve it against.
+
+[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
+
+This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
+
+The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. A slot that holds a vector of children is recursed element by element, which is the rule [`resolve_deferred_child`](@ref) applies on the resolution path. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
+
+The message names both types with `nameof`, not by printing the type. A printed type carries a module prefix whenever the name is not visible from `Main`, which is the case inside an isolated test worker and inside any module that imports the package qualified. `Variance.sigma` is the path the caller wrote, and the message must read the same in every process.
+
+# Related
+
+  - [`deferred_slots`](@ref)
+  - [`DeferredQuantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function assert_resolved_slots(x)
+    for (key, slot) in pairs(deferred_slots(x))
+        @argcheck(!isa(slot, DeferredQuantity),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. Resolving a slot needs `pr.w` and the factor returns, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+        assert_resolved_slots(slot)
+    end
+    return nothing
+end
+function assert_resolved_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
+                                                         <:AbstractAlgorithm}})
+    for x in xs
+        assert_resolved_slots(x)
+    end
+    return nothing
+end
+"""
+    sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
+
+Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
+
+`chol` is a factorisation of `sigma`. Pairing a factor with a covariance matrix it does not factorise would let the model optimise one quantity while the functor evaluates another. So the pair falls back to the prior only when the measure names neither; a stated `sigma` with no factor keeps no factor, and the consumer derives the right one.
+
+The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` without a matrix `sigma` beside it — [`assert_derived_slot_has_source`](@ref) refuses both that and a `chol` stated beside a deferred `sigma` at construction, so the two arms below see only value states.
+
+A stated `chol` is never rebuilt from `sigma`. Under a factor prior the factorisation is sparse and special, and a rebuild would throw that structure away.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`chol_sigma_selector`](@ref)
+"""
+function sigma_chol_selector(sigma, chol, ::AbstractPriorResult)
+    return sigma, chol
+end
+function sigma_chol_selector(::Nothing, ::Nothing, pr::AbstractPriorResult)
+    return pr.sigma, pr.chol
+end
+"""
+    assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
+
+Refuse a derived slot that was stated without a source the caller can see.
+
+A derived slot is a function of its source, so the two are one pair out of one fit. Two states break that, and both are refused at construction:
+
+  - **The source is unstated.** The prior supplies it, so the caller's derived value would pair with a source the caller never saw.
+  - **The source holds a Deferred Quantity.** That fit supplies the pair, so the caller's derived value would be discarded, or worse, kept beside a source it does not describe.
+
+`chol` is a factorisation of `sigma`, and `V` is the negative spectral part of `sk`. Both follow this rule, so a stated derived slot always means a stated source value.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+function assert_derived_slot_has_source(derived, source, dname::Symbol, sname::Symbol)
+    if isa(source, DeferredQuantity)
+        @argcheck(isnothing(derived),
+                  ArgumentError("`$dname` is derived from `$sname`, so it cannot be given when `$sname` holds a Deferred Quantity. That fit supplies the pair, and a stated `$dname` would describe a `$sname` the caller never saw. Give `$sname` alone, or state both as values."))
+    else
+        @argcheck(isnothing(derived) || !isnothing(source),
+                  ArgumentError("`$dname` is derived from `$sname`, so it cannot be given on its own. Give `$sname` as well, or give neither and let the prior supply the pair."))
+    end
+    return nothing
 end
 """
     sel(risk_variable, source_variable)

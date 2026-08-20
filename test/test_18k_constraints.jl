@@ -380,7 +380,7 @@ end
                     -1.778276197103779e-13, -1.9695027660052278e-13, 0.20146961053707255],
                    rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
@@ -392,12 +392,12 @@ end
                         wb = WeightBounds(; lb = -1, ub = 1))
     @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-    plc = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pl = clr, p = 10), rd.X)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 10)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
@@ -413,7 +413,7 @@ end
                     2.284039630442464e-9, 4.098035458673607e-9, 2.8259584736181038e-9,
                     1.9502905591238874e-9, 0.4730283635464767], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 5)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
@@ -430,7 +430,7 @@ end
                     2.3540415362795815e-11, 6.674140406117119e-11, 3.620870179464855e-11,
                     2.9544937962876324e-11, 0.5589695057771867], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
@@ -446,7 +446,7 @@ end
                     1.2549206102211462e-9, 5.816904347357348e-10, 9.192974758044433e-10,
                     1.3752920313726993e-9, 0.05823418837805521], rtol = 1e-6)
 
-    plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
+    plc = SemiDefinitePhylogeny(; A = phylogeny_matrix(clr, pr.X), p = 5)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                         wb = WeightBounds(; lb = -1, ub = 1))
     res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
@@ -660,7 +660,7 @@ end
     # Estimator form (lb defaulting to nothing) must also assemble and solve. The
     # WeightBoundsEstimator resolves per-name bounds, so it needs `sets`.
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
-                        wb = WeightBoundsEstimator(; ub = 0.15))
+                        wb = WeightBoundsEstimator(; lb = nothing, ub = 0.15))
     res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
     @test isapprox(sum(res.w), 1; rtol = 1e-6)
     @test all(res.w .<= 0.15 + 1e-6)
@@ -670,4 +670,44 @@ end
     res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
     @test all(res.w .>= 0.01 - 1e-6)
     @test all(res.w .<= 0.2 + 1e-6)
+end
+
+@testset "Name resolution does not edit the caller's Universe Sets" begin
+    # `name_to_val!` used to call `unique!` on the member list it read out of `sets.dict`, so
+    # resolving a group with a repeated member permanently shortened the user's Universe Sets.
+    # Universe Sets are configuration and are reused across folds and optimisers, so the
+    # resolver must leave them untouched. `resolve_axis_name` now returns a copy.
+    dup_sets = UniverseSets(; xkey = "nx",
+                            dict = Dict("nx" => ["A", "B", "C"], "Tech" => ["A", "B", "A"]))
+    val = PortfolioOptimisers.estimator_to_val("Tech" => 0.5, dup_sets)
+    @test val == [0.5, 0.5, 0.0]
+    @test dup_sets.dict["Tech"] == ["A", "B", "A"]
+
+    # The dictionary form takes the same path and must also leave the sets alone.
+    val = PortfolioOptimisers.estimator_to_val(Dict("Tech" => 0.25, "C" => 0.75), dup_sets)
+    @test val == [0.25, 0.25, 0.75]
+    @test dup_sets.dict["Tech"] == ["A", "B", "A"]
+
+    # An asset name takes precedence over a group of the same spelling.
+    clash_sets = UniverseSets(; xkey = "nx",
+                              dict = Dict("nx" => ["A", "B", "C"], "A" => ["B", "C"]))
+    val = PortfolioOptimisers.estimator_to_val("A" => 1.0, clash_sets)
+    @test val == [1.0, 0.0, 0.0]
+
+    # An unknown name warns when `strict` is false and throws when it is true. Both branches
+    # now run through `strict_diagnostic`, so the policy is one function.
+    @test_logs (:warn,) PortfolioOptimisers.estimator_to_val("Nope" => 1.0, dup_sets)
+    @test_throws ArgumentError PortfolioOptimisers.estimator_to_val("Nope" => 1.0, dup_sets;
+                                                                    strict = true)
+
+    # A group whose member is missing from the axis keeps the members it can place, and
+    # reports the rest under the same strictness policy.
+    partial_sets = UniverseSets(; xkey = "nx",
+                                dict = Dict("nx" => ["A", "B", "C"], "Mixed" => ["A", "Z"]))
+    val = @test_logs (:warn,) PortfolioOptimisers.estimator_to_val("Mixed" => 0.3,
+                                                                   partial_sets)
+    @test val == [0.3, 0.0, 0.0]
+    @test_throws ArgumentError PortfolioOptimisers.estimator_to_val("Mixed" => 0.3,
+                                                                    partial_sets;
+                                                                    strict = true)
 end

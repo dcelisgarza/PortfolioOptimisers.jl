@@ -66,10 +66,10 @@ Table Key:
 | Tail drawdown | [`EntropicDrawdownatRisk`](@ref) ([`EDaR`](@ref))                                                                                             | JuMP + Hierarchical | EC             | Clarabel                    |
 | Tail drawdown | [`RelativeEntropicDrawdownatRisk`](@ref) ([`R_EDaR`](@ref))                                                                                   | Hierarchical        | EC             | Clarabel                    |
 | Dispersion    | [`EntropicValueatRiskRange`](@ref) ([`EVaR_RG`](@ref))                                                                                        | JuMP + Hierarchical | EC             | Clarabel                    |
-| Tail loss     | [`RelativisticValueatRisk`](@ref) ([`RVaR`](@ref))                                                                                            | JuMP + Hierarchical | PC             | Clarabel                    |
+| Tail loss     | [`RelativisticValueatRisk`](@ref) ([`RLVaR`](@ref))                                                                                           | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`RelativisticDrawdownatRisk`](@ref) ([`RLDaR`](@ref))                                                                                        | JuMP + Hierarchical | PC             | Clarabel                    |
-| Tail drawdown | [`RelativeRelativisticDrawdownatRisk`](@ref) ([`R_RDaR`](@ref))                                                                               | Hierarchical        | PC             | Clarabel                    |
-| Dispersion    | [`RelativisticValueatRiskRange`](@ref) ([`RVaR_RG`](@ref))                                                                                    | JuMP + Hierarchical | PC             | Clarabel                    |
+| Tail drawdown | [`RelativeRelativisticDrawdownatRisk`](@ref) ([`R_RLDaR`](@ref))                                                                              | Hierarchical        | PC             | Clarabel                    |
+| Dispersion    | [`RelativisticValueatRiskRange`](@ref) ([`RLVaR_RG`](@ref))                                                                                   | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail loss     | [`PowerNormValueatRisk`](@ref) ([`PNVaR`](@ref))                                                                                              | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`PowerNormDrawdownatRisk`](@ref) ([`PNDaR`](@ref))                                                                                           | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`RelativePowerNormDrawdownatRisk`](@ref) ([`R_PNDaR`](@ref))                                                                                 | Hierarchical        | PC             | Clarabel                    |
@@ -138,9 +138,33 @@ Scalariser
 NonHierarchicalScalariser
 HierarchicalScalariser
 nothing_scalar_array_selector
+DeferredQuantity
+MuSlot
+SigmaSlot
+KtSlot
+SkSlot
+deferred_factors
+fit_deferred_quantity
+coskewness_processor
+deferred_centre
+centring_target
+fit_deferred_moment
+deferred_quantity
+fan_out_slot
+deferred_derived_quantity
+resolve_slot
+deferred_slots
+resolve_deferred_quantities(x, pr::AbstractPriorResult)
+resolve_deferred_child
+rebuild_with_slots
+assert_declared_slot_resolver
+assert_resolved_slots
+sigma_chol_selector
+assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
 solver_selector
 VecBaseRM
+BaseRM_VecBaseRM
 VecOptRM
 OptRM_VecOptRM
 VecRM
@@ -154,7 +178,9 @@ NetReturnsInput
 WeightsReturnsFeesInput
 WeightsInput
 risk_input_kind
+range_tails
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(rs::VecBaseRM)
 supports_precomputed_returns(::NetReturnsInput, ::Any)
 supports_precomputed_returns(::WeightsInput, ::Any)
 supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
@@ -162,7 +188,6 @@ weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
-factory(rs::VecBaseRM, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 _Frontier
 ```

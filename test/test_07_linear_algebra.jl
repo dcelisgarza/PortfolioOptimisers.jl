@@ -1,3 +1,24 @@
+using PortfolioOptimisers, Test
+
+# Card 7 of the 2026-08-17 maintainability review: the out-of-place verbs are documented
+# as an optional part of the extension interface, so an estimator that declares only the
+# in-place form must inherit a copying fallback. These estimators declare nothing else.
+struct Card7Posdef <: PortfolioOptimisers.AbstractPosdefEstimator end
+function PortfolioOptimisers.posdef!(::Card7Posdef, X::AbstractMatrix)
+    X .= (X .+ transpose(X)) ./ 2
+    return X
+end
+struct Card7Denoise <: PortfolioOptimisers.AbstractDenoiseEstimator end
+function PortfolioOptimisers.denoise!(::Card7Denoise, X::AbstractMatrix, q::Number)
+    X .*= 2
+    return X
+end
+struct Card7Detone <: PortfolioOptimisers.AbstractDetoneEstimator end
+function PortfolioOptimisers.detone!(::Card7Detone, X::AbstractMatrix)
+    X .-= 1
+    return X
+end
+
 @testset "Linear Algebra" begin
     using PortfolioOptimisers, Test, CSV, LinearAlgebra, DataFrames, TimeSeries, StableRNGs,
           Random
@@ -94,5 +115,30 @@
         sigma5 = matrix_processing(nothing, sigma1, pr.X)
         sigma4 == matrix_processing!(MatrixProcessing(), sigma2, pr.X)
         sigma5 == matrix_processing!(nothing, sigma3, pr.X)
+    end
+    @testset "Inherited out-of-place fallback" begin
+        X = [1.0 2.0; 0.0 1.0]
+        Xc = copy(X)
+        # Each verb inherits the copying wrapper from its abstract supertype.
+        @test posdef(Card7Posdef(), X) == [1.0 1.0; 1.0 1.0]
+        @test X == Xc
+        @test denoise(Card7Denoise(), X, 2.0) == [2.0 4.0; 0.0 2.0]
+        @test X == Xc
+        @test detone(Card7Detone(), X) == [0.0 1.0; -1.0 0.0]
+        @test X == Xc
+        # The field bounds accept a user estimator, so the contract is usable end to end.
+        mp = MatrixProcessing(; pdm = Card7Posdef(), dn = Card7Denoise(),
+                              dt = Card7Detone())
+        @test mp.pdm isa Card7Posdef
+        @test mp.dn isa Card7Denoise
+        @test mp.dt isa Card7Detone
+        @test Denoise(; pdm = Card7Posdef()).pdm isa Card7Posdef
+        @test Detone(; pdm = Card7Posdef()).pdm isa Card7Posdef
+        sigma = [1.0 0.5; 0.25 1.0]
+        sigmac = copy(sigma)
+        Xr = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        # Order (:pdm, :dn, :dt, :alg): symmetrise, then double, then subtract one.
+        @test matrix_processing(mp, sigma, Xr) == [1.0 -0.25; -0.25 1.0]
+        @test sigma == sigmac
     end
 end

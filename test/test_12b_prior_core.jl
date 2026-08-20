@@ -137,14 +137,32 @@ end
     @test occursin("cokurtosis", kt_err.msg)
     @test occursin("`kt`", kt_err.msg)
 
-    rr_err = try
-        HighOrderPrior(; pr = lopr, f_kt = ones(1, 1))
+    # The factor low order prior is reachable as `fpr.pr` and as `pr.fpr`, and the two must
+    # be the same object. Nesting the co-moments over a prior with no factor block at all.
+    no_block_err = try
+        HighOrderPrior(; pr = lopr, fpr = HighOrderPrior(; pr = lopr))
     catch e
         e
     end
-    @test rr_err isa PortfolioOptimisers.IsNothingError
-    @test occursin("regression result", rr_err.msg)
-    @test occursin("`rr`", rr_err.msg)
+    @test no_block_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("pr.fpr === nothing", no_block_err.msg)
+    @test occursin("FactorPrior", no_block_err.msg)
+
+    # Nesting a block whose inner prior is a *different* distribution from `pr.fpr`.
+    mismatch_err = try
+        HighOrderPrior(; pr = pr1, fpr = HighOrderPrior(; pr = lopr))
+    catch e
+        e
+    end
+    @test mismatch_err isa PortfolioOptimisers.ConflictingArgumentError
+    @test occursin("`fpr.pr`", mismatch_err.msg)
+    @test occursin("`pr.fpr`", mismatch_err.msg)
+
+    # The consistent nesting is accepted, and a low order factor block with no factor
+    # co-moments over it stays ordinary.
+    @test HighOrderPrior(; pr = pr1, fpr = HighOrderPrior(; pr = pr1.fpr)).fpr.pr ===
+          pr1.fpr
+    @test isnothing(HighOrderPrior(; pr = pr1).fpr)
 end
 
 @testset "High Order Factor Prior" begin
@@ -170,6 +188,32 @@ end
     @test isapprox(df[(N4 + N3 + N2 + Nf4 + 1):(N4 + N3 + N2 + Nf4 + Nf3), 1], vec(pr.f_sk))
     @test isapprox(df[(N4 + N3 + N2 + Nf4 + Nf3 + 1):(N4 + N3 + N2 + Nf4 + Nf3 + Nf2), 1],
                    vec(pr.f_V))
+
+    # The flat `f_*` names are virtual reads of the nested block, and the nested block's own
+    # prior is the low order carrier's factor block — the enforced invariant, on a real fit.
+    @test pr.fpr isa HighOrderPrior
+    @test pr.fpr.pr === pr.pr.fpr
+    @test pr.f_kt === pr.fpr.kt
+    @test pr.f_sk === pr.fpr.sk
+    @test pr.f_V === pr.fpr.V
+    @test pr.f_D2 === pr.fpr.D2
+    @test pr.f_L2 === pr.fpr.L2
+    @test pr.f_S2 === pr.fpr.S2
+    @test pr.f_skmp === pr.fpr.skmp
+    # `fpr` names the high order block, but reading through it still reaches the factor
+    # low order moments, because the nested carrier forwards to its own `pr`.
+    @test pr.fpr.mu === pr.f_mu
+    @test pr.fpr.sigma === pr.f_sigma
+    # An asset view forwards the factor block whole, so the invariant survives it.
+    v = PortfolioOptimisers.port_opt_view(pr, [1, 3, 5])
+    @test v.fpr === pr.fpr
+    @test v.fpr.pr === v.pr.fpr
+    # No factor block: every flat read is `nothing`, exactly as the fields were.
+    hopr = prior(HighOrderPriorEstimator(), rd)
+    @test isnothing(hopr.fpr)
+    @test all(isnothing,
+              (hopr.f_kt, hopr.f_sk, hopr.f_V, hopr.f_D2, hopr.f_L2, hopr.f_S2,
+               hopr.f_skmp))
 end
 
 @testset "Vanilla and Bayesian Black Litterman" begin
@@ -181,7 +225,7 @@ end
                                                                         "WMT == group2",
                                                                         "RRC-group1 == 0.0005"])),
            BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
-                                       sets = fsets, tau = 1 / size(rd.X, 1),
+                                       sets = xfsets, tau = 1 / size(rd.X, 1),
                                        views = LinearConstraintEstimator(;
                                                                          val = ["MTUM == 0.0001",
                                                                                 "QUAL - USMV == -0.0003"])),
@@ -221,9 +265,89 @@ end
     @test isapprox(df[!, 1], [pr.mu; vec(pr.sigma)], rtol = 1e-6)
 end
 
+@testset "Bayesian Black Litterman reads the declared factor axis" begin
+    # The golden test above is the bit-identity proof: entry 2 of `pes` runs on `xfsets`,
+    # whose factors live under `fkey`, and still matches `BlackLitterman.csv.gz` to the same
+    # tolerance it matched under the pre-migration shape. Only the *lookup* changed.
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # The pre-migration shape — factor names under `xkey`, no factor axis at all. The naive
+    # migration failure would be an *asset*-axis complaint about a user who never wrote an
+    # asset name, so the message has to name the factor universe.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by BayesianBlackLittermanPrior", msg)
+    @test occursin("it is not optional here", msg)
+    @test !occursin("asset", msg)
+    @test_throws KeyError prior(BayesianBlackLittermanPrior(; sets = fsets,
+                                                            views = f_views), rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(BayesianBlackLittermanPrior(; sets = shortf,
+                                                                     views = f_views), rd)
+    # …and says which two things disagree, rather than reporting an asset-axis length.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = shortf, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("declared factor axis disagree", msg)
+    # An *asset* name is now the thing that cannot resolve, and the message says so.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = xfsets,
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["$(rd.nx[1]) == 0.0001"])),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in factor universe", msg)
+    @test occursin("$(length(rd.nf)) factors under key `nf`", msg)
+    # The wrapped estimator's own `key` wins over the axis the estimator routes at, the same
+    # precedence `rebase_linear_constraints` uses — the plumbing #230 added applies here
+    # unchanged.
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = xfsets,
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["MTUM == 0.0001",
+                                                                                   "QUAL == 0.0001"],
+                                                                            key = "nx")),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in asset universe", msg)
+    @test occursin("$(length(rd.nx)) assets under key `nx`", msg)
+    # A sets carrying both axes, under a view. The factor axis has no meaning for an asset
+    # index, so it must come back untouched; the asset axis must slice. `sets` is `@vprop`
+    # because the object can now carry both — the exemption is a property of the data.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = BayesianBlackLittermanPrior(; sets = both, views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # And the views still resolve after the slice: the axis they are written against did
+    # not move.
+    rdi = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
+    @test isapprox(prior(pev, rdi).mu, prior(pe, rdi).mu)
+    # The consistency identity of ADR 0046 is a property of the update, not of the lookup:
+    # it must survive the migration exactly.
+    pr = prior(BayesianBlackLittermanPrior(; sets = xfsets, views = f_views), rd)
+    @test isapprox(pr.mu, pr.rr.M * pr.fpr.mu + pr.rr.b)
+end
+
 @testset "Factor Black Litterman" begin
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman1.csv.gz"), DataFrame)
-    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = false, sets = fsets,
+    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = false, sets = xfsets,
                                    tau = 1 / size(rd.X, 1),
                                    views = LinearConstraintEstimator(;
                                                                      val = ["MTUM == 0.0001",
@@ -251,7 +375,7 @@ end
     @test success
 
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman2.csv.gz"), DataFrame)
-    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), sets = fsets, l = 2,
+    pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), sets = xfsets, l = 2,
                                    tau = 1 / size(rd.X, 1),
                                    views = LinearConstraintEstimator(;
                                                                      val = ["MTUM == 0.0001",
@@ -279,10 +403,83 @@ end
     @test success
 end
 
+@testset "Factor Black Litterman reads the declared factor axis" begin
+    # The golden tests above are the bit-identity proof: they run on `xfsets`, whose factors
+    # live under `fkey`, and still match `FactorBlackLitterman[12].csv.gz` to the same
+    # tolerance they matched under the pre-migration shape. Only the *lookup* changed.
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # The pre-migration shape — factor names under `xkey`, no factor axis at all — is the
+    # error worth getting right, because the naive migration failure is an *asset*-axis
+    # complaint about a user who never wrote an asset name.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by FactorBlackLittermanPrior", msg)
+    @test occursin("it is not optional here", msg)
+    @test !occursin("asset", msg)
+    @test_throws KeyError prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views),
+                                rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; sets = shortf,
+                                                                   views = f_views), rd)
+    # An *asset* name is now the thing that cannot resolve, and the message says so.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = xfsets,
+                                        views = LinearConstraintEstimator(;
+                                                                          val = ["$(rd.nx[1]) == 0.0001"])),
+              rd; strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in factor universe", msg)
+    @test occursin("$(length(rd.nf)) factors under key `nf`", msg)
+    # The wrapped estimator's own `key` wins over the axis the estimator routes at — the
+    # precedence `rebase_linear_constraints` already uses. Before this migration the field
+    # was dropped on the Black-Litterman path entirely, so pointing it at the asset axis
+    # was a silent no-op; now it is honoured, and factor names cannot resolve there.
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = xfsets,
+                                        views = LinearConstraintEstimator(;
+                                                                          val = ["MTUM == 0.0001",
+                                                                                 "QUAL == 0.0001"],
+                                                                          key = "nx")), rd;
+              strict = true)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("not in asset universe", msg)
+    @test occursin("$(length(rd.nx)) assets under key `nx`", msg)
+    # A sets carrying both axes, under a view. The factor axis has no meaning for an asset
+    # index, so it must come back untouched; the asset axis must slice. `sets` is `@vprop`
+    # because the object can now carry both — the exemption is a property of the data.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = FactorBlackLittermanPrior(; sets = both, views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # And the views still resolve after the slice: the axis they are written against did
+    # not move.
+    @test isapprox(prior(pev,
+                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
+                                       F = rd.F)).mu,
+                   prior(pe,
+                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
+                                       F = rd.F)).mu)
+end
+
 @testset "Augmented Black Litterman" begin
     df = CSV.read(joinpath(@__DIR__, "./assets/AugmentedBlackLitterman.csv.gz"), DataFrame)
-    pes = [AugmentedBlackLittermanPrior(; a_sets = sets, f_sets = fsets,
-                                        tau = 1 / size(rd.X, 1),
+    pes = [AugmentedBlackLittermanPrior(; sets = afsets, tau = 1 / size(rd.X, 1),
                                         a_views = LinearConstraintEstimator(;
                                                                             val = Union{String,
                                                                                         Expr}[:(AAPL ==
@@ -297,8 +494,7 @@ end
                                                                                    :(QUAL -
                                                                                      USMV ==
                                                                                      -0.0003)])),
-           AugmentedBlackLittermanPrior(; a_sets = sets, f_sets = fsets,
-                                        tau = 1 / size(rd.X, 1), l = 2,
+           AugmentedBlackLittermanPrior(; sets = afsets, tau = 1 / size(rd.X, 1), l = 2,
                                         a_views = LinearConstraintEstimator(;
                                                                             val = ["AAPL == 0.00002",
                                                                                    "BAC == CVX",
@@ -323,6 +519,97 @@ end
         end
         @test success
     end
+end
+
+@testset "Augmented Black Litterman reads both declared axes" begin
+    # The golden tests above are the bit-identity proof: they run on `afsets` — one dual-axis
+    # sets — and still match `AugmentedBlackLitterman.csv.gz` to the tolerance they matched
+    # when the asset views took `sets` and the factor views a separate factors-under-`xkey`
+    # `fsets`. Only the *lookup* changed.
+    a_views = LinearConstraintEstimator(; val = ["$(rd.nx[1]) == 0.0002"])
+    f_views = LinearConstraintEstimator(; val = ["MTUM == 0.0001"])
+    # Precomputed halves. A `BlackLittermanViews` result carries its own `P` and resolves no
+    # names, so it is how each half is muted while the other keeps writing in names.
+    a_blv = BlackLittermanViews(; P = reshape(Float64.(rd.nx .== rd.nx[1]), 1, :),
+                                Q = [0.0002])
+    f_blv = BlackLittermanViews(; P = reshape(Float64.(rd.nf .== "MTUM"), 1, :),
+                                Q = [0.0001])
+    # Each axis is required only by the half that resolves names against it, so a mandate
+    # written on one axis alone is expressible with the same single sets.
+    @test isapprox(prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_views,
+                                                      f_views = f_blv), rd).mu,
+                   prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_views,
+                                                      f_views = f_views), rd).mu;
+                   rtol = 1e-6)
+    @test !isnothing(prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_blv,
+                                                        f_views = f_views), rd).mu)
+    # Both halves precomputed: no universe is read at all, so no sets is needed. Under the two
+    # unconditional length checks this shape threw on `nothing.dict` before reaching the model.
+    @test isapprox(prior(AugmentedBlackLittermanPrior(; a_views = a_blv, f_views = f_blv),
+                         rd).mu,
+                   prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_blv,
+                                                      f_views = f_blv), rd).mu)
+    # The pre-migration factor shape — factor names under `xkey`, no factor axis declared — is
+    # the error worth getting right. Muting the asset half keeps the asset check out of the
+    # way, so what is reported is the *factor* universe the user never declared.
+    msg = try
+        prior(AugmentedBlackLittermanPrior(; sets = fsets, a_views = a_blv,
+                                           f_views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("nf (the factor universe)", msg)
+    @test occursin("required by AugmentedBlackLittermanPrior", msg)
+    @test occursin("`f_views` are written in factor names", msg)
+    @test_throws KeyError prior(AugmentedBlackLittermanPrior(; sets = fsets,
+                                                             a_views = a_blv,
+                                                             f_views = f_views), rd)
+    # Declared, but not the axis `F` describes.
+    shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
+    @test_throws DimensionMismatch prior(AugmentedBlackLittermanPrior(; sets = shortf,
+                                                                      a_views = a_views,
+                                                                      f_views = f_views),
+                                         rd)
+    # And the asset axis is still checked, by the half that reads it.
+    shortx = UniverseSets(; dict = Dict("nx" => rd.nx[1:2], "nf" => rd.nf))
+    @test_throws DimensionMismatch prior(AugmentedBlackLittermanPrior(; sets = shortx,
+                                                                      a_views = a_views,
+                                                                      f_views = f_views),
+                                         rd)
+    # The latent bug, closed. One sets carrying both axes, under a view: the factor axis has no
+    # meaning for an asset index and must come back untouched, the asset axis must slice. This
+    # is the test the old shape could not have — `f_sets` was a *separate* object kept safe
+    # only by the missing `@vprop`, so marking it would have sliced factor names by asset
+    # indices and the mismatch would have surfaced as a length error inside `bl_preroll`.
+    both = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(rd.nx)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    pe = AugmentedBlackLittermanPrior(; sets = both, a_views = a_views, f_views = f_views)
+    i = [1, 3, 5]
+    pev = PortfolioOptimisers.port_opt_view(pe, i)
+    @test pev.sets.dict["nx"] == rd.nx[i]
+    @test pev.sets.dict["nx_sector"] == repeat(["S"], length(i))
+    @test pev.sets.dict["nf"] == rd.nf
+    @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
+    # The slice is load-bearing on one axis and inert on the other, and this is where the two
+    # differ from the factor-only members: there the asset axis is unread, so a view changes
+    # nothing. Here `a_views` reads it, so the *unsliced* estimator must reject the sliced
+    # data, and the viewed one must be indistinguishable from the sets written by hand — the
+    # asset entries cut to `i`, the factor entries whole.
+    rdv = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
+    @test_throws DimensionMismatch prior(pe, rdv)
+    hand = UniverseSets(;
+                        dict = Dict("nx" => rd.nx[i], "nf" => rd.nf,
+                                    "nx_sector" => repeat(["S"], length(i)),
+                                    "nf_family" => string.("fam", eachindex(rd.nf))))
+    peh = AugmentedBlackLittermanPrior(; sets = hand, a_views = a_views, f_views = f_views)
+    @test prior(pev, rdv).mu == prior(peh, rdv).mu
+    # Had `sets` been sliced blindly the factor entries would have been cut to `i` too, and
+    # the factor views would have resolved against a truncated axis. They do not: the factor
+    # half of the posterior is the one the unsliced factor universe produces.
+    @test prior(pev, rdv).fpr.mu == prior(peh, rdv).fpr.mu
+    @test length(prior(pev, rdv).fpr.mu) == length(rd.nf)
 end
 
 @testset "LogEntropyPooling" begin
@@ -412,34 +699,46 @@ end
                                              mu_views = mu_views), rd).w, rtol = 5e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.03264496113282452")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == ValueatRisk(;)(rd.X[:, 1])
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             var_views = var_views), rd).w, rtol = 1e-6)
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL >= 1.15*prior(AAPL)")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= 1.15 * ValueatRisk(;)(rd.X[:, 1])
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             var_views = var_views), rd).w, rtol = 1e-6)
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-6)
 
     var_views = LinearConstraintEstimator(; val = "AAPL == 0.12865204867438676")
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_views = var_views, opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; views = var_views)), rd)
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, var_views = var_views,
-                                             opt = jopt), rd).w, rtol = 5e-6)
+                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                             var_views = ValueatRiskView(;
+                                                                         views = var_views)),
+                         rd).w, rtol = 5e-6)
 
     var_views = LinearConstraintEstimator(; val = ["AAPL == 0.028", "XOM >= 0.027"])
-    pr = prior(EntropyPoolingPrior(; sets = sets, var_alpha = 0.07, var_views = var_views,
-                                   opt = opt), rd)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                   var_views = ValueatRiskView(; alpha = 0.07,
+                                                               views = var_views)), rd)
     @test isapprox(ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, 1]), 0.028, rtol = 7e-3)
     @test ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, end]) >= 0.027
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt, var_alpha = 0.07,
-                                             var_views = var_views), rd).w, rtol = 1e-4)
+                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                             var_views = ValueatRiskView(; alpha = 0.07,
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-4)
 
     sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0007")
     pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt), rd)
@@ -574,33 +873,47 @@ end
     @test isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35, rtol = 1e-3)
 
     cvar_views = LinearConstraintEstimator(; val = "AAPL == 0.07")
-    pr = prior(EntropyPoolingPrior(; sets = sets, cvar_views = cvar_views, opt = opt), rd)
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = opt,
+                                         cvar_views = ConditionalValueatRiskView(;
+                                                                                 views = cvar_views)),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-6)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             cvar_views = cvar_views), rd).w, rtol = 5e-5)
+                   prior(MeucciEntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                   cvar_views = ConditionalValueatRiskView(;
+                                                                                           views = cvar_views)),
+                         rd).w, rtol = 5e-5)
 
     cvar_views = LinearConstraintEstimator(; val = "AAPL == prior(AAPL)*1.37")
-    pr = prior(EntropyPoolingPrior(; sets = sets, cvar_views = cvar_views, opt = opt), rd)
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = opt,
+                                         cvar_views = ConditionalValueatRiskView(;
+                                                                                 views = cvar_views)),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]),
                    ConditionalValueatRisk(;)(rd.X[:, 1]) * 1.37, rtol = 1e-6)
     @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             cvar_views = cvar_views), rd).w, rtol = 1e-5)
+                   prior(MeucciEntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                   cvar_views = ConditionalValueatRiskView(;
+                                                                                           views = cvar_views)),
+                         rd).w, rtol = 1e-5)
 
     cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.053", "XOM==0.045"])
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = EntropyPoolingPrior(; sets = sets,
-                                                                alg = H2_EntropyPooling(),
-                                                                cvar_views = cvar_views,
-                                                                opt = opt)), rd)
+                                       pe = MeucciEntropyPoolingPrior(; sets = sets,
+                                                                      alg = H2_EntropyPooling(),
+                                                                      opt = opt,
+                                                                      cvar_views = ConditionalValueatRiskView(;
+                                                                                                              views = cvar_views))),
+               rd)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.053, rtol = 5e-5)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.045, rtol = 1e-4)
     @test isapprox(pr.w,
                    prior(HighOrderPriorEstimator(;
-                                                 pe = EntropyPoolingPrior(; sets = sets,
-                                                                          alg = H1_EntropyPooling(),
-                                                                          cvar_views = cvar_views)),
+                                                 pe = MeucciEntropyPoolingPrior(;
+                                                                                sets = sets,
+                                                                                alg = H1_EntropyPooling(),
+                                                                                cvar_views = ConditionalValueatRiskView(;
+                                                                                                                        views = cvar_views))),
                          rd).w, rtol = 5e-3)
 
     mu_views = LinearConstraintEstimator(;
@@ -705,42 +1018,137 @@ end
 @testset "Factor block guard on wrapped priors" begin
     # `pe` is typed `AbstractLowOrderPriorEstimator_F_AF`, whose `_AF` half uses factor
     # returns only *optionally* — so the type constrains which returns an estimator
-    # consumes, not whether the result it produces carries a regression. Both estimators
-    # below project factor moments through the loadings and used to die on `rr === nothing`
-    # with a bare `FieldError`/`MethodError` from deep inside the projection.
-    no_rr = EntropyPoolingPrior(; pe = EmpiricalPrior())          # never computes one
-    drops_rr = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,     # computes then discards
-                                   tau = 1 / size(rd.X, 1),
-                                   views = LinearConstraintEstimator(;
-                                                                     val = ["AAPL == 0.001"]))
+    # consumes, not whether the result it produces carries a regression. An estimator that
+    # never computes one projects factor moments through loadings that do not exist, and
+    # used to die on `rr === nothing` with a bare `FieldError`/`MethodError` from deep
+    # inside the projection.
+    no_rr = EntropyPoolingPrior(; pe = EmpiricalPrior())
     @test isnothing(prior(no_rr, rd).rr)
-    @test isnothing(prior(drops_rr, rd).rr)
 
-    for pe in (no_rr, drops_rr)
-        hofpe_err = try
-            prior(HighOrderFactorPriorEstimator(; pe = pe), rd)
-        catch e
-            e
-        end
-        @test hofpe_err isa PortfolioOptimisers.IsNothingError
-        @test occursin("regression", hofpe_err.msg)
-        @test occursin("`pe`", hofpe_err.msg)
-
-        bbl_err = try
-            prior(BayesianBlackLittermanPrior(; pe = pe, sets = fsets,
-                                              tau = 1 / size(rd.X, 1),
-                                              views = LinearConstraintEstimator(;
-                                                                                val = ["MTUM == 0.0001"])),
-                  rd)
-        catch e
-            e
-        end
-        @test bbl_err isa PortfolioOptimisers.IsNothingError
-        @test occursin("regression", bbl_err.msg)
+    hofpe_err = try
+        prior(HighOrderFactorPriorEstimator(; pe = no_rr), rd)
+    catch e
+        e
     end
+    @test hofpe_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("regression", hofpe_err.msg)
+    @test occursin("`pe`", hofpe_err.msg)
+
+    bbl_err = try
+        prior(BayesianBlackLittermanPrior(; pe = no_rr, sets = xfsets,
+                                          tau = 1 / size(rd.X, 1),
+                                          views = LinearConstraintEstimator(;
+                                                                            val = ["MTUM == 0.0001"])),
+              rd)
+    catch e
+        e
+    end
+    @test bbl_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("regression", bbl_err.msg)
+
+    # The *other* way to arrive here — a wrapper that computed loadings and discarded them
+    # — no longer exists: every wrapping estimator forwards `rr` and the factor block
+    # `fpr` (ADR 0046), so nesting order does not matter. `BlackLittermanPrior` over a
+    # `FactorPrior` used to be the canonical case and now goes straight through.
+    forwards_rr = BlackLittermanPrior(; pe = FactorPrior(), sets = sets,
+                                      tau = 1 / size(rd.X, 1),
+                                      views = LinearConstraintEstimator(;
+                                                                        val = ["AAPL == 0.001"]))
+    @test !isnothing(prior(forwards_rr, rd).rr)
+    @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = forwards_rr), rd).rr)
+    @test !isnothing(prior(BayesianBlackLittermanPrior(; pe = forwards_rr, sets = xfsets,
+                                                       tau = 1 / size(rd.X, 1),
+                                                       views = LinearConstraintEstimator(;
+                                                                                         val = ["MTUM == 0.0001"])),
+                           rd).rr)
 
     # A prior that does carry loadings still goes through untouched.
     @test !isnothing(prior(HighOrderFactorPriorEstimator(; pe = FactorPrior()), rd).rr)
+end
+
+@testset "The factor block is a nested prior result" begin
+    pr = prior(FactorPrior(), rd)
+
+    # `fpr` is the factor-axis prior itself, not a copy of three of its fields: its `X` is
+    # the factor returns matrix, over the same observations as the asset block.
+    @test pr.fpr isa LowOrderPrior
+    @test size(pr.fpr.X) == size(rd.F)
+    @test size(pr.fpr.X, 1) == size(pr.X, 1)
+    @test length(pr.fpr.mu) == size(pr.rr.M, 2)
+
+    # The flat `f_*` names are virtual reads of it, so code written against the pre-nesting
+    # shape is unaffected — and the three that did not exist before come with them.
+    @test pr.f_mu === pr.fpr.mu
+    @test pr.f_sigma === pr.fpr.sigma
+    @test pr.f_w === pr.fpr.w
+    @test pr.f_ens === pr.fpr.ens
+    @test pr.f_kld === pr.fpr.kld
+    @test pr.f_ow === pr.fpr.ow
+    for sym in (:f_mu, :f_sigma, :f_w, :f_ens, :f_kld, :f_ow)
+        @test sym in propertynames(pr)
+        @test !hasfield(LowOrderPrior, sym)
+    end
+
+    # With no factor block they read `nothing` rather than throwing — the behaviour the flat
+    # fields had, and the reason these are `compute` with a lambda and not `alias`.
+    bare = prior(EmpiricalPrior(), rd)
+    @test isnothing(bare.fpr)
+    @test all(isnothing,
+              (bare.f_mu, bare.f_sigma, bare.f_w, bare.f_ens, bare.f_kld, bare.f_ow))
+
+    # `rr` and `fpr` are one block: neither half is constructible alone.
+    @test_throws ArgumentError LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                             rr = pr.rr)
+    @test_throws ArgumentError LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                             fpr = pr.fpr)
+    # The flag names in that message used to be inverted — a present `rr` reported
+    # `isnothing(rr) = true`.
+    block_err = try
+        LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, rr = pr.rr)
+    catch e
+        e
+    end
+    @test occursin("isnothing(rr) = false", block_err.msg)
+    @test occursin("isnothing(fpr) = true", block_err.msg)
+
+    # A view slices assets, so the factor block is forwarded whole: factors are not assets.
+    i = [1, 3, 5]
+    prv = PortfolioOptimisers.port_opt_view(pr, i)
+    @test prv.fpr === pr.fpr
+    @test size(prv.rr.M, 1) == length(i)
+
+    # Every wrapping estimator that reports a factor block reports it nested, and the flat
+    # reads keep returning the same values they did as fields.
+    for pe in (FactorPrior(),
+               FactorBlackLittermanPrior(; sets = xfsets, tau = 1 / size(rd.X, 1),
+                                         views = LinearConstraintEstimator(;
+                                                                           val = ["MTUM == 0.0001"])),
+               BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = xfsets,
+                                           tau = 1 / size(rd.X, 1),
+                                           views = LinearConstraintEstimator(;
+                                                                             val = ["MTUM == 0.0001"])),
+               EntropyPoolingPrior(; pe = FactorPrior()),
+               FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures()))
+        prf = prior(pe, rd)
+        @test prf.fpr isa LowOrderPrior
+        @test prf.f_mu === prf.fpr.mu
+        @test prf.f_sigma === prf.fpr.sigma
+        @test size(prf.fpr.X, 1) == size(prf.X, 1)
+    end
+
+    # The one place `f_w`'s *value* changed: the pooling producers used to stamp their own
+    # pooled weights onto the factor slot (`f_w = !isnothing(rr) ? w : nothing`), which was a
+    # duplicate of `w` rather than anything the factor prior computed. The nested block now
+    # reports what its own producer recorded — and `EmpiricalPrior` records no `w`, so behind
+    # a plain `FactorPrior` that is `nothing`. Closing *that* gap belongs to the producer.
+    pooled = prior(EntropyPoolingPrior(; pe = FactorPrior(), sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = ["AAPL == 0.001"])),
+                   rd)
+    @test !isnothing(pooled.rr)
+    @test pooled.w isa StatsBase.AbstractWeights
+    @test isnothing(pooled.f_w)
+    @test isnothing(pooled.fpr.w)
 end
 
 @testset "Returns source selector (x_src)" begin
@@ -785,4 +1193,359 @@ end
     @test HierarchicalOptimiser().x_src == :prior
     @test JuMPOptimiser(; slv = slv).x_src == :prior
     @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
+end
+
+@testset "The prior carrier's `w` is documented as observation weights" begin
+    # `field_dict[:w_prior]` is what `LowOrderPrior`'s `# Fields` entry for `w` interpolates,
+    # and it read "Portfolio weights vector used in prior computation" — the wrong noun and
+    # the wrong axis. `w::Option{<:ObsWeights}` is validated against `size(X, 1)` and is
+    # consumed as observation weights: `@pprop w` selects it into risk measures, which
+    # resolve it with `get_observation_weights` against a length-`T` return series.
+    entry = PortfolioOptimisers.field_dict[:w_prior]
+    @test occursin("Observation weights", entry)
+    @test !occursin("Portfolio weights", entry)
+
+    pr = prior(EntropyPoolingPrior(; sets = sets,
+                                   mu_views = LinearConstraintEstimator(;
+                                                                        val = "AAPL == 0.002")),
+               rd)
+    @test length(pr.w) == size(pr.X, 1)
+    @test length(pr.w) != size(pr.X, 2)
+    @test pr.w isa PortfolioOptimisers.ObsWeights
+    # The axis the old wording named is the one the constructor refuses.
+    @test_throws DimensionMismatch LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma,
+                                                 w = StatsBase.pweights(fill(1 /
+                                                                             size(pr.X, 2),
+                                                                             size(pr.X, 2))))
+
+    # The neighbouring entry that would have been reached for instead is gone: `:rr` read
+    # "Returns result" while sitting in the prior-result block, where the field named `rr`
+    # is the *regression*. It had no consumer, so nothing stated it — but the next docstring
+    # to interpolate it would have. `:reg_rr` is the entry every prior docstring uses.
+    @test !haskey(PortfolioOptimisers.arg_dict, :rr)
+    @test occursin("Regression result", PortfolioOptimisers.field_dict[:reg_rr])
+
+    # `kld` is `Option{<:Num_VecNum}`: scalar from entropy pooling, one entry per opinion
+    # from opinion pooling. The entry described only the scalar.
+    @test occursin("one entry per opinion", PortfolioOptimisers.field_dict[:kld])
+    @test pr.kld isa Number
+    pooled = prior(OpinionPoolingPrior(;
+                                       pes = [EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*1.5")),
+                                              EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*2"))],
+                                       w = [0.5, 0.5]), rd)
+    @test pooled.kld isa AbstractVector
+    @test length(pooled.kld) == 2
+    @test all(isfinite, pooled.kld)
+end
+
+@testset "Precomputed Black-Litterman views need no sets" begin
+    # `assert_bl` deliberately permits `sets === nothing` when the views are a
+    # `BlackLittermanViews` *result*: it carries its own `P` and `Q` and resolves no names.
+    # Every member then read its universe unconditionally and died before reaching the model
+    # — #232 closed this for `AugmentedBlackLittermanPrior`, the other three inherited it.
+    fblv = BlackLittermanViews(; P = reshape(Float64.(rd.nf .== "MTUM"), 1, :),
+                               Q = [0.0001])
+    ablv = BlackLittermanViews(; P = reshape(Float64.(rd.nx .== rd.nx[1]), 1, :),
+                               Q = [0.0002])
+
+    @test isa(prior(FactorBlackLittermanPrior(; views = fblv), rd), LowOrderPrior)
+    @test isa(prior(BayesianBlackLittermanPrior(; pe = FactorPrior(), views = fblv), rd),
+              LowOrderPrior)
+    @test isa(prior(BlackLittermanPrior(; views = ablv), rd), LowOrderPrior)
+    @test isa(prior(AugmentedBlackLittermanPrior(; a_views = ablv, f_views = fblv), rd),
+              LowOrderPrior)
+
+    # The gate is on the views, not on the sets: supplying a sets alongside precomputed views
+    # is still legal and still changes nothing, so the two agree bit for bit.
+    @test prior(FactorBlackLittermanPrior(; views = fblv, sets = xfsets), rd).mu ==
+          prior(FactorBlackLittermanPrior(; views = fblv), rd).mu
+    @test prior(BlackLittermanPrior(; views = ablv, sets = sets), rd).mu ==
+          prior(BlackLittermanPrior(; views = ablv), rd).mu
+
+    # Named views still demand — and still check — the axis they resolve against.
+    f_views = LinearConstraintEstimator(; val = "MTUM == 0.0001")
+    @test_throws IsNothingError FactorBlackLittermanPrior(; views = f_views)
+    @test_throws KeyError prior(FactorBlackLittermanPrior(; views = f_views, sets = sets),
+                                rd)
+
+    # Not crashing is not the same as being right. A precomputed `P` resolves no names, so
+    # `bl_preroll` — where `P` first meets the distribution it updates — is the only place its
+    # width is ever seen; before, a wrong one reached the linear algebra as a bare
+    # `DimensionMismatch` about two matrices the caller never wrote down.
+    wide = BlackLittermanViews(; P = ones(1, size(rd.F, 2) + 1), Q = [0.0001])
+    @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; views = wide), rd)
+    @test_throws DimensionMismatch prior(BlackLittermanPrior(; views = wide), rd)
+end
+
+@testset "The carrier records the original returns matrix" begin
+    #=
+    Three estimators overwrite `X` with the reconstruction `F * transpose(M) .+
+    transpose(b)`, so on their carriers `X` is a posterior matrix rather than the returns
+    the caller supplied. `o_X` holds the returns the caller supplied, and `original_X` is
+    the read that is always a matrix. See ADR 0046's 2026-08-11 amendment.
+    =#
+    X, F = rd.X, rd.F
+    a_view = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.002")
+    f_view = LinearConstraintEstimator(; val = "$(rd.nf[1]) == 0.001")
+
+    # The three producers set it, and every other route leaves it `nothing`.
+    fp = prior(FactorPrior(), X, F)
+    fbl = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_view), X, F)
+    abl = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_view,
+                                             f_views = f_view), X, F)
+    for pr in (fp, fbl, abl)
+        @test pr.o_X === X
+        @test pr.original_X === X
+        @test pr.X !== X
+        @test size(pr.o_X) == size(pr.X)
+    end
+    bl = prior(BlackLittermanPrior(; sets = sets, views = a_view), X, F)
+    for pr in (prior(EmpiricalPrior(), X), bl)
+        @test isnothing(pr.o_X)
+        @test pr.original_X === pr.X
+    end
+
+    # The nested factor block is fit on factors, so it has no original of its own.
+    @test isnothing(fp.fpr.o_X)
+
+    # `HighOrderPrior` declares neither name and reads both through its `forward(pr)`
+    # block, so one declaration covers both carriers.
+    @test !hasfield(HighOrderPrior, :o_X)
+    hop = HighOrderPrior(; pr = fp)
+    @test hop.o_X === X
+    @test hop.original_X === X
+
+    #=
+    The two pooling estimators rebuild their carrier by explicit destructure rather than
+    through `forward_prior`, so they are the sites that would drop the field silently.
+    =#
+    epe = EntropyPoolingPrior(; pe = FactorPrior(), sets = xfsets, mu_views = a_view)
+    epp = prior(epe, X, F)
+    @test epp.o_X === X
+    @test epp.X !== X
+    opp = prior(OpinionPoolingPrior(; pes = [epe, epe], pe2 = FactorPrior()), X, F)
+    @test opp.o_X === X
+    @test opp.X !== X
+
+    # `forward_prior` needs no plumbing: it enumerates `fieldnames`, so the field travels
+    # unchanged, and it gains no binding to `X`.
+    @test PortfolioOptimisers.forward_prior(fp; mu = fp.mu .+ 0.001).o_X === X
+    @test haskey(PortfolioOptimisers.prior_field_values(fp), :o_X)
+
+    # A view slices it on the asset axis, exactly as it slices `X`.
+    i = [1, 3, 5, 7]
+    v = PortfolioOptimisers.port_opt_view(fp, i)
+    @test v.o_X == X[:, i]
+    @test v.original_X == X[:, i]
+    @test size(v.o_X) == size(v.X)
+
+    #=
+    Three guards, all O(1): no matrix is ever compared by value.
+    =#
+    base = (mu = fp.mu, sigma = fp.sigma, rr = fp.rr, fpr = fp.fpr)
+    # `o_X === X` says nothing, and would be a second encoding of "no reconstruction".
+    @test_throws ArgumentError LowOrderPrior(; X = fp.X, o_X = fp.X, base...)
+    # The original describes the same observations and the same assets.
+    @test_throws DimensionMismatch LowOrderPrior(; X = fp.X, o_X = X[1:(end - 1), :],
+                                                 base...)
+    #=
+    `rr` is required whenever `o_X` is set. This is a present-tense constraint rather than
+    a law of the domain: a future prior that transforms `X` without a regression is the
+    case that relaxes it. ADR 0046's amendment carries the reasoning.
+    =#
+    @test_throws IsNothingError LowOrderPrior(; X = fp.X, o_X = X, mu = fp.mu,
+                                              sigma = fp.sigma)
+    # The legal shape passes all three.
+    @test isa(LowOrderPrior(; X = fp.X, o_X = X, base...), LowOrderPrior)
+end
+
+@testset "The risk-free rate is one round trip: off before the update, back on after" begin
+    # ADR 0063. A Black-Litterman update is written in *excess* returns, so `rf` names one
+    # round trip. `remove_rf` takes it off the prior mean, `apply_rf` puts it back on the
+    # posterior asset mean, and each site is reached at most once per member.
+    #
+    # Which members convert, and what each therefore obeys:
+    #
+    #   * `BlackLittermanPrior` and `BayesianBlackLittermanPrior` have no equilibrium
+    #     branch, so they take the wrapped mean on the scale it is given and only add.
+    #     `mu(r) == mu(0) .+ r`, exactly.
+    #   * `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` with `l` set take
+    #     the equilibrium mean, which is a risk premium and so an excess return already.
+    #     Nothing is taken off, so the same identity holds.
+    #   * The same two with `l === nothing` take the wrapped mean, a total return, and
+    #     `remove_rf` converts it. The rate then cancels against `apply_rf` on the prior
+    #     term but *not* inside the view blend, so the identity does not hold — see the two
+    #     testsets below, which pin what holds instead.
+    rf = 0.02
+    bl_v = LinearConstraintEstimator(;
+                                     val = ["$(rd.nx[1]) == 0.003", "$(rd.nx[2]) == 0.002"])
+    f_v = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
+
+    # The two members that never convert.
+    unconverted(r) = [BlackLittermanPrior(; sets = sets, views = bl_v, rf = r),
+                      BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = xfsets,
+                                                  views = f_v, rf = r)]
+    # The two that convert, on the branch where they do not: `l` selects the equilibrium
+    # mean instead of the wrapped one.
+    equilibrium(r) = [FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = r,
+                                                l = 2.0),
+                      AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v,
+                                                   f_views = f_v, rf = r, l = 2.0)]
+    for (pe0, pe1) in zip(vcat(unconverted(0.0), equilibrium(0.0)),
+                          vcat(unconverted(rf), equilibrium(rf)))
+        pr0 = prior(pe0, rd)
+        pr1 = prior(pe1, rd)
+        # The shift is exact, not approximate: the rate is added at one site, last.
+        @test pr1.mu == pr0.mu .+ rf
+        # The rate is a property of the asset axis, so the factor block never carries it.
+        # `BlackLittermanPrior` here wraps no factor prior and reports no block.
+        if !isnothing(pr0.fpr)
+            @test pr1.fpr.mu == pr0.fpr.mu
+        end
+    end
+
+    # Isolation. The inner estimator applies its own rate; the outer neither undoes it nor
+    # repeats it, and shifts only by its own.
+    inner = BlackLittermanPrior(; sets = sets, views = bl_v, rf = 0.01)
+    outer0 = prior(BlackLittermanPrior(; pe = inner, sets = sets, views = bl_v, rf = 0.0),
+                   rd)
+    outer1 = prior(BlackLittermanPrior(; pe = inner, sets = sets, views = bl_v, rf = rf),
+                   rd)
+    @test outer1.mu == outer0.mu .+ rf
+    # The falsification witness: the inner rate does reach the result, so the assertion
+    # above is about a value that is there to be undone.
+    bare = BlackLittermanPrior(; sets = sets, views = bl_v, rf = 0.0)
+    @test prior(BlackLittermanPrior(; pe = bare, sets = sets, views = bl_v), rd).mu !=
+          outer0.mu
+end
+
+@testset "A relative view makes the round trip exact on one axis" begin
+    # The sharp case for `remove_rf`, and it is `AugmentedBlackLittermanPrior` that shows
+    # it. Its augmented prior spans `[assets; factors]`, so the rate comes off the asset
+    # rows and `apply_rf` puts it back on the same rows. Write the views so every row of
+    # `P` sums to zero -- each one a *difference* between two names -- and the view residual
+    # `Q - P * prior_mu` is untouched by the shift, so the rate cancels completely.
+    #
+    # `mu(r) == mu(0)`, exactly. That equality is what "one round trip" means, and it is
+    # unreachable without the subtraction: with it removed the rate would still be added at
+    # the end, and the answer would move by `r`.
+    rf = 0.02
+    a_rel = LinearConstraintEstimator(; val = ["$(rd.nx[1]) - $(rd.nx[2]) == 0.001"])
+    f_rel = LinearConstraintEstimator(; val = ["$(rd.nf[1]) - $(rd.nf[2]) == 0.001"])
+    pr0 = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_rel,
+                                             f_views = f_rel, rf = 0.0), rd)
+    pr1 = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_rel,
+                                             f_views = f_rel, rf = rf), rd)
+    @test isapprox(pr1.mu, pr0.mu)
+    # A real cancellation, not a rate that never arrived: the rate did come off, and the
+    # factor half of the augmented posterior still shows it, because nothing puts it back
+    # there. `rf` belongs to the asset axis.
+    @test isapprox(pr1.fpr.mu, pr0.fpr.mu .- rf)
+    @test !isapprox(pr1.mu, pr0.mu .+ rf)
+end
+
+@testset "The factor member crosses an axis, so the rate does not cancel" begin
+    # `FactorBlackLittermanPrior` takes the rate off the *factor* prior mean and puts it
+    # back on the *asset* mean, after the Factor Lift. Those are two axes, so the two moves
+    # are not inverses even under a purely relative view: the subtraction reaches the assets
+    # through the loadings as `M * (rf * 1)`, which is a projection of the rate rather than
+    # the rate.
+    #
+    # What holds instead is exact and is asserted here. Writing `s = M * ones` for the row
+    # sums of the loadings,
+    #
+    #     mu(r) == mu(0) + r * (1 - s)
+    #
+    # and the two moves cancel only for an asset whose loadings sum to one. The identity is
+    # the honest statement of the axis crossing, and it fails the moment either move is
+    # dropped.
+    rf = 0.02
+    f_rel = LinearConstraintEstimator(; val = ["$(rd.nf[1]) - $(rd.nf[2]) == 0.001"])
+    pr0 = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_rel, rf = 0.0), rd)
+    pr1 = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_rel, rf = rf), rd)
+    s = vec(sum(pr0.rr.M; dims = 2))
+    @test isapprox(pr1.mu, pr0.mu .+ rf .* (1 .- s))
+    # The loadings do not sum to one, so this is a live difference rather than a vacuous
+    # identity, and the plain shift is genuinely wrong.
+    @test !isapprox(s, ones(length(s)))
+    @test !isapprox(pr1.mu, pr0.mu .+ rf)
+    # The factor block is left on the excess scale the update ran on: `rf` belongs to the
+    # asset axis and is never put back on the factors.
+    @test isapprox(pr1.fpr.mu, pr0.fpr.mu .- rf)
+    # The carrier stays internally consistent across the axis crossing.
+    @test isapprox(pr1.mu, pr1.rr.M * pr1.fpr.mu + pr1.rr.b .+ rf)
+end
+
+@testset "An absolute view feels the rate through the blend" begin
+    # The complement of the testset above. Where a view row does not sum to zero, the
+    # conversion changes what the views are blended against, so the rate is *not* a plain
+    # shift of the answer. This is the behaviour the fix introduces, and asserting it stops
+    # the subtraction being dropped again as a no-op.
+    rf = 0.02
+    bl_v = LinearConstraintEstimator(;
+                                     val = ["$(rd.nx[1]) == 0.003", "$(rd.nx[2]) == 0.002"])
+    f_v = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
+    for (pe0, pe1) in
+        zip([FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = 0.0),
+             AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
+                                          rf = 0.0)],
+            [FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = rf),
+             AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
+                                          rf = rf)])
+        pr0 = prior(pe0, rd)
+        pr1 = prior(pe1, rd)
+        @test !isapprox(pr1.mu, pr0.mu .+ rf)
+        @test !isapprox(pr1.mu, pr0.mu)
+    end
+end
+
+@testset "`apply_rf`, `remove_rf` and `equilibrium_mu` are the only sites" begin
+    # A text census over the sources, so the convention is enforceable rather than
+    # documented. It loads no package and reads no data.
+    function code_lines(path)
+        in_doc = false
+        out = String[]
+        for line in eachline(path)
+            s = strip(line)
+            if s == "\"\"\""
+                in_doc = !in_doc
+                continue
+            end
+            (in_doc || startswith(s, "#")) && continue
+            push!(out, line)
+        end
+        return out
+    end
+    src = joinpath(@__DIR__, "..", "src")
+    # The two members with no equilibrium branch add the rate and never take it off. The
+    # two with one do both, at one site each.
+    for (file, adds, removes) in
+        [("06_BlackLittermanPrior.jl", 1, 0), ("07_BayesianBlackLittermanPrior.jl", 1, 0),
+         ("08_FactorBlackLittermanPrior.jl", 1, 1),
+         ("09_AugmentedBlackLittermanPrior.jl", 1, 1)]
+        lines = code_lines(joinpath(src, "13_Prior", file))
+        reads = filter(l -> occursin("pe.rf", l), lines)
+        @test length(reads) == adds + removes
+        @test count(l -> occursin("apply_rf(pe.rf", l), reads) == adds
+        @test count(l -> occursin("remove_rf(pe.rf", l), reads) == removes
+        # Every read goes through one of the two verbs; none is hand-written arithmetic.
+        @test all(l -> occursin("apply_rf(pe.rf", l) || occursin("remove_rf(pe.rf", l),
+                  reads)
+        # No member writes the equilibrium mean itself.
+        @test isempty(filter(l -> occursin("pe.l *", l), lines))
+    end
+    # The kernel carries no rate of its own.
+    kernel = code_lines(joinpath(src, "13_Prior", "06_BlackLittermanPrior.jl"))
+    decl = only(filter(l -> occursin("function vanilla_posteriors(", l), kernel))
+    @test !occursin("rf", decl)
+    # Both verbs are declared once, in the file that owns the family's kernel.
+    @test count(l -> occursin("function apply_rf(", l), kernel) == 1
+    @test count(l -> occursin("function remove_rf(", l), kernel) == 1
+    # `equilibrium_mu` owns `l * sigma * w` and its equal-weight fallback.
+    owner = code_lines(joinpath(src, "08_Moments", "17_EquilibriumExpectedReturns.jl"))
+    @test count(l -> occursin("function equilibrium_mu(", l), owner) == 2
 end

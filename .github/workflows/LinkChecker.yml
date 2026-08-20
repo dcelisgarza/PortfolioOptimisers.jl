@@ -15,6 +15,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
+# Lychee reports through the job status. It opens no issue, so it writes nothing.
+permissions:
+  contents: read
+
 jobs:
 
   # lint:
@@ -24,7 +28,7 @@ jobs:
   #     - name: Clone
   #       uses: actions/checkout@v7
   #     - name: Setup Julia
-  #       uses: julia-actions/setup-julia@v2
+  #       uses: julia-actions/setup-julia@latest
   #       with:
   #         version: "1"
   #     - name: Use Julia cache

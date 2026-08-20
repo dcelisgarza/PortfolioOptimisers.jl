@@ -17,8 +17,18 @@ const init_code = quote
     using Logging
     using CSV, TimeSeries, DataFrames, StableRNGs, StatsBase, LinearAlgebra
 
-    # # Silence all logging by default.
-    # global_logger(NullLogger())
+    # Drop `@info` and `@warn` from the default logger, and keep `@error` and above.
+    #
+    # The suite deliberately drives the failure and fallback paths -- an unsolvable model, a
+    # variable outside the universe, a view that matches no asset -- so those records are the
+    # expected output of a passing run, not a signal. On CI they were about a third of the
+    # job log, which buries the one line a reader is looking for.
+    #
+    # This is safe for every test that asserts on a log record: `@test_logs` and
+    # `with_logger` install their own logger for the duration of the block, so they still see
+    # everything. A test that needs the default logger loud can wrap its body in
+    # `with_logger(ConsoleLogger(stderr, Logging.Debug))`.
+    global_logger(ConsoleLogger(stderr, Logging.Error))
 
     # Headless GR for plotting tests; respect an externally set value.
     ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")

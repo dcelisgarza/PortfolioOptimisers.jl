@@ -185,3 +185,193 @@ runs the head + `assemble_jump_model!` and asserts on the registered Model-State
 without solving — `r` routing (one indexed risk key per measure), the `r = nothing` no-op
 (risk keys absent, head and return constraints still present), and `wn2`/`l1` toggling their
 keys. 15 assertions, ~1 s — versus the multi-minute solver suites.
+
+## Amendment (2026-08-17)
+
+The architecture review of 2026-08-16 (candidate A) found that §3 conflated two jobs. How a
+head shapes `w` does vary per optimiser, and §3 is right about that. Which `JuMPOptimiser`
+settings reach the model does not vary, and it had no interface — so it was six hand-written
+argument lists, and they had drifted. This amendment records the seam that closes the gap.
+§3 is narrowed, not overturned: the head still owns `set_weight_constraints!`.
+
+1. **The budget group travels as one object.** `set_weight_constraints!(model, wb, opt, long)`
+   takes the `JuMPOptimiser` and forwards `bgt`, `sbgt` and `gbgt` together. Every head reaches
+   the builder through it, so a budget field added to `JuMPOptimiser` is read in one place.
+   Before this, `gbgt` was named at one head of five, so `JuMPOptimiser(; gbgt = …)`
+   constructed, validated and solved under the other four with the leverage cap dropped.
+
+   `gbgt` binds only where the long/short decomposition exists, which a negative weight bound
+   forces. The two long-only head shapes — default `RiskBudgeting` and default
+   `RelaxedRiskBudgeting` — therefore reject the combination through the `long = true` bound
+   check rather than dropping it.
+
+2. **`k` has one head-level producer.** `set_maximum_ratio_factor_variables!` registers both
+   spellings: `k >= 0` under `MaximumRatio`, the literal `1` under every other objective. The
+   heads whose formulation is fixed pass `MinimumRisk()` and take the second branch instead of
+   hand-writing `@expression(model, k, 1)`. Its second method now takes exactly one objective;
+   the former `args...` fallback absorbed a wrong-arity call and registered the constant under
+   a ratio objective, which is how `test_03b_jump_model_assembly.jl` called it — so the ratio
+   branch went untested while the call still looked correct.
+
+   `RiskBudgeting` is the one head outside this producer. Its log barrier pins the scale, so
+   `_set_risk_budgeting_constraints!` declares a *free* `k` and then `set_unit_budget!`.
+   `get_k`'s error message names both routes.
+
+3. **Unconstrained NOC reports the bundle it already holds.** §4 and the Consequences section
+   describe unconstrained NOC as building its own `ProcessedJuMPOptimiserAttributes`. It was
+   in fact hand-listing all 19 fields off a processed `JuMPOptimiser` that
+   `jump_optimiser_from_attributes` had itself built from the `attrs` the setup already
+   returns — a round trip whose hand list is the same silent drop that function's own comment
+   records, pointing the other way. It now uses `attrs` directly, as the constrained head does.
+   There is deliberately no inverse remap helper: the bundle is never reconstructed, it is kept.
+
+§6 still holds — unconstrained NOC has no middle, and this amendment does not give it one.
+
+## Amendment 2 (2026-08-17)
+
+The maintainability review of 2026-08-17 (finding 5) found that §6 is wrong on its own terms,
+and that the exclusion had cost a defect. §6 is withdrawn. The amendment above ends with the
+sentence "§6 still holds"; that sentence is superseded here, and the rest of that amendment is
+untouched.
+
+### The finding
+
+Unconstrained NOC does not "skip straight from head to solve". It ran three steps of the
+shared middle inline — `set_risk_constraints!` → `scalarise_risk_expression!` →
+`set_return_constraints!` — and its argument list had drifted from the sequence it copied:
+
+```julia
+set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
+```
+
+The dispatched signature is `(model, r, opt, pr, pl, fees, args...)`. So `nothing` bound
+`fees`, and `opt.fees` fell into `args...`. Unconstrained NOC built every risk constraint
+fee-free from `4cd418494` — the commit that appended `opt.fees` to a call that already carried
+two `nothing`s — until this amendment. The intent never took effect, and nothing raised,
+because the callee's `args...` tail absorbed the overshoot. This is the second instance of the
+failure §2 of the first amendment records, and the second one found in this file.
+
+### Decision
+
+1. **Unconstrained NOC has a middle.** It is not `assemble_jump_model!`'s middle: the variant
+   applies no linear, cardinality, turnover, tracking, norm, regularisation, phylogeny or
+   custom constraint, and that omission is what "unconstrained" names. So the middle is named
+   and dispatched instead of excluded. `assemble_near_optimal_centering_model!(alg, model,
+   noc, setup, rd)` has one method per variant: the constrained one delegates to
+   `assemble_jump_model!`, the unconstrained one runs risk + scalarise + return and the same
+   `assert_frontier_sweep_cap` tail.
+
+2. **One head, one Result.** The two `_optimise` methods differed in 6 of 34 lines. They are
+   now one method that dispatches the middle through
+   `assemble_near_optimal_centering_model!` and the solve through
+   `solve_near_optimal_centering!(alg, model, noc, setup)`, which reads each `solve_noc!`
+   overload's arguments off the `NearOptimalSetup`. The 12-line Result block is written once.
+
+3. **The fee argument is positional in one place.** The unconstrained middle reaches
+   `set_risk_constraints!` through `set_risk_and_scalarise!`, as every other head does. A head
+   can no longer order that list for itself.
+
+4. **The absorber is removed.** Both generic `set_risk_constraints!` methods and both
+   `set_risk_and_scalarise!` methods take a named, typed `b1::Option{<:MatNum} = nothing` in
+   place of the `args...` tail. `b1` is the only trailing value the middle has ever passed, and
+   every caller already passed exactly one, so no call site changes arity. A `Fees` in that
+   slot is now a `MethodError` instead of a silent loss. The `::Nothing` no-op method carries
+   the same positional list rather than an `args...` tail — a tail is ambiguous against a typed
+   one, and it accepts calls its sibling would reject.
+
+5. **The unconstrained middle ends at `assert_frontier_sweep_cap` too.** The call is a no-op
+   there today: `near_optimal_centering_setup` hands the variant the `no_bounds_risk_measure`
+   and `no_bounds_optimiser` copies, so neither frontier registry can be populated. The sweep
+   the variant does run is parameterised over the `rk_opt`/`rt_opt` vectors its sub-problem
+   solves produce, and the cap applies inside those sub-problems. Making the call keeps the
+   invariant structural instead of resting on an argument about which bounds survive.
+
+§3 of the first amendment still holds: the head keeps `set_weight_constraints!`, and the two
+variants share it.
+
+### Verification
+
+`test_20_near_optimal_centering_optimisation.jl`, `test_03b_jump_model_assembly.jl`,
+`test_19_factor_risk_contribution.jl`, `test_18n_frontier_sweep_cap.jl`,
+`test_18m_return_multiplicity.jl`, `test_18o_no_return.jl`,
+`test_15_relaxed_risk_budgetting_optimisation.jl` (the `r = nothing` no-op),
+`test_16a_asset_risk_budgeting.jl`, `test_18a_mean_risk_1.jl` and `test_28_seam_lock.jl` all
+pass. No CSV baseline moved: no test configures fees on a `NearOptimalCentering`, which is why
+the dropped fees went unnoticed.
+
+## Amendment 3 (2026-08-18)
+
+The architecture review of 2026-08-17 (finding 1) revisits the same seam from the caller's
+side. Amendment 2 gave unconstrained NOC a named middle; this amendment says what that middle
+reads, fixes the one setting it read inconsistently, and records why the rest is documented
+rather than refused.
+
+### The census
+
+Every `JuMPOptimiser` setting was set one at a time on a default
+[`NearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl) with the three
+anchor portfolios supplied, and the assembled centring model was compared byte for byte
+against the same model without the setting. `lcse`, `card`, `l1`, `linf`, `lp`, `l2c`,
+`linfc`, `tn`, `tr` and `ss` all leave the model identical. They are carried and validated,
+and the builder each one drives belongs to the middle this variant does not run.
+
+They are **not** inert, which is why "carried and dropped" overstates the case. The three
+anchor portfolios are `MeanRisk` sub-problems that run the whole `assemble_jump_model!`, so an
+omitted setting shapes the anchors and, through them, the centring target. It reaches no model
+at all only when `w_min`, `w_opt` and `w_max` are all supplied and no sub-problem is solved.
+
+### The defect: the return expression was gross, the target net
+
+`near_optimal_centering_setup` computes `rt_min`, `rt_opt` and `rt_max` with
+`expected_return(ret, w, pr, fees)` — net of fees. The barrier constrains `ret - rt`, where
+`ret` is the model's return expression. `add_fees_to_ret!` subtracts the model's `:fees`
+expression only when one is registered, and `set_non_fixed_fees!` is what registers it. The
+unconstrained middle did not run it, so the two halves of one comparison used different units
+whenever a fee was set: with `Fees(; l = 0.05)` on a five-asset problem the model's return
+expression was unchanged from the fee-free one, while every coefficient should have moved by
+`0.05` — about fifty times the gross expected return itself.
+
+`set_non_fixed_fees!(model, opt.fees)` now runs first in the unconstrained middle, in the same
+position it holds in `assemble_jump_model!`. A **fixed** fee still does not apply on this path
+and cannot: it is charged per position held, so it needs the cardinality binaries
+`set_mip_constraints!` produces, and that builder is part of the omitted middle. The fee shapes
+`l`, `s`, `tn`, `fl` were each checked to build without error on the unconstrained path, under
+long-only and long-short bounds.
+
+This is the third fee defect on this one path, after amendment 2's argument-position drift. All
+three had the same shape: a value that the setup computes one way and the model consumes
+another, with nothing comparing the two.
+
+### What is documented rather than refused
+
+The review asks for a membership declaration that the head checks, so that a setting the
+formulation cannot honour raises instead of being ignored. That half is **not** done, and the
+exclusion is stated in the docstrings instead —
+[`UnconstrainedNearOptimalCentering`](../../src/20_Optimisation/13_NearOptimalCentering.jl)
+now lists every setting the centring model reads and every setting it does not, and the `alg`
+field text names the choice as the thing that selects between them.
+
+Three reasons:
+
+1. **The settings are meaningful on this variant.** They bind on the anchors. A head that
+   raised on them would refuse configurations that produce a correct answer today, and would
+   force a user who wants a constrained anchor and an unconstrained centring to give up one of
+   the two.
+2. **It is breaking on the default path.** `UnconstrainedNearOptimalCentering` is the default
+   `alg`, so every `NearOptimalCentering` that sets one of these fields and solves today would
+   start throwing, with no migration but a change of `alg` that changes the answer.
+3. **The gap the review names is a documentation gap first.** "No configuration error can be
+   raised" was true, but the reader had no way to learn the exclusion either. One of those two
+   is cheap to close and reversible.
+
+The declaration remains a reasonable future step, and this amendment does not argue against
+it. It belongs with a decision about what the raise should be — an error, a warning, or a
+`strict`-gated pair — and that is a wider change than one path.
+
+### Verification
+
+`test_20_near_optimal_centering_optimisation.jl`, "Unconstrained NOC return expression is net
+of fees": builds the head and the middle with the three anchors supplied, so no solve runs, and
+asserts that the model's return expression and the `rt_opt` target both move with the fees, and
+that a fixed fee moves neither. Proved to discriminate — before the fix the two return
+expressions are byte-identical.

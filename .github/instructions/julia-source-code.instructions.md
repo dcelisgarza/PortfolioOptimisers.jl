@@ -49,9 +49,10 @@ Every concrete estimator, algorithm, and exported function is listed in the **Ca
 **When you add a new estimator, algorithm, or exported function, you must also place it in `docs/capability_catalogue.jl`.** This is not optional bookkeeping: it is enforced by `test/test_26_docs.jl`, which fails if any concrete leaf subtype of `AbstractEstimator` or `AbstractAlgorithm` is absent, and CI runs that test on every PR touching `src/`.
 
 - **New estimator or algorithm** — add a `Cap(:YourType)` to the group it belongs to. Pick the group by the *job it does*, not the file it lives in.
+- **New estimator or algorithm the library constructs for itself** — a marker or other internal type no caller ever writes is not a choice, so list it in `NOT_A_CHOICE` with the reason `:internal` instead of cataloguing it. It keeps its docstring and its API page.
 - **New exported function** — either add a `Cap`, mention it in a section's `Prose` (a prose `@ref` counts as catalogued), or, if it is genuinely not a user-facing capability, list it in `NOT_A_FEATURE` with a reason: `:alias`, `:base_overload`, `:trait`, or `:internal`.
 - **Do not write a description.** Each entry's one-line description is taken from the first sentence of its docstring at build time, so there is exactly one description of every type in the repo. Pass `label` only where the docstring genuinely reads worse in a bullet (for example when a group's children would all repeat the same prefix).
-- **Removing an export?** Also remove its `NOT_A_FEATURE` entry — the check runs in both directions and a stale exemption fails too.
+- **Removing an export or a type?** Also remove its `NOT_A_FEATURE` or `NOT_A_CHOICE` entry — both checks run in both directions and a stale exemption fails too.
 
 Because descriptions come from docstrings, the docstring summary convention below is load-bearing for this page, not just for the API reference.
 

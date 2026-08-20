@@ -36,7 +36,7 @@ VaR
 CVaR
 DRCVaR
 EVaR
-RVaR
+RLVaR
 PNVaR
 ```
 
@@ -48,7 +48,7 @@ VaR_RG
 CVaR_RG
 DRCVaR_RG
 EVaR_RG
-RVaR_RG
+RLVaR_RG
 PNVaR_RG
 GVaR_RG
 ```
@@ -65,7 +65,7 @@ PNDaR
 R_DaR
 R_CDaR
 R_EDaR
-R_RDaR
+R_RLDaR
 R_PNDaR
 ```
 
@@ -220,6 +220,7 @@ TTS
 
 ```@docs
 LCE
+ECE
 WBE
 L2Reg
 LpReg
@@ -231,5 +232,5 @@ LpReg
 MinRk
 MaxRt
 MaxUt
-MaxSR
+MaxRa
 ```

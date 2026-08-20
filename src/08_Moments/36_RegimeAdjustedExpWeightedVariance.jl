@@ -813,7 +813,7 @@ result by the square of the regime multiplier derived from the smoothed regime s
 # Returns
 
   - `var::Vector{<:Number}`: Per-asset regime-adjusted exponentially weighted variance
-    vector of length `features`. Assets with fewer than `ce.min_obs` observations return
+    vector of length `assets`. Assets with fewer than `ce.min_obs` observations return
     `NaN`.
 
 ## Related

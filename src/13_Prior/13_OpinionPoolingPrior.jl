@@ -1,0 +1,398 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for opinion pooling algorithms.
+
+`OpinionPoolingAlgorithm` is the base type for all algorithms that combine multiple prior estimations into a consensus prior using opinion pooling. All concrete opinion pooling algorithms should subtype this type to ensure a consistent interface for consensus formation in portfolio optimisation workflows.
+
+# Related
+
+  - [`LinearOpinionPooling`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+"""
+abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Linear opinion pooling algorithm for consensus prior estimation.
+
+`LinearOpinionPooling` is a concrete subtype of [`OpinionPoolingAlgorithm`](@ref) that combines multiple prior probability distributions using a weighted linear average. This algorithm produces a consensus prior by averaging the input opinions according to their specified weights, resulting in a pooled distribution that reflects the collective beliefs of all contributors.
+
+# Details
+
+  - The consensus weights are computed as a linear combination of the individual prior weights, weighted by opinion confidence.
+  - Is the weighted arithmetic mean of the individual opinions.
+  - Suitable for scenarios where opinions are independent and additive.
+  - The only way to force a zero in the final opinion for all opinions to assign it a zero probability.
+
+# Related
+
+  - [`OpinionPoolingAlgorithm`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+"""
+struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Logarithmic opinion pooling algorithm for consensus prior estimation.
+
+`LogarithmicOpinionPooling` is a concrete subtype of [`OpinionPoolingAlgorithm`](@ref) that combines multiple prior probability distributions using a weighted geometric mean. This algorithm produces a consensus prior by minimising the average Kullback-Leibler divergence from the individual opinions to the pooled distribution, resulting in an information-theoretically optimal consensus.
+
+# Details
+
+  - The consensus weights are computed as the weighted geometric mean of the individual prior weights, weighted by opinion confidence.
+  - Robust to extremes, as it down-weights divergent or extreme views.
+  - If any opinion assigns zero probability to an event, the pooled opinion will also assign zero probability.
+  - Minimises the average Kullback-Leibler divergence from the individual opinions to the consensus.
+
+# Related
+
+  - [`OpinionPoolingAlgorithm`](@ref)
+  - [`LinearOpinionPooling`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+"""
+struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Opinion pooling prior estimator for asset returns.
+
+`OpinionPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. It supports both linear and logarithmic pooling, flexible weighting of opinions, and optional pre- and post-processing estimators.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OpinionPoolingPrior(;
+        pes::VecEP,
+        pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+        pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        p::Option{<:Number} = nothing,
+        w::Option{<:VecNum} = nothing,
+        alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+        ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx()
+    ) -> OpinionPoolingPrior
+
+Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
+
+## Validation
+
+  - `pes` must be a non-empty vector of prior estimators.
+  - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
+  - If `p` is not `nothing`, `p > 0`.
+
+# Details
+
+  - If `w` is not `nothing`, and `sum(w) < 1`, the remaining weight is assigned to the uniform prior. Otherwise, all opinions are assumed to be equally weighted.
+  - If `p` is `nothing`, the the opinion probabilities are used as given. Else they are adjusted according to their Kullback-Leibler divergence from the consensus.
+
+# Examples
+
+```jldoctest
+julia> sets = UniverseSets(; xkey = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+
+julia> OpinionPoolingPrior(;
+                           pes = [EntropyPoolingPrior(; sets = sets,
+                                                      mu_views = LinearConstraintEstimator(;
+                                                                                           val = [\"A == 0.03\",
+                                                                                                  \"B + C == 0.04\"])),
+                                  EntropyPoolingPrior(; sets = sets,
+                                                      mu_views = LinearConstraintEstimator(;
+                                                                                           val = [\"A == 0.05\",
+                                                                                                  \"B + C >= 0.06\"]))])
+OpinionPoolingPrior
+  pes ┼ 2-element Vector{EntropyPoolingPrior}
+      │ EntropyPoolingPrior ⋯
+      │ EntropyPoolingPrior ⋯
+  pe1 ┼ nothing
+  pe2 ┼ EmpiricalPrior
+      │        ce ┼ PortfolioOptimisersCovariance
+      │           │   ce ┼ Covariance
+      │           │      │    me ┼ SimpleExpectedReturns
+      │           │      │       │   w ┴ nothing
+      │           │      │    ce ┼ GeneralCovariance
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
+      │           │      │   alg ┴ FullMoment()
+      │           │   mp ┼ MatrixProcessing
+      │           │      │     pdm ┼ Posdef
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │      │      dn ┼ nothing
+      │           │      │      dt ┼ nothing
+      │           │      │     alg ┼ nothing
+      │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │        me ┼ SimpleExpectedReturns
+      │           │   w ┴ nothing
+      │   horizon ┴ nothing
+    p ┼ nothing
+    w ┼ nothing
+  alg ┼ LinearOpinionPooling()
+   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
+# Related
+
+  - [`OpinionPoolingAlgorithm`](@ref)
+  - [`LinearOpinionPooling`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref)
+  - [`prior`](@ref)
+"""
+@propagatable @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+    """
+    $(field_dict[:pes])
+    """
+    @fprop @vprop pes
+    """
+    $(field_dict[:pe1])
+    """
+    @fprop @vprop pe1
+    """
+    $(field_dict[:pe2])
+    """
+    @fprop @vprop pe2
+    """
+    $(field_dict[:p_pool])
+    """
+    p
+    """
+    $(field_dict[:op_w])
+    """
+    w
+    """
+    $(field_dict[:opalg])
+    """
+    alg
+    """
+    $(field_dict[:ex])
+    """
+    ex
+    function OpinionPoolingPrior(pes::VecEP,
+                                 pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
+                                 pe2::AbstractLowOrderPriorEstimator_A_F_AF,
+                                 p::Option{<:Number}, w::Option{<:VecNum},
+                                 alg::OpinionPoolingAlgorithm,
+                                 ex::FLoops.Transducers.Executor)
+        @argcheck(!isempty(pes), IsEmptyError("pes cannot be empty"))
+        if !isnothing(p)
+            @argcheck(p > zero(p), DomainError(p, "p must be > 0"))
+        end
+        if !isnothing(w)
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
+            @argcheck(length(w) == length(pes),
+                      DimensionMismatch("length(w) ($(length(w))) must match length(pes) ($(length(pes)))"))
+            @argcheck(all(x -> zero(x) <= x <= one(x), w), DomainError)
+            @argcheck(sum(w) <= one(eltype(w)),
+                      DomainError("sum(w) ($(sum(w))) must be <= 1"))
+        end
+        return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
+                   typeof(ex)}(pes, pe1, pe2, p, w, alg, ex)
+    end
+end
+function OpinionPoolingPrior(; pes::VecEP,
+                             pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+                             pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                             p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
+                             alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())::OpinionPoolingPrior
+    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
+end
+"""
+    robust_probabilities(ow::VecNum, args...)
+    robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
+
+Compute robust opinion probabilities for consensus formation in opinion pooling.
+
+`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is not `nothing`, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
+
+# Arguments
+
+  - `ow`: Vector of opinion probabilities (length = number of opinions).
+  - `pw`: Matrix of prior weights for each opinion (observations × opinions).
+  - `p`: Robustness penalty parameter.
+
+# Returns
+
+  - `ow::VecNum`: Opinion probabilities for pooling.
+
+# Details
+
+  - If `p` is `nothing`, i.e. the method with `args...`, returns the original opinion probabilities.
+  - If `p` is not `nothing`, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
+  - Used internally by [`OpinionPoolingPrior`](@ref) to ensure robust aggregation of opinions.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+"""
+function robust_probabilities(ow::VecNum, args...)
+    return ow
+end
+function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
+    c = pw * ow
+    kldivs = [sum(StatsBase.kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
+    ow .*= exp.(-p * kldivs)
+    ow /= sum(ow)
+    return ow
+end
+"""
+    compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
+    compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
+
+Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
+
+`compute_pooling` aggregates multiple prior probability distributions (`pw`) into a single consensus posterior distribution according to the specified opinion pooling algorithm and opinion probabilities (`ow`). Supports both linear and logarithmic pooling.
+
+# Arguments
+
+  - `alg`: Opinion pooling algorithm (`LinearOpinionPooling` or `LogarithmicOpinionPooling`).
+  - `ow`: Vector of opinion probabilities (length = number of opinions).
+  - `pw`: Matrix of prior weights for each opinion (observations × opinions).
+
+# Returns
+
+  - `w::StatsBase.ProbabilityWeights`: Consensus posterior probability weights.
+
+# Details
+
+  - For `LinearOpinionPooling`, computes the weighted arithmetic mean of the individual prior weights: `w = pw * ow`.
+  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
+  - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
+
+# Mathematical definition
+
+Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` the ``T \\times K`` matrix of scenario weights for ``K`` experts:
+
+Linear (weighted arithmetic mean):
+
+```math
+\\begin{align}
+\\boldsymbol{p}^* &= \\mathbf{P} \\boldsymbol{\\alpha}\\,.
+\\end{align}
+```
+
+Logarithmic (weighted geometric mean, normalised):
+
+```math
+\\begin{align}
+\\log p_t^* \\propto \\sum_{k&=1}^{K} \\alpha_k \\log p_{tk}\\,, \\\\
+p_t^* &= \\frac{\\exp\\!\\left(\\sum_k \\alpha_k \\log p_{tk}\\right)}{\\sum_{s} \\exp\\!\\left(\\sum_k \\alpha_k \\log p_{sk}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}^*``: ``T \\times 1`` pooled posterior weight vector.
+  - ``\\mathbf{P}``: ``T \\times K`` matrix of scenario weights for ``K`` experts.
+  - ``\\boldsymbol{\\alpha}``: ``K \\times 1`` opinion probability vector (weights summing to 1).
+  - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
+  - $(math_dict[:T])
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`LinearOpinionPooling`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref)
+"""
+function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
+    return StatsBase.pweights(pw * ow)
+end
+function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
+    u = log.(pw) * ow
+    lse = LogExpFunctions.logsumexp(u)
+    return StatsBase.pweights(vec(exp.(u .- lse)))
+end
+"""
+    prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+          dims::Int = 1, strict::Bool = false, kwargs...)
+
+Compute opinion pooling prior moments for asset returns.
+
+`prior` estimates the mean and covariance of asset returns by combining multiple prior estimations into a consensus prior using opinion pooling algorithms. Supports both linear and logarithmic pooling, robust opinion probability adjustment, and optional pre- and post-processing estimators.
+
+# Arguments
+
+  - `pe`: Opinion pooling prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Optional factor matrix.
+  - $(arg_dict[:dims])
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, consensus weights, entropy, Kullback-Leibler divergence, opinion probabilities, and optional factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Details
+
+  - Optional pre-processing estimator `pe.pe1` is applied to asset returns before pooling, else the original returns are used.
+  - Each prior estimator in `pe.pes` is applied to the asset returns, producing individual prior weights.
+  - Opinion probabilities `ow` are initialised from `pe.w` or set uniformly if it is `nothing`; if their sum is less than 1, the remainder is assigned to a uniform prior.
+  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is not `nothing`.
+  - Consensus posterior weights are computed using [`compute_pooling`](@ref) according to the specified pooling algorithm `pe.alg`.
+  - Post-processing estimator `pe.pe2` is applied using the consensus weights.
+  - The result includes the effective number of scenarios, Kullback-Leibler divergence to each opinion, robust opinion probabilities, and optional factor moments.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`LinearOpinionPooling`](@ref)
+  - [`LogarithmicOpinionPooling`](@ref)
+  - [`robust_probabilities`](@ref)
+  - [`compute_pooling`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
+    X, F = dims_oriented(dims, X, F)
+    X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F; strict = strict, kwargs...).X : X
+    T = size(X, 1)
+    M = length(pe.pes)
+    ow = isnothing(pe.w) ? range(inv(M), inv(M); length = M) : pe.w
+    rw = one(eltype(ow)) - sum(ow)
+    if rw > eps(typeof(rw))
+        pw = Matrix{eltype(X)}(undef, T, M + 1)
+        # `ow` may alias the struct's `pe.w`; build a new vector instead of `push!`ing
+        # into it so repeated `prior` calls do not grow the stored weights (and so the
+        # uniform-weight `range` branch, which is immutable, also works).
+        ow = vcat(ow, rw)
+        pw[:, end] .= inv(T)
+    else
+        pw = Matrix{eltype(X)}(undef, T, M)
+    end
+    let X = X, F = F, pw = pw
+        FLoops.@floop pe.ex for (i, pe) in enumerate(pe.pes)
+            pr = prior(pe, X, F; strict = strict, kwargs...)
+            pw[:, i] = pr.w
+        end
+    end
+    ow = robust_probabilities(ow, pw, pe.p)
+    w = compute_pooling(pe.alg, ow, pw)
+    pe2 = factory(pe.pe2, w)
+    # Opinion pooling reweights observations without touching either axis of `Z`, so the
+    # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
+    # The factor block is the refit prior's, forwarded whole rather than stamped with the
+    # pooled weights — see the note at the same seam in `12_EntropyPoolingPrior.jl`.
+    (; X, o_X, mu, sigma, chol, rr, fpr, Z) = prior(pe2, X, F; strict = strict, kwargs...)
+    ens = exp(StatsBase.entropy(w))
+    kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
+    return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
+                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr, Z = Z)
+end
+
+function factor_residual_config(pe::OpinionPoolingPrior)
+    # The pooled `pe.pes` contribute observation weights alone; every moment of the result
+    # comes from the refit `pe.pe2`, so the residual block is `pe.pe2`'s and this estimator
+    # forwards it (see [`factor_residual_config`](@ref)).
+    return factor_residual_config(pe.pe2)
+end
+
+export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

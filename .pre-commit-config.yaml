@@ -21,8 +21,10 @@ repos:
       - id: no-commit-to-branch
       - id: pretty-format-json
         args: [--autofix, --indent=2]
+        exclude: ^docs/paper/main-jlyfish\.json$
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: ^docs/paper/main-jlyfish\.json$
       - id: check-merge-conflict
         args: [--assume-in-merge]
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -48,7 +50,7 @@ repos:
         name: ExplicitImports checks
         args: [--print, --checklist, exclude_all_qualified_accesses_via_owners, --checklist, exclude_all_qualified_accesses_are_public]
   - repo: https://github.com/domluna/JuliaFormatter.jl
-    rev: v2.11.2
+    rev: v2.12.6
     hooks:
       - id: julia-formatter
         exclude: ^\.github/

@@ -3,6 +3,10 @@
 ```@docs
 MatNum_Pr
 RkRatioRM
+resolve_risk_inputs
+original_returns
+resolve_factor_risk_inputs
+resolve_factor_regression
 expected_risk
 expected_risk_from_returns
 supports_precomputed_returns(r::RkRatioRM)
@@ -10,6 +14,7 @@ supports_precomputed_returns(r::MeanReturnRiskRatio)
 expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
 expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
 number_effective_assets
+adjusted_risk
 risk_contribution
 factor_risk_contribution
 rolling_window_measure

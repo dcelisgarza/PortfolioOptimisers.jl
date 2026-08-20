@@ -319,11 +319,11 @@ Alias for [`EntropicValueatRisk`](@ref).
 """
 const EVaR = EntropicValueatRisk
 """
-    RVaR
+    RLVaR
 
 Alias for [`RelativisticValueatRisk`](@ref).
 """
-const RVaR = RelativisticValueatRisk
+const RLVaR = RelativisticValueatRisk
 """
     PNVaR
 
@@ -363,11 +363,11 @@ Alias for [`EntropicValueatRiskRange`](@ref).
 """
 const EVaR_RG = EntropicValueatRiskRange
 """
-    RVaR_RG
+    RLVaR_RG
 
 Alias for [`RelativisticValueatRiskRange`](@ref).
 """
-const RVaR_RG = RelativisticValueatRiskRange
+const RLVaR_RG = RelativisticValueatRiskRange
 """
     PNVaR_RG
 
@@ -438,11 +438,11 @@ Alias for [`RelativeEntropicDrawdownatRisk`](@ref).
 """
 const R_EDaR = RelativeEntropicDrawdownatRisk
 """
-    R_RDaR
+    R_RLDaR
 
 Alias for [`RelativeRelativisticDrawdownatRisk`](@ref).
 """
-const R_RDaR = RelativeRelativisticDrawdownatRisk
+const R_RLDaR = RelativeRelativisticDrawdownatRisk
 """
     R_PNDaR
 
@@ -981,6 +981,12 @@ Alias for [`LinearConstraintEstimator`](@ref).
 """
 const LCE = LinearConstraintEstimator
 """
+    ECE
+
+Alias for [`ExposureConstraintEstimator`](@ref).
+"""
+const ECE = ExposureConstraintEstimator
+"""
     WBE
 
 Alias for [`WeightBoundsEstimator`](@ref).
@@ -1033,20 +1039,20 @@ Alias for [`MaximumUtility`](@ref).
 """
 const MaxUt = MaximumUtility
 """
-    MaxSR
+    MaxRa
 
 Alias for [`MaximumRatio`](@ref).
 """
-const MaxSR = MaximumRatio
+const MaxRa = MaximumRatio
 
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
-       UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
-       EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RLDaR, PNDaR, R_DaR,
-       R_CDaR, R_EDaR, R_RDaR, R_PNDaR, OWA, ADD, R_ADD, UCI, R_UCI, MDD, R_MDD, BDVariance,
-       TrRM, RkTrRM, TnRM, VSK, NonOptRkRatio, FLM, MAD, SCM, SLM, ECM, ELM, TLM, SSK, FTCM,
-       FTLM, KT, SKT, OWA_GMD, OWA_CVaR, OWA_TG, OWA_WR, OWA_RG, OWA_CVaR_RG, OWA_TG_RG,
-       OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1, G2, GerberCov, SBCov,
-       SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
-       DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
-       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS, LCE, WBE, RkSet, HRkSet,
-       JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxSR, L2Reg, LpReg
+       UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RLVaR, PNVaR, RG, VaR_RG, CVaR_RG,
+       DRCVaR_RG, EVaR_RG, RLVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RLDaR,
+       PNDaR, R_DaR, R_CDaR, R_EDaR, R_RLDaR, R_PNDaR, OWA, ADD, R_ADD, UCI, R_UCI, MDD,
+       R_MDD, BDVariance, TrRM, RkTrRM, TnRM, VSK, NonOptRkRatio, FLM, MAD, SCM, SLM, ECM,
+       ELM, TLM, SSK, FTCM, FTLM, KT, SKT, OWA_GMD, OWA_CVaR, OWA_TG, OWA_WR, OWA_RG,
+       OWA_CVaR_RG, OWA_TG_RG, OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1,
+       G2, GerberCov, SBCov, SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov,
+       LTDCov, KCov, SCov, MICov, DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS,
+       BOP, EqER, ExER, CoSk, CoKt, LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS,
+       LCE, ECE, WBE, RkSet, HRkSet, JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxRa, L2Reg, LpReg

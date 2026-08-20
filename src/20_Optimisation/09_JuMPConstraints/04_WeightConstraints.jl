@@ -87,6 +87,10 @@ Where:
 
 !!! note
 
+    Optimiser heads do not call this method directly. They pass their [`JuMPOptimiser`](@ref), whose method forwards the whole budget group (`bgt`, `sbgt`, `gbgt`) in one hand-off, so a budget field cannot reach one head and miss the others.
+
+!!! note
+
     The budgets set here **bound** the realised exposures rather than pinning them, because `lw` and `sw` are upper bounds on the parts of `w`. Pinning them is the `xbgt` option of [`short_mip_threshold_constraints`](@ref), applied later by [`set_mip_constraints!`](@ref).
 
 # Validation
@@ -103,6 +107,8 @@ Where:
   - [`w_finite_flag`](@ref)
   - [`WeightBounds`](@ref)
   - [`set_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+  - [`JuMPOptimiser`](@ref)
 """
 function set_weight_constraints!(args...)
     return nothing
@@ -201,8 +207,10 @@ Where:
 
   - $(arg_dict[:model])
   - `lcms`: Collection of [`LinearConstraint`](@ref) objects defining the linear constraints.
-  - `key_ineq::Symbol`: Base key for naming inequality constraints in the model.
-  - `key_eq::Symbol`: Base key for naming equality constraints in the model.
+  - `name_ineq::Symbol`: Bare Model State entry name seeding the indexed inequality
+    constraint entries.
+  - `name_eq::Symbol`: Bare Model State entry name seeding the indexed equality constraint
+    entries.
 
 # Returns
 
@@ -217,8 +225,8 @@ Where:
 function set_linear_weight_constraints!(args...)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc, key_ineq::Symbol,
-                                        key_eq::Symbol)
+function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc,
+                                        name_ineq::Symbol, name_eq::Symbol)
     w = get_w(model)
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -226,12 +234,14 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc, key_i
         if !isnothing(lcm.ineq)
             A = lcm.ineq.A
             B = lcm.ineq.B
-            model[Symbol(key_ineq, i)] = JuMP.@constraint(model, sc * (A * w - k * B) <= 0)
+            state_set!(model, Symbol(""), name_ineq, i,
+                       JuMP.@constraint(model, sc * (A * w - k * B) <= 0))
         end
         if !isnothing(lcm.eq)
             A = lcm.eq.A
             B = lcm.eq.B
-            model[Symbol(key_eq, i)] = JuMP.@constraint(model, sc * (A * w - k * B) == 0)
+            state_set!(model, Symbol(""), name_eq, i,
+                       JuMP.@constraint(model, sc * (A * w - k * B) == 0))
         end
     end
     return nothing

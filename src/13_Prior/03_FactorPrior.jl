@@ -21,6 +21,16 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what this estimator forwards
+
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
+
+  - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * cholesky(fpr.sigma).L` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
+  - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
+  - No `Z` is carried: the only wrapped prior is fit on factors, so its feature matrix would be factors × features and would not describe the asset axis. The drop is a *relocation* rather than a destruction — the factor prior is forwarded whole, so a feature matrix it carried is still reachable at `pr.fpr.Z`, which is where a factor-axis one belongs. For an asset-axis one, wrap this estimator from the *outside*: `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads the loadings back off the result.
+
 # Examples
 
 ```jldoctest
@@ -122,7 +132,170 @@ end
     forward(pe, me, ce)
 end
 """
-    prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
+    factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum,
+                          F::MatNum) -> Tuple{AbstractRegressionResult, MatNum}
+
+Fit the loadings and rebuild the asset returns from the factor returns.
+
+This is the first half of the factor lift, and the only half every factor-axis estimator shares. It fits `re` on `(X, F)` and returns the regression result together with the *posterior returns matrix* `F * transpose(M) .+ transpose(b)` — the reconstruction that [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) each write into `LowOrderPrior.X`.
+
+The second half — projecting the factor moments through the loadings — is [`factor_lift`](@ref). The two are separate because [`FactorBlackLittermanPrior`](@ref) needs the reconstruction before it has the moments to project: its views land on the factor distribution, so the factor moments only exist after the Black-Litterman update.
+
+# Arguments
+
+  - $(arg_dict[:re])
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+# Returns
+
+  - `rr::AbstractRegressionResult`: Regression result carrying the loadings `M` and intercepts `b`.
+  - `posterior_X::MatNum`: Reconstructed asset returns, `observations × assets`.
+
+# Related
+
+  - [`factor_lift`](@ref)
+  - [`regression`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function factor_reconstruction(re::AbstractRegressionEstimator, X::MatNum, F::MatNum)
+    rr = regression(re, X, F)
+    return rr, F * transpose(rr.M) .+ transpose(rr.b)
+end
+"""
+    factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
+                rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                X::MatNum, posterior_X::MatNum; kwargs...) -> NamedTuple
+
+Project factor moments onto the asset axis through the regression loadings.
+
+This is the second half of the factor lift, and it owns the algorithm that [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) both apply: map `f_mu` and `f_sigma` through the loadings, process the resulting covariance, and — when `rsd` is `true` — add the diagonal residual block and extend the Cholesky factor with it.
+
+Which factor moments arrive is the caller's decision, and it is the only thing that differs between the two sites: [`FactorPrior`](@ref) passes the wrapped prior's moments unchanged, while [`FactorBlackLittermanPrior`](@ref) passes the Black-Litterman posterior moments.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{M} \\boldsymbol{f} + \\boldsymbol{b}\\\\
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{M} \\mathbf{\\Sigma}_f \\mathbf{M}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,,
+\\end{align}
+```
+
+where ``\\mathbf{\\Sigma}_\\varepsilon`` is the diagonal matrix of residual variances and is present only when `rsd` is `true`.
+
+# Arguments
+
+  - $(arg_dict[:mp])
+  - $(arg_dict[:ve])
+  - $(arg_dict[:rsd])
+  - `rr`: Regression result carrying the loadings `M` and intercepts `b`.
+  - `f_mu`: Factor expected returns, `factors × 1`.
+  - `f_sigma`: Factor covariance matrix, `factors × factors`.
+  - $(arg_dict[:X])
+  - `posterior_X`: Reconstructed asset returns from [`factor_reconstruction`](@ref).
+  - `kwargs...`: Additional keyword arguments passed to matrix processing.
+
+# Returns
+
+  - `(; mu, sigma, chol)::NamedTuple`: Asset expected returns, asset covariance, and the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`.
+
+# Related
+
+  - [`factor_reconstruction`](@ref)
+  - [`factor_residual_config`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
+                     rsd::Bool, rr::AbstractRegressionResult, f_mu::VecNum, f_sigma::MatNum,
+                     X::MatNum, posterior_X::MatNum; kwargs...)
+    (; b, M) = rr
+    posterior_mu = M * f_mu + b
+    posterior_sigma = M * f_sigma * transpose(M)
+    matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
+    posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
+    if rsd
+        err = X - posterior_X
+        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(ve, err; dims = 1)))
+        posterior_sigma .+= err_sigma
+        posdef!(mp.pdm, posterior_sigma)
+        posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
+    end
+    return (; mu = posterior_mu, sigma = posterior_sigma,
+            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)))
+end
+"""
+    factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:NamedTuple}
+
+Declare how a prior estimator adds a residual block to the covariance it lifts.
+
+A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and `mp.pdm` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
+
+The declaration closes that gap. Every estimator answers, and it answers beside its own definition: the two that own a residual block report it, a wrapper forwards the answer of the estimator it wraps, and an estimator that adds none says so with an explicit `nothing` method. A pooling estimator is a wrapper for this purpose. It forwards the one estimator its moments come from, however many priors it pools. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
+
+There is no default. A silent `nothing` fallback cannot separate *this estimator adds no residual block* from *the author of this estimator forgot the method*, and the second reading drops a residual block the covariance really carries. An undeclared type therefore throws and names itself, which is the polarity [`range_tails`](@ref) already uses for a per-type declaration whose absence is a defect rather than an answer.
+
+# Arguments
+
+  - `pe`: Prior estimator.
+
+# Returns
+
+  - `nothing`: The estimator adds no residual block.
+  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
+
+# Validation
+
+  - Throws an `ArgumentError` when the type of `pe` declares no method.
+
+# Related
+
+  - [`factor_lift`](@ref)
+  - [`assert_factor_residual_config`](@ref)
+  - [`range_tails`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
+"""
+function factor_residual_config(pe::AbstractPriorEstimator)
+    return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. Every concrete `AbstractPriorEstimator` must declare its residual block beside its own definition by adding a method returning `(; ve, pdm, rsd)`, forwarding the estimator it wraps, or returning `nothing` when it adds no residual block."))
+end
+function factor_residual_config(pe::FactorPrior)
+    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
+end
+"""
+    assert_factor_residual_config(pe::AbstractPriorEstimator, cfg) -> Nothing
+
+Check the shape of a [`factor_residual_config`](@ref) answer before a consumer reads it.
+
+A consumer reaches `ve`, `pdm` and `rsd` off the returned value by property access, which has no shape check of its own: a declaration that returns the wrong thing surfaces as a `FieldError` deep inside the correction rather than at the declaration that caused it. This checks the two shapes the contract admits, and names the estimator that answered.
+
+# Arguments
+
+  - `pe`: Prior estimator that answered.
+  - `cfg`: The answer of `factor_residual_config(pe)`.
+
+# Validation
+
+  - `cfg` is `nothing`, or a `NamedTuple` carrying `ve`, `pdm` and `rsd`.
+
+# Related
+
+  - [`factor_residual_config`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
+    @argcheck(isnothing(cfg) ||
+              (isa(cfg, NamedTuple) && all(k -> haskey(cfg, k), (:ve, :pdm, :rsd))),
+              ArgumentError("`factor_residual_config(::$(nameof(typeof(pe))))` must return `nothing` or a `NamedTuple` carrying `ve`, `pdm` and `rsd`. Got\ncfg => $(cfg)::$(typeof(cfg))."))
+    return nothing
+end
+"""
+    prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
+          kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -158,6 +331,7 @@ Where:
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
   - $(arg_dict[:dims])
+  - $(arg_dict[:strict])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Returns
@@ -173,34 +347,36 @@ Where:
   - [`FactorPrior`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`EmpiricalPrior`](@ref)
+  - [`factor_reconstruction`](@ref)
+  - [`factor_lift`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
-    end
-    f_prior = prior(pe.pe, F)
-    f_mu, f_sigma = f_prior.mu, f_prior.sigma
-    rr = regression(pe.re, X, F)
-    (; b, M) = rr
-    posterior_X = F * transpose(M) .+ transpose(b)
-    posterior_mu = M * f_mu + b
-    posterior_sigma = M * f_sigma * transpose(M)
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
-    if pe.rsd
-        err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
-        posterior_sigma .+= err_sigma
-        posdef!(pe.mp.pdm, posterior_sigma)
-        posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
-    end
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, rr = rr, f_mu = f_mu,
-                         f_sigma = f_sigma, f_w = f_prior.w)
+function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, strict::Bool = false,
+               kwargs...)
+    X, F = dims_oriented(dims, X, F)
+    # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
+    # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
+    f_prior = prior(pe.pe, F; strict = strict)
+    rr, posterior_X = factor_reconstruction(pe.re, X, F)
+    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_prior.mu, f_prior.sigma,
+                                      X, posterior_X; kwargs...)
+    # No `Z` is forwarded: `f_prior` is fit on the factors, so its feature matrix would be
+    # factors × features and would not describe the asset axis. To attach features here, wrap
+    # this estimator — `FeaturePrior(; pe = FactorPrior(…), ze = RegressionFeatures())` reads
+    # the loadings back off the result.
+    #
+    # The factor block *is* the prior that was fit on the factors: it needs no reconstruction,
+    # because nothing here modifies the factor distribution — the asset moments are its
+    # projection through `rr`.
+    #
+    # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
+    # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
+    # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
+    # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
+    # sizes every uncertainty set built on this result.
+    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
+                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
+                         ow = f_prior.ow, rr = rr, fpr = f_prior)
 end
 
 export FactorPrior

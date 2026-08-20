@@ -87,6 +87,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 
     RiskBudgetingResult(;
         jr::JuMPOptimisationResult,
+        r::BaseRM_VecBaseRM,
         prb::Union{ProcessedAssetRiskBudgetingAttributes,
                    ProcessedFactorRiskBudgetingAttributes},
         fb::Option{<:OptE_Opt}
@@ -97,6 +98,7 @@ Keywords correspond to the struct's fields.
 # Related
 
   - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`JuMPOptimisationResult`](@ref)
 """
@@ -106,6 +108,10 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:prb])
     """
     prb
@@ -113,18 +119,18 @@ Keywords correspond to the struct's fields.
     $(field_dict[:fb])
     """
     fb
-    function RiskBudgetingResult(jr::JuMPOptimisationResult,
+    function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                  prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                             ProcessedFactorRiskBudgetingAttributes},
                                  fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
+        return new{typeof(jr), typeof(r), typeof(prb), typeof(fb)}(jr, r, prb, fb)
     end
 end
-function RiskBudgetingResult(; jr::JuMPOptimisationResult,
+function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                              prb::Union{ProcessedAssetRiskBudgetingAttributes,
                                         ProcessedFactorRiskBudgetingAttributes},
                              fb::Option{<:OptE_Opt})::RiskBudgetingResult
-    return RiskBudgetingResult(jr, prb, fb)
+    return RiskBudgetingResult(jr, r, prb, fb)
 end
 # Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
@@ -241,7 +247,7 @@ $(DocStringExtensions.FIELDS)
 
     AssetRiskBudgeting(;
         rkb::Option{<:RkbE_Rkb} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         alg::RiskBudgetingFormulation = LogRiskBudgeting()
     ) -> AssetRiskBudgeting
 
@@ -270,7 +276,7 @@ Keywords correspond to the struct's fields.
     $(field_dict[:rba])
     """
     @vprop alg
-    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
+    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:UniverseSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
@@ -279,7 +285,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
-                            sets::Option{<:AssetSets} = nothing,
+                            sets::Option{<:UniverseSets} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
     return AssetRiskBudgeting(rkb, sets, alg)
 end
@@ -290,6 +296,8 @@ Factor-level Risk Budgeting algorithm.
 
 `FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
 
+A named budget is written in **factor** names and resolved against the declared factor axis, `sets.dict[sets.fkey]`, which must name the columns of `rr.L` in order — see [`risk_budget_universe_key`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -299,7 +307,7 @@ $(DocStringExtensions.FIELDS)
     FactorRiskBudgeting(;
         re::RegE_Reg = StepwiseRegression(),
         rkb::Option{<:RkbE_Rkb} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         flag::Bool = true
     ) -> FactorRiskBudgeting
 
@@ -309,11 +317,19 @@ Keywords correspond to the struct's fields.
 
   - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `re`: Loadings sliced to the selected assets via [`port_opt_view`](@ref).
+  - `sets`: Sliced via [`port_opt_view`](@ref), which subsets the **asset** axis and leaves the factor entries untouched. The field participates in views because it may carry both axes; `rkb` does not, because a factor budget has no asset index to slice by.
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
   - [`AssetRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
+  - [`risk_budget_universe_key`](@ref)
 """
 @propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     """
@@ -325,24 +341,25 @@ Keywords correspond to the struct's fields.
     """
     rkb
     """
-    $(field_dict[:sets])
+    $(field_dict[:sets_frb])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:flag])
     """
     flag
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
-                                 sets::Option{<:AssetSets}, flag::Bool)
+                                 sets::Option{<:UniverseSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when rkb is a RiskBudgetEstimator: the budget is written in factor names and is resolved against the declared factor axis, `sets.dict[sets.fkey]`"))
         end
         return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
 end
 function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              rkb::Option{<:RkbE_Rkb} = nothing,
-                             sets::Option{<:AssetSets} = nothing,
+                             sets::Option{<:UniverseSets} = nothing,
                              flag::Bool = true)::FactorRiskBudgeting
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
@@ -427,6 +444,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`RiskBudgetingResult`](@ref)
   - [`scalarise_risk_expression!`](@ref)
   - [`set_risk_constraints!`](@ref)
   - [`RiskJuMPOptimisationEstimator`](@ref)
@@ -463,7 +482,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
-        assert_risk_measure_required(r, :RiskBudgeting)
+        assert_risk_measure_required(r, :RiskBudgeting; flag = zero_risk_expression_flag)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
@@ -508,6 +527,42 @@ function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end
 """
+    risk_budget_universe_key(rba::RiskBudgetingAlgorithm,
+                             N::Integer) -> Option{<:AbstractString}
+
+Return the key of the universe a named risk budget resolves against, or `nothing` for the asset frame.
+
+The budget vector is indexed by the variables the budget is *over*, so the universe naming it is a property of the algorithm rather than of the sets: [`AssetRiskBudgeting`](@ref) budgets the asset weights and takes the default axis, while [`FactorRiskBudgeting`](@ref) budgets the factor weights `w1` and takes the declared factor axis, `sets.fkey`.
+
+The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`RiskBudget`](@ref) result carries its own vector and resolves no names, so an unread axis is left unvalidated, as it is in every other consumer of the declared axis. When it *is* read, [`factor_universe`](@ref) checks it against `N`, the number of factor weights, which is `size(rr.L, 2)`: under a [`DimensionReductionRegression`](@ref) that is the reduced basis the risk is decomposed in and not the columns of `F`, so a budget named after the original factors is rejected here rather than by a bare `DimensionMismatch` further down.
+
+# Arguments
+
+  - `rba`: Risk budgeting algorithm.
+  - `N`: Number of budgeted variables, `length(w)` at the call site.
+
+# Returns
+
+  - `key::Option{<:AbstractString}`: The universe key, or `nothing` to use `sets.xkey`.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`factor_universe`](@ref)
+  - [`risk_budget_constraints`](@ref)
+"""
+function risk_budget_universe_key(::AssetRiskBudgeting, ::Integer)
+    return nothing
+end
+function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
+    if !isa(rba.rkb, RiskBudgetEstimator)
+        return nothing
+    end
+    factor_universe(rba.sets, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
+    return rba.sets.fkey
+end
+"""
     _set_risk_budgeting_constraints!(model, rb, ...)
 
 Internal function to set risk budgeting constraints in the JuMP model.
@@ -531,14 +586,18 @@ Configures the equality constraints ensuring each asset's marginal risk contribu
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
+    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets,
+                                  risk_budget_universe_key(rb.rba, N); N = N,
+                                  strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
-    JuMP.@variables(model, begin
-                        k
-                        log_w[1:N]
-                    end)
+    # This head is the one producer of `k` that is not
+    # `set_maximum_ratio_factor_variables!`: the barrier below pins the scale, so `k` is a
+    # *free* variable here rather than `k >= 0` or the literal `1`. `get_k`'s error message
+    # names both routes.
+    JuMP.@variable(model, k)
+    JuMP.@variable(model, log_w[1:N])
     JuMP.@constraints(model,
                       begin
                           clog_w[i = 1:N],
@@ -584,7 +643,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
+    set_weight_constraints!(model, wb, rb.opt, true)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -606,18 +665,19 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                           mipcrkb, sc * (sum(w) - k) >= 0
                           orthcrkb, sc * w >= 0
                       end)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:FactorRiskBudgeting, <:Any},
-                                         ::Any, wb::WeightBounds, rd::ReturnsResult)
-    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, rb.rba.flag,
-                                                       rb.wi)
+                                         pr::AbstractPriorResult, wb::WeightBounds,
+                                         rd::ReturnsResult)
+    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
+                                                       rb.rba.flag, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
 """
@@ -672,7 +732,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     sc = get_constraint_scale(model)
     k = get_k(model)
     JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
-    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
+    set_weight_constraints!(model, wb, rb.opt)
     return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -684,14 +744,15 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
-    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
                                jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
                                                            sol = sol,
                                                            model = ifelse(save, model,
                                                                           nothing)),
-                               prb = prb, fb = nothing)
+                               r = factory(rb.r, attrs.pr, rb.opt.slv), prb = prb,
+                               fb = nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
@@ -721,6 +782,7 @@ function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
 end
 
 @pipe_delegates RiskBudgeting opt
+@pipe_route_rkb RiskBudgeting
 @pipe_route_sigma_ucs RiskBudgeting
 export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting, RiskBudgetingResult,
        LogRiskBudgeting, MixedIntegerRiskBudgeting

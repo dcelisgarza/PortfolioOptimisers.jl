@@ -169,14 +169,19 @@ rs = [StandardDeviation(), Variance(), LowOrderMoment(),
       OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
       OrderedWeightsArrayRange(), NegativeSkewness(),
       NegativeSkewness(; alg = SquaredSOCRiskExpr())]
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                             "group2" => rd.nx[2:2:end],
-                             "clusters1" =>
-                                 [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                                  3],
-                             "clusters2" =>
-                                 [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
-                                  2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
-                             "c3" => rd.nx[3:3:end]))
-fsets = AssetSets(; dict = Dict("nx" => rd.nf))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                "group2" => rd.nx[2:2:end],
+                                "clusters1" =>
+                                    [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                     3, 3],
+                                "clusters2" =>
+                                    [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                     1, 2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
+                                "c3" => rd.nx[3:3:end]))
+# `FactorRiskBudgeting` resolves its named budget against the declared factor axis, so its
+# sets carry both: `nx` for the assets a view slices, `nf` for the factors the budget names.
+# `fsets` keeps the pre-migration shape (factor names under the asset key, no factor axis)
+# and is only used for the negative paths.
+fsets = UniverseSets(; dict = Dict("nx" => rd.nf))
+xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))

@@ -3,8 +3,13 @@
 ```@docs
 BaseClusteringOptimisationEstimator
 ClusteringOptimisationEstimator
+BaseHierarchicalOptimisationResult
+HierarchicalOptimisationResult
 HierarchicalResult
-factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
+HierarchicalRiskParityResult
+factory(res::HierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+HierarchicalEqualRiskContributionResult
+factory(res::HierarchicalEqualRiskContributionResult, fb::Option{<:OptE_Opt})
 HierarchicalOptimiser
 hierarchical_optimiser_td_defaults
 needs_previous_weights(opt::HierarchicalOptimiser)

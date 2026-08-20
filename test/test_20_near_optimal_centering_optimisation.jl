@@ -112,8 +112,10 @@
         @test pred.rd.nx == rd.nx
         @test pred.rd.X == calc_net_returns(pred.res, rd.X)
         @test pred.rd.ts == rd.ts
-        @test pred.rd.iv == [rd.iv * w for w in pred.res.w]
-        @test pred.rd.ivpa == [dot(rd.ivpa, w) for w in pred.res.w]
+        @test pred.rd.iv ==
+              [rd.iv * PortfolioOptimisers.synthetic_asset_weights(w) for w in pred.res.w]
+        @test pred.rd.ivpa == [dot(rd.ivpa, PortfolioOptimisers.synthetic_asset_weights(w))
+                               for w in pred.res.w]
         res2 = optimise(NearOptimalCentering(;
                                              r = StandardDeviation(;
                                                                    settings = RiskMeasureSettings(;
@@ -132,12 +134,18 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                            ret = ArithmeticReturn(;
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = Frontier(;
+                                                                                                N = 5))))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_max, length = 5)))
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_max,
+                                                                                             length = 5))))
         res4 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
         @test all(isapprox.(res3.w, res4.w))
         success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
@@ -227,13 +235,19 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
-                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+                            ret = ArithmeticReturn(;
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = Frontier(;
+                                                                                                N = 5))))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
         opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_max, length = 5)))
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_max,
+                                                                                             length = 5))))
         res4 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
         @test all(isapprox.(res3.w, res4.w))
@@ -289,10 +303,13 @@
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr,
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min,
-                                                              stop = rt_min +
-                                                                     0.0009316063452440891,
-                                                              length = 3)), slv = slv)
+                                                   settings = JuMPReturnsSettings(;
+                                                                                  lb = range(;
+                                                                                             start = rt_min,
+                                                                                             stop = rt_min +
+                                                                                                    0.0009316063452440891,
+                                                                                             length = 3))),
+                            slv = slv)
         r1 = StandardDeviation(;
                                settings = RiskMeasureSettings(; scale = 2e2,
                                                               ub = range(;
@@ -335,8 +352,9 @@
                                                                                                        drk1)),
                                              opt = JuMPOptimiser(; pe = pr,
                                                                  ret = ArithmeticReturn(;
-                                                                                        lb = rt_min .-
-                                                                                             drt),
+                                                                                        settings = JuMPReturnsSettings(;
+                                                                                                                       lb = rt_min .-
+                                                                                                                            drt)),
                                                                  slv = slv),
                                              alg = ConstrainedNearOptimalCentering()))
         success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-4)
@@ -387,9 +405,13 @@
                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                                  sca = LogSumExpScalariser(;
                                                                                            gamma = 500))))
-        @test isapprox(res2.w, res_m1.w, rtol = 1e-4)
+        # `res_m1` is a lone `scale = 50` measure, so the model and the barrier both drop
+        # the combination weight and the sub-problems solve on numbers 50 times smaller.
+        # That shifts the solver's conditioning by about 1e-5 against the vector runs, which
+        # keep the weight. The portfolios still agree to five significant figures.
+        @test isapprox(res2.w, res_m1.w, rtol = 5e-4)
         @test isapprox(res1.w, res3.w, rtol = 1e-3)
-        @test isapprox(res4.w, res_m1.w, rtol = 1e-4)
+        @test isapprox(res4.w, res_m1.w, rtol = 5e-4)
     end
     @testset "UncertaintySetVariance barrier target parity" begin
         # Regression: the barrier risk targets used to be computed from the nominal
@@ -398,7 +420,9 @@
         # (slow progress or numerical error, seen with ellipsoidal sets) are acceptable;
         # a proven INFEASIBLE noc_opt is the bug and must fail.
         function noc_solver_stalled(rc)
-            isa(rc, OptimisationFailure) || return false
+            if !(isa(rc, OptimisationFailure))
+                return false
+            end
             err = string(get(get(rc.res, :clarabel1, Dict()), :err, ""))
             return occursin("SLOW_PROGRESS", err) || occursin("NUMERICAL_ERROR", err)
         end
@@ -442,5 +466,84 @@
             @test isa(res2.retcode, OptimisationSuccess) ||
                   noc_solver_stalled(res2.noc_retcode)
         end
+    end
+    @testset "Fees reach the unconstrained risk build" begin
+        # Regression (ADR 0008, amendment 2). The unconstrained head inlined the middle and
+        # passed `opt.fees` one argument late, so `fees` bound `nothing` and every risk
+        # constraint was built fee-free. `RiskTrackingRiskMeasure` under
+        # `DependentVariableTracking` reads the fees into its benchmark constant, so the
+        # assembled model text moves with them and pins the argument position.
+        #
+        # The three anchor portfolios are supplied, so the setup runs no sub-problem solve
+        # and the two models differ in the fees alone.
+        N = size(pr.X, 2)
+        w0 = fill(inv(N), N)
+        rtr = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                      r = ConditionalValueatRisk(),
+                                      alg = DependentVariableTracking())
+        function noc_unconstrained_model(fees)
+            noc = NearOptimalCentering(; r = rtr, w_min = w0, w_opt = w0, w_max = w0,
+                                       opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                           fees = fees))
+            setup = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
+            sopt = setup.opt
+            model = PortfolioOptimisers.JuMP.Model()
+            PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+            PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
+            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
+            PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
+                                                                       model, noc, setup,
+                                                                       rd)
+            return sprint(print, model)
+        end
+        @test noc_unconstrained_model(nothing) != noc_unconstrained_model(Fees(; l = 0.05))
+        # The fee slot is typed, so a `Fees` one argument late is a `MethodError` rather
+        # than a value absorbed by an `args...` tail and lost.
+        @test_throws MethodError PortfolioOptimisers.set_risk_and_scalarise!(PortfolioOptimisers.JuMP.Model(),
+                                                                             rtr, nothing,
+                                                                             nothing, pr,
+                                                                             nothing,
+                                                                             nothing,
+                                                                             Fees(;
+                                                                                  l = 0.05);
+                                                                             rd = rd)
+    end
+    @testset "Unconstrained NOC return expression is net of fees" begin
+        # Regression (ADR 0008, amendment 3). `near_optimal_centering_setup` computes the
+        # `noc_rt` target with `expected_return(ret, w, pr, fees)`, so the target is net of
+        # fees. The unconstrained middle did not run `set_non_fixed_fees!`, so no `:fees`
+        # expression was registered and `add_fees_to_ret!` left the model's return
+        # expression gross. The barrier's `ret - rt` slack was then biased by the whole fee.
+        #
+        # The three anchor portfolios are supplied, so the setup runs no sub-problem solve
+        # and the two return expressions differ in the fees alone.
+        N = size(pr.X, 2)
+        w0 = fill(inv(N), N)
+        function noc_unconstrained_ret(fees)
+            noc = NearOptimalCentering(; w_min = w0, w_opt = w0, w_max = w0,
+                                       opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                           fees = fees))
+            setup = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
+            sopt = setup.opt
+            model = PortfolioOptimisers.JuMP.Model()
+            PortfolioOptimisers.set_model_scales!(model, sopt.sc, sopt.so)
+            PortfolioOptimisers.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+            PortfolioOptimisers.set_w!(model, sopt.pe.X, setup.w_opt)
+            PortfolioOptimisers.set_weight_constraints!(model, sopt.wb, sopt)
+            PortfolioOptimisers.assemble_near_optimal_centering_model!(UnconstrainedNearOptimalCentering(),
+                                                                       model, noc, setup,
+                                                                       rd)
+            return (sprint(print, PortfolioOptimisers.get_ret(model)), setup.rt_opt)
+        end
+        gross, rt_gross = noc_unconstrained_ret(nothing)
+        net, rt_net = noc_unconstrained_ret(Fees(; l = 0.05))
+        # Both halves of the `ret - rt` comparison move with the fees, not just the target.
+        @test gross != net
+        @test rt_gross != rt_net
+        # A fixed fee needs the cardinality binaries, which this variant never builds, so it
+        # reaches neither half and the model is unchanged.
+        fixed, rt_fixed = noc_unconstrained_ret(Fees(; fl = 0.001))
+        @test fixed == gross
     end
 end

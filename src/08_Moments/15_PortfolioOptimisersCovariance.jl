@@ -92,10 +92,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     sigma = Statistics.cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
@@ -132,10 +129,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cor)
 """
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     rho = Statistics.cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)

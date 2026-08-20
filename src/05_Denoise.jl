@@ -10,7 +10,7 @@ All concrete and/or abstract types that implement denoising of covariance-like o
 In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `denoise!(dn::AbstractDenoiseEstimator, X::MatNum, q::Number) -> MatNum`: In-place denoising.
-  - `denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number) -> MatNum`: Optional out-of-place denoising.
+  - `denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number) -> MatNum`: Optional out-of-place denoising. A fallback method copies `X` and calls `denoise!`, so it is only needed if the copy can be avoided.
 
 ## Arguments
 
@@ -305,7 +305,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Denoise(;
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
         args::Tuple = (),
         kwargs::NamedTuple = (;),
@@ -394,15 +394,16 @@ Denoise
     Number of points in the range of eigenvalues used in the [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) density estimation.
     """
     n
-    function Denoise(pdm::Option{<:Posdef}, alg::AbstractDenoiseAlgorithm, args::Tuple,
-                     kwargs::NamedTuple, kernel, m::Integer, n::Integer)::Denoise
+    function Denoise(pdm::Option{<:AbstractPosdefEstimator}, alg::AbstractDenoiseAlgorithm,
+                     args::Tuple, kwargs::NamedTuple, kernel, m::Integer,
+                     n::Integer)::Denoise
         @argcheck(1 < m, DomainError)
         @argcheck(1 < n, DomainError)
         return new{typeof(pdm), typeof(alg), typeof(args), typeof(kwargs), typeof(kernel),
                    typeof(m), typeof(n)}(pdm, alg, args, kwargs, kernel, m, n)
     end
 end
-function Denoise(; pdm::Option{<:Posdef} = Posdef(),
+function Denoise(; pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                  alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
                  kwargs::NamedTuple = (;),
                  kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
@@ -483,6 +484,21 @@ function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     X .= corr0 +
          alg.alpha * corr1 +
          (one(alg.alpha) - alg.alpha) * LinearAlgebra.Diagonal(corr1)
+    #=
+    In exact arithmetic the reconstruction already preserves the diagonal: it is
+    `corr0[i, i] + corr1[i, i]`, since the two `alpha` weights sum to one there, and that
+    is `X[i, i]` back again. What is left is eigendecomposition round-off, measured at
+    `1 ± 1.5e-15`. `SpectralDenoise` and `FixedDenoise` shed it by routing their
+    reconstruction through `cov2cor`; this branch reconstructs directly, so it has to pin
+    the diagonal itself. `denoise!` has already converted a covariance to a correlation
+    before calling here, so one is the definitionally correct value.
+
+    It is worth pinning because the correlation distance kernels take `sqrt(1 - rho[i, i])`,
+    which *amplifies*: 1.1e-16 on the correlation diagonal becomes 7.45e-9 on the distance
+    diagonal, which is large enough to be a real self-loop weight in a weighted graph and
+    to fail `PhylogenyResult`'s zero-diagonal check.
+    =#
+    X[LinearAlgebra.diagind(X)] .= one(eltype(X))
     return X
 end
 """
@@ -557,7 +573,7 @@ function find_max_eval(vals::VecNum, q::Number,
     return x * op_sqrt_iq_sq
 end
 """
-    denoise!(dn::Option{<:Denoise}, X::MatNum, q::Number) -> MatNum
+    denoise!(dn::Option{<:AbstractDenoiseEstimator}, X::MatNum, q::Number) -> MatNum
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
@@ -670,7 +686,7 @@ function denoise!(dn::Denoise, X::MatNum, q::Number)
     return X
 end
 """
-    denoise(dn::Option{<:Denoise}, X::MatNum, q::Number) -> MatNum
+    denoise(dn::Option{<:AbstractDenoiseEstimator}, X::MatNum, q::Number) -> MatNum
 
 Out-of-place version of [`denoise!`](@ref).
 
@@ -722,7 +738,7 @@ julia> size(Xd)
 function denoise(::Nothing, X::MatNum, args...)::MatNum
     return X
 end
-function denoise(dn::Denoise, X::MatNum, q::Number)
+function denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)
     X = copy(X)
     denoise!(dn, X, q)
     return X

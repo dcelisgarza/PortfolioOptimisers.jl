@@ -65,6 +65,19 @@ pretty_table(DataFrame("Measure" => ["StandardDeviation", "MAD (LowOrderMoment)"
     additionally need a [`Solver`](@ref) in their `slv` field before you can call them outside an
     optimiser.
 
+!!! note
+
+    Handing `expected_risk` the prior itself — `expected_risk(r, w, pr)` — runs `factory` for you,
+    so the explicit call above is only needed when you want the bound measure back. Handing it a
+    bare returns matrix cannot: a slot that holds a [`DeferredQuantity`](@ref) has no prior to
+    resolve against there, and the call refuses rather than guessing.
+
+    That second form is the other half of the slot. `sigma`, `mu`, `kt` and `sk` each take the
+    value **or the estimator that computes it**, and the estimator is resolved against whichever
+    prior the optimisation actually runs on — per cross-validation fold, per resampled subset.
+    Worked through in the
+    [subset resampling example](../examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.md).
+
 ## 2. The three usage classes
 
 Every measure sits in one of three classes, and the class is what determines where it is legal.

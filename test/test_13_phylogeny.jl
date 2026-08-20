@@ -1,10 +1,489 @@
 @testset "Phylogeny tests" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StableRNGs,
-          StatsBase, SparseArrays
+          StatsBase, SparseArrays, LinearAlgebra, Clarabel
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPrior(), rd)
     wt = pweights(fill(inv(size(pr.X, 1)), size(pr.X, 1)))
+    @testset "Similarity matrix tests" begin
+        _, D = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), pr.X)
+        Sc = PortfolioOptimisers.distance_to_similarity(ComplementSimilarity(); D = D)
+        Sa = PortfolioOptimisers.distance_to_similarity(AngularSimilarity(); D = D)
+        # Both are pure elementwise transforms of D.
+        @test isapprox(Sc, one(eltype(D)) .- D)
+        @test isapprox(Sa, cos.(pi .* D))
+        # Symmetry and the unit diagonal survive both, since `pairwise` zeroes the diagonal.
+        for S in (Sc, Sa)
+            @test issymmetric(S)
+            @test isapprox(diag(S), ones(size(S, 1)))
+        end
+        # `AngularSimilarity` is bounded; `ComplementSimilarity` is only bounded when D is.
+        @test all(-one(eltype(Sa)) .<= Sa .<= one(eltype(Sa)))
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(ComplementSimilarity();
+                                                                  D = [0.0 7.0; 7.0 0.0]),
+                       [1.0 -6.0; -6.0 1.0])
+        # `AngularSimilarity` inverts a normalised angular distance exactly.
+        rho = cor(pr.X)
+        Da = acos.(clamp.(rho, -1, 1)) ./ pi
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                  D = Da), rho)
+        # The zero-row convention: D = 1 against a non-zero row, D = 0 between two zero rows.
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                  D = [0.0 1.0 1.0
+                                                                       1.0 0.0 0.0
+                                                                       1.0 0.0 0.0]),
+                       [1.0 -1.0 -1.0; -1.0 1.0 1.0; -1.0 1.0 1.0])
+        # `default_similarity` falls back to the linear complement for every metric.
+        for metric in (PortfolioOptimisers.Distances.CosineDist(),
+                       PortfolioOptimisers.Distances.Jaccard(),
+                       PortfolioOptimisers.Distances.BrayCurtis(),
+                       PortfolioOptimisers.Distances.CorrDist(),
+                       PortfolioOptimisers.Distances.Euclidean())
+            @test PortfolioOptimisers.default_similarity(metric) === ComplementSimilarity()
+        end
+        # Both new members are on the exported API and in the family. The family's
+        # abstract types are unexported, so the members reach them by the module prefix.
+        @test ComplementSimilarity() isa
+              PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+        @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+    end
+    @testset "Non-negative similarity interface (#239)" begin
+        nonneg = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                  GeneralExponentialSimilarity(), ComplementSimilarity())
+        # Four of the five members are in the interface; `AngularSimilarity` is out, and
+        # stays in the wider family it was always in.
+        for sim in nonneg
+            @test sim isa PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm
+            @test sim isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+            @test sim isa PortfolioOptimisers.Tree_SimMat
+        end
+        @test !isa(AngularSimilarity(),
+                   PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm)
+        @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+        @test !isa(AngularSimilarity(), PortfolioOptimisers.Tree_SimMat)
+        @test PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm <:
+              PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
+        # Both abstract types are unexported, per the repository convention. An extension
+        # subtypes the interface through the module prefix. `test_43` is the census that
+        # holds the whole exported abstract surface to its allow-list.
+        for T in (:AbstractSimilarityMatrixAlgorithm,
+                  :AbstractNonNegativeSimilarityMatrixAlgorithm)
+            @test T ∉ names(PortfolioOptimisers)
+            @test isdefined(PortfolioOptimisers, T)
+        end
+        #=
+        Issue #239's own reproduction. It reported `NetworkEstimator`, but the blast radius
+        is three estimators: `DBHT` and `LoGo` reach `PMFG_T2s` by their own routes. All
+        three now fail at *construction*, naming the caller's keyword, rather than inside
+        `PMFG_T2s` naming `W`.
+        =#
+        @test_throws TypeError NetworkEstimator(; alg = AngularSimilarity())
+        @test_throws TypeError DBHT(; sim = AngularSimilarity())
+        @test_throws TypeError LoGo(; sim = AngularSimilarity())
+        #=
+        The *positional* constructors refuse too. That needs saying, because it does not
+        come for free: `@concrete` generates its own constructor per struct, and a field
+        written bare gets an unbounded type parameter, so the generated method is the only
+        one matching a refused argument and it accepts. Declaring the bound on the field
+        itself -- `sim <: AbstractNonNegativeSimilarityMatrixAlgorithm` -- puts it on the
+        generated type parameter, so there is no method left to match and the refusal is a
+        `MethodError`. Every other field on these three structs is still bare.
+        =#
+        @test_throws MethodError DBHT(AngularSimilarity(), UniqueRoot())
+        @test_throws MethodError LoGo(Distance(), AngularSimilarity(), Posdef())
+        @test_throws MethodError NetworkEstimator(PortfolioOptimisersCovariance(),
+                                                  Distance(), AngularSimilarity(),
+                                                  HopCount())
+        # The admitted members build by either route.
+        @test DBHT(MaximumDistanceSimilarity(), UniqueRoot()) isa DBHT
+        @test LoGo(Distance(), ComplementSimilarity(), Posdef()) isa LoGo
+        @test NetworkEstimator(PortfolioOptimisersCovariance(), Distance(), KruskalTree(),
+                               HopCount()) isa NetworkEstimator
+        # Every surviving member still constructs on all three.
+        for sim in nonneg
+            @test NetworkEstimator(; alg = sim).alg === sim
+            @test DBHT(; sim = sim).sim === sim
+            @test LoGo(; sim = sim).sim === sim
+        end
+        # `FeatureDistance.sim` is untouched: its similarity never reaches `PMFG_T2s`,
+        # because every PMFG entry point recomputes one from its own algorithm.
+        @test FeatureDistance(; sim = AngularSimilarity()).sim === AngularSimilarity()
+        @testset "The domain precondition" begin
+            de = Distance()
+            Dok = [0.0 0.5 0.25; 0.5 0.0 0.75; 0.25 0.75 0.0]
+            Dbig = [0.0 7.0 0.25; 7.0 0.0 0.75; 0.25 0.75 0.0]
+            Dinf = [0.0 Inf 0.25; Inf 0.0 0.75; 0.25 0.75 0.0]
+            # A bounded, finite `D` is in every member's domain.
+            for sim in nonneg
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dok))
+            end
+            # The two members that declare nothing take the no-op fallback, so an
+            # unbounded or infinite `D` is theirs to transform. `exp(-Inf)` is 0 exactly.
+            for sim in (ExponentialSimilarity(), GeneralExponentialSimilarity())
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dbig))
+                @test isnothing(PortfolioOptimisers.assert_similarity_domain(sim, de, Dinf))
+            end
+            # `ComplementSimilarity` declares `D <= 1`, `MaximumDistanceSimilarity`
+            # declares finiteness, and `D <= 1` implies finiteness.
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                                                  de, Dbig)
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                                                  de, Dinf)
+            @test isnothing(PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                                         de, Dbig))
+            @test_throws DomainError PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                                                  de, Dinf)
+            # The message names *both* halves -- the distance estimator that produced the
+            # offending value, and the similarity that refused it. That is the whole point
+            # of the check: `PMFG_T2s` could only ever name `W`.
+            msg = try
+                PortfolioOptimisers.assert_similarity_domain(ComplementSimilarity(),
+                                                             Distance(;
+                                                                      alg = LogDistance()),
+                                                             Dbig)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("ComplementSimilarity", msg)
+            @test occursin("LogDistance", msg)
+            @test occursin("7.0", msg)
+            msg = try
+                PortfolioOptimisers.assert_similarity_domain(MaximumDistanceSimilarity(),
+                                                             DistanceDistance(), Dinf)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("MaximumDistanceSimilarity", msg)
+            @test occursin("DistanceDistance", msg)
+            # The check is *interface-scoped*, not member-wide: `distance_to_similarity`
+            # stays a pure transformation with no domain of its own, so the shipped
+            # `FeatureDistance` promise that every `SemiMetric` yields a similarity and
+            # nothing throws is untouched.
+            @test isapprox(PortfolioOptimisers.distance_to_similarity(ComplementSimilarity();
+                                                                      D = Dbig),
+                           one(eltype(Dbig)) .- Dbig)
+        end
+        @testset "The coefficient is finite as well as positive" begin
+            #=
+            `coef = Inf` used to construct. The zero diagonal then gives `exp(-Inf * 0)`,
+            which is `NaN`, so a NaN similarity matrix reached `PMFG_T2s` and the DBHT
+            clustering instead of a typed error naming the field. `power` is a separate
+            case and stays as it was: `power = Inf` yields a finite matrix.
+            =#
+            Dc = [0.0 0.5 0.25; 0.5 0.0 0.75; 0.25 0.75 0.0]
+            for coef in (Inf, -Inf, NaN)
+                @test_throws DomainError GeneralExponentialSimilarity(; coef = coef)
+            end
+            msg = try
+                GeneralExponentialSimilarity(; coef = Inf)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("coef", msg)
+            # The positivity half of the guard is unchanged.
+            for coef in (0, -1)
+                @test_throws DomainError GeneralExponentialSimilarity(; coef = coef)
+            end
+            # A finite coefficient still builds, and an infinite `power` is still admitted.
+            sec = GeneralExponentialSimilarity(; coef = 2, power = Inf)
+            @test sec isa GeneralExponentialSimilarity
+            @test all(isfinite, PortfolioOptimisers.distance_to_similarity(sec; D = Dc))
+        end
+        @testset "The precondition at the PMFG entry points" begin
+            #=
+            The oracle is that every pairing the precondition refuses already throws today,
+            only with a worse message. `LogDistance` and `DistanceDistance` both exceed 1;
+            `SimpleDistance` does not. `LogDistance` with `ExponentialSimilarity` works and
+            must keep working -- a blanket finiteness rule on the branch would break it.
+            =#
+            for (de, sim, throws) in
+                ((Distance(; alg = SimpleDistance()), ComplementSimilarity(), false),
+                 (Distance(; alg = LogDistance()), ExponentialSimilarity(), false),
+                 (Distance(; alg = LogDistance()), ComplementSimilarity(), true),
+                 (DistanceDistance(), ComplementSimilarity(), true))
+                nte = NetworkEstimator(; de = de, alg = sim)
+                cle = ClustersEstimator(; de = de, alg = DBHT(; sim = sim))
+                je = LoGo(; de = de, sim = sim)
+                sigma = cov(PortfolioOptimisersCovariance(), pr.X)
+                if throws
+                    @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, pr.X)
+                    @test_throws DomainError PortfolioOptimisers.calc_distance_weighted_graph(nte,
+                                                                                              pr.X)
+                    @test_throws DomainError clusterise(cle, pr.X)
+                    @test_throws DomainError PortfolioOptimisers.logo!(je, copy(sigma),
+                                                                       pr.X)
+                    @test_throws DomainError clusterise(NetworkClustersEstimator(;
+                                                                                 nte = nte),
+                                                        pr.X)
+                else
+                    @test PortfolioOptimisers.calc_adjacency(nte, pr.X) isa
+                          SparseMatrixCSC{Int, Int}
+                    @test clusterise(cle, pr.X) isa PortfolioOptimisers.Clusters
+                    @test isnothing(PortfolioOptimisers.logo!(je, copy(sigma), pr.X))
+                    @test clusterise(NetworkClustersEstimator(; nte = nte), pr.X) isa
+                          PortfolioOptimisers.Clusters
+                end
+            end
+            #=
+            The one live route to a non-finite distance: #237 established that `Denoise()`
+            makes exactly zero correlations, which `LogDistance` correctly maps to `Inf`.
+            `MaximumDistanceSimilarity` is the default of both `DBHT` and `LoGo`, so this
+            reached `PMFG_T2s` as a matrix of `NaN`s and was reported as a *negative*
+            weight. It is now named as what it is, at the configuration that caused it.
+            =#
+            ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
+            de = Distance(; alg = LogDistance())
+            # `pr.X` is too correlated to denoise to an exact zero, so this needs noise.
+            Xn = randn(StableRNG(987654321), 500, 20)
+            @test any(isinf, PortfolioOptimisers.distance(de, ce, Xn))
+            nte = NetworkEstimator(; ce = ce, de = de, alg = MaximumDistanceSimilarity())
+            @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)
+            #=
+            `ExponentialSimilarity` declares no domain and is right not to: `exp(-Inf)` is
+            `0` exactly, so an infinite distance is a legal similarity *value*. It is not a
+            legal edge *weight*. `PMFG_T2s` stores the structure and the weights in one
+            matrix, so a zero weight is an absent edge, and the denoised correlation of
+            pure noise is the identity -- every off-diagonal similarity is zero and the
+            PMFG comes back with `0` of its `54` edges. That empty structure used to be
+            returned as an answer. `assert_pmfg_weights` names it instead.
+            =#
+            nte = NetworkEstimator(; ce = ce, de = de, alg = ExponentialSimilarity())
+            @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)
+        end
+        @testset "`PMFG_T2s`' backstop" begin
+            #=
+            Kept, because the interface is open by *declaration*: an extension can subtype
+            it and return a negative anyway, and the DBHT failure below is silent. The two
+            checks are split because `0 <= NaN` is `false`, so one check reported a `NaN` as
+            a negative weight and sent the caller looking for the wrong thing.
+            =#
+            W = ones(9, 9)
+            @test PortfolioOptimisers.PMFG_T2s(W)[1] isa SparseMatrixCSC
+            Wn = copy(W)
+            Wn[1, 2] = Wn[2, 1] = NaN
+            msg = try
+                PortfolioOptimisers.PMFG_T2s(Wn)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin("isnan", msg)
+            @test !occursin(">= 0", msg)
+            Wm = copy(W)
+            Wm[1, 2] = Wm[2, 1] = -1.0
+            msg = try
+                PortfolioOptimisers.PMFG_T2s(Wm)
+                ""
+            catch e
+                sprint(showerror, e)
+            end
+            @test occursin(">= 0", msg)
+            @test occursin("-1.0", msg)
+        end
+    end
+    @testset "Feature distance tests" begin
+        DS = PortfolioOptimisers.Distances
+        rng = StableRNG(987654321)
+        # The elementwise method is `AngularDist`'s contract; `_pairwise!` is an internal
+        # hook overloaded to delegate to Distances' gemm `CosineDist` kernel. Nothing in
+        # Distances pins the two together, so this does.
+        function elementwise_pairwise(metric, Z; dims = 1)
+            n = dims == 1 ? size(Z, 1) : size(Z, 2)
+            obs(i) = dims == 1 ? view(Z, i, :) : view(Z, :, i)
+            D = zeros(Float64, n, n)
+            for i in 1:n, j in 1:n
+                D[i, j] = i == j ? 0.0 : metric(obs(i), obs(j))
+            end
+            return D
+        end
+        @testset "AngularDist gemm path matches the elementwise method" begin
+            for N in (2, 5, 50, 200), K in (1, 3, 30)
+                Z = randn(rng, N, K)
+                @test isapprox(DS.pairwise(AngularDist(), Z; dims = 1),
+                               elementwise_pairwise(AngularDist(), Z); atol = 1e-8)
+            end
+            # Zero rows are where the gemm kernel and the elementwise method could most
+            # easily disagree: the gemm divides by the norm and produces NaN.
+            Zz = randn(rng, 8, 4)
+            Zz[2, :] .= 0
+            Zz[5, :] .= 0
+            @test isapprox(DS.pairwise(AngularDist(), Zz; dims = 1),
+                           elementwise_pairwise(AngularDist(), Zz); atol = 1e-8)
+            @test isapprox(DS.pairwise(AngularDist(), permutedims(Zz); dims = 2),
+                           elementwise_pairwise(AngularDist(), permutedims(Zz); dims = 2);
+                           atol = 1e-8)
+            # The convention itself: 0 between two zero rows, 1 against a non-zero one.
+            Da = DS.pairwise(AngularDist(), Zz; dims = 1)
+            @test all(iszero, Da[[2, 5], [2, 5]])
+            @test all(isone, Da[[2, 5], [1, 3, 4, 6, 7, 8]])
+            # A true metric, unlike `CosineDist`.
+            @test AngularDist() isa DS.Metric
+            @test DS.result_type(AngularDist(), Int, Int) === Float64
+        end
+        @testset "2-D feature matrices" begin
+            Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
+            de = FeatureDistance()
+            @test de.metric === AngularDist()
+            @test de.alg === LastObservation()
+            # `sim` is defaulted from the metric, and `AngularDist` gets the exact inverse.
+            @test de.sim === AngularSimilarity()
+            @test FeatureDistance(; metric = DS.CosineDist()).sim === ComplementSimilarity()
+            D = distance(de, Z)
+            @test issymmetric(D)
+            @test all(iszero, diag(D))
+            @test isapprox(D, [0.0 0.5 0.25; 0.5 0.0 0.25; 0.25 0.25 0.0])
+            # `cor_and_dist`'s first slot is the similarity, derived from this very `D`.
+            S, D2 = cor_and_dist(de, Z)
+            @test D2 == D
+            @test isapprox(S, cos.(pi .* D))
+            # `AngularSimilarity` recovers the cosine similarity exactly, with no `Z`.
+            Zc = randn(rng, 40, 7)
+            Sc, _ = cor_and_dist(de, Zc)
+            @test isapprox(Sc,
+                           one(eltype(Zc)) .- DS.pairwise(DS.CosineDist(), Zc; dims = 1))
+            # Every `SemiMetric` yields a similarity; nothing throws.
+            Se, De = cor_and_dist(FeatureDistance(; metric = DS.Euclidean()), Zc)
+            @test isapprox(Se, one(eltype(De)) .- De)
+            # `dims` retargets to `Z`, so a transposed matrix gives the same answer.
+            @test isapprox(distance(de, permutedims(Zc); dims = 2), distance(de, Zc))
+            # Producer #4's square adjacency is integer-valued and needs no promotion.
+            Zi = [1 0 1; 0 1 1; 1 1 0]
+            @test eltype(distance(de, Zi)) === Float64
+            # Asset views are `SubArray`s and need no `collect`.
+            @test isapprox(distance(de, view(Zi, 1:2, :)), distance(de, Zi[1:2, :]))
+        end
+        @testset "Degenerate 2-D inputs" begin
+            de = FeatureDistance()
+            # A single feature: every asset is on one ray, so the angular distance is 0.
+            # `CorrDist` is NaN against any constant row, hence unusable here (#162).
+            Z1 = reshape([1.0, 2.0, 3.0], 3, 1)
+            @test all(iszero, distance(de, Z1))
+            Dc = distance(FeatureDistance(; metric = DS.CorrDist()), Z1)
+            @test all(isnan, Dc[(1:3) .!= (1:3)'])
+            # Zero rows: valid input the metric cannot measure. The patch rewrites only the
+            # entries the metric left as NaN.
+            Zz = [1.0 0.0; 0.0 0.0; 0.0 0.0; 1.0 1.0]
+            for metric in (AngularDist(), DS.CosineDist(), DS.Jaccard(), DS.BrayCurtis())
+                D = distance(FeatureDistance(; metric = metric), Zz)
+                @test !any(isnan, D)
+                @test iszero(D[2, 3])
+                @test isone(D[2, 1])
+                @test isone(D[3, 4])
+            end
+            # `Euclidean` places a zero row at the origin — a real distance, not a NaN — so
+            # the patch must leave it alone.
+            De = distance(FeatureDistance(; metric = DS.Euclidean()), Zz)
+            @test isapprox(De[2, 1], 1.0)
+            @test isapprox(De[2, 4], sqrt(2))
+            @test iszero(De[2, 3])
+        end
+        @testset "Collapse algorithms" begin
+            Z3 = abs.(randn(rng, 6, 5, 4))
+            algs = (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                    StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+            Ds = [distance(FeatureDistance(; alg = alg), Z3) for alg in algs]
+            for D in Ds
+                @test size(D) == (5, 5)
+                @test issymmetric(D)
+                @test all(iszero, diag(D))
+                @test !any(isnan, D)
+            end
+            # The four rules genuinely differ; `StackObservations` is not a rename of one
+            # of the other three.
+            for i in 1:4, j in (i + 1):4
+                @test !isapprox(Ds[i], Ds[j])
+            end
+            # `LastObservation` discards the window.
+            @test Ds[1] == distance(FeatureDistance(), Z3[6, :, :])
+            # `dims = 2` swaps the two trailing axes, for every rule.
+            Z3p = permutedims(Z3, (1, 3, 2))
+            for (alg, D) in zip(algs, Ds)
+                @test isapprox(distance(FeatureDistance(; alg = alg), Z3p; dims = 2), D)
+            end
+            # At T == 1 there is nothing to collapse, so all four agree exactly.
+            Z1 = Z3[6:6, :, :]
+            D1 = [distance(FeatureDistance(; alg = alg), Z1) for alg in algs]
+            @test all(D -> D == D1[1], D1)
+            @test D1[1] == Ds[1]
+            # `AggregateDistances` applies the zero-feature convention per observation, so
+            # an asset that is zero at *some* observations differs from the stacked form.
+            Zs = zeros(2, 3, 2)
+            Zs[1, :, :] = [1.0 0.0; 0.0 0.0; 0.0 1.0]
+            Zs[2, :, :] = [1.0 1.0; 1.0 0.0; 1.0 0.0]
+            @test !isapprox(distance(FeatureDistance(; alg = StackObservations()), Zs),
+                            distance(FeatureDistance(; alg = AggregateDistances()), Zs))
+            # A median of distance matrices is not a metric, so it is rejected outright.
+            @test_throws ArgumentError AggregateDistances(; alg = MedianCollapse())
+            @test AggregateFeatures(; alg = MedianCollapse()).alg === MedianCollapse()
+            # The 2-D method never consults `alg`.
+            Z2 = Z3[6, :, :]
+            for alg in algs
+                @test distance(FeatureDistance(; alg = alg), Z2) ==
+                      distance(FeatureDistance(), Z2)
+            end
+        end
+        @testset "Observation weights" begin
+            Z3 = abs.(randn(rng, 6, 5, 4))
+            w = pweights([1.0, 1, 1, 1, 1, 5])
+            pairs = [(AggregateFeatures(), AggregateFeatures(; w = w)),
+                     (AggregateDistances(), AggregateDistances(; w = w)),
+                     (AggregateFeatures(; alg = MedianCollapse()),
+                      AggregateFeatures(; w = w, alg = MedianCollapse()))]
+            for (alg, walg) in pairs
+                unweighted = distance(FeatureDistance(; alg = alg), Z3)
+                weighted = distance(FeatureDistance(; alg = walg), Z3)
+                @test !isapprox(unweighted, weighted)
+                @test issymmetric(weighted)
+                @test all(iszero, diag(weighted))
+            end
+            # `@wprop` on the collapse algorithm plus `@fprop` on `FeatureDistance.alg`
+            # closes the chain, so `factory` installs threaded weights.
+            fd = factory(FeatureDistance(; alg = AggregateFeatures()), w)
+            @test fd.alg.w === w
+            @test fd.metric === AngularDist()
+            @test fd.sim === AngularSimilarity()
+            # The rules with no observation axis to weight ignore threaded weights.
+            @test factory(FeatureDistance(), w).alg === LastObservation()
+            # `FeatureDistance` must be `@propagatable`, or `ClustersEstimator`'s `@fprop de`
+            # has nothing to recurse into.
+            @test hasmethod(factory, Tuple{FeatureDistance, Vararg{Any}})
+        end
+        @testset "Feature matrix validation" begin
+            de = FeatureDistance()
+            Z = [1.0 2.0; 3.0 4.0]
+            @test_throws DomainError distance(de, Z; dims = 3)
+            @test_throws PortfolioOptimisers.IsEmptyError distance(de,
+                                                                   Matrix{Float64}(undef, 0,
+                                                                                   0))
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de,
+                                                                       [1.0 NaN; 3.0 4.0])
+            @test_throws PortfolioOptimisers.IsNonFiniteError distance(de,
+                                                                       [1.0 Inf; 3.0 4.0])
+            # `Jaccard` is the Ruzicka form and returns values up to 2 on signed input,
+            # silently. The non-negativity check is mandatory for it, and for the two other
+            # non-negative-domain metrics, but must not fire for the default.
+            for metric in (DS.Jaccard(), DS.BrayCurtis(), DS.ChiSqDist())
+                @test_throws DomainError distance(FeatureDistance(; metric = metric),
+                                                  [1.0 -2.0; 3.0 4.0])
+            end
+            @test !any(isnan, distance(de, [1.0 -2.0; 3.0 4.0]))
+            # Structural degeneracy the metric can handle is admitted, not rejected.
+            @test size(distance(de, [1.0 1.0; 1.0 1.0; 0.0 0.0])) == (3, 3)
+            # The 3-D entry point validates the same way.
+            @test_throws DomainError distance(de, abs.(randn(rng, 2, 3, 2)); dims = 3)
+        end
+        @testset "FeatureDistance is a distance estimator" begin
+            # It is a peer of `Distance`/`DistanceDistance`, not one of their algorithms:
+            # every consumer types its `de` field as `AbstractDistanceEstimator`.
+            @test FeatureDistance() isa PortfolioOptimisers.AbstractDistanceEstimator
+            @test LastObservation() isa PortfolioOptimisers.AbstractFeatureCollapseAlgorithm
+            @test MeanCollapse() isa PortfolioOptimisers.AbstractCollapseAlgorithm
+            @test AngularDist() isa DS.SemiMetric
+        end
+    end
     @testset "Clustering tests" begin
         clr = clusterise(ClustersEstimator(; ce = PortfolioOptimisersCovariance(),
                                            de = Distance(; alg = CanonicalDistance()),
@@ -57,9 +536,10 @@
                                                                        alg = SecondOrderDifference())),
                          pr.X)
         S, D = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), pr.X)
-        @test isapprox(PortfolioOptimisers.dbht_similarity(ExponentialSimilarity(); D = D),
-                       PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
-                                                           D = D))
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity();
+                                                                  D = D),
+                       PortfolioOptimisers.distance_to_similarity(GeneralExponentialSimilarity();
+                                                                  D = D))
         A1, tri1, separators1, cliques1, cliqueTree1 = PortfolioOptimisers.PMFG_T2s(S, 5)
         @test isapprox(A1,
                        sparse([2, 3, 4, 6, 7, 9, 10, 13, 14, 16, 1, 3, 4, 5, 6, 7, 10, 13,
@@ -282,6 +762,25 @@
                                                                                      alg = SilhouetteScore(),
                                                                                      max_k = 100),
                                                                alg, clr.D)[2]
+        # A single cluster has no silhouette, so `W_list[1]` is never computed — it must
+        # still be *written*, or `argmax` reads uninitialised memory and returns `k = 1`
+        # whenever that garbage beats every real score. That made this whole block flaky,
+        # since the garbage is whatever the allocator last left there. Fresh allocations
+        # each iteration, so a reintroduction fails here rather than intermittently
+        # somewhere downstream.
+        onc_sil = OptimalNumberClusters(; alg = SilhouetteScore(), max_k = nothing)
+        rng_sil = StableRNG(1234)
+        for _ in 1:50
+            Dr = PortfolioOptimisers.cor_and_dist(Distance(; alg = CanonicalDistance()),
+                                                  PortfolioOptimisersCovariance(),
+                                                  randn(rng_sil, 200, 20))[2]
+            alg_sil = KMeansAlgorithm(; rng = StableRNG(42), seed = 42,
+                                      kwargs = (; init = :kmcen))
+            k = PortfolioOptimisers.optimal_number_clusters(onc_sil, alg_sil, Dr)[2]
+            # `max_k = nothing` gives `c1 = floor(sqrt(20)) = 4`, and the silhouette of a
+            # one-cluster partition is undefined, so `k = 1` is never a legitimate answer.
+            @test 2 <= k <= 4
+        end
         @test 4 ==
               PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
                                                                                 max_k = nothing),
@@ -402,7 +901,7 @@
     @testset "Phylogeny matrix" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
         for i in 1:8
-            A = phylogeny_matrix(NetworkEstimator(; n = i), pr)
+            A = phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = i)), pr)
             @test A === phylogeny_matrix(A)
             A = A.X
             res = isapprox(vec(A), df[!, i])
@@ -415,7 +914,7 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
-            A = phylogeny_matrix(NetworkEstimator(; n = i,
+            A = phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = i),
                                                   alg = MaximumDistanceSimilarity()), pr).X
             res = isapprox(vec(A), df[!, i])
             if !res
@@ -450,6 +949,127 @@
                              pr).X
         @test isapprox(vec(A), df[!, 1])
     end
+    @testset "The radius ball selects; the hop ball is untouched" begin
+        NAS = size(pr.X, 2)
+        NPAIRS = (NAS * (NAS - 1)) ÷ 2
+        algs = (KruskalTree(), BoruvkaTree(), PrimTree(), MaximumDistanceSimilarity(),
+                ExponentialSimilarity(), GeneralExponentialSimilarity(),
+                ComplementSimilarity())
+        # The hop branch moved behind `_phylogeny_matrix`, so the honest regression is its
+        # own body reproduced verbatim as an oracle -- values *and* type.
+        function hop_oracle(nte, X)
+            A = PortfolioOptimisers.calc_adjacency(nte, X; dims = 1)
+            P = zeros(Int, size(A))
+            for i in 0:(nte.sep.n)
+                P .+= A^i
+            end
+            return clamp!(P, 0, 1) - I
+        end
+        for alg in algs, n in 1:5
+            nte = NetworkEstimator(; alg = alg, sep = HopCount(; n = n))
+            A = phylogeny_matrix(nte, pr.X).X
+            want = hop_oracle(nte, pr.X)
+            @test A == want
+            @test typeof(A) === typeof(want)
+        end
+
+        # The radius ball is `Int`-valued. #204 decided values do not widen, only selection
+        # does, so this is the decision itself and not an implementation detail.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity()), dmax in (1.0, 1.5, 2.0)
+            nte = NetworkEstimator(; alg = alg, sep = PathLength(; dmax = dmax))
+            A = phylogeny_matrix(nte, pr.X).X
+            @test isa(A, Matrix{Int})
+            @test issymmetric(A)
+            @test all(iszero, diag(A))
+            # It *is* the thresholded separation matrix, reusing the one traversal rather
+            # than a second all-pairs routine of its own.
+            d = separation_matrix(nte.sep, nte, pr.X; dims = 1)
+            @test A == Int.(d .<= separation_budget(nte.sep, nte, d)) - I
+        end
+
+        # A larger budget relates a superset. The radius knob is a dial, not a reshuffle.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            prev = nothing
+            for dmax in (0.75, 1.0, 1.5, 2.0, 2.5)
+                A = phylogeny_matrix(NetworkEstimator(; alg = alg,
+                                                      sep = PathLength(; dmax = dmax)),
+                                     pr.X).X
+                if !isnothing(prev)
+                    @test all(prev .<= A)
+                end
+                prev = A
+            end
+        end
+
+        # `PathLength()` bare resolves to the observed diameter, so it relates *every*
+        # reachable pair -- the opposite end of the dial from `HopCount()`'s default `n = 1`.
+        # Documented rather than guarded: it is the honest reading of an unstated budget.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            A = phylogeny_matrix(NetworkEstimator(; alg = alg, sep = PathLength()), pr.X).X
+            @test count(isone, A) == 2 * NPAIRS
+            @test all(iszero, diag(A))
+        end
+
+        # The gain is intermediate cardinalities *between* the hop shells, not a different
+        # neighbourhood. The hop knob cannot express a count the radius knob reaches.
+        npmfg = NetworkEstimator(; alg = MaximumDistanceSimilarity(),
+                                 sep = HopCount(; n = 1))
+        shells = [count(isone,
+                        phylogeny_matrix(NetworkEstimator(;
+                                                          alg = MaximumDistanceSimilarity(),
+                                                          sep = HopCount(; n = n)), pr.X).X) ÷
+                  2 for n in 1:2]
+        @test shells == [54, 121]
+        between = count(isone,
+                        phylogeny_matrix(NetworkEstimator(;
+                                                          alg = MaximumDistanceSimilarity(),
+                                                          sep = PathLength(; dmax = 0.9768)),
+                                         pr.X).X) ÷ 2
+        @test shells[1] < between < shells[2]
+
+        # And it does not re-rank: a hop shell is the equal-cardinality prefix of the
+        # path-length ordering. Exactly so on the PMFG, near enough on the tree.
+        dh = separation_matrix(HopCount(), npmfg, pr.X; dims = 1)
+        dp = separation_matrix(PathLength(), npmfg, pr.X; dims = 1)
+        pairs = [(i, k) for i in 1:NAS for k in (i + 1):NAS]
+        ord = sortperm([dp[i, k] for (i, k) in pairs])
+        for n in 1:4
+            shell = Set(p for p in pairs if dh[p...] <= n)
+            @test shell == Set(pairs[ord[1:length(shell)]])
+        end
+
+        # The radius ball is reachable from both constraint families for free -- they call
+        # `phylogeny_matrix(plc.pl, X)` and dispatch does the rest. That reachability is the
+        # entire reason the radius ball exists.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            nte = NetworkEstimator(; alg = alg, sep = PathLength(; dmax = 1.5))
+            sdp = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pl = nte), pr.X)
+            ip = phylogeny_constraints(IntegerPhylogenyEstimator(; pl = nte), pr.X)
+            @test isa(sdp, SemiDefinitePhylogeny)
+            @test isa(ip, IntegerPhylogeny)
+            @test eltype(sdp.A) === Int
+            @test eltype(ip.A) === Int
+            @test sdp.A == phylogeny_matrix(nte, pr.X).X
+        end
+
+        # `clusterise` refuses a `PathLength` at *dispatch*. Its `D^i - A^i` is a power sum
+        # indexed by hops, and a radius has no analogue of a matrix power -- so the fourth
+        # type parameter is narrowed rather than the field access left to fail.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            @test_throws MethodError clusterise(NetworkClustersEstimator(;
+                                                                         nte = NetworkEstimator(;
+                                                                                                alg = alg,
+                                                                                                sep = PathLength())),
+                                                pr.X)
+            # The hop path is unaffected.
+            @test isa(clusterise(NetworkClustersEstimator(;
+                                                          nte = NetworkEstimator(;
+                                                                                 alg = alg,
+                                                                                 sep = HopCount(;
+                                                                                                n = 2))),
+                                 pr.X), PortfolioOptimisers.Clusters)
+        end
+    end
     #=
     @testset "DBHT Clustering tests" begin
         X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
@@ -461,12 +1081,12 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        @test isapprox(PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(GeneralExponentialSimilarity();
                                                            D = rho),
-                       PortfolioOptimisers.dbht_similarity(ExponentialSimilarity(); D = rho))
+                       PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity(); D = rho))
 
         sim = MaximumDistanceSimilarity()
-        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.distance_to_similarity(sim; S = rho, D = dist)
         root = UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = PortfolioOptimisers.DBHTs(dist, S;
                                                                      branchorder = :default,
@@ -611,7 +1231,7 @@
         @test isapprox(cliqueTree1, cliqueTree1_t)
 
         sim = ExponentialSimilarity()
-        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.distance_to_similarity(sim; S = rho, D = dist)
 
         root = EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = PortfolioOptimisers.DBHTs(dist, S;
@@ -887,4 +1507,1252 @@
         @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
     =#
+    @testset "Subsetting optimisers reject a precomputed phylogeny" begin
+        #=
+        A meta-optimiser hands its subproblems a subset of the universe, and a phylogeny
+        cannot follow them there. #184 got there through a phylogeny constraint *estimator*
+        holding a precomputed result in `pl` -- configuration on the outside, data one level
+        down, invisible to every check aimed at results.
+
+        That shape is now unconstructible rather than guarded: `pl` is bounded by `NwE_ClE`,
+        which admits only sources, on all three estimators that have the slot. So the checks
+        below assert a *type* error at construction, and the runtime guard is left with one
+        job -- a precomputed constraint result -- which is what it was originally written
+        for, and which no type bound can take over because `ple` legitimately accepts a
+        result outside a meta-optimiser.
+        =#
+        Xp = rd.X
+        plr = phylogeny_matrix(NetworkEstimator(), Xp)
+        clr = clusterise(ClustersEstimator(), Xp)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        mk(ple) = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ple = ple))
+
+        # The root cause: no estimator accepts precomputed structure in `pl` any more.
+        # A `Clusters` is rejected for the same reason as a `PhylogenyResult` -- both answer
+        # for the universe they were built on, and the slot asks how to build for any.
+        # The bound rejects at construction, so there is no runtime check to reach.
+        @test_throws TypeError SemiDefinitePhylogenyEstimator(; pl = plr)
+        @test_throws TypeError SemiDefinitePhylogenyEstimator(; pl = clr)
+        @test_throws TypeError IntegerPhylogenyEstimator(; pl = plr)
+        @test_throws TypeError IntegerPhylogenyEstimator(; pl = clr)
+        @test_throws TypeError CentralityEstimator(; pl = plr)
+        @test_throws TypeError CentralityEstimator(; pl = clr)
+        @test isa(CentralityEstimator(; pl = NetworkEstimator()), CentralityEstimator)
+        # Sources still construct, by keyword and positionally.
+        @test isa(SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator()),
+                  SemiDefinitePhylogenyEstimator)
+        @test isa(SemiDefinitePhylogenyEstimator(ClustersEstimator(), 0.05),
+                  SemiDefinitePhylogenyEstimator)
+        @test isa(IntegerPhylogenyEstimator(; pl = ClustersEstimator()),
+                  IntegerPhylogenyEstimator)
+        #=
+        Known and NOT specific to these two types: `@concrete` emits a fully generic
+        positional constructor (`ConcreteStructs.jl:146`) that is more specific than
+        nothing and shadows the annotated one, so every type bound in the package is
+        bypassable positionally. `PhylogenyFeatures(vector_shaped_result, alg)` does the
+        same thing and predates this. Pinned here so the limit of the guarantee is on the
+        record: the keyword constructor is the enforced API.
+        =#
+        @test isa(SemiDefinitePhylogenyEstimator(plr, 0.05), SemiDefinitePhylogenyEstimator)
+
+        # What the runtime guard is still for: a precomputed constraint *result* in `ple`.
+        # It was already rejected when held directly...
+        plres = phylogeny_constraints(SemiDefinitePhylogenyEstimator(), Xp)
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(mk(plres))
+        @test_throws ArgumentError PortfolioOptimisers.assert_internal_optimiser(mk(plres))
+        # ...but not when held in a vector: the branch meant to catch that was unreachable,
+        # because `||` binds looser than `&&`, so a vector satisfied the first clause and
+        # short-circuited to pass -- in exactly the case the branch was written for.
+        @test_throws ArgumentError PortfolioOptimisers.assert_external_optimiser(mk([plres]))
+        @test_throws ArgumentError PortfolioOptimisers.assert_internal_optimiser(mk([plres]))
+
+        # An estimator that refits per subproblem is the supported form and still passes.
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk(SemiDefinitePhylogenyEstimator())))
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk(nothing)))
+        @test isnothing(PortfolioOptimisers.assert_external_optimiser(mk([SemiDefinitePhylogenyEstimator()])))
+    end
+    @testset "A zero distance is repaired, not deleted" begin
+        #=
+        A distance matrix and a weighted graph disagree about `0`: the distance codomain
+        means *closest*, `SimpleWeightedGraph` reserves it for *absent* and sparsifies it
+        away. Left alone, the constructor deletes exactly the cheapest edge -- the one the
+        MST most wants -- and the most related pair in the universe comes out non-adjacent
+        with nothing raised. `graph_weight_matrix` moves each zero to the smallest
+        representable positive value instead.
+        =#
+        Dg = PortfolioOptimisers.distance(Distance(), PortfolioOptimisersCovariance(), pr.X)
+        tiny = nextfloat(zero(eltype(Dg)))
+
+        # Nothing to repair: `D` comes back untouched and uncopied, so the copy is only
+        # paid for when it buys something.
+        @test PortfolioOptimisers.graph_weight_matrix(Dg) === Dg
+
+        Dz = copy(Dg)
+        Dz[1, 2] = Dz[2, 1] = zero(eltype(Dz))
+        Wz = PortfolioOptimisers.graph_weight_matrix(Dz)
+        @test Wz !== Dz                       # repaired on a copy...
+        @test Dz[1, 2] === zero(eltype(Dz))   # ...leaving the caller's matrix exact,
+        @test Wz[1, 2] == tiny                # which `clusterise`'s `P` depends on.
+        @test Wz[2, 1] == tiny
+        # Only the zeros move.
+        @test all(Wz[i, j] == Dz[i, j]
+                  for i in axes(Dz, 1), j in axes(Dz, 2) if !iszero(Dz[i, j]))
+        # `-0.0` is a zero too.
+        Dm = copy(Dg)
+        Dm[1, 2] = Dm[2, 1] = -zero(eltype(Dm))
+        @test PortfolioOptimisers.graph_weight_matrix(Dm)[1, 2] == tiny
+
+        #=
+        Negative and NaN have no nearest representable value and are *unsound* rather than
+        merely wrong downstream: Dijkstra returns an answer on a negative edge instead of
+        raising, and NaN silently fails every comparison the tree algorithms make. A NaN
+        arrives from ordinary bad data -- a zero-variance asset gives a NaN correlation.
+        =#
+        Dn = copy(Dg)
+        Dn[1, 2] = -eps(eltype(Dn))
+        @test_throws DomainError PortfolioOptimisers.graph_weight_matrix(Dn)
+        Dnan = copy(Dg)
+        Dnan[2, 3] = NaN
+        @test_throws DomainError PortfolioOptimisers.graph_weight_matrix(Dnan)
+        # Inf is allowed: it is the honest LogDistance between uncorrelated assets, the
+        # graph accepts it, and a spanning tree simply takes those edges last.
+        Di = copy(Dg)
+        Di[1, 2] = Di[2, 1] = Inf
+        @test PortfolioOptimisers.graph_weight_matrix(Di) === Di
+        # The diagonal is exempt -- it is zero by construction.
+        @test all(iszero, LinearAlgebra.diag(PortfolioOptimisers.graph_weight_matrix(Dz)))
+
+        #=
+        The end-to-end failure, with `clusterise` as the oracle. `SimpleAbsoluteDistance`
+        is defined on `abs(rho)`, so an exactly anti-correlated pair -- a long/short leg,
+        an inverse ETF -- sits at distance zero and is genuinely maximally related. Before
+        the repair the two consumers of one estimator contradicted each other about that
+        pair: `clusterise` reads `D` directly and put them in the same cluster, while
+        `phylogeny_matrix` reads only the sparsified graph and declared them unrelated --
+        so the phylogeny constraints left the one pair they exist to separate unbounded.
+        =#
+        Xa = randn(StableRNG(11), 300, 12)
+        Xa[:, 12] .= -Xa[:, 1]
+        ntea = NetworkEstimator(; ce = Covariance(),
+                                de = Distance(; alg = SimpleAbsoluteDistance()),
+                                alg = KruskalTree())
+        Da = PortfolioOptimisers.distance(ntea.de, ntea.ce, Xa)
+        @test Da[1, 12] == zero(eltype(Da))          # the pair really is at the floor,
+        @test Da[1, 12] == minimum(Da)               # and nothing is closer.
+        pma = phylogeny_matrix(ntea, Xa)
+        cla = clusterise(NetworkClustersEstimator(; nte = ntea), Xa)
+        asg = Clustering.cutree(cla.res; k = cla.k)
+        @test size(pma.X) == (12, 12)                # the universe survives...
+        @test isone(pma.X[1, 12])                    # ...and the pair is adjacent,
+        @test asg[1] == asg[12]                      # which is what `clusterise` says too.
+        # The repair is a single-edge swap: 1--12 enters, and the 3--12 edge that stood in
+        # for it while 1--12 was deleted is gone. Every other edge is untouched.
+        @test iszero(pma.X[3, 12])
+        @test count(isone, pma.X) == 2 * (size(Xa, 2) - 1)
+    end
+    @testset "The weighted adjacency tiers" begin
+        #=
+        `calc_adjacency` no longer has a body of its own: the structure is built once by
+        `calc_weighted_adjacency_graph`, and the other two tiers are one operation each.
+        These are regressions of a fact already measured -- the refactor is subtractive, so
+        the binary matrix must come out of the new chain unchanged in value *and* in type.
+        The oracles below are the two branch bodies `calc_adjacency` used to carry.
+        =#
+        Gr = PortfolioOptimisers.Graphs
+        SWG = PortfolioOptimisers.SimpleWeightedGraphs
+        function tree_oracle(nte, X)
+            D = PortfolioOptimisers.distance(nte.de, nte.ce, X; dims = 1)
+            G = SWG.SimpleWeightedGraph(PortfolioOptimisers.graph_weight_matrix(D))
+            tree = PortfolioOptimisers.calc_mst(nte.alg, G)
+            return Gr.adjacency_matrix(Gr.SimpleGraph(G[tree]))
+        end
+        function pmfg_similarity(nte, X)
+            S, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            return PortfolioOptimisers.distance_to_similarity(nte.alg; S = S, D = D)
+        end
+        function pmfg_oracle(nte, X)
+            Rpm = PortfolioOptimisers.PMFG_T2s(pmfg_similarity(nte, X))[1]
+            return Gr.adjacency_matrix(Gr.SimpleGraph(Rpm))
+        end
+        # `AngularSimilarity` is absent because `NetworkEstimator.alg` now refuses it at
+        # construction: it is outside `AbstractNonNegativeSimilarityMatrixAlgorithm`, and
+        # `PMFG_T2s` cannot take its negative entries. Issue #239.
+        tree_algs = (KruskalTree(), BoruvkaTree(), PrimTree())
+        pmfg_algs = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                     GeneralExponentialSimilarity(), ComplementSimilarity())
+        for (algs, oracle) in ((tree_algs, tree_oracle), (pmfg_algs, pmfg_oracle))
+            for alg in algs
+                nte = NetworkEstimator(; alg = alg)
+                A = PortfolioOptimisers.calc_adjacency(nte, pr.X)
+                O = oracle(nte, pr.X)
+                @test A == O
+                @test typeof(A) === typeof(O)
+                @test A isa SparseMatrixCSC{Int, Int}
+                # Same structure, different values: the weighted tier keeps the sparsity
+                # pattern exactly and only stops discarding the numbers. `adjacency_matrix`
+                # of a *weighted* graph returns the weights, not 0/1.
+                W = PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+                @test W.colptr == A.colptr
+                @test W.rowval == A.rowval
+                @test eltype(W) === eltype(pr.X)
+                @test !all(isone, W.nzval)
+            end
+        end
+        # Per-branch polarity, recovered by dispatch on `nte.alg` and carried by no tag: the
+        # tree weights are the distances `calc_mst` minimised, strictly positive after the
+        # repair; the PMFG weights are the similarities `PMFG_T2s` maximised.
+        ntet = NetworkEstimator(; alg = KruskalTree())
+        Dt = PortfolioOptimisers.distance(ntet.de, ntet.ce, pr.X)
+        Wt = PortfolioOptimisers.calc_weighted_adjacency(ntet, pr.X)
+        @test all(>(zero(eltype(Wt))), Wt.nzval)
+        @test all(Wt[i, j] == Dt[i, j] for (i, j) in zip(findnz(Wt)[1], findnz(Wt)[2]))
+        # The PMFG's weighted adjacency *is* `PMFG_T2s(S)[1]` verbatim -- the graph round
+        # trip is structurally the identity, because `PMFG_T2s` emits no stored zero.
+        for alg in pmfg_algs
+            nte = NetworkEstimator(; alg = alg)
+            Rpm = PortfolioOptimisers.PMFG_T2s(pmfg_similarity(nte, pr.X))[1]
+            W = PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+            @test count(iszero, Rpm.nzval) == 0
+            @test W.colptr == Rpm.colptr
+            @test W.rowval == Rpm.rowval
+            @test W.nzval == Rpm.nzval
+        end
+        #=
+        The one place the removed `SimpleGraph` round trip could have diverged: an
+        explicitly stored zero. `adjacency_matrix` is `T.(copy(weights))` and the broadcast
+        drops a numerical zero, so a zero-weight edge survives the graph tier but not the
+        matrix tier. Injected by hand, since `PMFG_T2s` never produces one -- and both the
+        old path and the new one drop the edge, keeping every vertex.
+        =#
+        ntep = NetworkEstimator(; alg = ComplementSimilarity())
+        Rz = copy(PortfolioOptimisers.PMFG_T2s(pmfg_similarity(ntep, pr.X))[1])
+        Rz[1, 2] = Rz[2, 1] = zero(eltype(Rz))
+        @test count(iszero, Rz.nzval) == 2          # the zeros really are stored,
+        old_path = Gr.adjacency_matrix(Gr.SimpleGraph(Rz))
+        new_path = Gr.adjacency_matrix(Gr.SimpleGraph(SWG.SimpleWeightedGraph(Rz)))
+        @test old_path == new_path
+        @test iszero(old_path[1, 2])                # ...and both paths drop the edge,
+        @test nnz(old_path) == nnz(Rz) - 2
+        @test Gr.nv(SWG.SimpleWeightedGraph(Rz)) == size(pr.X, 2)  # losing no vertex.
+    end
+    @testset "clusterise reads the shared adjacency routine" begin
+        #=
+        Both `clusterise` methods used to re-derive the structure inline -- the tree one
+        rebuilt the graph, the tree and the adjacency, the PMFG one called `PMFG_T2s`
+        itself. They now enter `calc_weighted_adjacency` at its two-argument form, which
+        takes the *selecting quantity*: the distance on the tree branch, the similarity on
+        the PMFG branch. `clusterise` has already paid for that matrix -- it needs it for
+        its own power sum -- so the two-argument form is what keeps the fold free.
+
+        The oracles below are the two inline bodies, reproduced verbatim. `P` is the
+        quantity that changed hands, so `P` is what is compared, and bit-for-bit rather
+        than approximately: the fold is meant to be a substitution, not an improvement.
+        =#
+        Gr = PortfolioOptimisers.Graphs
+        SWG = PortfolioOptimisers.SimpleWeightedGraphs
+        function tree_P_oracle(nte, X, n)
+            _, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            P = zeros(eltype(D), size(D))
+            G = SWG.SimpleWeightedGraph(PortfolioOptimisers.graph_weight_matrix(D))
+            A = Gr.adjacency_matrix(G[PortfolioOptimisers.calc_mst(nte.alg, G)])
+            for i in 0:n
+                P .+= D^i - A^i
+            end
+            P .-= Diagonal(P)
+            return P, A
+        end
+        function pmfg_P_oracle(nte, X, n)
+            S, D = cor_and_dist(nte.de, nte.ce, X; dims = 1)
+            P = zeros(eltype(D), size(D))
+            S = PortfolioOptimisers.distance_to_similarity(nte.alg; S = S, D = D)
+            Rpm = PortfolioOptimisers.PMFG_T2s(S)[1]
+            for i in 0:n
+                P .+= S^i - Rpm^i
+            end
+            P .-= Diagonal(P)
+            return P, Rpm
+        end
+        # `AngularSimilarity` is absent for the same reason as above: issue #239.
+        tree_algs = (KruskalTree(), BoruvkaTree(), PrimTree())
+        pmfg_algs = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                     GeneralExponentialSimilarity(), ComplementSimilarity())
+        for (algs, oracle) in ((tree_algs, tree_P_oracle), (pmfg_algs, pmfg_P_oracle))
+            for alg in algs, n in 1:4
+                nte = NetworkEstimator(; alg = alg, sep = HopCount(; n = n))
+                Po, Ao = oracle(nte, pr.X, n)
+                clr = clusterise(NetworkClustersEstimator(; nte = nte), pr.X)
+                @test clr.P == Symmetric(Po)
+                @test typeof(clr.P) === typeof(Symmetric(Po))
+                # The substitution's premise, stated separately from its consequence: the
+                # matrix the shared routine returns *is* the one the inline body built,
+                # values and type, on both branches. `W` is the selecting quantity, which
+                # is where the two branches differ.
+                Sw, Dw = cor_and_dist(nte.de, nte.ce, pr.X; dims = 1)
+                W = if alg isa PortfolioOptimisers.AbstractTreeType
+                    Dw
+                else
+                    PortfolioOptimisers.distance_to_similarity(alg; S = Sw, D = Dw)
+                end
+                An = PortfolioOptimisers.calc_weighted_adjacency(alg, W)
+                @test An == Ao
+                @test typeof(An) === typeof(Ao)
+                # The middle tier's two entry points differ only in who derives `W`.
+                @test An == PortfolioOptimisers.calc_weighted_adjacency(nte, pr.X)
+            end
+        end
+    end
+end
+
+using PortfolioOptimisers, Test, SparseArrays, LinearAlgebra
+
+# A network estimator handing the kernels a *weighted* graph chosen by the test. Every
+# structure `calc_adjacency` can build is connected -- a spanning tree or a PMFG -- so this is
+# the only way to drive the unreachable branch through a verb that takes an **estimator**:
+# `centrality_vector` and `phylogeny_matrix` do, and cannot be handed a graph. The separation
+# kernels themselves take the structure, so they are driven directly below. It is an
+# `AbstractNetworkEstimator` and not a `NetworkEstimator`, which is also what makes it
+# evidence that `phylogeny_matrix` splits on the *separation* rather than on the estimator's
+# own type. Defined at top level because a `@testset` body becomes a function, which cannot
+# host a struct.
+struct FixedDistanceGraph{T} <: PortfolioOptimisers.AbstractNetworkEstimator
+    W::Matrix{Float64}
+    sep::T
+end
+function PortfolioOptimisers.calc_distance_weighted_graph(pl::FixedDistanceGraph, X;
+                                                          kwargs...)
+    return PortfolioOptimisers.SimpleWeightedGraphs.SimpleWeightedGraph(pl.W)
+end
+function PortfolioOptimisers.calc_adjacency(pl::FixedDistanceGraph, X; kwargs...)
+    return SparseArrays.sparse(Int.(pl.W .!= 0))
+end
+
+@testset "An unreachable pair is outside every budget" begin
+    # Two disjoint edges, 1-2 and 3-4. `floyd_warshall_shortest_paths` reports `Inf` across
+    # the components, and `is_related` rejects it without a repair. Every structure a shipped
+    # estimator can build is connected -- a spanning tree or a PMFG -- so the disconnected one
+    # is handed to the kernels directly, through their graph-taking entry points. No test
+    # double subtypes `AbstractNetworkEstimator` to answer an internal generic any more;
+    # `NetworkEstimator()` stands in the inert estimator slots.
+    PO = PortfolioOptimisers
+    SWG = PortfolioOptimisers.SimpleWeightedGraphs
+    W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+    nte = NetworkEstimator()
+    gw = SWG.SimpleWeightedGraph(W)
+    want = [0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
+
+    d = separation_matrix(PathLength(), gw)
+    @test d[1, 3] == Inf
+    @test separation_budget(PathLength(), nte, d) == 1.0
+    @test !PO.is_reachable(PathLength(), d[1, 3])
+    @test PO.is_reachable(PathLength(), d[1, 2])
+
+    @test PO._phylogeny_matrix(PathLength(), nte, gw) == want
+    # The clamp to the observed diameter excludes the sentinel, so even a budget far above
+    # the diameter cannot reach across a component.
+    @test PO._phylogeny_matrix(PathLength(; dmax = 100.0), nte, gw) == want
+    # A hop count agrees on this graph, which is what makes the comparison meaningful: the
+    # two separations differ on the budget, not on reachability. It reads the same structure
+    # binarised, which is `separation_graph`'s graph-taking entry point.
+    gh = PO.separation_graph(HopCount(), gw)
+    @test PO._phylogeny_matrix(HopCount(; n = 3), nte, gh) == want
+    # And the sentinel a hop count reports is the one `isfinite` alone would let through.
+    @test separation_matrix(HopCount(), gh)[1, 3] == typemax(Int)
+    @test !PO.is_reachable(HopCount(), typemax(Int))
+end
+
+# A distance estimator that counts how often the correlation is derived from `X`. It only
+# forwards; the counters are the whole point. Defined at top level because a `@testset`
+# body becomes a function, which cannot host a struct.
+mutable struct CountingDistance{T} <: PortfolioOptimisers.AbstractDistanceEstimator
+    const de::T
+    n_cor_and_dist::Int
+    n_distance::Int
+end
+CountingDistance(de) = CountingDistance(de, 0, 0)
+function PortfolioOptimisers.cor_and_dist(de::CountingDistance, ce, X; kwargs...)
+    de.n_cor_and_dist += 1
+    return PortfolioOptimisers.cor_and_dist(de.de, ce, X; kwargs...)
+end
+function PortfolioOptimisers.distance(de::CountingDistance, ce, X; kwargs...)
+    de.n_distance += 1
+    return PortfolioOptimisers.distance(de.de, ce, X; kwargs...)
+end
+
+@testset "clusterise derives the correlation once" begin
+    #=
+    Why `calc_weighted_adjacency` has a two-argument form at all. `clusterise` holds the
+    selecting quantity already -- it needs `D` and `S` for its own power sum and for the
+    `Clusters` it returns -- so entering the shared routine at its `(nte, X)` form would
+    derive the same correlation a second time. That is not a rounding error: under
+    `VariationInfoDistance` the derivation is `98%` of `clusterise`'s runtime, so the
+    second one would almost double it. This test is the guard on that, and it fails for
+    the naive substitution rather than merely running slower.
+    =#
+    Xc = randn(StableRNG(987654321), 200, 10)
+    for alg in (KruskalTree(), ComplementSimilarity())
+        de = CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg)
+        clusterise(NetworkClustersEstimator(; nte = nte), Xc)
+        @test de.n_cor_and_dist == 1
+        @test de.n_distance == 0
+        # The naive substitution, for contrast: it re-enters the derivation on its own.
+        PortfolioOptimisers.calc_weighted_adjacency(nte, Xc)
+        @test de.n_cor_and_dist + de.n_distance == 2
+    end
+
+    #=
+    And once is once with a budget *rule* too. A rule needs the structure to answer, so a
+    rule asked to derive its own would spend this method's saving right back -- the second
+    full derivation the two-argument entry point exists to prevent, inside the very function
+    that avoided it. `separation_graph` is what closes that: the structure is built once and
+    handed to `resolve_separation`.
+    =#
+    for alg in (KruskalTree(), ComplementSimilarity())
+        de = CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg,
+                               sep = HopCount(; n = HopCountQuantile(; q = 0.5)))
+        clusterise(NetworkClustersEstimator(; nte = nte), Xc)
+        @test de.n_cor_and_dist == 1
+        @test de.n_distance == 0
+    end
+end
+
+@testset "phylogeny_matrix and phylogeny_features build one structure per call" begin
+    #=
+    The same guard on the other two consumers of a network, over both separations and over
+    both halves of the dial: a stated budget builds one structure, and a budget rule builds
+    the same one rather than a second. `phylogeny_features` reaches the separation kernels
+    through `Proximity`, so it is checked here beside `phylogeny_matrix` rather than by its
+    own counting fixture.
+    =#
+    Xc = randn(StableRNG(123456789), 200, 10)
+    seps = (HopCount(; n = 2), HopCount(; n = HopCountQuantile(; q = 0.5)), PathLength(),
+            PathLength(; dmax = PathLengthQuantile(; q = 0.5)))
+    for alg in (KruskalTree(), ComplementSimilarity()), sep in seps
+        de = CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte = NetworkEstimator(; de = de, alg = alg, sep = sep)
+        phylogeny_matrix(nte, Xc)
+        # A tree branch derives `D` through `distance`, a PMFG branch derives both through
+        # `cor_and_dist`, so the sum is what the count is about.
+        @test de.n_cor_and_dist + de.n_distance == 1
+        de2 = CountingDistance(Distance(; alg = CanonicalDistance()))
+        nte2 = NetworkEstimator(; de = de2, alg = alg, sep = sep)
+        phylogeny_features(Proximity(), nte2, Xc)
+        @test de2.n_cor_and_dist + de2.n_distance == 1
+    end
+end
+
+#=
+Weighted centrality (#205). `centrality_polarity` declares which quantity an algorithm's
+weights must be, and `centrality_graph` supplies it. Nothing in the path raises: an
+algorithm that declares no polarity, and a source that carries no weights, run on the plain
+graph instead.
+=#
+using PortfolioOptimisers, Test
+
+# An algorithm that says nothing about itself, for the fallback. Defined at top level
+# because a `@testset` body becomes a function, which cannot host a struct.
+struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+
+@testset "Weighted centrality" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, StatsBase, SparseArrays,
+          LinearAlgebra
+    PO = PortfolioOptimisers
+    G = PortfolioOptimisers.Graphs
+    SWG = PortfolioOptimisers.SimpleWeightedGraphs
+
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    X = prior(EmpiricalPrior(), rd).X
+    nte_t = NetworkEstimator()                                       # tree branch
+    nte_p = NetworkEstimator(; alg = MaximumDistanceSimilarity())    # similarity branch
+    ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),
+           EigenvectorCentrality(), KatzCentrality(), Pagerank(), RadialityCentrality(),
+           StressCentrality()]
+
+    @testset "The declared polarity" begin
+        # The fallback declares nothing, so an algorithm is unweightable until it opts in.
+        struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm end
+        @test PO.centrality_polarity(UndeclaredCentrality()) === nothing
+        # Every shipped member, one assertion each.
+        for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
+                   StressCentrality())
+            @test PO.centrality_polarity(ct) === PO.DistancePolarity()
+        end
+        @test PO.centrality_polarity(EigenvectorCentrality()) === PO.SimilarityPolarity()
+        for ct in (DegreeCentrality(), KatzCentrality(), Pagerank())
+            @test PO.centrality_polarity(ct) === nothing
+        end
+    end
+
+    @testset "The routing table" begin
+        #=
+        Which graph each pair gets. The distance route is available on both branches; the
+        similarity route only on the branch a similarity actually selected.
+        =#
+        want_t = [SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph, G.SimpleGraph,
+                  G.SimpleGraph, G.SimpleGraph, G.SimpleGraph, SWG.SimpleWeightedGraph,
+                  SWG.SimpleWeightedGraph]
+        want_p = [SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph, G.SimpleGraph,
+                  SWG.SimpleWeightedGraph, G.SimpleGraph, G.SimpleGraph,
+                  SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph]
+        for (i, ct) in pairs(ces)
+            @test isa(PO.centrality_graph(nte_t, ct, X), want_t[i])
+            @test isa(PO.centrality_graph(nte_p, ct, X), want_p[i])
+            # A clustering source is weightless whatever the algorithm declares.
+            @test isa(PO.centrality_graph(ClustersEstimator(), ct, X), G.SimpleGraph)
+        end
+    end
+
+    @testset "Weights re-rank, and equal weights do not" begin
+        #=
+        Both halves of the claim, on a graph constructed so the first one must hold. The
+        cycle 1-2-3-4-5-1 has a heavy shortcut on (1,5): unweighted, vertices 1 and 5 are
+        adjacent and tie with 3 on closeness; weighted, the shortcut is not worth taking
+        and 3 wins outright. `FixedDistanceGraph` supplies the graph directly, because
+        every structure `calc_adjacency` builds from data is a spanning tree or a PMFG.
+        =#
+        W = zeros(5, 5)
+        for (i, j, w) in ((1, 2, 1.0), (2, 3, 1.0), (3, 4, 1.0), (4, 5, 1.0), (1, 5, 10.0))
+            W[i, j] = W[j, i] = w
+        end
+        Xd = zeros(3, 5)
+        nte = FixedDistanceGraph(W, HopCount(; n = 1))
+        unw = PO.calc_centrality(ClosenessCentrality(),
+                                 G.SimpleGraph(phylogeny_matrix(nte, Xd).X))
+        wtd = centrality_vector(nte, ClosenessCentrality(), Xd).X
+        @test wtd != unw
+        # The re-ranking, not merely a rescale: 1 ties with 3 unweighted and loses weighted.
+        @test unw[1] == unw[3]
+        @test wtd[3] > wtd[1]
+
+        # Equal weights reproduce the unweighted answer exactly, on the same structure.
+        We = Float64.(W .!= 0)
+        nte_e = FixedDistanceGraph(We, HopCount(; n = 1))
+        for ct in (BetweennessCentrality(), ClosenessCentrality(), RadialityCentrality(),
+                   StressCentrality())
+            @test centrality_vector(nte_e, ct, Xd).X ==
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte_e, Xd).X))
+        end
+    end
+
+    @testset "A tree's shortest paths are weight-independent" begin
+        #=
+        Exact `==`, because it is a theorem rather than a numerical coincidence: a tree has
+        exactly one path between any two vertices, so the shortest-path set does not depend
+        on the weights. Betweenness and stress count paths, so both are invariant. Closeness
+        and radiality read the path *lengths* and are not -- which is what makes the pair of
+        assertions evidence that the weights really did arrive.
+        =#
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            unw(ct) = PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte, X).X))
+            for ct in (BetweennessCentrality(), StressCentrality())
+                @test centrality_vector(nte, ct, X).X == unw(ct)
+            end
+            for ct in (ClosenessCentrality(), RadialityCentrality())
+                @test centrality_vector(nte, ct, X).X != unw(ct)
+            end
+        end
+        # It is a fact about the tree, not about the algorithms: on a PMFG, where a pair has
+        # many paths, both of them do move.
+        for ct in (BetweennessCentrality(), StressCentrality())
+            @test centrality_vector(nte_p, ct, X).X !=
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte_p, X).X))
+        end
+    end
+
+    @testset "The similarity branch is re-weighted with D, not with S" begin
+        #=
+        The PMFG's own weights are the similarities that selected its edges, and a shortest
+        path over those seeks the route through the weakest links. `calc_distance_weighted_graph`
+        supplies the distances on the same structure instead. Asserting the S-weighted answer
+        is *not* what ships: it correlates about 0.95 with the right one, so a correlation
+        test would pass the bug.
+        =#
+        gD = PO.centrality_graph(PO.DistancePolarity(), nte_p, X)
+        gS = PO.centrality_graph(PO.SimilarityPolarity(), nte_p, X)
+        # Same structure, different weights.
+        @test G.adjacency_matrix(G.SimpleGraph(gD)) == G.adjacency_matrix(G.SimpleGraph(gS))
+        @test G.weights(gD) != G.weights(gS)
+        for ct in (ClosenessCentrality(), RadialityCentrality())
+            shipped = centrality_vector(nte_p, ct, X).X
+            @test shipped == PO.calc_centrality(ct, gD)
+            @test shipped != PO.calc_centrality(ct, gS)
+        end
+        # Eigenvector is the one algorithm that wants the similarities, and gets them.
+        @test PO.centrality_graph(nte_p, EigenvectorCentrality(), X) === nothing ||
+              G.weights(PO.centrality_graph(nte_p, EigenvectorCentrality(), X)) ==
+              G.weights(gS)
+    end
+
+    @testset "The five unweightable cases return the unweighted answer" begin
+        #=
+        #240: weightedness is a property of the source, not of the request. There is no
+        flag, so a caller never asks for weights, and an unweightable pair has not been
+        handed a request it cannot serve. Exact `==` against the plain-graph result --
+        except for eigenvector, whose `Graphs.eigenvector_centrality` seeds its Arnoldi
+        iteration randomly and differs from itself at about `6e-16` between two runs on one
+        and the same graph.
+        =#
+        eig_noise(ct) = isa(ct, EigenvectorCentrality)
+        same(ct, a, b) = eig_noise(ct) ? isapprox(a, b) : a == b
+
+        # 1. Weightless sources: a clustering estimator, a precomputed `Clusters`, and a
+        #    precomputed `PhylogenyResult`.
+        clr = clusterise(ClustersEstimator(), X)
+        for pl in (ClustersEstimator(), clr)
+            for ct in ces
+                @test same(ct, centrality_vector(pl, ct, X).X,
+                           PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(pl, X).X)))
+            end
+        end
+        plr = phylogeny_matrix(nte_p, X)
+        for ct in ces
+            @test same(ct, centrality_vector(plr, ct).X,
+                       PO.calc_centrality(ct, G.SimpleGraph(plr.X)))
+        end
+
+        # 2--4. Degree, pagerank and Katz declare no polarity, on either branch.
+        for nte in (nte_t, nte_p), ct in (DegreeCentrality(), Pagerank(), KatzCentrality())
+            @test centrality_vector(nte, ct, X).X ==
+                  PO.calc_centrality(ct, G.SimpleGraph(phylogeny_matrix(nte, X).X))
+        end
+        # Katz needs the route rather than merely the absence of a check: it does not ignore
+        # the weights, it fails on them.
+        @test_throws InexactError PO.calc_centrality(KatzCentrality(),
+                                                     PO.calc_distance_weighted_graph(nte_t,
+                                                                                     X))
+
+        # 5. Eigenvector on a tree branch, where no similarity exists.
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            @test isapprox(centrality_vector(nte, EigenvectorCentrality(), X).X,
+                           PO.calc_centrality(EigenvectorCentrality(),
+                                              G.SimpleGraph(phylogeny_matrix(nte, X).X)))
+        end
+    end
+
+    @testset "The separation is read on the unweighted route only" begin
+        #=
+        The weighted routes read the structure, not the separation closure, because a power
+        of a weighted matrix sums products of distances rather than counting edges. So `sep`
+        is inert there and live on the unweighted route. At the default `n = 1` the two
+        agree, since the closure of a graph at one hop is the graph.
+        =#
+        base_w = centrality_vector(nte_t, ClosenessCentrality(), X).X
+        base_u = centrality_vector(nte_t, DegreeCentrality(), X).X
+        @test centrality_vector(NetworkEstimator(; sep = HopCount(; n = 1)),
+                                DegreeCentrality(), X).X == base_u
+        for n in 2:3
+            nte = NetworkEstimator(; sep = HopCount(; n = n))
+            @test centrality_vector(nte, ClosenessCentrality(), X).X == base_w
+            @test centrality_vector(nte, DegreeCentrality(), X).X != base_u
+        end
+    end
+
+    @testset "A matrix in args is refused" begin
+        #=
+        `args` was already a half-working weighted channel and is now a second one. The
+        working half silently overrode the declared polarity; the other half bound the
+        matrix to `betweenness_centrality`'s `vs` and overflowed the stack -- so this check
+        also closes a crash. Non-matrix positional arguments are untouched.
+        =#
+        D = zeros(3, 3)
+        for T in (BetweennessCentrality, ClosenessCentrality, StressCentrality)
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (D,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (1:3, D))
+            @test isa(T(; args = (1:3,)), T)
+            @test isa(T(), T)
+        end
+    end
+
+    @testset "A second weighting channel is refused on the tree family" begin
+        #=
+        The tree family carries the same two splat fields, and every channel they can reach
+        re-weights a graph that is already weighted. Unlike the centrality case the calls
+        SUCCEED, so the cost is a silent wrong result rather than a crash: a matrix binds to
+        `distmx`, a vector binds to `kruskal_mst`'s `weight_vector`, and `minimize = false`
+        yields a MAXIMUM spanning tree that everything downstream still reads as a minimum
+        one. None of the three functions declares a positional argument that is not a weight,
+        so both shapes are refused outright.
+        =#
+        D = zeros(3, 3)
+        for T in (KruskalTree, BoruvkaTree, PrimTree)
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (D,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(;
+                                                                        args = (zeros(3),))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (1:3,))
+            @test_throws PortfolioOptimisers.ConflictingArgumentError T(; args = (2, D))
+            for kw in ((; minimize = false), (; minimize = true))
+                @test_throws PortfolioOptimisers.ConflictingArgumentError T(; kwargs = kw)
+            end
+            @test isa(T(), T)
+            @test isa(T(; args = (), kwargs = (;)), T)
+        end
+    end
+
+    @testset "kwargs needs no guard on the centrality family" begin
+        #=
+        A keyword binds by NAME, so a matrix in `kwargs` can never reach the positional slot
+        the `args` guard was written for. None of the four functions declares a matrix-valued
+        keyword and each of them refuses one on its own, so the family fails closed at the
+        call without a guard. Constructing is deliberately left alone.
+        =#
+        D = zeros(6, 6)
+        cc = PortfolioOptimisers.calc_centrality
+        g = PortfolioOptimisers.Graphs.SimpleGraph(PortfolioOptimisers.Graphs.grid((3, 2)))
+        for (T, kw) in
+            ((BetweennessCentrality, (; distmx = D)), (ClosenessCentrality, (; distmx = D)),
+             (StressCentrality, (; distmx = D)), (DegreeCentrality, (; normalize = D)),
+             (BetweennessCentrality, (; normalize = D)))
+            ct = T(; kwargs = kw)
+            @test isa(ct, T)
+            @test_throws Union{MethodError, TypeError} cc(ct, g)
+        end
+    end
+end
+
+#=
+The polarity override (#258). `TopologyOnly` in an algorithm's `ov` field withdraws the
+declared polarity, so `centrality_polarity` answers `nothing` and `centrality_graph` routes
+to the plain graph. It runs one way only -- away from weights -- so every request is served
+on every source, and nothing warns and nothing goes inert.
+=#
+@testset "Polarity override" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, StatsBase, SparseArrays,
+          LinearAlgebra
+    PO = PortfolioOptimisers
+    G = PortfolioOptimisers.Graphs
+
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    X = prior(EmpiricalPrior(), rd).X
+    nte_t = NetworkEstimator()                                       # tree branch
+    nte_p = NetworkEstimator(; alg = MaximumDistanceSimilarity())    # similarity branch
+
+    # The five that declare a polarity, plain and overridden. Kept as pairs so every test
+    # below compares like with like.
+    pairs_ov = ((BetweennessCentrality(), BetweennessCentrality(; ov = TopologyOnly())),
+                (ClosenessCentrality(), ClosenessCentrality(; ov = TopologyOnly())),
+                (StressCentrality(), StressCentrality(; ov = TopologyOnly())),
+                (RadialityCentrality(), RadialityCentrality(; ov = TopologyOnly())),
+                (EigenvectorCentrality(), EigenvectorCentrality(; ov = TopologyOnly())))
+    # `Graphs.eigenvector_centrality` seeds its Arnoldi iteration randomly and differs from
+    # itself at about `6e-16` between two runs on one and the same graph.
+    eq(ct, a, b) = isa(ct, EigenvectorCentrality) ? isapprox(a, b) : a == b
+
+    @testset "The effective polarity" begin
+        #=
+        `centrality_polarity` answers the *effective* polarity, not the declared one, and
+        each method returns one concrete type. A `Union` return would put a dynamic
+        dispatch on the one call site in `src/`.
+        =#
+        for (plain, ov) in pairs_ov
+            @test PO.centrality_polarity(plain) !== nothing
+            @test PO.centrality_polarity(ov) === nothing
+            @test only(Base.return_types(PO.centrality_polarity, (typeof(ov),))) === Nothing
+            @test isconcretetype(only(Base.return_types(PO.centrality_polarity,
+                                                        (typeof(plain),))))
+        end
+        # The override is `nothing` by default, so the declaration stands untouched.
+        for (plain, _) in pairs_ov
+            @test plain.ov === nothing
+        end
+    end
+
+    @testset "The three without the field refuse the keyword" begin
+        #=
+        Capability is type-level, so the refusal costs no check: only the five that declare
+        a polarity carry `ov`. Julia's own message reads `got unsupported keyword argument
+        "ov"` and lists the supported ones, so the throw is asserted and not the text.
+        =#
+        @test_throws MethodError DegreeCentrality(; ov = TopologyOnly())
+        @test_throws MethodError KatzCentrality(; ov = TopologyOnly())
+        @test_throws MethodError Pagerank(; ov = TopologyOnly())
+        for T in (DegreeCentrality, KatzCentrality, Pagerank)
+            @test !hasfield(T, :ov)
+        end
+        for (plain, _) in pairs_ov
+            @test hasfield(typeof(plain), :ov)
+        end
+    end
+
+    @testset "The override gives the plain-graph answer" begin
+        #=
+        The oracle, on both branches. #257 measured the gap as 2 of 8 on a tree and 5 of 8
+        on a graph, so a test that only exercises a tree passes vacuously for three of the
+        five -- hence both branches, and hence the second assertion, which pins where the
+        override actually moves the answer.
+        =#
+        moves_t = (false, true, false, true, false)   # tree: closeness and radiality
+        moves_p = (true, true, true, true, true)      # graph: all five
+        for (nte, moves) in ((nte_t, moves_t), (nte_p, moves_p))
+            plain_g = PO.centrality_graph(nothing, nte, X)
+            for (i, (plain, ov)) in pairs(pairs_ov)
+                got = centrality_vector(nte, ov, X).X
+                @test eq(ov, got, PO.calc_centrality(ov, plain_g))
+                # The routing, not merely the number: an overridden call builds a plain
+                # graph rather than a weighted one.
+                @test isa(PO.centrality_graph(nte, ov, X), G.SimpleGraph)
+                # And it is not a no-op wherever the weights were reaching the answer.
+                was = centrality_vector(nte, plain, X).X
+                @test eq(ov, was, got) == !moves[i]
+            end
+        end
+    end
+
+    @testset "Trivially satisfied on the weightless sources" begin
+        #=
+        #253 and #254: the override runs one way, away from weights, so a source that
+        carries none already returns the requested answer. Nothing warns and nothing
+        throws, and the equality is trivial by construction.
+        =#
+        clr = clusterise(ClustersEstimator(), X)
+        for pl in (ClustersEstimator(), clr)
+            for (plain, ov) in pairs_ov
+                got = @test_logs centrality_vector(pl, ov, X).X
+                @test eq(ov, got,
+                         PO.calc_centrality(ov, G.SimpleGraph(phylogeny_matrix(pl, X).X)))
+            end
+        end
+        # A precomputed `PhylogenyResult` builds its own plain graph and never passes the
+        # polarity seam at all.
+        plr = phylogeny_matrix(nte_p, X)
+        for (plain, ov) in pairs_ov
+            got = @test_logs centrality_vector(plr, ov).X
+            @test eq(ov, got, PO.calc_centrality(ov, G.SimpleGraph(plr.X)))
+        end
+        # Eigenvector on a tree branch: `SimilarityPolarity` already routes to the plain
+        # graph there, because a tree carries no similarity to read.
+        for alg in (KruskalTree(), BoruvkaTree(), PrimTree())
+            nte = NetworkEstimator(; alg = alg)
+            plain, ov = pairs_ov[5]
+            @test isapprox(centrality_vector(nte, ov, X).X,
+                           centrality_vector(nte, plain, X).X)
+        end
+    end
+
+    @testset "The separation goes live again" begin
+        #=
+        `sep` is inert on a weighted route, because a power of a weighted matrix sums
+        products of distances rather than counting edges. The override moves the call off
+        that route, so the separation closure is read once more.
+        =#
+        ov = ClosenessCentrality(; ov = TopologyOnly())
+        base = centrality_vector(NetworkEstimator(; sep = HopCount(; n = 1)), ov, X).X
+        for n in 2:3
+            nte = NetworkEstimator(; sep = HopCount(; n = n))
+            @test centrality_vector(nte, ov, X).X != base
+            # The declared route stays inert, which is what makes the contrast evidence.
+            @test centrality_vector(nte, ClosenessCentrality(), X).X ==
+                  centrality_vector(nte_t, ClosenessCentrality(), X).X
+        end
+    end
+
+    @testset "The seams take the override positionally, and only positionally" begin
+        #=
+        The carrier is the algorithm, and `ct` is positional on every public surface, so
+        the override reaches all of them with no signature change. The trap this avoids:
+        an undeclared keyword is swallowed in silence at every seam, so a documented `ov =`
+        beside an undeclared one would have shipped a request that does nothing.
+        =#
+        ov = ClosenessCentrality(; ov = TopologyOnly())
+        want = centrality_vector(nte_p, ov, X).X
+        w = fill(inv(size(X, 2)), size(X, 2))
+
+        # The estimator bundle carries it through, and the bundle identity still holds.
+        cte = CentralityEstimator(; pl = nte_p, ct = ov)
+        @test centrality_vector(cte, X).X == want
+        @test average_centrality(cte, w, X) == average_centrality(cte.pl, cte.ct, w, X)
+        @test average_centrality(cte, w, X) ≈ LinearAlgebra.dot(want, w)
+
+        # No seam accepts an `ov` keyword: the keyword form is swallowed and returns the
+        # plain answer, so the request must be made by configuring the algorithm.
+        @test centrality_vector(nte_p, ClosenessCentrality(), X; ov = TopologyOnly()).X ==
+              centrality_vector(nte_p, ClosenessCentrality(), X).X
+        @test centrality_vector(nte_p, ClosenessCentrality(), X; ov = TopologyOnly()).X !=
+              want
+
+        # The constraint generator reads `cc.A.ct`, so it gets the override for free.
+        cte_pl = CentralityEstimator(; pl = nte_p, ct = ClosenessCentrality())
+        lc_ov = centrality_constraints(CentralityConstraint(; A = cte, B = 0.5, comp = <=),
+                                       X)
+        lc_pl = centrality_constraints(CentralityConstraint(; A = cte_pl, B = 0.5,
+                                                            comp = <=), X)
+        @test vec(lc_ov.ineq.A) == want
+        @test vec(lc_ov.ineq.A) != vec(lc_pl.ineq.A)
+    end
+end
+
+# Rules for a separation budget. Defined at top level because a `@testset` body becomes a
+# function, which cannot host a struct.
+struct ConstantHops{T} <: PortfolioOptimisers.HopCountAlgorithm
+    n::T
+end
+function (r::ConstantHops)(nte, X, g; dims::Int = 1, kwargs...)
+    return r.n
+end
+struct ConstantRadius{T} <: PortfolioOptimisers.PathLengthAlgorithm
+    dmax::T
+end
+function (r::ConstantRadius)(nte, X, g; dims::Int = 1, kwargs...)
+    return r.dmax
+end
+# Records what it was handed, so the argument contract is asserted rather than assumed.
+mutable struct RecordingHops <: PortfolioOptimisers.HopCountAlgorithm
+    calls::Int
+    nte::Any
+    size::Any
+    dims::Int
+    g::Any
+end
+RecordingHops() = RecordingHops(0, nothing, nothing, 0, nothing)
+function (r::RecordingHops)(nte, X, g; dims::Int = 1, kwargs...)
+    r.calls += 1
+    r.nte = nte
+    r.size = size(X)
+    r.dims = dims
+    r.g = g
+    return 2
+end
+
+@testset "A separation budget may be a rule" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, LinearAlgebra
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    pr = prior(EmpiricalPrior(), rd)
+    X = pr.X
+    nte = NetworkEstimator()
+    n_assets = size(X, 2)
+    n_pairs = n_assets * (n_assets - 1)
+    related(sep, Xs = X) = count(!iszero,
+                                 phylogeny_matrix(NetworkEstimator(; sep = sep), Xs).X)
+
+    @testset "A stated budget passes through untouched" begin
+        # The fallback on the abstract type is an identity, so an extension inherits the
+        # kernel and a stated budget costs nothing.
+        for sep in (HopCount(), HopCount(; n = 4), PathLength(), PathLength(; dmax = 1.5))
+            @test resolve_separation(sep, nte, X) === sep
+        end
+    end
+
+    @testset "A rule is stored uncalled and resolved at the point of use" begin
+        rec = RecordingHops()
+        sep = HopCount(; n = rec)
+        # Construction does not run it.
+        @test rec.calls == 0
+        @test sep.n === rec
+
+        resolved = resolve_separation(sep, nte, X)
+        @test rec.calls == 1
+        @test resolved == HopCount(; n = 2)
+        # The rule is handed the estimator that owns it, the data the network is about to be
+        # built from, and the structure already built from them -- which is what lets it read
+        # the network without paying for a second one.
+        @test rec.nte === nte
+        @test rec.size == size(X)
+        @test rec.dims == 1
+        @test rec.g == PortfolioOptimisers.separation_graph(sep, nte, X)
+        # It is the structure the separation measures over, which for a hop count is the
+        # binarised one: a weighted graph would make `A^i` sum products of distances.
+        @test isa(rec.g, PortfolioOptimisers.Graphs.SimpleGraph)
+        @test PortfolioOptimisers.Graphs.adjacency_matrix(rec.g) ==
+              PortfolioOptimisers.calc_adjacency(nte, X; dims = 1)
+        # And the graph-taking form is the one the wrapper delegates to.
+        @test resolve_separation(HopCount(; n = RecordingHops()), nte, X,
+                                 PortfolioOptimisers.separation_graph(sep, nte, X)) ==
+              HopCount(; n = 2)
+    end
+
+    @testset "A rule answers exactly as the value it returns" begin
+        # The point of the widening: a rule is a deferred way of writing the same budget,
+        # not a second notion of one.
+        @test related(HopCount(; n = ConstantHops(3))) == related(HopCount(; n = 3))
+        @test related(PathLength(; dmax = ConstantRadius(1.5))) ==
+              related(PathLength(; dmax = 1.5))
+        # A bare `Function` is admitted in the same field.
+        @test related(HopCount(; n = (nte, X, g; kwargs...) -> 3)) ==
+              related(HopCount(; n = 3))
+        @test related(PathLength(; dmax = (nte, X, g; kwargs...) -> 1.5)) ==
+              related(PathLength(; dmax = 1.5))
+    end
+
+    @testset "The return value is checked, and then validated" begin
+        # A functor's return type is not part of its signature, so the `Integer` obligation
+        # is a run-time check. It is not cosmetic: three readers use `0:n` as a
+        # matrix-power count, where `0:1.5` drops a power silently.
+        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(1.5)),
+                                                      nte, X)
+        @test_throws ArgumentError resolve_separation(HopCount(; n = ConstantHops(nothing)),
+                                                      nte, X)
+        # `nothing` is a stated budget rather than a computed one, so a path length rule
+        # may not answer with it.
+        @test_throws ArgumentError resolve_separation(PathLength(;
+                                                                 dmax = ConstantRadius(nothing)),
+                                                      nte, X)
+        @test_throws ArgumentError resolve_separation(PathLength(;
+                                                                 dmax = ConstantRadius("1")),
+                                                      nte, X)
+        # Resolution goes back through the ordinary constructor, so a rule's answer meets
+        # exactly the validation a stated budget meets.
+        @test_throws DomainError resolve_separation(HopCount(; n = ConstantHops(0)), nte, X)
+        @test_throws DomainError resolve_separation(PathLength(;
+                                                               dmax = ConstantRadius(-1.0)),
+                                                    nte, X)
+        # Storing those same rules is fine. The check belongs where the value exists.
+        @test HopCount(; n = ConstantHops(0)) isa HopCount
+        @test PathLength(; dmax = ConstantRadius(-1.0)) isa PathLength
+    end
+
+    @testset "separation_budget refuses an unresolved separation" begin
+        # It takes the separation matrix rather than the data, deliberately, so it is the
+        # one kernel that cannot resolve a rule. Returning the rule would put a function
+        # where every caller expects a number.
+        d = separation_matrix(HopCount(), nte, X)
+        @test_throws ArgumentError separation_budget(HopCount(; n = ConstantHops(2)), nte,
+                                                     d)
+        @test_throws ArgumentError separation_budget(PathLength(;
+                                                                dmax = ConstantRadius(1.5)),
+                                                     nte, d)
+        # A resolved one answers as before.
+        @test separation_budget(resolve_separation(HopCount(; n = ConstantHops(2)), nte, X),
+                                nte, d) == 2
+    end
+
+    @testset "Every consumer of a network resolves" begin
+        rule = HopCount(; n = ConstantHops(3))
+        stated = HopCount(; n = 3)
+
+        @test phylogeny_matrix(NetworkEstimator(; sep = rule), X).X ==
+              phylogeny_matrix(NetworkEstimator(; sep = stated), X).X
+
+        # Both `clusterise` branches read `n` as a matrix-power count.
+        for alg in (KruskalTree(), MaximumDistanceSimilarity())
+            r = clusterise(NetworkClustersEstimator(;
+                                                    nte = NetworkEstimator(; alg = alg,
+                                                                           sep = rule)), X)
+            s = clusterise(NetworkClustersEstimator(;
+                                                    nte = NetworkEstimator(; alg = alg,
+                                                                           sep = stated)),
+                           X)
+            @test r.k == s.k
+            @test PortfolioOptimisers.assignments(r) == PortfolioOptimisers.assignments(s)
+        end
+
+        # The graded feature producer reads the budget through `separation_budget`.
+        prule = PathLength(; dmax = ConstantRadius(1.5))
+        @test PortfolioOptimisers.phylogeny_features(Proximity(),
+                                                     NetworkEstimator(; sep = prule), X) ==
+              PortfolioOptimisers.phylogeny_features(Proximity(),
+                                                     NetworkEstimator(;
+                                                                      sep = PathLength(;
+                                                                                       dmax = 1.5)),
+                                                     X)
+
+        # Centrality reaches the separation through the unweighted route's phylogeny matrix.
+        @test centrality_vector(CentralityEstimator(; pl = NetworkEstimator(; sep = rule)),
+                                X).X == centrality_vector(CentralityEstimator(;
+                                                pl = NetworkEstimator(; sep = stated)),
+                            X).X
+    end
+
+    @testset "The quantile rules place the budget by cardinality" begin
+        # `q` is the share of the reachable off-diagonal pairs the budget relates, so a
+        # continuous budget lands on it and a discrete one cannot.
+        for q in (0.1, 0.25, 0.5)
+            share = related(PathLength(; dmax = PathLengthQuantile(; q = q))) / n_pairs
+            @test isapprox(share, q; atol = 0.01)
+        end
+        # The hop rule rounds to a shell, and three values of `q` collapse onto one budget
+        # here. That is the unit, not a defect.
+        ns = [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)), nte, X).n
+              for q in (0.1, 0.2, 0.25)]
+        @test all(isa.(ns, Integer))
+        @test allequal(ns)
+        # Wider quantiles are never narrower budgets.
+        dmaxs = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = q)), nte,
+                                    X).dmax for q in 0.1:0.1:0.9]
+        @test issorted(dmaxs)
+        @test_throws DomainError PathLengthQuantile(; q = 1.5)
+        @test_throws DomainError HopCountQuantile(; q = -0.1)
+    end
+
+    @testset "A quantile rule holds the pair count still across folds" begin
+        # The motivating case. A `dmax` tuned on the whole sample is a different constraint
+        # strength on every fold; the rule fixes the strength and moves the radius instead.
+        folds = [1:63, 64:126, 127:189, 190:252]
+        fixed = [related(PathLength(; dmax = 1.0107), X[f, :]) for f in folds]
+        ruled = [related(PathLength(; dmax = PathLengthQuantile(; q = 0.25)), X[f, :])
+                 for f in folds]
+        radii = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = 0.25)),
+                                    nte, X[f, :]).dmax for f in folds]
+        @test !allequal(fixed)
+        @test allequal(ruled)
+        @test !allequal(radii)
+    end
+
+    @testset "The quantile population excludes the diagonal and the sentinel" begin
+        # Two disjoint edges. Every reachable off-diagonal separation is one hop, so any
+        # quantile of them is `1`. Admitting `typemax(Int)` would blow the budget up, and
+        # admitting the zero diagonal would drag it down.
+        W = [0.0 1.0 0.0 0.0; 1.0 0.0 0.0 0.0; 0.0 0.0 0.0 1.0; 0.0 0.0 1.0 0.0]
+        X4 = zeros(Float64, 3, 4)
+        pl = FixedDistanceGraph(W, HopCount())
+        d = separation_matrix(HopCount(), pl, X4)
+        @test maximum(d) == typemax(Int)
+        for q in (0.0, 0.5, 1.0)
+            @test PortfolioOptimisers.separation_quantile(HopCount(), d, q) == 1
+        end
+        dp = separation_matrix(PathLength(), pl, X4)
+        @test maximum(dp) == Inf
+        @test PortfolioOptimisers.separation_quantile(PathLength(), dp, 1.0) == 1.0
+        # A structure with no reachable pair of distinct assets has no population.
+        @test_throws ArgumentError PortfolioOptimisers.separation_quantile(HopCount(),
+                                                                           zeros(Int, 1, 1),
+                                                                           0.5)
+    end
+end
+@testset "A zero similarity is an absent edge, not a weak one" begin
+    using PortfolioOptimisers, Test, LinearAlgebra, StatsBase
+    #=
+    ADR 0049 admits an exactly zero similarity on the PMFG path, on the ground that
+    `PMFG_T2s`'s gain argmax is shift-invariant. That holds for the argmax and fails for
+    the graph: `PMFG_T2s` ends with `A = W ⊙ ((A + A') .== 1)`, so a zero weight is an
+    *absent* edge rather than a weak one, and it inserts every remaining vertex whatever
+    the gain, so it declines none. Before `assert_pmfg_weights` the run carried the
+    shrunken graph as far as `turn_into_Hclust_merges` and died there with a `BoundsError`
+    about a matrix index.
+
+    The fixture is 12 assets over 16 observations, built from a Hadamard matrix so that
+    many sample correlations are *exactly* zero. No random number is involved: the zeros
+    are structural. `LogDistance` maps them to `Inf`, and `ExponentialSimilarity` maps an
+    `Inf` to `exp(-Inf)`, which is `0` exactly.
+    =#
+    H = [1 1 1 1 1 1 1 1; 1 -1 1 -1 1 -1 1 -1; 1 1 -1 -1 1 1 -1 -1; 1 -1 -1 1 1 -1 -1 1;
+         1 1 1 1 -1 -1 -1 -1; 1 -1 1 -1 -1 1 -1 1; 1 1 -1 -1 -1 -1 1 1;
+         1 -1 -1 1 -1 1 1 -1]
+    Xa = Float64.(vcat(H, H))
+    Xz = hcat(Xa[:, 2:8], [Xa[:, 2] .* 0.9 .+ 0.05 .* Xa[:, k] for k in 3:7]...)
+    rho = cor(Xz)
+    Dz = max.(-log.(abs.(rho)), zero(eltype(rho)))
+    Sz = exp.(-Dz)
+    N = size(Xz, 2)
+    @test count(isinf, Dz) == 80
+    @test count(iszero, Sz) == 80
+
+    # The same distances with the infinities finite, so the similarity stays strictly
+    # positive. This is the isolation: the zero is the cause, not the `Inf`.
+    Dp = copy(Dz)
+    Dp[isinf.(Dp)] .= 20.0
+    Sp = exp.(-Dp)
+    @test all(>(0), Sp)
+
+    #=
+    A PMFG on `N` vertices has `3N - 6` edges. The zeros cost this one several of its
+    thirty, and the shortfall is what the guard reports.
+
+    Assert the SHORTFALL, never a particular count. `PMFG_T2s` inserts by maximum gain, and
+    the gains here are read off correlations whose non-zero entries differ in their last
+    bits from one machine to the next, so a near-tie resolves differently and the surviving
+    edge count moves with it. CI has produced both 20 and 21 on this same fixture, at jobs
+    96256586958 and 96273304920, with no commit between them touching the computation. The
+    count is not the decision under test. The decision is that an exactly zero weight is an
+    absent edge, so the structure falls short.
+
+    The bound is not vacuous. 80 of the 132 off-diagonal entries are zero, which is 40 of
+    the 66 pairs, so at most 26 edges can carry a weight and 30 is unreachable by
+    construction.
+    =#
+    edges_z = count(!iszero, PortfolioOptimisers.PMFG_T2s(Sz)[1]) ÷ 2
+    @test edges_z < 3 * N - 6
+    @test count(!iszero, PortfolioOptimisers.PMFG_T2s(Sp)[1]) ÷ 2 == 3 * N - 6
+
+    #=
+    Every site that consumes the weighted structure refuses it.
+
+    `pdm = nothing` is load-bearing, and this is the second thing the fixture cannot leave
+    to the host. `rho` is singular to working precision -- `eigmin(rho)` is about -8.3e-16
+    -- so whether `isposdef` succeeds is a coin toss across machines. Where it fails,
+    `Posdef`'s default `NearestCorrelationMatrix.Newton` step repairs the matrix and moves
+    EVERY entry: measured here, `count(iszero, rho)` goes from 78 to 0. The similarity is
+    then strictly positive, the graph is a full PMFG, and these three sites throw nothing.
+    That is what CI job 96256586958 recorded -- `clusterise`, `calc_weighted_adjacency_graph`
+    and `calc_distance_weighted_graph` all reported "No exception thrown" on the same run
+    that produced 20 edges.
+
+    Switching the repair off is what makes the input reach the guard on every host. It also
+    states the test's subject exactly: the guard is about a zero weight, not about whether a
+    fixture happens to survive a Cholesky.
+    =#
+    ce0 = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; pdm = nothing))
+    nte = NetworkEstimator(; ce = ce0, de = Distance(; alg = LogDistance()),
+                           alg = ExponentialSimilarity())
+    cle = ClustersEstimator(; ce = ce0, de = Distance(; alg = LogDistance()),
+                            alg = DBHT(; sim = ExponentialSimilarity()))
+    # The zeros survive the estimator's own correlation, which is the precondition the three
+    # refusals below rest on. Assert it, so a regression names its cause.
+    @test count(iszero, PortfolioOptimisers.cor(ce0, Xz)) == 80
+    @test_throws DomainError PortfolioOptimisers.DBHTs(Dz, Sz)
+    @test_throws DomainError clusterise(cle, Xz)
+    @test_throws DomainError PortfolioOptimisers.calc_weighted_adjacency_graph(ExponentialSimilarity(),
+                                                                               Sz)
+    @test_throws DomainError PortfolioOptimisers.calc_weighted_adjacency_graph(nte, Xz)
+    @test_throws DomainError PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)
+
+    # The message names the shortfall, not the symptom.
+    raised(f) =
+        try
+            f()
+            nothing
+        catch e
+            e
+        end
+    err = raised(() -> PortfolioOptimisers.DBHTs(Dz, Sz))
+    @test err isa DomainError
+    msg = sprint(showerror, err)
+    # `edges => …` carries the same host-dependent count as the assertion above, so read it
+    # from the same computation rather than writing a number. `3 * N - 6` is structural.
+    @test occursin("edges => $edges_z", msg)
+    @test occursin("3 * N - 6 => 30", msg)
+    @test occursin("of its edges and the structure is not a PMFG", msg)
+
+    #=
+    It also names as much of the configuration as the site holds, which is what
+    `assert_similarity_domain` does one step earlier. `DBHTs` called with the matrices
+    alone knows neither half, `clusterise` forwards the similarity, and
+    `calc_distance_weighted_graph` holds both.
+    =#
+    @test !occursin("must hold for", msg)
+    @test occursin("must hold for ExponentialSimilarity. Got",
+                   sprint(showerror, raised(() -> clusterise(cle, Xz))))
+    both = sprint(showerror,
+                  raised(() -> PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)))
+    #=
+    Julia decides at `show` time whether a type name is qualified. It reads visibility
+    from `Base.active_module()`, and it applies the one decision to every name in the
+    type. So the message reads `Distance{Nothing, LogDistance}` where both names are
+    visible, and `PortfolioOptimisers.Distance{Nothing, PortfolioOptimisers.LogDistance}`
+    where neither is. Neither spelling is a substring of the other, so do not write one.
+    Render the expectation with the same renderer that wrote the message.
+    =#
+    @test occursin("for ExponentialSimilarity, from", both)
+    @test occursin(string(typeof(nte.de)), both)
+
+    # The strictly positive counterpart runs, with the infinite distances left in place.
+    @test PortfolioOptimisers.DBHTs(Dp, Sp) isa Tuple
+    @test PortfolioOptimisers.DBHTs(Dz, Sp) isa Tuple
+
+    #=
+    `logo!` is the fourth `PMFG_T2s` caller and is deliberately not guarded. It reads
+    separators and cliques, which `PMFG_T2s` derives from the insertion order rather than
+    from `A`, so a zero weight does not shrink them and refusing it would refuse a
+    configuration that works.
+    =#
+    c3z, cqz = PortfolioOptimisers.PMFG_T2s(Sz, 4)[3:4]
+    c3p, cqp = PortfolioOptimisers.PMFG_T2s(Sp, 4)[3:4]
+    @test size(c3z) == size(c3p) == (N - 4, 3)
+    @test size(cqz) == size(cqp) == (N - 3, 4)
 end

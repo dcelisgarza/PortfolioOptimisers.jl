@@ -137,9 +137,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DistributionValueatRisk(;
-        mu::Option{<:VecNum} = nothing,
-        sigma::Option{<:MatNum} = nothing,
+        mu::Option{<:MuSlot} = nothing,
+        sigma::Option{<:SigmaSlot} = nothing,
         chol::Option{<:MatNum} = nothing,
+        pe::Option{<:AbstractPriorEstimator} = nothing,
         dist::Distributions.Distribution = Distributions.Normal()
     ) -> DistributionValueatRisk
 
@@ -149,7 +150,11 @@ Keywords correspond to the struct's fields.
 
   - If `mu` is not `nothing`: `!isempty(mu)`.
   - If `sigma` is not `nothing`: `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
-  - If `chol` is not `nothing`: `!isempty(chol)`.
+  - If `chol` is not `nothing`: `!isempty(chol)`, and `sigma` is a matrix rather than `nothing` or a **Deferred Quantity**.
+
+!!! warning
+
+    `mu`, `sigma` and `chol` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill all three from a single fit. A caller who states them by hand must make sure that they agree.
 
 # Examples
 
@@ -159,6 +164,7 @@ DistributionValueatRisk
      mu ┼ nothing
   sigma ┼ nothing
    chol ┼ nothing
+     pe ┼ nothing
    dist ┴ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
 ```
 
@@ -167,53 +173,126 @@ DistributionValueatRisk
   - [`ValueatRiskFormulation`](@ref)
   - [`MIPValueatRisk`](@ref)
   - [`ValueatRisk`](@ref)
+  - [`MuSlot`](@ref)
+  - [`SigmaSlot`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
   - [`Option`](@ref)
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_dvar_slot])
     """
-    @pprop mu
+    mu
     """
-    $(field_dict[:sigma])
+    $(field_dict[:sigma_slot])
     """
-    @pprop sigma
+    sigma
     """
-    $(field_dict[:chol])
+    $(field_dict[:chol_slot])
     """
-    @pprop chol
+    chol
+    """
+    $(field_dict[:pe_rm])
+    """
+    pe
     """
     $(field_dict[:dist])
     """
     dist
-    function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
+    function DistributionValueatRisk(mu::Option{<:MuSlot}, sigma::Option{<:SigmaSlot},
                                      chol::Option{<:MatNum},
+                                     pe::Option{<:AbstractPriorEstimator},
                                      dist::Distributions.Distribution)
-        if !isnothing(mu)
+        if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
-        if !isnothing(sigma)
+        if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
-        if !isnothing(chol)
+        if isa(chol, MatNum)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
-        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(dist)}(mu, sigma, chol,
-                                                                          dist)
+        assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
+        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(pe), typeof(dist)}(mu,
+                                                                                      sigma,
+                                                                                      chol,
+                                                                                      pe,
+                                                                                      dist)
     end
 end
-function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
-                                 sigma::Option{<:MatNum} = nothing,
+function DistributionValueatRisk(; mu::Option{<:MuSlot} = nothing,
+                                 sigma::Option{<:SigmaSlot} = nothing,
                                  chol::Option{<:MatNum} = nothing,
+                                 pe::Option{<:AbstractPriorEstimator} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
-    return DistributionValueatRisk(mu, sigma, chol, dist)
+    return DistributionValueatRisk(mu, sigma, chol, pe, dist)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve every **Deferred Quantity** held by [`DistributionValueatRisk`](@ref) `alg` against prior result `pr`.
+
+The measure carries three prior-derived fields, and `mu` and `sigma` are independent of each other, so it takes a `pe`: one fit fills every slot the caller left unstated. `chol` is derived from `sigma` and travels with it — a `sigma` that names its own estimator supplies the factorisation from that same fit, and never from the `pe`'s.
+
+# Related
+
+  - [`DistributionValueatRisk`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+"""
+function resolve_deferred_quantities(alg::DistributionValueatRisk,
+                                     pr::AbstractPriorResult)::DistributionValueatRisk
+    sigma, chol = if isa(alg.sigma, DeferredQuantity)
+        fitted = fit_deferred_quantity(alg.sigma, pr)
+        deferred_quantity(fitted, :sigma), deferred_derived_quantity(fitted, :chol)
+    else
+        alg.sigma, alg.chol
+    end
+    mu = resolve_slot(alg.mu, :mu, pr)
+    if isnothing(alg.pe)
+        return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, pe = nothing,
+                                       dist = alg.dist)
+    end
+    fitted = fit_deferred_quantity(alg.pe, pr)
+    # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
+    # also supplies the `sigma` it factorises. Read before `sigma` is filled.
+    chol = isnothing(sigma) ? deferred_derived_quantity(fitted, :chol) : chol
+    return DistributionValueatRisk(; mu = fan_out_slot(fitted, mu, :mu),
+                                   sigma = fan_out_slot(fitted, sigma, :sigma), chol = chol,
+                                   pe = nothing, dist = alg.dist)
+end
+# Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
+function deferred_slots(alg::DistributionValueatRisk)
+    return (; mu = alg.mu, sigma = alg.sigma, pe = alg.pe)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionValueatRisk`](@ref) by resolving its **Deferred Quantities**, then falling back to the prior result for whatever is still unstated.
+
+`sigma` and `chol` are selected **as a pair** ([`sigma_chol_selector`](@ref)), not field by field: a stated `sigma` with no factor must not be paired with the prior's, which factorises a different matrix.
+
+# Related
+
+  - [`DistributionValueatRisk`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`sigma_chol_selector`](@ref)
+"""
+function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::DistributionValueatRisk
+    alg = resolve_deferred_quantities(alg, pr)
+    sigma, chol = sigma_chol_selector(alg.sigma, alg.chol, pr)
+    return DistributionValueatRisk(; mu = sel(alg.mu, pr.mu), sigma = sigma, chol = chol,
+                                   pe = nothing, dist = alg.dist)
 end
 function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
-    return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
+    return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, pe = alg.pe,
+                                   dist = alg.dist)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -346,13 +425,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Value-at-Risk Range risk measure.
 
-`ValueatRiskRange` computes the difference between the lower-tail Value-at-Risk (at level `alpha`) and the upper-tail Value-at-Risk (at level `beta`), measuring the spread between downside and upside tail risks.
+`ValueatRiskRange` evaluates the Value-at-Risk at level `alpha` on the portfolio returns and the Value-at-Risk at level `beta` on the negated portfolio returns, then sums the two to give the total spread between the downside and the upside tail.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,\\,.
+\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,.
 \\end{align}
 ```
 
@@ -391,7 +470,7 @@ Keywords correspond to the struct's fields.
 
     (r::ValueatRiskRange)(x::VecNum)
 
-Computes the VaR Range of a portfolio returns vector `x`.
+Computes the VaR Range of a portfolio returns vector `x`, as the sum of the two tail quantiles. The method holds the upper tail in the negated convention of [`ValueatRisk`](@ref), so it writes the sum as `loss - gain`.
 
 ## Arguments
 
@@ -460,6 +539,22 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
+# Deferrable slots — see `deferred_slots`. The formulation carries them, so both the check and
+# the derived recursion in `resolve_deferred_quantities` reach them through `alg`.
+# `MIPValueatRisk` defers nothing, so the recursion is the identity for it.
+deferred_slots(r::ValueatRisk) = (; alg = r.alg)
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::ValueatRiskRange) = (; alg = r.alg)
+# Tail decomposition — see `range_tails`. Declared for the MIP formulation only: the
+# `DistributionValueatRisk` range shares one `g_var` cone between its two tails, so it fuses
+# rather than duplicating, and has no two sub-models to build.
+function range_tails(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = ValueatRisk(; settings = settings, alpha = r.alpha, w = r.w,
+                               alg = r.alg),
+            gain = ValueatRisk(; settings = settings, alpha = r.beta, w = r.w, alg = r.alg))
+end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     x = copy(x)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
@@ -477,8 +572,14 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights})(x::VecNum)
     idx = ifelse(idx > length(x), idx - 1, idx)
     loss = -sorted_x[idx]
 
-    sorted_x = reverse!(sorted_x)
-    sorted_w = reverse!(sorted_w)
+    # Reverse the **permutation**, never the views. `sorted_x` and `sorted_w` are views, so
+    # `reverse!` on them writes through into the caller's `x` and into `r.w` —
+    # `get_observation_weights` hands back the stored weights object itself, so the measure
+    # would permute its own configuration. `order` was just allocated by `sortperm`, so it is
+    # ours to mutate, and the element sequence read below is identical.
+    reverse!(order)
+    sorted_x = view(x, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, sw * r.beta)
     idx = ifelse(idx > length(x), idx - 1, idx)

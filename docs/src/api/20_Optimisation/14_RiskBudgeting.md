@@ -18,6 +18,7 @@ RiskBudgetingAlgorithm
 AssetRiskBudgeting
 FactorRiskBudgeting
 RiskBudgeting
+risk_budget_universe_key
 needs_previous_weights(opt::RiskBudgeting)
 factory(rb::RiskBudgeting, w::AbstractVector)
 port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)

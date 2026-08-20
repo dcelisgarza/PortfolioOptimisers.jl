@@ -58,13 +58,13 @@ budget `sbgt` let you build long/short and leveraged mandates — see
 
 ## 2. Linear and group constraints
 
-Group and linear constraints are written as plain strings over an [`AssetSets`](@ref) and passed
+Group and linear constraints are written as plain strings over a [`UniverseSets`](@ref) and passed
 through `lcse` as a [`LinearConstraintEstimator`](@ref) — the same syntax used for views. Name a
 group, then bound it. Here we require the tech group to hold at least 15% (a floor the
 unconstrained minimum-risk portfolio would not give it).
 
 ````@example 04_Constraints_and_Costs
-sets = AssetSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
+sets = UniverseSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
 res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                 lcse = LinearConstraintEstimator(;
@@ -75,7 +75,63 @@ The same `lcse` handles absolute and relative bounds (`"AAPL <= 0.1"`, `"MSFT >=
 constraints built from the asset *hierarchy* — phylogeny and centrality — see
 [Phylogeny & Centrality](../examples/4_constraints_costs/04_Phylogeny_Centrality.md).
 
-## 3. Turnover
+## 3. Factor exposure constraints
+
+Real mandates are often written in **factor** names rather than tickers — "at most 10% momentum",
+"market-neutral to value". Those bound the portfolio's factor weights `w_f = Mᵀw`, where `M` is
+the loadings matrix a factor model already computes.
+
+Wrap a [`LinearConstraintEstimator`](@ref) in an [`ExposureConstraintEstimator`](@ref) and declare
+the space with [`FactorSpace`](@ref); the names resolve against the factor axis a
+[`UniverseSets`](@ref) declares under `fkey` (default `"nf"`), and the rows are projected through
+the loadings while the constraint is generated. What the optimiser receives is an ordinary
+asset-space constraint, so this composes with everything else on this page.
+
+It needs loadings from somewhere, and factor data, which [`prices_to_returns`](@ref) takes as an
+optional second argument. By default the loadings come from the prior, so this wants
+[`FactorPrior`](@ref) rather than [`EmpiricalPrior`](@ref) — and a prior with no regression is an
+error, never a silently dropped row. The space can also supply its own:
+`FactorSpace(; re = StepwiseRegression())` fits the loadings itself, which makes the mandate legal
+on any prior, and `FactorSpace(; re = <a fitted Regression>)` pins them. The deep dive covers the
+precedence and when a pinned basis goes stale.
+
+````@example 04_Constraints_and_Costs
+Fac = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
+                timestamp = :Date)[(end - 252):end]
+rd_f = prices_to_returns(X, Fac)
+sets_f = UniverseSets(; dict = Dict("nx" => rd_f.nx, "nf" => rd_f.nf))
+
+res_fac = optimise(MeanRisk(; obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = FactorPrior(), slv = slv,
+                                                sets = sets_f,
+                                                lcse = ExposureConstraintEstimator(;
+                                                                                   lce = LinearConstraintEstimator(;
+                                                                                                                   val = "MTUM >= 0.2"),
+                                                                                   space = FactorSpace()))),
+                   rd_f)
+````
+
+Verify it by computing the realised exposures from the result — the loadings the optimiser
+actually used are on its prior:
+
+````@example 04_Constraints_and_Costs
+pretty_table(DataFrame("Factor" => rd_f.nf,
+                       "Exposure" => transpose(res_fac.pa.pr.rr.M) * res_fac.w);
+             formatters = [resfmt], title = "Realised factor exposures")
+````
+
+Pass the prior **estimator**, not a precomputed prior: the projection is then recomputed inside
+every cross-validation fold, against the loadings that fold actually fitted. This is the one
+constraint that cannot be precomputed by hand without going stale, and
+[Factor Exposure Constraints](../examples/4_constraints_costs/10_Factor_Exposure_Constraints.md)
+measures how far a hand-written row drifts. It also covers factor groups, mixing factor- and
+asset-space rows, and which constraints have no factor form — the rule is that a constraint is
+re-based only if it *is* a linear row in `w`, so cardinality, thresholds, weight bounds, turnover,
+tracking error and fees all stay out, each for its own reason. Tracking a *factor* is the case
+that looks like a gap and is not: [`ReturnsTracking`](@ref) takes a benchmark return series, and a
+factor's return series is a column of the factor matrix, so it needs no re-basis at all.
+
+## 4. Turnover
 
 Costs enter the same way. [`Turnover`](@ref) (`tn`) limits how far the new weights may drift
 from a reference portfolio `w` — your current holdings — so a rebalance stays cheap. Here we
@@ -90,7 +146,7 @@ res_tn = optimise(MeanRisk(; obj = MinimumRisk(),
 A tighter `val` keeps the result closer to the reference holdings; a looser one frees the
 optimiser to move toward the unconstrained solution.
 
-## 4. Fees
+## 5. Fees
 
 [`Fees`](@ref) (`fees`) charges proportional (and optionally fixed) transaction costs on long
 and short positions, which the objective then trades off against return. The minimal form sets a
@@ -105,10 +161,10 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
 Soft alternatives to hard turnover/position limits — L1/L2 weight regularisation and a
 weight-norm ceiling that doubles as a diversification floor (`l1`, `l2`, `l2c`) — are covered in
 [Regularisation](../examples/4_constraints_costs/07_Regularisation.md); benchmark
-[`Tracking`](@ref) (the `tr` keyword) in
+[`TrackingError`](@ref) (the `tr` keyword) in
 [Turnover & Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).
 
-## 5. Custom objectives and constraints
+## 6. Custom objectives and constraints
 
 When a mandate needs something no built-in keyword covers — a continuous per-asset preference
 like a factor score, or a relationship between weights that isn't a plain linear bound — two
@@ -134,7 +190,7 @@ builds both from scratch — a momentum tilt and a momentum floor — and works 
 model idioms (the constraint scale, and the homogenisation variable `k`) that keep a
 hand-written term correct.
 
-## 6. Comparing the effect
+## 7. Comparing the effect
 
 Same prior, same objective — only the constraint or cost changes the allocation.
 

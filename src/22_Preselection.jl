@@ -791,6 +791,12 @@ Clusters come from [`clusterise`](@ref), so the whole clustering family — hier
 
 A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
+## Clustering on a feature matrix
+
+A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a feature matrix rather than the returns, and `ClusterGroups` supplies it from `rd.Z` — the data carrier the selector is fitted on. There is no `z_src` field here, and that absence is the whole statement: preselection is a *pre-prior* site, so only the data carrier can supply a feature matrix. A selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result; in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. An optimiser's `z_src` therefore does not reach here, and setting it changes nothing about this call. Supply `Z` on the [`ReturnsResult`](@ref) — for instance from [`asset_sets_features`](@ref) — or the clustering throws (see [`assert_feature_matrix_supplied`](@ref)).
+
+The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -809,6 +815,8 @@ Keywords correspond to the struct's fields.
   - [`ClustersEstimator`](@ref)
   - [`clusterise`](@ref)
   - [`groups_argbest`](@ref)
+  - [`FeatureDistance`](@ref)
+  - [`assert_feature_matrix_supplied`](@ref)
 """
 @concrete struct ClusterGroups <: AbstractRedundancyAlgorithm
     """
@@ -825,7 +833,7 @@ function ClusterGroups(;
 end
 function redundancy_keep(alg::ClusterGroups, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
-    clr = clusterise(alg.cle, rd.X)
+    clr = clusterise(alg.cle, rd.X; Z = rd.Z, z_src = :data_only)
     idx = assignments(clr)
     groups = [findall(==(k), idx) for k in 1:(clr.k)]
     return groups_argbest(groups, scores, bib)

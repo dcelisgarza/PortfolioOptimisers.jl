@@ -55,11 +55,12 @@ $(DocStringExtensions.FIELDS)
     Kurtosis(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing,
-        kt::Option{<:MatNum} = nothing,
+        mu::Option{<:MuSlot} = nothing,
+        kt::Option{<:KtSlot} = nothing,
         N::Option{<:Integer} = nothing,
         alg1::AbstractMomentAlgorithm = FullMoment(),
-        alg2::VarianceFormulation = SOCRiskExpr(),
+        alg2::SecondMomentFormulation = SOCRiskExpr(),
+        pe::Option{<:AbstractPriorEstimator} = nothing,
     ) -> Kurtosis
 
 Keywords correspond to the struct's fields.
@@ -83,6 +84,14 @@ Keywords correspond to the struct's fields.
           * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
 
   - If `N` is not `nothing`: must be positive.
+
+!!! warning
+
+    `mu` and `kt` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill both from a single fit. A caller who states them by hand must make sure that they agree.
+
+!!! info
+
+    `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
 
 # `JuMP` Formulations
 
@@ -108,7 +117,8 @@ Kurtosis
         kt ┼ nothing
          N ┼ nothing
       alg1 ┼ FullMoment()
-      alg2 ┴ SOCRiskExpr()
+      alg2 ┼ SOCRiskExpr()
+        pe ┴ nothing
 ```
 
 # Related
@@ -119,6 +129,7 @@ Kurtosis
   - [`SemiMoment`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
 """
 @concrete struct Kurtosis <: RiskMeasure
     """
@@ -126,15 +137,15 @@ Kurtosis
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """
-    $(field_dict[:kt])
+    $(field_dict[:kt_slot])
     """
     kt
     """
@@ -149,10 +160,14 @@ Kurtosis
     $(field_dict[:alg2])
     """
     alg2
+    """
+    $(field_dict[:pe_rm])
+    """
+    pe
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                      mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
-                      N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
-                      alg2::SecondMomentFormulation)
+                      mu::Option{<:MuSlot}, kt::Option{<:KtSlot}, N::Option{<:Integer},
+                      alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation,
+                      pe::Option{<:AbstractPriorEstimator})
         mu_flag = isa(mu, VecNum)
         kt_flag = isa(kt, MatNum)
         if mu_flag
@@ -177,17 +192,62 @@ Kurtosis
             @argcheck(N > zero(N), DomainError(N, "N must be positive"))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(kt), typeof(N),
-                   typeof(alg1), typeof(alg2)}(settings, w, mu, kt, N, alg1, alg2)
+                   typeof(alg1), typeof(alg2), typeof(pe)}(settings, w, mu, kt, N, alg1,
+                                                           alg2, pe)
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                  kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
+                  w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
+                  kt::Option{<:KtSlot} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = FullMoment(),
-                  alg2::SecondMomentFormulation = SOCRiskExpr())::Kurtosis
-    return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
+                  alg2::SecondMomentFormulation = SOCRiskExpr(),
+                  pe::Option{<:AbstractPriorEstimator} = nothing)::Kurtosis
+    return Kurtosis(settings, w, mu, kt, N, alg1, alg2, pe)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve every **Deferred Quantity** held by [`Kurtosis`](@ref) `r` against prior result `pr`.
+
+Three passes, in order.
+
+ 1. A deferred `mu` resolves on its own.
+ 2. A deferred `kt` resolves next, and it carries the centre with it. `kt` is a moment **about** a centre, so the two are one pair of quantities out of one object: when `mu` is still unstated, [`deferred_centre`](@ref) reads it off the cokurtosis estimator's own `me`, threads it into the fit as `mean =`, and it becomes the resolved `mu`. A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the centre is read back off the prior result it produced.
+ 3. `pe` fans out into whatever both passes left `nothing`.
+
+A deferred slot therefore **wins over `pe`**, which is the map's precedence rule one level down. `kt` lives on a [`HighOrderPrior`](@ref), so a prior estimator named in `kt` or `pe` must compute one.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_centre`](@ref)
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+"""
+function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurtosis
+    if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.kt, DeferredQuantity)
+        return r
+    end
+    mu = resolve_slot(r.mu, :mu, pr)
+    kt = r.kt
+    if isa(kt, DeferredQuantity)
+        centre = isnothing(mu) ? deferred_centre(kt, pr) : mu
+        fitted = fit_deferred_moment(kt, pr, centre)
+        kt = deferred_quantity(fitted, :kt)
+        mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
+    end
+    if isnothing(r.pe)
+        return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
+                        alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
+    end
+    fitted = fit_deferred_quantity(r.pe, pr)
+    return Kurtosis(; settings = r.settings, w = r.w, mu = fan_out_slot(fitted, mu, :mu),
+                    kt = fan_out_slot(fitted, kt, :kt), N = r.N, alg1 = r.alg1,
+                    alg2 = r.alg2, pe = nothing)
+end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)
 """
     calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, ...}, ::Any, x::VecNum)
     calc_moment_target(r::Kurtosis{<:Any, <:ObsWeights, Nothing, ...}, ::Any, x::VecNum)
@@ -284,24 +344,7 @@ function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Any, <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:SemiMoment,
-                      <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
-                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
-end
-function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:SemiMoment,
-                      <:Any})(x::VecNum)
-    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, x), mu = r.mu,
-                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -315,11 +358,12 @@ Create an instance of [`Kurtosis`](@ref) by selecting the cokurtosis matrix, exp
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -334,11 +378,12 @@ Create an instance of [`Kurtosis`](@ref) from a [`LowOrderPrior`](@ref) result (
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, nothing)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -369,7 +414,7 @@ function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
     end
     mu = nothing_scalar_array_view(mu, i)
     return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = r.pe)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

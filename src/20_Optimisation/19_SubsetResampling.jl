@@ -101,14 +101,13 @@ $(DocStringExtensions.FIELDS)
         pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
-        scale::TD_Option{<:VecNum} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         opt::OptE_TD,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        subset_size::TD{<:SubsetSizeE} = 0.5,
-        n_subsets::TD{<:NumberSubsetsE} = 100,
-        max_comb::Integer = 1000,
+        subset_size::TD{<:SubsetSizeE} = 0.8,
+        n_subsets::TD{<:NumberSubsetsE} = 2,
+        max_comb::Integer = 1_000_000_000,
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
@@ -120,11 +119,10 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`pe`, `wb`, `fees`, `sets`, `scale`, `opt`, `wf`, `subset_size`, `n_subsets` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. The optimiser-valued positions `opt` and `fb` are `bind = :outermost` only: `SubsetResampling`'s internal loop is over randomly drawn *asset subsets*, not time folds, so there is no inner fold loop for a `:nearest` optimiser schedule to bind to and it is rejected at construction. The fold loop that reaches the `SubsetResampling` resolves its schedules; a fold-less solve resets `pe`/`wf`/`subset_size`/`n_subsets` to their static defaults, `wb`/`fees`/`sets`/`scale`/`fb` to `nothing`, and requires an `opt` schedule to carry its own `default`. `max_comb`, `rng` and `seed` are execution control and stay static.
+`pe`, `wb`, `fees`, `sets`, `opt`, `wf`, `subset_size`, `n_subsets` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. The optimiser-valued positions `opt` and `fb` are `bind = :outermost` only: `SubsetResampling`'s internal loop is over randomly drawn *asset subsets*, not time folds, so there is no inner fold loop for a `:nearest` optimiser schedule to bind to and it is rejected at construction. The fold loop that reaches the `SubsetResampling` resolves its schedules; a fold-less solve resets `pe`/`wf`/`subset_size`/`n_subsets` to their static defaults, `wb`/`fees`/`sets`/`fb` to `nothing`, and requires an `opt` schedule to carry its own `default`. `max_comb`, `rng` and `seed` are execution control and stay static.
 
 ## Validation
 
-  - If `scale` is provided and static: all elements must be non-empty, `> 0`, and finite.
   - `opt` must pass `assert_internal_optimiser` (a schedule delegates to its entries and `default`).
   - If `wb` is a `WeightBoundsEstimator`: `!isnothing(sets)`.
   - If `fees` is a `FeesEstimator`: `!isnothing(sets)`.
@@ -163,8 +161,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
-  - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
+  - [`optimise`](@ref)
   - [`SubsetResamplingResult`](@ref)
+  - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
@@ -184,10 +183,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:sets])
     """
     sets
-    """
-    Optional scaling vector for subset optimiser weights.
-    """
-    scale
     """
     Base portfolio optimiser applied to each asset subset.
     """
@@ -233,8 +228,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     function SubsetResampling(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
-                              fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
-                              scale::TD_Option{<:VecNum}, opt::OptE_TD,
+                              fees::TD_Option{<:FeesE_Fees},
+                              sets::TD_Option{<:UniverseSets}, opt::OptE_TD,
                               wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
@@ -242,9 +237,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                               fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool)
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
-        if !isa(scale, TimeDependent)
-            assert_nonempty_gt0_finite_val(scale, :scale)
-        end
         assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
@@ -262,23 +254,20 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         assert_time_dependent_substitution(SubsetResampling,
-                                           (; pe, wb, fees, sets, scale, opt, wf, ex,
-                                            subset_size, n_subsets, max_comb, rng, seed, fb,
-                                            brt, strict), subset_resampling_td_defaults())
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
-                   typeof(opt), typeof(wf), typeof(ex), typeof(subset_size),
-                   typeof(n_subsets), typeof(max_comb), typeof(rng), typeof(seed),
-                   typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opt,
-                                                            wf, ex, subset_size, n_subsets,
-                                                            max_comb, rng, seed, fb, brt,
-                                                            strict)
+                                           (; pe, wb, fees, sets, opt, wf, ex, subset_size,
+                                            n_subsets, max_comb, rng, seed, fb, brt,
+                                            strict), subset_resampling_td_defaults())
+        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
+                   typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
+                   typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(brt),
+                   typeof(strict)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
+                                   max_comb, rng, seed, fb, brt, strict)
     end
 end
 function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                           wb::TD_Option{<:WbE_Wb} = nothing,
                           fees::TD_Option{<:FeesE_Fees} = nothing,
-                          sets::TD_Option{<:AssetSets} = nothing,
-                          scale::TD_Option{<:VecNum} = nothing, opt::OptE_TD,
+                          sets::TD_Option{<:UniverseSets} = nothing, opt::OptE_TD,
                           wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                           subset_size::TD{<:SubsetSizeE} = 0.8,
@@ -288,7 +277,7 @@ function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                           seed::Option{<:Integer} = nothing,
                           fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                           strict::Bool = false)::SubsetResampling
-    return SubsetResampling(pe, wb, fees, sets, scale, opt, wf, ex, subset_size, n_subsets,
+    return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
                             max_comb, rng, seed, fb, brt, strict)
 end
 """
@@ -296,7 +285,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`SubsetResampling`](@ref) fields that may hold a [`TimeDependent`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued field `opt` is required and has no static default, so it is marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe`, `wf`, `subset_size` and `n_subsets` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `scale`, `fb`) are omitted.
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued field `opt` is required and has no static default, so it is marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe`, `wf`, `subset_size` and `n_subsets` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `fb`) are omitted.
 
 # Related
 
@@ -387,8 +376,8 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     fees = port_opt_view(sr.fees, i)
     sets = port_opt_view(sr.sets, i)
     opt = port_opt_view(sr.opt, i, X)
-    return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, scale = sr.scale,
-                            opt = opt, wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
+    return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
+                            wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
@@ -448,7 +437,7 @@ Combines optimised weights from multiple asset subsets, averaging over subsets t
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ::VecNum, ::Nothing)
+                                     ress::VecOpt, ::VecNum)
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)
@@ -460,7 +449,7 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ws::VecVecNum, ::Nothing)
+                                     ress::VecOpt, ws::VecVecNum)
     M = length(ws)
     w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
     for i in 1:n_subsets
@@ -471,37 +460,6 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     end
     for j in 1:M
         w[j] /= n_subsets
-    end
-    retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
-    return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
-           map(x -> x[2], retcode_w)
-end
-function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
-                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ::VecNum, scale::VecNum)
-    w = zeros(eltype(ress[1].w), N)
-    for i in 1:n_subsets
-        idx = view(asset_idx, :, i)
-        w[idx] .+= scale[i] * ress[i].w
-    end
-    w /= sum(scale)
-    retcode, w = finalise_weight_bounds(wf, wb, w)
-    return subset_resampling_retcode(ress, retcode), w
-end
-function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
-                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ws::VecVecNum, scale::VecNum)
-    M = length(ws)
-    w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
-    for i in 1:n_subsets
-        idx = view(asset_idx, :, i)
-        for j in 1:M
-            w[j][idx] .+= scale[i] * ress[i].w[j]
-        end
-    end
-    denom = sum(scale)
-    for j in 1:M
-        w[j] /= denom
     end
     retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
     return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
@@ -518,10 +476,6 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
     subset_size = get_subset_size(subset_size, pr)
     n_subsets = get_n_subsets(n_subsets, pr)
-    if !isnothing(sr.scale)
-        @argcheck(length(sr.scale) == n_subsets,
-                  DimensionMismatch("sr.scale ($(length(sr.scale))) must match n_subsets ($n_subsets)"))
-    end
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
@@ -540,13 +494,13 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict,
                                    datatype = eltype(X))
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
-                                             ress[1].w, sr.scale)
+                                             ress[1].w)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
                                   idx = asset_idx, retcode = retcode, w = w, fb = nothing)
 end
 """
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                     <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
              dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> SubsetResamplingResult
@@ -569,7 +523,7 @@ Run the Subset Resampling portfolio optimisation.
   - [`SubsetResamplingResult`](@ref)
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+                                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)

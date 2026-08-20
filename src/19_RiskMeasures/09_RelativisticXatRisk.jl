@@ -106,23 +106,23 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Value-at-Risk (RVaR) risk measure.
+Represents the Relativistic Value-at-Risk (RLVaR) risk measure.
 
 `RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Tsallis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme.
 
 # Mathematical definition
 
-Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RVaR is:
+Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RLVaR is:
 
 ```math
 \\begin{align}
-\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
@@ -171,7 +171,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticValueatRisk)(x::VecNum)
 
-Computes the RVaR of a portfolio returns vector `x`.
+Computes the RLVaR of a portfolio returns vector `x`.
 
 ## Arguments
 
@@ -249,15 +249,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure.
+Represents the Relativistic Value-at-Risk Range (RLVaR Range) risk measure.
 
-`RelativisticValueatRiskRange` computes the sum of the lower-tail RVaR (at level `alpha` with deformation `kappa_a`) and the upper-tail RVaR (at level `beta` with deformation `kappa_b`).
+`RelativisticValueatRiskRange` computes the sum of the lower-tail RLVaR (at level `alpha` with deformation `kappa_a`) and the upper-tail RLVaR (at level `beta` with deformation `kappa_b`).
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
+\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
 \\end{align}
 ```
 
@@ -265,8 +265,8 @@ Where:
 
   - ``\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x})``: Relativistic VaR range.
   - $(math_dict[:xret])
-  - ``\\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x})``: Lower-tail RVaR with parameters ``(\\alpha, \\kappa_a)``.
-  - ``\\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RVaR with parameters ``(\\beta, \\kappa_b)``.
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x})``: Lower-tail RLVaR with parameters ``(\\alpha, \\kappa_a)``.
+  - ``\\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RLVaR with parameters ``(\\beta, \\kappa_b)``.
 
 # Fields
 
@@ -297,7 +297,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticValueatRiskRange)(x::VecNum)
 
-Computes the RVaR Range of a portfolio returns vector `x`.
+Computes the RLVaR Range of a portfolio returns vector `x`.
 
 ## Arguments
 
@@ -381,6 +381,17 @@ function RelativisticValueatRiskRange(;
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
+# Tail decomposition — see `range_tails`. Each tail carries its own deformation parameter:
+# `kappa_a` shapes the loss side, `kappa_b` the gain side. The functor below is the
+# value-level twin, and it is what pins that pairing.
+function range_tails(r::RelativisticValueatRiskRange)
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.alpha, kappa = r.kappa_a, w = r.w),
+            gain = RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.beta, kappa = r.kappa_b, w = r.w))
+end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
@@ -408,11 +419,11 @@ Where:
   - $(math_dict[:ct])
   - $(math_dict[:dtdd])
 
-The Relativistic Drawdown-at-Risk is the RVaR of the drawdown series:
+The Relativistic Drawdown-at-Risk is the RLVaR of the drawdown series:
 
 ```math
 \\begin{align}
-\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
 \\end{align}
 ```
 
@@ -500,7 +511,8 @@ RelativisticDrawdownatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
+    function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
+                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -515,7 +527,7 @@ RelativisticDrawdownatRisk
                                                                                            w)
     end
 end
-function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
+function RelativisticDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
                                     alpha::Number = 0.05, kappa::Number = 0.3,
                                     w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk
@@ -549,11 +561,11 @@ Where:
   - $(math_dict[:Ct])
   - $(math_dict[:rdt])
 
-The Relative Relativistic Drawdown-at-Risk is the RVaR of the relative drawdown series:
+The Relative Relativistic Drawdown-at-Risk is the RLVaR of the relative drawdown series:
 
 ```math
 \\begin{align}
-\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
 \\end{align}
 ```
 

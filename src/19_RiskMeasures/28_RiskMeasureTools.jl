@@ -11,6 +11,17 @@ function no_risk_expr_risk_measure(r::RiskMeasure)
     return Accessors.@set r.settings = RiskMeasureSettings(; rke = false, ub = settings.ub,
                                                            scale = settings.scale)
 end
+function unit_scale_risk_measure(r::RiskMeasure)
+    settings = r.settings
+    scale = settings.scale
+    return if isone(scale)
+        r
+    else
+        Accessors.@set r.settings = RiskMeasureSettings(; scale = one(scale),
+                                                        ub = settings.ub,
+                                                        rke = settings.rke)
+    end
+end
 function bounds_risk_measure(r::RiskMeasure, ub::Number)
     settings = r.settings
     return Accessors.@set r.settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
@@ -23,6 +34,9 @@ function no_bounds_no_risk_expr_risk_measure(r::HierarchicalRiskMeasure, ::Any =
     return r
 end
 function no_risk_expr_risk_measure(r::HierarchicalRiskMeasure)
+    return r
+end
+function unit_scale_risk_measure(r::HierarchicalRiskMeasure)
     return r
 end
 function bounds_risk_measure(r::HierarchicalRiskMeasure, ::Any = nothing)
@@ -122,6 +136,95 @@ returned unchanged.
 function bounds_risk_measure(r::VecBaseRM, ubs::VecNum)
     return bounds_risk_measure.(r, ubs)
 end
+"""
+    unit_scale_risk_measure(r)
+
+Return a copy of risk measure `r` with its `scale` set to `one(scale)`, preserving its
+upper bound and its `rke` flag. A measure that already carries a unit scale is returned
+unchanged, so the common path allocates nothing.
+
+`scale` is a combination weight: it says how much this measure contributes to an aggregate
+built from several measures. One measure is not an aggregate, so the weight has nothing to
+weigh and the model drops it before it can reach the risk expression. Hierarchical risk
+measures are returned unchanged.
+
+# Arguments
+
+  - `r`: Risk measure.
+
+# Returns
+
+  - Risk measure carrying a unit scale.
+
+# Related
+
+  - [`no_bounds_risk_measure`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function unit_scale_risk_measure end
+
+"""
+    measure_label(r::AbstractBaseRiskMeasure) -> String
+    measure_label(rs::VecBaseRM) -> String
+
+Name a risk measure for an axis label, a title, or a legend entry.
+
+One measure answers its own type name. A vector answers its elements' names joined by `" + "`.
+
+The vector arm is the reason the helper exists. `string(nameof(typeof(rs)))` on a vector evaluates to `"Vector"` — a wrong label, silently, with no error — and seven plot sites spelled that expression inline. Writing the rule once means a future measure-taking plot inherits it.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
+"""
+function measure_label(r::AbstractBaseRiskMeasure)
+    return string(nameof(typeof(r)))
+end
+function measure_label(rs::VecBaseRM)
+    return join(measure_label.(rs), " + ")
+end
+
+"""
+    const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T}, <:Kurtosis{<:Any, T}, <:Skewness{<:Any, <:Any, <:Any, T}, <:ThirdCentralMoment{<:Any, T}}
+
+Parameterised union of the five central-moment risk measures sharing the same observation-weight (`T`) type parameter.
+
+The members are [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Kurtosis`](@ref), [`Skewness`](@ref) and [`ThirdCentralMoment`](@ref). Each evaluates the same way — deviations from the centring target, then [`moment_risk`](@ref) — and each resolves a [`DynamicAbstractWeights`](@ref) the same way, so the four functor methods are written once here rather than four times per measure.
+
+`T` selects the arm:
+
+  - `Option{<:StatsBase.AbstractWeights}`: the weights are resolved, so the measure computes.
+  - `<:DynamicAbstractWeights`: the weights are not resolved, so the measure resolves them against the data it was handed and re-calls itself.
+
+The rebuild replaces `w` and copies every other field, so it names no field list and cannot drop a field. The ten hand-written rebuilds it replaces did: [`Skewness`](@ref) reset its `settings`, and [`Kurtosis`](@ref) bound its rebuild to `SemiMoment`, which left a default [`Kurtosis`](@ref) carrying dynamic weights matching no method at all.
+
+# Related
+
+  - [`moment_risk`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+const MomentRiskMeasures{T} = Union{<:LowOrderMoment{<:Any, T}, <:HighOrderMoment{<:Any, T},
+                                    <:Kurtosis{<:Any, T},
+                                    <:Skewness{<:Any, <:Any, <:Any, T},
+                                    <:ThirdCentralMoment{<:Any, T}}
+function (r::MomentRiskMeasures{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
+                                                                        X::MatNum,
+                                                                        fees::Option{<:Fees} = nothing)
+    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::MomentRiskMeasures{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
+    return moment_risk(r, calc_deviations_vec(r, x))
+end
+function (r::MomentRiskMeasures{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                           fees::Option{<:Fees} = nothing)
+    return (Accessors.@set r.w = get_observation_weights(r.w, X))(w, X, fees)
+end
+function (r::MomentRiskMeasures{<:DynamicAbstractWeights})(x::VecNum)
+    return (Accessors.@set r.w = get_observation_weights(r.w, x))(x)
+end
 
 export no_bounds_risk_measure, no_bounds_no_risk_expr_risk_measure,
-       no_risk_expr_risk_measure, bounds_risk_measure
+       no_risk_expr_risk_measure, bounds_risk_measure, unit_scale_risk_measure

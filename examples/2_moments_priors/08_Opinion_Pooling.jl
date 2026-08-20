@@ -51,9 +51,9 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX"]))
 
 #=
 ## 2. Three opinions
@@ -219,7 +219,7 @@ plot_stacked_bar_composition([res_emp, res_op], rd; xticks = (1:2, ["Empirical",
 #src - BUG FIXED this session (→ #126): prior(OpinionPoolingPrior) used to MUTATE the stored
 #src   weights `pe.w` in place — `ow = pe.w` aliased it and `push!(ow, rw)` grew it when
 #src   sum(w)<1, so a second prior() call threw `length(w) == length(pes)`. Fixed in
-#src   src/13_Prior/11_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
+#src   src/13_Prior/13_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
 #src   `range` branch, which was immutable). Regression test added in test_12b_prior_core.jl.
 #src - FINDING (→ #126): robust pooling `p` had NEGLIGIBLE effect here — even an extreme outlier
 #src   (AMD == 0.006) at p∈{1.0,0.5,0.1,0.01} moved pooled mu by ~1e-14 (machine eps) and sigma

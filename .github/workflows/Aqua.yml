@@ -10,6 +10,10 @@ on:
   workflow_dispatch:
   pull_request:
 
+# Aqua only checks out the tree and runs the checks. It writes nothing.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

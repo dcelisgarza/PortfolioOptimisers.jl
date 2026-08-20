@@ -119,10 +119,7 @@ julia> cor(KendallCovariance(), X)
   - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
 """
 function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return StatsBase.corkendall(X)
 end
 """
@@ -233,10 +230,7 @@ julia> cor(SpearmanCovariance(), X)
   - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
 """
 function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     return StatsBase.corspearman(X)
 end
 export KendallCovariance, SpearmanCovariance

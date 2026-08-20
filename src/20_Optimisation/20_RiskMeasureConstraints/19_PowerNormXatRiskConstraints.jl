@@ -55,70 +55,105 @@ Where:
 
 # Related
 
-  - [`set_drawdown_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
-    key = Symbol(:pvar_risk_, i)
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    T = length(net_X)
-    ip = inv(r.p)
-    pvar_eta, pvar_t, pvar_w, pvar_v = model[Symbol(:pvar_eta_, i)], model[Symbol(:pvar_t_, i)], model[Symbol(:pvar_w_, i)], model[Symbol(:pvar_v_, i)] = JuMP.@variables(model,
-                                                                                                                                                                          begin
-                                                                                                                                                                              ()
-                                                                                                                                                                              ()
-                                                                                                                                                                              [1:T],
-                                                                                                                                                                              (lower_bound = 0)
-                                                                                                                                                                              [1:T]
-                                                                                                                                                                          end)
-
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    iaT = if isnothing(wi)
-        model[Symbol(:cpvar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc * (sum(pvar_v) - pvar_t) <= 0)
-        inv(r.alpha * T^ip)
-    else
-        model[Symbol(:cpvar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        (LinearAlgebra.dot(wi, pvar_v) -
-                                                         pvar_t) <= 0)
-        inv(r.alpha * sum(wi)^ip)
-    end
-    model[Symbol(:cpvar_, i)], model[Symbol(:cpvar_pcone_, i)] = JuMP.@constraints(model,
-                                                                                   begin
-                                                                                       sc *
-                                                                                       ((net_X +
-                                                                                         pvar_w) .+
-                                                                                        pvar_eta) >=
-                                                                                       0
-                                                                                       [i = 1:T],
-                                                                                       [sc *
-                                                                                        pvar_v[i],
-                                                                                        sc *
-                                                                                        pvar_t,
-                                                                                        sc *
-                                                                                        pvar_w[i]] in
-                                                                                       JuMP.MOI.PowerCone(ip)
-                                                                                   end)
-    pvar_risk = model[key] = JuMP.@expression(model, pvar_eta + iaT * pvar_t)
-    set_risk_bounds_and_expression!(model, opt, pvar_risk, r.settings, key)
-    return pvar_risk
+    series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
+    return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
+                                            (; eta = :pvar_eta_, t = :pvar_t_,
+                                             slack = :pvar_w_, v = :pvar_v_,
+                                             budget = :cpvar_eq_, exceedance = :cpvar_,
+                                             pcone = :cpvar_pcone_, risk = :pvar_risk_);
+                                            prefix = prefix)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `PowerNormValueatRiskRange` to `model`.
+Encode the power-norm tail programme of `series` and register it under the names in `keys`.
 
-Introduces variables and power-cone constraints to encode the range between a lower and
-upper power-norm value-at-risk, parameterised by `r.pa` and `r.pb`.
+This is the shared body of `PowerNormValueatRisk` and `PowerNormDrawdownatRisk`. The two are
+one power cone programme over different series, so [`risk_series`](@ref) chooses the series
+and this function writes the cone once.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The power-norm risk measure, read for `alpha`, `p`, `w` and
+    `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `T::Int`: The number of observations.
+  - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The power-norm risk expression added to the model.
+
+# Related
+
+  - [`risk_series`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                          opt::RiskJuMPOptimisationEstimator,
+                                          pr::AbstractPriorResult, series, T::Int,
+                                          keys::NamedTuple; prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    ip = inv(r.p)
+    eta, t, slack, v = JuMP.@variables(model, begin
+                                           ()
+                                           ()
+                                           [1:T], (lower_bound = 0)
+                                           [1:T]
+                                       end)
+    state_set!(model, prefix, keys.eta, i, eta)
+    state_set!(model, prefix, keys.t, i, t)
+    state_set!(model, prefix, keys.slack, i, slack)
+    state_set!(model, prefix, keys.v, i, v)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
+    iaT = if isnothing(wi)
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (sum(v) - t) <= 0))
+        inv(r.alpha * T^ip)
+    else
+        state_set!(model, prefix, keys.budget, i,
+                   JuMP.@constraint(model, sc * (LinearAlgebra.dot(wi, v) - t) <= 0))
+        inv(r.alpha * sum(wi)^ip)
+    end
+    exceedance, pcone = JuMP.@constraints(model,
+                                          begin
+                                              sc * ((series + slack) .+ eta) >= 0
+                                              [i = 1:T],
+                                              [sc * v[i], sc * t, sc * slack[i]] in
+                                              JuMP.MOI.PowerCone(ip)
+                                          end)
+    state_set!(model, prefix, keys.exceedance, i, exceedance)
+    state_set!(model, prefix, keys.pcone, i, pcone)
+    risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, eta + iaT * t))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
+                                    prefix = prefix)
+    return risk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `PowerNormValueatRiskRange` (PNVaR range) to `model`.
+
+Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`
+and `pa` on the net portfolio returns, and the gain tail from `beta` and `pb` on their
+negation, then sums the two PNVaR expressions. Each tail brings its own power cone, shaped
+by *its own* norm order.
 
 # Arguments
 
@@ -126,113 +161,23 @@ upper power-norm value-at-risk, parameterised by `r.pa` and `r.pb`.
   - $(arg_dict[:ci])
   - `r::PowerNormValueatRiskRange`: The power-norm VaR range risk measure.
   - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr])
+  - $(arg_dict[:pr_X])
 
 # Returns
 
-  - `nothing`.
+  - `pvar_range_risk`: The combined `loss + gain` risk expression added to the model.
 
 # Related
 
   - [`PowerNormValueatRiskRange`](@ref)
-  - [`set_risk_constraints!`](@ref)
+  - [`range_tails`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:pvar_range_risk_, i)
-    sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    T = length(net_X)
-    ipa = inv(r.pa)
-    ipb = inv(r.pb)
-    pvar_eta_l, pvar_t_l, pvar_w_l, pvar_v_l, pvar_eta_h, pvar_t_h, pvar_w_h, pvar_v_h = model[Symbol(:pvar_eta_l_, i)], model[Symbol(:pvar_t_l_, i)], model[Symbol(:pvar_w_l_, i)], model[Symbol(:pvar_v_l_, i)], model[Symbol(:pvar_eta_h_, i)], model[Symbol(:pvar_t_h_, i)], model[Symbol(:pvar_w_h_, i)], model[Symbol(:pvar_v_h_, i)] = JuMP.@variables(model,
-                                                                                                                                                                                                                                                                                                                                                              begin
-                                                                                                                                                                                                                                                                                                                                                                  ()
-                                                                                                                                                                                                                                                                                                                                                                  ()
-                                                                                                                                                                                                                                                                                                                                                                  [1:T],
-                                                                                                                                                                                                                                                                                                                                                                  (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                  [1:T]
-                                                                                                                                                                                                                                                                                                                                                                  ()
-                                                                                                                                                                                                                                                                                                                                                                  ()
-                                                                                                                                                                                                                                                                                                                                                                  [1:T],
-                                                                                                                                                                                                                                                                                                                                                                  (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                  [1:T]
-                                                                                                                                                                                                                                                                                                                                                              end)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
-    iaT, ibT = if isnothing(wi)
-        model[Symbol(:cpvar_eq_l_, i)], model[Symbol(:cpvar_eq_h_, i)] = JuMP.@constraints(model,
-                                                                                           begin
-                                                                                               sc *
-                                                                                               (sum(pvar_v_l) -
-                                                                                                pvar_t_l) <=
-                                                                                               0
-                                                                                               sc *
-                                                                                               (sum(pvar_v_h) -
-                                                                                                pvar_t_h) <=
-                                                                                               0
-                                                                                           end)
-        inv(r.alpha * T^ipa), inv(r.beta * T^ipb)
-    else
-        sw = sum(wi)
-        model[Symbol(:cpvar_eq_l_, i)], model[Symbol(:cpvar_eq_h_, i)] = JuMP.@constraints(model,
-                                                                                           begin
-                                                                                               sc *
-                                                                                               (LinearAlgebra.dot(wi,
-                                                                                                                  pvar_v_l) -
-                                                                                                pvar_t_l) <=
-                                                                                               0
-                                                                                               sc *
-                                                                                               (LinearAlgebra.dot(wi,
-                                                                                                                  pvar_v_h) -
-                                                                                                pvar_t_h) <=
-                                                                                               0
-                                                                                           end)
-        inv(r.alpha * sw^ipa), inv(r.beta * sw^ipb)
-    end
-    model[Symbol(:cpvar_l_, i)], model[Symbol(:cpvar_pcone_l_, i)], model[Symbol(:cpvar_h_, i)] = JuMP.@constraints(model,
-                                                                                                                    begin
-                                                                                                                        sc *
-                                                                                                                        ((net_X +
-                                                                                                                          pvar_w_l) .+
-                                                                                                                         pvar_eta_l) >=
-                                                                                                                        0
-                                                                                                                        [i = 1:T],
-                                                                                                                        [sc *
-                                                                                                                         pvar_v_l[i],
-                                                                                                                         sc *
-                                                                                                                         pvar_t_l,
-                                                                                                                         sc *
-                                                                                                                         pvar_w_l[i]] in
-                                                                                                                        JuMP.MOI.PowerCone(ipa)
-
-                                                                                                                        sc *
-                                                                                                                        ((-net_X +
-                                                                                                                          pvar_w_h) .+
-                                                                                                                         pvar_eta_h) >=
-                                                                                                                        0
-                                                                                                                        [i = 1:T],
-                                                                                                                        [sc *
-                                                                                                                         pvar_v_h[i],
-                                                                                                                         sc *
-                                                                                                                         pvar_t_h,
-                                                                                                                         sc *
-                                                                                                                         pvar_w_h[i]] in
-                                                                                                                        JuMP.MOI.PowerCone(ipa)
-                                                                                                                    end)
-    pvar_risk_l, pvar_risk_h = model[Symbol(:pvar_risk_l_, i)], model[Symbol(:pvar_risk_h_, i)] = JuMP.@expressions(model,
-                                                                                                                    begin
-                                                                                                                        pvar_eta_l +
-                                                                                                                        iaT *
-                                                                                                                        pvar_t_l
-                                                                                                                        pvar_eta_h +
-                                                                                                                        ibT *
-                                                                                                                        pvar_t_h
-                                                                                                                    end)
-    pvar_range_risk = model[key] = JuMP.@expression(model, pvar_risk_l + pvar_risk_h)
-    set_risk_bounds_and_expression!(model, opt, pvar_range_risk, r.settings, key)
-    return pvar_range_risk
+    return set_range_risk_constraints!(model, i, r, :pvar_range_risk_, opt, pr, args...;
+                                       prefix = prefix, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -262,50 +207,11 @@ computed over the drawdown path of portfolio returns.
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:pdar_risk_, i)
-    sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-    T = length(dd) - 1
-    ip = inv(r.p)
-    pdar_eta, pdar_t, pdar_w, pdar_v = model[Symbol(:pdar_eta_, i)], model[Symbol(:pdar_t_, i)], model[Symbol(:pdar_w_, i)], model[Symbol(:pdar_v_, i)] = JuMP.@variables(model,
-                                                                                                                                                                          begin
-                                                                                                                                                                              ()
-                                                                                                                                                                              ()
-                                                                                                                                                                              [1:T],
-                                                                                                                                                                              (lower_bound = 0)
-                                                                                                                                                                              [1:T]
-                                                                                                                                                                          end)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
-    iaT = if isnothing(wi)
-        model[Symbol(:cpdar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc * (sum(pdar_v) - pdar_t) <= 0)
-        inv(r.alpha * T^ip)
-    else
-        model[Symbol(:cpdar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        (LinearAlgebra.dot(wi, pdar_v) -
-                                                         pdar_t) <= 0)
-        inv(r.alpha * sum(wi)^ip)
-    end
-    model[Symbol(:cpdar_, i)], model[Symbol(:cpdar_pcone_, i)] = JuMP.@constraints(model,
-                                                                                   begin
-                                                                                       sc *
-                                                                                       ((pdar_w -
-                                                                                         view(dd,
-                                                                                              2:(T + 1))) .+
-                                                                                        pdar_eta) >=
-                                                                                       0
-                                                                                       [i = 1:T],
-                                                                                       [sc *
-                                                                                        pdar_v[i],
-                                                                                        sc *
-                                                                                        pdar_t,
-                                                                                        sc *
-                                                                                        pdar_w[i]] in
-                                                                                       JuMP.MOI.PowerCone(ip)
-                                                                                   end)
-    pdar_risk = model[key] = JuMP.@expression(model, pdar_eta + iaT * pdar_t)
-    set_risk_bounds_and_expression!(model, opt, pdar_risk, r.settings, key)
-    return pdar_risk
+    series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
+    return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
+                                            (; eta = :pdar_eta_, t = :pdar_t_,
+                                             slack = :pdar_w_, v = :pdar_v_,
+                                             budget = :cpdar_eq_, exceedance = :cpdar_,
+                                             pcone = :cpdar_pcone_, risk = :pdar_risk_);
+                                            prefix = prefix)
 end

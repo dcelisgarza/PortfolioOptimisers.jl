@@ -81,27 +81,28 @@ mip_slv = [Solver(; name = :mip1,
                                                                                        0.95)),
                   check_sol = (; allow_local = true, allow_almost = true))]
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                             "group2" => rd.nx[2:2:end],
-                             "clusters1" =>
-                                 [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                                  3],
-                             "clusters2" =>
-                                 [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
-                                  2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
-                             "c3" => rd.nx[3:3:end],
-                             "nx_industries" => ["Technology", "Technology", "Financials",
-                                                 "Consumer_Discretionary", "Energy", "Industrials",
-                                                 "Consumer_Discretionary", "Healthcare", "Financials",
-                                                 "Consumer_Staples", "Healthcare", "Healthcare",
-                                                 "Technology", "Consumer_Staples", "Healthcare",
-                                                 "Consumer_Staples", "Energy", "Healthcare",
-                                                 "Consumer_Staples", "Energy"],
-                             "ux_industries" =>
-                                 ["Technology", "Financials", "Consumer_Discretionary",
-                                  "Energy", "Industrials", "Healthcare",
-                                  "Consumer_Staples"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                "group2" => rd.nx[2:2:end],
+                                "clusters1" =>
+                                    [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                     3, 3],
+                                "clusters2" =>
+                                    [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                     1, 2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
+                                "c3" => rd.nx[3:3:end],
+                                "nx_industries" =>
+                                    ["Technology", "Technology", "Financials",
+                                     "Consumer_Discretionary", "Energy", "Industrials",
+                                     "Consumer_Discretionary", "Healthcare", "Financials",
+                                     "Consumer_Staples", "Healthcare", "Healthcare",
+                                     "Technology", "Consumer_Staples", "Healthcare",
+                                     "Consumer_Staples", "Energy", "Healthcare",
+                                     "Consumer_Staples", "Energy"],
+                                "ux_industries" =>
+                                    ["Technology", "Financials", "Consumer_Discretionary",
+                                     "Energy", "Industrials", "Healthcare",
+                                     "Consumer_Staples"]))
 
 #=
 ## 2. Asset-level: `card`, `lt`, `st`

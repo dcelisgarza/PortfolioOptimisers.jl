@@ -79,25 +79,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       <:ExactOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:owa_risk_, i)
     sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = model[Symbol(:owa_a_, i)], model[Symbol(:owa_b_, i)] = JuMP.@variables(model,
-                                                                                          begin
-                                                                                              [1:T]
-                                                                                              [1:T]
-                                                                                          end)
-    owa_risk = model[key] = JuMP.@expression(model, sum(owa_a + owa_b))
+    owa_a, owa_b = JuMP.@variables(model, begin
+                                       [1:T]
+                                       [1:T]
+                                   end)
+    state_set!(model, prefix, :owa_a_, i, owa_a)
+    state_set!(model, prefix, :owa_b_, i, owa_b)
+    owa_risk = state_set!(model, prefix, :owa_risk_, i,
+                          JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
-    model[Symbol(:cowa_, i)] = JuMP.@constraint(model,
-                                                sc * (owa * transpose(owa_w) -
-                                                      ovec * transpose(owa_a) -
-                                                      owa_b * transpose(ovec)) in
-                                                JuMP.Nonpositives())
-    set_risk_bounds_and_expression!(model, opt, owa_risk, r.settings, key)
+    state_set!(model, prefix, :cowa_, i,
+               JuMP.@constraint(model,
+                                sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
+                                      owa_b * transpose(ovec)) in JuMP.Nonpositives()))
+    set_risk_bounds_and_expression!(model, opt, owa_risk, r.settings, :owa_risk_, i;
+                                    prefix = prefix)
     return owa_risk
 end
 """
@@ -134,27 +135,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            <:ExactOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:owa_range_risk_, i)
     sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = model[Symbol(:owa_range_a_, i)], model[Symbol(:owa_range_b_, i)] = JuMP.@variables(model,
-                                                                                                      begin
-                                                                                                          [1:T]
-                                                                                                          [1:T]
-                                                                                                      end)
-    owa_range_risk = model[key] = JuMP.@expression(model, sum(owa_a + owa_b))
+    owa_a, owa_b = JuMP.@variables(model, begin
+                                       [1:T]
+                                       [1:T]
+                                   end)
+    state_set!(model, prefix, :owa_range_a_, i, owa_a)
+    state_set!(model, prefix, :owa_range_b_, i, owa_b)
+    owa_range_risk = state_set!(model, prefix, :owa_range_risk_, i,
+                                JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
     owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
     owa_w = owa_w1 - owa_w2
-    model[Symbol(:cowa_range_, i)] = JuMP.@constraint(model,
-                                                      sc * (owa * transpose(owa_w) -
-                                                            ovec * transpose(owa_a) -
-                                                            owa_b * transpose(ovec)) in
-                                                      JuMP.Nonpositives())
-    set_risk_bounds_and_expression!(model, opt, owa_range_risk, r.settings, key)
+    state_set!(model, prefix, :cowa_range_, i,
+               JuMP.@constraint(model,
+                                sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
+                                      owa_b * transpose(ovec)) in JuMP.Nonpositives()))
+    set_risk_bounds_and_expression!(model, opt, owa_range_risk, r.settings,
+                                    :owa_range_risk_, i; prefix = prefix)
     return owa_range_risk
 end
 """
@@ -175,9 +177,16 @@ the OWA risk as a weighted sum of p-norm terms.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
+    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
+    builds the gain tail of [`OrderedWeightsArrayRange`](@ref) through.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `aowa_risk`: The OWA risk expression added to the model.
 
 # Related
 
@@ -189,80 +198,82 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ApproxOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:aowa_risk_, i)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     owa_p = r.alg.p
     M = length(owa_p)
-    owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = model[Symbol(:owa_t_, i)], model[Symbol(:owa_nu_, i)], model[Symbol(:owa_eta_, i)], model[Symbol(:owa_epsilon_, i)], model[Symbol(:owa_psi_, i)], model[Symbol(:owa_z_, i)], model[Symbol(:owa_y_, i)] = JuMP.@variables(model,
-                                                                                                                                                                                                                                                                                          begin
-                                                                                                                                                                                                                                                                                              ()
-                                                                                                                                                                                                                                                                                              [1:T],
-                                                                                                                                                                                                                                                                                              (lower_bound = 0)
-                                                                                                                                                                                                                                                                                              [1:T],
-                                                                                                                                                                                                                                                                                              (lower_bound = 0)
-                                                                                                                                                                                                                                                                                              [1:T,
-                                                                                                                                                                                                                                                                                               1:M]
-                                                                                                                                                                                                                                                                                              [1:T,
-                                                                                                                                                                                                                                                                                               1:M]
-                                                                                                                                                                                                                                                                                              [1:M]
-                                                                                                                                                                                                                                                                                              [1:M],
-                                                                                                                                                                                                                                                                                              (lower_bound = 0)
-                                                                                                                                                                                                                                                                                          end)
+    owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = JuMP.@variables(model,
+                                                                                 begin
+                                                                                     ()
+                                                                                     [1:T],
+                                                                                     (lower_bound = 0)
+                                                                                     [1:T],
+                                                                                     (lower_bound = 0)
+                                                                                     [1:T,
+                                                                                      1:M]
+                                                                                     [1:T,
+                                                                                      1:M]
+                                                                                     [1:M]
+                                                                                     [1:M],
+                                                                                     (lower_bound = 0)
+                                                                                 end)
+    state_set!(model, prefix, :owa_t_, i, owa_t)
+    state_set!(model, prefix, :owa_nu_, i, owa_nu)
+    state_set!(model, prefix, :owa_eta_, i, owa_eta)
+    state_set!(model, prefix, :owa_epsilon_, i, owa_epsilon)
+    state_set!(model, prefix, :owa_psi_, i, owa_psi)
+    state_set!(model, prefix, :owa_z_, i, owa_z)
+    state_set!(model, prefix, :owa_y_, i, owa_y)
     owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
     owa_s = sum(owa_w)
     owa_l = minimum(owa_w)
     owa_h = maximum(owa_w)
     owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
-    aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = model[key], model[Symbol(:neg_owa_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = JuMP.@expressions(model,
-                                                                                                                                                           begin
-                                                                                                                                                               owa_s *
-                                                                                                                                                               owa_t -
-                                                                                                                                                               owa_l *
-                                                                                                                                                               sum(owa_nu) +
-                                                                                                                                                               owa_h *
-                                                                                                                                                               sum(owa_eta) +
-                                                                                                                                                               LinearAlgebra.dot(owa_d,
-                                                                                                                                                                                 owa_y)
-                                                                                                                                                               -owa_z .*
-                                                                                                                                                               owa_p
-                                                                                                                                                               owa_p ./
-                                                                                                                                                               (owa_p .-
-                                                                                                                                                                one(eltype(owa_p)))
-                                                                                                                                                           end)
-    model[Symbol(:ca1_owa_, i)], model[Symbol(:ca2_owa_, i)], model[Symbol(:ca_owa_pcone_, i)] = JuMP.@constraints(model,
-                                                                                                                   begin
-                                                                                                                       sc *
-                                                                                                                       ((net_X -
-                                                                                                                         owa_nu +
-                                                                                                                         owa_eta -
-                                                                                                                         vec(sum(owa_epsilon;
-                                                                                                                                 dims = 2))) .+
-                                                                                                                        owa_t) ==
-                                                                                                                       0
-                                                                                                                       sc *
-                                                                                                                       (owa_z +
-                                                                                                                        owa_y -
-                                                                                                                        vec(sum(owa_psi;
-                                                                                                                                dims = 1))) ==
-                                                                                                                       0
-                                                                                                                       [i = 1:M,
-                                                                                                                        j = 1:T],
-                                                                                                                       [sc *
-                                                                                                                        neg_owa_z_owa_p[i],
-                                                                                                                        sc *
-                                                                                                                        owa_psi[j,
-                                                                                                                                i] *
-                                                                                                                        owa_p_o_owa_pm1[i],
-                                                                                                                        sc *
-                                                                                                                        owa_epsilon[j,
-                                                                                                                                    i]] in
-                                                                                                                       JuMP.MOI.PowerCone(inv(owa_p[i]))
-                                                                                                                   end)
-    set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, key)
+    aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = JuMP.@expressions(model,
+                                                                    begin
+                                                                        owa_s * owa_t -
+                                                                        owa_l *
+                                                                        sum(owa_nu) +
+                                                                        owa_h *
+                                                                        sum(owa_eta) +
+                                                                        LinearAlgebra.dot(owa_d,
+                                                                                          owa_y)
+                                                                        -owa_z .* owa_p
+                                                                        owa_p ./ (owa_p .-
+                                                                                  one(eltype(owa_p)))
+                                                                    end)
+    state_set!(model, prefix, :aowa_risk_, i, aowa_risk)
+    state_set!(model, prefix, :neg_owa_z_owa_p_, i, neg_owa_z_owa_p)
+    state_set!(model, prefix, :owa_p_o_owa_pm1_, i, owa_p_o_owa_pm1)
+    ca1_owa, ca2_owa, ca_owa_pcone = JuMP.@constraints(model,
+                                                       begin
+                                                           sc *
+                                                           ((net_X - owa_nu + owa_eta -
+                                                             vec(sum(owa_epsilon; dims = 2))) .+
+                                                            owa_t) == 0
+                                                           sc * (owa_z + owa_y -
+                                                                 vec(sum(owa_psi; dims = 1))) ==
+                                                           0
+                                                           [i = 1:M, j = 1:T],
+                                                           [sc * neg_owa_z_owa_p[i],
+                                                            sc *
+                                                            owa_psi[j, i] *
+                                                            owa_p_o_owa_pm1[i],
+                                                            sc * owa_epsilon[j, i]] in
+                                                           JuMP.MOI.PowerCone(inv(owa_p[i]))
+                                                       end)
+    state_set!(model, prefix, :ca1_owa_, i, ca1_owa)
+    state_set!(model, prefix, :ca2_owa_, i, ca2_owa)
+    state_set!(model, prefix, :ca_owa_pcone_, i, ca_owa_pcone)
+    set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, :aowa_risk_, i;
+                                    prefix = prefix)
     return aowa_risk
 end
 """
@@ -271,8 +282,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `OrderedWeightsArrayRange` using the approximate OWA
 formulation to `model`.
 
-Uses the Wasserstein-based power cone approximation parameterised by `r.alg.p` to encode
-both OWA tail expressions, then computes their difference as the range risk.
+Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `w1` on
+the net portfolio returns and the gain tail from `w2` on their negation, then sums the two
+OWA expressions. Each tail brings its own power cone block.
 
 # Arguments
 
@@ -285,145 +297,20 @@ both OWA tail expressions, then computes their difference as the range risk.
 
 # Returns
 
-  - `nothing`.
+  - `aowa_range_risk`: The combined `loss + gain` risk expression added to the model.
 
 # Related
 
   - [`OrderedWeightsArrayRange`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
-  - [`set_risk_constraints!`](@ref)
+  - [`range_tails`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:aowa_range_risk_, i)
-    sc = get_constraint_scale(model)
-    X = pr.X
-    T = size(X, 1)
-    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    owa_p = r.alg.p
-    M = length(owa_p)
-    owa_l_t, owa_l_nu, owa_l_eta, owa_l_epsilon, owa_l_psi, owa_l_z, owa_l_y, owa_h_t, owa_h_nu, owa_h_eta, owa_h_epsilon, owa_h_psi, owa_h_z, owa_h_y = model[Symbol(:owa_l_t_, i)], model[Symbol(:owa_l_nu_, i)], model[Symbol(:owa_l_eta_, i)], model[Symbol(:owa_l_epsilon_, i)], model[Symbol(:owa_l_psi_, i)], model[Symbol(:owa_l_z_, i)], model[Symbol(:owa_l_y_, i)], model[Symbol(:owa_h_t_, i)], model[Symbol(:owa_h_nu_, i)], model[Symbol(:owa_h_eta_, i)], model[Symbol(:owa_h_epsilon_, i)], model[Symbol(:owa_h_psi_, i)], model[Symbol(:owa_h_z_, i)], model[Symbol(:owa_h_y_, i)] = JuMP.@variables(model,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      begin
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ()
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:M],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ()
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:T,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:M]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [1:M],
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          (lower_bound = 0)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      end)
-    owa_l_w = isa(r.w1, VecNum) ? -r.w1 : -r.w1(T)
-    owa_l_s = sum(owa_l_w)
-    owa_l_l = minimum(owa_l_w)
-    owa_l_h = maximum(owa_l_w)
-    owa_l_d = [LinearAlgebra.norm(owa_l_w, p) for p in owa_p]
-    owa_h_w = isa(r.w2, VecNum) ? -r.w2 : -r.w2(T)
-    owa_h_s = sum(owa_h_w)
-    owa_h_l = minimum(owa_h_w)
-    owa_h_h = maximum(owa_h_w)
-    owa_h_d = [LinearAlgebra.norm(owa_h_w, p) for p in owa_p]
-    owa_l_risk, neg_owa_l_z_owa_p, owa_h_risk, neg_owa_h_z_owa_p, owa_p_o_owa_pm1 = model[Symbol(:owa_l_risk_, i)], model[Symbol(:neg_owa_l_z_owa_p_, i)], model[Symbol(:owa_h_risk_, i)], model[Symbol(:neg_owa_h_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = JuMP.@expressions(model,
-                                                                                                                                                                                                                                                                                          begin
-                                                                                                                                                                                                                                                                                              owa_l_s *
-                                                                                                                                                                                                                                                                                              owa_l_t -
-                                                                                                                                                                                                                                                                                              owa_l_l *
-                                                                                                                                                                                                                                                                                              sum(owa_l_nu) +
-                                                                                                                                                                                                                                                                                              owa_l_h *
-                                                                                                                                                                                                                                                                                              sum(owa_l_eta) +
-                                                                                                                                                                                                                                                                                              LinearAlgebra.dot(owa_l_d,
-                                                                                                                                                                                                                                                                                                                owa_l_y)
-                                                                                                                                                                                                                                                                                              -owa_l_z .*
-                                                                                                                                                                                                                                                                                              owa_p
-                                                                                                                                                                                                                                                                                              owa_h_s *
-                                                                                                                                                                                                                                                                                              owa_h_t -
-                                                                                                                                                                                                                                                                                              owa_h_l *
-                                                                                                                                                                                                                                                                                              sum(owa_h_nu) +
-                                                                                                                                                                                                                                                                                              owa_h_h *
-                                                                                                                                                                                                                                                                                              sum(owa_h_eta) +
-                                                                                                                                                                                                                                                                                              LinearAlgebra.dot(owa_h_d,
-                                                                                                                                                                                                                                                                                                                owa_h_y)
-                                                                                                                                                                                                                                                                                              -owa_h_z .*
-                                                                                                                                                                                                                                                                                              owa_p
-                                                                                                                                                                                                                                                                                              owa_p ./
-                                                                                                                                                                                                                                                                                              (owa_p .-
-                                                                                                                                                                                                                                                                                               one(eltype(owa_p)))
-                                                                                                                                                                                                                                                                                          end)
-    model[Symbol(:ca1_owa_l_, i)], model[Symbol(:ca2_owa_l_, i)], model[Symbol(:ca_owa_pcone_l_, i)], model[Symbol(:ca1_owa_h_, i)], model[Symbol(:ca2_owa_h_, i)], model[Symbol(:ca_owa_pcone_h_, i)] = JuMP.@constraints(model,
-                                                                                                                                                                                                                           begin
-                                                                                                                                                                                                                               sc *
-                                                                                                                                                                                                                               ((net_X -
-                                                                                                                                                                                                                                 owa_l_nu +
-                                                                                                                                                                                                                                 owa_l_eta -
-                                                                                                                                                                                                                                 vec(sum(owa_l_epsilon;
-                                                                                                                                                                                                                                         dims = 2))) .+
-                                                                                                                                                                                                                                owa_l_t) ==
-                                                                                                                                                                                                                               0
-                                                                                                                                                                                                                               sc *
-                                                                                                                                                                                                                               (owa_l_z +
-                                                                                                                                                                                                                                owa_l_y -
-                                                                                                                                                                                                                                vec(sum(owa_l_psi;
-                                                                                                                                                                                                                                        dims = 1))) ==
-                                                                                                                                                                                                                               0
-                                                                                                                                                                                                                               [i = 1:M,
-                                                                                                                                                                                                                                j = 1:T],
-                                                                                                                                                                                                                               [sc *
-                                                                                                                                                                                                                                neg_owa_l_z_owa_p[i],
-                                                                                                                                                                                                                                sc *
-                                                                                                                                                                                                                                owa_l_psi[j,
-                                                                                                                                                                                                                                          i] *
-                                                                                                                                                                                                                                owa_p_o_owa_pm1[i],
-                                                                                                                                                                                                                                sc *
-                                                                                                                                                                                                                                owa_l_epsilon[j,
-                                                                                                                                                                                                                                              i]] in
-                                                                                                                                                                                                                               JuMP.MOI.PowerCone(inv(owa_p[i]))
-                                                                                                                                                                                                                               sc *
-                                                                                                                                                                                                                               ((-net_X -
-                                                                                                                                                                                                                                 owa_h_nu +
-                                                                                                                                                                                                                                 owa_h_eta -
-                                                                                                                                                                                                                                 vec(sum(owa_h_epsilon;
-                                                                                                                                                                                                                                         dims = 2))) .+
-                                                                                                                                                                                                                                owa_h_t) ==
-                                                                                                                                                                                                                               0
-                                                                                                                                                                                                                               sc *
-                                                                                                                                                                                                                               (owa_h_z +
-                                                                                                                                                                                                                                owa_h_y -
-                                                                                                                                                                                                                                vec(sum(owa_h_psi;
-                                                                                                                                                                                                                                        dims = 1))) ==
-                                                                                                                                                                                                                               0
-                                                                                                                                                                                                                               [i = 1:M,
-                                                                                                                                                                                                                                j = 1:T],
-                                                                                                                                                                                                                               [sc *
-                                                                                                                                                                                                                                neg_owa_h_z_owa_p[i],
-                                                                                                                                                                                                                                sc *
-                                                                                                                                                                                                                                owa_h_psi[j,
-                                                                                                                                                                                                                                          i] *
-                                                                                                                                                                                                                                owa_p_o_owa_pm1[i],
-                                                                                                                                                                                                                                sc *
-                                                                                                                                                                                                                                owa_h_epsilon[j,
-                                                                                                                                                                                                                                              i]] in
-                                                                                                                                                                                                                               JuMP.MOI.PowerCone(inv(owa_p[i]))
-                                                                                                                                                                                                                           end)
-    aowa_range_risk = model[key] = JuMP.@expression(model, owa_l_risk + owa_h_risk)
-    set_risk_bounds_and_expression!(model, opt, aowa_range_risk, r.settings, key)
-    return aowa_range_risk
+    return set_range_risk_constraints!(model, i, r, :aowa_range_risk_, opt, pr, args...;
+                                       prefix = prefix, kwargs...)
 end

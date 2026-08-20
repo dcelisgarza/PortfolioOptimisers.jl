@@ -159,3 +159,40 @@ add_custom_constraint!(model, ccnt, optimiser, attrs)             # unchanged
 - **[ADR 0004](0004-typed-jump-model-state.md)** — the objective penalty accumulator (`:op`) is
   Model State reached through `add_to_objective_penalty!`, and is now the sole channel by which user
   terms enter the objective.
+
+## Amendment (2026-08-18)
+
+The architecture review of 2026-08-17 (finding 1) reports that §7 is contradicted on the
+unconstrained Near Optimal Centering path. This amendment records where the claim holds, where
+it does not, and why the reach is left as it is.
+
+`set_near_optimal_objective_function!` has one method per NOC variant. The constrained one calls
+`add_custom_objective_term!` and then `add_penalty_to_objective!`; the unconstrained one sets the
+barrier alone. So on the default `alg` the hook is not reached from the centring solve.
+
+1. **§7 still holds wherever an anchor solve runs.** `near_optimal_centering_setup` builds the
+   three reference portfolios as `MeanRisk` sub-problems off the same `opt`, and
+   `set_portfolio_objective_function!` reaches the hook. A `CustomJuMPObjective` with no builder
+   method therefore raises on the first anchor solve, as §7 requires.
+
+2. **§7 does not hold when all three anchors are supplied.** `w_min`, `w_opt` and `w_max` given,
+   with the default `alg`, is the one configuration in which no solve reaches the hook: a term
+   that names itself and supplies no builder silently contributes nothing. This is narrow, and it
+   is the gap §7 was written to close.
+
+3. **The user-visible effect on a working term is a scope difference, not a loss.** A Custom
+   Objective Term prices the anchor sub-problems, so it moves the reference points and hence the
+   centring target. It does not price the centring solve itself.
+
+4. **The omitted `add_penalty_to_objective!` changes no number today.** Contributions to the
+   Objective Penalty come from the regularisation builders, the SDP phylogeny builder and the
+   custom-term hook. The unconstrained middle runs none of them, so the accumulator is empty and
+   the fold would be a no-op.
+
+The reach is documented rather than widened. Calling the hook from the unconstrained objective
+would change the answer for every configuration that sets `cobj` on the default `alg`, and the
+same argument that keeps the constraint builders out of that model — "unconstrained" names the
+omission — does not obviously settle whether an objective term belongs in it. That is a
+formulation question for a later decision, not a defect fix. `UnconstrainedNearOptimalCentering`
+and `set_near_optimal_objective_function!` now state the behaviour, and ADR 0008's amendment 3
+records the wider census of what that variant reads.

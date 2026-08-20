@@ -10,9 +10,11 @@ needs_previous_weights(opt::MeanRisk)
 factory(mr::MeanRisk, w::AbstractVector)
 port_opt_view(mr::MeanRisk, i, X::MatNum, args...)
 solve_mean_risk!
+return_term
 compute_ret_lbs
 _rebuild_risk_frontier
 rebuild_risk_frontier
+unresolved_risk_frontier
 compute_risk_ubs
 optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

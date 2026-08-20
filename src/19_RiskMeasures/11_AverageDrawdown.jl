@@ -93,7 +93,7 @@ AverageDrawdown
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
@@ -232,7 +232,7 @@ RelativeAverageDrawdown
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,

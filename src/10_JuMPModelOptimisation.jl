@@ -81,6 +81,8 @@ Keywords correspond to the struct's fields.
 
 # Examples
 
+The default `check_sol` is strict — it accepts only a solution the solver reports as `OPTIMAL` or `LOCALLY_SOLVED` at a `FEASIBLE_POINT`.
+
 ```jldoctest
 julia> Solver(; solver = nothing)
 Solver
@@ -88,6 +90,18 @@ Solver
        solver ┼ nothing
      settings ┼ nothing
     check_sol ┼ @NamedTuple{}: NamedTuple()
+  add_bridges ┴ Bool: true
+```
+
+To also accept an approximate solution, which is the common case and what the examples, user guide and tests use:
+
+```jldoctest
+julia> Solver(; solver = nothing, check_sol = (; allow_local = true, allow_almost = true))
+Solver
+         name ┼ String: ""
+       solver ┼ nothing
+     settings ┼ nothing
+    check_sol ┼ @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
   add_bridges ┴ Bool: true
 ```
 

@@ -23,6 +23,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
+# The caller sets the ceiling for `ReusableTest.yml`, which only builds and tests.
+permissions:
+  contents: read
+
 jobs:
   test:
     uses: ./.github/workflows/ReusableTest.yml

@@ -19,7 +19,7 @@ then [Entropy Pooling](07_Entropy_Pooling.md), then [Opinion Pooling](08_Opinion
 Each builds on the last, but each page also stands alone.
 
 In `PortfolioOptimisers`, [`BlackLittermanPrior`](@ref) takes a base estimator `pe` (whose
-default mean is [`EquilibriumExpectedReturns`](@ref)), an [`AssetSets`](@ref) that names assets
+default mean is [`EquilibriumExpectedReturns`](@ref)), a [`UniverseSets`](@ref) that names assets
 and groups, and a `views` estimator. Views are written as plain string constraints through a
 [`LinearConstraintEstimator`](@ref), and their conviction is controlled by `views_conf` and the
 global scaling parameter `tau`.
@@ -97,13 +97,13 @@ plot_mu(pr_eq, rd.nx)
 
 ## 3. Naming assets and groups
 
-Views refer to assets and groups by name, so we declare an [`AssetSets`](@ref): the `nx` key
+Views refer to assets and groups by name, so we declare a [`UniverseSets`](@ref): the `nx` key
 holds every asset, and we add two illustrative groups so we can express a group-level view.
 
 ````@example 05_Black_Litterman
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                             "energy" => ["CVX"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                "energy" => ["CVX"]))
 ````
 
 ## 4. The three kinds of views
@@ -212,13 +212,15 @@ the equilibrium prior and the Black–Litterman posterior. The view shifts the w
 fr_eq = optimise(MeanRisk(; obj = MinimumRisk(),
                           opt = JuMPOptimiser(; pe = pr_eq, slv = slv,
                                               ret = ArithmeticReturn(;
-                                                                     lb = Frontier(;
-                                                                                   N = 20)))))
+                                                                     settings = JuMPReturnsSettings(;
+                                                                                                    lb = Frontier(;
+                                                                                                                  N = 20))))))
 fr_bl = optimise(MeanRisk(; obj = MinimumRisk(),
                           opt = JuMPOptimiser(; pe = pr_abs, slv = slv,
                                               ret = ArithmeticReturn(;
-                                                                     lb = Frontier(;
-                                                                                   N = 20)))))
+                                                                     settings = JuMPReturnsSettings(;
+                                                                                                    lb = Frontier(;
+                                                                                                                  N = 20))))))
 
 plot_measures(fr_eq.w, pr_eq; x = Variance(), y = ExpectedReturn(; rt = fr_eq.ret),
               title = "Efficient frontier: equilibrium prior", xlabel = "Variance",

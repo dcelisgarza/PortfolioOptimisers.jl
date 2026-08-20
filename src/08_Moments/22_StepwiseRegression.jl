@@ -138,7 +138,8 @@ StepwiseRegression
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
         if haskey(tgt.kwargs, :weights)
-            @argcheck(isa(tgt.kwargs.weights, ObsWeights), TypeError)
+            @argcheck(isa(tgt.kwargs.weights, ObsWeights),
+                      ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
             if isa(tgt.kwargs.weights, AbstractVector)
                 @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
             end
@@ -152,9 +153,9 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
     return StepwiseRegression(crit, alg, tgt)
 end
 """
-    add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
-                                         included::VecInt, F::MatNum,
-                                         x::VecNum)
+    add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
+                                        included::VecInt, F::MatNum,
+                                        x::VecNum)
 
 Helper for stepwise regression: add the "best" asset by p-value if no variables are included.
 
@@ -164,7 +165,7 @@ This function is used in stepwise regression routines when no variables meet the
 
   - `tgt`: Regression target type (e.g., `LinearModel()`).
   - `included`: Indices of currently included variables (modified in-place).
-  - `F`: Factor matrix (features × observations).
+  - `F`: Factor matrix (factors × observations).
   - `x`: Response vector.
 
 # Returns
@@ -180,15 +181,15 @@ If `included` is not empty, the function does nothing. Otherwise, it evaluates e
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
-                                              included::VecInt, F::MatNum, x::VecNum)
+function add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
+                                             included::VecInt, F::MatNum, x::VecNum)
     if !isempty(included)
         return nothing
     end
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     best_pval = typemax(eltype(x))
-    new_feature = 0
+    new_factor = 0
     for i in 1:N
         factors = [included; i]
         f1 = [ovec view(F, :, factors)]
@@ -198,11 +199,11 @@ function add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
         test_pval = new_pvals[idx]
         if best_pval > test_pval
             best_pval = test_pval
-            new_feature = i
+            new_factor = i
         end
     end
-    @warn("No asset with p-value lower than threshold. Best we can do is feature $new_feature, with p-value $best_pval.")
-    push!(included, new_feature)
+    @warn("No factor with p-value lower than threshold. Best we can do is factor $new_factor, with p-value $best_pval.")
+    push!(included, new_factor)
     return nothing
 end
 """
@@ -227,14 +228,14 @@ This method implements forward selection for stepwise regression, where variable
 
   - Starts with no variables included in the regression.
   - Tries to add variables one at a time based on p-value, stopping when no further variables can be added under the threshold.
-  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_feature_after_pval_failure!`](@ref)).
+  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_factor_after_pval_failure!`](@ref)).
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
   - [`ForwardSelection`](@ref)
-  - [`add_best_feature_after_pval_failure!`](@ref)
+  - [`add_best_factor_after_pval_failure!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::VecNum,
                      F::MatNum)
@@ -246,7 +247,7 @@ function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::Ve
     while val <= re.crit.t
         excluded = setdiff(indices, included)
         best_pval = typemax(eltype(x))
-        new_feature = 0
+        new_factor = 0
         for i in excluded
             factors = [included; i]
             f1 = [ovec view(F, :, factors)]
@@ -256,16 +257,16 @@ function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::Ve
             test_pval = new_pvals[idx]
             if best_pval > test_pval && maximum(new_pvals) <= re.crit.t
                 best_pval = test_pval
-                new_feature = i
+                new_factor = i
                 pvals = copy(new_pvals)
             end
         end
-        iszero(new_feature) ? break : push!(included, new_feature)
+        iszero(new_factor) ? break : push!(included, new_factor)
         if !isempty(pvals)
             val = maximum(pvals)
         end
     end
-    add_best_feature_after_pval_failure!(re.tgt, included, F, x)
+    add_best_factor_after_pval_failure!(re.tgt, included, F, x)
     return included
 end
 """
@@ -439,14 +440,14 @@ This method implements backward elimination for stepwise regression, where all v
 
   - Starts with all variables included in the regression.
   - Removes variables one at a time based on whichever has the largest p-value, stopping when the p-value falls under the threshold.
-  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_feature_after_pval_failure!`](@ref)).
+  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_factor_after_pval_failure!`](@ref)).
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
   - [`BackwardElimination`](@ref)
-  - [`add_best_feature_after_pval_failure!`](@ref)
+  - [`add_best_factor_after_pval_failure!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x::VecNum,
                      F::MatNum)
@@ -468,7 +469,7 @@ function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x:
         val, idx = findmax(pvals)
         push!(excluded, included[idx])
     end
-    add_best_feature_after_pval_failure!(re.tgt, included, F, x)
+    add_best_factor_after_pval_failure!(re.tgt, included, F, x)
     return included
 end
 """
@@ -621,26 +622,26 @@ end
 
 Apply stepwise regression to each column of a response matrix.
 
-This method fits a stepwise regression model (as specified by `re`) to each column of the response matrix `X`, using the feature matrix `F` as predictors. For each response vector (column of `X`), the function selects variables via stepwise regression, fits the final model, and stores the estimated intercept and coefficients in the result.
+This method fits a stepwise regression model (as specified by `re`) to each column of the response matrix `X`, using the factor matrix `F` as predictors. For each response vector (column of `X`), the function selects variables via stepwise regression, fits the final model, and stores the estimated intercept and coefficients in the result.
 
 # Arguments
 
   - `re`: Stepwise regression estimator specifying the criterion, algorithm, and regression target.
   - `X`: Asset returns matrix (observations × assets).
-  - `F`: Factor returns matrix (observations × factors or features).
+  - `F`: Factor returns matrix (observations × factors).
 
 # Returns
 
   - `reg::Regression`: A regression result object containing:
 
       + `b`: Vector of intercepts for each asset.
-      + `M`: Matrix of coefficients for each asset and feature (zeros for excluded features).
+      + `M`: Matrix of coefficients for each asset and factor (zeros for excluded factors).
 
 # Details
 
   - For each column in `X`, stepwise regression is performed using the specified criterion and algorithm.
-  - Only the features selected by the stepwise procedure are included in the final model for each response.
-  - The output `Regression` object contains the intercepts and a coefficient matrix with zeros for features not selected for each response.
+  - Only the factors selected by the stepwise procedure are included in the final model for each response.
+  - The output `Regression` object contains the intercepts and a coefficient matrix with zeros for factors not selected for each response.
 
 # Related
 
@@ -649,7 +650,7 @@ This method fits a stepwise regression model (as specified by `re`) to each colu
   - [`Regression`](@ref)
 """
 function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
-    features = 1:size(F, 2)
+    factors = 1:size(F, 2)
     cols = size(F, 2) + 1
     N, rows = size(X)
     ovec = range(one(eltype(F)), one(eltype(F)); length = N)
@@ -660,7 +661,7 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
         fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
         params = StatsAPI.coef(fri)
         rr[i, 1] = params[1]
-        idx = [searchsortedfirst(features, i) + 1 for i in included]
+        idx = [searchsortedfirst(factors, i) + 1 for i in included]
         rr[i, idx] = params[2:end]
     end
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))

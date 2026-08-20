@@ -2,7 +2,9 @@
 
 ```@docs
 L1UncertaintySet
+port_opt_view(risk_ucs::L1UncertaintySet, i, args...)
 SignedL1UncertaintySet
+port_opt_view(risk_ucs::SignedL1UncertaintySet, i, args...)
 L1UncertaintySetAlgorithm
 SignedL1UncertaintySetAlgorithm
 CharacteristicUncertaintySet

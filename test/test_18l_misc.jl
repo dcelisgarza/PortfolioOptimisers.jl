@@ -70,8 +70,13 @@ end
     mr = MeanRisk(; opt = opt)
     pred = fit_predict(mr, rd)
     res1 = pred.res
-    @test pred.rd.iv == rd.iv * abs.(pred.res.w)
-    @test pred.rd.ivpa == dot(rd.ivpa, abs.(pred.res.w))
+    # `iv`/`ivpa` are intensive, so they collapse as convex combinations: the synthetic
+    # asset's rates must not scale with gross exposure. This portfolio is long-short with
+    # a gross exposure of 3, so an un-normalised weighted sum would inflate both 3x.
+    wa = abs.(pred.res.w)
+    @test isapprox(sum(wa), 3)
+    @test pred.rd.iv ≈ rd.iv * (wa / sum(wa))
+    @test pred.rd.ivpa ≈ dot(rd.ivpa, wa) / sum(wa)
     @test isapprox(sum(res1.w), 1)
     @test isapprox(sum(res1.w[res1.w .< zero(eltype(res1.w))]), -1)
     @test isapprox(sum(res1.w[res1.w .>= zero(eltype(res1.w))]), 2)

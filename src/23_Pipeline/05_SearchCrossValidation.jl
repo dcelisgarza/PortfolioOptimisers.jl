@@ -51,11 +51,30 @@ Return the element type search-CV score matrices use for the given data level.
 cv_data_eltype(rd::AbstractReturnsResult) = eltype(rd.X)
 cv_data_eltype(pr::AbstractPricesResult) = eltype(TimeSeries.values(pr.X))
 """
+    has_lens_structure(key::AbstractString) -> Bool
+
+Return `true` when `key` carries lens structure — a dotted path (`"impute.stat"`) or an index (`"steps[1]"`).
+
+The predicate the `AbstractString` arm of [`pipeline_lens`](@ref) uses to separate a *typo* from a *raw property path* when the leading segment misses the step-name table. A key with no structure at all is a bare identifier, which can only have been meant as a step name; a structured key is the documented raw-path form and falls through to [`parse_lens`](@ref).
+
+The `Symbol` arm tests for a dot alone, and that is not the same asymmetry the guard exists to remove: a string key is run through `Meta.parse`, where `steps[1]` is an index, while a symbol key is not, so an index in a symbol is a character in a property name.
+
+# Related
+
+  - [`pipeline_lens`](@ref)
+  - [`parse_lens`](@ref)
+"""
+function has_lens_structure(key::AbstractString)
+    return occursin('.', key) || occursin('[', key)
+end
+"""
     pipeline_lens(pipe::Pipeline, key) -> lens
 
 Resolve a tuning key into an Accessors.jl lens on a [`Pipeline`](@ref).
 
-A leading step name resolves to the step's position (name → index → property path): `"impute.stat"` targets the `stat` field of the step named `"impute"`, and a bare step name (`"impute"`, `:impute`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. Keys whose leading segment is not a step name fall through to [`parse_lens`](@ref), so raw property paths (`"steps[2].stat"`) and prebuilt lenses keep working.
+A leading step name resolves to the step's position (name → index → property path): `"impute.stat"` targets the `stat` field of the step named `"impute"`, and a bare step name (`"impute"`, `:impute`) or an integer position targets the whole step — swapping entire estimators as grid values needs no extra syntax. Keys whose leading segment is not a step name fall through to [`parse_lens`](@ref), so raw property paths (`"steps[2].stat"`, `"steps[2]"`) and prebuilt lenses keep working.
+
+A key that misses the step-name table and carries no lens structure at all (see [`has_lens_structure`](@ref)) is rejected instead — `"imputer"` is a typo, not a path, and reinterpreting it as a property access on the `Pipeline` struct tunes nothing at best and writes into a real field (`names`, `steps`) at worst. The `Symbol` arm fails closed on the same rule, reading a dot alone as the structure, because a symbol key never reaches `Meta.parse`.
 
 # Arguments
 
@@ -76,6 +95,14 @@ function pipeline_lens(pipe::Pipeline, key::AbstractString)
     parts = split(key, '.'; limit = 2)
     i = findfirst(==(parts[1]), pipe.names)
     if isnothing(i)
+        # A structureless key that misses the step-name table is a typo, not a lens path —
+        # fail closed rather than silently reinterpreting it as a property access on the
+        # pipeline struct, where a name colliding with a real field (`names`, `steps`) is
+        # written into on every fold. Structured keys still fall through to `parse_lens`,
+        # which is structurally capped. Mirrors the `Symbol` arm below.
+        @argcheck(has_lens_structure(key),
+                  ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps" *
+                                did_you_mean(key, pipe.names)))
         return parse_lens(key)
     end
     step = Accessors.IndexLens((i,)) ∘ Accessors.PropertyLens(:steps)
@@ -88,7 +115,9 @@ function pipeline_lens(pipe::Pipeline, key::Symbol)
         # A bare (undotted) symbol that misses the step-name table is a typo, not a
         # lens path — fail closed rather than silently reinterpreting it as a property
         # access on the pipeline struct. Genuinely dotted symbols still fall through to
-        # `parse_lens`, which is structurally capped.
+        # `parse_lens`, which is structurally capped. The test is a dot rather than
+        # `has_lens_structure` because a `Symbol` is never run through `Meta.parse`: an
+        # index in one is a character in a property name, not a lens path.
         @argcheck(occursin('.', ks),
                   ArgumentError("`$(key)` is not a step name among the $(length(pipe.names)) named pipeline steps" *
                                 did_you_mean(ks, pipe.names)))
@@ -118,19 +147,27 @@ Build the (lens, value) grid for tuning a [`Pipeline`](@ref) — the pipeline-aw
 
   - `(lenses, vals)`: Per-candidate lens vectors and value tuples.
 
+# Validation
+
+  - The candidate count must not exceed `RESOURCE_LIMITS[].max_search_grid`, asserted by [`assert_search_grid_cap`](@ref) before the product is materialised.
+
 # Related
 
   - [`pipeline_lens`](@ref)
+  - [`assert_search_grid_cap`](@ref)
   - [`search_cross_validation`](@ref)
 """
 function pipeline_lens_val_grid(pipe::Pipeline,
                                 estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
+    # Same product sink as `lens_val_grid`, same cap, same place -- before the `collect`.
+    assert_search_grid_cap(estval)
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
     lenses = fill(map(x -> pipeline_lens(pipe, x[1]), estval), length(vals))
     return lenses, vals
 end
 function pipeline_lens_val_grid(pipe::Pipeline,
                                 estval::AbstractDict{<:Any, <:AbstractVector})
+    assert_search_grid_cap(estval)
     vals = vec(collect(Iterators.product(values(estval)...)))
     lenses = fill(map(x -> pipeline_lens(pipe, x), collect(keys(estval))), length(vals))
     return lenses, vals
@@ -143,6 +180,8 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     lenses_vals = [pipeline_lens_val_grid(pipe, estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)
+    assert_search_grid_cap(length(vals),
+                           "the sum of the $(length(estvals)) concatenated parameter sets")
     return lenses, vals
 end
 """

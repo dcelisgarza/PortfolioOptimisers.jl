@@ -1,11 +1,32 @@
 # Asset sets matrix
 
 ```@docs
-AssetSets
+UniverseSets
 AssetSetsMatrixEstimator
 MatNum_ASetMatE
 MatNum_ASetMatE_VecMatNum_ASetMatE
 VecMatNum_ASetMatE
+PortfolioOptimisers.taxonomy_column
 asset_sets_matrix
+PortfolioOptimisers.assert_feature_keys
+AbstractFeatureValue
+Scale
+resolve_feature_value
+PortfolioOptimisers.Num_AFeatVal
+asset_sets_features
+asset_sets_feature_names
+PortfolioOptimisers.feature_program_candidates
+PortfolioOptimisers.is_feature_taxonomy_key
+PortfolioOptimisers.is_feature_factor_key
+PortfolioOptimisers.feature_grammar_msg
+PortfolioOptimisers.feature_factor_key_msg
+PortfolioOptimisers.feature_missing_group_value_msg
+PortfolioOptimisers.feature_unknown_name_msg
+PortfolioOptimisers.feature_numeric_column
+PortfolioOptimisers.feature_write!
+PortfolioOptimisers.feature_diagonal!
+PortfolioOptimisers.feature_rows
+PortfolioOptimisers.feature_target!
+PortfolioOptimisers.feature_entry!
 port_opt_view(smtx::MatNum, i, args...)
 ```

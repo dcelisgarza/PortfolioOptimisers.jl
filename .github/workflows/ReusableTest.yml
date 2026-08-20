@@ -27,6 +27,11 @@ on:
       codecov_token:
         required: true
 
+# Build, test, and upload coverage under `codecov_token`. None of that needs the job token to
+# write. A called workflow can only lower the caller's scopes, so this block binds both callers.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Julia ${{ inputs.version }} - ${{ inputs.os }} - ${{ inputs.arch }} - ${{ github.event_name }}
@@ -35,7 +40,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ inputs.version }}
           arch: ${{ inputs.arch }}

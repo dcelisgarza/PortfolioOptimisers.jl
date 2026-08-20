@@ -13,17 +13,26 @@ Converts the input vector of `key => values` pairs into a grid of Accessors.jl l
 
   - Grid of (lens, value) combinations.
 
+# Validation
+
+  - The candidate count must not exceed `RESOURCE_LIMITS[].max_search_grid`, asserted by [`assert_search_grid_cap`](@ref) before the product is materialised.
+
 # Related
 
   - [`parse_lens`](@ref)
+  - [`assert_search_grid_cap`](@ref)
   - [`GridSearchCrossValidation`](@ref)
 """
 function lens_val_grid(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
+    # Trust boundary: the grid is a Cartesian product, so cap it before `collect`
+    # materialises it -- `k` parameters of `N` values are `N^k` candidates and `N^k` fits.
+    assert_search_grid_cap(estval)
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
     lenses = fill(map(x -> parse_lens(x[1]), estval), length(vals))
     return lenses, vals
 end
 function lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
+    assert_search_grid_cap(estval)
     vals = vec(collect(Iterators.product(values(estval)...)))
     lenses = fill(map(x -> parse_lens(x), collect(keys(estval))), length(vals))
     return lenses, vals
@@ -35,6 +44,10 @@ function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<
     lenses_vals = [lens_val_grid(estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)
+    # Concatenated grids are a sum of products: each one is capped as it is built, this
+    # caps what they add up to.
+    assert_search_grid_cap(length(vals),
+                           "the sum of the $(length(estvals)) concatenated parameter sets")
     return lenses, vals
 end
 """

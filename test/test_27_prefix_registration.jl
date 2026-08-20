@@ -134,10 +134,14 @@
     end
 
     # Tracking-nested-in-tracking: prefixes COMPOSE rather than replace, so the innermost
-    # build is namespaced under BOTH layers and cannot collide. The inner tracking's index
-    # is itself the composed symbol, so the innermost prefix is
-    # `Symbol(:tr_iv_1_, :tr_iv_, :tr_iv_1_1, :_)`. This is the re-entrancy the old swap
-    # could not provide.
+    # build is namespaced under BOTH layers and cannot collide. This is the re-entrancy the
+    # old swap could not provide.
+    #
+    # The inner tracking builds at measure index 1 — its own position in the nested build —
+    # NOT at an index seeded with the enclosing prefix. Separation across builds is the
+    # prefix's job alone, so the innermost prefix is `Symbol(:tr_iv_1_, :tr_iv_, 1, :_)`.
+    # Before ADR 0037's amendment the index carried the prefix too, and the same fact was
+    # spelled on both axes.
     @testset "nested Tracking(Tracking(A)) composes — $(nameof(typeof(alg)))" for alg in
                                                                                   (IndependentVariableTracking(),
                                                                                    DependentVariableTracking())
@@ -155,12 +159,15 @@
             @test_skip "nested DependentVariableTracking unsupported"
             continue
         end
-        p_outer = Symbol(base, 1, :_)                 # outer tracking at index 1
-        i_inner = Symbol(p_outer, 1)                  # inner tracking's composed index
-        p_inner = Symbol(p_outer, base, i_inner, :_)  # innermost prefix = composition
-        @test p_inner != p_outer                       # composed, not replaced
-        @test haskey(m, Symbol(p_outer, :w))          # outer layer weights
-        @test haskey(m, Symbol(p_inner, :w))          # innermost layer weights (deeper)
-        @test haskey(m, Symbol(p_inner, :net_X))      # innermost CVaR infra, deeply namespaced
+        p_outer = Symbol(base, 1, :_)            # outer tracking at index 1
+        p_inner = Symbol(p_outer, base, 1, :_)   # innermost prefix = composition
+        @test p_inner != p_outer                 # composed, not replaced
+        @test haskey(m, Symbol(p_outer, :w))     # outer layer weights
+        @test haskey(m, Symbol(p_inner, :w))     # innermost layer weights (deeper)
+        @test haskey(m, Symbol(p_inner, :net_X)) # innermost CVaR infra, deeply namespaced
+        # The measure index is NOT seeded with the prefix: the innermost CVaR's own scratch
+        # sits at index 1 under the innermost prefix, on the other axis entirely.
+        @test haskey(m, Symbol(p_inner, :cvar_risk_1))
+        @test !haskey(m, Symbol(:cvar_risk_, p_inner, 1))
     end
 end

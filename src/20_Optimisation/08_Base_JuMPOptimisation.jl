@@ -107,23 +107,52 @@ abstract type BaseJuMPOptimisationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for JuMP-based continuous optimisation results.
+Abstract supertype for JuMP-based continuous optimisation results that **carry a risk measure**.
 
-The JuMP half of the result split; mirrors [`RiskJuMPOptimisationEstimator`](@ref). Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
+One of the two JuMP result halves; mirrors [`RiskJuMPOptimisationEstimator`](@ref). The sibling half is [`NonRiskJuMPOptimisationResult`](@ref), for the JuMP results that carry no risk measure at all. Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. Every subtype carries a resolved `r`; a JuMP result with no `r` belongs on the sibling branch. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
 
 # Related
 
+  - [`NonRiskJuMPOptimisationResult`](@ref)
+  - [`RJR_NRJR`](@ref)
   - [`NonJuMPOptimisationResult`](@ref)
   - [`JuMPOptimisationResult`](@ref)
   - [`MeanRiskResult`](@ref)
 """
 abstract type RiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based continuous optimisation results that **carry no risk measure**.
+
+The sibling half of [`RiskJuMPOptimisationResult`](@ref). A relaxed risk budgeting run builds its constraints straight from `pr.sigma` and never resolves a measure, so its result has no `r` to carry. Splitting the branch keeps `r` mandatory on the risk half instead of optional on a shared type. Concrete subtypes follow the same shape: an embedded [`JuMPOptimisationResult`](@ref) `jr` first, their unique fields, then the trailing `fb`.
+
+# Related
+
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`RJR_NRJR`](@ref)
+  - [`RelaxedRiskBudgetingResult`](@ref)
+"""
+abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+    const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+
+Union of both JuMP result halves.
+
+The default `getproperty` and `propertynames` are bound here, not on either half alone. [`MeanRiskResult`](@ref) and [`NearOptimalCenteringResult`](@ref) declare no [`@forward_properties`](@ref) rule and depend on that default for `res.w`, so a half without it would silently cost the next measure-less leaf its property forwarding.
+
+# Related
+
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`NonRiskJuMPOptimisationResult`](@ref)
+"""
+const RJR_NRJR = Union{<:RiskJuMPOptimisationResult, <:NonRiskJuMPOptimisationResult}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Default property access for [`RiskJuMPOptimisationResult`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
+Default property access for [`RJR_NRJR`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
 """
-function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+function Base.getproperty(r::RJR_NRJR, sym::Symbol)
     return if sym in fieldnames(typeof(r))
         getfield(r, sym)
     else
@@ -133,9 +162,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Default property enumeration for [`RiskJuMPOptimisationResult`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
+Default property enumeration for [`RJR_NRJR`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
 """
-function Base.propertynames(r::RiskJuMPOptimisationResult)
+function Base.propertynames(r::RJR_NRJR)
     return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
 end
 """
@@ -279,14 +308,8 @@ end
 function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
 end
-function port_opt_view(cs::VecJuMPConstr, i::Any, args...; kwargs...)
-    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
-end
 function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
-end
-function port_opt_view(cs::VecJuMPObj, i::Any, args...; kwargs...)
-    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
 end
 """
     add_custom_objective_term!(model::JuMP.Model, obj, cobj::Nothing, optimiser, attrs)
@@ -556,18 +579,31 @@ end
 
 Return the homogenisation variable `model[:k]`.
 
-`k >= 0` is the auxiliary scaling variable used to homogenise fractional/ratio
-objectives (e.g. maximum ratio); recovered weights are `w / k`. Asserts `:k` has
-been registered; errors otherwise.
+`k` is the auxiliary scaling variable used to homogenise fractional/ratio objectives (e.g.
+maximum ratio); recovered weights are `w / k`. Asserts `:k` has been registered; errors
+otherwise.
+
+Two producers register it, and the error message names both because a head reaches only
+one of them:
+
+  - [`set_maximum_ratio_factor_variables!`](@ref) is the head-level producer. Every head
+    that shapes `w` from an objective calls it: `k >= 0` under [`MaximumRatio`](@ref), and
+    the literal `1` otherwise.
+  - [`_set_risk_budgeting_constraints!`](@ref) declares a *free* `k` instead, because the
+    log barrier it builds is what pins the scale. That head also declares
+    [`set_unit_budget!`](@ref), so downstream builders read [`effective_k`](@ref) and get
+    `1` rather than the free variable.
 
 # Related
 
   - [`process_model`](@ref)
   - [`get_w`](@ref)
+  - [`effective_k`](@ref)
+  - [`set_maximum_ratio_factor_variables!`](@ref)
 """
 function get_k(model::JuMP.Model)
     @argcheck(haskey(model, :k),
-              ArgumentError("model[:k] (homogenisation variable) has not been registered; call set_maximum_ratio_factor_variables! first"))
+              ArgumentError("model[:k] (homogenisation variable) has not been registered. A head registers it either through set_maximum_ratio_factor_variables! (objective-shaped heads: MeanRisk, FactorRiskContribution, NearOptimalCentering, RelaxedRiskBudgeting) or through _set_risk_budgeting_constraints!, whose log barrier declares a free k (RiskBudgeting). Call the one that matches the head before any builder that reads k."))
     return model[:k]
 end
 """
@@ -919,13 +955,18 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # the weights through its own prefixed `:w`; it does not
                                   # reshape the long/short parts.
                                   :lw, :sw, :wp, :wn, :w1, :w_obj, :wip,
-                                  # Returns and objective plumbing, outer level only.
-                                  :ohf, :op, :cost_bgt_expr, :bucs_w, :t_eucs_gw, :sr_risk,
-                                  # Risk accumulation and frontier bookkeeping: collected by
-                                  # the terminal scalarise seam (ADR 0024), which runs once
-                                  # at the outer level. A nested build returns its
-                                  # expression to its caller instead of pushing here.
-                                  :risk_vec, :risk_frontier, :ret_frontier,
+                                  # Returns and objective plumbing, outer level only. The
+                                  # robust-cone scratch a return term raises (`bucs_w_i`,
+                                  # `t_eucs_gw_i`) is index-suffixed and read by index, so
+                                  # it is not on this list; `sr_risk` stays because the
+                                  # ratio constraint is hoisted and registers exactly one.
+                                  :ohf, :op, :cost_bgt_expr, :sr_risk,
+                                  # Risk and return accumulation and frontier bookkeeping:
+                                  # collected by the terminal scalarise seams (ADR 0024),
+                                  # which run once at the outer level. A nested build
+                                  # returns its expression to its caller instead of pushing
+                                  # here.
+                                  :risk_vec, :risk_frontier, :ret_vec, :ret_frontier,
                                   # Per-optimiser scratch on the outer model.
                                   :noc_rk, :noc_rt, :psi,
                                   # The one deliberate write-prefixed / read-bare entry
@@ -995,24 +1036,412 @@ function shared_get(model::JuMP.Model, name::Symbol)
     return model[name]
 end
 """
+    frontier_point_count(front::Frontier)
+    frontier_point_count(front::VecNum)
+
+Number of sweep points one frontier bound asks for.
+
+A [`Frontier`](@ref) states its count in `N`; a stated vector of bounds states it in its
+length. Both shapes are admissible in `:ret_frontier` and `:risk_frontier` (see
+[`Front_NumVec`](@ref)), and at Model Assembly time a `Frontier` has not yet been resolved
+into its range, so the count is read from the shape rather than from a materialised vector.
+
+# Related
+
+  - [`frontier_sweep_points`](@ref)
+  - [`Frontier`](@ref)
+"""
+function frontier_point_count(front::Frontier)
+    return Int(front.N)
+end
+function frontier_point_count(front::VecNum)
+    return length(front)
+end
+"""
+    frontier_sweep_points(model::JuMP.Model)
+
+Count the solves the model's frontier sweep runs, and the factors that make up the count.
+
+The sweep is a **product**: every swept return term and every swept risk measure joins the
+same `Iterators.product`, so `k` bounds of `N` points each cost `N^k` full solves rather
+than `k * N`. This reads both frontier registries — `:ret_frontier` and `:risk_frontier` —
+and multiplies their per-entry counts together.
+
+The product is accumulated as a `BigInt`, so it is exact and cannot overflow into a value
+that would pass a cap it should fail.
+
+# Returns
+
+  - `(total, factors)`: the total number of sweep points, and a `bound_key => count` pair
+    per swept entry, in registration order (return terms first).
+
+# Related
+
+  - [`assert_frontier_sweep_cap`](@ref)
+  - [`frontier_point_count`](@ref)
+  - [`SHARED_STATE`](@ref)
+"""
+function frontier_sweep_points(model::JuMP.Model)
+    factors = Pair{Symbol, Int}[]
+    for name in (:ret_frontier, :risk_frontier)
+        if !shared_has(model, name)
+            continue
+        end
+        for entry in shared_get(model, name)
+            push!(factors, entry.first[2] => frontier_point_count(entry.second[2]))
+        end
+    end
+    return prod(big(n) for (_, n) in factors; init = big(1)), factors
+end
+"""
+    assert_frontier_sweep_cap(model::JuMP.Model)
+
+Assert the **total** frontier sweep does not exceed the active `max_frontier` ceiling.
+
+[`Frontier`](@ref)'s constructor caps the `N` of one bound; nothing there sees the product,
+so `k` bounds at the ceiling cost `max_frontier^k` solves and no guard fires. This is the
+guard, and it runs at Model Assembly — the point at which both frontier registries are
+complete and no sweep solve has started yet.
+
+Every sweep point runs a full inner `optimise_JuMP_model!` solve, so the product is the
+compute-exhaustion sink `max_frontier` exists to bound (see [`RESOURCE_LIMITS`](@ref)). The
+cap applies to the risk side and the return side alike.
+
+# Returns
+
+  - `nothing`.
+
+# Throws
+
+  - `DomainError` if the product exceeds `RESOURCE_LIMITS[].max_frontier`. The message names
+    the product, the factors that made it, and the knob that raises the ceiling.
+
+# Related
+
+  - [`frontier_sweep_points`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`assert_resource_cap`](@ref)
+"""
+function assert_frontier_sweep_cap(model::JuMP.Model)
+    total, factors = frontier_sweep_points(model)
+    if isempty(factors)
+        return nothing
+    end
+    cap = RESOURCE_LIMITS[].max_frontier
+    @argcheck(total <= cap,
+              DomainError(total,
+                          "the frontier sweep is $total points — the product $(join(("$key = $n" for (key, n) in factors), " × ")) across every swept return term and every swept risk measure — and exceeds RESOURCE_LIMITS[].max_frontier = $cap. Every point runs a full solve, so the ceiling is on the product, not on any single Frontier's N. Sweep fewer bounds, or lower an N. Raise the ceiling with set_resource_limits!(; max_frontier) — or with_resource_limits for a single scope, or the \"max_frontier\" preference for a whole project — for genuinely large machine-authored runs."))
+    return nothing
+end
+"""
+    frontier_axis(frontier::VecPair)
+
+Turn one resolved frontier registry into the sweep axis it stands for.
+
+Both registries — `:ret_frontier` and `:risk_frontier` — hold
+`(bound_var_key, bound_key) => (expr, points, …)` entries, and both are swept as a **product**
+across their own entries: two swept risk measures of `N` points each cost `N^2` solves on the
+risk axis alone. This is that product, in two halves — the keys of the bound parameters, and
+the values to write into them — so [`set_frontier_point!`](@ref) can zip one against the
+other.
+
+# Arguments
+
+  - `frontier::VecPair`: A resolved frontier registry. Every entry's bound is already a vector
+    of sweep points.
+
+# Returns
+
+  - `(keys, points)`: Two product iterators of equal length.
+
+# Related
+
+  - [`set_ret_frontier_parameters!`](@ref)
+  - [`set_risk_frontier_parameters!`](@ref)
+  - [`frontier_sweep_axes`](@ref)
+"""
+function frontier_axis(frontier::VecPair)
+    itrs = [(Iterators.repeated(entry.first[1], length(entry.second[2])), entry.second[2])
+            for entry in frontier]
+    return Iterators.product.(itrs...)
+end
+"""
+    set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
+
+Register one parameter and one lower-bound constraint per swept return term.
+
+Each term's bound binds on that term's **own** expression, so the return side is a product
+across terms rather than a single ladder. The bound is homogenised by `k`, exactly as the
+scalar bound in [`set_return_bounds!`](@ref) is.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `ret_frontier::VecPair`: The resolved `:ret_frontier` registry.
+
+# Returns
+
+  - The return sweep axis, as [`frontier_axis`](@ref) builds it.
+
+# Related
+
+  - [`set_risk_frontier_parameters!`](@ref)
+  - [`frontier_sweep!`](@ref)
+  - [`set_return_bounds!`](@ref)
+"""
+function set_ret_frontier_parameters!(model::JuMP.Model, ret_frontier::VecPair)
+    sc = get_constraint_scale(model)
+    k = get_k(model)
+    for (keys, vals) in ret_frontier
+        lb = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - lb * k) >= 0)
+    end
+    return frontier_axis(ret_frontier)
+end
+"""
+    set_risk_frontier_parameters!(model::JuMP.Model, risk_frontier::VecPair)
+
+Register one parameter and one bound constraint per swept risk measure.
+
+The twin of [`set_ret_frontier_parameters!`](@ref), and the one place the risk side's two
+extra pieces are stated: the polarity `d`, which flips the inequality for a measure whose
+bigger value is better, and the homogenisation `k`, which the scalar bound in
+[`set_risk_upper_bound!`](@ref) also applies. `k` is the literal `1` under every head whose
+objective is fixed — [`NearOptimalCentering`](@ref) minimises a barrier, so its head registers
+`k = 1` and the factor is a no-op there — and the ratio variable under [`MaximumRatio`](@ref).
+Reading it here rather than at each call site is what keeps the two heads from drifting apart.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `risk_frontier::VecPair`: The resolved `:risk_frontier` registry.
+
+# Returns
+
+  - The risk sweep axis, as [`frontier_axis`](@ref) builds it.
+
+# Related
+
+  - [`set_ret_frontier_parameters!`](@ref)
+  - [`frontier_sweep!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+  - [`get_k`](@ref)
+"""
+function set_risk_frontier_parameters!(model::JuMP.Model, risk_frontier::VecPair)
+    sc = get_constraint_scale(model)
+    k = get_k(model)
+    for (keys, vals) in risk_frontier
+        ub = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        d = ifelse(vals[3], 1, -1)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
+    end
+    return frontier_axis(risk_frontier)
+end
+"""
+    frontier_sweep_axes(ret_axis, risk_axis)
+
+Join the two sweep axes into the flat sequence of sweep points.
+
+The risk axis varies **fastest**, so the flat order is return-outer and risk-inner. That order
+is load-bearing rather than cosmetic: [`NearOptimalCentering`](@ref) solves its anchor
+portfolios as one [`MeanRisk`](@ref) sweep over the same two frontiers, and pairs anchor `i`
+with sweep point `i`. Stating the order once here is what keeps the two sweeps aligned. Either
+axis may be `nothing`, which means that side is not swept. If both axes are `nothing`, the
+sweep is one point that writes nothing.
+
+# Arguments
+
+  - `ret_axis`: The return axis from [`set_ret_frontier_parameters!`](@ref), or `nothing`.
+  - `risk_axis`: The risk axis from [`set_risk_frontier_parameters!`](@ref), or `nothing`.
+
+# Returns
+
+  - An iterator of sweep points. Each point is a tuple of `(keys, bounds)` pairs, one per
+    swept axis, and its `length` is the number of solves the sweep runs.
+
+# Related
+
+  - [`frontier_axis`](@ref)
+  - [`frontier_sweep!`](@ref)
+  - [`frontier_sweep_points`](@ref)
+"""
+function frontier_sweep_axes(ret_axis, risk_axis)
+    return Iterators.product(zip(risk_axis...), zip(ret_axis...))
+end
+function frontier_sweep_axes(::Nothing, risk_axis)
+    return Iterators.product(zip(risk_axis...))
+end
+function frontier_sweep_axes(ret_axis, ::Nothing)
+    return Iterators.product(zip(ret_axis...))
+end
+function frontier_sweep_axes(::Nothing, ::Nothing)
+    return Iterators.product()
+end
+"""
+    set_frontier_point!(model::JuMP.Model, point::Tuple)
+
+Write one sweep point's bounds into the frontier parameters.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `point::Tuple`: One element of a [`frontier_sweep_axes`](@ref) iterator. An empty tuple
+    writes nothing, which is the sweep that has no frontier at all.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`frontier_sweep!`](@ref)
+  - [`frontier_sweep_axes`](@ref)
+"""
+function set_frontier_point!(model::JuMP.Model, point::Tuple)
+    for (keys, bounds) in point
+        for (key, bound) in zip(keys, bounds)
+            JuMP.set_parameter_value(model[key], bound)
+        end
+    end
+    return nothing
+end
+"""
+    frontier_sweep!(point!, model, opt, ::Type{T}, points)
+    frontier_sweep!(point!, model, opt, ::Type{T}, n::Integer)
+    frontier_sweep!(model, opt, ::Type{T}, points)
+
+Solve one model per sweep point and collect the outcomes.
+
+The collect tail every frontier sweep shares. The model is assembled once and its objective is
+set once; a sweep point changes only parameter values, so no constraint is rebuilt between
+solves. `point!` is the per-optimiser hook, called with the **flat 1-based index** of the point
+after its bounds are written — [`NearOptimalCentering`](@ref) uses it to move `noc_rk` and
+`noc_rt` onto that point's anchor, and [`MeanRisk`](@ref) needs no hook at all.
+
+The `n::Integer` method sweeps `n` points with no frontier bound to write, which is the
+unconstrained [`NearOptimalCentering`](@ref) sweep over a vector of anchors.
+
+# Arguments
+
+  - `point!`: Hook of one argument, the flat index of the sweep point. Defaults to a no-op.
+  - $(arg_dict[:model])
+  - `opt::JuMPOptimisationEstimator`: The optimiser, for [`optimise_JuMP_model!`](@ref).
+  - `::Type{T}`: Element type of the returns matrix.
+  - `points`: A [`frontier_sweep_axes`](@ref) iterator, or the point count `n`.
+
+# Returns
+
+  - `(retcodes, sols)`: One entry per sweep point, in flat sweep order.
+
+# Related
+
+  - [`frontier_sweep_axes`](@ref)
+  - [`set_frontier_point!`](@ref)
+  - [`solve_mean_risk!`](@ref)
+  - [`solve_noc!`](@ref)
+"""
+function frontier_sweep!(point!, model::JuMP.Model, opt::JuMPOptimisationEstimator,
+                         ::Type{T}, points) where {T}
+    n = length(points)
+    retcodes = sizehint!(OptimisationReturnCode[], n)
+    sols = sizehint!(JuMPOptimisationSolution[], n)
+    for (i, point) in enumerate(points)
+        set_frontier_point!(model, point)
+        point!(i)
+        retcode, sol = optimise_JuMP_model!(model, opt, T)
+        push!(retcodes, retcode)
+        push!(sols, sol)
+    end
+    return retcodes, sols
+end
+function frontier_sweep!(point!, model::JuMP.Model, opt::JuMPOptimisationEstimator,
+                         ::Type{T}, n::Integer) where {T}
+    return frontier_sweep!(point!, model, opt, T, Iterators.repeated((), n))
+end
+function frontier_sweep!(model::JuMP.Model, opt::JuMPOptimisationEstimator, ::Type{T},
+                         points) where {T}
+    return frontier_sweep!(Returns(nothing), model, opt, T, points)
+end
+"""
     state_key(prefix::Symbol, name::Symbol)
+    state_key(prefix::Symbol, name::Symbol, i)
 
-Resolve the Model State key for entry `name` under `prefix`.
+Resolve the Model State key for entry `name` under `prefix`, optionally at measure index `i`.
 
-Internal to the Model State interface: the single place the prefix-namespacing convention
-is spelled. Keeping it here is what lets the seam-lock test assert that no emitter builds a
-key by hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
+Internal to the Model State interface: the single place the two namespacing conventions are
+spelled. A Model State key is disambiguated on two axes, and both are resolved here:
+
+  - `prefix` separates one *build* from another, so a nested risk build cannot collide with
+    the build that encloses it (ADR 0005).
+  - `i` separates one *measure instance* from another inside a single build, so two
+    `ConditionalValueatRisk` measures in the same vector get their own scratch entries.
+
+Keeping both here is what lets the seam-lock test assert that no emitter builds a key by
+hand — emitters reach Model State through [`state_get`](@ref), [`state_has`](@ref),
 [`state_set!`](@ref) and [`state_build!`](@ref). See ADR 0037.
+
+Neither axis carries a delimiter, so composition is **not injective**: `(:te_dr_, 11)` and
+`(:te_dr_1, 1)` both give `:te_dr_11`. The spelling is kept — a delimiter would move every
+top-level key a caller reads — and the collision is caught where it does harm, by
+[`assert_state_key_free`](@ref) at registration.
 
 # Related
 
   - [`state_build!`](@ref)
+  - [`nested_prefix`](@ref)
+  - [`assert_state_key_free`](@ref)
 """
 function state_key(prefix::Symbol, name::Symbol)
     return Symbol(prefix, name)
 end
+function state_key(prefix::Symbol, name::Symbol, i)
+    return Symbol(prefix, name, i)
+end
+"""
+    assert_state_key_free(model::JuMP.Model, key::Symbol)
+
+Assert Model State key `key` is not registered yet, so a write cannot replace an entry.
+
+Neither axis of [`state_key`](@ref) is separated by a delimiter, so key composition is
+**not injective**: a name that ends in a digit and a low index compose the same `Symbol` as
+a shorter name and a higher index — `state_key(p, :te_dr_, 11) == state_key(p, :te_dr_1, 1)`.
+Without this guard the second write wins, the model carries one entry where the build
+expected two, and a constraint binds the wrong variable. That is a wrong answer, not a
+crash, so the registration verb fails closed instead.
+
+A delimiter was rejected as the fix: it would move every top-level key spelling
+(`state_key(Symbol(""), :ret_, 1)` is `:ret_1`, a key callers read), and it would still let
+one emitter overwrite another's entry under a key both spell correctly. The guard closes
+both. Re-registration under one key has no legitimate reading either: the build-once case
+is [`state_build!`](@ref), which returns the existing entry untouched, and the flag case is
+[`mark_state!`](@ref), which is idempotent. See ADR 0037.
+
+# Returns
+
+  - `nothing`.
+
+# Throws
+
+  - `ArgumentError` if `key` is already registered. The message names the key and the two
+    verbs that do accept a repeat.
+
+# Related
+
+  - [`state_key`](@ref)
+  - [`state_set!`](@ref)
+  - [`state_build!`](@ref)
+"""
+function assert_state_key_free(model::JuMP.Model, key::Symbol)
+    @argcheck(!haskey(model, key),
+              ArgumentError("model[$key] is already registered, so this registration would replace it and lose the earlier entry. Model State keys compose by concatenation and are not injective — state_key(prefix, :te_dr_, 11) and state_key(prefix, :te_dr_1, 1) are both :te_dr_11 — so either two entries composed the same key and one of them must be renamed, or the same entry is registered twice. Use state_build! to build an entry once and reuse it, or mark_state! for an idempotent presence flag."))
+    return nothing
+end
 """
     state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+    state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, i, val)
 
 Register `val` in the model under the prefixed Model State key and return it.
 
@@ -1020,19 +1449,41 @@ A nested risk build (e.g. risk tracking) passes a non-empty `prefix` so the shar
 infrastructure entries it creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the
 outer model's; the default empty prefix reproduces the bare key. See ADR 0005.
 
+The indexed method registers per-measure scratch (`:cvar_risk_`, `:z_cvar_`, …) at measure
+index `i`, so two instances of the same measure in one build get their own entries. Both
+disambiguators are resolved by [`state_key`](@ref).
+
+Registration is *fresh*: the composed key must be free, because key composition is not
+injective and a replaced entry is a wrong answer rather than an error
+([`assert_state_key_free`](@ref)). Reuse is the other two verbs' job.
+
+# Throws
+
+  - `ArgumentError` if the composed key is already registered.
+
 # Related
 
   - [`state_get`](@ref)
   - [`state_build!`](@ref)
+  - [`assert_state_key_free`](@ref)
 """
 function state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
-    model[state_key(prefix, name)] = val
+    key = state_key(prefix, name)
+    assert_state_key_free(model, key)
+    model[key] = val
+    return val
+end
+function state_set!(model::JuMP.Model, prefix::Symbol, name::Symbol, i, val)
+    key = state_key(prefix, name, i)
+    assert_state_key_free(model, key)
+    model[key] = val
     return val
 end
 """
     state_has(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    state_has(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
-Return `true` if Model State entry `name` is registered under `prefix`.
+Return `true` if Model State entry `name` is registered under `prefix`, at index `i` if given.
 
 # Related
 
@@ -1041,14 +1492,20 @@ Return `true` if Model State entry `name` is registered under `prefix`.
 function state_has(model::JuMP.Model, prefix::Symbol, name::Symbol)
     return haskey(model, state_key(prefix, name))
 end
+function state_has(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
+    return haskey(model, state_key(prefix, name, i))
+end
 """
     state_get(model::JuMP.Model, prefix::Symbol, name::Symbol)
+    state_get(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
 Return Model State entry `name` under `prefix`, asserting it has been registered.
 
 Prefer a named accessor ([`get_X`](@ref), [`get_net_X`](@ref), [`get_dd`](@ref), …) where
 one exists: those name the builder that produces the entry, so an out-of-order read reports
 which builder to call instead of a generic missing-entry error.
+
+The indexed method reads per-measure scratch registered at measure index `i`.
 
 # Related
 
@@ -1061,8 +1518,15 @@ function state_get(model::JuMP.Model, prefix::Symbol, name::Symbol)
               ArgumentError("model[$key] has not been registered; it is being read before the builder that produces it has run"))
     return model[key]
 end
+function state_get(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
+    key = state_key(prefix, name, i)
+    @argcheck(haskey(model, key),
+              ArgumentError("model[$key] has not been registered; it is being read before the builder that produces it has run"))
+    return model[key]
+end
 """
     state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol)
+    state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol, i)
 
 Return Model State entry `name` under `prefix`, building it with `f()` exactly once.
 
@@ -1090,6 +1554,15 @@ function state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol)
     model[key] = val
     return val
 end
+function state_build!(f, model::JuMP.Model, prefix::Symbol, name::Symbol, i)
+    key = state_key(prefix, name, i)
+    if haskey(model, key)
+        return model[key]
+    end
+    val = f()
+    model[key] = val
+    return val
+end
 """
     mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol)
 
@@ -1109,6 +1582,10 @@ function mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol)
     state_build!(() -> true, model, prefix, name)
     return nothing
 end
+function mark_state!(model::JuMP.Model, prefix::Symbol, name::Symbol, i)
+    state_build!(() -> true, model, prefix, name, i)
+    return nothing
+end
 """
     nested_prefix(prefix::Symbol, tag::Symbol)
     nested_prefix(prefix::Symbol, tag::Symbol, i)
@@ -1122,6 +1599,7 @@ index, which is what makes tracking-nested-in-tracking collision-free. See ADR 0
 
 # Related
 
+  - [`nested_index`](@ref)
   - [`state_build!`](@ref)
 """
 function nested_prefix(prefix::Symbol, tag::Symbol)
@@ -1129,6 +1607,28 @@ function nested_prefix(prefix::Symbol, tag::Symbol)
 end
 function nested_prefix(prefix::Symbol, tag::Symbol, i)
     return Symbol(prefix, tag, i, :_)
+end
+"""
+    nested_index(tag::Symbol, i)
+
+Compose the Model State measure index a sub-measure build threads down.
+
+The twin of [`nested_prefix`](@ref) on the other disambiguating axis. A composite measure
+that builds its parts *in the same build* — `GenericValueatRiskRange` over its `loss` and
+`gain` sides — separates the parts by index rather than by namespace, because they share
+the build's infrastructure entries and must not each rebuild them. `tag` names the part
+(`:loss_`, `:gain_`), and the composition nests, so a range inside a range stays
+collision-free.
+
+Distinct from a Model State *key*: this produces an index, not an entry name. See ADR 0037.
+
+# Related
+
+  - [`nested_prefix`](@ref)
+  - [`state_key`](@ref)
+"""
+function nested_index(tag::Symbol, i)
+    return Symbol(tag, i)
 end
 """
     set_initial_w!(args...)

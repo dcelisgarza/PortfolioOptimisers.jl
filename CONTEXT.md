@@ -1,102 +1,111 @@
 # PortfolioOptimisers.jl — Domain Glossary
 
-The library is organised as a workflow:
+A Julia portfolio-optimisation library. The domain is organised as a workflow:
 
 > data → moments → prior → optimisation → post-processing
 
-("Pipeline" is reserved for the reified workflow Estimator below, not this informal organisation.)
-
-with a small set of cross-cutting abstractions (Estimator / Algorithm / Result / Factory) that everything is built from. This glossary follows that order. Concept families list their concrete variants as one-line bullets.
+with a small set of cross-cutting abstractions (Estimator / Algorithm / Result / Factory) that everything is built from. This file is a glossary and nothing else: it names the concepts and fixes the words for them. Decisions and their reasoning live in `docs/adr/`.
 
 ## 1. Core Abstractions
 
 **Estimator**
-A configuration object that encodes a statistical or mathematical method along with its hyperparameters. Estimators are the primary input to high-level user-facing functions (`optimise`, `prior`, `factory`, etc.). Sometimes callable (functor) when it makes sense, but that is not required. Estimators may compose other estimators when the inner estimator is also independently useful.
+A configuration object encoding a statistical or mathematical method together with its hyperparameters, and the primary input to the library's user-facing functions. An Estimator says *how to compute for whatever input it is given*, and so never holds a Result.
 
 **Algorithm**
-A type used inside an Estimator to select or modify its computational behaviour. Dispatched on internally. Not intended to be used directly by the user on their own — always consumed through an Estimator.
+A type held inside an Estimator that selects or modifies its computational behaviour. Consumed through an Estimator, never used on its own.
 
 **Result**
-A plain data struct that holds the computed outputs of a function applied to an Estimator. Never callable. Passed downstream as inputs to further computation.
+A plain data struct holding the computed output of a function applied to an Estimator: *the answer for the input it was computed on*. Never callable.
 
 **Choice Surface**
-The set of things a caller picks when specifying a problem: the concrete leaf Estimators and Algorithms. Results are not part of it — they are what comes back, never what is chosen, so a caller writes `MeanRisk` but never writes `MeanRiskResult`. The distinction is implied by the three definitions above but worth stating, because it decides membership questions that would otherwise be settled case by case: which types a user-facing inventory must cover, and which are outputs that merely need to be reachable from one.
+The set of things a caller picks when specifying a problem: the concrete leaf Estimators and Algorithms. Results are what comes back, never what is chosen.
 
 **Factory**
-A generic configuration mechanism for immutable structs — they may be Estimator, Result, or Algorithm structs. Because all structs are immutable and the library relies heavily on composition, `factory` is the standard way to propagate runtime-computed values (moments from a Prior Result, observation weights, previous portfolio weights, etc.) down through a composed struct tree. It takes a struct and runtime data and returns a new, fully-configured struct of the same type.
+The mechanism that propagates runtime-computed values down a composed struct tree, returning a new, fully-configured struct of the same type.
+
+**Deferred Quantity**
+A moment Estimator standing where a prior-derived value goes, so the slot admits either the value or the method that computes it. Factory resolves it against the optimisation's own Prior.
 
 **View**
-The sub-selection counterpart to Factory. Where Factory propagates runtime *values* down a composed struct tree, a View propagates an index *selection*: it restricts an Estimator, Algorithm, or Result (or an array of them) to a subset of assets — or, for returns data, observations — and returns a new struct of the same type with every data-bearing field and composed child consistently sub-selected. Used wherever the library operates on part of the problem rather than the whole: meta-optimisers (Subset Resampling, Nested Clustered), Cross-Validation, and windowed moment estimators. Like Factory, it relies on composition — each struct declares which of its fields participate, and the selection is threaded recursively down the tree. Unlike Factory, View is primarily an *internal* mechanism — driven by the meta-optimisers and Cross-Validation rather than called directly by everyday callers — so its entry point `port_opt_view` is marked `public`, not exported.
-Extension authors implementing a new composed estimator should define a `port_opt_view` method for it, or tag data-bearing fields with `@vprop` to have the method generated automatically.
-`ReturnsResult` is Viewed through the same entry point: `port_opt_view(rd, i)` selects assets, while `port_opt_view(rd, i, j, k)` selects observations, assets, and factors — the one place in the family where the first index is not the asset index.
+An index selection propagated down a composed struct tree, restricting an Estimator, Algorithm or Result to a subset of assets or observations.
+*Avoid*: using it for a **Tail View** (§3.6), which is a statement about the distribution rather than a selection.
+
+**Propagation Channel**
+One generated method of `@propagatable`, and the field tag that opts a field into it. Three exist: factory, view, and prior.
 
 **Pipeline**
-An Estimator that reifies an end-to-end workflow — price preprocessing, prices-to-returns, returns preprocessing, prior, phylogeny, uncertainty sets, constraint generation, optimisation — as an ordered list of optionally-named steps executed left-to-right over a Pipeline Context. Steps are ordinary Estimators; the step's family determines which context slot it reads and writes (custom steps use an explicit wrapper). Executed with `fit` (producing a result that carries every step's fitted Result) and evaluated out-of-sample with `predict`.
-The Pipeline — data preparation included — is the unit that Cross-Validation splits (on contiguous input-time windows) and hyperparameter tuning searches; tuning lenses address steps by name or index and may swap entire estimators. Slots computed by pipeline steps override the optimisation step's corresponding internal configuration; slots with no step are computed internally by the optimiser as usual, so every stage is optional. Pipelines may nest as steps of other Pipelines; wrapping a Pipeline in a Meta-optimiser is deliberately unsupported (a Meta-optimiser may instead *be* the optimisation step).
-*Avoid*: Workflow, Workbench (GUI-era synonyms); using "pipeline" for the library's informal stage ordering.
+An Estimator that reifies an end-to-end workflow as an ordered list of optionally-named steps, executed left to right over a Pipeline Context.
+*Avoid*: Workflow, Workbench; and using "pipeline" for the library's informal stage ordering.
 
 **Pipeline Context**
-The accumulating blackboard threaded through a Pipeline's steps: a set of coarse typed slots — prices, returns, prior, phylogeny, uncertainty, constraints, weights — where each step reads the slots it needs and writes the slot its family produces. Heterogeneous slots (uncertainty, constraints) hold collections whose elements are routed to their optimiser targets by Result type. Internal machinery, not user-facing.
+The accumulating blackboard threaded through a Pipeline's steps: a set of coarse typed slots that each step reads from and writes to.
 
 **Routing Target**
-The destination a computed Pipeline Context slot is delivered to inside the optimisation step: `pe`, `cle`, `wb`, `lcse`, `ple`, `mu_ucs`, `sigma_ucs`. Targets are finer than slots and address a different audience — a *slot* is pipeline-author vocabulary naming a stage of the workflow, a *target* is optimiser-author vocabulary naming a destination, and nobody writing a Pipeline ever names one. The Pipeline owns the fan-out (splitting the uncertainty pair, grouping constraint results by Result type); the optimiser owns where a target lands, so a field rename stays local instead of breaking the Pipeline at run time. Five targets are named after the field they land in, making the routing rule derived rather than declared — a target lands in the like-named field of whichever optimiser has one. The two exceptions carry policy and name no field. A target an optimiser cannot receive is ignored when losing it cannot change the answer (`pe`, `cle`), an error otherwise. Internal machinery.
+The destination a computed Pipeline Context slot is delivered to inside the optimisation step. Finer than a slot: a slot names a stage of the workflow, a target names a destination field.
 
 **Data Slot**
-The two Pipeline Context slots — prices and returns — whose write *changes the asset universe*, as opposed to a *derived slot* (prior, phylogeny, uncertainty, constraints, weights) computed from the data. Writing a data slot makes every slot derived from it stale: a prior or constraint fitted on one universe does not match a later, different one, so a Pipeline rejects at construction any ordering that would strand such a result. The distinction is the whole content of the invalidation rule — only data slots invalidate, and they invalidate every later slot except the terminal *weights* slot, which is the workflow's output and which nothing derives from. Because nothing derives from weights, an optimisation step must be the last step of a Pipeline.
+A Pipeline Context slot whose write changes the asset universe — prices and returns — as opposed to a *derived slot* (prior, phylogeny, uncertainty, constraints, weights) computed from the data.
 
 **Preprocessing Estimator**
-The family of Estimators that transform price or returns data inside a Pipeline (prices-to-returns conversion, missing-data filtering, imputation, asset selection). Fitting one on training data produces a Result carrying any fitted state — imputation parameters, thresholds, and crucially the selected asset universe — which is then *applied* to unseen data so train and test are transformed consistently. Stateless steps carry no state and applying them is just running them.
+The family of Estimators that transform price or returns data inside a Pipeline. Fitting one yields a Result carrying its fitted state, which is then applied to unseen data.
 
 **Holdout Split**
-The evaluation protocol that reserves the tail of the time-ordered observations as a test window and trains on the head. It exists in two forms: a free function (`train_test_split`) that cuts price- or returns-level data into a train/test pair, and a step form (`TrainTestSplit`) that must be the *first* step of a Pipeline, so every fitted step downstream sees the training window alone. The held-out window is fitted state — the split's Result carries both windows — and replaying a fitted split on unseen data is a pass-through, so predicting on future windows still works. One evaluation protocol per call: a Pipeline containing a holdout step cannot also be handed to Cross-Validation.
-Sizes are given as row counts (integers) or fractions of the observations (floats in (0, 1)); giving one side makes the other its complement.
+The evaluation protocol that reserves the tail of the time-ordered observations as a test window and trains on the head.
 *Avoid*: Validation Split (nothing is tuned on the held-out window).
 
 **Embargo**
-The deliberate gap between the training and test windows of a Holdout Split when both sizes are given and sum to less than the number of observations: train comes from the head, test from the tail, and the middle rows belong to *neither* window. Overlapping windows are rejected outright.
+The deliberate gap between the training and test windows of a Holdout Split, belonging to neither.
 
 **Asset Selector**
-The Preprocessing Estimator subfamily that restricts the *asset universe* from returns data — dropping constant columns, keeping the best or worst assets by a risk measure, pruning redundant ones. A selector answers one question on the training window, *which asset columns survive?*, and that answer is its fitted state: applying it to an unseen window replays the fitted universe rather than re-deciding it. Selectors restrict columns only; dropping observations is a price-level concern (`MissingDataFilter`), because a fitted transformation cannot choose which rows of an unseen window to drop without breaking the weights/returns alignment. Every selector implements one method, `select_assets`, and shares a single `AssetSelectorResult`.
-*Avoid*: Filter, Screen (used only by `MissingDataFilter`, which drops and never selects, and by the `ZeroVarianceFilter` alias, which is a pure drop).
+The Preprocessing Estimator subfamily that restricts the asset universe from returns data. Its fitted state is the set of surviving asset columns.
+*Avoid*: Filter, Screen (reserved for `MissingDataFilter`, which drops and never selects).
 
 **Selection Rule**
-The Algorithm consumed by a `ScoreSelector` that turns per-asset scores into a keep-mask. *Literal* rules (`ThresholdRule`) compare raw scores against absolute bounds and ignore orientation. *Ordinal* rules (`RankRule`, `QuantileRule`) consult `bigger_is_better` — so "best" is lowest risk for a risk measure and highest value for a return measure — and take counts or fractions **from each end**, not positions, which is what makes "drop the worst 5" expressible without knowing the universe size.
+The Algorithm consumed by a `ScoreSelector` that turns per-asset scores into a keep-mask. *Literal* rules compare raw scores against absolute bounds; *ordinal* rules consult orientation and take counts or fractions from each end.
 
 **Redundancy Algorithm**
-The Algorithm consumed by a `RedundancySelector`, deciding which assets duplicate information others already carry. It returns a *keep-mask*, not a partition: `PairwiseCorrelation` drops one asset at a time and may keep two members of the same correlated blob, which partition-then-keep-the-best cannot express. `CorrelationComponents` and `ClusterGroups` do partition, and share a `groups_argbest` helper. The selector's `score` chooses the survivor of each redundancy group; absent one, the correlation algorithms fall back on each asset's summary correlation to the rest of the universe.
-Note that `PairwiseCorrelation` and `CorrelationComponents` give different answers on the same input: the former guarantees no surviving pair exceeds the threshold, the latter reads correlation transitively and keeps one representative per connected blob.
+The Algorithm consumed by a `RedundancySelector`, deciding which assets duplicate information others already carry. It returns a keep-mask, not a partition.
 
 **Trust-neither tie policy**
-When two assets are indistinguishable under the criterion being applied, the library keeps *neither*. A tied block straddling a rank cut is excluded entirely (so `RankRule(; best = 20)` may return fewer than 20), and `find_uncorrelated_indices` removes both members of an exactly-tied correlated pair. The alternative — breaking ties by column index — would make the result depend on column order, which is not a property of the data.
+The convention that when two assets are indistinguishable under the criterion being applied, the library keeps neither.
 
 **Vector-to-Scalar Reducers**
-Small reusable Algorithms that collapse a vector of reals to a scalar, reused throughout the library: `MinValue`, `MaxValue`, `MeanValue`, `MedianValue`, `ModeValue`, `StdValue`, `VarValue`, `SumValue`, `ProdValue`, `StandardisedValue` (weighted mean ÷ weighted std). Most accept optional observation weights.
+Small reusable Algorithms collapsing a vector of reals to a scalar: `MinValue`, `MaxValue`, `MeanValue`, `MedianValue`, `ModeValue`, `StdValue`, `VarValue`, `SumValue`, `ProdValue`, `StandardisedValue`.
 
 **LxNorm error family**
-LxNorm errors are used as constraints, targets for risk measures, and in entropy pooling of multiple
-conditional value at risk views: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
+The norm forms used as constraints, as risk-measure targets, and in entropy pooling: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
 
 **FullMoment vs SemiMoment**
-A pervasive Algorithm distinction in moment estimation: `FullMoment` includes all deviations; `SemiMoment` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
+The pervasive Algorithm distinction in moment estimation: `FullMoment` includes all deviations, `SemiMoment` only those below a target. It drives the split between symmetric and downside measures.
 
 ## 2. Data
 
 **ReturnsResult**
-The central data structure carrying all return series through the library. Fields: `X` (asset returns matrix, observations × assets), `F` (factor returns matrix), `B` (benchmark returns matrix), `nx`/`nf`/`nb` (asset/factor/benchmark names), `ts` (timestamps), `iv` (implied volatility), `ivpa` (implied volatility premium). Produced by `prices_to_returns` from raw price data. Every Prior Estimator and Optimisation Estimator consumes a `ReturnsResult`.
+The central data structure carrying all return series through the library: asset, factor and benchmark returns, their names, timestamps, implied volatility, and the Feature Matrix. Produced by `prices_to_returns`.
 
 **PricesResult**
-The container of aligned, time-indexed *price-level* series — asset prices plus optional factor, benchmark, and implied-volatility series — the prices-level mirror of `ReturnsResult`. The input to price Preprocessing Estimators and to prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline Cross-Validation. Like `ReturnsResult`, user-constructible yet classified as a Result (produced by filtering steps); `FiniteAllocationInput` remains the glossary's only data-as-Estimator deviation.
+The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators.
+
+**Feature Matrix** (`Z` / `nz`)
+An assets × features matrix of per-asset quantities that are *not* return series — a sector taxonomy, a fundamentals or ESG panel, factor loadings, a graph neighbourhood. It is exogenous data, letting the clustering and network stack see structure the returns do not encode.
+*Avoid*: Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
+
+**Feature Matrix Estimator**
+A producer turning something the library already computes, or a classification the caller supplies, into a Feature Matrix: `RegressionFeatures`, `AssetSetsFeatures`, `PhylogenyFeatures`.
+
+**Feature Program**
+An ordered, last-wins list of authored edges resolving into a Feature Matrix. Where the group-key form stacks partitions and derives its axis, a Program writes cells into an axis the caller declared.
 
 **Implied Volatility**
-A forward-looking estimate of how much an asset's price is expected to fluctuate, derived from current options contract prices using models such as Black-Scholes. Stored as `iv`. Not a historical measurement.
+A forward-looking estimate of an asset's expected price fluctuation, derived from current option prices. Not a historical measurement.
 
 **Implied Volatility Premium (VRP)**
-The difference between Implied Volatility (market expectation) and realised volatility (historical outcome). Typically positive because investors pay a premium to hedge downside risk. Stored as `ivpa`.
+The difference between Implied Volatility and realised volatility, typically positive because investors pay to hedge downside risk.
 
 ## 3. Statistics
 
 **Windowed Estimator**
-A moment estimator that restricts an inner moment estimator to a sub-window of the observations — the most recent *n*, or an explicit set of indices — and rebinds observation weights to that window before delegating. The inner estimator's semantics are untouched: windowing decides *which observations are seen*, never how the moment is computed from them, so any moment kind can be windowed and a windowed estimator is substitutable wherever its inner one is. The family spans the moment kinds (expected returns, covariance, variance, coskewness, cokurtosis), one type each, because each answers a different generic. Distinct from a Cross-Validation fold, which restricts observations to evaluate a strategy; a Windowed Estimator restricts them because older observations are held to be less informative about the present.
+A moment estimator restricting an inner moment estimator to a sub-window of the observations, then delegating. Windowing decides *which observations are seen*, never how the moment is computed from them.
 
 ### 3.1 Expected Returns (Moments)
 
@@ -105,287 +114,340 @@ Computes a per-asset mean-return vector. Variants:
 
 - **SimpleExpectedReturns**: sample mean, with optional observation weights.
 - **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`.
-- **EquilibriumExpectedReturns**: implied (equilibrium) returns via reverse optimisation, Π = λ·Σ·w_eq — parameterised by a covariance estimator, equilibrium weights `w`, and risk-aversion `l`. Serves as the Black-Litterman equilibrium anchor (classified as a shrinkage estimator).
+- **EquilibriumExpectedReturns**: implied (equilibrium) returns via reverse optimisation, Π = λ·Σ·w_eq. The Black-Litterman equilibrium anchor.
 - **ExcessExpectedReturns**: returns net of a reference/risk-free rate.
 - **MedianExpectedReturns**: (weighted) per-asset median.
-- **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: return the asset standard deviations / variances (used where a "return" slot should carry dispersion).
+- **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: the asset standard deviations / variances, where a "return" slot should carry dispersion.
 - **CustomValueExpectedReturns**: user-supplied per-asset values.
 - **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
 
 ### 3.2 Covariance & Variance (Moments)
 
 **Covariance Estimator**
-Computes an asset covariance (and correlation) matrix. Core wrappers: `Covariance` (flexible container), `GeneralCovariance` (wraps any `StatsBase.CovarianceEstimator` + weights), `SimpleVariance`, `CorrelationCovariance` (returns correlation as both cov and corr). Robust / specialised families:
+Computes an asset covariance (and correlation) matrix. Core wrappers: `Covariance`, `GeneralCovariance`, `SimpleVariance`, `CorrelationCovariance`. Robust and specialised families:
 
 - **Gerber** (`Gerber0/1/2`): co-movement counting that ignores small noise-level moves below a threshold.
-- **GerberIQ** (Gerber Information Quality): Gerber with temporal lookback/decay and asset-volatility-scaled thresholds (`BasicGerberIQ`, `PartialGerberIQ`, `FullGerberIQ`; tuners `ExpGerberIQDecay`, `AssetVolatilityGerberIQScaler`).
+- **GerberIQ**: Gerber with temporal lookback/decay and asset-volatility-scaled thresholds (`BasicGerberIQ`, `PartialGerberIQ`, `FullGerberIQ`).
 - **Smyth-Broby** (`SmythBroby0/1/2`, `…Gerber*`, `…Count*`): Gerber-family extensions weighting co-movements by magnitude and/or vote counts.
 - **DistanceCovariance**: covariance derived from a distance metric between assets.
 - **LowerTailDependenceCovariance**: dependence in the joint lower tail (crash co-movement).
 - **RankCovariance**: rank-correlation based — `KendallCovariance` (τ), `SpearmanCovariance` (ρ).
-- **MutualInfoCovariance**: dependence via mutual information; uses a histogram binning Algorithm (`Knuth`, `FreedmanDiaconis`, `Scott`, `HacineGharbiRavier`).
-- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators that rescale by a detected market regime state (methods `LogRegimeAdjusted`, `FirstMomentRegimeAdjusted`, `RootMeanSquaredAdjusted`; covariance targets `MahalanobisTarget`, `DiagonalTarget`, `PortfolioTarget`).
-- **ImpliedVolatility** (covariance): scales covariance using implied volatility, optionally regressing realised on implied (`ImpliedVolatilityRegression`) or applying a premium factor (`ImpliedVolatilityPremium`).
-- **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply denoising / detoning / custom matrix processing plus posdef projection.
+- **MutualInfoCovariance**: dependence via mutual information, over a histogram binning Algorithm.
+- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state.
+- **ImpliedVolatility** (covariance): scales covariance using implied volatility.
+- **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply matrix processing.
 - **PortfolioOptimisersCovariance**: composite estimator bundling covariance estimation with post-processing.
-- **Windowed** variants (`WindowedCovariance`, `WindowedVariance`): the Windowed Estimators for covariance and variance.
+- **WindowedCovariance** / **WindowedVariance**: the Windowed Estimators for covariance and variance.
 
 ### 3.3 Higher-Order Moments
 
 **Coskewness** / **Cokurtosis**
-Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and the Windowed Estimators `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
+Third- and fourth-order co-moment tensors, with `FullMoment`/`SemiMoment` and Windowed variants. They feed high-order priors and higher-moment risk measures.
 
 ### 3.4 Regression (factor modelling)
 
 **Regression Estimator**
-Builds a factor model mapping factor returns to asset returns; underpins factor priors. Families:
+Builds a factor model mapping factor returns to asset returns, underpinning factor priors. Families:
 
-- **StepwiseRegression**: greedy feature selection — `ForwardSelection` (selection) or `BackwardElimination` (elimination), driven by a criterion: `PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`.
+- **StepwiseRegression**: greedy feature selection — `ForwardSelection` or `BackwardElimination`, driven by a criterion (`PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`).
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 
 ### 3.5 Matrix Processing
 
 **Denoising**
-Removes statistical noise from a covariance/correlation matrix via spectral thresholding (Random Matrix Theory). Algorithms: `SpectralDenoise` (zero smallest eigenvalues), `FixedDenoise` (replace with constant), `ShrunkDenoise` (shrink). Requires the effective sample ratio `q = observations / assets`.
+Removal of statistical noise from a covariance/correlation matrix by spectral thresholding (Random Matrix Theory). Algorithms: `SpectralDenoise`, `FixedDenoise`, `ShrunkDenoise`.
 
 **Detoning**
-Removes the largest `n` principal components (market modes) from a correlation matrix, isolating asset-specific correlation.
+Removal of the largest principal components (market modes) from a correlation matrix, isolating asset-specific correlation.
 
 **Posdef**
-Projects a matrix to the nearest positive definite matrix; used when a matrix is ill-conditioned or non-PD after denoising/detoning.
+Projection of a matrix to the nearest positive definite matrix.
 
 **Matrix Processing**
-A composing estimator (`MatrixProcessing`) that applies a sequence of post-processing steps — Posdef projection, Denoising, Detoning, and a custom algorithm — to a covariance/correlation matrix. Each step has its own estimator field (`pdm`/`dn`/`dt`/`alg`); the `order` field is a tuple (or vector) of step symbols (`:pdm`, `:dn`, `:dt`, `:alg`) naming which steps run and in what sequence, applied left to right.
+The composing estimator applying a sequence of post-processing steps — Posdef, Denoising, Detoning, and a custom algorithm — to a covariance/correlation matrix.
 
 ### 3.6 Prior
 
 **Prior**
-The full statistical summary of asset returns that feeds an optimiser. A Prior Estimator bundles Moment Estimators and may adjust them using user assumptions. "Prior" derives from "prior statistics", not Bayesian inference. Structural axes:
+The full statistical summary of asset returns that feeds an optimiser. A Prior Estimator bundles Moment Estimators and may adjust them using user assumptions. The name derives from "prior statistics", not from Bayesian inference.
 
-- **Low-order vs High-order**: low-order = mean + covariance (`LowOrderPrior`); high-order = also coskewness/cokurtosis (`HighOrderPrior`).
-- **Data dependency** (`_A` / `_F` / `_AF`): asset-only, factor-required, or asset-and-factor. Determines whether `F` must be present.
-
-Concrete estimators:
+Structural axes: **low-order** is mean plus covariance, **high-order** adds coskewness and cokurtosis; the **data dependency** suffixes `_A` / `_F` / `_AF` say whether factor returns are required. Concrete estimators:
 
 - **EmpiricalPrior**: moments computed directly from returns.
-- **FactorPrior** / **HighOrderFactorPriorEstimator**: moments reconstructed through a factor model (regression).
+- **FactorPrior** / **HighOrderFactorPriorEstimator**: moments reconstructed through a factor model.
 - **HighOrderPriorEstimator**: empirical high-order prior.
-- **Black-Litterman family**: blends market-equilibrium priors with investor views — `BlackLittermanViews` (views container), `BlackLittermanPrior`, `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior`, `AugmentedBlackLittermanPrior`.
-- **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy. Stepwise schemes `H0/H1/H2_EntropyPooling` (bias vs speed trade-off); optimisers `LogEntropyPooling`, `ExpEntropyPooling`, `CVaREntropyPooling`, backed by `OptimEntropyPooling` or `JuMPEntropyPooling`.
-- **OpinionPoolingPrior**: consensus across multiple priors — `LinearOpinionPooling`, `LogarithmicOpinionPooling`.
+- **Black-Litterman family**: blends market-equilibrium priors with investor views — `BlackLittermanPrior`, `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior`, `AugmentedBlackLittermanPrior`, with `BlackLittermanViews` as the views container.
+- **EntropyPoolingPrior**: re-weights scenario probabilities to satisfy views with minimal relative entropy.
+- **MeucciEntropyPoolingPrior**: the earlier entropy pooling estimator, whose CVaR route root-finds the Value at Risk level rather than writing a formulation.
+- **OpinionPoolingPrior**: consensus across several priors — `LinearOpinionPooling`, `LogarithmicOpinionPooling`.
+
+**Tail View**
+A view on a quantile risk measure of the posterior — CVaR or EVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities.
+*Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
+
+**Risk-Free Shift**
+The round trip a Black-Litterman prior makes around its own update: the rate comes off before the update, because the update is written in excess returns, and goes back on after it.
+
+**Factor Lift**
+The hop from the factor axis to the asset axis: fit the loadings, rebuild the returns through them, project the factor moments, and optionally add a residual block.
+*Avoid*: calling it a **Forward**, which carries a wrapped Result along its own axis instead of crossing axes.
+
+**Original Returns Matrix**
+The returns matrix the caller supplied, as distinct from the one a Prior Result asserts. The two differ only where a factor prior overwrites the returns with its reconstruction.
 
 ### 3.7 Distance
 
 **Distance Matrix**
-A symmetric, zero-diagonal matrix where larger values mean less relatedness. Usually derived from correlation, but any matrix satisfying that convention qualifies. The fundamental input to Phylogeny.
+A symmetric, zero-diagonal matrix in which larger values mean less relatedness. The fundamental input to Phylogeny.
 
 **Distance Estimator**
-Converts correlation/returns into a distance. Algorithms: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance` (variation of information), `CanonicalDistance`. `Distance` is the configurable container (supports a generalised power distance); `DistanceDistance` computes a distance-of-distances.
+Converts correlation or returns into a distance: `SimpleDistance`, `SimpleAbsoluteDistance`, `LogDistance`, `CorrelationDistance`, `VariationInfoDistance`, `CanonicalDistance`. `Distance` is the configurable container and `DistanceDistance` computes a distance-of-distances.
+
+**Feature Distance**
+The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, so the resulting hierarchy expresses exogenous structure.
+
+**Similarity Matrix Algorithm**
+The transform turning a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`.
+
+**Non-Negative Similarity Matrix Algorithm**
+The narrower similarity family admitted on the PMFG path, whose members cannot go negative over their own admissible distances.
 
 ### 3.8 Phylogeny
 
 **Phylogeny**
-The characterisation of asset relationships derived from a Distance Matrix. The biological metaphor is intentional: related assets cluster like species on an evolutionary tree. Three sub-concepts:
+The characterisation of asset relationships derived from a Distance Matrix. The biological metaphor is intentional: related assets cluster like species on an evolutionary tree. It has three sub-concepts:
 
-- **Clustering**: groups related assets into a dendrogram. `ClustersEstimator` with `HClustAlgorithm` (hierarchical linkage), `DBHT` (Direct Bubble Hierarchical Tree — PMFG-based, root methods `UniqueRoot`/`EqualRoot`, similarity transforms, `LoGo` sparse inverse), or `KMeansAlgorithm` (non-hierarchical). Optimal cluster count via `OptimalNumberClusters` using `SecondOrderDifference` or `SilhouetteScore`.
-- **Network**: assets as graph nodes/edges. `NetworkEstimator` builds a minimum spanning tree — `KruskalTree`, `BoruvkaTree`, `PrimTree`.
+- **Clustering**: groups related assets into a dendrogram — `ClustersEstimator` with `HClustAlgorithm`, `DBHT` (PMFG-based, with the `LoGo` sparse inverse) or `KMeansAlgorithm`, and `OptimalNumberClusters` for the cluster count.
+- **Network**: assets as graph nodes and edges. `NetworkEstimator` builds a minimum spanning tree — `KruskalTree`, `BoruvkaTree`, `PrimTree`.
 - **Centrality**: which assets are most influential — `BetweennessCentrality`, `ClosenessCentrality`, `DegreeCentrality`, `EigenvectorCentrality`, `KatzCentrality`, `Pagerank`, `RadialityCentrality`, `StressCentrality`.
 
-`PhylogenyResult` carries the resulting matrix/vector. Required input to clustering-based Optimisation Estimators and to phylogeny constraints.
+`PhylogenyResult` carries the resulting matrix or vector.
+
+**Phylogeny Features**
+The reverse direction: a phylogeny reused as a Feature Matrix rather than consumed as one, since an assets × assets neighbourhood matrix is an assets × features matrix.
+
+**Separation**
+How far apart two assets sit in a Network, and how far is too far. Two members: `HopCount`, the number of edges on the shortest path, and `PathLength`, the summed distance along it.
+
+**Separation Budget Rule**
+A callable standing where a Separation's budget number goes, computing it from the data instead of stating it in advance: `HopCountQuantile`, `PathLengthQuantile`.
+
+**Separation Decay**
+The rule turning a Separation into a score: `LinearDecay`, `ExponentialDecay`, `ReciprocalDecay`, `NoDecay`.
+*Avoid*: confusing it with the exponentially-weighted moment estimators' `decay`, which is a smoothing constant over observations.
+
+**Polarity**
+Which of the two opposite quantities a Centrality algorithm's edge weights must be: `DistancePolarity` (small is close) or `SimilarityPolarity` (large is close). It is a fact about the algorithm's mathematics, not about the graph.
 
 ### 3.9 Uncertainty Sets
 
 **Uncertainty Set**
-A robust optimisation construct that sits alongside a Prior in JuMP-based optimisers: the Prior gives the central estimate (mean, covariance) and the Uncertainty Set bounds how far off it might be; the optimiser then protects against the worst case within the set. Always a robust-optimisation concept. Shapes and constructors:
+A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
 
-- **Box** (`BoxUncertaintySet`): independent per-parameter bounds.
-- **Ellipsoidal** (`EllipsoidalUncertaintySet`, `Mu…`/`Sigma…` classes): joint confidence region; scaling parameter `k` from `NormalKUncertaintyAlgorithm`, `GeneralKUncertaintyAlgorithm`, or `ChiSqKUncertaintyAlgorithm`.
-- **ℓ1 / cross-polytope** (`L1UncertaintySet`): one error budget `eps` shared across all assets and both signs, optionally scaled per asset by `sd`; worst case `mu'w − eps·‖sd ⊙ w‖∞`. **Mean-only** — it bounds a *characteristic* vector and has no covariance analogue.
-- **Signed ℓ1** (`SignedL1UncertaintySet`): a budget per error sign (`ep`, `em`); worst case `mu'w − ep·[maxᵢ(−sdᵢwᵢ)]₊ − em·[maxᵢ(sdᵢwᵢ)]₊`. Not the joint set with `ep == em` — the joint set shares one budget across signs (`max(t₊,t₋)`), this one spends a budget per sign (`ep·t₊ + em·t₋`); they agree only when `w` is single-signed.
-- **Estimators**: `DeltaUncertaintySet` (delta bounds), `NormalUncertaintySet` (normality assumption), `ARCHUncertaintySet` (bootstrap for time series — `StationaryBootstrap`, `CircularBootstrap`, `MovingBootstrap`), `CharacteristicUncertaintySet` (the ℓ1 family; shape via `L1UncertaintySetAlgorithm`/`SignedL1UncertaintySetAlgorithm`, whose `scaled` flag selects equal-weight vs inverse-volatility behaviour).
-
-**ucs Triple** (`ucs` / `mu_ucs` / `sigma_ucs`)
-The three ways to ask an Uncertainty Set estimator for its sets: `ucs` returns the mean and covariance sets as a pair, `mu_ucs` returns the mean half, `sigma_ucs` the covariance half. Conceptually `ucs` *is* the mean half alongside the covariance half — but for sampling-based estimators the pair shares one random draw threaded through both halves, so `ucs`'s covariance half can differ numerically from a standalone `sigma_ucs` call that re-seeds (deliberate; not a drift). ℓ1 sets are mean-only: their `ucs`/`sigma_ucs` throw (ADR 0035).
-*Avoid*: assuming `ucs(ue) == (mu_ucs(ue), sigma_ucs(ue))` element-for-element under a fixed seed.
+**ucs Triple**
+The three ways to ask an Uncertainty Set estimator for its sets: `ucs` for the mean and covariance sets as a pair, `mu_ucs` for the mean half, `sigma_ucs` for the covariance half.
 
 **Characteristic Vector**
-The per-asset quantity an ℓ1 uncertainty set is built around. Usually the expected return, but the construction is indifferent: a prior built on `StandardDeviationExpectedReturns` ranks on volatility instead. The radius `eps` decides how many assets the resulting portfolio holds — small radius, one asset; moderate, a quintile; large, all of them equally — which is what makes the *quintile* and *1/N* heuristics exact solutions of a robust optimisation problem rather than folk wisdom (ADR 0032). There is deliberately no quintile optimiser: the portfolios are a `MeanRisk` recipe over this set.
+The per-asset quantity an ℓ1 uncertainty set is built around, usually the expected return, entering the objective as `mu'w`.
+*Avoid*: Feature (§2), which is a coordinate of an asset in a matrix whose rows become a distance.
 
-**Radius Calibration** (`ActiveAssetsUncertaintyAlgorithm`)
-The conversion from "how many assets should I hold?" to the opaque radius `eps` that produces it, by inverting the closed forms. A *calibration, not a constraint*: exact only for the bare budget-and-sign problem the closed forms assume, so any further constraint may move the realised count. `card` remains the tool for a hard cardinality bound.
-*Avoid*: reading `active` as a promise.
+**Radius Calibration**
+The conversion from "how many assets should I hold?" to the radius that produces it. It is a calibration, not a constraint, so a further constraint may move the realised count.
 
 ## 4. Optimisation
 
 **Optimisation Estimator**
-Produces portfolio weights from a Prior Result and zero or more constraints/risk measures. Primary split: **JuMP-based** (require a solver), **Non-JuMP-based** (naive + clustering), and **Meta-optimisers** (wrap others). Finite Allocation is a separate post-processing class.
+Produces portfolio weights from a Prior Result and zero or more constraints and risk measures. The primary split is **JuMP-based** (requires a solver), **Non-JuMP-based** (naive and clustering), and **Meta-optimisers** (wrap others).
 
 ### 4.1 Naive (Non-JuMP)
 
 - **EqualWeighted**: `1/N` across assets.
 - **InverseVolatility**: weights inversely proportional to asset volatility.
-- **RandomWeighted**: random feasible weights (baseline/benchmark).
+- **RandomWeighted**: random feasible weights, as a baseline.
 
 ### 4.2 Clustering (Non-JuMP)
 
 - **HierarchicalRiskParity (HRP)**: recursive bisection of the cluster tree, allocating by risk.
-- **HierarchicalEqualRiskContribution (HERC)**: equalises risk contribution across clusters then within.
-- **SchurComplementHierarchicalRiskParity (SCHRP)**: HRP augmented with a Schur-complement step (`MonotonicSchurComplement` / `NonMonotonicSchurComplement`).
+- **HierarchicalEqualRiskContribution (HERC)**: equalises risk contribution across clusters, then within them.
+- **SchurComplementHierarchicalRiskParity (SCHRP)**: HRP augmented with a Schur-complement step.
 
 `HierarchicalOptimiser` is the shared configuration for these.
 
+**Branch order**
+The dendrogram's leaf permutation. It never changes the merge tree or the cluster memberships.
+
 ### 4.3 JuMP-based
 
-- **MeanRisk**: efficient-frontier trade-off between expected return and risk (Markowitz-style). The classic objective optimiser.
-- **RiskBudgeting (RB)**: targets prescribed risk *contributions* per asset/factor rather than a return/risk trade-off. `AssetRiskBudgeting` / `FactorRiskBudgeting`; formulations `LogRiskBudgeting` (log-barrier), `MixedIntegerRiskBudgeting`.
-- **RelaxedRiskBudgeting (RRB)**: convex relaxation — `BasicRelaxedRiskBudgeting`, `RegularisedRelaxedRiskBudgeting`, `RegularisedPenalisedRelaxedRiskBudgeting`.
-- **FactorRiskContribution (FRC)**: optimises/targets risk contributions attributed to factors.
-- **NearOptimalCentering (NOC)**: finds a robust interior point near the efficient frontier (`ConstrainedNearOptimalCentering` / `UnconstrainedNearOptimalCentering`).
+- **MeanRisk**: the efficient-frontier trade-off between expected return and risk. The classic objective optimiser.
+- **RiskBudgeting (RB)**: targets prescribed risk *contributions* per asset or factor rather than a return/risk trade-off.
+- **RelaxedRiskBudgeting (RRB)**: a convex relaxation of Risk Budgeting.
+- **FactorRiskContribution (FRC)**: optimises or targets risk contributions attributed to factors.
+- **NearOptimalCentering (NOC)**: finds a robust interior point near the efficient frontier.
 
-**Returns estimators** (objective inputs): `ArithmeticReturn` (dot-product), `LogarithmicReturn` (geometric).
+**JuMP Returns Estimator**
+One term of the objective's return expression: `ArithmeticReturn` (dot-product) or `LogarithmicReturn` (geometric). The model-global return expression is their weighted sum.
 
-**Objective Functions**: `MinimumRisk`, `MaximumUtility`, `MaximumRatio` (Sharpe-type), `MaximumReturn`.
+**Objective Functions**
+`MinimumRisk`, `MaximumUtility`, `MaximumRatio` (Sharpe-type), `MaximumReturn`.
 
 **Solver**
-Wraps a single external backend (Clarabel, HiGHS, …): solver module, settings, name, and `check_sol` kwargs passed to JuMP's `is_solved_and_feasible` to validate a solution at runtime.
+A wrapper around a single external backend (Clarabel, HiGHS, …): its module, settings, name, and the checks that validate a returned solution.
 
 **JuMPOptimiser**
-The shared JuMP model configuration: one or more `Solver`s (fallback chains) plus JuMP-level settings. The execution environment consumed by all JuMP-based optimisers.
+The shared JuMP model configuration: one or more `Solver`s as a fallback chain, plus JuMP-level settings.
 
 **Model State**
-The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Reached only through its named interface, never by naming an entry directly; see Per-Build Risk State for which entries a nested build must keep to itself.
+The in-flight state of the JuMP model as it is built: the shared variables, expressions and scales that successive constraint and risk builders read and write.
 
 **Per-Build Risk State**
-The part of Model State that belongs to *one* risk build rather than to the model as a whole, and so must not be shared with a build nested inside it. Two things qualify: anything that is a function of the weights being optimised — a nested build (risk tracking) shifts those weights, so the inner and outer answers genuinely differ — and any presence flag that gates a formulation choice for the build that set it. Everything else is a pure function of the Prior, identical in both builds, and is correctly shared: treating it as per-build would break sharing rather than protect it. The distinction decides correctness, not tidiness: getting it wrong makes a nested build silently read its parent's state.
+The part of Model State belonging to one risk build rather than to the model as a whole, and so not shared with a build nested inside it.
 
 **Model Assembly**
-The fixed sequence in which a single-JuMP-model Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one — the steps between shaping the weight variables and setting the objective. Shared by MeanRisk, Risk Budgeting, Relaxed Risk Budgeting, Factor Risk Contribution, and constrained Near Optimal Centering; the per-optimiser parts (how weights are shaped, the objective, the solve) sit outside it. Distinct from Model State: Model State is the data the builders read and write, Model Assembly is the ordering of the builders themselves.
+The fixed sequence in which an Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one. Distinct from Model State, which is the data those builders read and write.
 
 **Objective Penalty**
-The accumulator through which every *soft* contribution reaches the objective — built-in regularisation, soft Turnover and Tracking, and user-supplied Custom Objective Terms alike. It exists because the objective's optimisation *sense* varies (some objectives are minimised, some maximised, and a ratio objective is either depending on the risk measure), so contributions are expressed once, sense-free, and the sense-correct factor is applied centrally when the accumulator is folded into the objective. A contribution always worsens the objective; a reward is a negative contribution. Distinct from a hard constraint, which bounds the feasible region rather than pricing a preference.
+The accumulator through which every *soft* contribution reaches the objective: regularisation, soft Turnover and Tracking, and Custom Objective Terms. A contribution always worsens the objective, so a reward is a negative contribution.
 
-**Custom Term** (the extension point)
-The user-facing escape hatch for expressing a preference the library does not already name: a Custom Objective Term prices one (through the Objective Penalty), a Custom Constraint mandates one. Both are supplied as inputs to the JuMPOptimiser and both are reached during Model Assembly, receiving the model under construction, the outer Optimisation Estimator, and the processed problem data. A term that names itself as one but supplies no builder is an error, not a no-op.
+**Custom Term**
+The user-facing extension point for a preference the library does not name: a Custom Objective Term prices one, a Custom Constraint mandates one.
 
 ### 4.4 Constraints
 
-**Asset Sets**
-A user-defined mapping of assets to named groups (sectors, countries), groups of assets, or unique-member groups. Always user-defined, though code can generate them (e.g. from Phylogeny). The foundational input to nearly all Constraint Generation.
+**Universe Sets**
+A user-defined mapping of names to named groups (sectors, countries), groups, or unique-member groups, declaring every axis it carries: assets, factors and features. The foundational input to nearly all Constraint Generation.
+
+**Constraint Space**
+The basis a constraint's names resolve in. Assets are the absence of a re-basis; `FactorSpace` is the only member, declared by the `ExposureConstraintEstimator` wrapper.
+
+**Factor Exposure Constraint**
+A linear constraint on a portfolio's factor weights, written in factor names and projected through the loadings.
 
 **Constraint Generation**
-User-facing utilities converting high-level specifications into the numeric form optimisers need (linear systems or bounds). Built on Asset Sets. Concepts:
+The user-facing utilities converting high-level specifications into the numeric form optimisers need. Built on Universe Sets:
 
-- **LinearConstraint / LinearConstraintEstimator**: parses equations into `A·w ≤/= B` (`PartialLinearConstraint`, `ParsingResult`).
-- **WeightBounds**: per-asset lower/upper bounds (scalar = same for all; vector = per asset). `UniformValues` gives `1/N…1`. Group-level sum bounds are linear constraints, not Weight Bounds.
-- **RiskBudget**: per-asset/group risk-contribution targets.
-- **Phylogeny constraints**: `SemiDefinitePhylogeny` (SDP coupling) and `IntegerPhylogeny` (cardinality/grouping); `CentralityConstraint` constrains by centrality.
-- **Threshold**: buy-in thresholds (minimum non-zero position size).
+- **LinearConstraint / LinearConstraintEstimator**: parses equations into `A·w ≤/= B`.
+- **ExposureConstraintEstimator**: re-bases a linear constraint into another Constraint Space.
+- **WeightBounds**: per-asset lower and upper bounds. Group-level sum bounds are linear constraints, not Weight Bounds.
+- **RiskBudget**: per-name or per-group risk-contribution targets.
+- **Phylogeny constraints**: `SemiDefinitePhylogeny` (SDP coupling) and `IntegerPhylogeny` (cardinality and grouping); `CentralityConstraint` constrains by centrality.
+- **Threshold**: buy-in thresholds, the minimum non-zero position size.
 - **AssetSetsMatrixEstimator**: builds binary group-membership matrices.
 
 **JuMP Constraints**
-The layer adding numeric constraint data into a JuMP model. Includes budget constraints (`BudgetRange` = sum-of-weights interval, `BudgetCosts` = linear transaction costs, `BudgetMarketImpact` = power-law impact), `LpRegularisation`, plus Turnover, Tracking, and Fees constraints.
+The layer adding numeric constraint data into a JuMP model: the budget constraints, `LpRegularisation`, and the Turnover, Tracking and Fees constraints.
 
 **Net vs Gross Budget**
-`bgt` is the *net* exposure `1ᵀw`; `sbgt` the short side; `gbgt` the *gross* exposure (leverage) `‖w‖₁`. `bgt` and `sbgt` constrain net and gross only **together** — pinning both gives `1ᵀw = bgt` and `‖w‖₁ = bgt + 2·sbgt` — so `gbgt` exists for the combination they cannot reach: gross pinned with net free (the market-neutral portfolio). A number pins it, a `BudgetRange` bounds it (a leverage cap). It requires bounds admitting shorts, and is rejected when `bgt` and `sbgt` already determine the gross exposure.
+`bgt` is the net exposure `1ᵀw`, `sbgt` the short side, and `gbgt` the gross exposure or leverage `‖w‖₁`. `gbgt` exists for the combination the other two cannot reach: gross pinned with net free.
 
-**Exact vs Bounded Budgets** (`xbgt`, `miprb`)
-The long/short variables `lw`/`sw` are *upper bounds* on the parts of `w`, not equal to them, so by default every budget built on them **bounds** the realised exposure rather than pinning it: `sbgt = 0.3` means *at most* 30% short. The objective normally pushes against the budget, making the bound tight, but it is not the same problem. Pinning the decomposition needs a per-asset *sign* bit and the big-M constraints keyed on it, so the budgets hold exactly — turning a linear program into a mixed-integer one, which is why it is opt-in. (The MIP complementarity used by threshold/fee constraints forces the long-xor-short *sign pattern* but does **not** close this slack; pinning emits that pair *and* the two constraints that close it.)
-
-Two callers want this, and they are one request routed through the **head contract** (`decomposition_contract`, in Model State): an explicit `xbgt` under a head whose `lw`/`sw` merely *bound* `w` (`PartsBoundWeights`), and risk budgeting's head, which makes `w = lw − sw` an *identity* (`WeightsFromParts`) and so asks for the pin by construction with no flag — the mechanism the old `miprb_flag` named. Both route to `set_exact_budget_constraints!`, which reads the contract back off the model and emits what it needs (the identity needs only the pin-pair; the bound needs two more constraints to close the slack).
-
-The sign bit need not be new. When the model already runs `short_mip_threshold_constraints` for a threshold / fee / cardinality feature, its `ilb`/`isb` already mean long and short and the exact-budget constraints reuse them — `i_mip = ilb + isb` stays the *held* bit that `card` counts. Only when *nothing else* consumes a held indicator does pinning declare its own: `sign_mip_constraints` adds a single sign bit `xb` per asset (`N` binaries, not the `2N` of a full long-short split), because the sign split is total — `w_i = 0` satisfies both `w_i ≥ 0` and `w_i ≤ 0` — so the inactive third state a held builder carries is dead weight. The long-only `mip_constraints` cannot serve it either: its `ib` means *held* and carries no sign, and a sign bit and a held bit are different bits. `xbgt` is ignored when the weight bounds admit no shorts, and is applied by `set_mip_constraints!` rather than `set_weight_constraints!`, since the budgets are built before the binaries that pin them exist.
+**Exact vs Bounded Budgets**
+The distinction between a budget that *bounds* the realised exposure and one that *pins* it. Pinning needs a per-asset sign bit, which makes the problem mixed-integer, so it is opt-in.
 
 **Time-Dependent Input (Schedule)**
-An optimiser input whose value changes across the folds of a cross-validation scheme instead of being fixed for the whole horizon. Historically "time-dependent constraint" — constraint inputs were the first to vary — but the concept spans every **problem-definition** input.
-An input may be time-dependent **iff it is problem definition** — what is being solved: priors, returns, risk measures, objectives, constraints, weight finalisers, asset sets, warm starts, fallbacks, the meta-optimisers' inner/outer optimisers — never **execution control** — how it is solved: solvers, JuMP scaling factors, RNGs and seeds, strictness flags, a meta's own inner cross-validation scheme. The widened constructor signatures encode the criterion and are the admissibility table.
-Expressed by storing a per-fold sequence of values — or a callable (a function, or a functor struct that can additionally declare its previous-weights needs as inspectable data) computing the value from the fold's Time-Dependent Context — *directly in the optimiser input it varies*, so an input holds either a static value or a schedule, never both, and the input's position names what varies. Schedules never nest, but an estimator swapped in by a schedule may carry schedules in its own inputs — those resolve against the same fold's context after the swap.
-Entry *i* corresponds to fold *i* of the consuming scheme's split enumeration; the machinery imposes no ordering of its own, so where that enumeration is not a timeline (combinatorial splits, randomised paths) keying entries to time is the user's responsibility. For an input that itself accepts a vector of constraints, entry *i* is fold *i*'s whole vector (a vector of vectors); there is no separate "vector of schedules" — to vary individual entries within a constraint vector, build the fold's vector inside a callable.
-A time-dependent input participates only where folds exist and is inert everywhere else — a plain (fold-less) optimisation, including a meta-optimiser's full-window solve, resolves the schedule to its own explicit `default` if it carries one, else to the input's static default; a *required* input with neither (the optimiser-valued positions) fails closed with a structured error.
-Which fold loop consumes a schedule is chosen by its `bind`: the default `:outermost` binds it to the outermost fold loop (so an inner estimator's schedule under an outer backtest is sized to the outer folds), while `:nearest` binds it to the nearest enclosing loop — inside a meta-optimiser's inner estimators, the meta's own cross-validation leg, which consumes it (sized to the inner folds) even under an outer backtest. Entitlement to `:nearest` is per *input*, not per host: an input a host hands across its own inner fold loop belongs to that inner loop, whatever loop reaches the host. Either way a schedule must be sized to the folds of the loop that consumes it.
+An optimiser input whose value changes across the folds of a cross-validation scheme instead of being fixed for the whole horizon. Only **problem definition** may vary this way, never **execution control**.
 
 **Schedule of Optimisers**
-A Time-Dependent Input whose per-fold values are whole optimisers — so the *strategy itself* varies over the backtest (e.g. regime switching). Lives in two positions: handed to cross-validation directly as the optimiser (fold *i* runs entry *i*), or held in an optimiser-valued input (a fallback, a meta-optimiser's inner/outer optimisers, a Pipeline's optimisation step). Entries may mix estimators and precomputed Optimisation Results — a fold optimises or predicts depending on what its entry is — except under asset-subsampling cross-validation, where a solved result has no asset-subset view and is rejected. Optimiser positions are required inputs, so a schedule there must state its fold-less `default` explicitly. `:nearest` binding is legal only where an inner fold loop actually consumes the position (NestedClustered's inner optimiser as a whole; an individual Stacking candidate) and is rejected at construction everywhere else, fallbacks included.
+A Time-Dependent Input whose per-fold values are whole optimisers, so the strategy itself varies over the backtest.
 
 **Time-Dependent Context**
-The per-fold information handed to a function-form Time-Dependent Input: the fold's position in the scheme's split enumeration (which indexes the fold index vectors, so a function can always identify its own training and test windows), the fold count, the fold's data (the possibly asset-viewed returns; for Pipeline fold loops, the raw pre-preprocessing input), and — only when previous weights are threaded — the previous fold's weights.
+The per-fold information handed to a function-form Time-Dependent Input: the fold's position and count, its data, and the previous fold's weights where those are threaded.
+
+**Time-Dependent Callable**
+A struct, rather than a bare function, that computes a Time-Dependent Input's per-fold value from the Time-Dependent Context. Its parameters are data, and it declares a previous-weights need as a trait. A member declares what it returns: a constraint value, or an optimiser.
 
 **Weight Finaliser**
-Post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
+A post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
 
 **Turnover**
-Measures/constrains change relative to a reference. Dynamic (vs previous weights, needs them at runtime) or fixed (vs static target). Soft penalty or hard constraint.
+The change in the portfolio relative to a reference, either the previous weights or a static target. Usable as a soft penalty or a hard constraint.
 
 **Tracking Error**
-Measures/constrains closeness to a benchmark/target. `WeightsTracking` (vs a reference weight vector — needs a weight vector, not necessarily *previous*) or `ReturnsTracking` (vs a benchmark return series). Return tracking formulations: LxNorm error family (norm-based errors). Risk tracking formulations: `IndependentVariableTracking` / `DependentVariableTracking` (variable). Soft penalty or hard constraint.
+The closeness of the portfolio to a benchmark or target: `WeightsTracking` against a reference weight vector, `ReturnsTracking` against a benchmark return series.
 
 ### 4.5 Meta-optimisers
 
 Wrap and compose other optimisers, using Cross-Validation to estimate inner out-of-sample returns:
 
 - **NestedClustered (NCO)**: optimise within clusters, then across clusters.
-- **Stacking**: combine several base optimisers' weights via a meta-optimiser.
-- **SubsetResampling**: average optimisations over many asset/observation subsets for robustness.
+- **Stacking**: combine several base optimisers' weights through a meta-optimiser.
+- **SubsetResampling**: average optimisations over many asset or observation subsets.
+
+**Sub-Portfolio**
+The unit a meta-optimiser solves one inner problem for, and one asset of the synthetic universe its outer optimiser allocates over. NCO's sub-portfolios are cluster index sets; Stacking's are its inner optimisers.
 
 ### 4.6 Cross-Validation
 
-Used for (1) hyperparameter tuning and (2) out-of-sample evaluation; also supplies inner out-of-sample returns to meta-optimisers. Axes: **optimisation vs non-optimisation**, **sequential (time-aware) vs non-sequential**. Schemes:
+Used for hyperparameter tuning and for out-of-sample evaluation, and to supply inner out-of-sample returns to meta-optimisers. The axes are **optimisation vs non-optimisation** and **sequential (time-aware) vs non-sequential**. Schemes:
 
-- **KFold**: k-fold with optional purging/embargoing.
-- **CombinatorialCrossValidation**: all train/test combinations (multi-path).
-- **WalkForward**: `IndexWalkForward` / `DateWalkForward` for time series (purging, windowing; `DateAdjusterEstimator` for date alignment).
-- **MultipleRandomised**: random asset subsets × rolling windows.
-- **Search**: `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` (scorers `HighestMeanScore`, `NearestQuantilePrediction`; `PredictionScorer` vs `PopulationScorer`).
+- **KFold**: k-fold with optional purging and embargoing.
+- **CombinatorialCrossValidation**: all train/test combinations, giving multiple paths.
+- **WalkForward**: `IndexWalkForward` / `DateWalkForward` for time series.
+- **MultipleRandomised**: random asset subsets crossed with rolling windows.
+- **Search**: `GridSearchCrossValidation`, `RandomisedSearchCrossValidation`.
 
-Result types: `PredictionResult`, `MultiPeriodPredictionResult`, `PopulationPredictionResult`, `PredictionReturnsResult`.
+**Fold Loop**
+The one loop every cross-validation entry point runs. Per fold it resolves the estimator, views the data, swaps the Time-Dependent Inputs, and hands the callback one Fold.
+
+**Fold**
+The record the Fold Loop hands its callback: the fold's index and count, its already-resolved estimator, its already-viewed data, and its own training and test index vectors.
 
 ### 4.7 Finite Allocation (post-processing)
 
-Discretises continuous weights into whole shares for a fixed cash budget (real-world: no fractional shares).
+Discretises continuous weights into whole shares for a fixed cash budget, since real markets have no fractional shares.
 
-- **DiscreteAllocation**: MIP-based exact allocation (needs a MIP solver).
+- **DiscreteAllocation**: MIP-based exact allocation.
 - **GreedyAllocation**: heuristic greedy rounding.
 
 **FiniteAllocationInput**
-The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, and optional time horizon / fees. Shared by both `DiscreteAllocation` and `GreedyAllocation`, and passed as the single positional argument to `optimise`. Subtypes `AbstractEstimator` — deliberately treated as a configuration object (the primary input to `optimise`) rather than as a computed output, keeping the `Result` tree reserved for outputs and staying clear of the `plot_*`/`OptimisationResult` dispatch surface. This makes it the one pure-data struct classified as an Estimator (the `WeightBounds`/`RiskBudget` precedent puts data under the Result tree); the deviation is intentional so the allocation *inputs* never collide with allocation *results*.
+The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, and optional horizon and fees.
 *Avoid*: FiniteAllocation (that is the family), AllocationProblem, AllocationInput.
 
 ## 5. Risk Measures
 
 **Risk Measure**
-Quantifies portfolio risk. Three-way split by legal usage: **Optimisation** (has a JuMP formulation; usable as objective/constraint), **Non-Optimisation** (analysis only; may be negative or non-formulable), **Hierarchical** (no JuMP formulation but valid as a clustering risk proxy).
+Quantifies portfolio risk. The three-way split by legal usage is **Optimisation** (has a JuMP formulation, so it can serve as objective or constraint), **Non-Optimisation** (analysis only) and **Hierarchical** (no JuMP formulation, but valid as a clustering risk proxy).
 
 **Risk Input Kind**
-A classification of a risk measure *orthogonal* to the legal-usage split above: what the measure consumes when its expected risk is evaluated. Three kinds — **net-returns** (a function of the portfolio's net-return series), **weights-returns-fees** (needs the weights, the asset-return matrix, and fees together — the moment families and tracking), and **weights-only** (a function of the weights alone — the variance/standard-deviation family). A measure sits on this axis independently of whether it is Optimisation, Non-Optimisation, or Hierarchical, so the two axes are stated separately.
+A classification orthogonal to legal usage: what a measure consumes when its expected risk is evaluated. The three kinds are **net-returns**, **weights-returns-fees** and **weights-only**.
 
 **Precomputed-returns contract**
-The rule for evaluating a risk measure on an *already-reduced* net-return series the caller holds directly, with no weights to apply (e.g. an out-of-sample portfolio return series, or a single asset's return column). Well-defined exactly when the measure's result is a function of the series alone: the net-returns measures, and the moment families whose target is weight-independent. It is undefined for weights-only measures and for moment measures carrying a per-asset target — these need the weights the bare series no longer carries — and asking for it there is a defined error, never a silent wrong number.
+The rule for evaluating a risk measure on an already-reduced net-return series the caller holds directly, with no weights to apply. It is well defined only where the result is a function of the series alone.
 
-The `XatRisk` naming uses "X" as shorthand for "Value" or "Drawdown" — the same family applied to returns or to drawdowns. "Relative" variants are the hierarchical drawdown forms; "Range" variants penalise the gap between upper and lower tails; "Distributionally Robust (DR)" variants optimise against worst-case scenario distributions.
+**XatRisk**
+The naming convention in which "X" stands for "Value" or "Drawdown", the same family applied to returns or to drawdowns. *Relative* variants are the hierarchical drawdown forms, *Range* variants penalise the gap between the two tails, and *Distributionally Robust (DR)* variants optimise against worst-case scenario distributions.
+
+**Range Tails**
+The two point measures a Range variant is the sum of: the **loss** tail on the net portfolio returns, and the **gain** tail on their negation at the range's second level.
+
+**Risk Series**
+The per-observation series a conic tail measure reduces. Two exist: the net portfolio returns, and the negated drawdown path. Both are signed as returns, so a loss is a negative entry.
 
 ### Settings & combination
 
-- **RiskMeasureSettings / HierarchicalRiskMeasureSettings / MaxRiskMeasureSettings**: per-measure config (scaling, bounds, direction).
-- **Scalariser**: combines multiple risk measures into one scalar — `SumScalariser`, `MaxScalariser`, `MinScalariser`, `LogSumExpScalariser`.
-- **Frontier / FrontierBoundEstimator**: efficient-frontier point count and bound transforms (`LinearBound`, `SquareRootBound`, `SquaredBound`).
+- **Risk Measure Settings**: the per-measure configuration of scaling, bounds and direction — `RiskMeasureSettings`, `HierarchicalRiskMeasureSettings`, `MaxRiskMeasureSettings`.
+- **Scalariser**: combines several risk measures into one scalar — `SumScalariser`, `MaxScalariser`, `MinScalariser`, `LogSumExpScalariser`. There is no return-side counterpart: several return terms are always a weighted sum.
+- **Degeneracy Guard**: the refusal an optimiser or objective makes when the expression it reads is identically zero.
+- **Combination Weight**: the weight an element carries inside a combination of *several* elements, and inert on a lone element. The elements combined are risk measures, return terms, sub-portfolios, or whole portfolios.
+- **Frontier / FrontierBoundEstimator**: the efficient-frontier point count and the bound transforms `LinearBound`, `SquareRootBound`, `SquaredBound`.
+- **Frontier Sweep**: the sequence of solves a bound-swept optimiser runs. It is a product: every swept entry on both axes joins the same enumeration.
 
 ### Dispersion / moment measures
 
-- **Variance**, **StandardDeviation**, **UncertaintySetVariance** (robust). Optimisation formulations: `QuadRiskExpr`, `SOCRiskExpr`, `SquaredSOCRiskExpr`, `RSOCRiskExpr`.
+- **Variance**, **StandardDeviation**, **UncertaintySetVariance** (robust).
 - **LowOrderMoment** (`FirstLowerMoment`, `MeanAbsoluteDeviation`, `SecondMoment`, `EvenMoment`) and **HighOrderMoment** (`ThirdLowerMoment`, `FourthMoment`, `StandardisedHighOrderMoment`).
 - **Kurtosis**, **Skewness**, **NegativeSkewness**, **VarianceSkewKurtosis** (composite), **ThirdCentralMoment**.
 - **MedianAbsoluteDeviation (MAD)**: centred by `MedianCentering` or `MeanCentering`.
 
 ### Quantile / tail measures (XatRisk)
 
-- **Value-at-Risk (VaR)**: `ValueatRisk` (formulations `MIPValueatRisk`, `DistributionValueatRisk`), `ValueatRiskRange`; drawdown forms `DrawdownatRisk`, `RelativeDrawdownatRisk`.
-- **Conditional (CVaR / Expected Shortfall)**: `ConditionalValueatRisk`, `…Range`, DR forms, drawdown `ConditionalDrawdownatRisk` (CDaR) and relatives.
-- **Entropic (EVaR)**: `EntropicValueatRisk`, `…Range`, `EntropicDrawdownatRisk` (EDaR), relatives.
-- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RLDaR), relatives.
-- **Power Norm**: `PowerNormValueatRisk` (PNVaR), `…Range`, `PowerNormDrawdownatRisk`, relatives.
+- **Value-at-Risk (VaR)**: `ValueatRisk`, `ValueatRiskRange`; drawdown forms `DrawdownatRisk`, `RelativeDrawdownatRisk`.
+- **Conditional (CVaR / Expected Shortfall)**: `ConditionalValueatRisk`, its Range and DR forms, and the drawdown `ConditionalDrawdownatRisk` (CDaR).
+- **Entropic (EVaR)**: `EntropicValueatRisk`, its Range form, and `EntropicDrawdownatRisk` (EDaR).
+- **Relativistic (RLVaR)**: `RelativisticValueatRisk`, its Range form, and `RelativisticDrawdownatRisk` (RLDaR).
+- **Power Norm**: `PowerNormValueatRisk` (PNVaR), its Range form, and `PowerNormDrawdownatRisk`.
 
 **OWA (Ordered Weights Array)**
-Weighted sum of *sorted* return realisations; weights generated by an Algorithm composing L-moments (`MaximumEntropy` with `ExponentialConeEntropy`/`RelativeEntropy`, `MinimumSquaredDistance`, `MinimumSumSquares`, `NormalisedConstantRelativeRiskAversion`). Formulations `ExactOrderedWeightsArray` (LP) / `ApproxOrderedWeightsArray` (p-norm). `OrderedWeightsArray`, `OrderedWeightsArrayRange`. Flexible enough to approximate CVaR and higher-moment criteria.
+A weighted sum of *sorted* return realisations, with weights generated by an Algorithm composing L-moments. Flexible enough to approximate CVaR and higher-moment criteria.
 
 ### Drawdown measures
 
@@ -393,40 +455,40 @@ Weighted sum of *sorted* return realisations; weights generated by an Algorithm 
 
 ### Other measures
 
-- **BrownianDistanceVariance (BDVar)**: distance-covariance-based dispersion (`NormOneConeBrownianDistanceVariance`, `IneqBrownianDistanceVariance`).
-- **WorstRealisation**: worst single-period loss.
-- **NoRisk**: contributes *no* risk term at all. Exists so a risk-taking optimiser can express a problem that genuinely has none — an objective ignoring risk would otherwise still build the default `Variance`, dragging cone constraints into what is a linear program (the robust best-characteristic portfolios; the global maximum return portfolio). Only coherent under an objective that never consults risk, so `MeanRisk` rejects it with `MinimumRisk` and `MaximumRatio`, and the optimisers whose formulation *is* their risk measure reject it outright.
-- **Range**: spread between best and worst realisations.
+- **BrownianDistanceVariance (BDVar)**: distance-covariance-based dispersion.
+- **WorstRealisation**: the worst single-period loss.
+- **NoRisk**: contributes no risk term at all, so a risk-taking optimiser can express a problem that genuinely has none.
+- **Range**: the spread between the best and worst realisations.
 - **TurnoverRiskMeasure**: turnover expressed as a risk quantity.
-- **TrackingRiskMeasure**: benchmark deviation measured as a **norm** of the portfolio-vs-benchmark difference.
-- **RiskTrackingRiskMeasure**: benchmark deviation measured through a configurable **risk measure `r`** applied to the portfolio-vs-benchmark difference (a `WeightsTracking` benchmark + risk measure + `VariableTracking` algorithm) — i.e. tracking the *risk* relative to a benchmark rather than the raw norm.
+- **TrackingRiskMeasure**: benchmark deviation measured as a *norm* of the portfolio-versus-benchmark difference.
+- **RiskTrackingRiskMeasure**: benchmark deviation measured through a configurable *risk measure* applied to that difference.
 - **EqualRisk**: enforces equal risk contributions (hierarchical).
 - **RiskRatio** / **NonOptimisationRiskRatio**: ratio-form measures for hierarchical use.
 
 ### Non-optimisation (analysis) measures
 
-- **ExpectedReturn**: scalar portfolio expected return given weights (reporting). Distinct from the per-asset mean vector in the Prior.
+- **ExpectedReturn**: the scalar portfolio expected return given weights. Distinct from the per-asset mean vector in the Prior.
 - **MeanReturn**, **ThirdCentralMoment**: reporting statistics.
-- **ExpectedReturnRiskRatio** / **MeanReturnRiskRatio**: configurable return-to-risk ratio — subsumes Sharpe, Calmar, Sortino, etc. via choice of risk measure.
+- **ExpectedReturnRiskRatio** / **MeanReturnRiskRatio**: a configurable return-to-risk ratio, subsuming Sharpe, Calmar and Sortino through the choice of risk measure.
 
 ## 6. Post-Processing
 
 **Net Returns**
-Portfolio returns adjusted for fees and turnover costs; computed before drawdowns.
+Portfolio returns adjusted for fees and turnover costs. Computed before drawdowns.
 
 **Drawdowns**
-Peak-to-trough declines computed from Net Returns; the input series to drawdown-based risk measures.
+Peak-to-trough declines computed from Net Returns, and the input series to drawdown-based risk measures.
 
 **Fees**
-Composite of holding/trading costs, each proportional to the relevant weight unless fixed: **long** (≈ management), **short** (≈ borrowing), **turnover** (≈ commission), and **fixed** (constant charge whenever the weight is non-zero). Feed Net Returns and can act as optimisation constraints.
+The composite of holding and trading costs: **long** (management), **short** (borrowing), **turnover** (commission) and **fixed** (a constant charge on any non-zero weight).
 
 **Finite Allocation**
-See §4.7 — discretising weights into whole shares within a cash budget.
+See §4.7: the discretisation of weights into whole shares within a cash budget.
 
 ## 7. Errors & Status
 
 **PortfolioOptimisersError**
-Base for library exceptions (`IsNothingError`, `IsEmptyError`, `IsNonFiniteError`, …) raised by argument validation.
+The base for library exceptions raised by argument validation.
 
 **OptimisationReturnCode**
-Status of an optimisation: `OptimisationSuccess` / `OptimisationFailure`.
+The status of an optimisation: `OptimisationSuccess` or `OptimisationFailure`.

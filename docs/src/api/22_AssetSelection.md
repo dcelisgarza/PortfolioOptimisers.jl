@@ -38,6 +38,8 @@ A [`RedundancySelector`](@ref) discards assets that duplicate information alread
 
 Leaving `score` as `nothing` falls back to the correlation algorithms' own survivor rule: the asset with the lowest summary correlation to the rest of the universe. [`ClusterGroups`](@ref) has no such fallback and requires a `score`.
 
+[`ClusterGroups`](@ref) is also the only redundancy algorithm that reaches a distance estimator — the other two carry a `StatsBase.CovarianceEstimator` — so it is the only one that can be driven by a feature matrix rather than by the returns. Give its `cle` a [`FeatureDistance`](@ref) and the redundancy groups come from exogenous structure: a sector taxonomy from [`asset_sets_features`](@ref) reduces the universe to one representative per classification, not per correlated blob. The matrix is read straight off `Z` on the [`ReturnsResult`](@ref), because preselection runs before any prior exists — there is no `z_src` to set here, and an optimiser's does not reach this call.
+
 ```@docs
 RedundancySelector
 PortfolioOptimisers.AbstractRedundancyAlgorithm

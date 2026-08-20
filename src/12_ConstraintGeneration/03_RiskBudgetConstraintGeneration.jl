@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudget(;
-        val::VecNum
+        val::Num_VecNum
     ) -> RiskBudget
 
 Keywords correspond to the struct's fields.
@@ -72,7 +72,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudgetEstimator(;
-        val::EstValType
+        val::EstValType,
+        dval::Option{<:Number} = nothing
     ) -> RiskBudgetEstimator
 
 Keywords correspond to the struct's fields.
@@ -99,7 +100,7 @@ RiskBudgetEstimator
 
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
     """
@@ -127,6 +128,8 @@ end
 Alias for a risk budget estimator or result.
 
 Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk budget constraints) or a [`RiskBudget`](@ref) result (a pre-computed risk budget allocation). Used internally to accept either form in constraint generation dispatch.
+
+There is no vector counterpart, and [`risk_budget_constraints`](@ref) has no vector method. A risk budget is one allocation over the whole universe, so an optimiser holds exactly one. This is the same reason [`WbE_Wb`](@ref) and [`FeesE_Fees`](@ref) are singular, and the reason [`TnE_Tn`](@ref), [`LcE_Lc`](@ref) and [`PlCE_PlC`](@ref) are not: several turnover, linear or phylogeny constraints can hold at once, and each of those does carry a vector alias and a broadcast method.
 
 # Related
 
@@ -206,24 +209,26 @@ function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)::RiskBudget
     return rb
 end
 """
-    risk_budget_constraints(rb::EstValType, sets::AssetSets,
-                            dval::Option{<:Number} = nothing; strict::Bool = false,
+    risk_budget_constraints(rb::EstValType, sets::UniverseSets,
+                            dval::Option{<:Number} = nothing,
+                            key::Option{<:AbstractString} = nothing; strict::Bool = false,
                             kwargs...)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
-This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`AssetSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Asset and group names are resolved using `sets`, and the resulting risk budget vector is normalised to sum to one.
+This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`UniverseSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Names are resolved against the universe `key` selects, and the resulting risk budget vector is normalised to sum to one.
 
 # Arguments
 
   - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
-  - `dval`: Default value to use for assets not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[sets.key])` is used.
+  - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
+  - `dval`: Default value to use for names not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[key])` is used.
+  - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes `sets.fkey`, because its budget is written in factor names.
   - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
 
 # Details
 
-  - Asset and group names in `rb` are mapped to indices in the asset universe using `sets`.
+  - Names and groups in `rb` are mapped to indices in the selected universe using `sets`.
   - If a key is a group, all assets in the group are assigned the specified value.
   - The resulting vector is normalised to sum to one.
   - If `strict` is `true`, missing keys cause an error; otherwise, a warning is issued.
@@ -235,36 +240,50 @@ This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group n
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; key = \"nx\", dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
+julia> sets = UniverseSets(; xkey = \"nx\",
+                           dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"group1\" => [\"A\", \"B\"]));
 
 julia> risk_budget_constraints(Dict(\"A\" => 0.2, \"group1\" => 0.8), sets)
 RiskBudget
   val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```
 
+A budget written in factor names resolves against the declared factor axis, which is what [`FactorRiskBudgeting`](@ref) passes — the unspecified factors take the `1/length(sets.dict[key])` default before normalisation:
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"nf\" => [\"F1\", \"F2\"]));
+
+julia> risk_budget_constraints(Dict(\"F1\" => 0.25), sets, nothing, sets.fkey)
+RiskBudget
+  val ┴ Vector{Float64}: [0.3333333333333333, 0.6666666666666666]
+```
+
 # Related
 
   - [`RiskBudget`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
 """
-function risk_budget_constraints(rb::EstValType, sets::AssetSets,
-                                 dval::Option{<:Number} = nothing; strict::Bool = false,
-                                 kwargs...)::RiskBudget
+function risk_budget_constraints(rb::EstValType, sets::UniverseSets,
+                                 dval::Option{<:Number} = nothing,
+                                 key::Option{<:AbstractString} = nothing;
+                                 strict::Bool = false, kwargs...)::RiskBudget
     if isnothing(dval)
-        dval = inv(length(sets.dict[sets.key]))
+        dval = inv(length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]))
     end
-    val = estimator_to_val(rb, sets, dval; strict = strict)
+    val = estimator_to_val(rb, sets, dval, key; strict = strict)
     return RiskBudget(; val = val / sum(val))
 end
 """
-    risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
-                            strict::Bool = false, kwargs...)
+    risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets,
+                            key::Option{<:AbstractString} = nothing; strict::Bool = false,
+                            kwargs...)
 
 This method is a wrapper calling:
 
-    risk_budget_constraints(rb.val, sets; strict = strict)
+    risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
 
@@ -272,14 +291,9 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
+function risk_budget_constraints(rb::RiskBudgetEstimator, sets::UniverseSets,
+                                 key::Option{<:AbstractString} = nothing;
                                  strict::Bool = false, kwargs...)::RiskBudget
-    return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
+    return risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict, kwargs...)
 end
-# const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
-# function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
-#                                  kwargs...)
-#     return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
-# end
-
 export RiskBudget, RiskBudgetEstimator, risk_budget_constraints

@@ -12,9 +12,9 @@
                      settings = Dict("log_to_console" => false),
                      check_sol = (; allow_local = true, allow_almost = true))
     da = DiscreteAllocation(; slv = mip_slv)
-    sets = AssetSets(;
-                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                                 "group2" => rd.nx[2:2:end]))
+    sets = UniverseSets(;
+                        dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                    "group2" => rd.nx[2:2:end]))
     fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = Dict("BAC" => 0.001)),
                          l = Dict("group2" => 0.002), s = Dict("group1" => 0.003),
                          fl = Dict("XOM" => 0.005, "WMT" => 0.005, "LLY" => 0.005),
@@ -88,11 +88,14 @@
         @test isapprox(rtf, rt - f)
         @test isapprox(srf, expected_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf))
         @test isapprox(sr, expected_ratio(r, res.ret, res.w, pr; rf = rf))
-        @test isapprox(sric, expected_sric(r, res.ret, res.w, pr, fes[1]; rf = rf))
+        @test isapprox(sric, expected_sric(r, res.ret, res.w, pr; rf = rf))
+        @test isapprox(srfic, expected_sric(r, res.ret, res.w, pr, fes[1]; rf = rf))
         @test all(isapprox.((rk, rtf, srf),
                             expected_risk_ret_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)))
         @test all(isapprox.((rk, rt, sric),
                             expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)))
+        @test all(isapprox.((rk, rtf, srfic),
+                            expected_risk_ret_sric(r, res.ret, res.w, pr, fes[1]; rf = rf)))
 
         @test isapprox(expected_risk(ExpectedReturn(), res.w, pr, fes[1]),
                        rt - calc_fees(res.w, fes[1]))

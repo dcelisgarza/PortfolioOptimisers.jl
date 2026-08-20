@@ -23,12 +23,24 @@ Stores the optimisation estimator, prior result, weight bounds, clustering resul
 
 $(DocStringExtensions.FIELDS)
 
+## The measure is on the result, and the result is flat
+
+Schur joins [`HierarchicalOptimisationResult`](@ref) — it embeds a [`HierarchicalOptimiser`](@ref), which is the family's membership rule — but it keeps its own flat field block rather than embedding [`HierarchicalResult`](@ref). Its field set genuinely differs: it carries `gamma`, and it has **no** `fees` field.
+
+It carries **no scalariser**, because it carries no vector of measures to combine. `SchurComplementParams.r` is bounded [`Sd_Var`](@ref), so Schur takes one standard deviation or one variance.
+
+!!! warning
+
+    On the **multi-bundle** path `r` is a vector, and the blend is over **portfolios**, not risks: the loop accumulates `w .+= ps.r.settings.scale * wi`. So `expected_risk(res.r, res.w, res.pr)` reports the measure-scalarised figure on the blended weights, which is **not** the number Schur computed. On the single-bundle path, which is the default, the same call is exactly right.
+
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct SchurComplementHierarchicalRiskParityResult <: NonJuMPOptimisationResult
+@concrete struct SchurComplementHierarchicalRiskParityResult <:
+                 HierarchicalOptimisationResult
     """
     $(field_dict[:pr])
     """
@@ -41,6 +53,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:clr])
     """
     clr
+    """
+    $(field_dict[:r_res_schur])
+    """
+    r
     """
     $(field_dict[:gamma_schur])
     """
@@ -60,22 +76,26 @@ $(DocStringExtensions.FIELDS)
     function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
+                                                         r::Union{<:Sd_Var, <:VecBaseRM},
                                                          gamma::Union{<:Number, <:VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          fb::Option{<:OptE_Opt})
-        return new{typeof(pr), typeof(wb), typeof(clr), typeof(gamma), typeof(retcode),
-                   typeof(w), typeof(fb)}(pr, wb, clr, gamma, retcode, w, fb)
+        return new{typeof(pr), typeof(wb), typeof(clr), typeof(r), typeof(gamma),
+                   typeof(retcode), typeof(w), typeof(fb)}(pr, wb, clr, r, gamma, retcode,
+                                                           w, fb)
     end
 end
 function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
+                                                     r::Union{<:Sd_Var, <:VecBaseRM},
                                                      gamma::Union{<:Number, <:VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, gamma, retcode, w, fb)
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, r, gamma, retcode, w,
+                                                       fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -177,7 +197,7 @@ $(DocStringExtensions.FIELDS)
     SchurComplementParams(;
         r::Sd_Var = Variance(),
         gamma::Number = 0.5,
-        pdm::Option{<:Posdef} = Posdef(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
         flag::Bool = true
     ) -> SchurComplementParams
@@ -214,7 +234,8 @@ Keywords correspond to the struct's fields.
     $(field_dict[:flag])
     """
     flag
-    function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
+    function SchurComplementParams(r::Sd_Var, gamma::Number,
+                                   pdm::Option{<:AbstractPosdefEstimator},
                                    alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma),
                   DomainError(gamma, "gamma must be in [0, 1]"))
@@ -226,7 +247,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function SchurComplementParams(; r::Sd_Var = Variance(), gamma::Number = 0.5,
-                               pdm::Option{<:Posdef} = Posdef(),
+                               pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)::SchurComplementParams
     return SchurComplementParams(r, gamma, pdm, alg, flag)
@@ -400,6 +421,7 @@ SchurComplementHierarchicalRiskParity
          │          │   iter ┴ Int64: 100
          │      brt ┼ Bool: false
          │    x_src ┼ Symbol: :prior
+         │    z_src ┼ Symbol: :data
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
@@ -443,6 +465,8 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -703,7 +727,9 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
             w[rc] .*= one(alpha) - alpha
         end
     end
-    return w, gamma
+    # The resolved measure is threaded out beside `gamma`. It is computed here and was
+    # discarded before, so the result had no way to name what it optimised.
+    return w, gamma, r
 end
 """
     schur_complement_binary_search(objective, lgamma, hgamma, ...)
@@ -753,7 +779,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
         end
     end
     msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-    strict ? throw(ArgumentError(msg)) : @warn(msg)
+    strict_diagnostic(msg, strict)
     return w, lgamma
 end
 """
@@ -781,7 +807,8 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
         nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                           alg = NonMonotonicSchurComplement(),
                                           flag = params.flag)
-        return schur_complement_weights(pr, items, wb, nm_params)
+        wi, gi, _ = schur_complement_weights(pr, items, wb, nm_params)
+        return wi, gi, r
     end
     nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                       alg = NonMonotonicSchurComplement(), flag = false)
@@ -801,19 +828,21 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
         if risk >= risks[i - 1]
             # Turning point is strictly between [gammas[i-2], gammas[i]].
             lidx = max(1, i - 2)
-            return schur_complement_binary_search(objective, gammas[lidx], gammas[i],
-                                                  risks[lidx], params.alg.tol,
-                                                  params.alg.iter, params.alg.strict)
+            wi, gi = schur_complement_binary_search(objective, gammas[lidx], gammas[i],
+                                                    risks[lidx], params.alg.tol,
+                                                    params.alg.iter, params.alg.strict)
+            return wi, gi, r
         end
     end
     # If there's no turning point in the range of gammas, check the derivative at the last gamma.
     if risk <= objective(max_gamma - params.alg.tol)[2]
-        return w, max_gamma
+        return w, max_gamma, r
     end
     # If the turning point exists and was not found within the range, or the last gamma, it is between the last two gammas.
-    return schur_complement_binary_search(objective, gammas[end - 1], gammas[end],
-                                          risks[end - 1], params.alg.tol, params.alg.iter,
-                                          params.alg.strict)
+    wi, gi = schur_complement_binary_search(objective, gammas[end - 1], gammas[end],
+                                            risks[end - 1], params.alg.tol, params.alg.iter,
+                                            params.alg.strict)
+    return wi, gi, r
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -834,14 +863,16 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = sh.opt.x_src)
+                     x_src = sh.opt.x_src, z_src = sh.opt.z_src)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
-    w, gamma = schur_complement_weights(pr, items, wb, sh.params)
+    w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr, r = r,
                                                        gamma = gamma, retcode = retcode,
                                                        w = w, fb = nothing)
 end
@@ -864,23 +895,28 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = sh.opt.x_src)
+                     x_src = sh.opt.x_src, z_src = sh.opt.z_src)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
     params = sh.params
     gammas = Vector{eltype(X)}(undef, length(params))
+    rs = Vector{Any}(undef, length(params))
     w = zeros(eltype(X), size(X, 2))
     for (i, ps) in enumerate(params)
-        wi, gamma = schur_complement_weights(pr, items, wb, ps)
+        wi, gamma, ri = schur_complement_weights(pr, items, wb, ps)
         w .+= ps.r.settings.scale * wi
         gammas[i] = gamma
+        rs[i] = ri
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
     return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
-                                                       gamma = gammas, retcode = retcode,
-                                                       w = w, fb = nothing)
+                                                       r = [rs...], gamma = gammas,
+                                                       retcode = retcode, w = w,
+                                                       fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
@@ -894,6 +930,10 @@ Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
   - $(arg_dict[:rd]) If `isa(sh.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Details
+
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
 
 # Related
 

@@ -115,10 +115,7 @@ julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
            sigma = X * X'
@@ -127,10 +124,7 @@ julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimiser
 
 julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = X * X'
@@ -240,10 +234,7 @@ julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = LinearAlgebra.diag(X * X')
@@ -252,10 +243,7 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = sqrt.(LinearAlgebra.diag(X * X'))
@@ -362,10 +350,7 @@ julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
-           PortfolioOptimisers.assert_dims(dims)
-           if dims == 2
-               X = X'
-           end
+           X = PortfolioOptimisers.dims_oriented(dims, X)
            w = isnothing(est.w) ? fill(one(eltype(X)), size(X, 1)) : est.w
            X = X .* w
            mu = sum(X; dims = 1) / sum(w)
@@ -581,6 +566,33 @@ function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 
                               Statistics.std(ce.ve, X; dims = dims, kwargs...))
 end
 """
+    densify(X::MatNum) -> MatNum
+
+Materialise a lazy or sparse observation matrix as a dense `Matrix`.
+
+`StatsBase`'s weighted moment API is typed on `DenseMatrix`. A `Transpose`, an `Adjoint`, a `SubArray` or a sparse matrix does not match it. Without a `mean` the call raises a `MethodError`, which is recoverable. With a `mean` it is not: `cov(::SimpleCovariance, X, w; mean = mu)` forwards four positional arguments as `covm(X, mu, w, dims)`, and when the `DenseMatrix` method does not match, that call resolves to `Statistics.covm(x, xmean, y, ymean, vardim)` — the **cross-covariance of `X` against the weight vector**. It returns an `N × 1` matrix in place of an `N × N` one and raises nothing. [`robust_cov`](@ref) and [`robust_cor`](@ref) densify before every weighted call so that neither outcome is reachable.
+
+# Arguments
+
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `X::MatNum`: `X` itself when it is already a dense `Matrix`, and `Matrix(X)` otherwise.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`robust_cov`](@ref)
+  - [`robust_cor`](@ref)
+"""
+function densify(X::DenseMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}})
+    return X
+end
+function densify(X::MatNum)
+    return Matrix(X)
+end
+"""
     compat_cov(
         ce::StatsBase.CovarianceEstimator,
         X::MatNum,
@@ -644,7 +656,7 @@ end
         kwargs...
     ) -> MatNum
 
-Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+Computes the optionally weighted covariance with [`compat_cov`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Arguments
 
@@ -662,16 +674,19 @@ Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `
 # Details
 
   - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-covariance there without raising.
 
 # Related
 
   - [`MatNum`](@ref)
+  - [`densify`](@ref)
   - [`compat_cov`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
     catch err
@@ -683,14 +698,8 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
 end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
-    return try
-        compat_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cov(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
-    end
+    assert_dims(dims)
+    return compat_cov(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
 end
 """
     compat_cor(
@@ -773,7 +782,7 @@ end
         kwargs...
     ) -> MatNum
 
-Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+Computes the optionally weighted correlation with [`compat_cor`](@ref) on dense observations. The unweighted method retries once with a densified `Matrix` after a `MethodError`. The weighted method calls [`densify`](@ref) before the estimator.
 
 # Arguments
 
@@ -791,16 +800,19 @@ Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `
 # Details
 
   - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The unweighted method calls the estimator on `X` as given. If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+  - The weighted method calls [`densify`](@ref) first. `StatsBase`'s weighted API is typed on `DenseMatrix`, and a lazy `X` can resolve to a cross-correlation there without raising.
 
 # Related
 
   - [`MatNum`](@ref)
+  - [`densify`](@ref)
   - [`compat_cor`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cor/)
 """
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    assert_dims(dims)
     return try
         compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
     catch err
@@ -812,14 +824,8 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
 end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
-    return try
-        compat_cor(ce, X, w; dims = dims, mean = mean, kwargs...)
-    catch err
-        if !(err isa MethodError)
-            rethrow()
-        end
-        compat_cor(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
-    end
+    assert_dims(dims)
+    return compat_cor(ce, densify(X), w; dims = dims, mean = mean, kwargs...)
 end
 """
     moment_window_and_weights(
@@ -941,7 +947,9 @@ stays aligned with the windowed returns. Only `window = nothing`, which resolves
   - `X`: Data matrix of asset returns.
   - `iv`: Optional instrument variable matrix; subsetted to the window when `window` is a
     `VecInt`.
-  - `dims`: Observation dimension — 1 for rows (default), 2 for columns.
+  - `dims`: Observation dimension — 1 for rows (default), 2 for columns. Checked by
+    [`assert_dims`](@ref), so every generated windowed method rejects an out-of-range `dims`
+    instead of silently resolving a one-observation window.
   - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref).
 
 # Returns
@@ -964,6 +972,7 @@ stays aligned with the windowed returns. Only `window = nothing`, which resolves
 function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
                            X::MatNum; iv::Option{<:MatNum} = nothing, dims::Int = 1,
                            kwargs...)
+    assert_dims(dims)
     win = get_window(window, X, dims)
     X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
     inner = factory(est, w_new)
@@ -1073,25 +1082,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Suggest the nearest `candidates` entry to a mistyped [`@windowed_estimator`](@ref) key.
 
-Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default:
-Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The
-strict global default exists to keep near-miss probes from echoing real *asset names* back to
-the caller (ADR 0026); that boundary does not apply here, because the candidates are
-compile-time constants — block keys and `field_dict`/`ret_dict` names — with nothing to leak.
-At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5
-against `noun`, so the suggestion would be dead code.
+Delegates to [`suggest_declared_key`](@ref), which holds the looser scoped configuration every
+declaration-key suggestion shares: Damerau-Levenshtein at `min_score = 0.5`, because the
+candidates here are compile-time constants — block keys and `field_dict`/`ret_dict` names —
+with nothing to leak.
 
 # Related
 
   - [`@windowed_estimator`](@ref)
+  - [`suggest_declared_key`](@ref)
   - [`did_you_mean`](@ref)
-  - [`with_string_distance`](@ref)
 """
 function windowed_estimator_suggest(key, candidates)
-    return with_string_distance(; dist = StringDistances.DamerauLevenshtein(),
-                                min_score = 0.5) do
-        return did_you_mean(string(key), string.(collect(candidates)))
-    end
+    return suggest_declared_key(key, candidates)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

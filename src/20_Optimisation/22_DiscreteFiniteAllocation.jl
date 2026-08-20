@@ -149,9 +149,10 @@ DiscreteAllocation
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`GreedyAllocation`](@ref)
-  - [`DiscreteAllocationResult`](@ref)
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
     """
@@ -371,7 +372,7 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
 """
-    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing},
+    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, Nothing},
              fai::FiniteAllocationInput; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
@@ -391,7 +392,7 @@ Run the Discrete Allocation portfolio optimisation.
   - [`DiscreteAllocationResult`](@ref)
   - [`FiniteAllocationInput`](@ref)
 """
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing},
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, Nothing},
                   fai::FiniteAllocationInput; str_names::Bool = false, save::Bool = true,
                   kwargs...)
     return _optimise(da, fai; str_names = str_names, save = save, kwargs...)

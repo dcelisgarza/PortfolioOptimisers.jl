@@ -135,10 +135,7 @@ Where:
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
                kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     mu = vec(Statistics.mean(pe.me, X; kwargs...))
     sigma = Statistics.cov(pe.ce, X; kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
@@ -201,10 +198,7 @@ Where:
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
                dims::Int = 1, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log; kwargs...))
     sigma = Statistics.cov(pe.ce, X_log; kwargs...)
@@ -214,6 +208,12 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
     sigma .= (mu ⊗ mu) ⊙ (exp.(sigma) .- one(eltype(sigma)))
     mu .-= one(eltype(mu))
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
+end
+
+function factor_residual_config(::EmpiricalPrior)
+    # An empirical prior estimates the asset covariance directly. There is no factor lift,
+    # so there is no residual block to remove (see [`factor_residual_config`](@ref)).
+    return nothing
 end
 
 export EmpiricalPrior

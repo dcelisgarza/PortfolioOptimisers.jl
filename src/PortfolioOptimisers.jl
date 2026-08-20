@@ -26,7 +26,6 @@ using LogExpFunctions: LogExpFunctions
 using MultivariateStats: MultivariateStats
 using NearestCorrelationMatrix: NearestCorrelationMatrix
 using Optim: Optim
-using PrecompileTools: PrecompileTools
 using Preferences: Preferences
 using Random: Random
 using Roots: Roots
@@ -111,6 +110,8 @@ include("08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl")
 include("09_Distance/01_Base_Distance.jl")
 include("09_Distance/02_Distance.jl")
 include("09_Distance/03_DistanceDistance.jl")
+include("09_Distance/04_Similarity.jl")
+include("09_Distance/05_FeatureDistance.jl")
 include("10_JuMPModelOptimisation.jl")
 include("11_Phylogeny/01_Base_Phylogeny.jl")
 include("11_Phylogeny/02_Clusters.jl")
@@ -125,6 +126,7 @@ include("12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl")
 include("12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl")
 include("12_ConstraintGeneration/06_AssetSetsMatrix.jl")
 include("12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl")
+include("12_ConstraintGeneration/08_ExposureConstraintGeneration.jl")
 include("13_Prior/01_Base_Prior.jl")
 include("13_Prior/02_EmpiricalPrior.jl")
 include("13_Prior/03_FactorPrior.jl")
@@ -134,9 +136,12 @@ include("13_Prior/06_BlackLittermanPrior.jl")
 include("13_Prior/07_BayesianBlackLittermanPrior.jl")
 include("13_Prior/08_FactorBlackLittermanPrior.jl")
 include("13_Prior/09_AugmentedBlackLittermanPrior.jl")
-include("13_Prior/10_EntropyPoolingPrior.jl")
-include("13_Prior/11_OpinionPoolingPrior.jl")
-include("13_Prior/12_HighOrderFactorPriorEstimator.jl")
+include("13_Prior/10_Base_EntropyPoolingPrior.jl")
+include("13_Prior/11_MeucciEntropyPoolingPrior.jl")
+include("13_Prior/12_EntropyPoolingPrior.jl")
+include("13_Prior/13_OpinionPoolingPrior.jl")
+include("13_Prior/14_HighOrderFactorPriorEstimator.jl")
+include("13_Prior/15_FeaturePrior.jl")
 include("14_UncertaintySets/01_Base_UncertaintySets.jl")
 include("14_UncertaintySets/02_DeltaUncertaintySets.jl")
 include("14_UncertaintySets/03_NormalUncertaintySets.jl")
@@ -251,4 +256,13 @@ include("23_Pipeline/04_PredictionCV.jl")
 include("23_Pipeline/05_SearchCrossValidation.jl")
 include("24_Plotting.jl")
 include("25_Aliases.jl")
+
+# Every `@propagatable` struct is declared by now, and so is every outer keyword
+# constructor, so the contract behind the generated `factory`/`port_opt_view` methods is
+# checked at the declaration instead of at the first call. Runs at precompile time only.
+check_propagatable_contracts()
+# The propagation tag set is data. A row of `PROP_TAG_NAMES` that lacks a stub macro, a
+# field transform, or a channel is a tag that parses and never propagates, so it is refused
+# here rather than at the first `factory` call. Runs at precompile time only.
+check_prop_tag_macros()
 end

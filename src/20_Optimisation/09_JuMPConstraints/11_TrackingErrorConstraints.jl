@@ -72,19 +72,16 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     err = tr.err
     T = size(X, 1)
     f = err * T
-    t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
-    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
-    model[Symbol(:cte_noc_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
-                                                                             begin
-                                                                                 [sc * t_te;
-                                                                                  sc * tr] in
-                                                                                 JuMP.MOI.NormOneCone(1 +
-                                                                                                      T)
-                                                                                 sc *
-                                                                                 (t_te -
-                                                                                  f * k) <=
-                                                                                 0
-                                                                             end)
+    t_te = state_set!(model, Symbol(""), :t_te_, i, JuMP.@variable(model))
+    tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
+    cte_noc, cte = JuMP.@constraints(model,
+                                     begin
+                                         [sc * t_te;
+                                          sc * tr] in JuMP.MOI.NormOneCone(1 + T)
+                                         sc * (t_te - f * k) <= 0
+                                     end)
+    state_set!(model, Symbol(""), :cte_noc_, i, cte_noc)
+    state_set!(model, Symbol(""), :cte_, i, cte)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -100,18 +97,16 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
     f = err * sqrt(size(X, 1) - tr.alg.ddof)
-    t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
-    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
-    model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
-                                                                             begin
-                                                                                 [sc * t_te;
-                                                                                  sc * tr] in
-                                                                                 JuMP.SecondOrderCone()
-                                                                                 sc *
-                                                                                 (t_te -
-                                                                                  f * k) <=
-                                                                                 0
-                                                                             end)
+    t_te = state_set!(model, Symbol(""), :t_te_, i, JuMP.@variable(model))
+    tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
+    cte_soc, cte = JuMP.@constraints(model,
+                                     begin
+                                         [sc * t_te;
+                                          sc * tr] in JuMP.SecondOrderCone()
+                                         sc * (t_te - f * k) <= 0
+                                     end)
+    state_set!(model, Symbol(""), :cte_soc_, i, cte_soc)
+    state_set!(model, Symbol(""), :cte_, i, cte)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -129,32 +124,24 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     p_inv = inv(tr.alg.p)
     scale = T - tr.alg.ddof
     f = err * (tr.alg.p == 3 ? cbrt(scale) : scale^p_inv)
-    t_te, r_te = model[Symbol(:t_te_, i)], model[Symbol(:r_te_, i)] = JuMP.@variables(model,
-                                                                                      begin
-                                                                                          ()
-                                                                                          [1:T]
-                                                                                      end)
-    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
-    model[Symbol(:cte_pnorm_, i)], model[Symbol(:cste_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
-                                                                                                         begin
-                                                                                                             [i = 1:T],
-                                                                                                             [sc *
-                                                                                                              r_te[i],
-                                                                                                              sc *
-                                                                                                              t_te,
-                                                                                                              sc *
-                                                                                                              tr[i]] in
-                                                                                                             JuMP.MOI.PowerCone(p_inv)
-                                                                                                             sc *
-                                                                                                             (sum(r_te) -
-                                                                                                              t_te) ==
-                                                                                                             0
-                                                                                                             sc *
-                                                                                                             (t_te -
-                                                                                                              f *
-                                                                                                              k) <=
-                                                                                                             0
-                                                                                                         end)
+    t_te, r_te = JuMP.@variables(model, begin
+                                     ()
+                                     [1:T]
+                                 end)
+    state_set!(model, Symbol(""), :t_te_, i, t_te)
+    state_set!(model, Symbol(""), :r_te_, i, r_te)
+    tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
+    cte_pnorm, cste, cte = JuMP.@constraints(model,
+                                             begin
+                                                 [i = 1:T],
+                                                 [sc * r_te[i], sc * t_te, sc * tr[i]] in
+                                                 JuMP.MOI.PowerCone(p_inv)
+                                                 sc * (sum(r_te) - t_te) == 0
+                                                 sc * (t_te - f * k) <= 0
+                                             end)
+    state_set!(model, Symbol(""), :cte_pnorm_, i, cte_pnorm)
+    state_set!(model, Symbol(""), :cste_, i, cste)
+    state_set!(model, Symbol(""), :cte_, i, cte)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -170,21 +157,16 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     err = tr.err
     scale = T - tr.alg.ddof
     f = err * scale
-    t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
-    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
-    model[Symbol(:cte_infnorm_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
-                                                                                 begin
-                                                                                     [sc *
-                                                                                      t_te
-                                                                                      sc *
-                                                                                      tr] in
-                                                                                     JuMP.MOI.NormInfinityCone(1 +
-                                                                                                               T)
-                                                                                     sc *
-                                                                                     (t_te -
-                                                                                      f * k) <=
-                                                                                     0
-                                                                                 end)
+    t_te = state_set!(model, Symbol(""), :t_te_, i, JuMP.@variable(model))
+    tr = state_set!(model, Symbol(""), :te_, i, JuMP.@expression(model, net_X - wb * k))
+    cte_infnorm, cte = JuMP.@constraints(model,
+                                         begin
+                                             [sc * t_te
+                                              sc * tr] in JuMP.MOI.NormInfinityCone(1 + T)
+                                             sc * (t_te - f * k) <= 0
+                                         end)
+    state_set!(model, Symbol(""), :cte_infnorm_, i, cte_infnorm)
+    state_set!(model, Symbol(""), :cte_, i, cte)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -204,7 +186,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
     risk_expr = set_risk_tracking_risk_constraints!(model, r, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
-    model[Symbol(:cter_, i)] = JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0)
+    state_set!(model, prefix, :cter_, i,
+               JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -220,24 +203,24 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    key = Symbol(:te_dr_, i)
-    te_dr = model[key] = JuMP.@variable(model)
+    te_dr = state_set!(model, prefix, :te_dr_, i, JuMP.@variable(model))
     tprefix = nested_prefix(prefix, :te_dr_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
     risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
-    dr = model[Symbol(key, i)] = JuMP.@expression(model, risk_expr - rb * k)
-    model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = JuMP.@constraints(model,
-                                                                               begin
-                                                                                   [sc *
-                                                                                    te_dr
-                                                                                    sc * dr] in
-                                                                                   JuMP.MOI.NormOneCone(2)
-                                                                                   sc *
-                                                                                   (te_dr -
-                                                                                    err * k) <=
-                                                                                   0
-                                                                               end)
+    # The risk difference is its own entry name. It was `Symbol(key, i)` — the *composed*
+    # key with the index appended a second time — which put entry 1 at `:te_dr_11`, the
+    # key `te_dr` itself takes at entry 11.
+    dr = state_set!(model, prefix, :te_dr_diff_, i,
+                    JuMP.@expression(model, risk_expr - rb * k))
+    cter_noc, cter = JuMP.@constraints(model,
+                                       begin
+                                           [sc * te_dr
+                                            sc * dr] in JuMP.MOI.NormOneCone(2)
+                                           sc * (te_dr - err * k) <= 0
+                                       end)
+    state_set!(model, prefix, :cter_noc_, i, cter_noc)
+    state_set!(model, prefix, :cter_, i, cter)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,

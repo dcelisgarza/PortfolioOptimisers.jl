@@ -3,19 +3,15 @@
 ```@docs
 UniqueRoot
 EqualRoot
-MaximumDistanceSimilarity
-ExponentialSimilarity
-GeneralExponentialSimilarity
 DBHT
 LoGo
 clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::MatNum; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
 DBHTRootMethod
-AbstractSimilarityMatrixAlgorithm
 InverseMatrixSparsificationAlgorithm
 PMFG_T2s
-dbht_similarity
+assert_pmfg_weights
 distance_wei
 clique3
 breadth

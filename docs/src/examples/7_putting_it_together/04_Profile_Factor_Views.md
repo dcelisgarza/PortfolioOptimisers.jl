@@ -50,7 +50,7 @@ nothing #hide
 ## 1. Data, factors, and the factor view
 
 We load the S&P 500 slice together with its factor block (`MTUM`, `QUAL`, `SIZE`, `USMV`, `VLUE`),
-declare an asset `AssetSets` with sector groups (for the sector caps) and a factor `AssetSets` (for
+declare an asset `UniverseSets` with sector groups (for the sector caps) and a factor `UniverseSets` (for
 the views), and write the desk's thesis as factor-premia views: momentum earns 5 bps/day and value
 earns 3 bps/day.
 
@@ -60,11 +60,13 @@ F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = 
 rd = prices_to_returns(X, F)
 prices = vec(values(X)[end, :])
 
-asset_sets = AssetSets(;
-                       dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                                   "energy" => ["CVX", "XOM", "RRC"],
-                                   "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
-factor_sets = AssetSets(; dict = Dict("nx" => rd.nf))
+asset_sets = UniverseSets(;
+                          dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                                      "energy" => ["CVX", "XOM", "RRC"],
+                                      "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+# `FactorBlackLittermanPrior` reads the *declared* factor axis, so the sets it takes names
+# both: assets under `xkey`, factors under `fkey`, in the column order of `rd.F`.
+factor_sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 tau = 1 / size(rd.X, 1)
 
 factor_views = LinearConstraintEstimator(; val = ["MTUM == 0.0005", "VLUE == 0.0003"])

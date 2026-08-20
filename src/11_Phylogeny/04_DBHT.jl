@@ -37,189 +37,6 @@ struct EqualRoot <: DBHTRootMethod end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
-
-# Related
-
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`DBHT`](@ref)
-  - [`LoGo`](@ref)
-"""
-abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using the maximum distance transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using the exponential transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Similarity matrix algorithm using a generalised exponential transformation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
-\\end{align}
-```
-
-Where:
-
-  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
-  - ``\\mathbf{D}``: Distance matrix.
-  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
-  - ``c``: Scale factor.
-  - ``p``: Exponent.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    GeneralExponentialSimilarity(;
-        coef::Number = 1.0,
-        power::Number = 1.0
-    ) -> GeneralExponentialSimilarity
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:dbhtcoef])
-  - $(val_dict[:dbhtpower])
-
-# Examples
-
-```jldoctest
-julia> GeneralExponentialSimilarity()
-GeneralExponentialSimilarity
-   coef ┼ Int64: 1
-  power ┴ Int64: 1
-```
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`dbht_similarity`](@ref)
-"""
-@concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
-    """
-    $(field_dict[:dbhtcoef])
-    """
-    coef
-    """
-    $(field_dict[:dbhtpower])
-    """
-    power
-    function GeneralExponentialSimilarity(coef::Number, power::Number)
-        @argcheck(zero(coef) < coef, DomainError)
-        @argcheck(zero(power) < power, DomainError)
-        return new{typeof(coef), typeof(power)}(coef, power)
-    end
-end
-function GeneralExponentialSimilarity(; coef::Number = 1,
-                                      power::Number = 1)::GeneralExponentialSimilarity
-    return GeneralExponentialSimilarity(coef, power)
-end
-"""
-    dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::MatNum, kwargs...)
-
-Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
-
-This function dispatches on the type of `se` to apply the appropriate similarity transformation to the distance matrix `D`. Used internally by DBHT and related clustering algorithms.
-
-# Arguments
-
-  - `se`: Similarity matrix algorithm.
-
-      + `se::MaximumDistanceSimilarity`: Uses the maximum distance transformation.
-      + `se::ExponentialSimilarity`: Uses the exponential transformation.
-      + `se::GeneralExponentialSimilarity`: Uses a generalised exponential transformation.
-
-  - `D`: Distance matrix.
-
-  - `kwargs...`: Additional keyword arguments (not used).
-
-# Returns
-
-  - `S::Matrix{<:Number}`: Similarity matrix of the same size as `D`.
-
-# Related
-
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-  - [`MaximumDistanceSimilarity`](@ref)
-  - [`ExponentialSimilarity`](@ref)
-  - [`GeneralExponentialSimilarity`](@ref)
-"""
-function dbht_similarity(::MaximumDistanceSimilarity; D::MatNum, kwargs...)
-    return ceil(maximum(D)^2) .- D .^ 2
-end
-function dbht_similarity(::ExponentialSimilarity; D::MatNum, kwargs...)
-    return exp.(-D)
-end
-function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
-    power = se.power
-    coef = se.coef
-    return exp.(-coef * D .^ power)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
 `DBHT` is a composable clustering algorithm type for constructing hierarchical clusterings using the Direct Bubble Hierarchical Tree (DBHT) method, as described in [DBHTs](@cite).
@@ -231,7 +48,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DBHT(;
-        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
         root::DBHTRootMethod = UniqueRoot()
     ) -> DBHT
 
@@ -249,6 +66,7 @@ DBHT
 # Related
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
@@ -261,16 +79,17 @@ DBHT
     """
     $(field_dict[:sim])
     """
-    sim
+    sim <: AbstractNonNegativeSimilarityMatrixAlgorithm
     """
     $(field_dict[:root])
     """
     root
-    function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
+    function DBHT(sim::AbstractNonNegativeSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
     end
 end
-function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+function DBHT(;
+              sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               root::DBHTRootMethod = UniqueRoot())::DBHT
     return DBHT(sim, root)
 end
@@ -283,13 +102,25 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # Arguments
 
-  - `W`: `N × N` matrix of non-negative weights (e.g., similarity or correlation matrix).
+  - `W`: `N × N` matrix of non-negative, finite weights (e.g. a similarity matrix from an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), or an absolute correlation matrix).
   - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
 
 # Validation
 
   - `N >= 9` is required for a meaningful PMFG.
-  - All entries in `W` must be non-negative.
+  - No entry in `W` is `NaN`.
+  - All entries in `W` are non-negative.
+
+An entry that is exactly zero passes all three and still costs the graph an edge, because `A` carries
+the structure in its sparsity pattern and this function declines no edge on the way in. That is
+[`assert_pmfg_weights`](@ref)'s check, and it runs in the callers that consume the weighted structure
+rather than here, because [`logo!`](@ref) reads only the cliques and is unaffected by a zero.
+
+# The checks are a backstop, not the enforcement
+
+Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or at the seam, with a message that names the configuration rather than `W`.
+
+These two checks are kept for the case those cannot cover: that family is open **by declaration**, so an extension can subtype it and return a negative anyway. The failure downstream is silent — `DirectHb` sums signed mass and a cancelling row manufactures a separating bubble — so a wrong clustering would come back with no error at all.
 
 # Details
 
@@ -315,8 +146,12 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     N = size(W, 1)
     @argcheck(9 <= N, DimensionMismatch("9 <= size(W, 1) must hold. Got\nsize(W, 1) => $N"))
+    # Split in two, because `0 <= NaN` is `false`: one check would report a `NaN` as a
+    # negative weight and send the caller looking for the wrong thing.
+    @argcheck(!any(isnan, W),
+              DomainError("!any(isnan, W) must hold. Got\ncount(isnan, W) => $(count(isnan, W))."))
     @argcheck(all(x -> zero(x) <= x, W),
-              DomainError("all(x -> x >= 0, W) must hold. Got\nall(x -> x >= 0, W) => $(all(x -> zero(x) <= x, W))."))
+              DomainError("all(x -> x >= 0, W) must hold. Got\nminimum(W) => $(minimum(W))."))
     A = SparseArrays.spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -372,18 +207,18 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
         A[ve, tri[agm, :]] .= 1
 
         # Update 3-clique list
-        clique3[k - 4, :] = tri[agm, :]
+        clique3[k-4, :] = tri[agm, :]
 
         # Update triangle list replacing 1 and adding 2 triangles
-        tri[kk + 1, :] = vcat(tri[agm, [1, 3]], ve) # add
-        tri[kk + 2, :] = vcat(tri[agm, [2, 3]], ve) # add
+        tri[kk+1, :] = vcat(tri[agm, [1, 3]], ve) # add
+        tri[kk+2, :] = vcat(tri[agm, [2, 3]], ve) # add
         tri[agm, :] = vcat(tri[agm, [1, 2]], ve)     # replace
 
         # # Update gain table
         gain[ve, :] .= 0
         gain[ou_v, agm] = sum(W[ou_v, tri[agm, :]]; dims = 2)
-        gain[ou_v, kk + 1] = sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
-        gain[ou_v, kk + 2] = sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
+        gain[ou_v, kk+1] = sum(W[ou_v, tri[kk+1, :]]; dims = 2)
+        gain[ou_v, kk+2] = sum(W[ou_v, tri[kk+2, :]]; dims = 2)
 
         # # Update number of triangles
         kk += 2
@@ -412,6 +247,68 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     end
 
     return A, tri, clique3, cliques, cliqueTree
+end
+"""
+    assert_pmfg_weights(A::MatNum,
+                        sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing,
+                        de::Option{<:AbstractDistanceEstimator} = nothing)
+
+Check that the weights did not delete an edge from the graph [`PMFG_T2s`](@ref) built.
+
+A maximal planar graph on `N >= 3` vertices has exactly `3N - 6` edges, and [`PMFG_T2s`](@ref) returns the structure and the weights in one matrix, `A = W ⊙ ((A + A') .== 1)`. An **exactly zero** weight is therefore an *absent* edge rather than a weak one, and what reaches the consumer is no longer a PMFG. This function counts the stored edges and refuses the difference.
+
+# The zero is admissible input and an unusable structure
+
+[`PMFG_T2s`](@ref)'s own check is `>= 0` and stays that way, because a zero is an honest similarity. [`ExponentialSimilarity`](@ref) maps the infinite distance [`LogDistance`](@ref) returns at an exactly zero correlation to `exp(-Inf)`, which is `0` exactly, and [`ComplementSimilarity`](@ref) maps `D = 1` to `0`. The value is right. What it cannot do is carry an edge.
+
+Without this check the failure is a `BoundsError` about a matrix index, raised much later inside [`turn_into_Hclust_merges`](@ref), because [`HierarchyConstruct4s`](@ref) then builds fewer merges than the dendrogram needs.
+
+# Where it runs, and where it deliberately does not
+
+At the three sites that consume the **weighted** structure: [`DBHTs`](@ref), [`calc_weighted_adjacency_graph`](@ref) and [`calc_distance_weighted_graph`](@ref).
+
+[`logo!`](@ref) is the fourth [`PMFG_T2s`](@ref) caller and is **not** guarded. It reads separators and cliques, which [`PMFG_T2s`](@ref) derives from the insertion order rather than from `A`, so a zero weight does not change its answer and refusing it would refuse a configuration that works.
+
+# Arguments
+
+  - `A`: `N × N` weighted adjacency matrix, the first output of [`PMFG_T2s`](@ref).
+  - `sim`: Similarity matrix algorithm that produced the weights, named in the message. Read for nothing else, as [`assert_similarity_domain`](@ref) reads its `de`.
+  - `de`: Distance estimator the similarity was derived from, named in the message beside `sim`.
+
+Each caller passes what it holds, so the message names as much of the configuration as the site knows. [`calc_distance_weighted_graph`](@ref) holds both halves, [`calc_weighted_adjacency_graph`](@ref) and [`DBHTs`](@ref) hold the similarity, and a caller that holds only the matrices names neither.
+
+# Validation
+
+  - The number of stored edges is `3N - 6`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PMFG_T2s`](@ref)
+  - [`DBHTs`](@ref)
+  - [`assert_similarity_domain`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
+"""
+function assert_pmfg_weights(A::MatNum,
+                             sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing,
+                             de::Option{<:AbstractDistanceEstimator} = nothing)::Nothing
+    N = size(A, 1)
+    edges = count(!iszero, A) ÷ 2
+    expected = 3 * N - 6
+    source = if isnothing(sim)
+        ""
+    elseif isnothing(de)
+        " for $(nameof(typeof(sim)))"
+    else
+        " for $(nameof(typeof(sim))), from $(typeof(de))"
+    end
+    @argcheck(edges == expected,
+              DomainError(edges,
+                          "count(!iszero, A) / 2 == 3 * size(A, 1) - 6 must hold$source. Got\nedges => $edges\n3 * N - 6 => $expected\nAn exactly zero weight is an absent edge rather than a weak one, so the PMFG is missing $(expected - edges) of its edges and the structure is not a PMFG. Use a similarity that is strictly positive over this data."))
+    return nothing
 end
 """
     distance_wei(L::MatNum)
@@ -1116,7 +1013,7 @@ function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::Mat
     end
 
     Sep = vec(Int.(iszero.(sum(Hc; dims = 2))))
-    Sep[vec(iszero.(sum(Hc; dims = 1))) .&& kb .> 1] .= 2
+    Sep[vec(iszero.(sum(Hc; dims = 1))).&&kb .> 1] .= 2
 
     return Hc, Sep
 end
@@ -1397,8 +1294,8 @@ function build_link_and_dendro(rg::AbstractRange, dpm::MatNum, LabelVec::VecNum,
                                Z::MatNum)
     for _ in rg
         PairLink, dvu = LinkageFunction(dpm, LabelVec)  # Look for the pair of clusters which produces the best linkage
-        LabelVec[LabelVec .== PairLink[1] .|| LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
-                                                                           1  # Merge the cluster pair by updating the label vector with a same label.
+        LabelVec[LabelVec .== PairLink[1].||LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                         1  # Merge the cluster pair by updating the label vector with a same label.
         LabelVec2[V] = LabelVec
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, 1 / nc)
         nc -= 1
@@ -1485,11 +1382,11 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
     dcl = ones(Int, length(LabelVec1))
     for _ in 1:(length(kvec) - 1)
         PairLink, dvu = LinkageFunction(Dpm, LabelVec1)
-        LabelVec2[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
-                                                                              1
+        LabelVec2[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                            1
         dvu = unique(dcl[LabelVec1 .== PairLink[1]]) +
               unique(dcl[LabelVec1 .== PairLink[2]])
-        dcl[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= dvu
+        dcl[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= dvu
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, dvu)
         LabelVec1 = copy(LabelVec2)
     end
@@ -1563,7 +1460,8 @@ function turn_into_Hclust_merges(Z::MatNum)
 end
 """
     DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
-          root::DBHTRootMethod = UniqueRoot())
+          root::DBHTRootMethod = UniqueRoot(),
+          sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
 
 Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG).
 
@@ -1575,12 +1473,14 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - `S`: `N × N` non-negative similarity matrix. Must be symmetric and non-empty.
   - `branchorder`: Ordering method for the dendrogram branches. Accepts `:optimal`, `:barjoseph`, or `:r`.
   - `root`: Root selection method for the clique hierarchy.
+  - `sim`: Similarity matrix algorithm that produced `S`. It is forwarded to [`assert_pmfg_weights`](@ref) and read for nothing else, so that a refusal names the configuration rather than the matrix. A caller that holds only the matrices leaves it `nothing`.
 
 # Validation
 
   - `!isempty(D) && LinearAlgebra.issymmetric(D)`.
   - `!isempty(S) && LinearAlgebra.issymmetric(S)`.
   - `size(D) == size(S)`.
+  - The PMFG built from `S` keeps its `3N - 6` edges, by [`assert_pmfg_weights`](@ref). An exactly zero similarity is an absent edge.
 
 # Details
 
@@ -1612,11 +1512,13 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
 function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
-               root::DBHTRootMethod = UniqueRoot())
+               root::DBHTRootMethod = UniqueRoot(),
+               sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
     @argcheck(!isempty(S), IsEmptyError)
     @argcheck(!isempty(D), IsEmptyError)
     @argcheck(size(S) == size(D), DimensionMismatch)
     Rpm = PMFG_T2s(S)[1]
+    assert_pmfg_weights(Rpm, sim)
     Apm = copy(Rpm)
     Apm[Apm .!= 0] = D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
@@ -1769,7 +1671,7 @@ This method computes the similarity and distance matrices from the input data ma
 # Details
 
   - Computes the similarity and distance matrices using the estimator's configured correlation and distance estimators.
-  - Applies the selected similarity transformation via [`dbht_similarity`](@ref).
+  - Applies the selected similarity transformation via [`distance_to_similarity`](@ref).
   - Runs the full DBHT clustering pipeline via [`DBHTs`](@ref), including PMFG construction, clique and bubble hierarchy extraction, and dendrogram construction.
   - Determines the optimal number of clusters using the estimator's cluster selection method.
   - Returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
@@ -1783,14 +1685,15 @@ This method computes the similarity and distance matrices from the input data ma
   - [`DBHT`](@ref)
   - [`Clusters`](@ref)
   - [`DBHTs`](@ref)
-  - [`dbht_similarity`](@ref)
+  - [`distance_to_similarity`](@ref)
   - [`ClustersEstimator`](@ref)
 """
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                     branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
-    S = dbht_similarity(cle.alg.sim; S = S, D = D)
-    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
+    assert_similarity_domain(cle.alg.sim, cle.de, D)
+    S = distance_to_similarity(cle.alg.sim; S = S, D = D)
+    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root, sim = cle.alg.sim)[end]
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
@@ -1833,8 +1736,8 @@ $(DocStringExtensions.FIELDS)
 
     LoGo(;
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-        pdm::Option{<:Posdef} = Posdef()
+        sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef()
     ) -> LoGo
 
 Keywords correspond to the struct's fields.
@@ -1857,6 +1760,7 @@ LoGo
 
   - [`InverseMatrixSparsificationAlgorithm`](@ref)
   - [`AbstractDistanceEstimator`](@ref)
+  - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
   - [`ExponentialSimilarity`](@ref)
@@ -1870,19 +1774,20 @@ LoGo
     """
     $(field_dict[:sim])
     """
-    sim
+    sim <: AbstractNonNegativeSimilarityMatrixAlgorithm
     """
     $(field_dict[:pdm])
     """
     pdm
-    function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
-                  pdm::Option{<:Posdef} = Posdef())
+    function LoGo(de::AbstractDistanceEstimator,
+                  sim::AbstractNonNegativeSimilarityMatrixAlgorithm,
+                  pdm::Option{<:AbstractPosdefEstimator} = Posdef())
         return new{typeof(de), typeof(sim), typeof(pdm)}(de, sim, pdm)
     end
 end
 function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-              pdm::Option{<:Posdef} = Posdef())
+              sim::AbstractNonNegativeSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+              pdm::Option{<:AbstractPosdefEstimator} = Posdef())
     return LoGo(de, sim, pdm)
 end
 """
@@ -1984,7 +1889,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - [`J_LoGo`](@ref)
   - [`LoGo_dist_assert`](@ref)
   - [`PMFG_T2s`](@ref)
-  - [`dbht_similarity`](@ref)
+  - [`distance_to_similarity`](@ref)
   - [`Posdef`](@ref)
 """
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
@@ -1999,7 +1904,8 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
         sigma
     end
     D = distance(je.de, S, X; dims = dims, kwargs...)
-    S = dbht_similarity(je.sim; S = S, D = D)
+    assert_similarity_domain(je.sim, je.de, D)
+    S = distance_to_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I
     posdef!(je.pdm, sigma)
@@ -2072,5 +1978,4 @@ function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::
     return logo!(je, sigma, X; dims = dims, kwargs...)
 end
 
-export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
-       UniqueRoot, EqualRoot, DBHT, LoGo, Clusters
+export UniqueRoot, EqualRoot, DBHT, LoGo, Clusters

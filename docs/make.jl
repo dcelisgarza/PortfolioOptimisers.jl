@@ -1,6 +1,7 @@
 using PortfolioOptimisers
-using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI, Random
+using Documenter, DocumenterTools, DocumenterCitations, DocumenterCodeBlocks,
+      DocumenterLandingPage, Literate, StatsPlots, GraphRecipes, Handcalcs, StatsBase,
+      Dates, JuMP, StatsAPI, Random
 
 f = x -> !contains(string(x), r"#|^eval$|^include$")
 exported_symbols = filter!(f, names(PortfolioOptimisers))
@@ -57,6 +58,7 @@ function pre_process_content_nb(content)
 end
 
 fix_suffix_md(filename) = replace(filename, ".jl" => ".md")
+fix_suffix_nb(filename) = replace(filename, ".jl" => ".ipynb")
 
 # Display labels for the pipeline-stage example groups (see ADR 0014). Subdirectories not
 # listed here fall back to a derived title-case label.
@@ -110,14 +112,19 @@ function generate_files(source::String, build::String, diff_flag::Bool)
     # Render one Literate source: markdown into the build dir, notebook next to the source.
     # Returns the page path relative to docs/src.
     function process(jl, src_dir_abs, out_build_abs, rel_build)
-        if !(diff_flag &&
-             isempty(String(read(Cmd(`git diff $DIFF_REF -- $(joinpath(src_dir_abs, jl))`)))))
-            Literate.markdown(joinpath(src_dir_abs, jl), out_build_abs;
-                              preprocess = pre_process_content_md,
+        jlp = joinpath(src_dir_abs, jl)
+        md_out = joinpath(out_build_abs, fix_suffix_md(jl))
+        nb_out = joinpath(src_dir_abs, fix_suffix_nb(jl))
+        # The selective path asks only whether the SOURCE changed since `DIFF_REF`. A
+        # missing output therefore has to force a rebuild on its own: otherwise a deleted
+        # (or never generated) `.md` stays missing and `makedocs` fails on the absent page,
+        # and a deleted `.ipynb` is never restored.
+        unchanged = diff_flag && isempty(String(read(Cmd(`git diff $DIFF_REF -- $jlp`))))
+        if !unchanged || !isfile(md_out) || !isfile(nb_out)
+            Literate.markdown(jlp, out_build_abs; preprocess = pre_process_content_md,
                               postprocess = postprocess, documenter = true, credit = true)
-            Literate.notebook(joinpath(src_dir_abs, jl), src_dir_abs;
-                              preprocess = pre_process_content_nb, documenter = true,
-                              credit = true)
+            Literate.notebook(jlp, src_dir_abs; preprocess = pre_process_content_nb,
+                              documenter = true, credit = true)
         end
         return joinpath(rel_build, fix_suffix_md(jl))
     end
@@ -181,8 +188,32 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
-         format = DocumenterVitepress.MarkdownVitepress(;
-                                                        repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
+         # Bare Documenter HTML. `DocumenterCodeBlocks` and `DocumenterLandingPage` both
+         # need the stock HTML writer: the first rewrites rendered code blocks, the second
+         # injects its stylesheet into `HTML.assets`. Neither sees a Markdown build.
+         format = Documenter.HTML(;
+                                  # Always on, so the deployed and the local build agree. A
+                                  # local build therefore needs a server, not `file://`:
+                                  # `using LiveServer; serve(; dir = "docs/build")`.
+                                  prettyurls = true,
+                                  canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable",
+                                  # `repo` above is a String, so Documenter cannot
+                                  # derive the navbar link. Name the remote explicitly.
+                                  repolink = "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
+                                  # Landing-page customisation. Documenter emits
+                                  # this BEFORE the plugin's own stylesheet, so read
+                                  # the file's header before adding an override.
+                                  # `generated-pages.css` styles the two generated
+                                  # pages (capability catalogue, type hierarchy),
+                                  # whose markup no stock theme covers.
+                                  assets = ["assets/landing-overrides.css",
+                                            "assets/generated-pages.css"],
+                                  edit_link = "main",
+                                  # The API pages and the capability catalogue go
+                                  # far past the 200 KiB default, so the size gate is
+                                  # off and only the warning survives.
+                                  size_threshold = nothing,
+                                  size_threshold_warn = 400 * 2^10),
          pages = ["Home" => HOME_PAGE;
                   "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
@@ -208,15 +239,40 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "Contribute" => contribute;
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
-                                         style = :numeric)])
+                                         style = :numeric), CodeBlocks(), LandingPage()])
 
-DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
-                               target = "build", devbranch = "main", branch = "gh-pages",
-                               push_preview = true)
-
-# ~/docs $ npm run docs:dev
+deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
+           devbranch = "main", branch = "gh-pages", push_preview = true)
 
 # allpages = String[]
 # for page in api_pages
 #     append!(allpages, joinpath.(page[1][idx1:end], page[3]))
 # end
+
+# ---------------------------------------------------------------------------------------
+# Viewing the docs locally
+# ---------------------------------------------------------------------------------------
+#
+# 1. Build, from the repository root:
+#
+#        julia --project=docs docs/make.jl
+#
+#    The first run precompiles the docs environment. Expect about 35 minutes in total:
+#    Literate executes all 62 notebooks, and Documenter then runs every `@example` block.
+#    `deploydocs` is inert outside CI, so a local build never touches `gh-pages`.
+#
+# 2. Serve `docs/build`. `prettyurls` is always on, so every page is `<name>/index.html`
+#    and a `file://` open shows nothing. A server is required. Either of these works:
+#
+#        julia --project=docs -e 'using LiveServer; serve(; dir = "docs/build")'
+#        python3 -m http.server 8000 --directory docs/build
+#
+#    Then open http://localhost:8000.
+#
+# A rebuild is only needed for a content change. To tune CSS, such as the landing-page
+# glow, edit `docs/build/assets/landing-overrides.css` and reload the page. Copy the final
+# value back into `docs/src/assets/landing-overrides.css`, because the next build
+# overwrites everything under `docs/build`.
+#
+# Selective rebuilds: `process` re-renders a page when its source changed since `HEAD~1`,
+# or when its `.md` or `.ipynb` output is missing. Delete an output to force one page.

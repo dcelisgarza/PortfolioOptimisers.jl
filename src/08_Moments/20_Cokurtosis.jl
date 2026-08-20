@@ -23,7 +23,7 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
 ### Returns
 
-  - `ckurt::MatNum`: Cokurtosis tensor `features^2 × features^2`.
+  - `ckurt::MatNum`: Cokurtosis tensor `assets^2 × assets^2`.
 
 ## Factory
 
@@ -324,10 +324,7 @@ julia> cokurtosis(Cokurtosis(), X)
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = X .- mu
@@ -335,10 +332,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
 end
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-    end
+    X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))

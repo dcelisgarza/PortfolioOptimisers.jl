@@ -9,6 +9,9 @@ run_step
 require_slot
 set_slot
 run_uncertainty_step
+run_constraint_step
+resolve_constraint_target
+constraint_step_value
 pipeline_asset_sets
 add_constraint_result
 ```

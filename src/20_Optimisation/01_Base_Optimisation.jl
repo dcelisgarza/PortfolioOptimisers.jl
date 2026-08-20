@@ -252,6 +252,36 @@ macro pipe_route_sigma_ucs(T)
                end)
 end
 """
+    @pipe_route_rkb T
+
+Declare that optimiser type `T` absorbs the `:rkb` [Routing Target](@ref PIPELINE_ROUTING_TARGETS) into the `rkb` field of its risk-budgeting algorithm.
+
+`:rkb` is the one target named after a field an optimiser does not carry directly. A risk budget belongs to the *algorithm* — `AssetRiskBudgeting` budgets assets, `FactorRiskBudgeting` budgets factors — so it lands one level down, at `rba.rkb`, and the derived `hasfield` rule cannot reach it.
+
+Acceptance is not a constant: it asks the algorithm the optimiser is actually carrying. A [`TimeDependent`](@ref) schedule in `rba` has no `rkb` to write, so such an optimiser declines the target and a pipeline computing a budget for it is refused at construction rather than failing in the fold loop.
+
+Declared per concrete type, for the same reason as [`@pipe_route_sigma_ucs`](@ref): it must out-specialise the [`@pipe_delegates`](@ref) forwarder on the same type.
+
+# Related
+
+  - [`@pipe_delegates`](@ref)
+  - [`pipe_route`](@ref)
+"""
+macro pipe_route_rkb(T)
+    #! Escaped whole, for the same reason as `@pipe_delegates`.
+    return esc(quote
+                   function pipe_route(x::$T, ::Val{:rkb}, v)
+                       @argcheck(hasfield(typeof(x.rba), :rkb),
+                                 ArgumentError("cannot route a risk budget into a $(Base.typename(typeof(x)).wrapper): its rba field holds a $(Base.typename(typeof(x.rba)).wrapper), which has no rkb field to receive it"))
+                       rba = Accessors.set(x.rba, Accessors.PropertyLens{:rkb}(), v)
+                       return Accessors.set(x, Accessors.PropertyLens{:rba}(), rba)
+                   end
+                   function pipe_accepts(x::$T, ::Val{:rkb})::Bool
+                       return hasfield(typeof(x.rba), :rkb)
+                   end
+               end)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation algorithms used by portfolio optimisers.
@@ -286,7 +316,7 @@ Abstract supertype for continuous (non-integer allocation) optimisation results.
 
   - [`OptimisationResult`](@ref)
   - [`NaiveOptimisationResult`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
   - [`MeanRiskResult`](@ref)
 """
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
@@ -295,16 +325,54 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for non-JuMP continuous optimisation results.
 
-Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side; the JuMP half is [`RiskJuMPOptimisationResult`](@ref).
+Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side. The JuMP side is itself two halves, [`RiskJuMPOptimisationResult`](@ref) for the results that carry a risk measure and [`NonRiskJuMPOptimisationResult`](@ref) for those that carry none.
+
+The hierarchical members are grouped one level further down, under [`HierarchicalOptimisationResult`](@ref).
 
 # Related
 
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`RiskJuMPOptimisationResult`](@ref)
+  - [`NonRiskJuMPOptimisationResult`](@ref)
   - [`NaiveOptimisationResult`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
 """
 abstract type NonJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the **core** field block shared by hierarchical optimisation results.
+
+Sits off the optimisation-result tree on purpose, exactly as [`BaseJuMPOptimisationResult`](@ref) does on the JuMP side. A core is not a thing `optimise` returns, so it must not satisfy methods bounded on the result family — [`factory`](@ref)`(res::NonFiniteAllocationOptimisationResult, fb)` included.
+
+Its one subtype is [`HierarchicalResult`](@ref), embedded as `hr` by each leaf.
+
+# Related
+
+  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalOptimisationResult`](@ref)
+  - [`BaseJuMPOptimisationResult`](@ref)
+"""
+abstract type BaseHierarchicalOptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the results of the estimators that embed a [`HierarchicalOptimiser`](@ref).
+
+The membership rule is exact: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold an `opt::HierarchicalOptimiser`. [`NestedClustered`](@ref) does not, and its result is **not** in this family.
+
+The family is deliberately **not** called `ClusteringOptimisationResult`: [`ClusteringOptimisationEstimator`](@ref) has four subtypes and the fourth is [`NestedClustered`](@ref), so that name would claim a set this type does not hold.
+
+Two of the three members embed [`HierarchicalResult`](@ref) as `hr`; [`SchurComplementHierarchicalRiskParityResult`](@ref) keeps a flat field block, which is why the property forwarding lives on the leaves rather than here.
+
+# Related
+
+  - [`BaseHierarchicalOptimisationResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
+  - [`HierarchicalEqualRiskContributionResult`](@ref)
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
+"""
+abstract type HierarchicalOptimisationResult <: NonJuMPOptimisationResult end
 """
     const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 
@@ -459,23 +527,45 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable structs used as time-dependent constraint values.
+Abstract supertype for the callable structs used as time-dependent values.
 
 A subtype is a data-carrying alternative to a bare function inside a [`TimeDependent`](@ref): it must implement a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's field value. Because it is a struct, it participates in a trait a bare function cannot: define `needs_previous_weights(::MySubtype) = true` to declare a previous-weights requirement directly (the default is `false`), instead of wrapping in [`PreviousWeightsFunction`](@ref).
 
 Being a struct also makes it the natural home for **recording what a callable schedule chose**: a bare `ctx -> …` selects nothing by index, so its per-fold decision is not otherwise recoverable (see the provenance note on [`TimeDependent`](@ref)). A functor can carry a mutable field — e.g. a vector it writes at `ctx.i` — and log the fold's resolved value as a side effect of computing it.
 
+The family classifies by what the functor returns, and a subtype declares that kind in its type. Subtype [`TimeDependentConstraintCallable`](@ref) when the per-fold value is a constraint value, and [`TimeDependentOptimiserCallable`](@ref) when it is an optimiser. Only the second is statically admissible in an optimiser-valued field (see [`TD_OptE_Opt`](@ref)), so the classification is what that admissibility is read off. Do not subtype this root directly.
+
 # Related
 
+  - [`TimeDependentConstraintCallable`](@ref)
+  - [`TimeDependentOptimiserCallable`](@ref)
   - [`TimeDependent`](@ref)
   - [`TimeDependentContext`](@ref)
   - [`PreviousWeightsFunction`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-abstract type TimeDependentCallable <: AbstractAlgorithm end
+abstract type TimeDependentCallable <: AbstractEstimator end
 function needs_previous_weights(::TimeDependentCallable)::Bool
     return false
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for callable structs whose per-fold value is a *constraint value*.
+
+A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's value for a constraint-position field — a budget, a set of weight bounds, a fee structure, a turnover limit, anything a [`TimeDependent`](@ref) may carry other than an optimiser. The value is checked when the fold loop swaps it into the field, by the host's own keyword constructor.
+
+This is the kind to subtype for a functor whose output is *not* an optimiser. A functor returning an optimiser declares [`TimeDependentOptimiserCallable`](@ref) instead, which is what makes an optimiser-position schedule statically admissible (see [`TD_OptE_Opt`](@ref)).
+
+# Related
+
+  - [`TimeDependentCallable`](@ref)
+  - [`TimeDependentOptimiserCallable`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+abstract type TimeDependentConstraintCallable <: TimeDependentCallable end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -486,6 +576,7 @@ A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` retur
 # Related
 
   - [`TimeDependentCallable`](@ref)
+  - [`TimeDependentConstraintCallable`](@ref)
   - [`TimeDependent`](@ref)
   - [`TD_OptE_Opt`](@ref)
   - [`TimeDependentContext`](@ref)
@@ -601,7 +692,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TimeDependent(val, bind::Symbol = :outermost; default = NoDefault())
-    TimeDependent(; val, bind::Symbol = :outermost, default = NoDefault())
+    TimeDependent(; val::Union{<:AbstractVector, <:Base.Callable,
+                               <:PreviousWeightsFunction, <:TimeDependentCallable,
+                               <:TimeDependent}, bind::Symbol = :outermost,
+                  default = NoDefault())
 
 ## Validation
 
@@ -1623,19 +1717,6 @@ const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`factory`](@ref) element-wise to a vector of optimisation estimators or results, elements that are [`TimeDependent`](@ref) schedules included.
-
-# Related
-
-  - [`VecOptE_Opt_TD`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(opt::VecOptE_Opt_TD, args...)
-    return [factory(opti, args...) for opti in opt]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Apply [`factory`](@ref) through a [`TimeDependent`](@ref) schedule: to each vector entry and to the `default`, rebuilding the schedule.
 
 A schedule can survive a fold loop's resolution pass (a `bind = :nearest` element left for a meta's inner cross-validation), so the factory pass that follows resolution must see through it. Callable forms pass through unchanged — their per-fold values do not exist yet, and a callable receives the fold's context (including `w_prev`) when it runs.
@@ -2284,19 +2365,6 @@ function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
     return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Apply [`port_opt_view`](@ref) element-wise to a vector of optimisation estimators.
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`VecOptE`](@ref)
-"""
-function port_opt_view(opt::Union{<:VecOptE, <:VecOptE_Opt_TD}, i, args...)
-    return [port_opt_view(opti, i, args...) for opti in opt]
-end
-"""
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
     optimise(opt::OptimisationResult, args...; kwargs...) -> OptimisationResult
 
@@ -2481,6 +2549,115 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Normalises inner weights into the convex weights that collapse real assets onto a meta-optimiser's synthetic assets.
+
+Quantities carried alongside the returns matrix are either *extensive* (returns, benchmark returns) and collapse as a plain weighted sum `w'x`, or *intensive* (rates such as `rd.iv` and `rd.ivpa`) and collapse as a weighted *average*. A plain weighted sum scales an intensive quantity by the gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, so a shorting or leveraged portfolio (`sⱼ ≠ 1`) inflates a rate that should not depend on gross exposure at all.
+
+Normalising the weights once here makes every subsequent product a convex combination, so callers collapsing an intensive quantity need only pass their weights through this function.
+
+# Arguments
+
+  - `w`: Inner weights. A vector collapses onto a single synthetic asset; a matrix (assets × synthetic assets) collapses each column independently.
+
+# Returns
+
+  - `w`: `abs.(w)`, with each column scaled to sum to one. A column summing to zero — a degenerate synthetic asset — is left as-is rather than divided, preserving the zero row it already produced.
+
+# Related
+
+  - [`prepare_outer_rd`](@ref)
+  - [`reconstruct_rd`](@ref)
+"""
+function synthetic_asset_weights(w::VecNum)
+    w = abs.(w)
+    s = sum(w)
+    return iszero(s) ? w : w / s
+end
+function synthetic_asset_weights(w::MatNum)
+    w = abs.(w)
+    s = sum(w; dims = 1)
+    return w ./ map(x -> iszero(x) ? one(x) : x, s)
+end
+"""
+    collapse_feature_matrix(Z::Nothing, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
+    collapse_feature_matrix(Z::Nothing, w::VecNum)
+    collapse_feature_matrix(Z::MatNum, w::VecNum)
+    collapse_feature_matrix(Z::Arr3Num, w::VecNum)
+
+Aggregate a feature matrix onto the synthetic assets a meta-optimiser builds for its outer problem.
+
+A meta-optimiser's outer problem allocates across *synthetic* assets — [`NestedClustered`](@ref)'s clusters, [`Stacking`](@ref)'s inner portfolios — each of which is a weighted combination of the real ones. Every quantity the outer [`ReturnsResult`](@ref) carries has to be re-expressed on that universe, and a feature matrix is no exception: without this collapse the outer optimiser has no feature matrix at all, so a [`FeatureDistance`](@ref) there throws rather than clustering the synthetic universe.
+
+Features are treated as **intensive**, exactly as `iv` and `ivpa` are: the collapse is a convex combination, obtained by pushing the inner weights through [`synthetic_asset_weights`](@ref) first. An un-normalised weighted sum would scale each synthetic asset's feature vector by its gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, inflating it under leverage or shorting. Under the default [`AngularDist`](@ref) the normalisation is a mathematical no-op for a rectangular feature matrix — scaling one row of the result leaves every cosine unchanged — but it is *not* one in the square case, where the two-sided product rescales feature columns as well, and it is what keeps the collapse bounded for any `sⱼ > 0`. An extensive feature (a market capitalisation, a headcount) wanting a weighted *sum* is not supported: the divisor depends on the inner solve, so a caller cannot pre-scale their way to one.
+
+## The two weight shapes
+
+  - A weight **matrix** `wi` (assets × synthetic assets) collapses the whole universe at once. When `sq` is `true` the feature axis *is* the asset axis ([`features_are_assets`](@ref)), so it is contracted too and the result is again square on the synthetic universe.
+  - A weight **vector** `w` collapses onto a *single* synthetic asset, which is all [`reconstruct_rd`](@ref) has in scope within a cross-validation fold. It takes no `sq` argument, and that absence is the statement: the second contraction of the square case needs every synthetic asset's weights simultaneously, and contracting the feature axis with the one vector available would collapse it to a single number per synthetic asset — a feature space in which every asset is trivially identical. A square feature matrix therefore keeps the real assets as its feature axis through the fold path, reading as "this synthetic asset's weighted-average neighbourhood".
+
+## Degenerate synthetic assets
+
+A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_asset_weights`](@ref) leaves the column alone rather than dividing, so the collapse gives that asset a **zero feature vector** instead of throwing. It then lands on the zero-feature-vector convention the distance kernel already implements, matching the zero returns column, `iv` and `ivpa` the same degenerate weights already produce.
+
+# Arguments
+
+  - `Z`: Feature matrix, static (assets × features) or time-varying (observations × assets × features).
+  - `sq`: Whether the feature axis is the asset axis, from [`features_are_assets`](@ref).
+  - `wi`: Inner weights, assets × synthetic assets.
+  - `w`: Inner weights for a single synthetic asset, assets × 1.
+
+# Returns
+
+  - `nothing` when `Z` is `nothing`.
+  - Matrix arity: `synthetic assets × features`, or `synthetic assets × synthetic assets` when `sq`; `observations × …` with the same trailing axes for a time-varying `Z`.
+  - Vector arity: a `features`-length vector for a static `Z`, an `observations × features` matrix for a time-varying one.
+
+# Related
+
+  - [`synthetic_asset_weights`](@ref)
+  - [`features_are_assets`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`reconstruct_rd`](@ref)
+  - [`FeatureDistance`](@ref)
+"""
+function collapse_feature_matrix(::Nothing, ::Bool, ::MatNum)
+    return nothing
+end
+function collapse_feature_matrix(Z::MatNum, sq::Bool, wi::MatNum)
+    wi = synthetic_asset_weights(wi)
+    Zc = transpose(wi) * Z
+    return sq ? Zc * wi : Zc
+end
+function collapse_feature_matrix(Z::Arr3Num, sq::Bool, wi::MatNum)
+    wi = synthetic_asset_weights(wi)
+    k = size(wi, 2)
+    nf = sq ? k : size(Z, 3)
+    Zc = Array{promote_type(eltype(Z), eltype(wi))}(undef, size(Z, 1), k, nf)
+    @inbounds for t in axes(Z, 1)
+        Zt = transpose(wi) * view(Z, t, :, :)
+        Zc[t, :, :] = sq ? Zt * wi : Zt
+    end
+    return Zc
+end
+function collapse_feature_matrix(::Nothing, ::VecNum)
+    return nothing
+end
+function collapse_feature_matrix(Z::MatNum, w::VecNum)
+    return transpose(Z) * synthetic_asset_weights(w)
+end
+function collapse_feature_matrix(Z::Arr3Num, w::VecNum)
+    w = synthetic_asset_weights(w)
+    Zc = Matrix{promote_type(eltype(Z), eltype(w))}(undef, size(Z, 1), size(Z, 3))
+    @inbounds for t in axes(Z, 1)
+        Zc[t, :] = transpose(view(Z, t, :, :)) * w
+    end
+    return Zc
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Extracts the prior result for risk calculation from an optimisation result. Checks for an explicitly provided `pr`, then looks for `res.pr` and `res.pa.pr` before throwing an error if none are found.
 
 # Arguments
@@ -2502,8 +2679,8 @@ function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     end
 end
 """
-    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
-    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
 
 Compute the expected risk for an [`OptimisationResult`](@ref).
 
@@ -2511,22 +2688,32 @@ Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref
 
 When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or `res.pa.pr` before delegating.
 
+`r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
+
+The prior-taking method forwards the carrier whole, so a caller's **own** measure resolves against it: an unstated slot takes the prior's field and a **Deferred Quantity** is fitted, exactly as in `expected_risk(r, w, pr)`. Pass a matrix instead to opt out and supply every slot yourself.
+
 # Related
 
   - [`expected_risk`](@ref)
   - [`OptimisationResult`](@ref)
-  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`BaseRM_VecBaseRM`](@ref)
+  - [`resolve_risk_inputs`](@ref)
 """
-function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
+function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     fees = extract_fees(res, fees)
     return expected_risk(r, res.w, X, fees; kwargs...)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
                        kwargs...)
-    pr = extract_pr(res, pr)
-    return expected_risk(r, res, pr.X, fees; kwargs...)
+    # The carrier is forwarded whole, never unwrapped to `pr.X`. `expected_risk`'s own
+    # `Pr_RR` route resolves the measure through `resolve_risk_inputs`, which has an arm for
+    # each carrier: a prior result resolves the measure, a `ReturnsResult` only unwraps `X`.
+    # Unwrapping here dropped the prior fallback, so `expected_risk(Variance(), res)` — the
+    # call this docstring asks callers to make — hit the kernel with an unstated `sigma`.
+    fees = extract_fees(res, fees)
+    return expected_risk(r, res.w, extract_pr(res, pr), fees; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2548,5 +2735,4 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
-       TimeDependentCallable, TimeDependentOptimiserCallable, NoDefault,
-       TimeDependentDefaultError
+       NoDefault, TimeDependentDefaultError

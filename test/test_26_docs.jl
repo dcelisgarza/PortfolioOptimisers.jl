@@ -69,10 +69,17 @@ function -- cannot host.
     # A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
     # than `isconcretetype`: nearly every struct here is `@concrete`, so the bare
     # name is a `UnionAll` and `isconcretetype` is false for every one of them.
+    #
+    # The runner gives each test file its own module, but not its own process. An
+    # estimator that another file declares therefore stays in the worker, and
+    # `subtypes` finds it here. The catalogue is about the shipped universe, so a
+    # leaf from another module is not one of its members: keep only what
+    # `PortfolioOptimisers` itself declares. Which files share a worker changes
+    # from run to run, so without this filter the test is a scheduling flake.
     function leaf_types(T, acc = Set{Type}())
         subs = subtypes(T)
         if isempty(subs)
-            if !isabstracttype(T)
+            if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
                 push!(acc, T)
             else
                 false
@@ -92,14 +99,33 @@ function -- cannot host.
             # Results are outputs nobody constructs, so they are not required here.
             required = Set(nameof.(collect(union(leaf_types(PO.AbstractEstimator),
                                                  leaf_types(PO.AbstractAlgorithm)))))
-            filter!(n -> !contains(string(n), "_test"), required)
-            uncatalogued = sort(collect(setdiff(required, catalogued)))
+            # A type the library constructs for itself is not a choice, so it is
+            # exempt by name and with a reason -- see `NOT_A_CHOICE`.
+            uncatalogued = sort(collect(setdiff(required, catalogued, keys(NOT_A_CHOICE))))
             if !isempty(uncatalogued)
                 @warn """$(length(uncatalogued)) estimator(s)/algorithm(s) are missing from the
                          Capability Catalogue. Add each to `docs/capability_catalogue.jl` under
-                         the group it belongs to:\n  $(join(uncatalogued, "\n  "))"""
+                         the group it belongs to, or list it in `NOT_A_CHOICE` with a reason
+                         (`:internal`):\n  $(join(uncatalogued, "\n  "))"""
             end
             @test isempty(uncatalogued)
+
+            # The other direction, as for `NOT_A_FEATURE`: an exemption for a type
+            # that is no longer a leaf estimator or algorithm is stale, and would
+            # silently exempt whatever later takes that name.
+            stale = sort([n for n in keys(NOT_A_CHOICE) if !(n in required)])
+            if !isempty(stale)
+                @warn "Stale `NOT_A_CHOICE` entries (no longer a leaf estimator/algorithm): $(join(stale, ", "))"
+            end
+            @test isempty(stale)
+
+            # An exempt type is still catalogued nowhere, so nothing else states
+            # that it is absent on purpose. A name in both places is a contradiction.
+            contradictory = sort([n for n in keys(NOT_A_CHOICE) if n in catalogued])
+            if !isempty(contradictory)
+                @warn "Names both catalogued and listed in `NOT_A_CHOICE`: $(join(contradictory, ", "))"
+            end
+            @test isempty(contradictory)
         end
 
         @testset "every exported function is accounted for" begin

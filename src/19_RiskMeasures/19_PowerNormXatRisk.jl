@@ -162,7 +162,7 @@ PowerNormValueatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
@@ -296,7 +296,7 @@ PowerNormValueatRiskRange
     """
     pb
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
@@ -321,6 +321,17 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
                                    pa::Number = 2.0, pb::Number = 2.0,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
+end
+# Tail decomposition — see `range_tails`. Each tail carries its own norm order: `pa` shapes
+# the loss side, `pb` the gain side. The functor below is the value-level twin, and it is
+# what pins that pairing.
+function range_tails(r::PowerNormValueatRiskRange)
+    settings = RiskMeasureSettings(; rke = false)
+    return (;
+            loss = PowerNormValueatRisk(; settings = settings, slv = r.slv, alpha = r.alpha,
+                                        p = r.pa, w = r.w),
+            gain = PowerNormValueatRisk(; settings = settings, slv = r.slv, alpha = r.beta,
+                                        p = r.pb, w = r.w))
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
@@ -440,7 +451,7 @@ PowerNormDrawdownatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
@@ -580,7 +591,7 @@ RelativePowerNormDrawdownatRisk
     """
     p
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,

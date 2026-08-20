@@ -333,6 +333,8 @@ The same definitions apply as above, but for each individual asset in the return
 
 `drawdowns` computes the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
 
+The running peak starts at the initial capital, not at the first observation, so a series that is under water from the first period reports a negative drawdown there. `drawdowns` dispatches to [`absolute_drawdown_arr`](@ref) or [`relative_drawdown_arr`](@ref), which hold the single definition of the peak.
+
 # Examples
 
 ```jldoctest
@@ -347,19 +349,25 @@ julia> drawdowns([0.01, 0.02, -0.01], true)
   0.0
   0.0
  -0.010000000000000009
+
+julia> drawdowns([-0.1, 0.05])
+2-element Vector{Float64}:
+ -0.1
+ -0.05
 ```
 
 # Related
 
   - [`ArrNum`](@ref)
   - [`cumulative_returns`](@ref)
+  - [`absolute_drawdown_arr`](@ref)
+  - [`relative_drawdown_arr`](@ref)
 """
 function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
-    cX = !cX ? cumulative_returns(X, compound; dims = dims) : X
-    if !compound
-        cX - accumulate(max, cX; dims = dims)
+    return if !compound
+        absolute_drawdown_arr(X; cX = cX, dims = dims)
     else
-        cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
+        relative_drawdown_arr(X; cX = cX, dims = dims)
     end
 end
 

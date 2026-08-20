@@ -111,6 +111,11 @@ vector of risk measures.
 The single-measure overload calls `set_risk_constraints!(model, 1, r, ...)`. The vector
 overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
 
+The single-measure overload also drops the measure's `scale` through
+[`unit_scale_risk_measure`](@ref). `scale` weights a measure inside an aggregate built from
+several measures, and one measure is not an aggregate, so the weight is inert. The vector
+overload keeps every element's `scale`.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -119,6 +124,7 @@ overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
+  - $(arg_dict[:b1_opt])
 
 # Returns
 
@@ -131,18 +137,101 @@ overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                               kwargs...)
-    set_risk_constraints!(model, 1, r, opt, pr, pl, fees, args...; kwargs...)
+                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
+                               b1::Option{<:MatNum} = nothing; kwargs...)
+    # A `JuMP` model builder reads the measure's slots directly and never calls `factory`,
+    # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
+    # alone; each builder's own prior fallback is untouched.
+    #
+    # `scale` is a combination weight, so it is dropped here: a lone measure is not an
+    # aggregate and the weight has nothing to weigh. The vector method below keeps it,
+    # because there the measures really do combine.
+    #
+    # `b1` is typed and named, not absorbed by an `args...` tail. The tail let a caller pass
+    # a `Fees` in the slot after `fees` and lose it silently — which is exactly what
+    # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
+    set_risk_constraints!(model, 1,
+                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
+                          pr, pl, fees, b1; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
-                               fees::Option{<:Fees}, args...; kwargs...)
+                               fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
+                               kwargs...)
     for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, i, r, opt, pr, pl, fees, args...; kwargs...)
+        set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr), opt, pr, pl,
+                              fees, b1; kwargs...)
     end
     return nothing
+end
+"""
+    prior_high_order_quantity(pr::AbstractPriorResult, key::Symbol)
+
+Read the high-order quantity named by `key` off prior result `pr`, or `nothing` when it carries none.
+
+A [`HighOrderPrior`](@ref) carries `kt`, `sk`, `V` and the three vectorisation matrices. A [`LowOrderPrior`](@ref) carries none of them, and a [`HighOrderPrior`](@ref) fitted with only one of the two tensors leaves the other `nothing`, so the answer is a value or `nothing` rather than an error either way.
+
+# Related
+
+  - [`assert_high_order_quantity`](@ref)
+  - [`dup_elim_sum_selector`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function prior_high_order_quantity(pr::AbstractPriorResult, key::Symbol)
+    return hasproperty(pr, key) ? getproperty(pr, key) : nothing
+end
+"""
+    assert_high_order_quantity(q, pr::AbstractPriorResult, rm::Symbol, key::Symbol,
+                               est::Symbol)
+
+Refuse a high-order risk measure whose tensor resolves neither on the measure nor on the prior.
+
+`q` is what the measure holds in the slot named `key`, after [`resolve_deferred_quantities`](@ref) has run. The measure is buildable when either side supplies the quantity, so the gate is on the pair rather than on the type of `pr`: a caller who has told the measure how to build its own cokurtosis has already met the requirement, and a [`HighOrderPrior`](@ref) that computed neither tensor does not meet it.
+
+The message names the three ways out: state the quantity, name a `est` or an [`AbstractPriorEstimator`](@ref) in the slot, or give the optimiser a prior estimator that computes one.
+
+# Related
+
+  - [`prior_high_order_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`Kurtosis`](@ref)
+  - [`NegativeSkewness`](@ref)
+  - [`VarianceSkewKurtosis`](@ref)
+"""
+function assert_high_order_quantity(q, pr::AbstractPriorResult, rm::Symbol, key::Symbol,
+                                    est::Symbol)
+    @argcheck(!isnothing(q) || !isnothing(prior_high_order_quantity(pr, key)),
+              ArgumentError("`$rm` needs a `$key`, and neither the measure nor the `$(typeof(pr).name.name)` it was given carries one. State `$key` on the measure, or name a `$est` or an `AbstractPriorEstimator` in it, or give the optimiser a prior estimator that computes a `$key`."))
+    return nothing
+end
+"""
+    dup_elim_sum_selector(pr::AbstractPriorResult, N::Integer)
+
+Select the duplication, elimination and summation matrices for `N` assets from prior result `pr`, rebuilding whichever of the three it does not carry.
+
+[`dup_elim_sum_matrices`](@ref) is a pure function of the asset count, with no data in it, so the three matrices a [`HighOrderPrior`](@ref) carries are exactly the ones this rebuilds. That is what lets a measure holding its own tensor be built against a [`LowOrderPrior`](@ref): the vectorisation matrices were the only other thing the kernel took from the prior.
+
+One call builds all three, so the rebuild costs the same whether one of them is missing or all three are.
+
+# Related
+
+  - [`dup_elim_sum_matrices`](@ref)
+  - [`prior_high_order_quantity`](@ref)
+  - [`assert_high_order_quantity`](@ref)
+"""
+function dup_elim_sum_selector(pr::AbstractPriorResult, N::Integer)
+    D2 = prior_high_order_quantity(pr, :D2)
+    L2 = prior_high_order_quantity(pr, :L2)
+    S2 = prior_high_order_quantity(pr, :S2)
+    if isnothing(D2) || isnothing(L2) || isnothing(S2)
+        rD2, rL2, rS2 = dup_elim_sum_matrices(N)
+        D2 = nothing_scalar_array_selector(D2, rD2)
+        L2 = nothing_scalar_array_selector(L2, rL2)
+        S2 = nothing_scalar_array_selector(S2, rS2)
+    end
+    return D2, L2, S2
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -191,8 +280,8 @@ end
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key,
                                flag::Bool = true)
-    bound_key = Symbol(key, :_ub)
-    bound_var_key = Symbol(key, :_ub_var)
+    bound_key = state_key(key, :_ub)
+    bound_var_key = state_key(key, :_ub_var)
     if !shared_has(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
@@ -211,9 +300,8 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                flag::Bool = true)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    bound_key = Symbol(key, :_ub)
     d = ifelse(flag, 1, -1)
-    model[bound_key] = JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0)
+    state_set!(model, key, :_ub, JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0))
     return nothing
 end
 """
@@ -267,9 +355,11 @@ with `settings.scale` and `settings.rke`.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
   - `name`: Bare Model State entry name seeding the derived bound keys (`<name>_ub`,
-    `<name>_ub_var`). Per-instance Category-B scratch names are passed as-is; a
-    prefix-managed name is resolved against `prefix` here rather than at the call site, so
-    emitters never build a key by hand (ADR 0037).
+    `<name>_ub_var`). The key is resolved here rather than at the call site, so emitters
+    never build a key by hand (ADR 0037).
+  - `i`: Measure index, for per-measure entry names. The indexed method resolves the same
+    key the emitter registered the risk expression under, so the bound keys and the entry
+    key cannot drift apart.
   - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
 
 # Keyword arguments
@@ -289,9 +379,19 @@ with `settings.scale` and `settings.rke`.
 function set_risk_bounds_and_expression!(model::JuMP.Model,
                                          opt::RiskJuMPOptimisationEstimator,
                                          r_expr::JuMP.AbstractJuMPScalar,
-                                         settings::RiskMeasureSettings, name,
+                                         settings::RiskMeasureSettings, name::Symbol,
                                          flag::Bool = true; prefix::Symbol = Symbol(""))
     key = state_key(prefix, name)
+    set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
+    set_risk_expression!(model, r_expr, settings.scale, settings.rke)
+    return nothing
+end
+function set_risk_bounds_and_expression!(model::JuMP.Model,
+                                         opt::RiskJuMPOptimisationEstimator,
+                                         r_expr::JuMP.AbstractJuMPScalar,
+                                         settings::RiskMeasureSettings, name::Symbol, i,
+                                         flag::Bool = true; prefix::Symbol = Symbol(""))
+    key = state_key(prefix, name, i)
     set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
@@ -355,4 +455,199 @@ function set_drawdown_constraints!(model::JuMP.Model, X::MatNum;
                                     sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0))
         return dd
     end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add a range risk measure's constraints to `model` by building its two tails and summing them.
+
+A range measure is its base measure applied twice, so this builds it that way. It reads the
+two point measures from [`range_tails`](@ref), calls [`set_risk_constraints!`](@ref) on the
+loss tail with `loss = true` and on the gain tail with `loss = false`, and registers the sum
+under `key`. The gain tail sees the *negated* net portfolio returns, which is the whole of
+what "the other tail" means and is what each base builder's `loss` keyword does.
+
+The two tails carry `rke = false` and no upper bound, so only the composite expression
+reaches the objective and the bound. Each tail builds under its own measure index, composed
+by [`nested_index`](@ref), so a two-tail model names its parts by the side they describe and
+a range nested in a range stays collision-free.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The range risk measure.
+  - `name::Symbol`: Bare Model State entry name for the composite range expression.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `range_risk`: The combined `loss + gain` risk expression added to the model.
+
+# Related
+
+  - [`range_tails`](@ref)
+  - [`nested_index`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_range_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                     name::Symbol, opt::RiskJuMPOptimisationEstimator,
+                                     pr::AbstractPriorResult, args...;
+                                     prefix::Symbol = Symbol(""), kwargs...)
+    (; loss, gain) = range_tails(r)
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
+                                      args...; loss = true, prefix = prefix, kwargs...)
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
+                                      args...; loss = false, prefix = prefix, kwargs...)
+    range_risk = state_set!(model, prefix, name, i,
+                            JuMP.@expression(model, loss_risk + gain_risk))
+    set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
+                                    prefix = prefix)
+    return range_risk
+end
+"""
+    abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for the series a conic risk measure reduces.
+
+A conic tail measure is written once against a per-observation series of *returns*. The
+returns family reduces the net portfolio returns; the drawdown family reduces the negated
+drawdown path, which is the same series with one substitution. [`risk_series`](@ref) is the
+one place that substitution is made, so a builder is written once and each twin selects its
+series by passing the marker.
+
+# Related
+
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+"""
+abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
+"""
+    struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
+
+Marker selecting the net portfolio returns as the series a risk measure reduces.
+
+This is the series of every returns-tail measure, and the only one that can be
+range-composed: the gain tail is the same series negated, which is what `loss = false` means
+in [`risk_series`](@ref).
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+"""
+struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
+"""
+    struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
+
+Marker selecting the negated drawdown path as the series a risk measure reduces.
+
+`-dd[2:T+1]` is the return-signed drawdown series, so a builder written against net returns
+encodes the drawdown twin without a single sign written by hand.
+
+The drawdown series has no gain tail. A run-up is a different recurrence, not the negation
+of this one, so [`risk_series`](@ref) takes no `loss` keyword for this marker and no drawdown
+measure can be range-composed.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`risk_series`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+"""
+struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the per-observation series a conic risk measure reduces, and its length.
+
+The returns twin and the drawdown twin of a conic tail measure are one programme under the
+substitution `net_X -> -dd[2:T+1]`. This function is the one place that substitution is
+written, so each builder takes `(series, T)` and encodes both twins.
+
+The series is signed as a *return*: a loss is a negative entry, on both markers. That is why
+the drawdown branch negates — `dd` is a non-negative loss path — and it is what lets one
+builder body serve both.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg::NetReturnsRiskSeries`: Reduce the net portfolio returns.
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `loss::Bool`: `true` builds the loss tail on the net portfolio returns, `false` the gain
+    tail on their negation.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `series`: The per-observation return series, length `T`.
+  - `T::Int`: The number of observations.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
+"""
+function risk_series(model::JuMP.Model, ::NetReturnsRiskSeries, pr::AbstractPriorResult;
+                     loss::Bool = true, prefix::Symbol = Symbol(""))
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
+    return net_X, length(net_X)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the negated drawdown path a drawdown risk measure reduces, and its length.
+
+Registers the drawdown variables through [`set_drawdown_constraints!`](@ref), then returns
+`-dd[2:T+1]`. The negation is what makes the drawdown path a *return* series, so a builder
+written against net portfolio returns encodes the drawdown twin unchanged.
+
+There is no `loss` keyword. A drawdown has no gain tail, so a caller that tries to compose a
+range from this series fails at the call site rather than silently building the loss tail
+twice.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg::DrawdownRiskSeries`: Reduce the negated drawdown path.
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `series`: The negated drawdown path `-dd[2:T+1]`, length `T`.
+  - `T::Int`: The number of observations.
+
+# Related
+
+  - [`AbstractRiskSeriesAlgorithm`](@ref)
+  - [`NetReturnsRiskSeries`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+"""
+function risk_series(model::JuMP.Model, ::DrawdownRiskSeries, pr::AbstractPriorResult;
+                     prefix::Symbol = Symbol(""))
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
+    T = length(dd) - 1
+    return -view(dd, 2:(T + 1)), T
 end

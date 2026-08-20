@@ -138,7 +138,7 @@ $(DocStringExtensions.FIELDS)
         pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         scale::TD_Option{<:VecNum} = nothing,
         opti::Union{<:AbstractVector, <:TD_VecOptE_Opt},
         opto::OptE_TD,
@@ -168,11 +168,14 @@ Keywords correspond to the struct's fields.
 
 # Mathematical definition
 
-Let ``K`` inner optimisers produce weight vectors ``\\boldsymbol{w}_1, \\ldots, \\boldsymbol{w}_K``. Stack them as rows of a returns proxy matrix and pass to outer optimiser ``\\mathrm{opto}``:
+Let ``K`` inner optimisers produce weight vectors ``\\boldsymbol{w}_1, \\ldots, \\boldsymbol{w}_K``. Each one defines a synthetic asset whose return series is its portfolio's, and the outer optimiser allocates across that synthetic universe. The Combination Weight then re-weights the outer answer:
 
 ```math
 \\begin{align}
-\\boldsymbol{w}^* &= \\mathrm{opto}\\!\\left(\\sum_{k=1}^{K} s_k \\boldsymbol{W}_k\\right)\\,.
+\\boldsymbol{R}_{\\cdot k} &= \\boldsymbol{X} \\boldsymbol{w}_k\\,,\\\\
+\\boldsymbol{v} &= \\mathrm{opto}(\\boldsymbol{R})\\,,\\\\
+c_k &= \\frac{s_k v_k}{\\sum_{j=1}^{K} s_j v_j} \\sum_{j=1}^{K} v_j\\,,\\\\
+\\boldsymbol{w}^* &= \\sum_{k=1}^{K} c_k \\boldsymbol{w}_k\\,.
 \\end{align}
 ```
 
@@ -180,9 +183,14 @@ Where:
 
   - ``\\boldsymbol{w}^*``: Final stacked portfolio weights.
   - ``K``: Number of inner optimisers.
-  - ``s_k``: Optional scale factor for inner optimiser ``k``.
-  - ``\\boldsymbol{W}_k``: Returns proxy matrix weighted by inner-optimiser weights ``\\boldsymbol{w}_k``.
-  - ``\\mathrm{opto}``: Outer optimiser applied to the aggregated returns proxy.
+  - ``\\boldsymbol{X}``: Asset returns matrix.
+  - ``\\boldsymbol{R}``: Returns proxy matrix, one column per synthetic asset.
+  - ``\\boldsymbol{v}``: Outer optimiser weights over the synthetic universe.
+  - ``s_k``: Combination Weight of inner optimiser ``k``. Absent, or uniform, ``\\boldsymbol{c} = \\boldsymbol{v}``.
+  - ``c_k``: Coefficient inner optimiser ``k`` carries in the combination.
+  - ``\\mathrm{opto}``: Outer optimiser applied to the synthetic universe.
+
+The outer problem is built from ``\\boldsymbol{w}_k``, never from ``s_k \\boldsymbol{w}_k``: the weight acts at the combination alone, so a cross-validated run and a fold-less one agree on it (see [`combination_weights`](@ref)).
 
 ## Propagated parameters
 
@@ -195,9 +203,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`StackingResult`](@ref)
   - [`BaseStackingOptimisationEstimator`](@ref)
   - [`NestedClustered`](@ref)
-  - [`StackingResult`](@ref)
 """
 @propagatable @concrete struct Stacking <: BaseStackingOptimisationEstimator
     """
@@ -217,7 +226,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     sets
     """
-    Optional scaling vector for inner optimiser weights (length must match `opti`).
+    Optional Combination Weight over the inner optimisers, one entry per element of `opti`: the weight inner optimiser `k` carries inside the combination that `opto`'s answer defines. Only the ratios between the entries matter, because [`combination_weights`](@ref) rescales the tilted coefficients back to `opto`'s own total — so a common factor cancels, a uniform weight is neutral, and a lone inner optimiser is inert. `nothing` leaves `opto`'s answer alone.
     """
     scale
     """
@@ -253,7 +262,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     function Stacking(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
-                      fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
+                      fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:UniverseSets},
                       scale::TD_Option{<:VecNum},
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
@@ -300,7 +309,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 end
 function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                  sets::TD_Option{<:AssetSets} = nothing,
+                  sets::TD_Option{<:UniverseSets} = nothing,
                   scale::TD_Option{<:VecNum} = nothing,
                   opti::Union{<:AbstractVector, <:TD_VecOptE_Opt}, opto::OptE_TD,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
@@ -454,64 +463,6 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)
 end
-"""
-    predict_outer_st_estimator_returns(
-        st::Option{<:Stacking},
-        rd::ReturnsResult,
-        pr::AbstractPriorResult,
-        fees::Option{<:Fees},
-        wi::MatNum,
-        resi::VecOpt
-    )
-
-Predict outer portfolio returns for [`Stacking`](@ref) optimisation. Overload this using `st.cv` for custom cross-validation prediction.
-"""
-function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
-                                            pr::AbstractPriorResult, fees::Option{<:Fees},
-                                            wi::MatNum, resi::VecOpt)
-    nb, B, iv, ivpa, X = prepare_outer_rd(rd, wi)
-    for (i, res) in enumerate(resi)
-        X[:, i] = calc_net_returns(res, pr, fees)
-    end
-    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
-end
-function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any,
-                                                         <:OptimisationCrossValidation{<:NonCombOptCV}},
-                                            rd::ReturnsResult, pr::AbstractPriorResult,
-                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
-    (; opti, cv, ex) = st
-    cv = cv.cv
-    predictions = Vector{MultiPeriodPredictionResult}(undef, length(opti))
-    let cv = cv
-        FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
-        end
-    end
-    return rebuild_returns_result(rd, predictions)
-end
-function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any,
-                                                         <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
-                                            rd::ReturnsResult, pr::AbstractPriorResult,
-                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
-    (; opti, cv, ex) = st
-    (; cv, scorer) = cv
-    predictions = Vector{PopulationPredictionResult}(undef, length(opti))
-    let cv = cv
-        FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
-            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
-        end
-    end
-    if isnothing(scorer)
-        scorer = NearestQuantilePrediction()
-    end
-    best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions)
-end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -533,13 +484,13 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    swi = isnothing(st.scale) ? wi : wi .* transpose(st.scale)
-    rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, swi, resi)
+    rdo = predict_outer_returns(st.cv, st, FullUniverse(), rd, pr, fees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
                                    datatype = eltype(X))
-    retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode, reso.w, wi)
+    retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
+                                              combination_weights(st.scale, reso.w), wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
                           cv = st.cv, retcode = retcode, w = w, fb = nothing)
 end

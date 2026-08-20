@@ -118,9 +118,10 @@ GreedyAllocation
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`GreedyAllocationResult`](@ref)
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`DiscreteAllocation`](@ref)
-  - [`GreedyAllocationResult`](@ref)
 """
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     """

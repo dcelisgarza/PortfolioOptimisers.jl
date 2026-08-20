@@ -76,55 +76,9 @@ function PipelineUncertaintySets(; mu::Option{<:AbstractUncertaintySetResult} = 
     return PipelineUncertaintySets(mu, sigma)
 end
 """
-    const PIPELINE_SLOTS = (:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints, :opt)
-
-The named slots of a [`PipelineContext`](@ref). Each pipeline step reads the slots it needs and writes the slot its estimator family produces.
-"""
-const PIPELINE_SLOTS = (:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints,
-                        :opt)
-"""
-    const PIPELINE_DATA_SLOTS = (:prices, :returns)
-
-The [`PIPELINE_SLOTS`](@ref) whose write *changes the asset universe* — equivalently, the two slots a [`Pipeline`](@ref) input can fill directly. Writing one of these makes every slot *derived* from it stale, which is exactly what [`PIPELINE_INVALIDATES`](@ref) is derived from. Every other slot is computed from the data and reorders nothing, so writing it invalidates nothing.
-
-# Related
-
-  - [`PIPELINE_SLOTS`](@ref)
-  - [`PIPELINE_INVALIDATES`](@ref)
-  - [`PipelineContext`](@ref)
-"""
-const PIPELINE_DATA_SLOTS = (:prices, :returns)
-"""
-    PIPELINE_INVALIDATES
-
-The [`PipelineContext`](@ref) slots each written slot invalidates, derived from [`PIPELINE_SLOTS`](@ref) order and [`PIPELINE_DATA_SLOTS`](@ref):
-
-```julia
-(prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
- returns = (:prior, :phylogeny, :uncertainty, :constraints))
-```
-
-Writing a [data slot](@ref PIPELINE_DATA_SLOTS) makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
-
-The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
-
-# Related
-
-  - [`PIPELINE_SLOTS`](@ref)
-  - [`PIPELINE_DATA_SLOTS`](@ref)
-  - [`Pipeline`](@ref)
-  - [`PipelineContext`](@ref)
-"""
-const PIPELINE_INVALIDATES = let slots = PIPELINE_SLOTS, terminal = last(PIPELINE_SLOTS)
-    idx(x) = findfirst(==(x), slots)
-    NamedTuple{PIPELINE_DATA_SLOTS}(map(PIPELINE_DATA_SLOTS) do s
-                                        return Tuple(x
-                                                     for x in slots
-                                                     if x != terminal && idx(x) > idx(s))
-                                    end)
-end
-"""
-    const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs)
+    const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :cte, :ple, :lt, :st, :slt,
+                                     :sst, :sglt, :sgst, :smtx, :sgmtx, :rkb, :mu_ucs,
+                                     :sigma_ucs)
 
 The destinations [`inject_context`](@ref) can deliver a computed slot to.
 
@@ -135,9 +89,9 @@ The fan-out from slots to targets is the [`Pipeline`](@ref)'s job, and it is whe
   - `prior` → `:pe`.
   - `phylogeny` → `:cle`, when the result is a clustering structure.
   - `uncertainty` → `:mu_ucs` and `:sigma_ucs`, one per populated half of the [`PipelineUncertaintySets`](@ref) pair.
-  - `constraints` → `:wb`, `:lcse` or `:ple`, per element, by result type; multiple `:lcse`/`:ple` elements are packed into a vector.
+  - `constraints` → the target the element carries when it is a [`TargetedConstraint`](@ref), and otherwise the one its result type names: `:wb`, `:lcse`, `:ple` or `:rkb`. Elements reaching an [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) target are packed into a vector in write order; a second element reaching any other target is an error.
 
-Five of the seven are named after the field they land in, using this package's shared field vocabulary (see `field_dict`), so [`pipe_route`](@ref) needs no per-optimiser declaration — the target lands in the like-named field of whichever optimiser has one. `:mu_ucs` and `:sigma_ucs` are the exceptions: they carry validation policy and name no plain field.
+All but `:mu_ucs` and `:sigma_ucs` are named after the field they land in, using this package's shared field vocabulary (see `field_dict`), so [`pipe_route`](@ref) needs no per-optimiser declaration — the target lands in the like-named field of whichever optimiser has one. The two exceptions carry validation policy and name no plain field. `:rkb` names a field one level down (`rba.rkb`) and is declared per optimiser by [`@pipe_route_rkb`](@ref).
 
 Note that `:cle` and `:ple` are one letter apart and come from the *same* `phylogeny` slot; they are not interchangeable. `:cle` is a clustering structure the optimiser uses to build a hierarchy, `:ple` is a phylogeny *constraint* result. That is why only one of them is optional below.
 
@@ -150,7 +104,8 @@ Internal machinery — not part of the user-facing API.
   - [`pipe_route`](@ref)
   - [`inject_context`](@ref)
 """
-const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :ple, :mu_ucs, :sigma_ucs)
+const PIPELINE_ROUTING_TARGETS = (:pe, :cle, :wb, :lcse, :cte, :ple, :lt, :st, :slt, :sst,
+                                  :sglt, :sgst, :smtx, :sgmtx, :rkb, :mu_ucs, :sigma_ucs)
 """
     const PIPELINE_OPTIONAL_TARGETS = (:pe, :cle)
 
@@ -176,6 +131,81 @@ function unroutable_target(x, ::Val{target}, _) where {target}
         return x
     end
     return throw(ArgumentError("cannot route the :$target pipeline target into a $(Base.typename(typeof(x)).wrapper): it has no :$target field to receive it"))
+end
+"""
+    const PIPELINE_ACCUMULATING_TARGETS = (:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst,
+                                          :smtx, :sgmtx)
+
+The [routing targets](@ref PIPELINE_ROUTING_TARGETS) that accept more than one computed result.
+
+Two steps writing one of these compose, and [`accumulate_constraint_values`](@ref) says how. A second write to any other target is refused instead, because those fields hold one value and the second would silently replace the first.
+
+The rule for membership is that one step per estimator must reach the optimiser with the value the estimator vector would have produced, so what a target accepts is read off what constraint generation does when handed several estimators at once. That gives two shapes:
+
+  - **Packed.** `:lcse`, `:ple`, `:slt`, `:sst`, `:sglt`, `:sgst`, `:smtx` and `:sgmtx` hold a vector, and generation returns one result per estimator. `:lcse` and `:ple` are *order-free* blocks. The other six are *positional*: entry `i` belongs to scenario or group block `i`, paired with the corresponding entry of `scard` or `sgcarde`, so write order is block order. A count that does not match is not a silent mis-pairing — [`JuMPOptimiser`](@ref) validates those lengths against each other when the routed value is absorbed, so a wrong number of steps fails at injection with a `DimensionMismatch`.
+  - **Folded.** `:cte` holds one [`LinearConstraint`](@ref). Its field does take a vector, but a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into a single result. Separate steps therefore merge rather than pack, which is what makes a pipeline of *n* centrality steps agree with one `cte` field holding *n* estimators.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+  - [`accumulate_constraint_values`](@ref)
+  - [`constraint_targets`](@ref)
+"""
+const PIPELINE_ACCUMULATING_TARGETS = (:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx,
+                                       :sgmtx)
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A computed constraint value paired with the [routing target](@ref PIPELINE_ROUTING_TARGETS) it must land in.
+
+The `constraints` slot is heterogeneous, and for three families the result type alone names the destination: a [`WeightBounds`](@ref) can only be `:wb`, a [`LinearConstraint`](@ref) only `:lcse`, a phylogeny constraint result only `:ple`. The other families are not so lucky. A [`Threshold`](@ref) has six homes on a [`JuMPOptimiser`](@ref) (`lt`, `st`, `slt`, `sst`, `sglt`, `sgst`), a centrality result is a `LinearConstraint` that belongs in `cte` rather than `lcse`, and an asset-sets matrix is not a constraint result at all.
+
+`TargetedConstraint` carries the answer with the value. The target comes from [`pipe_constraint_targets`](@ref) when the family names exactly one, and from the [`PipelineStep`](@ref) wrapper when it names several — so the *same* declaration that [`assert_routable`](@ref) checks at construction is the one [`constraint_targets`](@ref) reads at injection, and the two cannot disagree.
+
+A step wraps only what needs wrapping. When the value's own type already names the target — see [`implicit_constraint_target`](@ref) — the slot keeps the bare result, so reading `ctx.constraints` still shows what constraint generation returned.
+
+Internal machinery — not part of the user-facing API.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TargetedConstraint(;
+        target::Symbol,
+        res
+    ) -> TargetedConstraint
+
+## Validation
+
+  - `target in PIPELINE_ROUTING_TARGETS`.
+
+# Related
+
+  - [`pipe_constraint_targets`](@ref)
+  - [`constraint_targets`](@ref)
+  - [`run_constraint_step`](@ref)
+"""
+@concrete struct TargetedConstraint <: AbstractConstraintResult
+    """
+    The [routing target](@ref PIPELINE_ROUTING_TARGETS) the value must land in.
+    """
+    target
+    """
+    The computed value.
+    """
+    res
+    function TargetedConstraint(target::Symbol, res)
+        @argcheck(target in PIPELINE_ROUTING_TARGETS,
+                  ArgumentError("target must be one of $(PIPELINE_ROUTING_TARGETS), got :$target"))
+        return new{typeof(target), typeof(res)}(target, res)
+    end
+end
+function TargetedConstraint(; target::Symbol, res)::TargetedConstraint
+    return TargetedConstraint(target, res)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -265,6 +295,61 @@ function PipelineContext(; prices::Option{<:AbstractPricesResult} = nothing,
     return PipelineContext(prices, returns, prior, phylogeny, uncertainty, constraints, opt)
 end
 """
+    const PIPELINE_SLOTS = fieldnames(PipelineContext)
+
+The named slots of a [`PipelineContext`](@ref), in field order: `(:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints, :opt)`. Each pipeline step reads the slots it needs and writes the slot its estimator family produces.
+
+The list is *derived* from the struct rather than retyped, so a new slot cannot be added to [`PipelineContext`](@ref) and forgotten here.
+
+# Related
+
+  - [`PipelineContext`](@ref)
+  - [`PIPELINE_DATA_SLOTS`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+"""
+const PIPELINE_SLOTS = fieldnames(PipelineContext)
+"""
+    const PIPELINE_DATA_SLOTS = (:prices, :returns)
+
+The [`PIPELINE_SLOTS`](@ref) whose write *changes the asset universe* — equivalently, the two slots a [`Pipeline`](@ref) input can fill directly. Writing one of these makes every slot *derived* from it stale, which is exactly what [`PIPELINE_INVALIDATES`](@ref) is derived from. Every other slot is computed from the data and reorders nothing, so writing it invalidates nothing.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+const PIPELINE_DATA_SLOTS = (:prices, :returns)
+"""
+    PIPELINE_INVALIDATES
+
+The [`PipelineContext`](@ref) slots each written slot invalidates, derived from [`PIPELINE_SLOTS`](@ref) order and [`PIPELINE_DATA_SLOTS`](@ref):
+
+```julia
+(prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
+ returns = (:prior, :phylogeny, :uncertainty, :constraints))
+```
+
+Writing a [data slot](@ref PIPELINE_DATA_SLOTS) makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
+
+The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_DATA_SLOTS`](@ref)
+  - [`Pipeline`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+const PIPELINE_INVALIDATES = let slots = PIPELINE_SLOTS, terminal = last(PIPELINE_SLOTS)
+    idx(x) = findfirst(==(x), slots)
+    NamedTuple{PIPELINE_DATA_SLOTS}(map(PIPELINE_DATA_SLOTS) do s
+                                        return Tuple(x
+                                                     for x in slots
+                                                     if x != terminal && idx(x) > idx(s))
+                                    end)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [`PipelineContext`](@ref) slot a pipeline step writes.
@@ -301,6 +386,9 @@ pipe_writes(::AbstractPriorEstimator) = :prior
 pipe_writes(::AbstractPhylogenyEstimator) = :phylogeny
 pipe_writes(::AbstractUncertaintySetEstimator) = :uncertainty
 pipe_writes(::AbstractConstraintEstimator) = :constraints
+function pipe_writes(ce::JuMPConstraintEstimator)
+    return throw(ArgumentError("a $(Base.typename(typeof(ce)).wrapper) is configuration for the JuMP model rather than a value computed from data, so it is not a pipeline step; pass it to the optimiser's own field (`ccnt` for a CustomJuMPConstraint, `bgt`/`sbgt`/`gbgt` for a budget constraint) instead"))
+end
 pipe_writes(::OptimisationEstimator) = :opt
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -308,6 +396,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return the [`PipelineContext`](@ref) slots a pipeline step requires to be populated before it runs.
 
 These are the *required* reads used for construction-time dependency validation, not every slot the step may consume. Slots an estimator can compute internally when absent (for example a phylogeny-constraint estimator's own phylogeny) are not listed.
+
+Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a bare constraint step resolves against is built from the returns' names (see [`pipeline_asset_sets`](@ref)). An [`ExposureConstraintEstimator`](@ref) additionally reads `:prior`, because the basis it re-bases through is the prior's regression loadings.
 
 # Arguments
 
@@ -339,7 +429,111 @@ pipe_reads(::AbstractPriorEstimator) = (:returns,)
 pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
 pipe_reads(::AbstractConstraintEstimator) = (:returns,)
+pipe_reads(::ExposureConstraintEstimator) = (:returns, :prior)
 pipe_reads(::OptimisationEstimator) = (:returns,)
+"""
+    const PIPELINE_THRESHOLD_TARGETS = (:lt, :st, :slt, :sst, :sglt, :sgst)
+
+The six [routing targets](@ref PIPELINE_ROUTING_TARGETS) a [`Threshold`](@ref) can land in.
+
+A buy-in threshold is one number per asset, and a [`JuMPOptimiser`](@ref) holds six of them: the long and short thresholds of the plain cardinality constraint (`lt`, `st`), and of its scenario and group variants (`slt`, `sst`, `sglt`, `sgst`). The result carries nothing that says which, so a threshold step must be told — see [`pipe_constraint_targets`](@ref).
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`pipe_constraint_targets`](@ref)
+  - [`PIPELINE_STEP_TARGETS`](@ref)
+"""
+const PIPELINE_THRESHOLD_TARGETS = (:lt, :st, :slt, :sst, :sglt, :sgst)
+"""
+    const PIPELINE_ASSET_SETS_MATRIX_TARGETS = (:smtx, :sgmtx)
+
+The two [routing targets](@ref PIPELINE_ROUTING_TARGETS) an [`AssetSetsMatrixEstimator`](@ref) result can land in: the scenario membership matrix and the group one.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`pipe_constraint_targets`](@ref)
+  - [`PIPELINE_STEP_TARGETS`](@ref)
+"""
+const PIPELINE_ASSET_SETS_MATRIX_TARGETS = (:smtx, :sgmtx)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a constraint family's step can write.
+
+This is the one declaration of the estimator → target half of the seam, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
+
+  - [`run_constraint_step`](@ref) resolves the target and pairs it with the computed value.
+  - [`pipe_required_targets`](@ref) hands it to [`assert_routable`](@ref), so a step whose target the terminal optimiser cannot receive is refused when the [`Pipeline`](@ref) is built rather than after the first fold has run.
+  - [`PipelineStep`](@ref) validates a declared target against it.
+
+The tuple's length is the contract:
+
+  - **One** target: the family names its destination, and the step needs no annotation.
+  - **Several**: the destination is a real choice the result cannot express, so the step must name one through its [`PipelineStep`](@ref) wrapper. This is the same rule an uncertainty-set step follows.
+  - **None**: the family has no value to contribute to the `constraints` slot, so it is not a step. [`JuMPConstraintEstimator`](@ref) is the case — it is configuration for the model, not a computation over data.
+
+# Arguments
+
+  - `ce`: A constraint estimator.
+
+# Returns
+
+  - A tuple of [routing targets](@ref PIPELINE_ROUTING_TARGETS).
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.pipe_constraint_targets(WeightBoundsEstimator())
+(:wb,)
+```
+
+# Related
+
+  - [`run_constraint_step`](@ref)
+  - [`pipe_required_targets`](@ref)
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+"""
+pipe_constraint_targets(::AbstractConstraintEstimator) = ()
+pipe_constraint_targets(::WeightBoundsEstimator) = (:wb,)
+pipe_constraint_targets(::LinearConstraintEstimator) = (:lcse,)
+pipe_constraint_targets(::ExposureConstraintEstimator) = (:lcse,)
+pipe_constraint_targets(::AbstractCentralityConstraint) = (:cte,)
+pipe_constraint_targets(::AbstractPhylogenyConstraintEstimator) = (:ple,)
+pipe_constraint_targets(::RiskBudgetEstimator) = (:rkb,)
+pipe_constraint_targets(::ThresholdEstimator) = PIPELINE_THRESHOLD_TARGETS
+pipe_constraint_targets(::AssetSetsMatrixEstimator) = PIPELINE_ASSET_SETS_MATRIX_TARGETS
+"""
+    const PIPELINE_STEP_TARGETS = (:mu, :sigma, :both, :lt, :st, :slt, :sst, :sglt, :sgst,
+                                  :smtx, :sgmtx)
+
+The routing annotations a [`PipelineStep`](@ref)'s `target` field may carry.
+
+A target is *routing intent*, not a slot. It is needed by exactly the steps whose destination their own result cannot express, and there are two such cases:
+
+  - An uncertainty-set step says which parameters it is meant to bound — `:mu`, `:sigma` or `:both` — and [`pipe_required_targets`](@ref) turns that into the [routing targets](@ref PIPELINE_ROUTING_TARGETS) `:mu_ucs` and `:sigma_ucs`.
+  - A constraint step whose family names several targets says which one, naming the routing target directly. The families and their targets are declared by [`pipe_constraint_targets`](@ref), and the annotations above are exactly the union of the ones that name more than one.
+
+`nothing` is the remaining accepted value and means "no annotation", which is what every step of every other family carries.
+
+The allowlist is applied at construction, beside the one on `writes`, so a mistyped target is refused where it is written rather than by [`run_uncertainty_step`](@ref) after the pipeline has already fitted the steps before it. [`run_uncertainty_step`](@ref) and [`run_constraint_step`](@ref) keep their own checks, because an unwrapped estimator reaches them with `target = nothing` and because an annotation legal for one family is not legal for another.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`run_uncertainty_step`](@ref)
+  - [`run_constraint_step`](@ref)
+  - [`pipe_constraint_targets`](@ref)
+  - [`pipe_required_targets`](@ref)
+  - [`PIPELINE_ROUTING_TARGETS`](@ref)
+"""
+const PIPELINE_STEP_TARGETS = (:mu, :sigma, :both, PIPELINE_THRESHOLD_TARGETS...,
+                               PIPELINE_ASSET_SETS_MATRIX_TARGETS...)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -357,7 +551,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PipelineStep(;
-        est,
+        est::Union{<:AbstractEstimator, <:Function},
         writes::Symbol,
         reads::Tuple{Vararg{Symbol}} = (),
         target::Option{Symbol} = nothing,
@@ -369,6 +563,7 @@ Keywords correspond to the struct's fields.
 
   - `writes in PIPELINE_SLOTS`.
   - `all(r -> r in PIPELINE_SLOTS, reads)`.
+  - `isnothing(target) || target in PIPELINE_STEP_TARGETS`.
   - A [`TimeDependent`](@ref) `est` must be an optimiser-position schedule ([`TD_OptE_Opt`](@ref)) and declare `writes = :opt`: schedules of non-optimiser families are not steppable — a per-fold prior/constraint/… is spelled as a `TimeDependent` *field* of the optimisation step instead.
 
 # Examples
@@ -405,7 +600,7 @@ julia> PortfolioOptimisers.pipe_reads(ps)
     """
     writes
     """
-    Optional routing annotation for heterogeneous slots (for uncertainty sets: `:mu`, `:sigma`, or `:both`).
+    Optional routing annotation for heterogeneous slots (one of [`PIPELINE_STEP_TARGETS`](@ref), or `nothing`).
     """
     target
     function PipelineStep(est::Union{<:AbstractEstimator, <:Function},
@@ -415,6 +610,8 @@ julia> PortfolioOptimisers.pipe_reads(ps)
                   ArgumentError("writes must be one of $(PIPELINE_SLOTS), got :$writes"))
         @argcheck(all(r -> r in PIPELINE_SLOTS, reads),
                   ArgumentError("all reads must be members of $(PIPELINE_SLOTS), got $reads"))
+        @argcheck(isnothing(target) || target in PIPELINE_STEP_TARGETS,
+                  ArgumentError("target must be one of $(PIPELINE_STEP_TARGETS) or nothing, got :$target"))
         if isa(est, TimeDependent)
             @argcheck(isa(est, TD_OptE_Opt),
                       ArgumentError("a TimeDependent schedule is only steppable when it stands in for the optimiser (an optimiser-position schedule, see TD_OptE_Opt); schedules of non-optimiser families are not pipeline steps. To vary a prior, constraint, or other input per fold, put a TimeDependent in the corresponding field of the optimisation step instead."))

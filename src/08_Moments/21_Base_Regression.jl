@@ -212,7 +212,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 # Arguments
 
   - `tgt`: Regression target specifying model options.
-  - `X`: The design matrix (observations × features).
+  - `X`: The design matrix (observations × factors).
   - `y`: The response vector.
 
 # Returns
@@ -318,7 +318,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 # Arguments
 
   - `tgt`: A [`GeneralisedLinearModel`](@ref) regression target specifying model options.
-  - `X`: The design matrix (observations × features).
+  - `X`: The design matrix (observations × factors).
   - `y`: The response vector.
 
 # Returns
@@ -679,7 +679,7 @@ end
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
-This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, and intercept vector `b` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets or features.
+This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, and intercept vector `b` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
 
 # Arguments
 
@@ -711,8 +711,14 @@ Regression
   - [`Regression`](@ref)
 """
 function port_opt_view(re::Regression, i, args...)::Regression
-    return Regression(; M = view(re.M, i, :),
-                      L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
+    # `L` and `b` are both optional, and `L` must be read with `getfield`: the
+    # `swap(L, M)` property rule above makes `re.L` return `re.M` when `L` is unset, so
+    # `isnothing(re.L)` is never true and a viewed result would materialise `L` as a copy
+    # of `M`, silently losing the unset-ness the rule exists to express.
+    L = getfield(re, :L)
+    b = getfield(re, :b)
+    return Regression(; M = view(re.M, i, :), L = isnothing(L) ? nothing : view(L, i, :),
+                      b = isnothing(b) ? nothing : view(b, i))
 end
 """
     regression(re::Regression, args...)

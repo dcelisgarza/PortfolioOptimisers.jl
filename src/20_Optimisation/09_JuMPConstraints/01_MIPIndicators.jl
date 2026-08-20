@@ -101,7 +101,7 @@ Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and 
 
 # Fields
 
-  - `smtx`: Selection matrix mapping assets to sub-groups.
+  - $(arg_dict[:smtx_arg])
   - `pfx::Symbol`: Key prefix; `:s` for cardinality sub-groups, `:sg` for group-cardinality sub-groups.
   - `i::Integer`: Index of the selection matrix, used in key naming.
 

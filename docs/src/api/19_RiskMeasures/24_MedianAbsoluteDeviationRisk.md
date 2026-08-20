@@ -6,6 +6,7 @@ MedianCentering
 MeanCentering
 MedAbsDevMu
 MedianAbsoluteDeviation
+resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPriorResult)
 nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
 port_opt_view(r::MedianAbsoluteDeviation, i, args...)
 calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering, <:Any}, ::Any, x::VecNum)

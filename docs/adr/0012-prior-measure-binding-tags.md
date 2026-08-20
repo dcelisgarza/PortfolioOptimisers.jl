@@ -119,7 +119,7 @@ avoided entirely by opting out the few measures whose fields are not universal.
 ### 5. Opt-outs stay hand-written
 
 The macro covers the ~29 (of ~36) pure-select and select-plus-`@fprop`-child measures
-(`Variance`, `StandardDeviation`, the VaR/CVaR/EVaR/RVaR/PNVaR + Range/Drawdown families,
+(`Variance`, `StandardDeviation`, the VaR/CVaR/EVaR/RLVaR/PNVaR + Range/Drawdown families,
 `MAD`, `ThirdCentralMoment`, `MeanReturn`, `ValueatRisk`/`…Range` via `@pprop w` + `@fprop alg`).
 These opt out and keep hand-written `factory` methods:
 

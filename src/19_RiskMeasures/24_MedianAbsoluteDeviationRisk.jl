@@ -35,19 +35,24 @@ Centres the returns series using the (weighted) mean before computing the Median
 """
 struct MeanCentering <: MedianCenteringFunction end
 """
-    const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
+    const MedAbsDevMu = Union{<:MuSlot, <:MedianCenteringFunction}
 
 Union of valid centring-target types for [`MedianAbsoluteDeviation`](@ref).
 
-Accepts a numeric scalar/vector target or a [`MedianCenteringFunction`](@ref) (e.g. mean or median centering).
+Accepts a numeric scalar/vector target, an estimator that computes one (a **Deferred Quantity** — see [`MuSlot`](@ref)), or a [`MedianCenteringFunction`](@ref) (e.g. mean or median centering).
+
+The field has **two resolution points**, and both are forced. A centring strategy resolves in [`calc_moment_target`](@ref), at the point of use, because it centres the *portfolio* series and so needs the asset weights. A Deferred Quantity resolves in [`factory`](@ref), because it needs the returns matrix, which `calc_moment_target` never sees. There is no `Nothing` state: the default is `MedianCentering()`.
+
+The two are different quantities, not two spellings of one. The median is not linear, so `median(w'X) ≠ w' * median(X)` — `MedianCentering()` and `mu = MedianExpectedReturns()` do not agree. Nor does `MeanCentering()` agree with a mean estimator when fees are set: it centres net of fees, a resolved vector is gross.
 
 # Related
 
-  - [`Num_VecNum_VecScalar`](@ref)
+  - [`MuSlot`](@ref)
+  - [`DeferredQuantity`](@ref)
   - [`MedianCenteringFunction`](@ref)
   - [`MedianAbsoluteDeviation`](@ref)
 """
-const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
+const MedAbsDevMu = Union{<:MuSlot, <:MedianCenteringFunction}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -96,6 +101,10 @@ Keywords correspond to the struct's fields.
   - If `mu` is a `Number`: `isfinite(mu)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or keeps a [`MedianCenteringFunction`](@ref), which recomputes the centre from the portfolio series at every call.
+
 # Functor
 
     (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees = nothing)
@@ -112,7 +121,7 @@ Computes the MAD of the portfolio returns series.
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
-  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `mu`: A stated value is sliced to the selected indices via [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
 
 # Examples
 
@@ -139,11 +148,11 @@ MedianAbsoluteDeviation
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     @pprop w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_mad_slot])
     """
     @vprop mu
     """
@@ -172,6 +181,30 @@ function MedianAbsoluteDeviation(;
                                  flag::Bool = true)::MedianAbsoluteDeviation
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`MedianAbsoluteDeviation`](@ref)'s `mu` slot against prior result `pr`.
+
+This is the only thing `factory` does to `mu`. The field is tagged [`@vprop`](@ref) and not [`@pprop`](@ref), so the prior never *fills* it — a bare `MedianAbsoluteDeviation()` inside a [`JuMPOptimiser`](@ref) keeps median-centring rather than silently taking `pr.mu`.
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`MedAbsDevMu`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPriorResult)
+    if !isa(r.mu, DeferredQuantity)
+        return r
+    end
+    return MedianAbsoluteDeviation(; settings = r.settings, w = r.w,
+                                   mu = resolve_slot(r.mu, :mu, pr), flag = r.flag)
+end
+# Deferrable slots — see `deferred_slots`. A centring strategy in `mu` is not deferred: it
+# resolves at the point of use, on the portfolio series.
+deferred_slots(r::MedianAbsoluteDeviation) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

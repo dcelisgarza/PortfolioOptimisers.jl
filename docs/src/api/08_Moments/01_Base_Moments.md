@@ -19,6 +19,7 @@ factory(me::AbstractExpectedReturnsEstimator, args...; kwargs...)
 port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any, args...)
 factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
 cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
+densify
 robust_cov
 robust_cor
 compat_cov

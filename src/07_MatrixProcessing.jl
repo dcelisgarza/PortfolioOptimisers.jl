@@ -10,7 +10,7 @@ All concrete and/or abstract types that implement matrix processing routines---s
 In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
-  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix.
+  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix. A fallback method copies `sigma` and calls `matrix_processing!`, so it is only needed if the copy can be avoided.
 
 ## Arguments
 
@@ -191,11 +191,12 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MatrixProcessing(;
-        pdm::Option{<:Posdef} = Posdef(),
-        dn::Option{<:Denoise} = nothing,
-        dt::Option{<:Detone} = nothing,
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+        dn::Option{<:AbstractDenoiseEstimator} = nothing,
+        dt::Option{<:AbstractDetoneEstimator} = nothing,
         alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-        order = (:pdm, :dn, :dt, :alg)
+        order::Union{<:NTuple{N, <:Symbol} where {N},
+                     <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt, :alg)
     ) -> MatrixProcessing
 
 Keywords correspond to the struct's fields.
@@ -275,8 +276,9 @@ MatrixProcessing
     A tuple or vector of symbols naming the processing steps in the order they are applied. Recognised steps are `:pdm`, `:dn`, `:dt`, and `:alg`; an unrecognised symbol errors at construction.
     """
     order
-    function MatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
-                              dt::Option{<:Detone},
+    function MatrixProcessing(pdm::Option{<:AbstractPosdefEstimator},
+                              dn::Option{<:AbstractDenoiseEstimator},
+                              dt::Option{<:AbstractDetoneEstimator},
                               alg::Option{<:AbstractMatrixProcessingAlgorithm},
                               order::Union{<:NTuple{N, <:Symbol} where {N},
                                            <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt,
@@ -289,8 +291,9 @@ MatrixProcessing
                                                                                     order)
     end
 end
-function MatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
-                          dn::Option{<:Denoise} = nothing, dt::Option{<:Detone} = nothing,
+function MatrixProcessing(; pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+                          dn::Option{<:AbstractDenoiseEstimator} = nothing,
+                          dt::Option{<:AbstractDetoneEstimator} = nothing,
                           alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                           order::Union{<:NTuple{N, <:Symbol} where {N},
                                        <:AbstractVector{<:Symbol}} = (:pdm, :dn, :dt, :alg))
@@ -298,7 +301,7 @@ function MatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
 end
 """
     matrix_processing!(
-        mp::Option{<:MatrixProcessing},
+        mp::Option{<:AbstractMatrixProcessingEstimator},
         sigma::MatNum,
         X::MatNum,
         args...;

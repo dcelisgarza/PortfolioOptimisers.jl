@@ -18,9 +18,9 @@ $(DocStringExtensions.FIELDS)
         re::AbstractRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         views::Lc_BLV,
-        sets::Option{<:AssetSets} = nothing,
+        sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
-        w::Option{<:ObsWeights} = nothing,
+        w::Option{<:VecNum} = nothing,
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
@@ -29,22 +29,40 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Composition: what this estimator forwards
+
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
+
+  - The factor block `fpr` is the **posterior** factor distribution, processed by `f_mp`, with `chol` dropped because the posterior covariance supersedes the one it factorises. Its `w` and that weighting's diagnostics forward untouched.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds by construction, and at the default `rf = 0.0` that is the plain identity. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence.
+  - No `Z` is carried: the only wrapped prior is fit on factors, so its feature matrix would be factors × features and would not describe the asset axis. The drop is a *relocation* rather than a destruction — the factor block is forwarded, so a feature matrix the factor prior carried is still reachable at `pr.fpr.Z`. Wrap this estimator from the *outside* with [`FeaturePrior`](@ref) if an asset-axis feature matrix is wanted.
+
+Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the identity exactly, while [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) do not — see their warnings.
+
+## The views are written on the factor axis
+
+`views` resolves against `sets.dict[sets.fkey]` — the axis [`UniverseSets`](@ref) declares for factors — because that is the distribution they update. The asset axis is still required (every `UniverseSets` carries one) and is what [`port_opt_view`](@ref) slices; the factor entries come back untouched, which is why this field is `@vprop` rather than exempted by hand.
+
+`sets.dict[sets.fkey]` must name the columns of `F` **in order**; [`factor_universe`](@ref) checks it, and reports the factor axis rather than the asset one when it is missing or the wrong length.
+
 ## Validation
 
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
-  - If `w` is not `nothing`, `length(w) == size(X, 2)`.
+  - If `l` and `w` are not `nothing`, `length(w) == size(X, 2)`.
 
 # Examples
 
 ```jldoctest
 julia> FactorBlackLittermanPrior(;
-                                 sets = AssetSets(; key = \"nx\",
-                                                  dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"])),
+                                 sets = UniverseSets(;
+                                                     dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"],
+                                                                 \"nf\" => [\"F1\", \"F2\"])),
                                  views = LinearConstraintEstimator(;
-                                                                   val = [\"A == 0.03\",
-                                                                          \"B + C == 0.04\"]))
+                                                                   val = [\"F1 == 0.03\",
+                                                                          \"F2 == 0.04\"]))
 FactorBlackLittermanPrior
           pe ┼ EmpiricalPrior
              │        ce ┼ PortfolioOptimisersCovariance
@@ -94,12 +112,15 @@ FactorBlackLittermanPrior
              │           w ┼ nothing
              │   corrected ┴ Bool: true
        views ┼ LinearConstraintEstimator
-             │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+             │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
-        sets ┼ AssetSets
-             │    key ┼ String: "nx"
-             │   ukey ┼ String: "ux"
-             │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        sets ┼ UniverseSets
+             │    xkey ┼ String: "nx"
+             │   uxkey ┼ String: "ux"
+             │    fkey ┼ String: "nf"
+             │   ufkey ┼ String: "uf"
+             │    zkey ┼ String: "nz"
+             │    dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"])
   views_conf ┼ nothing
            w ┼ nothing
           rf ┼ Float64: 0.0
@@ -113,7 +134,7 @@ FactorBlackLittermanPrior
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`BlackLittermanViews`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
@@ -143,19 +164,19 @@ FactorBlackLittermanPrior
     """
     views
     """
-    $(field_dict[:sets])
+    $(field_dict[:sets_f])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:views_conf])
     """
     views_conf
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:eqw])
     """
-    w
+    @vprop w
     """
-    $(field_dict[:rf])
+    $(field_dict[:bl_rf])
     """
     rf
     """
@@ -175,7 +196,7 @@ FactorBlackLittermanPrior
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractRegressionEstimator,
                                        ve::AbstractVarianceEstimator, views::Lc_BLV,
-                                       sets::Option{<:AssetSets},
+                                       sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
@@ -192,7 +213,7 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                                   views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
@@ -256,7 +277,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
-  - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
@@ -264,13 +285,14 @@ Where:
   - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
   - The factor prior is computed using the embedded asset prior estimator `pe.pe`.
   - Factor regression is performed using the regression estimator `pe.re`.
-  - Views are extracted using [`black_litterman_views`](@ref), which returns the view matrix `P` and view returns vector `Q`.
+  - Views are extracted using [`black_litterman_views`](@ref) **at `pe.sets.fkey`**, which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
   - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
-  - If leverage is specified, the prior mean is adjusted accordingly.
+  - The prior mean handed to the update is an **excess** return. If `pe.l` is specified it is the equilibrium mean [`equilibrium_mu`](@ref) computes, which is a risk premium already. Otherwise it is the factor prior's own mean less `pe.rf`, by [`remove_rf`](@ref).
   - The Black-Litterman posterior mean and covariance for factors are computed using [`vanilla_posteriors`](@ref).
   - Matrix processing is applied to the factor and asset posterior covariance matrices.
   - The asset posterior mean and covariance are reconstructed using the factor loadings.
+  - `pe.rf` is added back to the reconstructed asset mean once, by [`apply_rf`](@ref), and the factor block stays on the excess scale the update ran on. The rate comes off the factor axis and goes on the asset axis, so where `pe.l` is `nothing` the two moves are not inverses: writing `s` for the row sums of `rr.M`, the answer moves by `pe.rf * (1 - s)` against the same estimator at `rf = 0`, and cancels only for an asset whose loadings sum to one.
   - If `rsd` is `true`, residual variance is added to the posterior covariance and Cholesky factor.
   - The result includes asset returns, posterior mean, posterior covariance, Cholesky factor, weights, regression result, and factor prior details.
 
@@ -281,58 +303,77 @@ Where:
   - [`prior`](@ref)
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
+  - [`apply_rf`](@ref)
+  - [`remove_rf`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        F = transpose(F)
+    X, F = dims_oriented(dims, X, F)
+    # The views land on the *factor* distribution, so they resolve against the declared factor
+    # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
+    # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own
+    # `P`, so demanding one for it would reject the legitimate precomputed-views configuration,
+    # which `assert_bl` deliberately permits to supply no `sets` at all.
+    if isa(pe.views, LinearConstraintEstimator)
+        factor_universe(pe.sets, size(F, 2),
+                        "FactorBlackLittermanPrior, whose views are written in factor names",
+                        "F")
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
-              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
-    rr = regression(pe.re, X, F)
-    (; b, M) = rr
-    posterior_X = F * transpose(M) .+ transpose(b)
+    rr, posterior_X = factor_reconstruction(pe.re, X, F)
+    M = rr.M
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
-                                      size(X, 1), eltype(posterior_X), strict)
-    prior_mu = if !isnothing(pe.l)
-        w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2),
-                      DimensionMismatch("length(pe.w) ($(length(pe.w))) must match size(X, 2) ($(size(X, 2)))"))
-            pe.w
-        else
-            iN = inv(size(X, 2))
-            range(iN, iN; length = size(X, 2))
-        end
-        pe.l * (prior_sigma * transpose(M)) * w
+                                      size(X, 1), eltype(posterior_X), strict, :fkey)
+    # `pe.l` replaces the factor prior's own mean with an equilibrium one implied by the asset
+    # weights `pe.w`. The expression and its equal-weight fallback belong to
+    # [`equilibrium_mu`](@ref).
+    #
+    # Both branches must leave an *excess* return, because that is the scale the view returns
+    # in `Q` are written on, and the scale [`apply_rf`](@ref) undoes at the end. The
+    # equilibrium mean is one already — it is the risk premium reverse optimisation implies.
+    # The factor prior's own mean is a total return, so [`remove_rf`](@ref) takes the rate off
+    # it first.
+    prior_excess_mu = if !isnothing(pe.l)
+        equilibrium_mu(pe.l, prior_sigma * transpose(M), pe.w)
     else
-        prior_mu .- pe.rf
+        remove_rf(pe.rf, prior_mu)
     end
-    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu,
+    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, prior_excess_mu,
                                                            prior_sigma, omega, P, Q)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
-    # Reconstruct the posteriors using the black litterman adjusted factor statistics.
-    posterior_mu = M * f_posterior_mu + b
-    posterior_sigma = M * f_posterior_sigma * transpose(M)
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * LinearAlgebra.cholesky(f_posterior_sigma).L
-    if pe.rsd
-        err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
-        posterior_sigma .+= err_sigma
-        posdef!(pe.mp.pdm, posterior_sigma)
-        posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
-    end
-    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, rr = rr,
-                         f_mu = f_posterior_mu, f_sigma = f_posterior_sigma,
-                         f_w = f_prior.w)
+    # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
+    # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
+    (; mu, sigma, chol) = factor_lift(pe.mp, pe.ve, pe.rsd, rr, f_posterior_mu,
+                                      f_posterior_sigma, X, posterior_X; kwargs...)
+    # `pe.rf` goes back on here and only here (see [`apply_rf`](@ref)): once, on the asset
+    # expected returns this estimator returns. `f_posterior_mu` is an excess return and stays
+    # one — putting the rate back before the lift would carry it through the loadings as
+    # `M * (rf * 1)`, which is a projection of the rate rather than the rate.
+    mu = apply_rf(pe.rf, mu)
+    # No `Z` is forwarded: the only wrapped prior here is `f_prior`, fit on the factors, so
+    # its feature matrix would be factors × features and would not describe the asset axis.
+    #
+    # This is the one site that *modifies* the factor block rather than passing it through:
+    # the views land on the factor distribution. `chol` is dropped because `f_posterior_sigma`
+    # supersedes the factor prior's covariance (see [`forward_prior`](@ref)); everything else
+    # the factor prior carried — its `w` and that weighting's diagnostics — is forwarded.
+    fpr = forward_prior(f_prior; mu = f_posterior_mu, sigma = f_posterior_sigma,
+                        chol = nothing)
+    #
+    # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
+    # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
+    # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
+    # — a weighting with no provenance cannot be interrogated (ADR 0046).
+    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
+                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
+                         ow = f_prior.ow, rr = rr, fpr = fpr)
+end
+function factor_residual_config(pe::FactorBlackLittermanPrior)
+    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
 end
 
 export FactorBlackLittermanPrior

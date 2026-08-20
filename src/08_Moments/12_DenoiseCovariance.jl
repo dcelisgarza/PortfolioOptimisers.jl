@@ -1,14 +1,14 @@
 """
     DenoiseCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
-        dn::Denoise = Denoise(),
-        pdm::Option{<:Posdef} = Posdef(),
+        dn::AbstractDenoiseEstimator = Denoise(),
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
     ) -> PortfolioOptimisersCovariance
 
     DenoiseCovariance(
         ce::StatsBase.CovarianceEstimator,
-        dn::Denoise,
-        pdm::Option{<:Posdef},
+        dn::AbstractDenoiseEstimator,
+        pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
 Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
@@ -53,15 +53,15 @@ PortfolioOptimisersCovariance
   - [`Denoise`](@ref)
   - [`Posdef`](@ref)
 """
-function DenoiseCovariance(ce::StatsBase.CovarianceEstimator, dn::Denoise,
-                           pdm::Option{<:Posdef})::PortfolioOptimisersCovariance
+function DenoiseCovariance(ce::StatsBase.CovarianceEstimator, dn::AbstractDenoiseEstimator,
+                           pdm::Option{<:AbstractPosdefEstimator})::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(; ce = ce,
                                          mp = MatrixProcessing(; pdm = pdm, dn = dn,
                                                                order = (:pdm, :dn)))
 end
 function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                           dn::Denoise = Denoise(),
-                           pdm::Option{<:Posdef} = Posdef())::PortfolioOptimisersCovariance
+                           dn::AbstractDenoiseEstimator = Denoise(),
+                           pdm::Option{<:AbstractPosdefEstimator} = Posdef())::PortfolioOptimisersCovariance
     return DenoiseCovariance(ce, dn, pdm)
 end
 

@@ -1,0 +1,23 @@
+# Feature Distance
+
+```@docs
+AngularDist
+AbstractCollapseAlgorithm
+MeanCollapse
+MedianCollapse
+AbstractFeatureCollapseAlgorithm
+LastObservation
+AggregateFeatures
+AggregateDistances
+StackObservations
+FeatureDistance
+assert_metric_domain
+assert_feature_matrix
+zero_feature_vectors
+patch_zero_feature_vectors!
+feature_distance
+collapse_features
+stack_observations
+collapse_weights
+assert_feature_matrix_supplied
+```

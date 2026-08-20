@@ -13,8 +13,8 @@ $(DocStringExtensions.FIELDS)
 
     ThresholdEstimator(;
         val::EstValType,
-        dval::Option{<:Number} = nothing,
-        key::Option{<:AbstractString} = nothing
+        key::Option{<:AbstractString} = nothing,
+        dval::Option{<:Number} = nothing
     ) -> ThresholdEstimator
 
 ## Validation
@@ -226,9 +226,6 @@ Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`
   - [`VecOptBt`](@ref)
 """
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
-function port_opt_view(t::VecOptBtE_Bt, i, args...)
-    return [port_opt_view(ti, i) for ti in t]
-end
 """
     threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)
 
@@ -268,7 +265,7 @@ function threshold_constraints(t::Option{<:Threshold}, args...;
     return t
 end
 """
-    threshold_constraints(t::ThresholdEstimator, sets::AssetSets;
+    threshold_constraints(t::ThresholdEstimator, sets::UniverseSets;
                           datatype::DataType = Float64, strict::Bool = false)
 
 Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and asset set.
@@ -278,7 +275,7 @@ Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and 
 # Arguments
 
   - `t`: [`ThresholdEstimator`](@ref) specifying asset-specific threshold values.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `datatype`: Output data type for thresholds.
   - `strict`: If `true`, enforces strict matching between assets and thresholds (throws error on mismatch); if `false`, issues a warning.
 
@@ -294,7 +291,7 @@ Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and 
 # Examples
 
 ```jldoctest
-julia> sets = AssetSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
 
 julia> t = ThresholdEstimator(Dict(\"A\" => 0.05, \"B\" => 0.1));
 
@@ -308,9 +305,9 @@ Threshold
   - [`ThresholdEstimator`](@ref)
   - [`Threshold`](@ref)
   - [`threshold_constraints`](@ref)
-  - [`AssetSets`](@ref)
+  - [`UniverseSets`](@ref)
 """
-function threshold_constraints(t::ThresholdEstimator, sets::AssetSets;
+function threshold_constraints(t::ThresholdEstimator, sets::UniverseSets;
                                datatype::DataType = Float64,
                                strict::Bool = false)::Threshold
     return Threshold(;
@@ -318,14 +315,14 @@ function threshold_constraints(t::ThresholdEstimator, sets::AssetSets;
                                             strict = strict))
 end
 """
-    threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets;
+    threshold_constraints(t::VecOptBtE_Bt, sets::UniverseSets;
                           kwargs...)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
-function threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets; kwargs...)
+function threshold_constraints(t::VecOptBtE_Bt, sets::UniverseSets; kwargs...)
     return [threshold_constraints(ti, sets; kwargs...) for ti in t]
 end
 

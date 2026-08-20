@@ -23,9 +23,16 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    # The two jobs need different scopes, so each declares its own. This one deploys: it pushes
+    # `gh-pages`, reads the pull request it previews, and reports the preview as a status. These
+    # are the three scopes Documenter asks for.
+    permissions:
+      contents: write
+      pull-requests: read
+      statuses: write
     steps:
       - uses: actions/checkout@v7
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
           version: "1"
       - name: Use Julia cache
@@ -46,9 +53,12 @@ jobs:
   doctest:
     name: Doctests
     runs-on: ubuntu-latest
+    # This job runs `doctest` and deploys nothing.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
           version: "1"
       - name: Use Julia cache

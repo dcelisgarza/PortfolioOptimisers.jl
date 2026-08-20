@@ -11,6 +11,8 @@ IndexWalkForward
 Base.split(iwf::IndexWalkForward, rd::Prices_RR)
 DateWalkForward
 special_div(a::Integer, b::Integer)
+walk_forward_date_range
+date_index_positions
 Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)
 Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
 n_splits

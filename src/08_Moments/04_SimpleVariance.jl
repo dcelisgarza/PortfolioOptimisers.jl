@@ -76,6 +76,61 @@ function SimpleVariance(;
     return SimpleVariance(me, w, corrected)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var`.
+
+# Arguments
+
+  - `f`: Dispersion function to apply, either `Statistics.std` or `Statistics.var`.
+  - `ve::SimpleVariance`: Variance estimator. Supplies the observation weights and the `corrected` flag.
+  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used when no `mean` is provided. Matrix methods only.
+  - `X::VecNum_MatNum`: Data matrix or vector.
+  - `dims::Int = 1`: Dimension along which to operate. Matrix methods only.
+  - `mean = nothing`: Precomputed mean.
+  - `kwargs...`: Forwarded to the mean and weight resolution. Matrix methods only.
+
+# Validation
+
+  - $(val_dict[:dims]) Matrix methods only.
+
+# Returns
+
+  - `sigma::Union{<:Number, <:ArrNum}`: Dispersion of `X` computed by `f`.
+
+# Details
+
+  - For a matrix, resolves the mean from `mean` when given, else from `me`. A vector defers the mean to `f`.
+  - Resolves the observation weights from `ve.w` with [`get_observation_weights`](@ref).
+  - Applies `f` to the weighted branch when the resolved weights are not `nothing`, else to the unweighted branch.
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+function simple_variance_kernel(f::F, ve::SimpleVariance,
+                                me::AbstractExpectedReturnsEstimator, X::MatNum;
+                                dims::Int = 1, mean = nothing, kwargs...) where {F}
+    assert_dims(dims)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
+    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
+        f(X; dims = dims, corrected = ve.corrected, mean = mu)
+    else
+        f(X, w, dims; corrected = ve.corrected, mean = mu)
+    end
+end
+function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
+                                mean = nothing) where {F}
+    w = get_observation_weights(ve.w, X)
+    return if isnothing(w)
+        f(X; corrected = ve.corrected, mean = mean)
+    else
+        f(X, w; corrected = ve.corrected, mean = mean)
+    end
+end
+"""
     Statistics.std(
         ve::SimpleVariance,
         X::MatNum;
@@ -175,13 +230,8 @@ julia> std(sv, Xmat; dims = 1)
 """
 function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
-    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
-    return if isnothing(w)
-        Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
-    else
-        Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
-    end
+    return simple_variance_kernel(Statistics.std, ve, ve.me, X; dims = dims, mean = mean,
+                                  kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -190,17 +240,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 """
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    mu = if isnothing(mean)
-        Statistics.mean(SimpleExpectedReturns(), X; dims = dims, kwargs...)
-    else
-        mean
-    end
-    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
-    return if isnothing(w)
-        Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
-    else
-        Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
-    end
+    return simple_variance_kernel(Statistics.std, ve, SimpleExpectedReturns(), X;
+                                  dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.std(
@@ -258,12 +299,7 @@ julia> std(svw, X)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
-    w = get_observation_weights(ve.w, X)
-    return if isnothing(w)
-        Statistics.std(X; corrected = ve.corrected, mean = mean)
-    else
-        Statistics.std(X, w; corrected = ve.corrected, mean = mean)
-    end
+    return simple_variance_kernel(Statistics.std, ve, X; mean = mean)
 end
 """
     Statistics.var(
@@ -352,13 +388,8 @@ julia> var(sv, Xmat; dims = 1)
 """
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
-    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
-    return if isnothing(w)
-        Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
-    else
-        Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
-    end
+    return simple_variance_kernel(Statistics.var, ve, ve.me, X; dims = dims, mean = mean,
+                                  kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -367,14 +398,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 """
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    me = SimpleExpectedReturns()
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
-    w = get_observation_weights(me.w, X; dims = dims, kwargs...)
-    return if isnothing(w)
-        Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
-    else
-        Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
-    end
+    return simple_variance_kernel(Statistics.var, ve, SimpleExpectedReturns(), X;
+                                  dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.var(
@@ -432,11 +457,6 @@ julia> var(svw, X)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
-    w = get_observation_weights(ve.w, X)
-    return if isnothing(w)
-        Statistics.var(X; corrected = ve.corrected, mean = mean)
-    else
-        Statistics.var(X, w; corrected = ve.corrected, mean = mean)
-    end
+    return simple_variance_kernel(Statistics.var, ve, X; mean = mean)
 end
 export SimpleVariance, var, std

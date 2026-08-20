@@ -51,9 +51,9 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 rd = prices_to_returns(X)
 prices = vec(values(X)[end, :])
 
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "energy" => ["CVX", "XOM", "RRC"],
-                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "energy" => ["CVX", "XOM", "RRC"],
+                                "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 view_prior = EntropyPoolingPrior(; sets = sets,
                                  mu_views = LinearConstraintEstimator(;
                                                                       val = ["healthcare >= energy"]))
@@ -74,8 +74,9 @@ books across a sweep of return targets — rather than committing to a single ob
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                  ret = ArithmeticReturn(;
-                                                                        lb = Frontier(;
-                                                                                      N = 15)))))
+                                                                        settings = JuMPReturnsSettings(;
+                                                                                                       lb = Frontier(;
+                                                                                                                     N = 15))))))
 
 plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 ````

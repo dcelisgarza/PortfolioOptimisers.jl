@@ -4,10 +4,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add `GenericValueatRiskRange` constraints to `model` by delegating to the loss- and
 gain-side sub-constraints and summing the resulting expressions.
 
-Calls [`set_risk_constraints!`](@ref) twice — once for `r.loss` with `loss = true` (applied
-to the net portfolio returns) and once for `r.gain` with `loss = false` (applied to the
-negated net portfolio returns). The two expressions are summed into the composite range
-expression, which is then registered with [`set_risk_bounds_and_expression!`](@ref).
+Calls [`set_range_risk_constraints!`](@ref), which reads the two tails from
+[`range_tails`](@ref) — here `r.loss` and `r.gain` as given — and builds each through
+[`set_risk_constraints!`](@ref). This is the same path every other range measure takes.
 
 # Arguments
 
@@ -24,18 +23,12 @@ expression, which is then registered with [`set_risk_bounds_and_expression!`](@r
 # Related
 
   - [`GenericValueatRiskRange`](@ref)
-  - [`set_risk_constraints!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`range_tails`](@ref)
+  - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::GenericValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
-    key = Symbol(:genvar_range_, i)
-    loss = set_risk_constraints!(model, Symbol(:loss_, i), r.loss, opt, pr, args...;
-                                 loss = true, prefix = prefix, kwargs...)
-    gain = set_risk_constraints!(model, Symbol(:gain_, i), r.gain, opt, pr, args...;
-                                 loss = false, prefix = prefix, kwargs...)
-    genvar_range_risk = model[key] = JuMP.@expression(model, loss + gain)
-    set_risk_bounds_and_expression!(model, opt, genvar_range_risk, r.settings, key)
-    return genvar_range_risk
+    return set_range_risk_constraints!(model, i, r, :genvar_range_, opt, pr, args...;
+                                       prefix = prefix, kwargs...)
 end

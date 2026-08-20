@@ -62,8 +62,9 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Clustering optimisers — `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity` | `examples/3_optimisers/11_Clustering_Optimisers.jl` |
 | ✅ | Clustering optimisers with mixed risks — mixed risk measures, scalariser sweep, constrained `HierarchicalEqualRiskContribution` | `examples/3_optimisers/12_Clustering_Mixed_Risks_And_Constraints.jl` |
 | ✅ | Meta-optimisers overview — `NestedClustered`, `Stacking`, `SubsetResampling` | `examples/3_optimisers/13_Meta_Optimisers.jl` |
-| ✅ | Subset resampling and cross-validation — `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser | `examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl` |
+| ✅ | Subset resampling and cross-validation — `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser, Deferred Quantities in a risk-measure slot (fold and subset stability, ADR 0051) | `examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl` |
 | ✅ | Near optimal centering | `examples/3_optimisers/15_Near_Optimal_Centering.jl` |
+| ✅ | Feature matrices as a distance source — `FeatureDistance` driving `ClustersEstimator`, all four producers (literal matrix, `AssetSetsFeatures` and its graded edge-authoring grammar, `RegressionFeatures`, `PhylogenyFeatures`), `Proximity`'s `decay` crossed against `HopCount`/`PathLength` separations, metric domains and the `sim` slot, static vs time-varying shapes and the four collapse rules, the `z_src` carrier selector (`:data` slices, `:prior` refits), the square-`Z` non-commutation with an asset view, the meta-optimiser collapse onto synthetic assets, and what cross-validation exposes (a time-varying literal `ze` fails an observation fold; a bare `PathLength()` makes `Z`'s scale sample-dependent, additively) | `examples/3_optimisers/16_Feature_Distance_Clustering.jl` |
 
 ## 4. Constraints and costs
 
@@ -72,7 +73,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Budget constraints | `examples/4_constraints_costs/01_Budget_Constraints.jl` |
 | ✅ | Linear and group constraints | `examples/4_constraints_costs/02_Linear_Group_Constraints.jl` |
 | ✅ | Cardinality and threshold constraints (`card`, `gcarde`, `scard`/`slt`/`sst`, `sgcarde`/`sglt`/`sgst`; needs a MIP solver) | `examples/4_constraints_costs/03_Cardinality_and_Threshold.jl` |
-| ✅ | Phylogeny and centrality constraints | `examples/4_constraints_costs/04_Phylogeny_Centrality.jl` |
+| ✅ | Phylogeny and centrality constraints — `ple`/`cte`, the `sep` separation dial (`HopCount` hop shells vs `PathLength` radius balls, the related-pair ladder, `separation_budget` and the diameter clamp), the unguarded bare-`PathLength()` collapse onto one name, and where `sep` is inert on a weighted centrality route | `examples/4_constraints_costs/04_Phylogeny_Centrality.jl` |
 | ✅ | Turnover and tracking | `examples/4_constraints_costs/05_Turnover_and_Tracking.jl` |
 | ✅ | Fees and net returns | `examples/4_constraints_costs/06_Fees_and_Net_Returns.jl` |
 | ✅ | Regularisation and effective assets | `examples/4_constraints_costs/07_Regularisation.jl` |

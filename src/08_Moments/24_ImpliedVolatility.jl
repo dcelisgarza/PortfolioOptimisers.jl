@@ -443,11 +443,7 @@ Where:
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        iv = transpose(iv)
-    end
+    X, iv = dims_oriented(dims, X, iv)
     sigma = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
@@ -484,11 +480,7 @@ This method computes the correlation matrix of `X` using the base estimator in `
 """
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    assert_dims(dims)
-    if dims == 2
-        X = transpose(X)
-        iv = transpose(iv)
-    end
+    X, iv = dims_oriented(dims, X, iv)
     rho = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)

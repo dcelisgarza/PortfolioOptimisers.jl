@@ -12,7 +12,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
 # Constructors
 
     FactorRiskContributionResult(;
-        jr::JuMPOptimisationResult, rr::AbstractRegressionResult,
+        jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM, rr::AbstractRegressionResult,
         frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
     ) -> FactorRiskContributionResult
 
@@ -30,6 +30,10 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
+    $(field_dict[:r_res])
+    """
+    r
+    """
     $(field_dict[:reg_rr])
     """
     rr
@@ -41,18 +45,21 @@ Keywords correspond to the struct's fields.
     $(field_dict[:fb])
     """
     fb
-    function FactorRiskContributionResult(jr::JuMPOptimisationResult,
+    function FactorRiskContributionResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                           rr::AbstractRegressionResult,
                                           frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                           fb::Option{<:OptE_Opt})
-        return new{typeof(jr), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, rr, frc_plr, fb)
+        return new{typeof(jr), typeof(r), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, r,
+                                                                                   rr,
+                                                                                   frc_plr,
+                                                                                   fb)
     end
 end
-function FactorRiskContributionResult(; jr::JuMPOptimisationResult,
+function FactorRiskContributionResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
                                       rr::AbstractRegressionResult,
                                       frc_plr::Option{<:AbstractPhylogenyConstraintResult},
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
-    return FactorRiskContributionResult(jr, rr, frc_plr, fb)
+    return FactorRiskContributionResult(jr, r, rr, frc_plr, fb)
 end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
 # embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
@@ -126,7 +133,7 @@ $(DocStringExtensions.FIELDS)
         r::TD{<:RM_VecRM} = Variance(),
         obj::TD{<:ObjectiveFunction} = MinimumRisk(),
         frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
         fb::TDO_Option{<:OptE_Opt} = nothing
@@ -150,6 +157,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`FactorRiskContributionResult`](@ref)
   - [`RiskJuMPOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
@@ -196,13 +205,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     function FactorRiskContribution(opt::JuMPOptimiser, re::TD{<:RegE_Reg},
                                     r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
                                     frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
-                                    sets::TD_Option{<:AssetSets}, wi::TD_Option{<:VecNum},
-                                    flag::Bool, fb::TDO_Option{<:OptE_Opt})
+                                    sets::TD_Option{<:UniverseSets},
+                                    wi::TD_Option{<:VecNum}, flag::Bool,
+                                    fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :FactorRiskContribution)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
-        assert_risk_measure_required(r, :FactorRiskContribution)
+        assert_risk_measure_required(r, :FactorRiskContribution;
+                                     flag = zero_risk_expression_flag)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
@@ -220,7 +231,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser,
                                 r::TD{<:RM_VecRM} = Variance(),
                                 obj::TD{<:ObjectiveFunction} = MinimumRisk(),
                                 frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                                sets::TD_Option{<:AssetSets} = nothing,
+                                sets::TD_Option{<:UniverseSets} = nothing,
                                 wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
@@ -256,35 +267,42 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                                   flag = frc.flag, fb = frc.fb)
 end
 """
-    set_factor_risk_contribution_constraints!(model, re, ...)
+    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi)
 
 Add factor risk contribution constraints to the JuMP model.
 
-Sets up the factor-level risk budgeting constraints in the optimisation model, using the regression result or estimator `re` to specify factor loadings.
+Re-bases the weight variable onto the factor axis, `w = b1 * w1` (or `w = b1 * w1 + b2 * w2` when `flag` is `true`), using the factor loadings to specify the basis.
+
+The loadings come from [`resolve_factor_regression`](@ref), which is the same precedence the value-level [`factor_risk_contribution`](@ref) uses: a precomputed [`Regression`](@ref) in `re` wins, then the prior's own `rr`, then a refit from `rd`. The prior outranks the refit so that the decision basis is the one the moments were projected through.
+
+!!! warning
+
+    A stated regression **estimator** loses to a prior that carries loadings. To override a factor prior, pass the loadings as a precomputed [`Regression`](@ref) in `re`.
 
 # Arguments
 
   - `model`: JuMP model.
   - `re`: Regression result or estimator ([`RegE_Reg`](@ref)).
-  - Additional risk and budget parameters.
+  - `rd`: Returns result carrying `X` and `F`, used only when the loadings must be refitted.
+  - `pr`: Prior result, read for its factor block.
+  - `flag`: Whether to add the off-factor weight block.
+  - `wi`: Optional initial factor weights.
 
 # Returns
 
-  - `nothing`.
+  - `b1, rr`: The factor basis and the loadings it was built from.
 
 # Related
 
   - [`FactorRiskContribution`](@ref)
+  - [`resolve_factor_regression`](@ref)
   - [`RegE_Reg`](@ref)
 """
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
-                                                   rd::ReturnsResult, flag::Bool,
-                                                   wi::Option{<:VecNum})
-    if isa(re, AbstractRegressionEstimator)
-        @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
-                  IsNothingError("Factor risk budgeting/contribution with a regression estimator (`re::$(typeof(re))`) must fit the factor model, which needs the returns data: `rd.X` and `rd.F` must not be `nothing`.\nEither pass the `ReturnsResult` to `optimise` (e.g. `optimise(est, rd)`), or supply a precomputed `Regression` result as `re`, which needs no data.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))"))
-    end
-    rr = regression(re, rd)
+                                                   rd::ReturnsResult,
+                                                   pr::Option{<:AbstractPriorResult},
+                                                   flag::Bool, wi::Option{<:VecNum})
+    rr = resolve_factor_regression(re, rd, pr)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
     Nf = size(b1, 2)
@@ -310,13 +328,14 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
-    set_maximum_ratio_factor_variables!(model, attrs.pr.mu, frc.obj)
-    b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
-    set_weight_constraints!(model, attrs.wb, frc.opt.bgt, frc.opt.sbgt)
+    set_maximum_ratio_factor_variables!(model, frc.obj)
+    b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
+                                                       frc.flag, frc.wi)
+    set_weight_constraints!(model, attrs.wb, frc.opt)
     frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b1, false)
-    set_portfolio_objective_function!(model, frc.obj, attrs.ret, frc, attrs)
+    set_portfolio_objective_function!(model, frc.obj, frc, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
                                         jr = JuMPOptimisationResult(; pa = attrs,
@@ -325,7 +344,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                     model = ifelse(save,
                                                                                    model,
                                                                                    nothing)),
-                                        rr = rr, frc_plr = frc_plr, fb = nothing)
+                                        r = factory(frc.r, attrs.pr, frc.opt.slv), rr = rr,
+                                        frc_plr = frc_plr, fb = nothing)
 end
 """
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

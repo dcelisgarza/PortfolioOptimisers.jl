@@ -53,8 +53,11 @@ end;
 #=
 ## 1. Data, sets, and the equilibrium baseline
 
-We load the S&P 500 slice **with** its factor block, then declare two `AssetSets`: one over the
-assets (with a couple of groups, for the augmented asset views) and one over the factor names.
+We load the S&P 500 slice **with** its factor block, then declare **one** `UniverseSets` that all
+three variants read. It names both axes — assets under `xkey`, factors under `fkey`, each in the
+column order of `rd.X` and `rd.F` — plus a couple of asset groups for the augmented asset views.
+Every factor-view estimator here resolves its names on the *declared* factor axis, so one object
+covers a factor-only mandate, an asset-only mandate, and the augmented model that writes both.
 The [`EquilibriumExpectedReturns`](@ref) prior is the neutral anchor every Black–Litterman
 posterior tilts away from.
 =#
@@ -65,10 +68,10 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X, F)
 
-asset_sets = AssetSets(;
-                       dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
-                                   "energy" => ["CVX"]))
-factor_sets = AssetSets(; dict = Dict("nx" => rd.nf))
+universe_sets = UniverseSets(;
+                             dict = Dict("nx" => rd.nx, "nf" => rd.nf,
+                                         "tech" => ["AAPL", "AMD", "MSFT"],
+                                         "energy" => ["CVX"]))
 tau = 1 / size(rd.X, 1)
 
 pr_eq = prior(EmpiricalPrior(; me = EquilibriumExpectedReturns()), rd)
@@ -83,9 +86,9 @@ pretty_table(DataFrame(; factor = rd.nf); title = "Factor names (rd.nf)")
 ## 2. Bayesian Black–Litterman: factor views on a factor prior
 
 [`BayesianBlackLittermanPrior`](@ref) takes a [`FactorPrior`](@ref) as its base estimator and
-accepts views written in **factor space** (so its `sets` are the factor sets). It is the
-Bayesian formulation: the factor prior supplies the structure, the views update the factor
-means, and the result is mapped back to an asset-space posterior.
+accepts views written in **factor space**, resolved against the declared factor axis
+`sets.dict[sets.fkey]`. It is the Bayesian formulation: the factor prior supplies the structure,
+the views update the factor means, and the result is mapped back to an asset-space posterior.
 
 Our factor views: momentum earns 5 bps/day, and quality underperforms low-volatility by 3
 bps/day.
@@ -95,14 +98,17 @@ factor_views = LinearConstraintEstimator(;
                                          val = ["MTUM == 0.0005", "QUAL - USMV == -0.0003"])
 
 pr_bayes = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior()),
-                                             sets = factor_sets, tau = tau,
+                                             sets = universe_sets, tau = tau,
                                              views = factor_views), rd)
 
 #=
 ## 3. Factor Black–Litterman: views on factor premia
 
 [`FactorBlackLittermanPrior`](@ref) also takes factor views, but propagates them to the assets
-through the factor regression rather than a factor prior. Two knobs matter:
+through the factor regression rather than a factor prior. Its views resolve against the
+**declared factor axis**, `sets.dict[sets.fkey]`: the names must be looked up on the axis they
+were written in, and the asset axis is what a view over a subset of assets slices. Two knobs
+matter:
 
   - `rsd` — keep the idiosyncratic **residual** variance (`true`) or drop it (`false`), i.e.
     whether the posterior covariance is the full asset covariance or only its factor-explained
@@ -114,13 +120,13 @@ posterior.
 =#
 
 pr_fbl_rsd = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
-                                             sets = factor_sets, tau = tau,
+                                             sets = universe_sets, tau = tau,
                                              views = factor_views), rd)
 pr_fbl_nors = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = false,
-                                              sets = factor_sets, tau = tau,
+                                              sets = universe_sets, tau = tau,
                                               views = factor_views), rd)
 pr_fbl_l = prior(FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true, l = 5.0,
-                                           sets = factor_sets, tau = tau,
+                                           sets = universe_sets, tau = tau,
                                            views = factor_views), rd)
 
 i_aapl = findfirst(==("AAPL"), rd.nx)
@@ -137,16 +143,20 @@ explain all risk.
 
 ## 4. Augmented Black–Litterman: asset and factor views together
 
-[`AugmentedBlackLittermanPrior`](@ref) is the most general: it takes asset views (`a_views`,
-with asset sets) **and** factor views (`f_views`, with factor sets) in the same posterior. Use
-it when you have a stock-specific call and a factor call you do not want to choose between.
+[`AugmentedBlackLittermanPrior`](@ref) is the most general: it takes asset views (`a_views`)
+**and** factor views (`f_views`) in the same posterior. Use it when you have a stock-specific
+call and a factor call you do not want to choose between.
+
+It is the one estimator that reads **both** declared axes, and it reads them out of the same
+`universe_sets` every variant above used: `a_views` resolve against `sets.dict[sets.xkey]` — so
+the `tech` group is in scope — and `f_views` against `sets.dict[sets.fkey]`.
 =#
 
 asset_views = LinearConstraintEstimator(; val = ["AAPL == 0.0008", "tech == 0.0006"])
 
-pr_aug = prior(AugmentedBlackLittermanPrior(; a_sets = asset_sets, f_sets = factor_sets,
-                                            tau = tau, a_views = asset_views,
-                                            f_views = factor_views), rd)
+pr_aug = prior(AugmentedBlackLittermanPrior(; sets = universe_sets, tau = tau,
+                                            a_views = asset_views, f_views = factor_views),
+               rd)
 
 #=
 ## 5. Comparing the posteriors
@@ -213,11 +223,11 @@ like the base model — the difference is only in *where* the views live.
 #src   means are equilibrium [0.0231,0.0362,0.0191]%, Bayesian [0.0036,-0.1036,0.0005]%,
 #src   Factor [-0.044,-0.1656,-0.0392]%, Augmented [0.0217,-0.1488,-0.0373]% — the factor views
 #src   move the whole cross-section, and the augmented asset views add a further tilt.
-#src - ERGO: the three variants spread the view/sets wiring across different field names —
-#src   base/Bayesian use `sets`+`views`, Factor uses `sets`+`views`, Augmented splits into
-#src   `a_sets`/`a_views` + `f_sets`/`f_views`. A reader moving from one to another has to relearn
-#src   the keyword names each time; a short "field map" table in the BlackLitterman API docs would
-#src   help. Recorded, not blocking.
+#src - ERGO (RESOLVED by #232): the variants used to spread the view/sets wiring across different
+#src   field names — base/Bayesian/Factor took `sets`+`views` while Augmented split into
+#src   `a_sets`/`a_views` + `f_sets`/`f_views`, so a reader moving between them relearned the
+#src   keyword names each time. All four now take one `sets`, and this page went from three sets
+#src   objects to one. Only the *views* fields still differ, which is the real distinction.
 #src - `BayesianBlackLittermanPrior` requires a factor-capable `pe` (a `FactorPrior`); passing a
 #src   plain `EmpiricalPrior` is a different (asset-space) model. Worth a docstring note that the
 #src   Bayesian variant is factor-prior-based by construction.

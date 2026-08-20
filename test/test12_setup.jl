@@ -6,16 +6,22 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv
                                  timestamp = :Date)[(end - 252 * 4):end],
                        TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                  timestamp = :Date)[(end - 252 * 4):end])
-sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                             "group2" => rd.nx[2:2:end],
-                             "clusters1" =>
-                                 [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                                  3],
-                             "clusters2" =>
-                                 [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
-                                  2]))
-fsets = AssetSets(; dict = Dict("nx" => rd.nf))
+sets = UniverseSets(;
+                    dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                "group2" => rd.nx[2:2:end],
+                                "clusters1" =>
+                                    [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                     3, 3],
+                                "clusters2" =>
+                                    [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                     1, 2]))
+fsets = UniverseSets(; dict = Dict("nx" => rd.nf))
+# The post-#224 shape for a factor-flavoured consumer: both axes declared, factors under
+# `fkey`. `fsets` keeps the pre-migration shape for the consumers still reading `xkey`.
+xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
+# The dual-axis shape `AugmentedBlackLittermanPrior` needs: `sets`' asset groups, which its
+# `a_views` resolve against, *plus* the declared factor axis its `f_views` land on.
+afsets = UniverseSets(; dict = merge(sets.dict, Dict("nf" => rd.nf)))
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true),
               settings = "verbose" => false),

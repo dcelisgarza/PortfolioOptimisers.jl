@@ -116,6 +116,7 @@ HierarchicalRiskParity
       │          │   iter ┴ Int64: 100
       │      brt ┼ Bool: false
       │    x_src ┼ Symbol: :prior
+      │    z_src ┼ Symbol: :data
       │   strict ┴ Bool: false
     r ┼ Variance
       │   settings ┼ RiskMeasureSettings
@@ -150,6 +151,8 @@ Where:
 
 # Related
 
+  - [`optimise`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
   - [`ClusteringOptimisationEstimator`](@ref)
   - [`HierarchicalOptimiser`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -288,8 +291,10 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = hrp.opt.x_src)
+                     x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
@@ -322,8 +327,11 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
-                              w = w, fb = nothing)
+    return HierarchicalRiskParityResult(;
+                                        hr = HierarchicalResult(; pr = pr, clr = clr,
+                                                                wb = wb, fees = fees,
+                                                                retcode = retcode, w = w),
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 """
     hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
@@ -388,8 +396,10 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
+    # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
+    # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     x_src = hrp.opt.x_src)
+                     x_src = hrp.opt.x_src, z_src = hrp.opt.z_src)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     wk = zeros(eltype(X), size(X, 2))
@@ -417,12 +427,15 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
-                              w = w, fb = nothing)
+    return HierarchicalRiskParityResult(;
+                                        hr = HierarchicalResult(; pr = pr, clr = clr,
+                                                                wb = wb, fees = fees,
+                                                                retcode = retcode, w = w),
+                                        r = r, sca = hrp.sca, fb = nothing)
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalRiskParityResult
 
 Run the Hierarchical Risk Parity portfolio optimisation.
 
@@ -433,10 +446,14 @@ Run the Hierarchical Risk Parity portfolio optimisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Details
+
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser accepts no `branchorder` keyword. Recursive bisection allocates by splitting the dendrogram's leaf permutation, so that permutation is the algorithm's input rather than a presentation detail, and the clusterisation always runs with the optimal ordering. A `branchorder` passed here is absorbed by `kwargs` and ignored. See ADR 0055.
+
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
-  - [`HierarchicalResult`](@ref)
+  - [`HierarchicalRiskParityResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

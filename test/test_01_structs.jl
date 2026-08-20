@@ -2192,4 +2192,134 @@
         chain_opt = factory(chain_opt, w0)
         @test chain_opt.fb.fb.fb.r.w === w0
     end
+    @testset "Documentation dictionaries" begin
+        # A `Dict` literal is last-wins, so a repeated key used to drop the earlier entry
+        # with no warning. `unique_key_dict` builds the four documentation dictionaries and
+        # refuses a repeat at load time, naming both descriptions.
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict(:demo, :a => "one",
+                                                                       :b => "two",
+                                                                       :a => "three")
+        msg = try
+            PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :a => "three")
+        catch err
+            sprint(showerror, err)
+        end
+        @test occursin("`demo` has a repeated key, `:a`", msg)
+        @test occursin("first: one", msg)
+        @test occursin("later: three", msg)
+        good = PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :b => "two")
+        @test good == Dict(:a => "one", :b => "two")
+        @test isa(good, Dict{Symbol, String})
+        # The `:ple` collision this guard was written for: the surviving JuMP entry is now
+        # named like its neighbours, and the shadowed phylogeny entry had no reader.
+        @test !haskey(PortfolioOptimisers.arg_dict, :ple)
+        @test occursin("Phylogeny constraint estimator(s).",
+                       PortfolioOptimisers.arg_dict[:ple_jmp])
+        @test PortfolioOptimisers.field_dict[:ple_jmp] ==
+              "Phylogeny constraint estimator(s)."
+    end
+    @testset "UniverseSets" begin
+        both = Dict{String, Vector{String}}("nx" => ["AAPL", "MSFT", "JPM"],
+                                            "nx_sector" => ["Tech", "Tech", "Fin"],
+                                            "ux_sector" => ["Tech", "Fin"],
+                                            "nf" => ["MTUM", "VLUE", "QUAL"],
+                                            "nf_style" => ["Mom", "Val", "Qual"],
+                                            "uf_style" => ["Mom", "Val", "Qual"],
+                                            "defensive" => ["VLUE", "QUAL"],
+                                            "nz" => ["Tech", "Fin", "AAPL"])
+        sets = UniverseSets(; dict = both)
+        @test sets.xkey == "nx"
+        @test sets.uxkey == "ux"
+        @test sets.fkey == "nf"
+        @test sets.ufkey == "uf"
+        @test sets.zkey == "nz"
+
+        # The factor and feature axes are optional: the asset axis alone must still
+        # construct.
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).fkey == "nf"
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"])).zkey == "nz"
+
+        # `zkey` carries *no* length rule and no unique-entry sibling -- nothing is written
+        # over the feature axis, so its list is free to be any length -- but it does carry
+        # `allunique`, so `ReturnsResult`'s own `nz` check cannot be reached with a
+        # duplicate.
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"], "nz" => ["a", "b", "c"])) isa
+              UniverseSets
+        @test_throws ArgumentError UniverseSets(;
+                                                dict = Dict("nx" => ["A", "B"],
+                                                            "nz" => ["a", "a"]))
+        # And a `zkey`-prefixed key is nothing special: a plain, axis-blind group.
+        @test UniverseSets(; dict = Dict("nx" => ["A", "B"], "nz_whatever" => ["x"])).dict["nz_whatever"] ==
+              ["x"]
+
+        # Factor partitions are length-checked against the factor universe.
+        @test_throws DimensionMismatch UniverseSets(;
+                                                    dict = Dict("nx" => ["A", "B"],
+                                                                "nf" => ["F1", "F2"],
+                                                                "nf_style" => ["Mom"]))
+        # A `ufkey` group needs its matching `fkey` partition to exist.
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "nf" => ["F1", "F2"],
+                                                       "uf_style" => ["Mom"]))
+        # A factor-prefixed key without a factor universe is incoherent, not optional.
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "nf_style" => ["Mom", "Val"]))
+        @test_throws KeyError UniverseSets(;
+                                           dict = Dict("nx" => ["A", "B"],
+                                                       "uf_style" => ["Mom", "Val"]))
+
+        # All five keys must be pairwise prefix-disjoint, in both orders -- 20 ordered checks
+        # since `zkey` joined the loop. In turn: two keys equal, xkey == fkey, fkey prefixes
+        # ufkey, xkey prefixes fkey, uxkey prefixes ufkey, zkey == xkey, zkey prefixes xkey,
+        # xkey prefixes zkey.
+        for (xkey, uxkey, fkey, ufkey, zkey) in
+            (("nx", "nx", "nf", "uf", "nz"), ("nx", "ux", "nx", "uf", "nz"),
+             ("nx", "ux", "nf", "nf_", "nz"), ("n", "ux", "nf", "uf", "nz"),
+             ("nx", "u", "nf", "uf", "nz"), ("nx", "ux", "nf", "uf", "nx"),
+             ("nx", "ux", "nf", "uf", "n"), ("nx", "ux", "nf", "uf", "nx_z"))
+            @test_throws ArgumentError UniverseSets(; xkey = xkey, uxkey = uxkey,
+                                                    fkey = fkey, ufkey = ufkey, zkey = zkey,
+                                                    dict = Dict("nx" => ["A", "B"],
+                                                                "n" => ["A", "B"]))
+        end
+
+        # A view slices the asset axis and leaves the factor axis bit-identical.
+        v = PortfolioOptimisers.port_opt_view(sets, [1, 3])
+        @test v.dict["nx"] == ["AAPL", "JPM"]
+        @test v.dict["nx_sector"] == ["Tech", "Fin"]
+        @test v.dict["ux_sector"] == ["Tech", "Fin"]
+        @test v.dict["nf"] === sets.dict["nf"]
+        @test v.dict["nf_style"] === sets.dict["nf_style"]
+        @test v.dict["uf_style"] === sets.dict["uf_style"]
+        @test v.dict["defensive"] === sets.dict["defensive"]
+        # The feature axis is bit-identical too, but for a *different* reason: some of its
+        # nodes are assets, and it still passes through because the axis is declared rather
+        # than derived. Hence `AAPL` survives even in a view that keeps it, and would
+        # survive as an all-zero column in one that did not.
+        @test v.dict["nz"] === sets.dict["nz"]
+        @test (v.xkey, v.uxkey, v.fkey, v.ufkey, v.zkey) ==
+              (sets.xkey, sets.uxkey, sets.fkey, sets.ufkey, sets.zkey)
+
+        # A view collapsing the asset universe to one sector recomputes only `ux_sector`.
+        v = PortfolioOptimisers.port_opt_view(sets, [1, 2])
+        @test v.dict["ux_sector"] == ["Tech"]
+        @test v.dict["uf_style"] == ["Mom", "Val", "Qual"]
+
+        # Non-default axis keys are honoured, not just the defaults.
+        alt = UniverseSets(; xkey = "assets", uxkey = "uassets", fkey = "factors",
+                           ufkey = "ufactors", zkey = "features",
+                           dict = Dict("assets" => ["A", "B"],
+                                       "assets_sector" => ["Tech", "Fin"],
+                                       "factors" => ["F1"], "factors_style" => ["Mom"],
+                                       "ufactors_style" => ["Mom"],
+                                       "features" => ["Tech", "Fin"]))
+        v = PortfolioOptimisers.port_opt_view(alt, [2])
+        @test v.dict["assets"] == ["B"]
+        @test v.dict["assets_sector"] == ["Fin"]
+        @test v.dict["factors_style"] === alt.dict["factors_style"]
+        @test v.dict["features"] === alt.dict["features"]
+        @test v.zkey == "features"
+    end
 end

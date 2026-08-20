@@ -111,6 +111,13 @@
         @test is_plot(plot_clusters(cle, pr.X))
         @test is_plot(plot_clusters(cle, pr, rd.nx))
         @test is_plot(plot_clusters(cle, rd))
+
+        # A non-unit diagonal sends plot_clusters down its cov2cor! branch, which must not
+        # rewrite the caller's stored similarity matrix.
+        cov_clr = Clusters(; res = clr.res, S = 4 * clr.S, D = clr.D, k = clr.k)
+        S0 = copy(cov_clr.S)
+        @test is_plot(plot_clusters(cov_clr))
+        @test cov_clr.S == S0
     end
 
     @testset "plot_drawdowns" begin
@@ -155,10 +162,14 @@
     @testset "plot_factor_loadings" begin
         @test is_plot(plot_factor_loadings(fpr))
         @test is_plot(plot_factor_loadings(fpr, rd.nx, rd.nf))
+        @test is_plot(plot_factor_loadings(fpr, rd))
     end
 
     @testset "plot_factor_sigma" begin
         @test is_plot(plot_factor_sigma(fpr.f_sigma, rd.nf))
+        @test is_plot(plot_factor_sigma(fpr))
+        @test is_plot(plot_factor_sigma(fpr, rd.nf))
+        @test is_plot(plot_factor_sigma(fpr, rd))
     end
 
     @testset "plot_eigenspectrum" begin
@@ -188,6 +199,51 @@
     @testset "plot_factor_mu" begin
         @test is_plot(plot_factor_mu(fpr.f_mu))
         @test is_plot(plot_factor_mu(fpr.f_mu, rd.nf))
+        @test is_plot(plot_factor_mu(fpr))
+        @test is_plot(plot_factor_mu(fpr, rd.nf))
+        @test is_plot(plot_factor_mu(fpr, rd))
+    end
+
+    @testset "Factor entry points guard the factor block" begin
+        # `pr` is an `EmpiricalPrior` result, so it has no factor block. Each of the six
+        # prior-taking factor entry points must reach `assert_prior_regression` and throw
+        # its message. This is a falsification witness for two distinct pre-fix behaviours:
+        # `plot_factor_loadings` did check, but threw a bare `ArgumentError` whose message
+        # named neither the cause nor the remedy; `plot_factor_sigma` and `plot_factor_mu`
+        # had the check written but *unreachable*, because their optional axis-name argument
+        # defaulted to a size taken off the missing block — `1:size(pr.f_sigma, 1)` and
+        # `1:length(pr.f_mu)` — which Julia evaluates before the body, so the one-argument
+        # form died on `size(::Nothing, ::Int64)` / `length(::Nothing)` instead.
+        @test isnothing(pr.rr)
+        @test isnothing(pr.fpr)
+        for f in (plot_factor_loadings, plot_factor_sigma, plot_factor_mu)
+            @test_throws PortfolioOptimisers.IsNothingError f(pr)
+            @test_throws PortfolioOptimisers.IsNothingError f(pr, rd)
+        end
+
+        # The plotting lead names the entry point and its matrix-arity escape hatch; the
+        # shared tail names the one cause and the one remedy, and is the same string the
+        # estimator consumers get, so the two cannot drift apart on the diagnosis.
+        err = try
+            plot_factor_loadings(pr)
+        catch e
+            e
+        end
+        @test occursin("`plot_factor_loadings` draws the regression loadings `rr.M`",
+                       err.msg)
+        @test occursin("plot_factor_loadings(M, nx, nf)", err.msg)
+        @test occursin(PortfolioOptimisers.prior_regression_remedy, err.msg)
+        # …and it does *not* claim the caller is an estimator, which is the default lead.
+        @test !occursin("this estimator projects factor moments", err.msg)
+
+        err_mu = try
+            plot_factor_mu(pr, rd)
+        catch e
+            e
+        end
+        @test occursin("`plot_factor_mu` draws the factor expected returns `fpr.mu`",
+                       err_mu.msg)
+        @test occursin(PortfolioOptimisers.prior_regression_remedy, err_mu.msg)
     end
 
     @testset "plot_benchmark" begin
@@ -249,7 +305,7 @@
 
     @testset "plot_efficient_frontier" begin
         # Frontier result (VecVecNum weights)
-        mr_f  = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 8))))
+        mr_f  = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 8)))))
         res_f = optimise(mr_f, rd)
         @test is_plot(plot_efficient_frontier(res_f, rd))
         @test is_plot(plot_efficient_frontier(res_f, pr))

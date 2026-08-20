@@ -180,6 +180,16 @@ Computes the Tracking Error of a portfolio weight vector `w`.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
   - `fees`: Optional fee structure.
 
+## Precomputed portfolio returns
+
+    (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
+
+Computes the Tracking Error of an already-reduced portfolio returns series `x` (``T \\times 1``).
+Only a [`ReturnsTracking`](@ref) measure supports this, because its benchmark is itself a returns
+series. A [`WeightsTracking`](@ref) measure rebuilds its benchmark from the asset returns, so it
+needs the portfolio weights and throws an `ArgumentError` instead. See
+[`supports_precomputed_returns`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -231,13 +241,12 @@ function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = n
     benchmark = tracking_benchmark(r.tr, X)
     return norm_error(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
-function (r::TrackingRiskMeasure{<:ReturnsTracking})(X::VecNum)
-    benchmark = tracking_benchmark(r.tr, X)
-    return norm_error(r.alg, X, benchmark, length(X))
+function (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
+    benchmark = tracking_benchmark(r.tr, x)
+    return norm_error(r.alg, x, benchmark, length(x))
 end
-function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
-    return throw(MethodError(r,
-                             "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
+function (r::TrackingRiskMeasure{<:Any, <:WeightsTracking})(::VecNum)
+    return throw(ArgumentError("`TrackingRiskMeasure` with a `WeightsTracking` algorithm cannot be computed from a precomputed portfolio return series, because the benchmark is rebuilt from the asset returns and needs the portfolio weights. Call `r(w, X, fees)` with the weights and the asset returns matrix, or use `ReturnsTracking` to track a return series directly."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -419,6 +428,10 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingRiskMeasure(settings, tr, r, alg)
 end
+# Deferrable slots — see `deferred_slots`. The tracked measure carries its own, so both the
+# check and the derived recursion in `resolve_deferred_quantities` reach them through `r`.
+# `tr` holds the benchmark weights and `alg` the tracking variable, neither of which defers.
+deferred_slots(r::RiskTrackingRiskMeasure) = (; r = r.r)
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::VecNum, X::MatNum,
                                                                      fees::Option{<:Fees} = nothing)
@@ -514,7 +527,7 @@ vector and always requires explicit portfolio weights.
   - [`TrackingRiskMeasure`](@ref)
   - [`WeightsTracking`](@ref)
 """
-supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking}) = false
+supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking}) = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -527,6 +540,6 @@ series and its risk is a function of the net-return series alone.
   - [`TrackingRiskMeasure`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking}) = true
+supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking}) = true
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

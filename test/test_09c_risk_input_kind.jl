@@ -96,11 +96,20 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
                    ThirdCentralMoment(), LowOrderMoment(; mu = 0.01),
                    MedianAbsoluteDeviation(; mu = PO.MeanCentering()),
                    RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown()),
-                   MeanReturnRiskRatio(; rk = ConditionalValueatRisk())]
+                   MeanReturnRiskRatio(; rk = ConditionalValueatRisk()),
+                   TrackingRiskMeasure(; tr = ReturnsTracking(; w = _x_series .* 0.5))]
     for r in eligible
         @test PO.supports_precomputed_returns(r)
         v = g(r, _x_series)
         @test v isa Number && isfinite(v)
+    end
+
+    # A `ReturnsTracking` measure is dispatched on the *second* type parameter, because
+    # `settings` is the first. The declarations and the single-vector functor must bind on a
+    # concrete instance, not only on the `UnionAll` the completeness test below inspects.
+    let r = TrackingRiskMeasure(; tr = ReturnsTracking(; w = _x_series .* 0.5))
+        @test g(r, _x_series) ≈ r([1], reshape(_x_series, :, 1))
+        @test g(r, _x_series) > 0
     end
 
     # Differential oracle: for the moment family the single-vector form equals the one-asset
@@ -120,11 +129,17 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
                      VarianceSkewKurtosis(), RiskRatio(), LowOrderMoment(; mu = mu2),
                      HighOrderMoment(; mu = mu2), Skewness(; mu = mu2),
                      Kurtosis(; mu = mu2), MedianAbsoluteDeviation(; mu = mu2),
-                     ThirdCentralMoment(; mu = mu2)]
+                     ThirdCentralMoment(; mu = mu2),
+                     TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))]
     for r in ineligible
         @test !PO.supports_precomputed_returns(r)
         @test_throws ArgumentError g(r, _x_series)
     end
+
+    # The `WeightsTracking` functor is the second half of the same dispatch: a direct call
+    # explains the refusal instead of raising a bare `MethodError`.
+    @test_throws ArgumentError TrackingRiskMeasure(;
+                                                   tr = WeightsTracking(; w = [0.5, 0.5]))(_x_series)
 end
 
 @testset "precomputed-returns contract — completeness" begin

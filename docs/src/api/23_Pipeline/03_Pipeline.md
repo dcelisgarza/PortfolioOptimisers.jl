@@ -33,10 +33,15 @@ The pipeline resolves its computed slots into [routing targets](@ref PIPELINE_RO
 ```@docs
 inject_context
 constraint_results
+implicit_constraint_target
+constraint_target_of
+constraint_value_of
+accumulate_constraint_values
 constraint_targets
 maybe_inject_step
 pipe_required_targets
 assert_routable
+assert_constraint_targets
 ```
 
 ## Prediction

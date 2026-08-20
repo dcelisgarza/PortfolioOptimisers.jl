@@ -101,6 +101,12 @@ Estimator for generating semi-definite phylogeny-based constraints.
 
 `SemiDefinitePhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using a semi-definite matrix representation. The estimator wraps a phylogeny or clustering estimator and a non-negative penalty parameter `p`, which controls the strength of the constraint.
 
+Which pairs a network source relates — and therefore how strong the constraint is — comes from its [`AbstractSeparationAlgorithm`](@ref), not from anything set here. The constraint is **weight-inert**: `A ⊙ W == 0` is the same constraint at any magnitude, so the separation changes the *cardinality* of the forbidden set and nothing else.
+
+!!! warning
+
+    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs — and this estimator then forbids all pairwise co-movement. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -108,13 +114,14 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SemiDefinitePhylogenyEstimator(;
-        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        pl::NwE_ClE = NetworkEstimator(),
         p::Number = 0.05
     ) -> SemiDefinitePhylogenyEstimator
 
 ## Validation
 
   - `p >= 0`.
+  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`SemiDefinitePhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -144,7 +151,8 @@ SemiDefinitePhylogenyEstimator
      │   alg ┼ KruskalTree
      │       │     args ┼ Tuple{}: ()
      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │     n ┴ Int64: 1
+     │   sep ┼ HopCount
+     │       │   n ┴ Int64: 1
    p ┴ Float64: 0.05
 ```
 
@@ -157,20 +165,20 @@ SemiDefinitePhylogenyEstimator
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
-    $(field_dict[:pler])
+    $(field_dict[:plsrc])
     """
     pl
     """
     $(field_dict[:p_phylo])
     """
     p
-    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl,
+    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE,
                                             p::Number)::SemiDefinitePhylogenyEstimator
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
                                         p::Number = 0.05)::SemiDefinitePhylogenyEstimator
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
@@ -347,6 +355,12 @@ Estimator for generating integer phylogeny-based constraints.
 
 `IntegerPhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using integer or discrete representations. The estimator wraps a phylogeny or clustering estimator, a non-negative integer or vector of integers `B` specifying group sizes or allocations, and a big-M parameter `scale` used for formulating the MIP constraints.
 
+Which pairs a network source relates comes from its [`AbstractSeparationAlgorithm`](@ref), and `B` is an integer cardinality counted over them. The relatedness itself stays binary under either separation: [`PhylogenyResult`](@ref)'s matrix is `Int`, and a graded one would not be countable here.
+
+!!! warning
+
+    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -354,7 +368,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     IntegerPhylogenyEstimator(;
-        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        pl::NwE_ClE = NetworkEstimator(),
         B::Int_VecInt = 1,
         scale::Number = 100_000.0
     ) -> IntegerPhylogenyEstimator
@@ -364,6 +378,8 @@ $(DocStringExtensions.FIELDS)
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
       + `AbstractVector`: It is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
+
+  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`IntegerPhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -393,7 +409,8 @@ IntegerPhylogenyEstimator
         │   alg ┼ KruskalTree
         │       │     args ┼ Tuple{}: ()
         │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │     n ┴ Int64: 1
+        │   sep ┼ HopCount
+        │       │   n ┴ Int64: 1
       B ┼ Int64: 1
   scale ┴ Float64: 100000.0
 ```
@@ -407,7 +424,7 @@ IntegerPhylogenyEstimator
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
-    $(field_dict[:pler])
+    $(field_dict[:plsrc])
     """
     pl
     """
@@ -418,7 +435,7 @@ IntegerPhylogenyEstimator
     $(field_dict[:scale_phylo])
     """
     scale
-    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt,
+    function IntegerPhylogenyEstimator(pl::NwE_ClE, B::Int_VecInt,
                                        scale::Number)::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
@@ -427,8 +444,7 @@ IntegerPhylogenyEstimator
         return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   B::Int_VecInt = 1,
+function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_VecInt = 1,
                                    scale::Number = 100_000.0)::IntegerPhylogenyEstimator
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
@@ -525,7 +541,7 @@ If `plcs` is a vector, this method broadcasts over each element, returning a vec
 # Arguments
 
   - `plc`: A phylogeny constraint estimator, result, or `nothing`.
-  - `X`: Data matrix of asset features or returns (ignored when `plc` is not an estimator).
+  - `X`: Data matrix (`observations × assets`) (ignored when `plc` is not an estimator).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny matrix routine (ignored when `est` is not an estimator).
 
@@ -625,7 +641,8 @@ CentralityConstraint
        │      │   alg ┼ KruskalTree
        │      │       │     args ┼ Tuple{}: ()
        │      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │      │     n ┴ Int64: 1
+       │      │   sep ┼ HopCount
+       │      │       │   n ┴ Int64: 1
        │   ct ┼ DegreeCentrality
        │      │     kind ┼ Int64: 0
        │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -712,7 +729,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 # Arguments
 
   - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of such estimators.
-  - `X`: Data matrix of asset features or returns.
+  - `X`: Data matrix (`observations × assets`).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 

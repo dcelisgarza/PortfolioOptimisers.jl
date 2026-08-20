@@ -118,6 +118,8 @@ IndexWalkForward
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
@@ -342,6 +344,8 @@ DateWalkForward
 
 # Related
 
+  - [`cross_val_predict`](@ref)
+  - [`search_cross_validation`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
@@ -416,6 +420,90 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                            adjuster, previous, expand_train, reduce_test)
 end
 """
+    walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
+                            period_offset::Option{<:DatesUnionPeriod}, adjuster::DateAdjType)
+
+Build the date range that a [`DateWalkForward`](@ref) estimator walks over the timestamps `ts`.
+
+The range runs from the first to the last timestamp with a step of `period`. If `period_offset` is
+not `nothing`, the start moves to `min(ts[1], ts[1] - period_offset)`, the `adjuster` is applied, and
+the offset is added to every date. This shifts each date by the offset without losing the start of
+`ts`.
+
+# Arguments
+
+  - `ts`: Sorted timestamp vector ([`cv_timestamps`](@ref)).
+  - `period`: Step of the date range.
+  - `period_offset`: Offset applied to every date of the range, or `nothing`.
+  - `adjuster`: Function applied to the unshifted range, e.g. a business-day adjuster.
+
+# Returns
+
+  - The date range walked by [`Base.split`](@ref) and [`n_splits`](@ref).
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`date_index_positions`](@ref)
+"""
+function walk_forward_date_range(ts::AbstractVector, period::DatesUnionPeriod,
+                                 period_offset::Option{<:DatesUnionPeriod},
+                                 adjuster::DateAdjType)
+    ti = ts[1]
+    tf = ts[end]
+    po_flag = !isnothing(period_offset)
+    if po_flag
+        ti = min(ti, ti - period_offset)
+    end
+    date_range = adjuster(ti:period:tf)
+    if po_flag
+        date_range += period_offset
+    end
+    return date_range
+end
+"""
+    date_index_positions(ts::AbstractVector, date_range, previous::Bool,
+                         ::Type{T} = Int) where {T <: Integer}
+
+Map every date of `date_range` to a position in the sorted timestamp vector `ts`.
+
+A date that falls between two timestamps maps to the previous timestamp if `previous` is `true`, and
+to the next timestamp if `previous` is `false`. A date before `ts[1]` maps to the first timestamp.
+The mapping stops at the first date that falls after `ts[end]`, so the result is not longer than
+`date_range`.
+
+# Arguments
+
+  - `ts`: Sorted timestamp vector ([`cv_timestamps`](@ref)).
+  - `date_range`: Date range from [`walk_forward_date_range`](@ref).
+  - `previous`: If `true`, a date between two timestamps takes the previous timestamp.
+  - `T`: Element type of the returned vector.
+
+# Returns
+
+  - `Vector{T}`: Positions in `ts`, in the order of `date_range`.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`walk_forward_date_range`](@ref)
+"""
+function date_index_positions(ts::AbstractVector, date_range, previous::Bool,
+                              ::Type{T} = Int) where {T <: Integer}
+    idx = Vector{T}(undef, 0)
+    for date in date_range
+        i = searchsortedlast(ts, date)
+        if iszero(i) || !previous && ts[i] != date
+            i += 1
+        end
+        if i > length(ts)
+            break
+        end
+        push!(idx, i)
+    end
+    return idx
+end
+"""
     Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR) -> WalkForwardResult
 
 Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
@@ -445,28 +533,9 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)
     @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
     T = cv_nobs(rd)
-    ti = ts[1]
-    tf = ts[end]
-    po_flag = !isnothing(period_offset)
-    if po_flag
-        ti = min(ti, ti - period_offset)
-    end
-    date_range = adjuster(ti:period:tf)
-    if po_flag
-        date_range += period_offset
-    end
+    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
     tt = typeof(T)
-    idx = Vector{tt}(undef, 0)
-    for date in date_range
-        i = searchsortedlast(ts, date)
-        if iszero(i) || !previous && ts[i] != date
-            i += 1
-        end
-        if i > length(ts)
-            break
-        end
-        push!(idx, i)
-    end
+    idx = date_index_positions(ts, date_range, previous, tt)
     N = length(idx)
     i = 1
     train_indices = Vector{UnitRange{tt}}(undef, 0)
@@ -540,28 +609,8 @@ function n_splits(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)
     ts = cv_timestamps(rd)
     @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    ti = ts[1]
-    tf = ts[end]
-    po_flag = !isnothing(period_offset)
-    if po_flag
-        ti = min(ti, ti - period_offset)
-    end
-    date_range = adjuster(ti:period:tf)
-    if po_flag
-        date_range += period_offset
-    end
-
-    N = 0
-    for date in date_range
-        i = searchsortedlast(ts, date)
-        if !previous && ts[i] != date
-            i += 1
-        end
-        if i > length(ts)
-            break
-        end
-        N += 1
-    end
+    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
+    N = length(date_index_positions(ts, date_range, previous))
     max_start = N - train_size - ifelse(reduce_test, 0, test_size)
     return max_start > 0 ? special_div(max_start, test_size) + 1 : 0
 end
@@ -595,27 +644,8 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
     T = cv_nobs(rd)
-    ti = ts[1]
-    tf = ts[end]
-    po_flag = !isnothing(period_offset)
-    if po_flag
-        ti = min(ti, ti - period_offset)
-    end
-    date_range = adjuster(ti:period:tf)
-    if po_flag
-        date_range += period_offset
-    end
-    idx = Vector{typeof(T)}(undef, 0)
-    for date in date_range
-        i = searchsortedlast(ts, date)
-        if iszero(i) || !previous && ts[i] != date
-            i += 1
-        end
-        if i > length(ts)
-            break
-        end
-        push!(idx, i)
-    end
+    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
+    idx = date_index_positions(ts, date_range, previous, typeof(T))
     train_idx = Vector{typeof(T)}(undef, 0)
     for date in date_range
         date = date - train_size
@@ -673,29 +703,8 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     ts = cv_timestamps(rd)
     @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    ti = ts[1]
-    tf = ts[end]
-    po_flag = !isnothing(period_offset)
-    if po_flag
-        ti = min(ti, ti - period_offset)
-    end
-    date_range = adjuster(ti:period:tf)
-    if po_flag
-        date_range += period_offset
-    end
-
-    N = 0
-    for date in date_range
-        i = searchsortedlast(ts, date)
-        if !previous && ts[i] != date
-            i += 1
-        end
-        if i > length(ts)
-            break
-        end
-        N += 1
-    end
-
+    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
+    N = length(date_index_positions(ts, date_range, previous))
     M = -1
     for (j, date) in enumerate(date_range)
         date = date - train_size
@@ -720,26 +729,11 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    n = length(train_idx)
-    td_flag = is_time_dependent(opt)
-    if td_flag
-        assert_time_dependent_fold_count(opt, n)
-    end
-    predictions = run_folds(opt, n, ex) do i, prev
-        opti = opt
-        # Resolve time-dependent constraints first so freshly swapped-in per-fold
-        # constraints also receive the previous weights from the factory pass below.
-        if td_flag
-            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                       test_idx = test_idx,
-                                       w_prev = isnothing(prev) ? nothing : prev.res.w)
-            opti = update_time_dependent_estimator(opti, ctx)
-        end
-        if !isnothing(prev) && needs_previous_weights(opt)
-            opti = factory(opti, prev.res.w)
-        end
-        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
-                               cols = cols)
+    assert_unshuffled_folds(cv, train_idx)
+    predictions = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
+                            test_idx = test_idx) do fold
+        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
+                               test_idx = fold.test, cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
@@ -748,6 +742,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
+    assert_unshuffled_folds(cv, cv_res.train_idx)
     predictions = parallel_folds(length(test_idx), ex) do i
         return StatsAPI.predict(res, rd, test_idx[i])
     end

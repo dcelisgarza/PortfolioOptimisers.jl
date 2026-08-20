@@ -383,7 +383,7 @@ $(DocStringExtensions.FIELDS)
     LowOrderMoment(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        mu::Option{<:MuSlot} = nothing,
         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
     ) -> LowOrderMoment
 
@@ -397,6 +397,10 @@ Keywords correspond to the struct's fields.
       + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
 
   - If `w` is not `nothing`, `!isempty(w)`.
+
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
 
 # Mathematical definition
 
@@ -829,11 +833,11 @@ LowOrderMoment
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """
@@ -841,8 +845,7 @@ LowOrderMoment
     """
     alg
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                            mu::Option{<:Num_VecNum_VecScalar},
-                            alg::LowOrderMomentMeasureAlgorithm)
+                            mu::Option{<:MuSlot}, alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
             @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
@@ -857,8 +860,7 @@ LowOrderMoment
     end
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        w::Option{<:ObsWeights} = nothing,
-                        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+                        w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())::LowOrderMoment
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -878,7 +880,7 @@ $(DocStringExtensions.FIELDS)
     HighOrderMoment(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        mu::Option{<:MuSlot} = nothing,
         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
     ) -> HighOrderMoment
 
@@ -892,6 +894,10 @@ Keywords correspond to the struct's fields.
       + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
 
   - If `w` is not `nothing`, `!isempty(w)`.
+
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
 
 # Mathematical definition
 
@@ -1012,11 +1018,11 @@ HighOrderMoment
     """
     settings
     """
-    $(field_dict[:w_rm])
+    $(field_dict[:oow])
     """
     w
     """
-    $(field_dict[:mu_rm])
+    $(field_dict[:mu_slot])
     """
     mu
     """
@@ -1024,8 +1030,7 @@ HighOrderMoment
     """
     alg
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
-                             mu::Option{<:Num_VecNum_VecScalar},
-                             alg::HighOrderMomentMeasureAlgorithm)
+                             mu::Option{<:MuSlot}, alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
             @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
@@ -1038,8 +1043,7 @@ HighOrderMoment
     end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:ObsWeights} = nothing,
-                         mu::Option{<:Num_VecNum_VecScalar} = nothing,
+                         w::Option{<:ObsWeights} = nothing, mu::Option{<:MuSlot} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::HighOrderMoment
     return HighOrderMoment(settings, w, mu, alg)
 end
@@ -1368,42 +1372,7 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
 end
-function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(w::VecNum,
-                                                                                         X::MatNum,
-                                                                                         fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(w::VecNum,
-                                                                                          X::MatNum,
-                                                                                          fees::Option{<:Fees} = nothing)
-    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
-end
-function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any})(x::VecNum)
-    return moment_risk(r, calc_deviations_vec(r, x))
-end
-function (r::LowOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
-                                                                            X::MatNum,
-                                                                            fees::Option{<:Fees} = nothing)
-    return LowOrderMoment(; settings = r.settings, alg = r.alg,
-                          w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
-end
-function (r::LowOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(x::VecNum)
-    return LowOrderMoment(; settings = r.settings, alg = r.alg,
-                          w = get_observation_weights(r.w, x), mu = r.mu)(x)
-end
-function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
-                                                                             X::MatNum,
-                                                                             fees::Option{<:Fees} = nothing)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg,
-                           w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
-end
-function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(x::VecNum)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg,
-                           w = get_observation_weights(r.w, x), mu = r.mu)(x)
-end
+# Evaluation entry points — see `MomentRiskMeasures` in `28_RiskMeasureTools.jl`.
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1417,11 +1386,33 @@ Create an instance of [`LowOrderMoment`](@ref) by selecting observation weights,
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     alg = factory(r.alg, w)
     return LowOrderMoment(; settings = r.settings, alg = alg, w = w, mu = mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`LowOrderMoment`](@ref)'s `mu` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult)
+    if !isa(r.mu, DeferredQuantity)
+        return r
+    end
+    return LowOrderMoment(; settings = r.settings, w = r.w,
+                          mu = resolve_slot(r.mu, :mu, pr), alg = r.alg)
+end
+# Deferrable slots — see `deferred_slots`. `alg` holds a variance estimator by design, not a
+# Deferred Quantity, so it is not declared here.
+deferred_slots(r::LowOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1452,11 +1443,32 @@ Create an instance of [`HighOrderMoment`](@ref) by selecting observation weights
   - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+    r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     alg = factory(r.alg, w)
     return HighOrderMoment(; settings = r.settings, alg = alg, w = w, mu = mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a **Deferred Quantity** in [`HighOrderMoment`](@ref)'s `mu` slot against prior result `pr`. The measure carries one prior-derived slot, so the slot itself admits the estimator and there is no fan-out to make.
+
+# Related
+
+  - [`HighOrderMoment`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult)
+    if !isa(r.mu, DeferredQuantity)
+        return r
+    end
+    return HighOrderMoment(; settings = r.settings, w = r.w,
+                           mu = resolve_slot(r.mu, :mu, pr), alg = r.alg)
+end
+# Deferrable slots — see `deferred_slots`.
+deferred_slots(r::HighOrderMoment) = (; mu = r.mu)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

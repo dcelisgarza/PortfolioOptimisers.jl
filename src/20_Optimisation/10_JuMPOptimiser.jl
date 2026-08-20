@@ -33,7 +33,9 @@ $(DocStringExtensions.FIELDS)
         smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
         slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
         sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-        plr::Option{<:AbstractPhylogenyConstraintResult}, ret::JuMPReturnsEstimator
+        plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
+                            <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+        ret::JRE_VecJRE, sca::Scalariser
     ) -> ProcessedJuMPOptimiserAttributes
 
 Keywords correspond to the struct's fields. The field types are the *result* side of the
@@ -53,8 +55,8 @@ julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, s
                                         sgcardr = nothing, smtx = nothing, sgmtx = nothing,
                                         slt = nothing, sst = nothing, sglt = nothing,
                                         sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn()) isa
-       ProcessedJuMPOptimiserAttributes
+                                        plr = nothing, ret = ArithmeticReturn(),
+                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
 true
 ```
 
@@ -138,6 +140,10 @@ true
     $(field_dict[:ret_jmp])
     """
     ret
+    """
+    $(field_dict[:sca_res])
+    """
+    sca
     # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
     # this bundle holds the constraint/prior results produced by
     # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
@@ -160,15 +166,27 @@ true
                                               tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                               plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JuMPReturnsEstimator)
+                                              ret::JRE_VecJRE, sca::Scalariser)
         return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
                    typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(ret)}(pr, wb, lt, st, lcsr,
-                                                                       ctr, gcardr, sgcardr,
-                                                                       smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst, tn,
-                                                                       fees, plr, ret)
+                   typeof(tn), typeof(fees), typeof(plr), typeof(ret), typeof(sca)}(pr, wb,
+                                                                                    lt, st,
+                                                                                    lcsr,
+                                                                                    ctr,
+                                                                                    gcardr,
+                                                                                    sgcardr,
+                                                                                    smtx,
+                                                                                    sgmtx,
+                                                                                    slt,
+                                                                                    sst,
+                                                                                    sglt,
+                                                                                    sgst,
+                                                                                    tn,
+                                                                                    fees,
+                                                                                    plr,
+                                                                                    ret,
+                                                                                    sca)
     end
 end
 function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
@@ -187,10 +205,11 @@ function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
                                           tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
                                           plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
                                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JuMPReturnsEstimator)::ProcessedJuMPOptimiserAttributes
+                                          ret::JRE_VecJRE,
+                                          sca::Scalariser)::ProcessedJuMPOptimiserAttributes
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret)
+                                            plr, ret, sca)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -342,7 +361,7 @@ $(DocStringExtensions.FIELDS)
         xbgt::Bool = false,
         lt::TD_Option{<:BtE_Bt} = nothing,
         st::TD_Option{<:BtE_Bt} = nothing,
-        lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
         cte::TD_Option{<:Lc_CC_VecCC} = nothing,
         gcarde::TD_Option{<:LcE_Lc} = nothing,
         sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
@@ -354,10 +373,10 @@ $(DocStringExtensions.FIELDS)
         sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
         tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:UniverseSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
         ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+        ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
         sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
         ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
         cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
@@ -375,14 +394,16 @@ $(DocStringExtensions.FIELDS)
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         brt::Bool = false,
         x_src::Symbol = :prior,
+        z_src::Symbol = :data,
         strict::Bool = false,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `x_src`, `strict`) stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `x_src`, `z_src`, `strict`) stays static.
 
 ## Validation
 
   - `x_src in (:prior, :data)`.
+  - `z_src in (:prior, :data)`.
   - If `slv` is a vector: `!isempty(slv)`.
   - If `bgt` is a number: `isfinite(bgt)`.
   - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
@@ -501,7 +522,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     tr
     """
-    $(field_dict[:ple])
+    $(field_dict[:ple_jmp])
     """
     ple
     """
@@ -577,6 +598,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     x_src
     """
+    $(field_dict[:z_src])
+    """
+    z_src
+    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -584,7 +609,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            bgt::TD_Option{<:Num_BgtCE}, sbgt::TD_Option{<:Num_BgtRg},
                            gbgt::TD_Option{<:Num_BgtRg}, xbgt::Bool,
                            lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
-                           lcse::TD_Option{<:LcE_Lc_VecLcE_Lc},
+                           lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
                            cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
                            sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
                            smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
@@ -594,9 +619,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
-                           sets::TD_Option{<:AssetSets}, tr::TD_Option{<:Tr_VecTr},
-                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
-                           ret::TD{<:JuMPReturnsEstimator},
+                           sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
+                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC}, ret::TD{<:JRE_VecJRE},
                            sca::TD{<:NonHierarchicalScalariser},
                            ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
                            cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
@@ -605,8 +629,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            lpc::TD_Option{<:LpReg_VecLpReg}, linfc::TD_Option{<:Number},
                            l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
-                           brt::Bool, x_src::Symbol, strict::Bool)
+                           brt::Bool, x_src::Symbol, z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
+        assert_source_selector(z_src, :z_src)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -764,6 +789,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
            isa(sglt, ThresholdEstimator) ||
            isa(sgst, ThresholdEstimator) ||
            isa(lcse, LinearConstraintEstimator) ||
+           isa(lcse, ExposureConstraintEstimator) ||
            isa(cte, LinearConstraintEstimator) ||
            isa(gcarde, LinearConstraintEstimator) ||
            isa(sgcarde, LinearConstraintEstimator) ||
@@ -775,7 +801,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
            isa(sst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sst) ||
            isa(sglt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sglt) ||
            isa(sgst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sgst) ||
-           isa(lcse, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), lcse) ||
+           isa(lcse, AbstractVector) &&
+           any(x -> isa(x, LinearConstraintEstimator) || isa(x, ExposureConstraintEstimator),
+               lcse) ||
            isa(cte, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), cte) ||
            isa(gcarde, AbstractVector) &&
            any(x -> isa(x, LinearConstraintEstimator), gcarde) ||
@@ -793,7 +821,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                                             lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
                                             sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
                                             sca, ccnt, cobj, sc, so, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, linf, lp, brt, x_src,
+                                            lpc, linfc, l1, l2, linf, lp, brt, x_src, z_src,
                                             strict), jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
@@ -803,21 +831,50 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                    typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
                    typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
                    typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(brt), typeof(x_src), typeof(strict)}(pe, slv, wb, bgt,
-                                                                           sbgt, gbgt, xbgt,
-                                                                           lt, st, lcse,
-                                                                           cte, gcarde,
-                                                                           sgcarde, smtx,
-                                                                           sgmtx, slt, sst,
-                                                                           sglt, sgst, tn,
-                                                                           fees, sets, tr,
-                                                                           ple, ret, sca,
-                                                                           ccnt, cobj, sc,
-                                                                           so, ss, card,
-                                                                           scard, l2c, lpc,
-                                                                           linfc, l1, l2,
-                                                                           linf, lp, brt,
-                                                                           x_src, strict)
+                   typeof(lp), typeof(brt), typeof(x_src), typeof(z_src), typeof(strict)}(pe,
+                                                                                          slv,
+                                                                                          wb,
+                                                                                          bgt,
+                                                                                          sbgt,
+                                                                                          gbgt,
+                                                                                          xbgt,
+                                                                                          lt,
+                                                                                          st,
+                                                                                          lcse,
+                                                                                          cte,
+                                                                                          gcarde,
+                                                                                          sgcarde,
+                                                                                          smtx,
+                                                                                          sgmtx,
+                                                                                          slt,
+                                                                                          sst,
+                                                                                          sglt,
+                                                                                          sgst,
+                                                                                          tn,
+                                                                                          fees,
+                                                                                          sets,
+                                                                                          tr,
+                                                                                          ple,
+                                                                                          ret,
+                                                                                          sca,
+                                                                                          ccnt,
+                                                                                          cobj,
+                                                                                          sc,
+                                                                                          so,
+                                                                                          ss,
+                                                                                          card,
+                                                                                          scard,
+                                                                                          l2c,
+                                                                                          lpc,
+                                                                                          linfc,
+                                                                                          l1,
+                                                                                          l2,
+                                                                                          linf,
+                                                                                          lp,
+                                                                                          brt,
+                                                                                          x_src,
+                                                                                          z_src,
+                                                                                          strict)
     end
 end
 function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -826,7 +883,7 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        sbgt::TD_Option{<:Num_BgtRg} = nothing,
                        gbgt::TD_Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                        lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
-                       lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
                        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
                        gcarde::TD_Option{<:LcE_Lc} = nothing,
                        sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
@@ -838,10 +895,10 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
                        tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
                        fees::TD_Option{<:FeesE_Fees} = nothing,
-                       sets::TD_Option{<:AssetSets} = nothing,
+                       sets::TD_Option{<:UniverseSets} = nothing,
                        tr::TD_Option{<:Tr_VecTr} = nothing,
                        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                       ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+                       ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
                        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
                        ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
                        cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing, sc::Number = 1,
@@ -855,11 +912,12 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
                        linf::TD_Option{<:Number} = nothing,
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
-                       x_src::Symbol = :prior, strict::Bool = false)::JuMPOptimiser
+                       x_src::Symbol = :prior, z_src::Symbol = :data,
+                       strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
                          sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
                          ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                         linfc, l1, l2, linf, lp, brt, x_src, strict)
+                         linfc, l1, l2, linf, lp, brt, x_src, z_src, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -947,7 +1005,8 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, x_src = opt.x_src, strict = opt.strict)
+                         brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
+                         strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1010,6 +1069,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
         sgst = port_opt_view(opt.sgst, i)
     end
     tn = port_opt_view(opt.tn, i)
+    lcse = port_opt_view(opt.lcse, i)
     sets = port_opt_view(opt.sets, i)
     fees = port_opt_view(opt.fees, i)
     tr = port_opt_view(opt.tr, i, X)
@@ -1017,15 +1077,50 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
-                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st,
-                         lcse = opt.lcse, cte = opt.cte, gcarde = opt.gcarde,
-                         sgcarde = opt.sgcarde, smtx = smtx, sgmtx = sgmtx, slt = slt,
-                         sst = sst, sglt = sglt, sgst = sgst, tn = tn, fees = fees,
-                         sets = sets, tr = tr, ple = opt.ple, ret = ret, sca = opt.sca,
-                         ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
-                         card = opt.card, scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc,
-                         linfc = opt.linfc, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, brt = opt.brt, x_src = opt.x_src, strict = opt.strict)
+                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st, lcse = lcse,
+                         cte = opt.cte, gcarde = opt.gcarde, sgcarde = opt.sgcarde,
+                         smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
+                         sgst = sgst, tn = tn, fees = fees, sets = sets, tr = tr,
+                         ple = opt.ple, ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
+                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
+                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         brt = opt.brt, x_src = opt.x_src, z_src = opt.z_src,
+                         strict = opt.strict)
+end
+"""
+    assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult) -> Nothing
+
+Assert that every axis [`UniverseSets`](@ref) declares agrees, name for name and in order, with the returns data it is about to be used against.
+
+Nothing else in the library ties a declared universe to the data's column order. Names resolve to *positions* in `sets.dict[sets.xkey]`, and those positions index the columns of `pr.X`; if the two disagree the model is still feasible and still solves — it just constrains the wrong assets. Converting the one silent-wrong-answer failure mode into an error is the whole point, which is why this runs even though no supported path is expected to trip it.
+
+Both axes are checked, but only where both sides exist: `rd.nx` and `rd.nf` are optional on [`ReturnsResult`](@ref), and the factor axis is optional on [`UniverseSets`](@ref). The factor check is redundant with the one [`constraint_space_basis`](@ref) makes against the loadings and costs nothing when a caller copies `rd.nf` into the dict; the asset check is new behaviour on a path that has nothing to do with factors, and it may surface pre-existing misconfigurations — that is intended.
+
+`_update_asset_sets` rebuilds `sets.dict[sets.xkey]` from `rdo.nx` before a [`NestedClustered`](@ref) outer solve, and [`port_opt_view`](@ref) slices the asset axis alongside the data, so the synthetic-universe and subset paths satisfy this by construction.
+
+# Related
+
+  - [`UniverseSets`](@ref)
+  - [`misaligned_axis_msg`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+"""
+function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult)
+    if isnothing(sets)
+        return nothing
+    end
+    for (axis, key, names, sym) in
+        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.fkey, rd.nf, "nf"))
+        if isnothing(names) || !haskey(sets.dict, key)
+            continue
+        end
+        declared = sets.dict[key]
+        @argcheck(length(declared) == length(names),
+                  DimensionMismatch(misaligned_axis_msg(declared, names, axis, key, sym)))
+        @argcheck(declared == names,
+                  ArgumentError(misaligned_axis_msg(declared, names, axis, key, sym)))
+    end
+    return nothing
 end
 """
     processed_jump_optimiser_attributes(
@@ -1063,6 +1158,7 @@ processing happens exactly once per `optimise` call.
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, opt.brt)
+    assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd; dims = dims)
     X = pr.X
     datatype = eltype(X)
@@ -1070,9 +1166,10 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                    datatype = datatype)
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
-    lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict)
+    lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
+                              rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, kwargs...)
+                                 x_src = opt.x_src, z_src = opt.z_src, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx
@@ -1102,21 +1199,22 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                x_src = opt.x_src, kwargs...)
+                                x_src = opt.x_src, z_src = opt.z_src, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,
                                             sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
                                             slt = slt, sst = sst, sglt = sglt, sgst = sgst,
-                                            tn = tn, fees = fees, plr = plr, ret = ret)
+                                            tn = tn, fees = fees, plr = plr, ret = ret,
+                                            sca = opt.sca)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
 
-Return a copy of `opt` with the returns estimator replaced by its unbounded variant.
+Return a copy of `opt` with every return term replaced by its unbounded variant.
 
 Used internally in risk-frontier sub-problems where weight and risk bounds must be
-removed so the solver can range freely.
+removed so the solver can range freely. A vector of terms is stripped term by term.
 
 # Arguments
 
@@ -1125,7 +1223,7 @@ removed so the solver can range freely.
 
 # Returns
 
-  - `JuMPOptimiser`: Optimiser with an unbounded returns estimator.
+  - `JuMPOptimiser`: Optimiser whose return terms carry no bounds.
 
 # Examples
 
@@ -1184,6 +1282,10 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
     # fixed in 9ff28d6). Every `opt` field flows through by name (`base`); every `attrs` result
     # field overrides its optimiser slot. Six result fields carry a different name than their
     # slot — listed in `rename` — the other twelve match by name and map automatically.
+    #
+    # There is deliberately no inverse. A head that needs the bundle back keeps the `attrs` it
+    # already holds (both `NearOptimalCentering` heads do), because a reverse hand list is the
+    # same drop the comment above records — only pointing the other way.
     rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
               plr = :ple)
     of = fieldnames(JuMPOptimiser)
@@ -1228,6 +1330,42 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
     attrs = processed_jump_optimiser_attributes(opt, rd; dims = dims, kwargs...)
     return jump_optimiser_from_attributes(opt, attrs)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add weight bound and budget constraints to `model` from the optimiser's own budget group.
+
+Every JuMP optimiser head reaches [`set_weight_constraints!`](@ref) through this method, so
+the whole budget group (`bgt`, `sbgt`, `gbgt`) travels as one object. A budget field added
+to [`JuMPOptimiser`](@ref) is therefore read in one place rather than at every head, which
+is how the gross budget once reached [`MeanRisk`](@ref) alone and was silently dropped by
+the other four heads.
+
+`long = true` forbids negative weight bounds, so the long/short decomposition is never
+built and `sbgt` and `gbgt` cannot apply; they are still forwarded, because the bound check
+is what rejects the combination.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
+  - `opt::JuMPOptimiser`: Optimiser supplying the budget group.
+  - `long::Bool = false`: When `true`, raises an error if any weight bound is negative.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds, opt::JuMPOptimiser,
+                                 long::Bool = false)
+    return set_weight_constraints!(model, wb, opt.bgt, opt.sbgt, long; gbgt = opt.gbgt)
+end
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1236,9 +1374,11 @@ Add risk-measure constraints and scalarise the combined risk expression in `mode
 
 One step of [`assemble_jump_model!`](@ref), dispatched on `r`: when `r` is `nothing`
 (e.g. [`RelaxedRiskBudgeting`](@ref), whose risk lives in its head) this is a no-op.
-`extra` is the optional trailing-argument tuple — empty for most optimisers, or `(b1,)`
-for [`FactorRiskContribution`](@ref) — splatted into `set_risk_constraints!` so the
-non-factor call signature is reproduced exactly.
+
+This is the one place the fee argument is positional. Every head reaches
+[`set_risk_constraints!`](@ref) through it, so a head cannot mis-order the list and lose the
+fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inlined the step
+(ADR 0008, amendment 2 §3).
 
 # Arguments
 
@@ -1249,7 +1389,7 @@ non-factor call signature is reproduced exactly.
   - `pr`: Prior result passed to risk builders.
   - `pl`: Phylogeny result passed to risk builders.
   - `fees`: Fees result passed to risk builders.
-  - `extra`: Trailing-argument tuple splatted into risk builders (`()` or `(b1,)`).
+  - $(arg_dict[:b1_opt])
   - `rd`: Returns result forwarded as a keyword argument to risk builders.
 
 # Returns
@@ -1264,12 +1404,17 @@ non-factor call signature is reproduced exactly.
   - [`RelaxedRiskBudgeting`](@ref)
   - [`FactorRiskContribution`](@ref)
 """
-function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, args...; kwargs...)
+function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, optimiser, opt, pr, pl,
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
+                                 kwargs...)
+    # The no-op carries the same positional list as the builder below, not an `args...` tail:
+    # a tail is ambiguous with a typed tail on the sibling method, and it accepts a call the
+    # builder would reject.
     return nothing
 end
-function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl, fees,
-                                 args...; rd)
-    set_risk_constraints!(model, r, optimiser, pr, pl, fees, args...; rd = rd)
+function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl,
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd)
+    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     return nothing
 end
@@ -1295,6 +1440,11 @@ and *tail* (objective + solve). The head must have populated Model State (`w`/`k
 before calling this function. See `Model Assembly` in `CONTEXT.md` and
 `0008-jump-model-assembly.md`.
 
+The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
+complete here and no sweep solve has started, so this is the one point at which the **total**
+sweep — the product across every swept return term and every swept risk measure — is in hand
+and can be capped.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -1308,8 +1458,7 @@ before calling this function. See `Model Assembly` in `CONTEXT.md` and
   - `r::Option{<:RiskMeasure} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
-  - `b1::Option{<:MatNum} = nothing`: Factor loading matrix for
-    [`FactorRiskContribution`](@ref); `nothing` for all other optimisers.
+  - $(arg_dict[:b1_opt])
   - `sdp_asset_phylogeny::Bool = true`: Whether to apply the standard asset-space SDP phylogeny
     constraints. [`FactorRiskContribution`](@ref) passes `false` and applies its own
     factor-space variant in its tail instead.
@@ -1331,8 +1480,8 @@ julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, s
                                         sgcardr = nothing, smtx = nothing, sgmtx = nothing,
                                         slt = nothing, sst = nothing, sglt = nothing,
                                         sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn()) isa
-       ProcessedJuMPOptimiserAttributes
+                                        plr = nothing, ret = ArithmeticReturn(),
+                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
 true
 ```
 
@@ -1341,6 +1490,7 @@ true
   - [`ProcessedJuMPOptimiserAttributes`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
+  - [`assert_frontier_sweep_cap`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
@@ -1377,6 +1527,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
         set_sdp_phylogeny_constraints!(model, plr)
     end
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
+    assert_frontier_sweep_cap(model)
     return nothing
 end
 """
@@ -1385,6 +1536,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Route a mean uncertainty set into a [`JuMPOptimiser`](@ref)'s return estimator.
 
 One of the two [Routing Targets](@ref PIPELINE_ROUTING_TARGETS) that names no plain field: the set lands in `ret.ucs`, and only an [`ArithmeticReturn`](@ref) can bound expected returns, so any other return estimator is an error rather than a silent drop.
+
+A **vector** of return terms is refused for the same reason, from the other side: one set is a neighbourhood of one quantity (ADR 0050), so broadcasting it across *k* terms would apply a ball fitted on one fit to every other one — the very defect [#277](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/277) removed. Name the set on the term it belongs to instead.
 
 Internal machinery — not part of the user-facing API.
 
@@ -1395,7 +1548,11 @@ Internal machinery — not part of the user-facing API.
 """
 function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
     @argcheck(isa(cfg.ret, ArithmeticReturn),
-              ArgumentError("cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"))
+              ArgumentError(if isa(cfg.ret, VecJRE)
+                                "cannot route a mean uncertainty set into $(length(cfg.ret)) return terms: a set is a neighbourhood of the one quantity it was calibrated on (ADR 0050), so it cannot be broadcast across terms. Name the set in the `ucs` field of the term it belongs to."
+                            else
+                                "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
+                            end))
     return Accessors.set(cfg, Accessors.PropertyLens{:ret}(),
                          Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
 end

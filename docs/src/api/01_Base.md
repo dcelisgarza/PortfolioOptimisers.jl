@@ -14,7 +14,6 @@ PortfolioOptimisers
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
-DynamicAbstractWeights
 ```
 
 ## Configuration
@@ -58,6 +57,8 @@ pretty_show_vector_body
 Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types and utilities are non-specific and used throughout the library.
 
 ```@docs
+DynamicAbstractWeights
+AbstractCustomValue
 VecScalar
 AbstractEstimatorValueAlgorithm
 get_observation_weights
@@ -68,6 +69,7 @@ L1Norm
 LpNorm
 LInfNorm
 norm_error
+norm_factor
 resolve_rng
 ```
 
@@ -81,10 +83,16 @@ STRING_DISTANCE
 set_string_distance!
 with_string_distance
 did_you_mean
+suggest_declared_key
 unknown_variable_msg
+misaligned_axis_msg
+strict_diagnostic
 missing_group_assets_msg
 empty_row_msg
+empty_projected_row_msg
+gross_budget_bounds_msg
 failed_solve_msg
+relaxed_preferences_msg
 first_error_line
 EquationLimits
 EQUATION_LIMITS
@@ -137,9 +145,12 @@ VecNum
 VecInt
 MatNum
 ArrNum
+Arr3Num
 VecNum_MatNum
+MatNum_Arr3Num
 Num_VecNum
 Func_Num_VecNum
+CVal_Func_Num_VecNum
 Num_ArrNum
 PairStrNum
 DictStrNum
@@ -181,6 +192,7 @@ Func_VecNum
 In order to standardise the documentation we use a arg_dict of terms.
 
 ```@docs
+unique_key_dict
 arg_dict
 val_dict
 ret_dict

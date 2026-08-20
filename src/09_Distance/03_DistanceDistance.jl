@@ -5,6 +5,10 @@ Distance-of-distances estimator for portfolio optimization.
 
 `DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a distance algorithm, allowing you to compute a "distance of distances" matrix. If `power` is not `nothing`, it computes the generalised distance matrix, which is then used to compute the distances of distances matrix.
 
+!!! note
+
+    `power = 1` reproduces the base distance exactly, so the distance-of-distances matrix is the same as at `power = nothing`. Only ``p \\geq 2`` changes the result. See [`Distance`](@ref) for the formula of each algorithm.
+
 # Mathematical definition
 
 ```math
@@ -29,11 +33,11 @@ $(DocStringExtensions.FIELDS)
         metric::Distances.Metric = Distances.Euclidean(),
         args::Tuple = (),
         kwargs::NamedTuple = (;),
-        power::Option{<:Integer} = 1,
+        power::Option{<:Integer} = nothing,
         alg::AbstractDistanceAlgorithm = SimpleDistance()
     ) -> DistanceDistance
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `power` and `alg` are forwarded to a [`Distance`](@ref), so they carry the meaning and the defaults documented there.
 
 ## Validation
 
@@ -105,7 +109,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
   - `de`: Distance-of-distances estimator.
   - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
@@ -164,7 +168,7 @@ This method first computes the correlation and base distance matrices using [`Di
 
   - `de`: Distance-of-distances estimator.
   - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × features).
+  - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 

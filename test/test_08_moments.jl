@@ -255,6 +255,13 @@
                        2)
         @test std(SimpleVariance(), rd.X) == std(SimpleVariance(; me = nothing), rd.X)
         @test var(SimpleVariance(), rd.X) == var(SimpleVariance(; me = nothing), rd.X)
+        # The `SimpleVariance{Nothing}` matrix methods must read their own `w`, not the `w`
+        # of the `SimpleExpectedReturns` they build to resolve the mean.
+        vew = SimpleVariance(; me = nothing, w = ew, corrected = false)
+        @test isapprox(var(vew, rd.X; dims = 1), std(vew, rd.X; dims = 1) .^ 2)
+        @test !isapprox(var(vew, rd.X; dims = 1),
+                        var(SimpleVariance(; me = nothing, corrected = false), rd.X;
+                            dims = 1))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
@@ -282,6 +289,31 @@
                                             me = SimpleExpectedReturns()), rd.X),
                        cor(GerberCovariance(; alg = Gerber0(),
                                             me = SimpleExpectedReturns()), rd.X'; dims = 2))
+
+        # A constant column never crosses its own threshold, so every Gerber denominator
+        # vanishes on it: `Gerber0` divides by `(U + D)' * (U + D)`, `Gerber1` by
+        # `T .- N' * N`, and `Gerber2` by an unclamped `sqrt.(diag(H))`. Routing the three
+        # through `comovement_ratio` / `standardise_comovement!` guards all of them to
+        # zero, which is what the Smyth-Broby family already returned. Before the routing
+        # the Gerber estimators returned a NaN row here. See ADR 0022.
+        # `posdef!` still cannot take the zero diagonal, and that is true of both families,
+        # so these compare the reductions with `pdm = nothing`.
+        Xq = randn(StableRNG(987654321), 200, 4)
+        Xq[:, 3] .= 0.02
+        for (galg, salg) in
+            ((Gerber0(), SmythBrobyCount0()), (Gerber1(), SmythBrobyCount1()),
+             (Gerber2(), SmythBrobyCount2()))
+            rho = cor(GerberCovariance(; alg = galg, pdm = nothing), Xq)
+            sbrho = cor(SmythBrobyCovariance(; alg = salg, pdm = nothing), Xq)
+            @test all(isfinite, rho)
+            @test all(isfinite, sbrho)
+            @test all(iszero, view(rho, :, 3))
+            @test iszero(sbrho[3, 3])
+            # The threshold crossings are unchanged away from the degenerate asset.
+            @test isapprox(rho[1:2, 1:2],
+                           cor(GerberCovariance(; alg = galg, pdm = nothing),
+                               Xq[:, [1, 2, 4]])[1:2, 1:2])
+        end
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
@@ -810,6 +842,51 @@
             @test isapprox(d6, d1)
         end
     end
+    @testset "Every distance algorithm has an exactly zero diagonal" begin
+        #=
+        A distance matrix with a non-zero diagonal is not a distance matrix: `SimpleWeightedGraph`
+        reads it as a self-loop and `PhylogenyResult` rejects it outright. Two sources were
+        measured, and neither was a rounding speck that could be left alone.
+
+        `variation_info` estimated `VI(X, X)` instead of pinning it. It is zero by definition,
+        but the histogram estimate of `I(X; X)` does not reproduce the estimate of `H(X)` bit
+        for bit, so it left roughly 1e-16 on 7 of 12 assets.
+
+        `ShrunkDenoise` -- the *default* denoise algorithm -- reconstructs from eigen components
+        and, unlike `SpectralDenoise` and `FixedDenoise`, does not route through `cov2cor`, so
+        the correlation diagonal came out at `1 ± 1.5e-15`. That one matters more than it looks:
+        the correlation kernels take `sqrt(1 - rho[i, i])`, which **amplifies** 1.1e-16 into
+        7.45e-9 -- a real self-loop weight, not noise.
+        =#
+        Xd = rd.X
+        for a in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                  CorrelationDistance(), CanonicalDistance(), VariationInfoDistance()),
+            c in (Covariance(),
+                  PortfolioOptimisersCovariance(;
+                                                mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                          dn = Denoise())),
+                  PortfolioOptimisersCovariance(;
+                                                mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                          dt = Detone())))
+
+            @test all(iszero, diag(distance(Distance(; alg = a), c, Xd)))
+        end
+        # The correlation diagonal is one by definition, and `Denoise` now leaves it exact.
+        cdn = PortfolioOptimisersCovariance(;
+                                            mp = PortfolioOptimisers.MatrixProcessing(;
+                                                                                      dn = Denoise()))
+        rdn = cor(cdn, Xd)
+        @test all(isone, diag(rdn))
+        @test isposdef(rdn)
+        # `variation_info`'s diagonal is pinned, not estimated -- under both normalisations.
+        @test all(iszero, diag(PortfolioOptimisers.variation_info(Xd)))
+        @test all(iszero, diag(PortfolioOptimisers.variation_info(Xd, Knuth(), false)))
+        # `mutual_variation_info` pins its VI diagonal but keeps its MI one: `I(X; X) = H(X)`
+        # is a real value there, unlike VI's zero.
+        mm, vm = PortfolioOptimisers.mutual_variation_info(Xd)
+        @test all(iszero, diag(vm))
+        @test all(!iszero, diag(mm))
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`
@@ -1313,4 +1390,25 @@ end
         @test xw == X[21:30, 1]
         @test inner.w == ew[21:30]
     end
+end
+@testset "CustomValueExpectedReturns callable validation" begin
+    X = randn(StableRNG(987654321), 50, 4)
+    scalar_val = (X; kwargs...) -> 0.123
+    short_val = (X; kwargs...) -> [0.1, 0.2]
+    per_asset_val = function (X; dims::Int = 1, kwargs...)
+        return fill(0.5, size(X, setdiff((1, 2), (dims,))[1]))
+    end
+    # The callable branch validates what the callable returns, as the vector branch
+    # validates the stored field.
+    @test_throws ArgumentError mean(CustomValueExpectedReturns(; val = scalar_val), X)
+    @test_throws DimensionMismatch mean(CustomValueExpectedReturns(; val = short_val), X)
+    # A callable that returns one value per asset is accepted, along both dims.
+    @test mean(CustomValueExpectedReturns(; val = per_asset_val), X) == fill(0.5, 4)
+    @test mean(CustomValueExpectedReturns(; val = per_asset_val), X; dims = 2) ==
+          fill(0.5, 50)
+    # The scalar and vector branches are unchanged.
+    @test mean(CustomValueExpectedReturns(; val = 0.02), X) == fill(0.02, 1, 4)
+    @test mean(CustomValueExpectedReturns(; val = [0.1, 0.2, 0.3, 0.4]), X) ==
+          [0.1 0.2 0.3 0.4]
+    @test_throws DimensionMismatch mean(CustomValueExpectedReturns(; val = [0.1, 0.2]), X)
 end

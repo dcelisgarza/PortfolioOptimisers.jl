@@ -62,11 +62,17 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NearestQuantilePrediction(;
-        r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
         q::Real = 0.5,
         r_kwargs::NamedTuple = (;),
         q_kwargs::NamedTuple = (;)
     ) -> NearestQuantilePrediction
+
+## Multiplicity
+
+`r` takes one risk measure or a vector of them, and the type gains **no** scalariser field. `r_kwargs` is already a general keyword channel forwarded straight into [`expected_risk`](@ref), so a caller writes `r_kwargs = (sca = MaxScalariser(),)`.
+
+A mixed-polarity vector is admitted here, because [`quantile_by_measure`](@ref) takes an explicit `sign` rather than consulting [`bigger_is_better`](@ref).
 
 ## Validation
 
@@ -102,14 +108,14 @@ prediction.
     $(field_dict[:q_kwargs])
     """
     q_kwargs
-    function NearestQuantilePrediction(r::AbstractBaseRiskMeasure, q::Real,
-                                       r_kwargs::NamedTuple, q_kwargs::NamedTuple)
+    function NearestQuantilePrediction(r::BaseRM_VecBaseRM, q::Real, r_kwargs::NamedTuple,
+                                       q_kwargs::NamedTuple)
         @argcheck(zero(q) <= q <= one(q), DomainError(q, "`q` must be in [0, 1]"))
         return new{typeof(r), typeof(q), typeof(r_kwargs), typeof(q_kwargs)}(r, q, r_kwargs,
                                                                              q_kwargs)
     end
 end
-function NearestQuantilePrediction(; r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+function NearestQuantilePrediction(; r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
                                    q::Real = 0.5, r_kwargs::NamedTuple = (;),
                                    q_kwargs::NamedTuple = (;))::NearestQuantilePrediction
     return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)

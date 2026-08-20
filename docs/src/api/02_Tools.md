@@ -9,6 +9,7 @@ We strive to be as type-stable, inferrable, and immutable as possible in order t
 ```@docs
 traverse_concrete_subtypes
 concrete_typed_array
+concrete_typed_array_if_abstract
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
 @propagatable
@@ -18,15 +19,19 @@ factory_child
 @pprop
 @wprop
 @cprop
+PROP_TAG_NAMES
+PROP_TAG_MACRO_NAMES
+PROP_TAG_CHANNELS
+prop_tag
 is_prop_tag_call
-is_fprop_macro
-is_vprop_macro
-is_pprop_macro
-is_wprop_macro
-is_cprop_macro
+prop_tag_expr
+prop_channel_active
+prop_channel_pairs
+check_prop_tag_macros
 is_doc_macro
 _ctx
 _wprop
+resolve_deferred_quantities
 sel
 extract_field_name
 propagatable_find_struct
@@ -34,6 +39,11 @@ propagatable_bare_name
 try_field_name
 peel_prop_tags
 propagatable_parse_body
+PROPAGATABLE_CONTRACTS
+propagatable_register!
+propagatable_keywords
+propagatable_contract_violations
+check_propagatable_contracts
 @forward_properties
 forward_nonnothing
 forward_flatten_path
@@ -60,6 +70,7 @@ dot_scalar
 ```@docs
 port_opt_view(x, i, args...)
 port_opt_view(x::VecScalar, i, args...)
+port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...)
 nothing_scalar_array_view
 nothing_scalar_array_view_odd_order
 nothing_scalar_array_getindex

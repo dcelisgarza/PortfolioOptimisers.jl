@@ -1,0 +1,104 @@
+name: Paper
+
+on:
+  push:
+    branches:
+      - main
+      - dev*
+      - agents/*
+    tags: ["*"]
+  pull_request:
+    branches:
+      - main
+      - dev*
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  paper:
+    name: Paper
+    runs-on: ubuntu-latest
+    # The build reads the repository and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: "1"
+      - name: Use Julia cache
+        uses: julia-actions/cache@v3
+      # The paper's hidden cell activates `docs/` by relative path, so the listing runs against
+      # whatever that environment resolves. `docs/Manifest.toml` is not tracked, so the manifest
+      # that points PortfolioOptimisers at this checkout has to be built here, exactly as the
+      # documentation job builds it. Without this the cell would resolve the registered release,
+      # which is older than the API the listing uses.
+      - name: Instantiate environment with development version of the package
+        run: |
+          julia --color=yes --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      - name: Install TypstJlyfish
+        run: julia --color=yes --project=@jlyfishdoc -e 'using Pkg; Pkg.add("TypstJlyfish")'
+      # `recompute: false` keys a cell on its own text, and `main-jlyfish.json` is committed, so a
+      # build that kept the cache would render the stored answer and prove nothing. It caches a
+      # FAILURE too. Move it aside: the build then recomputes every cell against this checkout,
+      # which is the drift this job exists to catch, and the copy is still there to compare against.
+      - name: Clear the jlyfish cache
+        run: mv docs/paper/main-jlyfish.json "${RUNNER_TEMP}/main-jlyfish.committed.json"
+      # Launch from docs/paper. Inside a cell `@__DIR__` resolves to the directory Julia was
+      # launched from, and both the environment cell and the listing reach their files through it.
+      - name: Build the paper
+        run: julia --color=yes --project=@jlyfishdoc -e 'import TypstJlyfish; TypstJlyfish.compile("main.typ")'
+        working-directory: docs/paper
+        env:
+          JULIA_PKG_SERVER: ""
+          GKSwstype: "100"
+      - name: Check every cell ran, and that the committed cache is current
+        run: |
+          python3 - "${RUNNER_TEMP}/main-jlyfish.committed.json" <<'PY'
+          import json, sys
+
+          built = json.load(open("docs/paper/main-jlyfish.json"))
+          committed = json.load(open(sys.argv[1]))
+
+          # A cell that raised is recorded rather than thrown, and the paper then renders the error
+          # text instead of the answer. This is the drift check: a listing calling an API the
+          # library no longer has fails here.
+          failed = [k for k, v in built.items() if v["result"]["failed"]]
+          if failed:
+              for k in failed:
+                  print(f"::error::cell {k} failed\n{built[k]['result']['data']}")
+              sys.exit(1)
+
+          # The rebuilt cells must agree with the committed ones. A disagreement means somebody
+          # changed the listing, or the library changed its answer, without rebuilding the paper.
+          # `logs` and `stdout` are excluded because they carry solver chatter that varies by host.
+          def shape(d):
+              return {k: (v["code"], v["result"]["failed"], v["result"]["data"])
+                      for k, v in d.items()}
+
+          if shape(built) != shape(committed):
+              print("::error::docs/paper/main-jlyfish.json is stale. Rebuild the paper and commit "
+                    "it: julia --project=@jlyfishdoc -e 'import TypstJlyfish; "
+                    "TypstJlyfish.compile(\"main.typ\")' from docs/paper.")
+              for k in sorted(set(built) | set(committed)):
+                  if shape(built).get(k) != shape(committed).get(k):
+                      print(f"--- cell {k} differs ---")
+                      print("built:    ", shape(built).get(k))
+                      print("committed:", shape(committed).get(k))
+              sys.exit(1)
+
+          print(f"{len(built)} cells ran, none failed, and the committed cache is current.")
+          PY
+      - name: Upload the paper
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: docs/paper/main.pdf

@@ -107,3 +107,59 @@ as a single `:macrocall` node with:
 - `factory(ex, w)` propagates `ObsWeights` into `@prop`-tagged `inner`,
   leaves untagged `config` unchanged ✓
 - `@inferred factory(ex, w)` — type-stable ✓
+
+## Amendment (2026-08-17)
+
+Decision 4 was **stated but never implemented**, and the gap was found only when a later change
+tripped over it. The expansion emitted `factory`, `factory_child` and `port_opt_view` as **bare
+names**, and `AbstractPriorResult`, `sel`, `_ctx`, `_wprop` and `resolve_deferred_quantities`
+with them. Every one of them is escaped into the caller, so every one of them resolved where the
+struct is *declared*.
+
+### How it surfaced
+
+The contract check moved to the end of the module, so the expansion gained a call that records
+the declaration in `PROPAGATABLE_CONTRACTS`. That call went in bare like the rest, and
+`propagatable_register!` is private, so a declaration outside `PortfolioOptimisers` died at once:
+
+```julia
+UndefVarError: `propagatable_register!` not defined in `Main.WindowedEstimatorProbe`
+```
+
+The test suite's own probe module is such a declaration, so the whole of `test_08_moments`
+errored rather than one assertion failing. A loud failure is what made the rest visible.
+
+### What `factory` being exported does and does not buy
+
+Nothing. An exported name arrives through `using` as an **implicit** binding, and a method
+definition on an implicit binding does not extend it — Julia declares a **new** function of the
+caller's own. Measured on 2026-08-17 with a module that wrote only `using PortfolioOptimisers`
+and `using PortfolioOptimisers: @propagatable`:
+
+- the declaration **compiled**, with no error and no warning;
+- the contract **registered**, so the end-of-module check saw a healthy type;
+- `NaiveUserProbe.factory !== PortfolioOptimisers.factory` — the caller got its own;
+- `PortfolioOptimisers.factory(probe)` threw a **`MethodError`**.
+
+So the promise in `@propagatable`'s docstring — that a type declared in another package slots
+into PO's factory propagation chain — did not hold, and it failed **silently**. That is the
+worst shape available: three of the four observable signals said the declaration was fine.
+
+### The implementation
+
+`POMOD = @__MODULE__` is taken in the macro body, where it is the module that **defines** the
+macro. Each emitted name is built against it, e.g. `_factory = :($POMOD.factory)`. Interpolating
+the module *object* rather than the name `PortfolioOptimisers` means the expansion needs **no
+binding at all** in the caller, so a module that imports only `@propagatable` works.
+
+`@propagatable` is not exported, contrary to decision 4's wording. The minimum a caller writes
+is therefore `using PortfolioOptimisers: @propagatable`. Whether to export it is a separate,
+public-API question and is not decided here.
+
+### The rule for the next name added
+
+Anything the expansion emits by name is looked up where the struct is *declared*. Qualify it
+against `POMOD`. The test that catches a breach is `test/test_05_tools.jl`: it declares a type in
+a module that imports **only** the macro, then asserts that the caller gained no `factory` of its
+own and that `PortfolioOptimisers.factory` dispatches on the new type. A bare name fails that
+test whether it is private (`UndefVarError`) or exported (silent shadow).

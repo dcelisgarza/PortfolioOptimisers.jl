@@ -31,6 +31,10 @@ The map is exact, but **only for the bare problem** the closed forms assume: the
   - [`AbstractUncertaintyEpsAlgorithm`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct ActiveAssetsUncertaintyAlgorithm <: AbstractUncertaintyEpsAlgorithm
     """
@@ -68,7 +72,8 @@ $(DocStringExtensions.FIELDS)
 
     L1UncertaintySet(;
         eps::Number,
-        sd::Option{<:VecNum} = nothing
+        sd::Option{<:VecNum} = nothing,
+        mu::Option{<:VecNum} = nothing
     ) -> L1UncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -77,6 +82,8 @@ Keywords correspond to the struct's fields.
 
   - `isfinite(eps)` and `eps >= 0`.
   - If `sd` is provided: `!isempty(sd)` and `all(sd .> 0)`.
+  - If `mu` is provided: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If both `sd` and `mu` are provided: `length(mu) == length(sd)`.
 
 # Mathematical definition
 
@@ -99,12 +106,18 @@ Because the right-hand side is concave and positively homogeneous, this is an LP
 
 This set bounds a *mean/characteristic* vector. It has no covariance analogue, so [`sigma_ucs`](@ref) is not defined for the estimator that produces it.
 
+``\\hat{\\boldsymbol{\\mu}}`` is the `mu` field. A set produced by [`mu_ucs`](@ref) carries the characteristic vector its radius was calibrated on, so the consumer bounds that vector and not an unrelated one. See ADR 0050. A hand-built set that leaves `mu` as `nothing` defers to the consumer's own characteristic.
+
 # Related
 
   - [`SignedL1UncertaintySet`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct L1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -115,7 +128,11 @@ This set bounds a *mean/characteristic* vector. It has no covariance analogue, s
     $(field_dict[:sd_ucs])
     """
     sd
-    function L1UncertaintySet(eps::Number, sd::Option{<:VecNum})
+    """
+    $(field_dict[:mu_l1_ucs])
+    """
+    mu
+    function L1UncertaintySet(eps::Number, sd::Option{<:VecNum}, mu::Option{<:VecNum})
         @argcheck(isfinite(eps) && eps >= zero(eps),
                   DomainError(eps, "eps must be finite and >= 0"))
         if isa(sd, VecNum)
@@ -123,11 +140,41 @@ This set bounds a *mean/characteristic* vector. It has no covariance analogue, s
             @argcheck(all(x -> x > zero(x), sd),
                       DomainError(sd, "all entries of sd must be > 0"))
         end
-        return new{typeof(eps), typeof(sd)}(eps, sd)
+        if isa(mu, VecNum)
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu),
+                      IsNonFiniteError("all elements of mu must be finite"))
+            if isa(sd, VecNum)
+                @argcheck(length(mu) == length(sd),
+                          DimensionMismatch("mu ($(length(mu))) must match sd ($(length(sd)))"))
+            end
+        end
+        return new{typeof(eps), typeof(sd), typeof(mu)}(eps, sd, mu)
     end
 end
-function L1UncertaintySet(; eps::Number, sd::Option{<:VecNum} = nothing)::L1UncertaintySet
-    return L1UncertaintySet(eps, sd)
+function L1UncertaintySet(eps::Number, sd::Option{<:VecNum})::L1UncertaintySet
+    return L1UncertaintySet(eps, sd, nothing)
+end
+function L1UncertaintySet(; eps::Number, sd::Option{<:VecNum} = nothing,
+                          mu::Option{<:VecNum} = nothing)::L1UncertaintySet
+    return L1UncertaintySet(eps, sd, mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of an [`L1UncertaintySet`](@ref) restricted to the asset indices `i`. The
+radius is a scalar budget shared across the universe, so it passes through unchanged; the
+per-asset scaling and the carried characteristic are sliced.
+
+# Related
+
+  - [`L1UncertaintySet`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(risk_ucs::L1UncertaintySet, i, args...)::L1UncertaintySet
+    return L1UncertaintySet(; eps = risk_ucs.eps,
+                            sd = nothing_scalar_array_view(risk_ucs.sd, i),
+                            mu = nothing_scalar_array_view(risk_ucs.mu, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -145,7 +192,8 @@ $(DocStringExtensions.FIELDS)
     SignedL1UncertaintySet(;
         ep::Number,
         en::Number,
-        sd::Option{<:VecNum} = nothing
+        sd::Option{<:VecNum} = nothing,
+        mu::Option{<:VecNum} = nothing
     ) -> SignedL1UncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -155,6 +203,8 @@ Keywords correspond to the struct's fields.
   - `isfinite(ep)` and `ep >= 0`.
   - `isfinite(en)` and `en >= 0`.
   - If `sd` is provided: `!isempty(sd)` and `all(sd .> 0)`.
+  - If `mu` is provided: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If both `sd` and `mu` are provided: `length(mu) == length(sd)`.
 
 # Mathematical definition
 
@@ -180,6 +230,10 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares
   - [`L1UncertaintySet`](@ref)
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct SignedL1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -194,7 +248,12 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares
     $(field_dict[:sd_ucs])
     """
     sd
-    function SignedL1UncertaintySet(ep::Number, en::Number, sd::Option{<:VecNum})
+    """
+    $(field_dict[:mu_l1_ucs])
+    """
+    mu
+    function SignedL1UncertaintySet(ep::Number, en::Number, sd::Option{<:VecNum},
+                                    mu::Option{<:VecNum})
         @argcheck(isfinite(ep) && ep >= zero(ep),
                   DomainError(ep, "ep must be finite and >= 0"))
         @argcheck(isfinite(en) && en >= zero(en),
@@ -204,12 +263,42 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares
             @argcheck(all(x -> x > zero(x), sd),
                       DomainError(sd, "all entries of sd must be > 0"))
         end
-        return new{typeof(ep), typeof(en), typeof(sd)}(ep, en, sd)
+        if isa(mu, VecNum)
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu),
+                      IsNonFiniteError("all elements of mu must be finite"))
+            if isa(sd, VecNum)
+                @argcheck(length(mu) == length(sd),
+                          DimensionMismatch("mu ($(length(mu))) must match sd ($(length(sd)))"))
+            end
+        end
+        return new{typeof(ep), typeof(en), typeof(sd), typeof(mu)}(ep, en, sd, mu)
     end
 end
-function SignedL1UncertaintySet(; ep::Number, en::Number,
-                                sd::Option{<:VecNum} = nothing)::SignedL1UncertaintySet
-    return SignedL1UncertaintySet(ep, en, sd)
+function SignedL1UncertaintySet(ep::Number, en::Number,
+                                sd::Option{<:VecNum})::SignedL1UncertaintySet
+    return SignedL1UncertaintySet(ep, en, sd, nothing)
+end
+function SignedL1UncertaintySet(; ep::Number, en::Number, sd::Option{<:VecNum} = nothing,
+                                mu::Option{<:VecNum} = nothing)::SignedL1UncertaintySet
+    return SignedL1UncertaintySet(ep, en, sd, mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a [`SignedL1UncertaintySet`](@ref) restricted to the asset indices `i`.
+Both radii are scalar budgets shared across the universe, so they pass through unchanged;
+the per-asset scaling and the carried characteristic are sliced.
+
+# Related
+
+  - [`SignedL1UncertaintySet`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(risk_ucs::SignedL1UncertaintySet, i, args...)::SignedL1UncertaintySet
+    return SignedL1UncertaintySet(; ep = risk_ucs.ep, en = risk_ucs.en,
+                                  sd = nothing_scalar_array_view(risk_ucs.sd, i),
+                                  mu = nothing_scalar_array_view(risk_ucs.mu, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -251,6 +340,10 @@ Using the wrong one mis-calibrates the radius; it does not make the optimisation
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct L1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -311,6 +404,10 @@ Keywords correspond to the struct's fields.
   - [`SignedL1UncertaintySet`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct SignedL1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -390,6 +487,10 @@ This estimator is **mean-only**. [`ucs`](@ref) and [`sigma_ucs`](@ref) are defin
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`mu_ucs`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 @concrete struct CharacteristicUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -424,6 +525,10 @@ Return the vector `g` whose `k`-th entry is the radius at which the `k`-th asset
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_activation_ladder(mu::VecNum, sd::Option{<:VecNum})
     N = length(mu)
@@ -438,6 +543,10 @@ Convert an `active` target — a count or a fraction of the universe — into an
 # Related
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
     q = isa(active, Integer) ? Int(active) : round(Int, active * N)
@@ -456,6 +565,10 @@ Throws when the target interval is empty, which happens when the characteristic 
 
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
   - [`l1_activation_ladder`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_eps_from_ladder(method::Number, args...)
     return method
@@ -466,14 +579,14 @@ function l1_eps_from_ladder(method::ActiveAssetsUncertaintyAlgorithm, ladder::Ve
     @argcheck(L >= 1, IsEmptyError("activation ladder cannot be empty"))
     q = clamp(q, 1, L)
     if q < L
-        lo, hi = ladder[q], ladder[q + 1]
+        lo, hi = ladder[q], ladder[q+1]
         @argcheck(hi > lo,
                   DomainError(method.active,
                               "cannot calibrate a radius for $(q) active entries: the characteristic has ties across the cut, so the interval ($(lo), $(hi)) required by the closed form is empty. Break the tie, or pass an explicit radius."))
         return (lo + hi) / 2
     end
     # Top of the ladder: any radius above ladder[end] activates everything.
-    return L == 1 ? one(eltype(ladder)) : ladder[L] + (ladder[L] - ladder[L - 1]) / 2
+    return L == 1 ? one(eltype(ladder)) : ladder[L] + (ladder[L] - ladder[L-1]) / 2
 end
 """
     l1_resolve_eps(method, mus::VecNum, sds::Option{<:VecNum}, paired::Bool)
@@ -487,6 +600,10 @@ Resolve a radius from a [`Num_UcSEps`](@ref) against the characteristic vector.
   - [`l1_activation_ladder`](@ref)
   - [`l1_eps_from_ladder`](@ref)
   - [`L1UncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - [quintile](@cite)
 """
 function l1_resolve_eps(method::Number, args...)
     return method
@@ -501,12 +618,12 @@ function l1_resolve_eps(method::ActiveAssetsUncertaintyAlgorithm, mus::VecNum,
     half = N ÷ 2
     @argcheck(half >= 1,
               ArgumentError("a paired radius calibration needs at least 2 assets, got $N"))
-    ladder = (l1_activation_ladder(mus, sds) + l1_activation_ladder(reverse(-mus),
-                                                                    if isnothing(sds)
-                                                                        nothing
-                                                                    else
-                                                                        reverse(sds)
-                                                                    end))[1:half]
+    ladder = (l1_activation_ladder(mus, sds)+l1_activation_ladder(reverse(-mus),
+                                                                  if isnothing(sds)
+                                                                      nothing
+                                                                  else
+                                                                      reverse(sds)
+                                                                  end))[1:half]
     # `active` counts assets, but each paired ladder entry activates a long/short pair.
     q = if isa(method.active, Integer)
         max(Int(method.active) ÷ 2, 1)
@@ -522,6 +639,8 @@ end
 Construct an ``\\ell_1`` uncertainty set on the characteristic vector.
 
 Computes the prior, takes ``\\hat{\\boldsymbol{\\mu}}`` from it (and ``\\hat{\\boldsymbol{\\sigma}} = \\sqrt{\\mathrm{diag}(\\hat{\\mathbf{\\Sigma}})}`` when the shape algorithm is `scaled`), then resolves the radius from the shape algorithm.
+
+The set carries ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector the radius was calibrated on. See ADR 0050.
 
 # Arguments
 
@@ -547,9 +666,8 @@ function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:L1UncertaintySetAlgori
     alg = ue.alg
     sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
     idx = sortperm(pr.mu; rev = true)
-    eps = l1_resolve_eps(alg.method, pr.mu[idx], isnothing(sd) ? nothing : sd[idx],
-                         alg.paired)
-    return L1UncertaintySet(; eps = eps, sd = sd)
+    eps = l1_resolve_eps(alg.method, pr.mu[idx], alg.scaled ? sd[idx] : nothing, alg.paired)
+    return L1UncertaintySet(; eps = eps, sd = sd, mu = pr.mu)
 end
 function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySetAlgorithm},
                 X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
@@ -563,9 +681,8 @@ function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySet
     # short leg, calibrated against the bottom — i.e. the top of the reversed, negated
     # ranking, which is the same ladder read from the other end (Corollary 13).
     en = l1_resolve_eps(alg.mm, mus, sds, false)
-    ep = l1_resolve_eps(alg.mp, reverse(-mus), isnothing(sds) ? nothing : reverse(sds),
-                        false)
-    return SignedL1UncertaintySet(; ep = ep, en = en, sd = sd)
+    ep = l1_resolve_eps(alg.mp, reverse(-mus), alg.scaled ? reverse(sds) : nothing, false)
+    return SignedL1UncertaintySet(; ep = ep, en = en, sd = sd, mu = pr.mu)
 end
 """
     ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)

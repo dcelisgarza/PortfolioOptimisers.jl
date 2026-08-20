@@ -17,8 +17,9 @@
 # COVERAGE
 #
 # Every concrete leaf subtype of `AbstractEstimator` / `AbstractAlgorithm` must
-# appear in at least one `Cap`. Adding a new estimator therefore forces a
-# placement decision here rather than letting the page quietly fall behind.
+# appear in at least one `Cap`, or be listed in `NOT_A_CHOICE` with a reason.
+# Adding a new estimator therefore forces a placement decision here rather than
+# letting the page quietly fall behind.
 
 """
     Cap(names...; label = nothing)
@@ -65,7 +66,7 @@ Note(text::String) = Note(text, [])
 """
     Group(head, children)
 
-A collapsible sub-list, rendered as a `::: details` block. `head` is either a
+A collapsible sub-list, rendered as an HTML `<details>` block. `head` is either a
 `Cap` (the group is itself a capability that contains others) or a plain
 `String` (a pure heading, e.g. "Algorithms").
 """
@@ -143,8 +144,36 @@ const NOT_A_FEATURE = Dict{Symbol, Symbol}(
                                            :no_bounds_no_risk_expr_risk_measure => :trait,
                                            :supported_risk_measures => :trait,
                                            :supports_risk_measure => :trait,
+                                           :unit_scale_risk_measure => :trait,
                                            # Extension-author plumbing.
                                            :concrete_typed_array => :internal)
+
+"""
+    NOT_A_CHOICE
+
+Estimator and Algorithm leaf types that deliberately have no catalogue entry,
+each with the reason it is off the choice surface.
+
+The coverage rule is that every leaf `AbstractEstimator` / `AbstractAlgorithm`
+is catalogued, because those two families *are* what a user chooses (CONTEXT.md).
+A type the library constructs for itself is not a choice, so listing it here is
+a statement about the domain, not a hole cut in the check.
+
+Checked in both directions, like `NOT_A_FEATURE`: a name here that is no longer
+a leaf estimator or algorithm fails just as loudly as an uncatalogued one, so an
+exemption cannot outlive the type it was written for.
+
+  - `:internal` -- constructed inside the library, never by a caller. It is
+    documented on its API page like any other type; it is simply not a
+    capability a reader can reach for.
+"""
+const NOT_A_CHOICE = Dict{Symbol, Symbol}(
+                                          # Series markers a conic risk builder passes to
+                                          # `risk_series` (ADR 0059). The capability is the
+                                          # risk measure; the marker is how one builder body
+                                          # serves both twins.
+                                          :NetReturnsRiskSeries => :internal,
+                                          :DrawdownRiskSeries => :internal)
 
 """
     CATALOGUE
@@ -301,7 +330,25 @@ const CATALOGUE = [Section("Core abstractions",
                                           Cap(:Scott; label = "Scott's bin width")]),
                                    Cap(:HacineGharbiRavier),
                                    Note("Predefined number of bins")]),
-                            Cap(:CanonicalDistance)]),
+                            Cap(:CanonicalDistance),
+                            Section("Feature distances",
+                                    [Prose("A feature matrix describes assets by their exposures, memberships, loadings or adjacencies rather than by their returns, and can be turned into a distance matrix directly — no correlation matrix in between."),
+                                     Group(Cap(:FeatureDistance),
+                                           [Cap(:AngularDist),
+                                            Group("Collapsing a window of time-varying features",
+                                                  [Cap(:LastObservation),
+                                                   Group(Cap(:AggregateFeatures,
+                                                             :AggregateDistances),
+                                                         [Cap(:MeanCollapse),
+                                                          Cap(:MedianCollapse)]),
+                                                   Cap(:StackObservations)])])]),
+                            Section("Similarity matrices",
+                                    [Prose("Every similarity matrix algorithm is a pure transformation of a distance matrix, applied by [`distance_to_similarity`](@ref). [`FeatureDistance`](@ref) picks one from its metric via [`default_similarity`](@ref); the Planar Maximally Filtered Graph used by [`DBHT`](@ref) and [`LoGo`](@ref) takes its own."),
+                                     Prose("The PMFG cannot take a negative weight, so it admits only the narrower [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and refuses [`AngularSimilarity`](@ref) at construction. Two of the admitted members carry a domain precondition on the distance matrix, checked by [`assert_similarity_domain`](@ref): [`ComplementSimilarity`](@ref) needs `D <= 1`, and [`MaximumDistanceSimilarity`](@ref) needs a finite `D`."),
+                                     Cap(:ComplementSimilarity), Cap(:AngularSimilarity),
+                                     Cap(:MaximumDistanceSimilarity),
+                                     Cap(:ExponentialSimilarity),
+                                     Cap(:GeneralExponentialSimilarity)])]),
                    Section("Phylogeny",
                            [Prose("`PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios."),
                             Section("Clustering",
@@ -331,12 +378,9 @@ const CATALOGUE = [Section("Core abstractions",
                                                     [Cap(:KruskalTree, :BoruvkaTree,
                                                          :PrimTree),
                                                      Group("Triangulated Maximally Filtered Graph with various similarity matrix estimators",
-                                                           [Cap(:MaximumDistanceSimilarity;
-                                                                label = "Maximum distance similarity"),
-                                                            Cap(:ExponentialSimilarity;
-                                                                label = "Exponential similarity"),
-                                                            Cap(:GeneralExponentialSimilarity;
-                                                                label = "General exponential similarity")])]),
+                                                           [Prose("Any member of [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref): [`MaximumDistanceSimilarity`](@ref), [`ExponentialSimilarity`](@ref), [`GeneralExponentialSimilarity`](@ref) or [`ComplementSimilarity`](@ref). [`AngularSimilarity`](@ref) is refused, because a PMFG cannot take the negative weight it returns whenever a correlation is negative.")]),
+                                                     Group("Which pairs count as related: the `sep` separation",
+                                                           [Prose("[`HopCount`](@ref) gives the **hop ball**, every pair within `n` edges. [`PathLength`](@ref) gives the **radius ball**, every pair whose shortest path is no longer than `dmax` -- which buys the cardinalities *between* the hop shells, since a hop knob can only step whole neighbourhoods at a time. It does not re-rank: both are selected by distance to begin with, so a path length refines a hop count rather than rivalling it. Note that `PathLength()` with no `dmax` means the observed diameter and therefore relates every reachable pair, the opposite end of the dial from `HopCount()`'s default. Both reach [`SemiDefinitePhylogenyEstimator`](@ref) and [`IntegerPhylogenyEstimator`](@ref); [`NetworkClustersEstimator`](@ref) takes only the hop count, because its power sum is indexed by edges.")])]),
                                               Cap(:ClustersEstimator, :Clusters),
                                               Cap(:NetworkClustersEstimator),
                                               Cap(:ClusterGroups)]),
@@ -357,6 +401,17 @@ const CATALOGUE = [Section("Core abstractions",
                                                          label = "Radiality"),
                                                      Cap(:StressCentrality;
                                                          label = "Stress")]),
+                                              Group(Cap(:AbstractCentralityPolarity,
+                                                        :centrality_polarity;
+                                                        label = "The network is weighted where it can be, in the polarity [`centrality_polarity`](@ref) answers for the algorithm"),
+                                                    [Cap(:DistancePolarity;
+                                                         label = "[`DistancePolarity`](@ref) for the shortest-path algorithms -- betweenness, closeness, radiality and stress"),
+                                                     Cap(:SimilarityPolarity;
+                                                         label = "[`SimilarityPolarity`](@ref) for eigenvector centrality, which reads the weighted adjacency matrix itself"),
+                                                     Cap(:TopologyOnly;
+                                                         label = "[`TopologyOnly`](@ref) in the `ov` field of any of the five polarity-declaring algorithms, which withdraws the declaration and asks for the centrality over the network's topology alone"),
+                                                     Prose("Five cases run on the plain unweighted graph and none of them raises: a weightless source (a [`ClustersEstimator`](@ref), a precomputed [`Clusters`](@ref), a precomputed [`PhylogenyResult`](@ref)), [`DegreeCentrality`](@ref), [`Pagerank`](@ref), [`KatzCentrality`](@ref), and [`EigenvectorCentrality`](@ref) on a tree branch. Polarity says *which* weights an algorithm receives, never *whether* the call succeeds. Note that the `sep` of a [`NetworkEstimator`](@ref) is inert on the weighted routes, which read the structure rather than the separation closure -- at the default `HopCount(; n = 1)` the two agree."),
+                                                     Prose("The override runs one way: it removes the weights and never supplies them, so there is no value that forces a polarity onto an algorithm. Every source honours it, because the topology-only answer is what a partition source, a precomputed [`PhylogenyResult`](@ref) and the tree branch already compute. Only the five that declare a polarity carry the field -- `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`, since the other three already read the topology alone. `ct` is positional on every centrality surface, so a configured algorithm reaches all of them, and a [`CentralityEstimator`](@ref) stays a pure bundle of `pl` and `ct`.")]),
                                               Cap(:centrality_vector),
                                               Cap(:average_centrality),
                                               Cap(:asset_phylogeny)]),
@@ -365,11 +420,15 @@ const CATALOGUE = [Section("Core abstractions",
                                               Cap(:PreorderTreeByID)])])]),
                    Section("Optimisation constraints",
                            [Prose("Non clustering optimisers support a wide range of constraints, while naive and clustering optimisers only support weight bounds. Furthermore, entropy pooling prior supports a variety of views constraints. It is therefore important to provide users with the ability to generate constraints manually and/or programmatically. We therefore provide a wide, robust, and extensible range of types such as [`AbstractEstimatorValueAlgorithm`](@ref) and [`UniformValues`](@ref), and functions that make this easy, fast, and safe."),
-                            Prose("Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`AssetSets`](@ref). Internally, `PortfolioOptimisers.jl` uses all the information and calls [`group_to_val!`](@ref), and [`replace_group_by_assets`](@ref) to produce the appropriate arrays."),
+                            Prose("Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`UniverseSets`](@ref). Internally, `PortfolioOptimisers.jl` uses all the information and calls [`name_to_val!`](@ref), and [`replace_group_by_assets`](@ref) to produce the appropriate arrays."),
                             Cap(:parse_equation, :ParsingResult;
                                 label = "Equation parsing"),
                             Cap(:linear_constraints, :LinearConstraintEstimator,
                                 :PartialLinearConstraint, :LinearConstraint),
+                            Group(Cap(:ExposureConstraintEstimator;
+                                      label = "Factor exposure constraints"),
+                                  [Prose("Wraps whatever `lcse` already accepts and declares the [`AbstractConstraintSpace`](@ref) its rows are written in, so a mandate can be stated in factor names -- \"at most 30% momentum\" -- and re-based through the prior's loadings. The projection happens during constraint generation, so what reaches the optimiser is an ordinary asset-space [`LinearConstraint`](@ref) and every optimiser sharing [`JuMPOptimiser`](@ref) supports one. The names resolve against the factor axis a [`UniverseSets`](@ref) declares."),
+                                   Cap(:FactorSpace)]),
                             Cap(:risk_budget_constraints, :RiskBudgetEstimator,
                                 :RiskBudget),
                             Cap(:phylogeny_constraints, :centrality_constraints,
@@ -377,7 +436,7 @@ const CATALOGUE = [Section("Core abstractions",
                                 :IntegerPhylogenyEstimator, :IntegerPhylogeny,
                                 :CentralityConstraint),
                             Cap(:weight_bounds_constraints, :WeightBoundsEstimator,
-                                :WeightBounds), Cap(:AssetSets),
+                                :WeightBounds), Cap(:UniverseSets),
                             Group(Cap(:BudgetEstimator, :BudgetRange;
                                       label = "Budget constraints"),
                                   [Cap(:BudgetCosts), Cap(:BudgetMarketImpact)]),
@@ -391,6 +450,7 @@ const CATALOGUE = [Section("Core abstractions",
                             Group(Cap(:TimeDependent),
                                   [Prose("A time-dependent input takes a different value in each fold of a cross-validation scheme, and is inert outside one."),
                                    Cap(:TimeDependentCallable),
+                                   Cap(:TimeDependentConstraintCallable),
                                    Cap(:TimeDependentOptimiserCallable),
                                    Cap(:TimeDependentContext),
                                    Cap(:PreviousWeightsFunction)]),
@@ -407,22 +467,82 @@ const CATALOGUE = [Section("Core abstractions",
                                           Cap(:FactorBlackLittermanPrior),
                                           Cap(:AugmentedBlackLittermanPrior)]),
                                    Group(Cap(:EntropyPoolingPrior),
-                                         [Prose("Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior."),
+                                         [Prose("Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior. Alongside the moment views it takes views on the conditional and entropic value at risk, each written as constraints of the one entropy pooling problem."),
                                           Cap(:BlackLittermanViews),
                                           Group("View constraint algorithms",
                                                 [Cap(:H0_EntropyPooling),
                                                  Cap(:H1_EntropyPooling),
-                                                 Cap(:H2_EntropyPooling),
-                                                 Cap(:CVaREntropyPooling)]),
+                                                 Cap(:H2_EntropyPooling)]),
+                                          Group("Tail view formulations",
+                                                [Cap(:LinearConditionalValueatRiskView),
+                                                 Cap(:IntegerConditionalValueatRiskView),
+                                                 Cap(:ConicEntropicValueatRiskView),
+                                                 Cap(:GridEntropicValueatRiskView)]),
+                                          Group("View groups",
+                                                [Prose("A significance level belongs to a view, not to the estimator holding it. These pair a group of view equations with the level, and for a tail view the formulation, they are read under, so one estimator can state views at several levels."),
+                                                 Cap(:ValueatRiskView),
+                                                 Cap(:ConditionalValueatRiskView),
+                                                 Cap(:EntropicValueatRiskView)]),
                                           Group("Divergence formulations",
                                                 [Cap(:ExpEntropyPooling),
                                                  Cap(:LogEntropyPooling)]),
                                           Group("Optimisers",
                                                 [Cap(:OptimEntropyPooling),
                                                  Cap(:JuMPEntropyPooling)])]),
+                                   Group(Cap(:MeucciEntropyPoolingPrior),
+                                         [Prose("The earlier entropy pooling estimator, which hunts a conditional value at risk target with the recursive algorithm of Meucci, Ardia and Keel. It takes equality CVaR views alone, and re-solves the whole problem once per candidate value at risk level."),
+                                          Group("View constraint algorithms",
+                                                [Cap(:H0_EntropyPooling),
+                                                 Cap(:H1_EntropyPooling),
+                                                 Cap(:H2_EntropyPooling),
+                                                 Cap(:ConditionalValueatRiskEntropyPooling)])]),
                                    Group(Cap(:OpinionPoolingPrior),
                                          [Cap(:LinearOpinionPooling),
-                                          Cap(:LogarithmicOpinionPooling)])]),
+                                          Cap(:LogarithmicOpinionPooling)]),
+                                   Group(Cap(:FeaturePrior),
+                                         [Prose("A feature prior attaches an `assets × features` matrix to the prior it wraps, without touching a single moment, so any prior becomes a source for [`FeatureDistance`](@ref). The matrix comes from a feature matrix estimator."),
+                                          Cap(:feature_matrix,
+                                              :AbstractFeatureMatrixEstimator),
+                                          Cap(:RegressionFeatures),
+                                          Group(Cap(:PhylogenyFeatures,
+                                                    :phylogeny_features),
+                                                [Prose("Reuses a square `assets × assets` phylogeny or adjacency matrix as features, so the distance measures neighbourhood overlap. The only producer whose feature axis *is* the asset axis; its source is always an estimator, so every fold and subproblem refits the graph on its own universe. Exogenous square structure travels on [`ReturnsResult`](@ref) instead."),
+                                                 Group(Cap(:Proximity),
+                                                       [Prose("Keeps the step count `phylogeny_matrix`'s clamp throws away, scoring each pair by how far apart it sits. `decay` shapes the fall-off and the source's `sep` truncates it -- two knobs, deliberately separate, because an exponential never reaches zero. Apart from [`NoDecay`](@ref) no decay emits zero inside the budget, so a zero entry means unreachable and nothing else."),
+                                                        Group(Cap(:separation_matrix,
+                                                                  :separation_budget,
+                                                                  :AbstractSeparationAlgorithm;
+                                                                  label = "Separations: the open [`AbstractSeparationAlgorithm`](@ref) family, applied by [`separation_matrix`](@ref) and [`separation_budget`](@ref)"),
+                                                              [Prose("Carried by [`NetworkEstimator`](@ref) as `sep`. Says how far apart two assets sit *and* how far is too far, because the two share a unit. It sits on the network estimator rather than on the feature producer: every consumer of a network needs to know which pairs it relates, and the constraint path never sees the producer at all."),
+                                                               Cap(:HopCount),
+                                                               Cap(:PathLength;
+                                                                   label = "[`PathLength`](@ref) sums the distances along the shortest path instead of counting its edges, and budgets in the distance estimator's units -- `dmax = nothing` means the observed diameter"),
+                                                               Group(Cap(:resolve_separation;
+                                                                         label = "Budget rules: a callable in place of the budget number, resolved by [`resolve_separation`](@ref) once the data is in hand"),
+                                                                     [Prose("A budget cannot always be named in advance -- a cross-validation fold and a meta optimiser's subproblem each refit the graph. `HopCount(; n = ⋅)` takes a `HopCountAlgorithm` and `PathLength(; dmax = ⋅)` a `PathLengthAlgorithm`, each a callable struct; a bare `Function` is admitted in either field. The hop obligation is an `Integer`, checked at resolution because a functor's return type is not part of its signature. A rule changes *which* quantity stays put: a stated budget holds the radius still, a quantile rule holds the related-pair count still."),
+                                                                      Cap(:HopCountQuantile;
+                                                                          label = "[`HopCountQuantile`](@ref) places the hop budget at a quantile of the observed hop separations, rounded to a shell -- so it lands near the requested share rather than on it"),
+                                                                      Cap(:PathLengthQuantile;
+                                                                          label = "[`PathLengthQuantile`](@ref) does the same in distance units with no rounding, so it hits the requested share of related pairs -- which is how the radius ball's intermediate cardinalities become reachable by name")])]),
+                                                        Group(Cap(:separation_decay,
+                                                                  :AbstractSeparationDecayAlgorithm;
+                                                                  label = "Separation decays: the open [`AbstractSeparationDecayAlgorithm`](@ref) family, applied by [`separation_decay`](@ref)"),
+                                                              [Prose("The argument is a *real* separation, so one family serves a hop count and any continuous separation alike. The contract -- `f(0) > 0` and maximal, monotone non-increasing, non-negative inside the budget, never assumed to reach zero -- is probed by a fail-safe fallback that the shipped members opt out of."),
+                                                               Cap(:LinearDecay),
+                                                               Cap(:ExponentialDecay),
+                                                               Cap(:ReciprocalDecay),
+                                                               Cap(:NoDecay;
+                                                                   label = "[`NoDecay`](@ref) is the flat end of the dial, and *not* no truncation: the budget still cuts, so it yields the neighbourhood indicator")])])]),
+                                          Group(Cap(:AssetSetsFeatures,
+                                                    :asset_sets_features,
+                                                    :asset_sets_feature_names),
+                                                [Prose("Stacks taxonomy memberships -- sector, industry, country -- from a [`UniverseSets`](@ref) into the feature axis. The only *exogenous* rectangular source: a classification is structure return correlations do not contain, which is what a feature distance exists to bring in. Because every key is a partition, the rows have equal norms and the cosine similarity is exactly the fraction of classification levels two assets agree on. [`asset_sets_features`](@ref) is also public on its own, for building the matrix straight onto a [`ReturnsResult`](@ref)."),
+                                                 Group(Cap(:resolve_feature_value,
+                                                           :AbstractFeatureValue;
+                                                           label = "Graded programs: `vals` as an ordered edge-authoring program over the axis declared at `sets.zkey`, resolved through [`resolve_feature_value`](@ref) on the open [`AbstractFeatureValue`](@ref) family"),
+                                                       [Prose("The same type's second contract, dispatched on `vals`' element type, and it strictly subsumes the key list -- an all-`1.0` program is bit-identical to stacking the same keys. Entries apply in order and every write is an overwrite, so **last wins**; targets are always fully qualified, node names are bare, and the declared axis makes `size(Z, 2)` fold-invariant. `strict` governs names only: an all-zero row and a one-column matrix are both legal."),
+                                                        Cap(:Scale;
+                                                            label = "[`Scale`](@ref) multiplies the cell's *natural value* -- the key's own datum for a numeric key, membership otherwise -- where a bare `Number` sets it absolutely")])])])]),
                             Group(Cap(:HighOrderPrior),
                                   [Cap(:HighOrderPriorEstimator),
                                    Cap(:HighOrderFactorPriorEstimator)])]),
@@ -480,6 +600,7 @@ const CATALOGUE = [Section("Core abstractions",
                             Cap(:IndependentVariableTracking)]),
                    Section("Risk measures",
                            [Prose("`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them."),
+                            Prose("Every prior-derived slot on a risk measure -- `mu`, `sigma`, `kt`, `sk` -- takes the value itself or the estimator that computes it, a [`DeferredQuantity`](@ref). The estimator is resolved against the optimisation's own prior, so it refits per cross-validation fold and per meta-optimiser subset where a pasted matrix cannot. A measure with two or more deferrable slots names one prior estimator in `pe` instead, and one fit fills every slot the measure leaves unstated. See ADR 0051."),
                             Section("Risk measures for traditional optimisation",
                                     [Prose("These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimisation estimators."),
                                      Group(Cap(:Variance),
@@ -645,17 +766,20 @@ const CATALOGUE = [Section("Core abstractions",
                                      Cap(:MeanReturnRiskRatio),
                                      Cap(:NonOptimisationRiskRatio)])]),
                    Section("Performance metrics",
-                           [Cap(:expected_risk), Cap(:number_effective_assets),
+                           [Prose("Every reader here takes one risk measure or a vector of them, scalarised into one number by a `sca` keyword bounded [`Scalariser`](@ref) — all four scalarisers, [`MinScalariser`](@ref) included, because the value level combines computed numbers rather than building a model expression. Where a return axis is present it takes one term or a vector of them, summed at the terms' own combination weights; there is no scalariser on the return axis. A result carries the measure and scalariser it ran under, so `expected_risk(res.r, res.w, res.pr; sca = res.sca)` reports the optimised figure without naming either by hand."),
+                            Cap(:expected_risk), Cap(:number_effective_assets),
                             Group("Risk contribution",
                                   [Cap(:risk_contribution), Cap(:factor_risk_contribution)]),
                             Group(Cap(:expected_return),
                                   [Cap(:ArithmeticReturn; label = "Arithmetic"),
-                                   Cap(:LogarithmicReturn; label = "Logarithmic")]),
+                                   Cap(:LogarithmicReturn; label = "Logarithmic"),
+                                   Cap(:NoReturn; label = "None")]),
                             Cap(:expected_risk_from_returns), Cap(:rolling_window_measure),
                             Cap(:sort_by_measure),
                             Cap(:expected_ratio, :expected_risk_ret_ratio),
                             Cap(:expected_sric, :expected_risk_ret_sric),
-                            Cap(:brinson_attribution)]),
+                            Cap(:brinson_attribution),
+                            Cap(:performance_summary, :PerformanceSummaryResult)]),
                    Section("Portfolio optimisation",
                            [Prose("Optimisations are implemented via [`optimise`](@ref). Optimisations consume an estimator and return a result."),
                             Section("Naive",
@@ -685,7 +809,8 @@ const CATALOGUE = [Section("Core abstractions",
                                                      Cap(:MaximumRatio;
                                                          label = "Maximum return over risk ratio"),
                                                      Cap(:MaximumReturn;
-                                                         label = "Maximum return")]),
+                                                         label = "Maximum return"),
+                                                     Cap(:MaximumElementReturn)]),
                                               Group(Cap(:MeanRisk, :NearOptimalCentering),
                                                     [Group(Cap(:Frontier),
                                                            [Note("Return based"),
@@ -722,8 +847,8 @@ const CATALOGUE = [Section("Core abstractions",
                                                          :RiskBudgetingResult;
                                                          label = "Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)"),
                                                      Group(Cap(:RelaxedRiskBudgeting,
-                                                               :RiskBudgetingResult;
-                                                               label = "Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)"),
+                                                               :RelaxedRiskBudgetingResult;
+                                                               label = "Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RelaxedRiskBudgetingResult`](@ref)"),
                                                            [Cap(:BasicRelaxedRiskBudgeting),
                                                             Cap(:RegularisedRelaxedRiskBudgeting),
                                                             Cap(:RegularisedPenalisedRelaxedRiskBudgeting)])])]),
@@ -759,15 +884,19 @@ const CATALOGUE = [Section("Core abstractions",
                                               Cap(:IntegerPhylogenyEstimator,
                                                   :SemiDefinitePhylogenyEstimator),
                                               Group("Portfolio returns",
-                                                    [Group(Cap(:ArithmeticReturn;
+                                                    [Note("One return term, or a vector of them weighted-summed into the model's return expression"),
+                                                     Cap(:JuMPReturnsSettings),
+                                                     Group(Cap(:ArithmeticReturn;
                                                                label = "Arithmetic"),
                                                            [Cap(:BoxUncertaintySet,
                                                                 :BoxUncertaintySetAlgorithm,
                                                                 :EllipsoidalUncertaintySet,
                                                                 :EllipsoidalUncertaintySetAlgorithm),
-                                                            Note("Custom expected returns vector")]),
+                                                            Note("Custom expected returns vector"),
+                                                            Note("Deferred expected returns estimator, resolved against the optimisation's own prior")]),
                                                      Cap(:LogarithmicReturn;
-                                                         label = "Logarithmic")]),
+                                                         label = "Logarithmic"),
+                                                     Cap(:NoReturn; label = "None")]),
                                               Group("Risk vector scalarisation",
                                                     [Cap(:SumScalariser),
                                                      Cap(:MaxScalariser),
@@ -781,27 +910,30 @@ const CATALOGUE = [Section("Core abstractions",
                                                     [Prose("Where a regularisation penalty prices a norm in the objective, these bound it instead."),
                                                      Note("L2 (`l2c`)"), Note("Lp (`lpc`)"),
                                                      Note("L-Inf (`linfc`)")]),
-                                              Cap(:NormalisedConstantRelativeRiskAversion),
-                                              Cap(:MinScalariser)])]),
+                                              Cap(:NormalisedConstantRelativeRiskAversion)])]),
                             Section("Clustering optimisation",
                                     [Prose("Clustering optimisations make use of asset relationships to either minimise the risk exposure by breaking the asset universe into subsets which are hierarchically or individually optimised."),
                                      Cap(:HierarchicalOptimiser),
                                      Section("Hierarchical clustering optimisation",
                                              [Prose("These optimisations minimise risk by hierarchically splitting the asset universe into subsets, computing the risk of each subset, and combining them according to their hierarchy."),
+                                              Prose("Each result carries the measures and scalarisers its optimisation ran under, stored resolved, and shares its remaining fields through an embedded [`HierarchicalResult`](@ref) core reached as `res.hr` or directly as `res.w`, `res.pr` and the rest."),
                                               Cap(:HierarchicalRiskParity,
-                                                  :HierarchicalResult;
-                                                  label = "Hierarchical Risk Parity [`HierarchicalRiskParity`](@ref) returns a [`HierarchicalResult`](@ref)"),
+                                                  :HierarchicalRiskParityResult;
+                                                  label = "Hierarchical Risk Parity [`HierarchicalRiskParity`](@ref) returns a [`HierarchicalRiskParityResult`](@ref)"),
                                               Cap(:HierarchicalEqualRiskContribution,
-                                                  :HierarchicalResult;
-                                                  label = "Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`](@ref) returns a [`HierarchicalResult`](@ref)"),
+                                                  :HierarchicalEqualRiskContributionResult;
+                                                  label = "Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`](@ref) returns a [`HierarchicalEqualRiskContributionResult`](@ref)"),
+                                              Cap(:HierarchicalResult),
                                               Section("Hierarchical clustering optimisation features",
                                                       [Cap(:WeightBoundsEstimator,
                                                            :UniformValues, :WeightBounds),
                                                        Cap(:FeesEstimator, :Fees),
                                                        Group("Risk vector scalarisation",
-                                                             [Cap(:SumScalariser),
+                                                             [Note("The clustering optimisers accept every scalariser; a `JuMP` optimiser accepts only the non-hierarchical three"),
+                                                              Cap(:SumScalariser),
                                                               Cap(:MaxScalariser),
-                                                              Cap(:LogSumExpScalariser)]),
+                                                              Cap(:LogSumExpScalariser),
+                                                              Cap(:MinScalariser)]),
                                                        Group("Weight finalisers",
                                                              [Cap(:IterativeWeightFinaliser),
                                                               Group(Cap(:JuMPWeightFinaliser),

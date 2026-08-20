@@ -483,6 +483,23 @@
         @test all(x -> length(x) in (272 - 17, 274 - 16), test_idx)
         @test train_idx == UnitRange{Int64}[16:32, 288:304, 561:576]
         @test test_idx == UnitRange{Int64}[33:287, 305:559, 577:834]
+
+        # A negative period_offset puts the first date of the range before the first
+        # timestamp, so searchsortedlast returns 0. n_splits must survive that and stay in
+        # step with split.
+        @test PortfolioOptimisers.walk_forward_date_range(rd.ts, Month(1), Day(-10),
+                                                          identity)[1] < rd.ts[1]
+        for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
+                   DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
+                                   previous = true),
+                   DateWalkForward(Month(12), 3; period = Month(1), period_offset = Day(-10)),
+                   DateWalkForward(Month(12), 3; period = Month(1), period_offset = Day(-10),
+                                   previous = true))
+            (; train_idx, test_idx) = split(cv, rd)
+            N = n_splits(cv, rd)
+            @test length(train_idx) == length(test_idx) == N
+            @test N > 0
+        end
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -632,7 +649,8 @@
         test_pred(walkforward_pred, "walkforward_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = "AAPL" => 0.003,
                                                                  dval = Inf, w = w0),
                                           slv = slv))
@@ -640,7 +658,8 @@
         test_pred(walkforward_serial_1_pred, "walkforward_serial_1_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = 0.003, w = w0),
                                           slv = slv))
         walkforward_serial_2_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
@@ -664,7 +683,8 @@
         test_pred(multiple_rand_pred, "multiple_rand_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
-                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                      opt = JuMPOptimiser(;
+                                          sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = "JPM" => 0.003,
                                                                  dval = 100000.0,
                                                                  w = fill(1 / 100, 20)),
@@ -676,7 +696,10 @@
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; slv = slv,
-                                          ret = ArithmeticReturn(; lb = Frontier(; N = 15))))
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = Frontier(;
+                                                                                                              N = 15)))))
         cv = IndexWalkForward(127, 171)
         eff_front = cross_val_predict(mr, rd, cv)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front.pred[1]),
