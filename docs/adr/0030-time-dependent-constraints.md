@@ -308,3 +308,42 @@ where the position is required and neither exists — throws a structured
   `fit(pipe, data)` gains a reset seam at its top, mirroring `_optimise`. The
   `TimeDependentContext` inner constructor accepts `Prices_RR` where it required a
   `ReturnsResult`; optimiser fold loops still always pass returns-level data.
+
+## Amendment (2026-08-19)
+
+The callable family is reclassified, and none of it is exported.
+
+The decision above put `TimeDependentCallable <: AbstractAlgorithm` and made it two things at
+once: the root of the callable family, and the type a caller subtypes for a
+**constraint-position** functor. `TimeDependentOptimiserCallable` then hung off it as the one
+declared kind. A reader could not tell whether a bare `TimeDependentCallable` meant "any callable
+struct" or "a constraint-value callable struct", and the root carried the constraint case only by
+being the one thing left after the optimiser case was taken.
+
+The family now states the classification in the type tree:
+
+| Type | Role |
+| ---- | ---- |
+| `TimeDependentCallable <: AbstractEstimator` | The family root. Carries the `needs_previous_weights` trait. Do not subtype it directly. |
+| `TimeDependentConstraintCallable <: TimeDependentCallable` | The per-fold value is a constraint value. |
+| `TimeDependentOptimiserCallable <: TimeDependentCallable` | The per-fold value is an optimiser. |
+
+Two changes come with it.
+
+1. The root moves from `AbstractAlgorithm` to `AbstractEstimator`. A callable struct is
+   configuration that computes a fold's value, which is what an estimator is. Every generic
+   method that reached it named both supertypes in one `Union` (`factory`, `port_opt_view`,
+   `needs_previous_weights`, the pretty show, the one-element iteration protocol), so no dispatch
+   changes.
+2. All three names are unexported. `CLAUDE.md` states the rule, and
+   `test/test_43_exported_abstract_type_census.jl` gates it: the exported abstract surface drops
+   from seven names to five, and the three are pinned by name in that file. Each keeps its
+   docstring, its `docs/src/api/` entry and its catalogue entry, so unexported is not
+   undocumented. A caller reaches them through the module prefix, which is what the examples and
+   `test/test_37_time_dependent_constraints.jl` already did.
+
+The `val` bound on `TimeDependent` is unchanged: it names the root, so both kinds are admissible
+in a schedule. What the optimiser-position bounds (`TD_OptE_Opt`, and the pipeline's
+`TD_OptE_Opt_Inferable`) accept is unchanged too — they name
+`TimeDependent{<:TimeDependentOptimiserCallable}`, so a constraint callable is still rejected
+there statically.

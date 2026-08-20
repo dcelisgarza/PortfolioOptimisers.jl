@@ -527,23 +527,45 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable structs used as time-dependent constraint values.
+Abstract supertype for the callable structs used as time-dependent values.
 
 A subtype is a data-carrying alternative to a bare function inside a [`TimeDependent`](@ref): it must implement a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's field value. Because it is a struct, it participates in a trait a bare function cannot: define `needs_previous_weights(::MySubtype) = true` to declare a previous-weights requirement directly (the default is `false`), instead of wrapping in [`PreviousWeightsFunction`](@ref).
 
 Being a struct also makes it the natural home for **recording what a callable schedule chose**: a bare `ctx -> …` selects nothing by index, so its per-fold decision is not otherwise recoverable (see the provenance note on [`TimeDependent`](@ref)). A functor can carry a mutable field — e.g. a vector it writes at `ctx.i` — and log the fold's resolved value as a side effect of computing it.
 
+The family classifies by what the functor returns, and a subtype declares that kind in its type. Subtype [`TimeDependentConstraintCallable`](@ref) when the per-fold value is a constraint value, and [`TimeDependentOptimiserCallable`](@ref) when it is an optimiser. Only the second is statically admissible in an optimiser-valued field (see [`TD_OptE_Opt`](@ref)), so the classification is what that admissibility is read off. Do not subtype this root directly.
+
 # Related
 
+  - [`TimeDependentConstraintCallable`](@ref)
+  - [`TimeDependentOptimiserCallable`](@ref)
   - [`TimeDependent`](@ref)
   - [`TimeDependentContext`](@ref)
   - [`PreviousWeightsFunction`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-abstract type TimeDependentCallable <: AbstractAlgorithm end
+abstract type TimeDependentCallable <: AbstractEstimator end
 function needs_previous_weights(::TimeDependentCallable)::Bool
     return false
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for callable structs whose per-fold value is a *constraint value*.
+
+A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's value for a constraint-position field — a budget, a set of weight bounds, a fee structure, a turnover limit, anything a [`TimeDependent`](@ref) may carry other than an optimiser. The value is checked when the fold loop swaps it into the field, by the host's own keyword constructor.
+
+This is the kind to subtype for a functor whose output is *not* an optimiser. A functor returning an optimiser declares [`TimeDependentOptimiserCallable`](@ref) instead, which is what makes an optimiser-position schedule statically admissible (see [`TD_OptE_Opt`](@ref)).
+
+# Related
+
+  - [`TimeDependentCallable`](@ref)
+  - [`TimeDependentOptimiserCallable`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+abstract type TimeDependentConstraintCallable <: TimeDependentCallable end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -554,6 +576,7 @@ A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` retur
 # Related
 
   - [`TimeDependentCallable`](@ref)
+  - [`TimeDependentConstraintCallable`](@ref)
   - [`TimeDependent`](@ref)
   - [`TD_OptE_Opt`](@ref)
   - [`TimeDependentContext`](@ref)
@@ -2712,5 +2735,4 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
-       TimeDependentCallable, TimeDependentOptimiserCallable, NoDefault,
-       TimeDependentDefaultError
+       NoDefault, TimeDependentDefaultError

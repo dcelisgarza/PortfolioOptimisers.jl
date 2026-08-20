@@ -7,7 +7,7 @@ Every constraint we have used so far is *static*: it is fixed when the optimiser
 
  1. **Static** — set the field itself; the same value applies to every fold.
  2. **Schedule-based** — `TimeDependent([v₁, …, vₙ])`; entry `i` is the complete field value for fold `i` of the consuming scheme's `split` enumeration.
- 3. **Callable** — `TimeDependent(f)`; `f(ctx)` computes the value per fold on the fly. `f` can be a bare function or a [`TimeDependentCallable`](@ref) functor struct.
+ 3. **Callable** — `TimeDependent(f)`; `f(ctx)` computes the value per fold on the fly. `f` can be a bare function or a [`TimeDependentConstraintCallable`](@ref) functor struct.
 
 Two rules govern the behaviour:
 
@@ -93,11 +93,11 @@ function vol_cap(ctx)
 end
 vol_cap_td = TimeDependent(vol_cap);
 #=
-Callables need not be bare functions. A struct subtyping [`TimeDependentCallable`](@ref) whose functor takes the context does the same job with two advantages: its parameters are inspectable data, and — being a type — a [`needs_previous_weights`](@ref) method can declare a previous-weights requirement directly, without the [`PreviousWeightsFunction`](@ref) wrapper.
+Callables need not be bare functions. A struct subtyping [`TimeDependentConstraintCallable`](@ref) — the constraint-value member of the [`TimeDependentCallable`](@ref) family — whose functor takes the context does the same job with two advantages: its parameters are inspectable data, and — being a type — a [`needs_previous_weights`](@ref) method can declare a previous-weights requirement directly, without the [`PreviousWeightsFunction`](@ref) wrapper.
 
 Here is the de-leveraging plan once more, as a reusable parameterised type:
 =#
-struct DeleverageCap <: PortfolioOptimisers.TimeDependentCallable
+struct DeleverageCap <: PortfolioOptimisers.TimeDependentConstraintCallable
     hi::Float64
     lo::Float64
 end
@@ -382,7 +382,7 @@ There is no separate "vector of schedules": to vary only *some* entries of a con
 |---|---|---|---|---|
 | Static | the field itself | at construction | yes | constraints that do not change |
 | Schedule | `field = TimeDependent([v₁, …, vₙ])` | each entry test-substituted at construction; length vs fold count at `split` time | yes | known calendars: de-leveraging plans, phased mandates, regime dates fixed in advance |
-| Callable | `field = TimeDependent(f)` — a function, or a [`TimeDependentCallable`](@ref) struct that can declare previous-weights needs as a trait | output validated by the host constructor at each fold | yes, unless previous weights are declared ([`PreviousWeightsFunction`](@ref) wrapper or the struct's trait) | values computed from the fold: volatility regimes, universe size, previous weights |
+| Callable | `field = TimeDependent(f)` — a function, or a [`TimeDependentConstraintCallable`](@ref) struct that can declare previous-weights needs as a trait | output validated by the host constructor at each fold | yes, unless previous weights are declared ([`PreviousWeightsFunction`](@ref) wrapper or the struct's trait) | values computed from the fold: volatility regimes, universe size, previous weights |
 
 Across schemes, the entry index always means the same thing — fold `i` of the consuming scheme's `split` enumeration, with `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` as the fold's own windows — and whatever the spelling, each fold ends up solving an ordinary static optimiser: the schedule is resolved through the host's validated constructor, so nothing downstream of the fold loop knows time dependence exists. For an input that accepts a vector of constraints, a schedule is a per-fold vector of vectors (§7.6). Meta-optimisers ([`NestedClustered`](@ref), [`Stacking`](@ref), [`SubsetResampling`](@ref)) accept schedules in their own problem-definition fields (`wb`/`fees`/`pe`/`sets`/`wf`, and their optimiser-valued fields) and forward the resolution into their inner estimators like any other wrapper. Which fold loop consumes a schedule is its `bind`: the default `:outermost` means an outer fold loop over a meta resolves an inner schedule against the outer folds (standalone, the meta's inner cross-validation consumes it instead), while `:nearest` (§7.5) keeps a meta's inner schedule bound to the inner cross-validation even under an outer backtest.
 

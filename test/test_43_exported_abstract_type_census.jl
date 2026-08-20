@@ -17,13 +17,17 @@
 
     This census closes that hole. Every exported abstract type must appear in the
     allow-list below, so an export becomes a deliberate edit to this file and never an
-    accident. The list is the seven that held before the feature matrix work started. An
-    export is public API: adding an entry is the maintainer's call, not a decision made in
-    passing while landing a feature.
+    accident. An export is public API: adding an entry is the maintainer's call, not a
+    decision made in passing while landing a feature.
+
+    The list held seven names when the census was written. `TimeDependentCallable` and
+    `TimeDependentOptimiserCallable` left it on 2026-08-19, when the time-dependent callable
+    family was reclassified (ADR 0030, amendment): the family root moved to
+    `AbstractEstimator` and gained a third member, `TimeDependentConstraintCallable`, and
+    none of the three is exported. Five names remain.
     =#
     allowed_export = Set([:AbstractCentralityAlgorithm, :AbstractUncertaintyEpsAlgorithm,
-                          :HierarchicalRiskMeasure, :RegimeAdjustedTarget, :RiskMeasure,
-                          :TimeDependentCallable, :TimeDependentOptimiserCallable])
+                          :HierarchicalRiskMeasure, :RegimeAdjustedTarget, :RiskMeasure])
 
     #=
     `public` is the weaker declaration, and `names(PortfolioOptimisers)` returns both, so a
@@ -68,13 +72,17 @@
     @test length(exported) < length(defined) / 10
 
     #=
-    The six names stay reachable through the module prefix, which is what an extension needs
+    The nine names stay reachable through the module prefix, which is what an extension needs
     to subtype them, and each keeps its docstring and its `docs/src/api/` entry. Unexported
     is not undocumented. They are pinned by name so the regression cannot come back quietly.
+    The last three are the time-dependent callable family, whose classification is stated in
+    the type tree rather than in the export list.
     =#
     for n in (:AbstractFeatureMatrixEstimator, :AbstractPhylogenyFeatureAlgorithm,
               :AbstractConstraintSpace, :AbstractFeatureValue,
-              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm)
+              :AbstractSimilarityMatrixAlgorithm, :AbstractNonNegativeSimilarityMatrixAlgorithm,
+              :TimeDependentCallable, :TimeDependentConstraintCallable,
+              :TimeDependentOptimiserCallable)
         @test is_abstract(n)
         @test !Base.isexported(PortfolioOptimisers, n)
         @test n ∉ names(PortfolioOptimisers)

@@ -5,6 +5,10 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
 
 ## Orientation
 
+- **`STANDARDS.md` is the map.** It routes a subject — a docstring, an `export`, a constructor, a
+  test — to the file that owns the rule and to the check that fails when the rule breaks. Start
+  there when you do not know which file governs what you are about to change. It carries no rules
+  of its own, so it never overrides the file it points at. `/improve-standards` audits it.
 - **`CONTEXT.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
   Universe Sets, Feature Matrix, Objective Penalty, …) and is hand-written. When you introduce or
   rename a concept, update it in the same change.

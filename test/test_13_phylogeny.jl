@@ -2695,7 +2695,8 @@ end
                    sprint(showerror, raised(() -> clusterise(cle, Xz))))
     both = sprint(showerror,
                   raised(() -> PortfolioOptimisers.calc_distance_weighted_graph(nte, Xz)))
-    @test occursin("for ExponentialSimilarity, from Distance{Nothing, LogDistance}", both)
+    @test occursin("for ExponentialSimilarity, from PortfolioOptimisers.Distance{Nothing, LogDistance}",
+                   both)
 
     # The strictly positive counterpart runs, with the infinite distances left in place.
     @test PortfolioOptimisers.DBHTs(Dp, Sp) isa Tuple

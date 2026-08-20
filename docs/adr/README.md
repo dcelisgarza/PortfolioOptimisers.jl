@@ -50,7 +50,7 @@ decision that moved many times, so read the amendments as well as the body.
 | 0027 | [Cap the equation parser's length and depth](0027-cap-equation-parser-recursion.md) | 1 · 2026-07-06 | Two static, overridable caps at the trust boundary. The parser fails closed with a typed error. |
 | 0028 | [`Pipeline` is a root workflow Estimator](0028-pipeline-workflow-estimator.md) | 5 | A linear step list over an accumulating context. The whole workflow becomes the unit that is fitted per fold. |
 | 0029 | [Asset selection is returns preprocessing](0029-asset-selection-is-returns-preprocessing.md) | | A selector is a preprocessing subfamily. The fitted universe is state on one shared result. |
-| 0030 | [Time-dependent inputs are in-field wrappers](0030-time-dependent-constraints.md) | | `TimeDependent(val; default)` is consumed by whichever fold loop processes it. |
+| 0030 | [Time-dependent inputs are in-field wrappers](0030-time-dependent-constraints.md) | 1 · 2026-08-19 | `TimeDependent(val; default)` is consumed by whichever fold loop processes it. |
 | 0031 | [The holdout split is a pipeline step](0031-holdout-split-as-a-pipeline-step.md) | | `TrainTestSplit` is pinned to the first position, and it excludes cross-validation. |
 | 0032 | [Quintile portfolios are an uncertainty set](0032-quintile-portfolios-are-an-uncertainty-set.md) | 1 · 2026-08-16 | There is deliberately no `QuintilePortfolio` type. The recipe is an uncertainty-set shape. |
 | 0033 | [Split the MIP file into an indicator layer and topical emitters](0033-split-mip-file-into-indicator-layer-and-emitters.md) | | The MIP file keeps only the indicator layer. Each consumer moves to a file named for its feature. |

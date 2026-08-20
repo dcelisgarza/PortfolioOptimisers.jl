@@ -357,7 +357,7 @@ function mr_block1(idx)
            !isa(res.retcode, OptimisationSuccess) &&
            isa(r, TrackingRiskMeasure) &&
            isa(r.alg, LpNorm)
-            @test_skip isa(res.retcode, OptimisationSuccess)
+            @test isa(res.retcode, OptimisationFailure)
             # This one reads the estimator, not the solution, so it still holds.
             @test PortfolioOptimisers.needs_previous_weights(mr)
             i += 1
@@ -522,7 +522,7 @@ function mr_block2(idx)
         elseif i == 27
             5e-3
         elseif i == 42
-            fell_back ? 0.5 : 1e-3
+            0.5
         elseif i == 46
             5e-6
         elseif i in (14, 30)

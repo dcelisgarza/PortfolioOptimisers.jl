@@ -1,6 +1,6 @@
 # TimeDependentCallable subtypes must be defined at top level. `_test_TDCap` is a plain functor;
 # `_test_TDPrevWCap` declares its previous-weights requirement directly.
-struct _test_TDCap <: PortfolioOptimisers.TimeDependentCallable
+struct _test_TDCap <: PortfolioOptimisers.TimeDependentConstraintCallable
     hi::Float64
     lo::Float64
 end
@@ -8,7 +8,7 @@ function (c::_test_TDCap)(ctx::TimeDependentContext)
     return WeightBounds(; lb = 0.0,
                         ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
 end
-struct _test_TDPrevWCap <: PortfolioOptimisers.TimeDependentCallable end
+struct _test_TDPrevWCap <: PortfolioOptimisers.TimeDependentConstraintCallable end
 function (c::_test_TDPrevWCap)(ctx::TimeDependentContext)
     return Threshold(; val = isnothing(ctx.w_prev) ? 0.01 : 0.05)
 end
@@ -150,6 +150,34 @@ end
         # port_opt_view carries the default through alongside the entries.
         v = PortfolioOptimisers.port_opt_view(tdd, 1)
         @test v.bind == :outermost && v.default.ub == 0.9
+    end
+    #=
+    The callable family states its classification in the type tree (ADR 0030, amendment
+    2026-08-19): one root carrying the `needs_previous_weights` trait, and one member per kind
+    of per-fold value. The kind is what the optimiser-position bounds read, so the tree is
+    load-bearing and is pinned here rather than left to the definition site.
+    =#
+    @testset "Callable family classification" begin
+        PO = PortfolioOptimisers
+        @test PO.TimeDependentCallable <: PO.AbstractEstimator
+        @test PO.TimeDependentConstraintCallable <: PO.TimeDependentCallable
+        @test PO.TimeDependentOptimiserCallable <: PO.TimeDependentCallable
+        # The two kinds are siblings: neither is reachable from the other.
+        @test !(PO.TimeDependentConstraintCallable <: PO.TimeDependentOptimiserCallable)
+        @test !(PO.TimeDependentOptimiserCallable <: PO.TimeDependentConstraintCallable)
+        # All three are unexported. `test_43` gates the whole exported abstract surface.
+        for n in (:TimeDependentCallable, :TimeDependentConstraintCallable,
+                  :TimeDependentOptimiserCallable)
+            @test !Base.isexported(PO, n)
+        end
+        # The trait defaults to `false` on the root and is declared per type.
+        @test !PO.needs_previous_weights(_test_TDCap(0.35, 0.2))
+        @test PO.needs_previous_weights(_test_TDPrevWCap())
+        @test !PO.needs_previous_weights(TimeDependent(_test_TDCap(0.35, 0.2)))
+        @test PO.needs_previous_weights(TimeDependent(_test_TDPrevWCap()))
+        # A constraint callable is a legal schedule value, and never an optimiser schedule.
+        @test TimeDependent(_test_TDCap(0.35, 0.2)) isa TimeDependent
+        @test !(TimeDependent(_test_TDCap(0.35, 0.2)) isa PO.TD_OptE_Opt)
     end
     @testset "Optimiser-position bound" begin
         ew, iv = EqualWeighted(), InverseVolatility()
@@ -658,7 +686,7 @@ end
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn.pred)
         # The callable may also return vectors that differ in length per fold (the
         # vector-of-vectors shape, computed rather than listed).
-        struct _test_TD_LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
+        struct _test_TD_LC_Callable <: PortfolioOptimisers.TimeDependentConstraintCallable end
         function (c::_test_TD_LC_Callable)(ctx::TimeDependentContext)
             return if ctx.i == 1
                 [LinearConstraintEstimator(; val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]

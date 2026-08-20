@@ -47,6 +47,7 @@ TimeDependent
 factory(td::TimeDependent, args...)
 TimeDependentContext
 TimeDependentCallable
+TimeDependentConstraintCallable
 TimeDependentOptimiserCallable
 PreviousWeightsFunction
 NoDefault

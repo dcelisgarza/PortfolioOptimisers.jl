@@ -352,6 +352,9 @@ A Time-Dependent Input whose per-fold values are whole optimisers, so the strate
 **Time-Dependent Context**
 The per-fold information handed to a function-form Time-Dependent Input: the fold's position and count, its data, and the previous fold's weights where those are threaded.
 
+**Time-Dependent Callable**
+A struct, rather than a bare function, that computes a Time-Dependent Input's per-fold value from the Time-Dependent Context. Its parameters are data, and it declares a previous-weights need as a trait. A member declares what it returns: a constraint value, or an optimiser.
+
 **Weight Finaliser**
 A post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
 
