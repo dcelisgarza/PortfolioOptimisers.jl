@@ -18,7 +18,7 @@ Everything below is measured `v0.28.0..HEAD`.
 
 | Quantity | Against the branch point | **Against `v0.28.0`** |
 | --- | --- | --- |
-| Exports removed | 6 | **6** |
+| Exports removed | 8 | **8** |
 | Exports added | 63 | **62** |
 | Exported types gone | 2 | **2** |
 | Exported types whose fields change | 44 | **40** |
@@ -264,6 +264,38 @@ worked and returned a full graph changes: the refusal is exactly the set of inpu
 already missing edges. Before this change the same inputs died later, in `turn_into_Hclust_merges`,
 with a `BoundsError` about a matrix index. See ADR 0049, *Non-negative reaches the check, positive
 reaches the graph*.
+
+### 4. Two exported names lose their export. The names stay
+
+`TimeDependentCallable` and `TimeDependentOptimiserCallable` are exported at `v0.28.0` and are not
+exported at 0.29.0. This is a **withdrawal**, not a rename: both types still exist, keep their
+names, keep their docstrings and keep their `docs/src/api/` and catalogue entries. Only the export
+goes, so a caller that writes the bare name after `using PortfolioOptimisers` now gets an
+`UndefVarError`.
+
+| Old spelling | New spelling |
+| --- | --- |
+| `TimeDependentCallable` | `PortfolioOptimisers.TimeDependentCallable` |
+| `TimeDependentOptimiserCallable` | `PortfolioOptimisers.TimeDependentOptimiserCallable` |
+
+```julia
+# Before
+struct MySchedule <: TimeDependentCallable end
+
+# After
+struct MySchedule <: PortfolioOptimisers.TimeDependentOptimiserCallable end
+```
+
+**Why.** ADR 0030's amendment of 2026-08-19 reclassifies the family. The root moves from
+`AbstractAlgorithm` to `AbstractEstimator`, and a third name, `TimeDependentConstraintCallable`,
+splits the constraint case out of the root so that a bare root no longer means two things at once.
+All three are abstract types, and `CLAUDE.md` does not export an abstract type unasked, so all
+three are unexported and pinned by name in `test/test_43_exported_abstract_type_census.jl`. No
+dispatch changes: every generic method that reached the root already named both supertypes in one
+`Union`.
+
+The module prefix is what the examples and `test/test_37_time_dependent_constraints.jl` already
+used, so the migration is a prefix and nothing else.
 
 ### Not a migration item
 

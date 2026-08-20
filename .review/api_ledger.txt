@@ -20,15 +20,17 @@ FactorRiskBudgeting `sets`, BayesianBlackLittermanPrior `sets` -- and missed
 that AugmentedBlackLittermanPrior collapses `a_sets`/`f_sets` into one `sets`.
 
 === RELEASE NOTES BASE: v0.28.0 -> HEAD ===
-Exported names: 706 -> 762
+Exported names: 706 -> 760
 
-REMOVED EXPORTS (6):
+REMOVED EXPORTS (8):
    - AssetSets
    - CVaREntropyPooling
    - MaxSR
    - RVaR
    - RVaR_RG
    - R_RDaR
+   - TimeDependentCallable
+   - TimeDependentOptimiserCallable
 
 EXPORTED TYPES THAT NO LONGER EXIST (2): ['AssetSets', 'CVaREntropyPooling']
 
@@ -78,15 +80,17 @@ FIELD CHANGES ON EXPORTED TYPES (40; 9 lose a field):
    VarianceSkewKurtosis: removed=-  added=['pe']
 
 === REVIEW BASE: c975293745 -> HEAD ===
-Exported names: 705 -> 762
+Exported names: 705 -> 760
 
-REMOVED EXPORTS (6):
+REMOVED EXPORTS (8):
    - AssetSets
    - CVaREntropyPooling
    - MaxSR
    - RVaR
    - RVaR_RG
    - R_RDaR
+   - TimeDependentCallable
+   - TimeDependentOptimiserCallable
 
 EXPORTED TYPES THAT NO LONGER EXIST (2): ['AssetSets', 'CVaREntropyPooling']
 
