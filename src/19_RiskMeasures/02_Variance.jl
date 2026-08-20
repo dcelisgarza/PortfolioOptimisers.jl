@@ -1,7 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of second moment risk measures.
+Abstract supertype for the `JuMP` encodings of a second moment.
+
+A second-moment risk measure hands the formulation a deviation vector and a correction factor, and the formulation decides which quadratic object or cone carries the sum of squares. The four encodings differ in the cone they need and in the units they report: [`SOCRiskExpr`](@ref) reports the square root of the second moment, and the other three report the second moment itself. A bound in `settings.ub` is stated in the units that the chosen formulation reports. The cone encodings bound the sum of squares from above, so they are tight where the risk is minimised or bounded above, which is how a risk expression enters the model.
+
+All concrete types implementing a second-moment `JuMP` encoding should subtype `SecondMomentFormulation`.
 
 # Related
 
@@ -15,64 +19,82 @@ abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of variance-based risk measures.
+Abstract supertype for the second-moment encodings that state the risk as an explicit square.
+
+[`Variance`](@ref) accepts these two and no others. Both report the variance itself, one as a quadratic form in the weights and the other as the square of a second-order cone variable.
 
 # Related
 
+  - [`SecondMomentFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
 """
 abstract type VarianceFormulation <: SecondMomentFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
+Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone.
 
-# Summary statistics
+The encoding takes two shapes. A risk measure that holds a co-moment matrix uses the first, and a risk measure that builds a deviation vector uses the second.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
+R(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,,\\\\
+R(\\boldsymbol{w}) &= c \\, \\boldsymbol{d}^\\intercal \\boldsymbol{d}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - $(math_dict[:R_w])
+  - $(math_dict[:w_port])
   - ``\\mathbf{\\Sigma}``: `N × N` co-moment matrix.
-
-# Scenario-based
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
-\\text{s.t.} \\quad & \\boldsymbol{d} \\in \\mathcal{S}_{w}.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` deviations vector.
-  - ``\\mathcal{S}_{w}``: Scenario set for portfolio `x`.
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
 
 # Related
 
+  - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
-  - [`Variance`](@ref)
-  - [`SOCRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
 """
 struct QuadRiskExpr <: VarianceFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Squared second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using the square of a variable constrained by a second order cone.
+Encodes the second moment as the square of a second-order cone variable.
+
+The cone bounds the norm of the deviation vector, and the risk expression squares that variable, so the reported units are those of the second moment.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= c \\, t^{2}\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
+  - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`Variance`](@ref)
 """
@@ -80,20 +102,59 @@ struct SquaredSOCRiskExpr <: VarianceFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
+Encodes the second moment as a variable that a rotated second-order cone bounds.
+
+The cone carries the square, so the risk expression stays linear in the auxiliary variable. The library builds it as `[t; 1/2; d] in JuMP.RotatedSecondOrderCone()`. That cone reads ``2 t u \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``, and the second entry pins ``u = 1/2``, so it states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``. The reported units are those of the second moment.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= c \\, t\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2}^{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, whose square is modelled as a [JuMP.RotatedSecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Rotated-Second-Order-Cone).
 
 # Related
 
   - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
-  - [`SOCRiskExpr`](@ref)
+  - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
 """
 struct RSOCRiskExpr <: SecondMomentFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using a variable constrained by a second order cone.
+Encodes the square root of the second moment as a second-order cone variable.
+
+This is the only one of the four encodings that reports a root. A risk measure that takes it reports a standard deviation where the other three report a variance, both in the model and in the functor, and a bound in `settings.ub` is read in the same units.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\sqrt{c} \\, t\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
@@ -107,7 +168,7 @@ struct SOCRiskExpr <: SecondMomentFormulation end
 """
     const NSkeQuadFormulations
 
-Union type of quadratic OWA risk expression formulations for the Negative Skewness risk measure.
+Union of the second-moment formulations that state the risk of the Negative Skewness risk measure as an explicit square.
 
 Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
 
@@ -121,12 +182,13 @@ const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 """
     const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 
-Union of quadratic and RSOC formulations for second-moment (variance-based) risk expressions.
+Union of the second-moment formulations that report the second moment itself rather than its square root.
 
 # Related
 
   - [`NSkeQuadFormulations`](@ref)
   - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
   - [`Variance`](@ref)
 """
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}

@@ -522,4 +522,31 @@
             @test isapprox(weighted(x), (sum(ow .* d .^ (2p)) / sum(ow))^inv(p))
         end
     end
+    @testset "The distribution Value-at-Risk agrees between the model and the functor (#351)" begin
+        # `ValueatRisk`'s functor computed the empirical order statistic whatever `alg`
+        # held, while the `JuMP` model under `DistributionValueatRisk` builds the
+        # parametric quantile. `alg` selects the estimand, so on a 200 x 6 normal sample
+        # the model reported 0.0059528 against the functor's 0.0063843, a gap of 7 %.
+        # The functor now reads the same two moments the model reads, and a `MinimumRisk`
+        # solve puts the two within 2e-9 of each other.
+        r = factory(ValueatRisk(; alpha = 0.05, alg = DistributionValueatRisk()), pr)
+        z = PortfolioOptimisers.compute_value_at_risk_z(r.alg.dist, r.alpha)
+        sd = sqrt(dot(w, pr.sigma, w))
+        @test isapprox(expected_risk(r, w, pr), -dot(pr.mu, w) + z * sd)
+
+        # The weights, not the net return series, reach the parametric branch.
+        @test PortfolioOptimisers.risk_input_kind(r) ==
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+
+        # The empirical branch is untouched, and the two are different numbers.
+        emp = expected_risk(ValueatRisk(; alpha = 0.05), w, pr)
+        @test isapprox(emp, -partialsort(rd.X * w, ceil(Int, 0.05 * size(rd.X, 1))))
+        @test !isapprox(emp, expected_risk(r, w, pr))
+
+        # The range's two legs share one mean term, which cancels in their difference.
+        rr = factory(ValueatRiskRange(; alpha = 0.05, beta = 0.05,
+                                      alg = DistributionValueatRisk()), pr)
+        z_h = PortfolioOptimisers.compute_value_at_risk_cz(rr.alg.dist, rr.beta)
+        @test isapprox(expected_risk(rr, w, pr), (z - z_h) * sd)
+    end
 end

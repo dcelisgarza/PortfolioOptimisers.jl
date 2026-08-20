@@ -832,14 +832,14 @@ end
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
         args...;
-        dims = dims,
+        dims::Int = 1,
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
     moment_window_and_weights(
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
         window::VecInt;
-        dims = dims,
+        dims::Int = 1,
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
 
@@ -876,8 +876,8 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
   - [`get_window`](@ref)
   - [`get_observation_weights`](@ref)
 """
-function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; dims = dims,
-                                   kwargs...)
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...;
+                                   dims::Int = 1, kwargs...)
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end

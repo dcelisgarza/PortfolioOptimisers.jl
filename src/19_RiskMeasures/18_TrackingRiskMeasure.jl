@@ -227,6 +227,7 @@ TrackingRiskMeasure
 # References
 
   - $(ref_dict[:palomar2025])
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
@@ -413,6 +414,7 @@ RiskTrackingRiskMeasure
 # References
 
   - $(ref_dict[:palomar2025])
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
     """

@@ -107,40 +107,26 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all tracking formulation algorithm types.
+Abstract supertype for all variable-based tracking formulation algorithms.
 
-All concrete and/or abstract types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should be subtypes of `TrackingFormulation`.
+A variable tracking algorithm states **which quantity** a risk-tracking measure compares against its benchmark: the weights that go into the risk measure, or the risk that comes out of it. It is orthogonal to the norm that measures the comparison, which a tracking measure holds in a separate field as a [`NormError`](@ref).
+
+All concrete and/or abstract types representing variable-based tracking algorithms should be subtypes of `VariableTracking`.
 
 # Related
 
   - [`AbstractAlgorithm`](@ref)
-  - [`NormError`](@ref)
-  - [`VariableTracking`](@ref)
-  - [`L2Norm`](@ref)
-  - [`SquaredL2Norm`](@ref)
-  - [`L1Norm`](@ref)
-"""
-abstract type TrackingFormulation <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all variable-based tracking formulation algorithms.
-
-All concrete and/or abstract types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should be subtypes of `VariableTracking`.
-
-# Related
-
-  - [`TrackingFormulation`](@ref)
   - [`IndependentVariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`NormError`](@ref)
 """
-abstract type VariableTracking <: TrackingFormulation end
+abstract type VariableTracking <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Independent variable-based tracking formulation.
+Applies the risk measure to the difference between the portfolio weights and the benchmark weights.
 
-`IndependentVariableTracking` tracks the independent variables of a measurement.
+The weights are the independent variable of a risk measure, so this formulation compares the two portfolios before the measure is evaluated: it reports ``R(\\boldsymbol{w} - \\boldsymbol{w}_{b})``.
 
 # Constructors
 
@@ -157,14 +143,18 @@ IndependentVariableTracking()
 
   - [`VariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Dependent variable-based tracking formulation.
+Applies the risk measure to each portfolio, then takes the absolute difference of the two risks.
 
-`DependentVariableTracking` tracks the measurement.
+The risk is the dependent variable of a risk measure, so this formulation compares the two portfolios after the measure is evaluated: it reports ``\\left\\lvert R(\\boldsymbol{w}) - R(\\boldsymbol{w}_{b}) \\right\\rvert``.
 
 # Constructors
 

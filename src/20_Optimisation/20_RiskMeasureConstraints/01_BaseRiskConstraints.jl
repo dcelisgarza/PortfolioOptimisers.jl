@@ -512,7 +512,7 @@ function set_range_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     return range_risk
 end
 """
-    abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the series a conic risk measure reduces.
 
@@ -530,7 +530,7 @@ series by passing the marker.
 """
 abstract type AbstractRiskSeriesAlgorithm <: AbstractAlgorithm end
 """
-    struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Marker selecting the net portfolio returns as the series a risk measure reduces.
 
@@ -547,7 +547,7 @@ in [`risk_series`](@ref).
 """
 struct NetReturnsRiskSeries <: AbstractRiskSeriesAlgorithm end
 """
-    struct DrawdownRiskSeries <: AbstractRiskSeriesAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Marker selecting the negated drawdown path as the series a risk measure reduces.
 

@@ -379,8 +379,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :l_b => "`l_b`: Risk aversion parameter for the upper tail.",#
                                  :r_b => "`r_b`: Radius parameter for the upper tail.",#
                                  :gamma => "`gamma`: Log-sum-exp scalariser smoothing parameter.",#
-                                 :b_mip => "`b`: Big-M upper bound for MIP formulations.",#
-                                 :s_mip => "`s`: Small-M lower bound for MIP formulations.",#
+                                 :b_mip => "`b`: Big-M constant of the MIP formulation. It relaxes the bound on an observation that the model flags as an exceedance. If `nothing`, the model uses `1000`.",#
+                                 :s_mip => "`s`: Cardinality slack of the MIP formulation. It caps the number of flagged observations at `(alpha - s) * T`. If `nothing`, the model uses `1e-5`.",#
                                  :slv => "`slv`: Solver or vector of solvers.",#
                                  :p_rm => "`p`: Power or order parameter.",#
                                  :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
@@ -845,6 +845,10 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
+                       # Second-moment formulations.
+                       :d_secmom => "``\\boldsymbol{d}``: Deviation vector ``T \\times 1`` that the formulation squares. The risk measure supplies it.",#
+                       :c_secmom => "``c``: Correction factor that the risk measure supplies. It is ``1`` when the co-moment matrix already carries it.",#
+                       :t_secmom => "``t``: Auxiliary model variable that the cone bounds.",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.")
 """
@@ -913,7 +917,8 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :emom => "[emom](@cite) D. Cajas. *Portfolio Optimization of Even Moments using Power Cone Programming*. Available at SSRN 6518258 (2026).",#
                                  :mad => "[mad](@cite) H. Konno and H. Yamazaki. *Mean-absolute deviation portfolio optimization model and its applications to Tokyo stock market*. Management Science 37, 519–531 (1991).",#
                                  :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#
-                                 :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).")
+                                 :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
+                                 :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).")
 
 """
 $(DocStringExtensions.TYPEDEF)

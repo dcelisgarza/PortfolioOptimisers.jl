@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Value-at-Risk formulation algorithms.
 
+The formulation selects the **estimand**, not only the encoding. [`MIPValueatRisk`](@ref) reports the empirical quantile of the sample, and [`DistributionValueatRisk`](@ref) reports the quantile of a fitted parametric distribution. The two are different numbers on the same data, and a measure that holds one reports that one in its optimisation model and in its functor alike.
+
 All concrete and/or abstract types representing the formulation for computing Value-at-Risk (e.g., mixed-integer programming, distribution-based) should be subtypes of `ValueatRiskFormulation`.
 
 # Related
@@ -54,11 +56,104 @@ function port_opt_view(r::ValueatRiskFormulation, ::Any, args...)::ValueatRiskFo
     return r
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the lower-tail z-score for a parametric VaR at significance level `alpha`.
+
+Returns the complementary quantile for Normal and scaled Student-t distributions, and the
+closed-form expression for the Laplace distribution.
+
+# Arguments
+
+  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `alpha::Number`: Significance level.
+
+# Returns
+
+  - `z::Number`: Lower-tail z-score for the parametric VaR.
+
+# Related
+
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function compute_value_at_risk_z(dist::Distributions.Normal, alpha::Number)
+    return Distributions.cquantile(dist, alpha)
+end
+function compute_value_at_risk_z(dist::Distributions.TDist, alpha::Number)
+    d = StatsAPI.dof(dist)
+    @argcheck(d > 2, DomainError(d, "degrees of freedom must be greater than 2"))
+    return Distributions.cquantile(dist, alpha) * sqrt((d - 2) / d)
+end
+function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
+    return -log(2 * alpha) / sqrt(2)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the upper-tail z-score for a parametric VaR at significance level `alpha`.
+
+Used for the high (upper) bound in VaR range constraints. Returns the lower quantile for
+Normal and scaled Student-t distributions, and the closed-form expression for Laplace.
+
+# Arguments
+
+  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `alpha::Number`: Significance level.
+
+# Returns
+
+  - `z::Number`: Upper-tail z-score for the parametric VaR.
+
+# Related
+
+  - [`compute_value_at_risk_z`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+function compute_value_at_risk_cz(dist::Distributions.Normal, alpha::Number)
+    return Statistics.quantile(dist, alpha)
+end
+function compute_value_at_risk_cz(dist::Distributions.TDist, alpha::Number)
+    d = StatsAPI.dof(dist)
+    @argcheck(d > 2, DomainError(d, "degrees of freedom must be greater than 2"))
+    return Statistics.quantile(dist, alpha) * sqrt((d - 2) / d)
+end
+function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
+    return -log(2 * (one(alpha) - alpha)) / sqrt(2)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Mixed-integer programming (MIP) formulation for Value-at-Risk.
 
-`MIPValueatRisk` specifies bounds used in the binary variable formulation of Value-at-Risk within a `JuMP` optimisation model.
+`MIPValueatRisk` specifies bounds used in the binary variable formulation of Value-at-Risk within a `JuMP` optimisation model. It reports the **empirical** quantile, which is the value the functor of the risk measure computes directly.
+
+# Mathematical definition
+
+One binary indicator per observation flags an exceedance, the cardinality constraint caps how many observations may be flagged, and the big-M constant `b` relaxes the bound on a flagged one. The risk is minimised, so it settles on the smallest value that leaves no more than the permitted number of exceedances.
+
+```math
+\\begin{align}
+\\underset{r,\\, \\boldsymbol{z}}{\\min} \\quad & r\\\\
+\\text{s.t.} \\quad & r \\geq -x_t - b z_t\\,, \\quad t = 1,\\ldots,T\\\\
+\\quad & \\sum_{t=1}^{T} z_t \\leq \\left(\\alpha - s\\right) T\\\\
+\\quad & z_t \\in \\left\\{0,\\, 1\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r``: Value-at-Risk variable.
+  - ``x_t``: Net portfolio return at observation ``t``.
+  - ``z_t``: Binary exceedance indicator at observation ``t``.
+  - ``b``: Big-M constant, the `b` field.
+  - ``s``: Cardinality slack, the `s` field.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+
+Observation weights replace both counts by their weighted sums, so the cardinality constraint reads ``\\boldsymbol{w}_{o}^\\intercal \\boldsymbol{z} \\leq (\\alpha - s) \\sum_{t=1}^{T} w_{o,t}``.
 
 # Fields
 
@@ -94,6 +189,10 @@ MIPValueatRisk
   - [`DistributionValueatRisk`](@ref)
   - [`ValueatRisk`](@ref)
   - [`Option`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
     """
@@ -128,7 +227,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Distribution-based formulation for Value-at-Risk.
 
-`DistributionValueatRisk` specifies a parametric distribution for computing Value-at-Risk analytically. The distribution parameters can be overridden by prior results during optimisation.
+`DistributionValueatRisk` specifies a parametric distribution for computing Value-at-Risk analytically. The distribution parameters can be overridden by prior results during optimisation. This is a different estimand from the empirical quantile that [`MIPValueatRisk`](@ref) reports, so the risk measure that holds it reports the parametric value in the optimisation model and in the functor alike.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_{\\alpha} \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:mu_er])
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - ``z_{\\alpha}``: Lower-tail z-score of the standardised `dist` at ``\\alpha``, from [`compute_value_at_risk_z`](@ref).
+  - $(math_dict[:alpha_rm])
+
+The optimisation model states the standard deviation as a second-order cone over ``\\mathbf{G} \\boldsymbol{w}``, where ``\\mathbf{G}`` factorises ``\\mathbf{\\Sigma}``. `mu` and `sigma` fall back to the prior's own, so [`factory`](@ref) fills them before either the model or the functor reads them.
 
 # Fields
 
@@ -177,6 +294,10 @@ DistributionValueatRisk
   - [`SigmaSlot`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`Option`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
 """
 @propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
@@ -344,12 +465,14 @@ Keywords correspond to the struct's fields.
 # Functor
 
     (r::ValueatRisk)(x::VecNum)
+    (r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum, X, fees)
 
-Computes the Value-at-Risk of a portfolio returns vector `x`.
+`alg` selects the quantity, and each method reports the one that its own `JuMP` formulation builds. The first computes the empirical quantile of a portfolio returns vector, weighted by `w` when the measure states observation weights. The second computes the parametric quantile from the moments that [`DistributionValueatRisk`](@ref) holds, so it takes the asset weights instead. `X` and `fees` are unused, because the model's terms are the prior's moments and no return series enters them.
 
 ## Arguments
 
   - `x::VecNum`: Portfolio returns vector.
+  - `w::VecNum`: Asset weights vector.
 
 # Examples
 
@@ -375,6 +498,10 @@ ValueatRisk
   - [`DistributionValueatRisk`](@ref)
   - [`ConditionalValueatRisk`](@ref)
   - [`ValueatRiskRange`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
 """
 @propagatable @concrete struct ValueatRisk <: RiskMeasure
     """
@@ -419,6 +546,18 @@ function (r::ValueatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
     idx = searchsortedfirst(cum_w, sw * r.alpha)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
+end
+# The parametric formulation is a different estimand from the empirical order statistic
+# above, and the `JuMP` model builds the parametric one. The functor must report the same
+# number, so it reads `mu` and `sigma` off the formulation, which `factory` fills from the
+# prior, exactly as the model does. `X` and `fees` are unused: the model's terms are the
+# prior's moments and no return series enters it.
+function (r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum,
+                                                                          ::Any = nothing,
+                                                                          ::Any = nothing)
+    alg = r.alg
+    z = compute_value_at_risk_z(alg.dist, r.alpha)
+    return -LinearAlgebra.dot(alg.mu, w) + z * sqrt(LinearAlgebra.dot(w, alg.sigma, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -471,12 +610,14 @@ Keywords correspond to the struct's fields.
 # Functor
 
     (r::ValueatRiskRange)(x::VecNum)
+    (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum, X, fees)
 
-Computes the VaR Range of a portfolio returns vector `x`, as the sum of the two tail quantiles. The method holds the upper tail in the negated convention of [`ValueatRisk`](@ref), so it writes the sum as `loss - gain`.
+`alg` selects the quantity, as it does for [`ValueatRisk`](@ref). The first method computes the sum of the two empirical tail quantiles of a portfolio returns vector. It holds the upper tail in the negated convention of [`ValueatRisk`](@ref), so it writes the sum as `loss - gain`. The second computes the parametric range, in which the two legs share one ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` term that cancels, leaving the spread of the two z-scores over one standard deviation.
 
 ## Arguments
 
   - `x::VecNum`: Portfolio returns vector.
+  - `w::VecNum`: Asset weights vector.
 
 # Examples
 
@@ -501,6 +642,10 @@ ValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`ValueatRisk`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3.
 """
 @propagatable @concrete struct ValueatRiskRange <: RiskMeasure
     """
@@ -588,12 +733,23 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights})(x::VecNum)
     gain = -sorted_x[idx]
     return loss - gain
 end
+# The parametric twin of the two functors above. The model's two legs share one mean term,
+# which cancels in their difference, so the range is the spread of the two z-scores over one
+# standard deviation.
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk})(w::VecNum,
+                                                                                      ::Any = nothing,
+                                                                                      ::Any = nothing)
+    alg = r.alg
+    z_l = compute_value_at_risk_z(alg.dist, r.alpha)
+    z_h = compute_value_at_risk_cz(alg.dist, r.beta)
+    return (z_l - z_h) * sqrt(LinearAlgebra.dot(w, alg.sigma, w))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Represents the Drawdown-at-Risk (DaR) risk measure.
 
-`DrawdownatRisk` quantifies the maximum drawdown not exceeded at a given confidence level `alpha`. It operates on absolute drawdowns computed from the portfolio returns series.
+`DrawdownatRisk` quantifies the maximum drawdown not exceeded at a given confidence level `alpha`. It operates on absolute drawdowns computed from the portfolio returns series. Its optimisation model is the mixed-integer programme of [`MIPValueatRisk`](@ref) applied to the drawdown series rather than to the return series, so `b` and `s` carry the same meaning here as they do there.
 
 # Mathematical definition
 
@@ -688,6 +844,7 @@ DrawdownatRisk
 # References
 
   - $(ref_dict[:cdar])
+  - $(ref_dict[:cajas2025]) Section 7.2.4.3.
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -997,6 +1154,25 @@ const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::ValueatRisk) = NetReturnsInput()
 risk_input_kind(::ValueatRiskRange) = NetReturnsInput()
+# The distribution formulation reads the prior's moments against `w`, so it takes the
+# weights rather than the net return series.
+function risk_input_kind(::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk})
+    return WeightsReturnsFeesInput()
+end
+function risk_input_kind(::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                            <:DistributionValueatRisk})
+    return WeightsReturnsFeesInput()
+end
+# A parametric quantile is read off the weights against a pinned pair of moments, so there
+# is nothing a precomputed return series can supply. Same shape as `WeightsTracking`.
+function supports_precomputed_returns(::ValueatRisk{<:Any, <:Any, <:Any,
+                                                    <:DistributionValueatRisk})
+    return false
+end
+function supports_precomputed_returns(::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                         <:DistributionValueatRisk})
+    return false
+end
 risk_input_kind(::DrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativeDrawdownatRisk) = NetReturnsInput()
 

@@ -197,4 +197,11 @@ xfsets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 pr = prior(HighOrderPriorEstimator(), rd)
 rr = regression(DimensionReductionRegression(), rd)
 clr = clusterise(ClustersEstimator(), pr)
+# A MIP quantile programme carries one binary per observation, and a range measure carries
+# two blocks of them, so a 253-observation MIP range is out of reach. The MIP range case uses
+# a short window instead, in the way `test18_setup.jl`'s `rd2` serves the expensive measures.
+rd_mip = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 50):end])
+pr_mip = prior(HighOrderPriorEstimator(), rd_mip)
+clr_mip = clusterise(ClustersEstimator(), pr_mip)
 w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))

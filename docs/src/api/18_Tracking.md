@@ -8,7 +8,6 @@ DependentVariableTracking
 WeightsTracking
 ReturnsTracking
 TrackingError
-TrackingFormulation
 ```
 
 ## Private
@@ -22,4 +21,11 @@ VariableTracking
 tracking_benchmark
 factory(tr::WeightsTracking, w::VecNum)
 narrow_optimiser_vector
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

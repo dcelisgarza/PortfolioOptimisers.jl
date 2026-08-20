@@ -4,6 +4,8 @@
 ValueatRiskFormulation
 factory(alg::ValueatRiskFormulation, args...; kwargs...)
 port_opt_view(r::ValueatRiskFormulation, ::Any, args...)
+compute_value_at_risk_z
+compute_value_at_risk_cz
 port_opt_view(alg::DistributionValueatRisk, i, args...)
 MIPValueatRisk
 DistributionValueatRisk

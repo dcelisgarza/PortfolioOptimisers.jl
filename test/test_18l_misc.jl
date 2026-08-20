@@ -551,3 +551,36 @@ end
                     0.005354628032118466, 0.010563552176813158, 0.04042806167670747,
                     0.02919805117977965, 0.015023246357866301], rtol = 1e-6)
 end
+
+@testset "The MIP quantile gain tail counts its own exceedances (#351)" begin
+    # `set_mip_quantile_risk_constraints!` negated the binary indicators for the gain tail.
+    # That made the cardinality constraint `-sum(z) <= (alpha - s) * T`, which every
+    # non-negative `sum(z)` satisfies, and it turned the big-M into a tightening rather
+    # than a relaxation. The solver therefore left every indicator at zero and the gain
+    # leg settled on the largest gain instead of its quantile: on the sample below the
+    # model reported 0.0185479 against the functor's 0.0156090.
+    #
+    # `risk_series` already negates the series for the gain tail, so the same programme
+    # over that series *is* the gain tail's quantile. The block no longer reads `loss`.
+    rng = StableRNG(24680)
+    X = randn(rng, 40, 3) / 100
+    rd_mip = ReturnsResult(; nx = ["a", "b", "c"], X = X)
+    pr_mip = prior(EmpiricalPrior(), X)
+    r = ValueatRiskRange(; alpha = 0.1, beta = 0.1, alg = MIPValueatRisk())
+    res = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = pr_mip, slv = mip_slv)), rd_mip)
+    x = X * res.w
+
+    # The model and the functor must report the same number.
+    @test isapprox(JuMP.value(res.model[:var_range_risk_1]), r(x))
+
+    # Both legs flag `floor((alpha - s) * T) = 3` exceedances. A gain leg that flags none
+    # is the defect above.
+    @test sum(round.(Int, JuMP.value.(res.model[:z_var_gain_1]))) == 3
+    @test sum(round.(Int, JuMP.value.(res.model[:z_var_loss_1]))) == 3
+
+    # The two legs are the two empirical quantiles, in the negated upper tail convention.
+    xs = sort(x)
+    @test isapprox(JuMP.value(res.model[:var_risk_loss_1]), -xs[4])
+    @test isapprox(JuMP.value(res.model[:var_risk_gain_1]), xs[end - 3])
+end
