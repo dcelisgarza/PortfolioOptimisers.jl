@@ -1001,7 +1001,8 @@ Time-dependent constraint: an optimiser input whose value changes across the fol
 
 A time-dependent input takes a different value in each fold of a cross-validation scheme, and is inert outside one.
 
-- Abstract supertype for callable structs used as time-dependent constraint values. [`TimeDependentCallable`](@ref)
+- Abstract supertype for the callable structs used as time-dependent values. [`TimeDependentCallable`](@ref)
+- Abstract supertype for callable structs whose per-fold value is a *constraint value*. [`TimeDependentConstraintCallable`](@ref)
 - Abstract supertype for callable structs whose per-fold value is an *optimiser*. [`TimeDependentOptimiserCallable`](@ref)
 - Per-fold context handed to time-dependent constraints when they are resolved. [`TimeDependentContext`](@ref)
 - Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights. [`PreviousWeightsFunction`](@ref)

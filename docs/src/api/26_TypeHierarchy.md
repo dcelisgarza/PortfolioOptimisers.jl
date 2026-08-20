@@ -435,6 +435,9 @@ its docstring.
 ├── [Solver](@ref)\
 ├── [SubsetSizeEstimator](@ref)\
 ├── [TimeDependent](@ref)\
+├── [TimeDependentCallable](@ref)\
+│   ├── [TimeDependentConstraintCallable](@ref)\
+│   └── [TimeDependentOptimiserCallable](@ref)\
 ├── [TurnoverEstimator](@ref)\
 ├── [UniverseSets](@ref)\
 └── [WindowSizeEstimator](@ref)
@@ -704,8 +707,6 @@ its docstring.
 │   └── [VarianceFormulation](@ref)\
 │       ├── [QuadRiskExpr](@ref)\
 │       └── [SquaredSOCRiskExpr](@ref)\
-├── [TimeDependentCallable](@ref)\
-│   └── [TimeDependentOptimiserCallable](@ref)\
 ├── [TopologyOnly](@ref)\
 ├── [TrackingFormulation](@ref)\
 │   └── [VariableTracking](@ref)\
