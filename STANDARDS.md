@@ -24,7 +24,12 @@ When two files disagree, the higher entry wins. Report the disagreement rather t
 picking a side — a contradiction between standards files is itself a defect.
 
  1. **`docs/adr/`** — a decision that reached `main` outranks every other file on the point it
-    settles. An ADR describing superseded behaviour is correct history, not a bug.
+    settles. An ADR describing superseded behaviour is correct history, not a bug. An ADR whose
+    decision has **not** reached `main` does not yet hold this rank: it is a draft, it is rewritten
+    in place rather than amended, and it loses to the files below it until the branch merges. This
+    is not a corner case on a release branch — measured against `main` at `9adac7735b`, the current
+    `dev` carries **25 ADRs that `main` has never seen**, and amends 15 more. All 40 change tier on
+    merge.
  2. **`CONTEXT.md`** — the domain glossary. It fixes the words; nothing else may rename a concept.
  3. **`CLAUDE.md`** — the working agreements for this checkout, including the rules an agent must
     not break.
@@ -50,6 +55,8 @@ picking a side — a contradiction between standards files is itself a defect.
 | An optimiser fallback shortcut | `test/test_40_fallback_shortcut_census.jl` — the census comment is the only written statement of this Rule | the same file |
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
+| A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
+| A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
@@ -87,8 +94,10 @@ Every Gate below is a real check that fails on a real breach.
 | markdownlint | markdown structure, from `.markdownlint.json` | inside `pre-commit` |
 | `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions | run the file |
 | `test/test_41_constructor_docstring_drift.jl` | a `# Constructors` block matches the signature it copies | run the file |
-| `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the seven on the allow-list | run the file |
+| `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
+| `test/test_44_range_tails_census.jl` | a range risk measure declares its tails, or is on the fused list | run the file |
+| `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
