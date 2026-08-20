@@ -59,12 +59,13 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`. Add an entry
   there rather than inlining prose, and delete entries that lose their last user.
-- **Never export an abstract type unless explicitly told to.** 233 of 240 abstract types in `src/`
-  are unexported, so unexported is the convention. An open family, a sibling family that exports its
-  supertype, and an existing API-page entry are none of them a reason to add one in passing — an
-  export is public API, and widening it is the maintainer's call. Ask instead.
-  `test/test_43_exported_abstract_type_census.jl` gates the rule against an allow-list of the seven
-  exported names, so an export is a deliberate edit to that list.
+- **Never export an abstract type unless explicitly told to.** All but a handful of the abstract
+  types in `src/` are unexported, so unexported is the convention. An open family, a sibling family
+  that exports its supertype, and an existing API-page entry are none of them a reason to add one in
+  passing — an export is public API, and widening it is the maintainer's call. Ask instead.
+  `test/test_43_exported_abstract_type_census.jl` gates the rule against the allow-list in that
+  file, so an export is a deliberate edit to that list. **Do not restate the count here or
+  anywhere else.** It has moved four times, and each written copy went stale where it stood.
 
 ## Repo etiquette
 
