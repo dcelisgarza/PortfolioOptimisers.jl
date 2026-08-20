@@ -11,6 +11,13 @@ wrong. It also reads a field declaration in every form this codebase uses:
 bare, `::`-bounded, `<:`-bounded (@concrete), and prefixed by a propagation
 macro (@fprop, @vprop, @pprop, @wprop, @cprop). Missing that last form is what
 made the first ledger report four field removals that never happened.
+
+It reports field changes twice, because the two readings answer different
+questions. The SET reading says which names a type gained and lost. The
+POSITIONAL reading says whether a stale positional call still matches: every
+`@concrete` type has a positional constructor, so a field inserted in a
+non-final position rebinds every argument from that slot onwards, while the set
+reading shows only a plain addition.
 """
 import re, subprocess, sys
 
@@ -110,6 +117,63 @@ def report(base, head, label):
     for n, rm, ad in rows:
         mark = "  <-- LOSES A FIELD" if rm else ""
         print(f"   {n}: removed={rm or '-'}  added={ad or '-'}{mark}")
+    order_report(bs, hs, he)
+
+
+def classify(b, h):
+    """Classify a field list change by POSITION, not by set membership.
+
+    Set membership cannot see a reorder, and every `@concrete` type also has a
+    positional constructor, so a field inserted in a non-final position reads as
+    a plain addition while every positional argument from that slot onwards
+    rebinds. Returns (kind, slot) where slot is the 1-based first divergent
+    position, or None when the lists agree as far as the shorter one runs.
+    """
+    slot = None
+    for i in range(min(len(b), len(h))):
+        if b[i] != h[i]:
+            slot = i + 1
+            break
+    if b == h:
+        return ("IDENTICAL", None)
+    if slot is None:
+        return ("PURE APPEND", None) if len(h) > len(b) else ("TRUNCATION", None)
+    if len(b) == len(h):
+        return ("SAME ARITY REORDER", slot)
+    return ("ARITY CHANGE", slot)
+
+
+def order_report(bs, hs, he):
+    """Report the POSITIONAL shape of every exported type present at both refs."""
+    buckets = {"IDENTICAL": [], "PURE APPEND": [], "SAME ARITY REORDER": [],
+               "ARITY CHANGE": [], "TRUNCATION": []}
+    for n in sorted(set(bs) & set(hs)):
+        if n not in he: continue
+        b, h = bs[n], hs[n]
+        kind, slot = classify(b, h)
+        buckets[kind].append((n, b, h, slot))
+    total = sum(len(v) for v in buckets.values())
+    print(f"\nPOSITIONAL SHAPE OF EXPORTED TYPES ({total} present at both refs):")
+    NOTE = {"IDENTICAL": "a positional call binds exactly as before",
+            "PURE APPEND": "a positional call binds exactly as before",
+            "SAME ARITY REORDER": "a stale positional call still MATCHES arity and rebinds",
+            "ARITY CHANGE": "a stale positional call may match at the shorter arity",
+            "TRUNCATION": "the type lost trailing fields"}
+    for kind in ("IDENTICAL", "PURE APPEND", "SAME ARITY REORDER", "ARITY CHANGE",
+                 "TRUNCATION"):
+        rows = buckets[kind]
+        print(f"   {kind} ({len(rows)}) -- {NOTE[kind]}:")
+        if kind == "IDENTICAL":
+            print("      (not listed)")
+            continue
+        for n, b, h, slot in rows:
+            if slot is None and kind == "TRUNCATION":
+                print(f"      {n}: {len(b)} -> {len(h)} fields, lost trailing {b[len(h):]}")
+            elif slot is None:
+                print(f"      {n}: {len(b)} -> {len(h)} fields, added {h[len(b):]}")
+            else:
+                print(f"      {n}: {len(b)} -> {len(h)} fields, first divergence at slot "
+                      f"{slot}, {b[slot-1]} -> {h[slot-1]}")
 
 
 if __name__ == "__main__":

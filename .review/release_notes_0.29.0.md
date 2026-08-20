@@ -297,6 +297,55 @@ dispatch changes: every generic method that reached the root already named both 
 The module prefix is what the examples and `test/test_37_time_dependent_constraints.jl` already
 used, so the migration is a prefix and nothing else.
 
+### 5. Four exported types keep their arity and change their field order
+
+A **keyword** call is unaffected by everything in this section. This is about a **positional**
+call, which `@concrete` gives every type in the library.
+
+`.review/api_ledger.txt` now reports the positional shape of every exported type present at both
+refs, because a set-membership reading cannot see a reorder — a field inserted anywhere but the end
+reads as a plain addition while every argument from that slot onwards rebinds. Of the 428 exported
+types present at both `v0.28.0` and 0.29.0:
+
+| Shape | Count | What a stale positional call does |
+| --- | --- | --- |
+| Identical | 388 | binds as before |
+| Pure append | 15 | binds as before |
+| Arity change | 20 | **`MethodError`** — the argument count no longer matches |
+| Truncation | 1 | **`MethodError`** — same reason |
+| **Same arity, reordered** | **4** | **builds a wrong object, silently** |
+
+The last row is the only one that needs care, and it needs it badly.
+
+| Type | Fields | First divergence | What a `v0.28.0` positional call produces |
+| --- | --- | --- | --- |
+| `ArithmeticReturn` | 3 | slot 1, `ucs` → `settings` | `settings` holds the old `ucs`, `ucs` holds the old `lb` |
+| `LogarithmicReturn` | 2 | slot 1, `w` → `settings` | `settings` holds the old `w` |
+| `LowOrderPrior` | 12 | slot 2, `mu` → `o_X` | `o_X` holds `mu`, `mu` holds `sigma`, `sigma` holds `nothing` |
+| `NetworkEstimator` | 4 | slot 4, `n` → `sep` | `sep` holds an integer |
+
+**It does not raise.** Each of these types declares a typed inner constructor, and each is
+`@concrete`, and `ConcreteStructs` emits an *unconstrained* generic constructor beside it:
+
+```julia
+LowOrderPrior(X::__T_X, o_X::__T_o_X, mu::__T_mu, …) where {__T_X, __T_o_X, __T_mu, …}
+```
+
+Where the argument types do not match the typed constructor, that one does, and it validates
+nothing. Verified by running each of the four, not by reading the signatures:
+
+```julia
+julia> v = ArithmeticReturn(BoxUncertaintySet(; lb = [0.1], ub = [0.2]), 0.05, nothing);
+
+julia> typeof(v.settings), typeof(v.ucs)
+(BoxUncertaintySet{…}, Float64)
+```
+
+**Migration.** Call these four by keyword. A keyword call names its slots, so it either binds
+correctly or raises. This is the general advice for the library — the positional constructor is an
+artefact of `@concrete`, not a supported interface — and here it is the difference between a
+`MethodError` and a wrong number.
+
 ### Not a migration item
 
 `LowOrderPrior.z_sq` is neither a field nor a forwarded property at `HEAD`. It was added and removed

@@ -79,6 +79,54 @@ FIELD CHANGES ON EXPORTED TYPES (40; 9 lose a field):
    ThirdCentralMoment: removed=-  added=['settings']
    VarianceSkewKurtosis: removed=-  added=['pe']
 
+POSITIONAL SHAPE OF EXPORTED TYPES (428 present at both refs):
+   IDENTICAL (388) -- a positional call binds exactly as before:
+      (not listed)
+   PURE APPEND (15) -- a positional call binds exactly as before:
+      BetweennessCentrality: 2 -> 3 fields, added ['ov']
+      BoxUncertaintySet: 2 -> 3 fields, added ['val']
+      ClosenessCentrality: 2 -> 3 fields, added ['ov']
+      EigenvectorCentrality: 0 -> 1 fields, added ['ov']
+      EllipsoidalUncertaintySet: 3 -> 4 fields, added ['val']
+      Kurtosis: 7 -> 8 fields, added ['pe']
+      L1UncertaintySet: 2 -> 3 fields, added ['mu']
+      PricesResult: 5 -> 7 fields, added ['nz', 'Z']
+      ProcessedJuMPOptimiserAttributes: 18 -> 19 fields, added ['sca']
+      RadialityCentrality: 0 -> 1 fields, added ['ov']
+      ReturnsResult: 9 -> 11 fields, added ['nz', 'Z']
+      SignedL1UncertaintySet: 3 -> 4 fields, added ['mu']
+      Skewness: 5 -> 6 fields, added ['pe']
+      StressCentrality: 2 -> 3 fields, added ['ov']
+      VarianceSkewKurtosis: 1 -> 2 fields, added ['pe']
+   SAME ARITY REORDER (4) -- a stale positional call still MATCHES arity and rebinds:
+      ArithmeticReturn: 3 -> 3 fields, first divergence at slot 1, ucs -> settings
+      LogarithmicReturn: 2 -> 2 fields, first divergence at slot 1, w -> settings
+      LowOrderPrior: 12 -> 12 fields, first divergence at slot 2, mu -> o_X
+      NetworkEstimator: 4 -> 4 fields, first divergence at slot 4, n -> sep
+   ARITY CHANGE (20) -- a stale positional call may match at the shorter arity:
+      AugmentedBlackLittermanPrior: 12 -> 11 fields, first divergence at slot 5, a_sets -> sets
+      BayesianBlackLittermanPrior: 6 -> 7 fields, first divergence at slot 1, mp -> f_mp
+      DistributionValueatRisk: 4 -> 5 fields, first divergence at slot 4, dist -> pe
+      EntropyPoolingPrior: 16 -> 13 fields, first divergence at slot 4, sigma_views -> evar_views
+      ExpectedReturn: 1 -> 2 fields, first divergence at slot 1, rt -> settings
+      ExpectedReturnRiskRatio: 3 -> 5 fields, first divergence at slot 1, rt -> settings
+      FactorRiskContributionResult: 4 -> 5 fields, first divergence at slot 2, rr -> r
+      HierarchicalOptimiser: 9 -> 10 fields, first divergence at slot 9, strict -> z_src
+      HighOrderPrior: 11 -> 9 fields, first divergence at slot 9, f_kt -> fpr
+      JuMPOptimiser: 43 -> 44 fields, first divergence at slot 43, strict -> z_src
+      MeanReturn: 2 -> 3 fields, first divergence at slot 1, w -> settings
+      MeanReturnRiskRatio: 3 -> 5 fields, first divergence at slot 1, rt -> settings
+      MeanRiskResult: 2 -> 3 fields, first divergence at slot 2, fb -> r
+      NearOptimalCenteringResult: 6 -> 7 fields, first divergence at slot 2, w_min_retcode -> r
+      NestedClustered: 14 -> 15 fields, first divergence at slot 14, strict -> z_src
+      NonOptimisationRiskRatio: 2 -> 5 fields, first divergence at slot 1, r1 -> settings
+      RiskBudgetingResult: 3 -> 4 fields, first divergence at slot 2, prb -> r
+      SchurComplementHierarchicalRiskParityResult: 7 -> 8 fields, first divergence at slot 4, gamma -> r
+      SubsetResampling: 16 -> 15 fields, first divergence at slot 5, scale -> opt
+      ThirdCentralMoment: 1 -> 2 fields, first divergence at slot 1, w -> settings
+   TRUNCATION (1) -- the type lost trailing fields:
+      HierarchicalResult: 7 -> 6 fields, lost trailing ['fb']
+
 === REVIEW BASE: c975293745 -> HEAD ===
 Exported names: 705 -> 760
 
@@ -138,3 +186,51 @@ FIELD CHANGES ON EXPORTED TYPES (40; 12 lose a field):
    SubsetResampling: removed=['scale']  added=-  <-- LOSES A FIELD
    ThirdCentralMoment: removed=-  added=['settings']
    VarianceSkewKurtosis: removed=-  added=['pe']
+
+POSITIONAL SHAPE OF EXPORTED TYPES (427 present at both refs):
+   IDENTICAL (387) -- a positional call binds exactly as before:
+      (not listed)
+   PURE APPEND (15) -- a positional call binds exactly as before:
+      BetweennessCentrality: 2 -> 3 fields, added ['ov']
+      BoxUncertaintySet: 2 -> 3 fields, added ['val']
+      ClosenessCentrality: 2 -> 3 fields, added ['ov']
+      EigenvectorCentrality: 0 -> 1 fields, added ['ov']
+      EllipsoidalUncertaintySet: 3 -> 4 fields, added ['val']
+      Kurtosis: 7 -> 8 fields, added ['pe']
+      L1UncertaintySet: 2 -> 3 fields, added ['mu']
+      PricesResult: 5 -> 7 fields, added ['nz', 'Z']
+      ProcessedJuMPOptimiserAttributes: 18 -> 19 fields, added ['sca']
+      RadialityCentrality: 0 -> 1 fields, added ['ov']
+      ReturnsResult: 9 -> 11 fields, added ['nz', 'Z']
+      SignedL1UncertaintySet: 3 -> 4 fields, added ['mu']
+      Skewness: 5 -> 6 fields, added ['pe']
+      StressCentrality: 2 -> 3 fields, added ['ov']
+      VarianceSkewKurtosis: 1 -> 2 fields, added ['pe']
+   SAME ARITY REORDER (4) -- a stale positional call still MATCHES arity and rebinds:
+      ArithmeticReturn: 3 -> 3 fields, first divergence at slot 1, ucs -> settings
+      LogarithmicReturn: 2 -> 2 fields, first divergence at slot 1, w -> settings
+      LowOrderPrior: 12 -> 12 fields, first divergence at slot 2, mu -> o_X
+      NetworkEstimator: 4 -> 4 fields, first divergence at slot 4, n -> sep
+   ARITY CHANGE (20) -- a stale positional call may match at the shorter arity:
+      AugmentedBlackLittermanPrior: 12 -> 11 fields, first divergence at slot 5, a_sets -> sets
+      BayesianBlackLittermanPrior: 6 -> 7 fields, first divergence at slot 1, mp -> f_mp
+      DistributionValueatRisk: 4 -> 5 fields, first divergence at slot 4, dist -> pe
+      EntropyPoolingPrior: 16 -> 13 fields, first divergence at slot 4, sigma_views -> evar_views
+      ExpectedReturn: 1 -> 2 fields, first divergence at slot 1, rt -> settings
+      ExpectedReturnRiskRatio: 3 -> 5 fields, first divergence at slot 1, rt -> settings
+      FactorRiskContributionResult: 4 -> 5 fields, first divergence at slot 2, rr -> r
+      HierarchicalOptimiser: 9 -> 10 fields, first divergence at slot 8, cle_pr -> x_src
+      HighOrderPrior: 11 -> 9 fields, first divergence at slot 9, f_kt -> fpr
+      JuMPOptimiser: 43 -> 44 fields, first divergence at slot 42, cle_pr -> x_src
+      MeanReturn: 2 -> 3 fields, first divergence at slot 1, w -> settings
+      MeanReturnRiskRatio: 3 -> 5 fields, first divergence at slot 1, rt -> settings
+      MeanRiskResult: 2 -> 3 fields, first divergence at slot 2, fb -> r
+      NearOptimalCenteringResult: 6 -> 7 fields, first divergence at slot 2, w_min_retcode -> r
+      NestedClustered: 14 -> 15 fields, first divergence at slot 13, cle_pr -> x_src
+      NonOptimisationRiskRatio: 2 -> 5 fields, first divergence at slot 1, r1 -> settings
+      RiskBudgetingResult: 3 -> 4 fields, first divergence at slot 2, prb -> r
+      SchurComplementHierarchicalRiskParityResult: 7 -> 8 fields, first divergence at slot 4, gamma -> r
+      SubsetResampling: 16 -> 15 fields, first divergence at slot 5, scale -> opt
+      ThirdCentralMoment: 1 -> 2 fields, first divergence at slot 1, w -> settings
+   TRUNCATION (1) -- the type lost trailing fields:
+      HierarchicalResult: 7 -> 6 fields, lost trailing ['fb']
