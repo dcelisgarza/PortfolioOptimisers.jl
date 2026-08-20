@@ -1,42 +1,44 @@
+# Standalone twin of the listing executed inside `main.typ`.
+#
+# `main.typ` now carries the executed copy of this workflow in a jlyfish cell, so
+# the paper cannot drift away from the library. Keep the two in sync, or delete
+# this file and let the paper be the only copy. Run it from `docs/paper/`.
+#
 # Import packages.
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
-# Load data.
+# Load prices and turn them into returns.
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../../examples/SP500.csv.gz"));
               timestamp = :Date)
-# Compute returns.
 rd = prices_to_returns(X)
-# Split into training and test sets.
 rd_train, rd_test = train_test_split(rd; test_size = 0.2)
-# Mean Risk optimisation. Defaults to minimising risk.
+# Mean risk optimisation, which minimises risk by default.
 mr = MR(;
-        # Variance with the direct quadratic risk expression.
+        # Variance, written directly as a quadratic expression.
         r = Variance(; alg = QuadRiskExpr()),
-        # Configured optimiser.
         opt = JuMPOpt(;
-                      # Using Clarabel as the solver. It's possible to provide fallbacks in the form of a vector, `PortfolioOptimisers.jl` will iterate until it finds one that works or they all fail.
+                      # Solvers are tried in order until one of them succeeds.
                       slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                                    settings = Dict("verbose" => false)),
-                      # Weight bounds using an estimator (it builds the constraint based on the data). Lower bound for all assets is 0, upper bound for AAPL is 0.2, for the rest it's 1.
+                      # An estimator, so the bounds are built from the data: every asset
+                      # is capped at 1 and floored at 0, except AAPL, capped at 0.2.
                       wb = WBE(; ub = "AAPL" => 0.2),
-                      # This maps asset names to their indices in the data, as well as sets to which they belong. It is needed to build constraints from estimators and is used by other components such as some prior statistics.
+                      # Maps asset names to their columns, and names to sets of assets.
+                      # Constraint estimators and some priors are built against this.
                       sets = UniverseSets(; dict = Dict("nx" => rd.nx)),
-                      # L2 regularisation using a squared L2 norm with a penalty coefficient of 0.0001.
+                      # Squared L2 penalty on the weights, lambda = 1e-4.
                       l2 = L2Reg(; val = 0.0001, alg = QuadRiskExpr()),
-                      # Arithmetic returns with 100 evenly distributed points between the minimum and maximum returns in the training set. This way we can compute the efficient frontier, which is a subset of pareto fronts.
+                      # Sweep 100 return levels: one solve each, one efficient frontier.
                       ret = ArithmeticReturn(;
                                              settings = JuMPReturnsSettings(;
                                                                             lb = Frontier(;
                                                                                           N = 100)))) # opt
         ) # mr
-# Perform optimisation on the training set.
+# Fit on the training set, then score both sets.
 res = optimise(mr, rd_train)
-# Predict on training data.
 pred_train = predict(res, rd_train)
-# Predict on test data.
 pred_test = predict(res, rd_test)
-# Scenario based standard deviation.
+# Scenario based standard deviation, as a second order cone expression.
 r = SCM(; alg = SOCRiskExpr())
-# Plot the results.
 plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
 plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
                     markercolor = :red, ylabel = "Mean Return",

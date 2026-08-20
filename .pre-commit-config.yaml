@@ -21,8 +21,10 @@ repos:
       - id: no-commit-to-branch
       - id: pretty-format-json
         args: [--autofix, --indent=2]
+        exclude: ^docs/paper/main-jlyfish\.json$
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: ^docs/paper/main-jlyfish\.json$
       - id: check-merge-conflict
         args: [--assume-in-merge]
   - repo: https://github.com/igorshubovych/markdownlint-cli
