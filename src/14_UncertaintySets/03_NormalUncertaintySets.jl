@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
+Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart.
+
+The two laws are Equation 11.16 of the source. `alg` picks the shape, and `n_sim` sets the number of Wishart draws the covariance bounds are read from. Its sampling-free counterpart is [`DeltaUncertaintySet`](@ref), and its distribution-free counterpart is [`ARCHUncertaintySet`](@ref).
 
 # Fields
 
@@ -72,6 +74,12 @@ NormalUncertaintySet
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
+  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:meucci2005])
 """
 @concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -194,9 +202,9 @@ end
 """
     choose_scaling_parameter(ue, pr)
 
-Select the scaling parameter for a normal uncertainty set from the prior result.
+Return ``T``, the effective number of observations that divides the covariance to give the asymptotic covariance of the mean.
 
-Internal helper that extracts the appropriate scaling parameter from `ue` given the prior result `pr`. Dispatches on the uncertainty set and prior types.
+Three sources are read in order, and the first that is not `nothing` wins: the estimator's own `ens`, the prior's `ens`, and the row count of the prior's returns matrix. The first two exist because a weighted or a shrunk prior carries fewer effective observations than it has rows.
 
 # Arguments
 
@@ -205,11 +213,12 @@ Internal helper that extracts the appropriate scaling parameter from `ue` given 
 
 # Returns
 
-  - Scaling parameter value.
+  - `T::Number`: Effective number of observations.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
+  - [`mu_asymptotic_cov`](@ref)
 """
 function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
     return if !isnothing(ue.ens)
@@ -563,7 +572,7 @@ Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
 \\end{align}
 ```
 
-The scaling ``k`` is fitted empirically from simulated samples ``\\hat{\\boldsymbol{\\mu}}^{(m)} \\sim \\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\mu})``:
+The radius ``k`` is fitted empirically, as the ``1-q`` quantile of the Mahalanobis distances of the simulated estimation errors ``\\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}`` and ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})``, drawn from ``\\hat{\\boldsymbol{\\mu}}^{(m)} \\sim \\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\mathbf{\\Sigma}_{\\mu})`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\mu})``:
 
 ```math
 \\begin{align}
@@ -631,7 +640,11 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
-    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
+    # `k_ucs` measures the Mahalanobis distance of an estimation ERROR against `sigma_mu`,
+    # so the sample must be the error itself: drawn from the sampling law of the estimator,
+    # which is `N(mu, sigma / T)`, and centred on `mu`. Drawing from `N(mu, sigma)` instead
+    # widens every deviation by `sqrt(T)`.
+    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
     sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
@@ -728,9 +741,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu,
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
                            MuEllipsoidalUncertaintySet(), pr.mu),
-           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma,
+           ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
                            SigmaEllipsoidalUncertaintySet(), pr.sigma)
 end
 """
@@ -831,7 +844,11 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
-    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
+    # `k_ucs` measures the Mahalanobis distance of an estimation ERROR against `sigma_mu`,
+    # so the sample must be the error itself: drawn from the sampling law of the estimator,
+    # which is `N(mu, sigma / T)`, and centred on `mu`. Drawing from `N(mu, sigma)` instead
+    # widens every deviation by `sqrt(T)`.
+    X_mu = transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
     return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
                            MuEllipsoidalUncertaintySet(), pr.mu)
 end
@@ -882,17 +899,18 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu,
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
                            MuEllipsoidalUncertaintySet(), pr.mu)
 end
 """
-    mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
+    mu_ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                     <:Any, <:Any, <:Any},
            X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
+Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
+
+The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T`` of Equation 11.24. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number.
 
 # Arguments
 
@@ -911,7 +929,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Computes the scaling parameter for the ellipsoidal using the chi-squared scaling algorithm.
+  - Computes the radius of the ellipsoid with the algorithm the caller gave.
   - Returns an ellipsoidal uncertainty set for the mean.
 
 # Related
@@ -919,7 +937,6 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - [`NormalUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
-  - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
@@ -1042,7 +1059,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     T = choose_scaling_parameter(ue, pr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma,
+    return ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
                            SigmaEllipsoidalUncertaintySet(), pr.sigma)
 end
 """

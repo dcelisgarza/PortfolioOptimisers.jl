@@ -31,6 +31,10 @@ Compute the sample entropic value-at-risk of a loss series and the dual variable
   - [`GridEntropicValueatRiskView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropicValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 function ep_evar(x::VecNum, w::VecNum, alpha::Number)
     lw = log.(w)
@@ -77,17 +81,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tail view constraint produced by [`LinearConditionalValueatRiskView`](@ref).
+Carries the loss series, the significance level and the target of a linear conditional value-at-risk view.
+
+The view parser produces one of these per view that takes the linear formulation. [`add_ep_tail_view!`](@ref) then writes the dual representation of CVaR into the model from it.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LinearConditionalValueatRiskViewConstraint(x, alpha, rhs)
+
+Arguments correspond to the fields above.
 
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct LinearConditionalValueatRiskViewConstraint <:
                  AbstractEntropyPoolingTailView
@@ -107,19 +123,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tail view constraint produced by [`IntegerConditionalValueatRiskView`](@ref).
+Carries the ordered tail window of every asset an integer conditional value-at-risk view names.
 
-Each entry of `ord`, `x` pairs one asset named by the view with its coefficient in `coef`, so an absolute view carries one entry and a relative view carries two.
+Each entry of `ord`, `x` pairs one asset named by the view with its coefficient in `coef`, so an absolute view carries one entry and a relative view carries two. The window is sorted ascending, so the largest loss is last and the tail the binary vector marks is a suffix of it.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    IntegerConditionalValueatRiskViewConstraint(ord, x, coef, alpha, op, rhs)
+
+Arguments correspond to the fields above.
 
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct IntegerConditionalValueatRiskViewConstraint <:
                  AbstractEntropyPoolingTailView
@@ -151,17 +177,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tail view constraint produced by [`ConicEntropicValueatRiskView`](@ref).
+Carries the loss series, the significance level and the target of a conic entropic value-at-risk view.
+
+The view parser produces one of these per view that takes the conic formulation. [`add_ep_tail_view!`](@ref) then writes the relative entropy cone that is the dual representation of EVaR from it.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConicEntropicValueatRiskViewConstraint(x, alpha, rhs)
+
+Arguments correspond to the fields above.
 
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct ConicEntropicValueatRiskViewConstraint <: AbstractEntropyPoolingTailView
     """
@@ -180,7 +218,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tail view constraint produced by [`GridEntropicValueatRiskView`](@ref) for an upper-bound or equality view.
+Carries the grid of dual variables that an upper-bound or equality entropic value-at-risk view selects one point of.
 
 A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this carrier. An equality view emits both: the rows go into the dictionary and the selector block comes here.
 
@@ -188,11 +226,21 @@ A lower-bound grid view is a set of rows on the posterior probabilities alone, s
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    GridEntropicValueatRiskViewConstraint(x, z, alpha, rhs, M)
+
+Arguments correspond to the fields above.
+
 # Related
 
   - [`AbstractEntropyPoolingTailView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
   - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct GridEntropicValueatRiskViewConstraint <: AbstractEntropyPoolingTailView
     """
@@ -240,6 +288,10 @@ Add the variables and constraints of one tail view to an entropy pooling JuMP mo
   - [`AbstractEntropyPoolingTailView`](@ref)
   - [`entropy_pooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 function add_ep_tail_view!(model::JuMP.Model, pw,
                            tv::LinearConditionalValueatRiskViewConstraint, sc1::Number)
@@ -464,7 +516,7 @@ Resolve the number of largest losses the integer conditional value-at-risk formu
 
 # Arguments
 
-  - `sbar`: Setting held by [`IntegerConditionalValueatRiskView`](@ref). An `Integer` is a count, a fraction in `(0, 1]` is a fraction of `T`, and `nothing` applies the rule of thumb of [EPTail](@cite).
+  - `sbar`: Setting held by [`IntegerConditionalValueatRiskView`](@ref). An `Integer` is a count, a fraction in `(0, 1)` is a fraction of `T`, and `nothing` applies the rule of thumb of [EPTail](@cite).
   - `T`: Number of observations.
   - `alpha`: Significance level of the view.
   - `w`: Prior probability weights.
@@ -482,6 +534,10 @@ Resolve the number of largest losses the integer conditional value-at-risk formu
 
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`ep_cvar_views!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecInt)
     cw = zero(eltype(w))
@@ -1001,9 +1057,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Entropy pooling prior estimator for asset returns with tail views.
+Reweights the observations of a prior so that its moments and its tails meet a set of views.
 
-`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports moment views (mean, variance, covariance, correlation, skewness, kurtosis), value at risk views, and the conditional and entropic value at risk views of [EPTail](@cite).
+`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis, views on the value at risk, and the conditional and entropic value at risk views of [EPTail](@cite).
 
 The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of Meucci et al. hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with relative CVaR views and views on the entropic value at risk.
 
@@ -1163,6 +1219,8 @@ EntropyPoolingPrior
 
 # References
 
+  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:vorobets2021])
   - $(ref_dict[:EPTail])
 """
 @propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
@@ -1299,7 +1357,7 @@ end
     forward(pe, me, ce)
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecEP = AbstractVector{<:Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}}
 
 Alias for an abstract vector of entropy pooling prior estimators of either family.
 

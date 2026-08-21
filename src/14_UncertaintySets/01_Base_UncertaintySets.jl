@@ -1,20 +1,56 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the abstract interface for uncertainty set estimators in portfolio optimisation.
-Subtypes of this abstract type are responsible for constructing and estimating uncertainty sets for risk or prior statistics, such as box or ellipsoidal uncertainty sets.
+Fits an uncertainty set around a prior statistic, so that a downstream model can take the worst case over it.
+
+All concrete subtypes should subtype `AbstractUncertaintySetEstimator`.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintySetEstimator` and implement the following methods:
+
+## `mu_ucs`
+
+  - `mu_ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the mean.
+
+## `sigma_ucs`
+
+  - `sigma_ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> AbstractUncertaintySetResult`: Fits the uncertainty set of the covariance. An estimator with no covariance analogue throws instead, as [`CharacteristicUncertaintySet`](@ref) does.
+
+## `ucs`
+
+  - `ucs(ue::AbstractUncertaintySetEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...) -> Tuple`: Fits both sets in one pass, so that a shared prior or a shared simulation is computed once.
+
+### Arguments
+
+  - `ue`: The concrete subtype instance.
+  - `X`: Matrix of asset returns.
+  - `F`: Optional matrix of factor returns, which a factor prior needs.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments, forwarded to the prior estimator.
+
+### Returns
+
+  - `ucs::AbstractUncertaintySetResult`: The fitted set, or a tuple of the mean set and the covariance set for `ucs`.
 
 # Related
 
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
+  - [`DeltaUncertaintySet`](@ref)
+  - [`NormalUncertaintySet`](@ref)
 """
 abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the abstract interface for algorithms that construct uncertainty sets in portfolio optimisation.
-Subtypes implement specific methods for generating uncertainty sets, such as box or ellipsoidal uncertainty sets, which are used to model uncertainty in risk or prior statistics.
+Selects which shape of uncertainty set an estimator builds, such as a box or an ellipsoid.
+
+All concrete subtypes should subtype `AbstractUncertaintySetAlgorithm`. A subtype carries the parameters of its own shape and nothing else. The estimator does the fitting.
+
+# Interfaces
+
+A subtype is a tag that the estimator dispatches on, so it declares no method of its own. To add a shape, subtype `AbstractUncertaintySetAlgorithm` and add the `ucs`, `mu_ucs`, and `sigma_ucs` methods of [`AbstractUncertaintySetEstimator`](@ref) that are specialised on it, one set for each estimator that is to offer the shape.
 
 # Related
 
@@ -27,9 +63,29 @@ abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract type for results produced by uncertainty set algorithms in portfolio optimisation.
+Carries a fitted uncertainty set, which is the data a worst-case model reads to build its robust expression.
 
-Represents the interface for all result types that encode uncertainty sets for risk or prior statistics, such as box or ellipsoidal uncertainty sets. Subtypes store the output of uncertainty set estimation or construction algorithms.
+All concrete subtypes should subtype `AbstractUncertaintySetResult`. A subtype also carries the statistic its bounds were calibrated on, so that the consumer bounds that statistic and not an unrelated one. See ADR 0050.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintySetResult` and implement the following method:
+
+## `port_opt_view`
+
+  - `port_opt_view(risk_ucs::AbstractUncertaintySetResult, i, args...) -> AbstractUncertaintySetResult`: Returns the set restricted to the asset indices `i`. A hierarchical optimiser calls it once per cluster.
+
+### Arguments
+
+  - `risk_ucs`: The concrete subtype instance.
+  - `i`: Asset index of the cluster.
+  - `args...`: Additional arguments.
+
+### Returns
+
+  - `risk_ucs::AbstractUncertaintySetResult`: The restricted set.
+
+A model that is to take the worst case over the new shape also needs its own `set_ucs_return_constraints!` method, or its own `set_ucs_variance_risk!` method, or both.
 
 # Related
 
@@ -53,15 +109,35 @@ const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetE
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the abstract interface for algorithms that compute the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
+Computes the radius `k` of an ellipsoidal uncertainty set, which is how far the true statistic may lie from its estimate.
 
-Subtypes implement specific methods for generating the scaling parameter, which controls the size of the ellipsoidal region representing uncertainty in risk or prior statistics.
+All concrete subtypes should subtype `AbstractUncertaintyKAlgorithm`. A plain number in place of one is the radius itself.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyKAlgorithm` and implement the following method:
+
+## `k_ucs`
+
+  - `k_ucs(km::AbstractUncertaintyKAlgorithm, q::Number, X, sigma_X::MatNum) -> Number`: Returns the radius.
+
+### Arguments
+
+  - `km`: The concrete subtype instance.
+  - `q`: Significance level.
+  - `X`: Matrix of sampled estimation errors, one row per sample. An algorithm that runs no simulation absorbs it.
+  - `sigma_X`: Shape matrix of the ellipsoid, whose first dimension is the dimension of the ellipsoid.
+
+### Returns
+
+  - `k::Number`: Radius of the ellipsoid.
 
 # Related
 
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
+  - [`k_ucs`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
@@ -77,9 +153,28 @@ const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the abstract interface for algorithms that compute the radius `eps` of an ``\\ell_1`` uncertainty set on the characteristic vector.
+Computes the radius `eps` of an ``\\ell_1`` uncertainty set, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the portfolio holds.
 
-Subtypes implement specific methods for choosing the radius, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the resulting portfolio holds. The counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
+All concrete subtypes should subtype `AbstractUncertaintyEpsAlgorithm`. A plain number in place of one is the radius itself. It is the counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyEpsAlgorithm` and implement the following method:
+
+## `l1_resolve_eps`
+
+  - `l1_resolve_eps(method::AbstractUncertaintyEpsAlgorithm, mus::VecNum, sds::Option{<:VecNum}, paired::Bool) -> Number`: Returns the radius.
+
+### Arguments
+
+  - `method`: The concrete subtype instance.
+  - `mus`: Characteristic vector, sorted in non-increasing order.
+  - `sds`: Per-asset scaling under the same permutation, or `nothing` when the set is unscaled.
+  - `paired`: Whether to read the paired ladder of the dollar-neutral problem rather than the long-only one.
+
+### Returns
+
+  - `eps::Number`: Radius of the set.
 
 # Related
 
@@ -353,21 +448,27 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for constructing box uncertainty sets in portfolio optimisation.
-Box uncertainty sets model uncertainty by specifying lower and upper bounds for risk or prior statistics.
+Selects a box uncertainty set, a convex polytope of element-wise bounds, from an estimator that can build either shape.
+
+Its sibling [`EllipsoidalUncertaintySetAlgorithm`](@ref) selects the ellipsoid instead. The box carries no correlation between the entries it bounds, and its worst case is a linear or semidefinite programme rather than a second-order cone one.
 
 # Related
 
   - [`BoxUncertaintySet`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 11.3.1.
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a box uncertainty set for risk or prior statistics in portfolio optimisation.
-Stores lower and upper bounds for the uncertain quantity, such as expected returns or covariance.
+Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix.
+
+A box is a convex polytope, so it reads as a polyhedral confidence interval on the entries it bounds. Its worst case is Equation 11.19 on the mean axis and Equation 11.20 on the covariance axis of the source.
 
 # Mathematical definition
 
@@ -415,6 +516,8 @@ Keywords correspond to the struct's fields.
 
 The mean route uses `val` as the centre of the worst-case return. The covariance route does not read it: the worst-case variance over a box is `tr(A_u \\mathbf{\\Sigma}_u) - tr(A_l \\mathbf{\\Sigma}_l)`, which names no centre.
 
+The mean route also reads the bounds only through their half-width ``(\\boldsymbol{u} - \\boldsymbol{\\ell}) / 2``, which is the ``\\delta_{\\mu}`` of Equation 11.14. Two estimators therefore write the same set two ways and agree: [`ARCHUncertaintySet`](@ref) stores the two quantiles of the bootstrap mean, while [`DeltaUncertaintySet`](@ref) stores ``\\boldsymbol{\\ell} = \\boldsymbol{0}`` and ``\\boldsymbol{u} = 2 \\delta_{\\mu}``. Neither `lb` nor `ub` is a bound on the mean on its own.
+
 # Examples
 
 ```jldoctest
@@ -430,6 +533,11 @@ BoxUncertaintySet
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.14.
+  - $(ref_dict[:sousalobo2000])
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
     """
@@ -496,7 +604,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
+Fits the ellipsoid radius `k` empirically, as the `1 - q` quantile of the Mahalanobis distances of the sampled estimation errors.
+
+The route makes no distributional assumption: it reads the errors the estimator family sampled, whether they come from a parametric draw or from a bootstrap resample. Its two closed-form siblings are [`ChiSqKUncertaintyAlgorithm`](@ref) and [`GeneralKUncertaintyAlgorithm`](@ref).
+
+The sample must be the estimation **error**, not the estimate. Under normality the centred Mahalanobis distance is a chi-squared variate, so this algorithm and [`ChiSqKUncertaintyAlgorithm`](@ref) then compute the same radius two ways and must agree — on a 252-by-20 sample they give ``5.5989`` and ``5.6045``. Feeding the raw estimates instead makes the distance **non-central**, which inflates the radius by the whole non-centrality: ``7.3876`` on that same sample, at ``T \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}} = 16.17``.
+
+# Mathematical definition
+
+```math
+k = \\sqrt{Q_{1-q}\\!\\left(\\left\\{ \\boldsymbol{\\delta}^{(m)\\intercal} \\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}^{-1} \\boldsymbol{\\delta}^{(m)} \\right\\}_{m=1}^{M}\\right)}\\,.
+```
+
+Where:
+
+  - ``\\boldsymbol{\\delta}^{(m)}``: The ``m``-th sampled estimation error, a row of the `X` argument of [`k_ucs`](@ref).
+  - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}``: Shape matrix of the ellipsoid.
+  - ``Q_{1-q}``: The `1 - q` quantile function.
+  - ``M``: Number of samples.
 
 # Fields
 
@@ -528,6 +653,10 @@ NormalKUncertaintyAlgorithm
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 11.3.2.
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
     """
@@ -545,7 +674,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the ellipsoidal uncertainty set scaling parameter `k` as `sqrt((1 - q) / q)`. This general formula ignores the distribution of the underlying data.
+Computes the ellipsoid radius `k` as `sqrt((1 - q) / q)`, the closed form that holds for any distribution of the estimation errors.
+
+It is the second branch of Equation 11.23 of the source, and it reads neither the data nor the shape matrix. Use [`ChiSqKUncertaintyAlgorithm`](@ref) instead when the errors are normal, because the chi-squared radius is the tighter one there.
+
+# Mathematical definition
+
+```math
+k = \\sqrt{\\dfrac{1 - q}{q}}\\,.
+```
+
+Where:
+
+  - ``q``: Significance level.
 
 # Related
 
@@ -553,12 +694,31 @@ Computes the ellipsoidal uncertainty set scaling parameter `k` as `sqrt((1 - q) 
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.23.
+  - $(ref_dict[:fabozzi2007])
 """
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using the chi-squared distribution in portfolio optimisation.
+Computes the ellipsoid radius `k` as the square root of the `1 - q` chi-squared quantile, the closed form that holds when the estimation errors are normal.
+
+The degrees of freedom is the dimension of the ellipsoid, which the shape matrix carries. It is ``N`` on the mean axis and ``N^{2}`` on the covariance axis, so the same algorithm gives a different radius on each. It is the first branch of Equation 11.23 of the source.
+
+# Mathematical definition
+
+```math
+k = \\sqrt{\\chi^{2,\\,-1}_{p}(1 - q)}\\,, \\qquad p = \\operatorname{size}(\\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}, 1)\\,.
+```
+
+Where:
+
+  - ``\\chi^{2,\\,-1}_{p}``: Inverse cumulative distribution function of the chi-squared distribution with ``p`` degrees of freedom.
+  - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}``: Shape matrix of the ellipsoid.
+  - ``q``: Significance level.
 
 # Related
 
@@ -566,39 +726,42 @@ Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty se
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.23.
+  - $(ref_dict[:fabozzi2007])
 """
 struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
     k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
     k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum)
     k_ucs(type::Number, args...)
 
-Computes the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
+Compute the radius `k` of an ellipsoidal uncertainty set at significance level `q`.
 
 # Arguments
 
   - `km`: Scaling algorithm instance.
-  - `q`: Quantile or confidence level.
-  - `X`: Data matrix (returns).
-  - `sigma_X`: Covariance matrix.
-  - `args...`: Additional arguments.
+  - `q`: Significance level.
+  - `X`: Matrix of estimation errors, one row per sample. Each row is a deviation from the point estimate, not the estimate itself.
+  - `sigma_X`: Shape matrix of the ellipsoid. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis.
+  - `args...`: Additional arguments, which the algorithms that need no sample absorb.
   - `type`: Number value for direct scaling.
 
 # Returns
 
-  - `k::Number`: Scaling parameter.
+  - `k::Number`: Radius of the ellipsoid.
 
 # Details
 
-  - Uses different algorithms to compute the scaling parameter:
+Each algorithm reads a different source. The two closed forms are the two branches of Equation 11.23 of [cajas2025](@cite), and the two simulated routes are its empirical counterpart:
 
-      + Normal: `1 - q`-th quantile of the Mahalanobis distances.
-      + General: formula `sqrt((1 - q) / q)`.
-      + Chi-squared: `1 - q`-th quantile of the chi-squared distribution.
-      + Number: returns the provided value directly.
-
-  - Supports multiple dispatch for extensibility.
+  - [`NormalKUncertaintyAlgorithm`](@ref): the square root of the `1 - q` quantile of the Mahalanobis distances `diag(X * inv(sigma_X) * X')` of the sampled estimation errors. It assumes nothing about the law of the errors, so it is the route the bootstrap family uses.
+  - [`GeneralKUncertaintyAlgorithm`](@ref): the distribution-free closed form `sqrt((1 - q) / q)`.
+  - [`ChiSqKUncertaintyAlgorithm`](@ref): the square root of the `1 - q` quantile of a chi-squared distribution whose degrees of freedom is `size(sigma_X, 1)`, the dimension of the ellipsoid. This route runs no simulation, so it ignores the sample container.
+  - `Number`: returns the provided value directly.
 
 # Related
 
@@ -606,6 +769,11 @@ Computes the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 11.3.2.
+  - $(ref_dict[:fabozzi2007])
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
     k_mus = LinearAlgebra.diag(X * (sigma_X \ transpose(X)))
@@ -614,8 +782,11 @@ end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
-    return sqrt(Distributions.cquantile(Distributions.Chisq(size(X, 1)), q))
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum)
+    # The degrees of freedom is the dimension of the ellipsoid, which the shape matrix
+    # carries: N on the mean axis, N^2 on the covariance axis. The sample container is
+    # unused, because this route runs no simulation.
+    return sqrt(Distributions.cquantile(Distributions.Chisq(size(sigma_X, 1)), q))
 end
 function k_ucs(type::Number, args...)::Number
     return type
@@ -623,8 +794,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for constructing ellipsoidal uncertainty sets in portfolio optimisation.
-Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal region for risk or prior statistics, typically using a covariance matrix and a scaling parameter.
+Selects an ellipsoidal uncertainty set, and carries the radius algorithm and the diagonal switch it needs.
+
+Its sibling [`BoxUncertaintySetAlgorithm`](@ref) selects the box instead. The ellipsoid reads the correlation between the entries it bounds through its shape matrix, which `diagonal = true` discards to remove the noise in the off-diagonal estimation errors.
 
 # Fields
 
@@ -655,6 +827,10 @@ EllipsoidalUncertaintySetAlgorithm
   - [`AbstractUncertaintyKAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 11.3.2.
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -677,9 +853,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the abstract interface for ellipsoidal uncertainty set result classes in portfolio optimisation.
+Names the axis an [`EllipsoidalUncertaintySet`](@ref) lives on, which fixes the dimension of its shape matrix.
 
-Subtypes of this abstract type represent the class or category of ellipsoidal uncertainty sets, such as those for mean or covariance statistics. Used to distinguish between different types of ellipsoidal uncertainty set results.
+The family has exactly two inhabitants, and both ship. A consumer dispatches on the tag, because a mean ellipsoid and a covariance ellipsoid are the same struct with shape matrices of different size.
+
+# Interfaces
+
+A subtype is a tag that carries no field and declares no method of its own.
 
 # Related
 
@@ -690,9 +870,9 @@ abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaint
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the class identifier for mean ellipsoidal uncertainty sets in portfolio optimisation.
+Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the mean axis, where the shape matrix is ``N \\times N``.
 
-Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for mean statistics, such as expected returns.
+The tag is what the consumers dispatch on. `port_opt_view` slices such a set with the plain asset index, and the robust-return builder refuses a set that carries the covariance tag instead.
 
 # Related
 
@@ -703,9 +883,9 @@ struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultCla
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the class identifier for covariance ellipsoidal uncertainty sets in portfolio optimisation.
+Tags an [`EllipsoidalUncertaintySet`](@ref) as living on the covariance axis, where the shape matrix is ``N^{2} \\times N^{2}``.
 
-Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for covariance statistics, such as covariance matrices.
+The tag is what the consumers dispatch on. `port_opt_view` maps the asset index through the fourth-moment index generator before it slices the shape matrix, because the ellipsoid bounds a vectorised covariance.
 
 # Related
 
@@ -716,8 +896,9 @@ struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResult
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents an ellipsoidal uncertainty set for risk or prior statistics in portfolio optimisation.
-Stores a covariance matrix, a scaling parameter, and a class identifier for the uncertain quantity, such as expected returns or covariance.
+Holds the shape matrix, the radius, and the axis tag of an ellipsoidal uncertainty set on a mean vector or on a covariance matrix.
+
+An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carries the correlation between the entries it bounds. Its worst case is Equation 11.25 on the mean axis and Equation 11.26 on the covariance axis of the source, and both are second-order cones.
 
 # Mathematical definition
 
@@ -785,6 +966,11 @@ EllipsoidalUncertaintySet
   - [`AbstractUncertaintySetResult`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.22.
+  - $(ref_dict[:fengpalomar2016])
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
     """

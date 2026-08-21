@@ -338,3 +338,70 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                                                                   :, 1)),
                     1.4 * Skewness()([1], reshape(pr0.X[:, end - 1], :, 1)); rtol = 5e-3)
 end
+
+# A covariance or correlation view carries its operator through a sign flip, and its
+# coefficient through both sides of the row. Until #379 the flip reached only the
+# `mu_i * mu_j` term, so a `>=` view targeted the NEGATED value and was vacuous against a
+# prior that already sat above it; and the coefficient reached only the left-hand side, so
+# a view whose coefficient was not one landed off target. Both are read off the posterior
+# matrix, never off a residual the solver reports.
+@testset "Covariance and correlation view operators and coefficients" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    rho0 = StatsBase.cov2cor(pr0.sigma)
+    ep_rho(v) = StatsBase.cov2cor(prior(EntropyPoolingPrior(; sets = sets,
+                                                            rho_views = LinearConstraintEstimator(;
+                                                                                                  val = v)),
+                                        rd).sigma)
+    ep_cov(v) = prior(EntropyPoolingPrior(; sets = sets,
+                                          cov_views = LinearConstraintEstimator(; val = v)),
+                      rd).sigma
+
+    # The prior correlation of AAPL and XOM is 0.3364, so a `>=` view above it has to move
+    # the posterior and a `<=` view below it has to move it the other way. A correlation is a
+    # ratio of two covariances, so the `T / (T - 1)` factor of the recomputed `pr.sigma`
+    # cancels and the posterior lands on the target itself.
+    @test rho0[1, end] < 0.45
+    @test isapprox(ep_rho("(AAPL, XOM) >= 0.45")[1, end], 0.45, rtol = 5e-5)
+    @test isapprox(ep_rho("(AAPL, XOM) == 0.45")[1, end], 0.45, rtol = 5e-5)
+    @test rho0[1, end] > 0.2
+    @test isapprox(ep_rho("(AAPL, XOM) <= 0.2")[1, end], 0.2, rtol = 5e-5)
+
+    # The coefficient scales both sides, so these two views are the same view.
+    @test isapprox(ep_rho("2*(AAPL, XOM) >= 0.9")[1, end],
+                   ep_rho("(AAPL, XOM) >= 0.45")[1, end], rtol = 5e-5)
+
+    # The covariance twin of each check. A covariance is not a ratio, so the constraint pins
+    # the UNCORRECTED weighted second moment and `pr.sigma` reports the corrected one: the
+    # posterior lands exactly `T / (T - 1)` above the target.
+    T = size(pr0.X, 1)
+    bessel = T / (T - 1)
+    tgt = pr0.sigma[13, 14] * 1.5
+    @test pr0.sigma[13, 14] < tgt
+    @test isapprox(ep_cov("(MSFT, PEP) >= $(tgt)")[13, 14], tgt * bessel, rtol = 1e-5)
+    @test isapprox(ep_cov("2*(MSFT, PEP) >= $(2 * tgt)")[13, 14],
+                   ep_cov("(MSFT, PEP) >= $(tgt)")[13, 14], rtol = 5e-5)
+
+    # A view naming two groups sets EVERY pair the groups span, on the same scale as the
+    # single-asset view. Until #379 the group branch scaled by the Frobenius norm of the
+    # VARIANCE products, which is neither a per-pair scale nor a standard deviation, so a
+    # correlation target of 0.3 landed three orders of magnitude below it.
+    gsets = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => sets.dict[sets.xkey],
+                                     "gA" => sets.dict[sets.xkey][1:2],
+                                     "gX" => fill(sets.dict[sets.xkey][end], 2)))
+    rg = StatsBase.cov2cor(prior(EntropyPoolingPrior(; sets = gsets,
+                                                     rho_views = LinearConstraintEstimator(;
+                                                                                           val = "(gA, gX) == 0.3")),
+                                 rd).sigma)
+    @test isapprox(rg[1, end], 0.3, rtol = 5e-4)
+    @test isapprox(rg[2, end], 0.3, rtol = 5e-4)
+end
+
+# `sc2` bounds the slack of the relaxed fixed equalities, so a negative value inverts the
+# box. `JuMPEntropyPooling` has always rejected it; `OptimEntropyPooling` documented the
+# same rule and never checked it (#379).
+@testset "OptimEntropyPooling validates sc2" begin
+    @test_throws DomainError OptimEntropyPooling(; sc2 = -1)
+    @test_throws DomainError OptimEntropyPooling(; sc1 = -1)
+    @test OptimEntropyPooling(; sc2 = 0).sc2 == 0
+end
