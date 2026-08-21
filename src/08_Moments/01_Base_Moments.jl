@@ -411,6 +411,8 @@ Given that these are meant to be used by expected returns estimators, there are 
 
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
+  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """

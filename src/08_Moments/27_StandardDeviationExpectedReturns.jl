@@ -85,16 +85,16 @@ This method returns the standard deviation vector of `X` as estimated by the cov
 
 ```math
 \\begin{align}
-\\hat{\\mu}_j &= \\hat{\\sigma}_j = \\sqrt{\\frac{1}{T-c} \\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j^{(0)})^2}\\,.
+\\hat{\\mu}_j &= \\hat{\\sigma}_j = \\sqrt{\\hat{\\mathbf{\\Sigma}}_{jj}}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\hat{\\mu}_j``: Expected return proxy of asset ``j``.
   - ``\\hat{\\sigma}_j``: Standard deviation of asset ``j``.
-  - ``c``: Bias correction (``c = 1`` if `corrected = true`, else ``c = 0``).
-  - ``T``: Number of observations.
-  - ``w_t``: Observation weights.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Covariance matrix that `me.ce` estimates.
+  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 
@@ -111,9 +111,14 @@ Where:
 
   - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
+# Details
+
+  - The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
+
 # Related
 
   - [`StandardDeviationExpectedReturns`](@ref)
+  - [`std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
@@ -203,6 +208,21 @@ Compute expected returns as the variance of each asset.
 
 This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mu}_j &= \\hat{\\sigma}_j^2 = \\hat{\\mathbf{\\Sigma}}_{jj}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mu}_j``: Expected return proxy of asset ``j``.
+  - ``\\hat{\\sigma}_j^2``: Variance of asset ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Covariance matrix that `me.ce` estimates.
+  - ``\\hat{\\mathbf{\\Sigma}}_{jj}``: ``j``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
+
 # Arguments
 
   - `me`: Variance expected returns estimator.
@@ -218,9 +238,14 @@ This method returns the variance vector of `X` as estimated by the covariance es
 
   - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
+# Details
+
+  - The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
+
 # Related
 
   - [`VarianceExpectedReturns`](@ref)
+  - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)

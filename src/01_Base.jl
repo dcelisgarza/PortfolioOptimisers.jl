@@ -81,6 +81,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :corrected => "`corrected`: Whether to apply Bessel's correction.",#
                                  :mutgt => "`tgt`: Shrinkage target.",#
                                  :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
+                                 :me_cval => "`val`: Custom expected returns value.\n\n  - If a scalar, every asset is assigned this value.\n  - If a vector, each element is one asset's value.\n  - If a callable, it is called as `val(X; dims = dims, kwargs...)` and must return one value per asset.",#
                                  :metric => "`metric`: Distance metric used for pairwise computations.",#
                                  :metric_args => "`args`: Additional positional arguments for the distance metric.",#
                                  :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
@@ -924,7 +925,11 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :mad => "[mad](@cite) H. Konno and H. Yamazaki. *Mean-absolute deviation portfolio optimization model and its applications to Tokyo stock market*. Management Science 37, 519–531 (1991).",#
                                  :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#
                                  :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
-                                 :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).")
+                                 :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
+                                 :meucci2005 => "[meucci2005](@cite) A. Meucci. *Risk and Asset Allocation* (Springer Berlin Heidelberg, 2005).",#
+                                 :jorion1986 => "[jorion1986](@cite) P. Jorion. *Bayes-Stein estimation for portfolio analysis*. The Journal of Financial and Quantitative Analysis 21, 279–292 (1986).",#
+                                 :bodnar2019 => "[bodnar2019](@cite) T. Bodnar, O. Okhrin and N. Parolya. *Optimal shrinkage estimator for high-dimensional mean vector*. Journal of Multivariate Analysis 170, 63–79 (2019).",#
+                                 :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).")
 
 """
 $(DocStringExtensions.TYPEDEF)

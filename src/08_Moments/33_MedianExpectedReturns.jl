@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Expected returns estimator that returns the optionally weighted asset medians.
+Computes the expected returns as the per-asset median of the asset returns.
+
+`w` carries optional observation weights. If `w` is `nothing`, the median is unweighted. The median resists an outlier that would move the sample mean.
 
 # Fields
 
@@ -14,6 +16,10 @@ $(DocStringExtensions.FIELDS)
     ) -> MedianExpectedReturns
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -30,7 +36,10 @@ MedianExpectedReturns
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`Option`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 @propagatable @concrete struct MedianExpectedReturns <: AbstractExpectedReturnsEstimator
     """
@@ -57,6 +66,8 @@ computes a weighted median for each asset using the observation weights `w`.
 
 # Mathematical definition
 
+Unweighted:
+
 ```math
 \\begin{align}
 \\hat{\\mu}_j &= \\mathrm{median}(r_{1j}, r_{2j}, \\ldots, r_{Tj})\\,.
@@ -68,6 +79,27 @@ Where:
   - ``\\hat{\\mu}_j``: Median expected return of asset ``j``.
   - ``r_{tj}``: Return of asset ``j`` at time ``t``.
   - $(math_dict[:T])
+
+Weighted. The weighted median is the `StatsBase` weighted quantile at probability ``1/2``, which **interpolates between two order statistics**. Order the returns of asset ``j`` so that ``r_{(1)j} \\leq \\ldots \\leq r_{(T)j}``, and let ``w_{(t)}`` be the weight that travels with each one:
+
+```math
+\\begin{align}
+S_m &= \\sum_{t=1}^{m} w_{(t)}\\,, \\\\
+h &= \\frac{1}{2} \\left( \\sum_{t=1}^{T} w_t - w_{(1)} \\right) + w_{(1)}\\,, \\\\
+k &= \\max \\left\\lbrace m : S_m \\leq h \\right\\rbrace\\,, \\\\
+\\hat{\\mu}_j &= r_{(k)j} + \\frac{h - S_k}{S_{k+1} - S_k} \\left( r_{(k+1)j} - r_{(k)j} \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_t``: Observation weight at time ``t``.
+  - ``w_{(t)}``: Weight of the ``t``-th smallest return, so the weights are permuted with the returns.
+  - ``r_{(t)j}``: ``t``-th smallest return of asset ``j``.
+  - ``S_m``: Cumulative weight of the ``m`` smallest returns.
+  - ``h``: Cumulative weight that the probability ``1/2`` corresponds to.
+
+The result is therefore not in general one of the observed returns. Under equal weights it reduces to the ordinary median.
 
 # Arguments
 
@@ -87,6 +119,7 @@ Where:
 # Related
 
   - [`MedianExpectedReturns`](@ref)
+  - [`Statistics.median`](https://juliastats.org/StatsBase.jl/stable/robust/)
 """
 function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::Int = 1,
                          kwargs...)

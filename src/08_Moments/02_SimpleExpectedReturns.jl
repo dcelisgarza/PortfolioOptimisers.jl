@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
+Computes the expected returns as the sample mean of the asset returns.
 
-`SimpleExpectedReturns` is the standard estimator for computing expected returns as the possibly weighted mean of asset returns.
+`w` carries optional observation weights. If `w` is `nothing`, the mean is unweighted. This is the default expected returns estimator throughout the library.
 
 # Fields
 

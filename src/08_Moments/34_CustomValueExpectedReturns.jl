@@ -47,7 +47,9 @@ const CER_Func_Num_VecNum = Union{<:CustomExpectedReturnsValueAlgorithm, <:Func_
 """
 $(DocStringExtensions.TYPEDEF)
 
-Expected returns estimator that returns custom values for each asset.
+Returns a caller-supplied value for each asset instead of estimating one from the data.
+
+`val` holds a scalar, a per-asset vector, or a callable that the estimator calls with the data matrix.
 
 # Fields
 
@@ -61,6 +63,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `val` is a vector, `!isempty(val)`.
+
 # Examples
 
 ```jldoctest
@@ -72,11 +78,13 @@ CustomValueExpectedReturns
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`CER_Func_Num_VecNum`](@ref)
+  - [`CustomExpectedReturnsValueAlgorithm`](@ref)
+  - [`assert_custom_expected_returns_val`](@ref)
 """
 @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
     """
-    Custom value.\n  - If a scalar, all assets are assigned this value.\n    - If a vector, each element corresponds to an asset.\n    - If a function, it is called with the full `X` matrix and `dims`, with additional keyword arguments passed through.
+    $(field_dict[:me_cval])
     """
     val
     function CustomValueExpectedReturns(val::CER_Func_Num_VecNum)
@@ -117,15 +125,24 @@ Where:
   - `me`: Custom value expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments. The callable branch passes them to `me.val`; the other two branches ignore them.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - The vector branch and the callable branch both check the value against the number of assets with [`assert_custom_expected_returns_val`](@ref).
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Expected returns matrix, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu`: Expected returns, one value per asset. The shape depends on the branch.
+
+      + `me.val::Number` and `me.val::VecNum`: A `Matrix{<:Number}`, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`, as the other expected returns estimators return.
+      + `me.val::Function` and `me.val::CustomExpectedReturnsValueAlgorithm`: The vector the callable returned, of length `N`, passed through unchanged. This branch inserts no dimension.
 
 # Related
 
   - [`CustomValueExpectedReturns`](@ref)
+  - [`assert_custom_expected_returns_val`](@ref)
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:Number}, X::MatNum; dims::Int = 1,
                          kwargs...)
@@ -145,14 +162,14 @@ Both the vector field of [`CustomValueExpectedReturns`](@ref) and the value retu
   - `N`: Number of assets implied by the data matrix and `dims`.
   - `val_sym`: Symbolic name used in the error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `isa(val, VecNum)`.
   - `length(val) == N`.
+
+# Returns
+
+  - `nothing`.
 
 # Details
 
