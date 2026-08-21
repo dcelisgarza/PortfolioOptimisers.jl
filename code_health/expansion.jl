@@ -14,9 +14,14 @@
 # only the residue that the declaration cannot bound. It loads the package, so it costs about 80
 # seconds against the complexity measurement's five.
 
-include(joinpath(@__DIR__, "CodeHealth.jl"))
+# `code_health/triage.jl` includes this file into a module of its own, so the include happens once
+# and always into `Main`. CodeHealth must be ONE module rather than three: a `Definition` built by a
+# second copy would not be the same type as one built by the first.
+if !(isdefined(Main, :CodeHealth))
+    Main.include(joinpath(@__DIR__, "CodeHealth.jl"))
+end
 
-using .CodeHealth
+using Main.CodeHealth
 using CodeComplexity, Pkg, TOML
 using PortfolioOptimisers
 
@@ -195,5 +200,10 @@ function publish(m)
     return nothing
 end
 
-exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
-                           render = render, publish = publish))
+# The scheduled job of ADR 0078 reuses this file's `measure` rather than carrying a second copy
+# of it, so the command line runs only when this file is the program. `code_health/triage.jl`
+# includes it into a module of its own and calls `measure` directly.
+if abspath(PROGRAM_FILE) == @__FILE__
+    exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
+                               render = render, publish = publish))
+end

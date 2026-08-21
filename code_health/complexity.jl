@@ -9,9 +9,14 @@
 # It writes `code_health/complexity_baseline.toml`. CodeComplexity is a pure JuliaSyntax parser, so
 # this script loads no package under measurement and costs about five seconds.
 
-include(joinpath(@__DIR__, "CodeHealth.jl"))
+# `code_health/triage.jl` includes this file into a module of its own, so the include happens once
+# and always into `Main`. CodeHealth must be ONE module rather than three: a `Definition` built by a
+# second copy would not be the same type as one built by the first.
+if !(isdefined(Main, :CodeHealth))
+    Main.include(joinpath(@__DIR__, "CodeHealth.jl"))
+end
 
-using .CodeHealth
+using Main.CodeHealth
 using CodeComplexity, JuliaSyntax, Pkg, TOML
 
 const NAME = "complexity_baseline.toml"
@@ -67,7 +72,7 @@ end
 struct FileNumbers
     max::Dict{String, Int}
     sum::Dict{String, Int}
-    definitions::Dict{String, Vector{Pair{String, Int}}}
+    definitions::Dict{String, Vector{CodeHealth.Definition}}
     macros::Vector{String}
 end
 
@@ -81,12 +86,13 @@ function measure()
     numbers = Dict{String, FileNumbers}()
     for f in files
         mx, sm = Dict{String, Int}(), Dict{String, Int}()
-        defs = Dict{String, Vector{Pair{String, Int}}}()
+        defs = Dict{String, Vector{CodeHealth.Definition}}()
         for (key, metric) in METRICS
             fns = measure_file(metric, joinpath(CodeHealth.REPO_ROOT, f)).functions
             mx[key] = isempty(fns) ? 0 : maximum(fn -> fn.value, fns)
             sm[key] = sum(fn -> fn.value, fns; init = 0)
-            defs[key] = [fn.name => fn.value for fn in fns]
+            defs[key] = [CodeHealth.Definition(String(fn.name), fn.value, fn.line)
+                         for fn in fns]
         end
         marker = sort!(collect(intersect(CodeHealth.called_macros(f), decl)))
         numbers[f] = FileNumbers(mx, sm, defs, marker)
@@ -127,7 +133,7 @@ function candidacy_failures(file, numbers::FileNumbers, rulings)
     bad = String[]
     for (key, limit) in limits
         exempt = CodeHealth.exempt_definitions(rulings, key)
-        vals = [v for (n, v) in numbers.definitions[key] if !((file, n) in exempt)]
+        vals = [d.value for d in numbers.definitions[key] if !((file, d.name) in exempt)]
         value = isempty(vals) ? 0 : maximum(vals)
         if value > limit
             push!(bad,
@@ -249,5 +255,10 @@ function publish(m)
     return nothing
 end
 
-exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
-                           render = render, publish = publish))
+# The scheduled job of ADR 0078 reuses this file's `measure` rather than carrying a second copy
+# of it, so the command line runs only when this file is the program. `code_health/triage.jl`
+# includes it into a module of its own and calls `measure` directly.
+if abspath(PROGRAM_FILE) == @__FILE__
+    exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
+                               render = render, publish = publish))
+end

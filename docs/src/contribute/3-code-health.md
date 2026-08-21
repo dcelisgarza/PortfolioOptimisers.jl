@@ -35,9 +35,9 @@ however high a number already stands. See
 `docs/adr/0076-the-code-health-pass-rule-is-a-ratchet.md`.
 
 Because the ratchet enforces no improvement, a **scheduled job** files the work. Every Monday it
-looks for files above a threshold, ranks them, and opens up to five issues at a time under the
-`code-health` label. It files each file once, so the queue is finite and it paces itself to what
-gets closed. See
+looks for files above a threshold, ranks them, and tops the `code-health` label up to **five open
+issues**. The cap is on the open count rather than on one run, so the queue paces itself to what
+gets closed. It files each file once, so the queue is also finite. See
 `docs/adr/0078-the-scheduled-job-files-a-file-once-and-refiles-it-on-a-rise.md`.
 
 !!! tip "Your pull request went red and you have no `code-health` issue"
@@ -213,7 +213,9 @@ number returns to the queue rather than becoming permanent.
 ## When to stop
 
 **The loop terminates on its own.** The scheduled job files each file once, so the queue is finite
-at roughly 30 issues and then the job goes quiet. You do not need to decide when the whole effort
+and then the job goes quiet. It stands at 80 files today: 30 above a complexity threshold and 73
+carrying a JET report no Dismissal covers, with 23 in both groups. It shrinks as Dismissals land,
+because a dismissed report stops making its file a candidate. You do not need to decide when the whole effort
 is over. You only decide when *one* issue is over.
 
 One issue is over when it reaches one of the three committed states in step 5. If the number could

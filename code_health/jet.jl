@@ -14,9 +14,14 @@
 # included, and no number is ever summed, so the four Plots-extension reports that attribute back
 # into `src/` cannot double count. ADR 0073.
 
-include(joinpath(@__DIR__, "CodeHealth.jl"))
+# `code_health/triage.jl` includes this file into a module of its own, so the include happens once
+# and always into `Main`. CodeHealth must be ONE module rather than three: a `Definition` built by a
+# second copy would not be the same type as one built by the first.
+if !(isdefined(Main, :CodeHealth))
+    Main.include(joinpath(@__DIR__, "CodeHealth.jl"))
+end
 
-using .CodeHealth
+using Main.CodeHealth
 using Pkg, TOML
 
 # The load set, loaded before anything measures. `report_package`'s number moves with it: 315
@@ -89,8 +94,8 @@ them ending in `Base_compiler.jl`, which throws away a defect in package code wh
 ends inside a dependency. Keying on the **shallowest** frame piles hundreds of reports onto the few
 entry points, so the per-file key stops localising anything. ADR 0073.
 """
-function attribute(report)
-    hit = nothing
+function attribute_frame(report)
+    hit, line = nothing, 0
     for frame in report.vst
         path = String(frame.file)
         rel = if startswith(path, CodeHealth.REPO_ROOT)
@@ -98,10 +103,12 @@ function attribute(report)
         else
             path
         end
-        CodeHealth.in_scope(rel) && (hit = rel)
+        CodeHealth.in_scope(rel) && ((hit, line) = (rel, Int(frame.line)))
     end
-    return hit
+    return hit, line
 end
+
+attribute(report) = attribute_frame(report)[1]
 
 report_kind(report) = String(nameof(typeof(report)))
 
@@ -149,20 +156,25 @@ function measure()
     dismissed = dismissal_set(rulings)
     files = filter(CodeHealth.in_scope, CodeHealth.tracked_jl_files())
     runs = Pair{String, Any}[]
+    reviewed = Dict(f => CodeHealth.Reviewed[] for f in files)
     unattributed = String[]
     for (run, which) in RUNS
         target = which === :package ? PortfolioOptimisers : target_module(which)
         result = JET.report_package(target; target_modules = (JET.AnyFrameModule(target),))
         counts = Dict(f => Dict("raw" => 0, "reviewed" => 0) for f in files)
         for report in JET.get_reports(result)
-            file, kind, message = fingerprint(report)
+            file, line = attribute_frame(report)
+            kind, message = report_kind(report), report_message(report)
             if file === nothing
                 push!(unattributed, "$run: $kind: $message")
                 continue
             end
             row = counts[file]
             row["raw"] += 1
-            (file, kind, message) in dismissed || (row["reviewed"] += 1)
+            if !((file, kind, message) in dismissed)
+                row["reviewed"] += 1
+                push!(reviewed[file], CodeHealth.Reviewed(run, kind, message, line))
+            end
         end
         push!(runs, run => counts)
     end
@@ -171,7 +183,7 @@ function measure()
               "nowhere to be recorded and the gate would lose them silently:\n" *
               join(first(unattributed, 10), "\n"))
     end
-    return (; files, runs, provenance = provenance())
+    return (; files, runs, reviewed, provenance = provenance())
 end
 
 function provenance()
@@ -346,5 +358,10 @@ function publish(m)
     return nothing
 end
 
-exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
-                           render = render, publish = publish))
+# The scheduled job of ADR 0078 reuses this file's `measure` rather than carrying a second copy
+# of it, so the command line runs only when this file is the program. `code_health/triage.jl`
+# includes it into a module of its own and calls `measure` directly.
+if abspath(PROGRAM_FILE) == @__FILE__
+    exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
+                               render = render, publish = publish))
+end

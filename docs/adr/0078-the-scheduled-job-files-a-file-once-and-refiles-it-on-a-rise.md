@@ -12,9 +12,9 @@ so without a second mechanism no number ever falls.
 
 The job runs against a tracker that already carries several live wayfinder maps, so its noise is
 the design problem. **38** of the 196 files in scope stand above at least one threshold today, and
-**30** remain once the 17 constructor Exemptions drop. JET adds 1 to 10 files with a suspected real
-finding. A job that files every offender every week would post all of them in its first run and
-repost them every Monday after that.
+**30** remain once the 17 constructor Exemptions drop. **73** more carry a JET report that no
+Dismissal covers. The union is **80** files. A job that files every offender every week would post
+all of them in its first run and repost them every Monday after that.
 
 ## Decision
 
@@ -56,6 +56,22 @@ live distribution never terminates, which is the same reason a percentile was re
 The numbers live as data in a committed configuration file rather than as literals in the job's
 script, so a change is one reviewed line.
 
+### Candidacy re-measures, and only the refile clause reads a committed number
+
+The job measures the tree itself. It has no choice for candidacy: an Exemption is dropped **before**
+the file's maximum is taken, and a baseline row records the maximum alone, so the per-definition
+numbers an Exemption keys on exist in no committed file. The same run supplies the rest of the body,
+which the baseline also does not carry — the worst definitions by name and line, and the reports by
+kind and site.
+
+The refile clause below is the one place a committed number is read, because the number a file
+carried at a **past** commit exists nowhere else. The two sources agree whenever the baseline is
+current, and the loop keeps it current: an issue closes on a commit, and one of the three closing
+commits is a refreshed baseline.
+
+The cost is one full JET measurement per run, so the job runs about as long as `JET.yml`. It is
+weekly, and it buys a job that never files a file whose number has already fallen.
+
 ### The cap is on the open count
 
 ```text
@@ -82,8 +98,13 @@ count 12 are not the same distance past their own thresholds.
 ### Deduplication searches `state:all`, so a file is filed once
 
 The search is `label:code-health state:all` plus the exact path in the title. Any match, open or
-closed, means skip. **This rule bounds the noise, not the cap and not the cadence.** The lifetime
-total is therefore about **30** issues, after which the job goes quiet.
+closed, means skip. **This rule bounds the noise, not the cap and not the cadence.**
+
+The lifetime total is the candidate pool: **80** files, measured by a dry run of the job on
+`ce5abb6e0f`. Most of them are JET-only, and most of those reports belong to the single systematic
+class the loop expects to close with a Dismissal rather than a fix. The pool shrinks as Dismissals
+land, because a dismissed report stops making its file a candidate — but only for a file the job
+has not yet filed. So the number falls fastest if the first Dismissals land early.
 
 ### A rise since the last issue closed refiles the file
 

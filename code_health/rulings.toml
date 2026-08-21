@@ -7,6 +7,7 @@
 # The four sections, and what each one binds:
 #
 #   [thresholds]        which files the scheduled job files as work. Never the pass rule.
+#   [scheduled_job]     how many of them stand open at once.
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
@@ -31,6 +32,15 @@ cyclomatic = 10
 cognitive = 15
 argcount = 10
 jet_reviewed = 1
+
+# --- the scheduled job -----------------------------------------------------
+#
+# ADR 0078 caps the OPEN count rather than the count of one run. A per-run cap is blind to
+# throughput, so an unworked backlog would grow at a fixed rate. This cap is self-limiting: if five
+# stand open the job files nothing, and the queue paces itself to what actually closes.
+
+[scheduled_job]
+open_queue = 5
 
 # --- unmeasured paths ------------------------------------------------------
 #

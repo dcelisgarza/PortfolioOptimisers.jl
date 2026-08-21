@@ -12,7 +12,45 @@ module CodeHealth
 
 using TOML
 
-export Rise, RefreshRefused, run_script
+export Definition, Reviewed, Rise, RefreshRefused, run_script
+
+# --- what one measurement says about one definition -------------------------
+#
+# The two record types below are the vocabulary the measuring scripts and the scheduled job share.
+# They live here rather than in the script that fills them because `code_health/triage.jl` reads
+# both, and a type is only one type when one module defines it.
+
+"""
+    Definition
+
+One definition, as `code_health/complexity.jl` measures it and the scheduled job reports it. ADR
+0078 asks the issue body for the worst definitions **by name and line**, so the line is carried
+through the measurement rather than measured a second time. Nothing here reaches a baseline file: a
+row records the maximum and the sum alone.
+"""
+struct Definition
+    name::String
+    value::Int
+    line::Int
+end
+
+"""
+    Reviewed
+
+One JET report that survived the Dismissals, as `code_health/jet.jl` measures it and the scheduled
+job reports it: the run it came from, its kind, its message, and the line of the frame the
+attribution chose.
+
+ADR 0078 asks the issue body for the reports **by kind and site**. The line is a reader's
+convenience and is never part of the Report Fingerprint, which ADR 0071 keys on the file, the kind
+and the message alone.
+"""
+struct Reviewed
+    run::String
+    kind::String
+    message::String
+    line::Int
+end
 
 # --- paths and scope -------------------------------------------------------
 

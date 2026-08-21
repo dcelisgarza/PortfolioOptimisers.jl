@@ -27,3 +27,4 @@ __pycache__/
 # The Refresh Artifact is staged here by a failing check and uploaded by CI. It is never
 # committed; the contributor puts the downloaded file at its committed path instead.
 code_health/_refresh/
+code_health/_triage/

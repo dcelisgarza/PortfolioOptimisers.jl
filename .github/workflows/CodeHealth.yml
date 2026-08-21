@@ -1,0 +1,123 @@
+name: Code health
+
+# The scheduled job of ADR 0078. It re-measures the tree, finds the files that stand above a
+# threshold, and opens one issue per file under the `code-health` label.
+#
+# It is NOT the gate. `Complexity.yml` and `JET.yml` are the ratchet: they ask whether a number has
+# risen, and they block a merge. This job asks whether a number can fall, and it blocks nothing.
+#
+# The division of labour is deliberate. The ratchet is green the day it lands and stays green
+# however high a number already stands, so without this job no number would ever fall.
+#
+# Every decision the job makes lives in `code_health/triage.jl`, which a person can run and read.
+# This file does two things around it: it asks the tracker what already exists, and it opens what
+# the plan names. It reuses the gate's own measuring scripts rather than a second copy of them.
+
+on:
+  schedule:
+    # Monday, 06:00 UTC. ADR 0078.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would be opened, and open nothing.'
+        type: boolean
+        default: true
+
+# `issues: write` is the one capability the gate does not have, and it is the reason this job is a
+# separate workflow rather than a third job on `Complexity.yml`. It needs no `contents: write`: the
+# refile clause of ADR 0078 READS git history and writes nothing back.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    # A fork never files into anybody's tracker. A scheduled workflow does run on a fork once it is
+    # enabled there, and `GITHUB_TOKEN` on a fork carries `issues: write` for the FORK, so without
+    # this guard a fork would quietly open this repository's backlog in its own tracker. The guard
+    # is on the job rather than on the create step, so a fork spends no runner minutes at all.
+    if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    steps:
+      # The job measures `dev`, because `dev` is where the work lands and where the committed
+      # baseline is current. The workflow file itself must reach `main` for the schedule to fire at
+      # all, which is GitHub's rule and not a choice here.
+      #
+      # `fetch-depth: 0` is REQUIRED, not a precaution. ADR 0078's refile clause reads a file's
+      # baseline row at the last commit before an issue closed, and a shallow clone reaches no such
+      # commit, so the job would silently never refile.
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Read the Julia pin from the Manifest
+        id: pin
+        run: |
+          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The code-health gate is pinned to Julia $v."
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      - name: Instantiate the gate's environment
+        run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
+      # The deduplication rule of ADR 0078 searches `state:all`, so a CLOSED issue is as much a
+      # match as an open one. That rule, not the cap and not the cadence, is what bounds the noise.
+      # The dump is a tab-separated line per issue, which needs no JSON parser on the Julia side.
+      - name: Dump the code-health issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p code_health/_triage
+          gh issue list --label code-health --state all --limit 500 \
+             --json number,state,closedAt,title \
+             --template '{{range .}}{{.number}}{{"\t"}}{{.state}}{{"\t"}}{{.closedAt}}{{"\t"}}{{.title}}{{"\n"}}{{end}}' \
+             > code_health/_triage/existing.tsv
+          echo "The tracker holds $(wc -l < code_health/_triage/existing.tsv) code-health issue(s)."
+      # About sixteen minutes: the complexity measurement is seconds and JET's three
+      # `report_package` calls are the rest. Weekly, so the cost is bounded.
+      - name: Plan the issues
+        run: julia --project=code_health code_health/triage.jl --existing code_health/_triage/existing.tsv
+      # The plan is the same whether or not it is posted, so a dry run exercises the real code path
+      # and leaves it unposted. There is no second rendering to drift.
+      - name: Open the issues
+        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The ranking's first key is whether a file carries a reviewed JET report. `triage.jl`
+          # writes READY only when JET actually ran, so a half-measured plan can never be filed.
+          if [ ! -f code_health/_triage/READY ]; then
+            echo "::error::The plan was measured without JET, so it must not be filed."
+            exit 1
+          fi
+          count=0
+          for t in code_health/_triage/[0-9][0-9].title; do
+            [ -e "$t" ] || break
+            b="${t%.title}.body"
+            url=$(gh issue create --label code-health \
+                    --title "$(cat "$t")" --body-file "$b")
+            echo "Opened $url"
+            count=$((count + 1))
+          done
+          echo "Opened $count issue(s)."
+      - name: Report the dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Dry run. Nothing was opened."
+          cat code_health/_triage/manifest.tsv || true
+      # The plan is kept so a dry run can be read in full. It carries no secret: every line of it
+      # was measured from the public tree.
+      - name: Publish the plan
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-health-plan
+          path: code_health/_triage/
+          if-no-files-found: ignore
