@@ -1,9 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Settings type for configuring risk measures that expose a lower bound (maximisation direction).
+Weights a risk measure inside an aggregate, and bounds its risk expression from **below**.
 
-Encapsulates scaling, lower bounds, and risk evaluation flags for risk measures such as [`Skewness`](@ref) that are maximised in optimisation routines. The `lb` field holds an optional lower bound on the risk expression; when set, the optimiser enforces the risk is at least that value.
+This is the settings type of a quantity the optimisation wants **more** of, so its bound is a floor rather than a ceiling — the shape of the return floor ``\\bar{\\mu}`` in Equation 8.7 of the reference below. [`Skewness`](@ref) is its one holder, and a stated `lb` reaches the model only through [`VarianceSkewKurtosis`](@ref), where that skewness term is built: `Skewness` is a [`NonOptimisationRiskMeasure`](@ref), so no optimiser takes it on its own. On a 250x5 sample the bound binds at the value stated — `1e-9`, `1e-8` and `5e-8` realised `1.0000006e-9`, `1.0000009e-8` and `5.0000003e-8`, each above the unconstrained optimum of `-6.16e-9`.
+
+Unlike the `ub` of [`RiskMeasureSettings`](@ref), `lb` is **not** validated. A negative floor is meaningful here and works: `lb = -1e-8` returns the unconstrained `-6.1627e-9`, which satisfies it. An empty vector is meaningful to nobody, and it constructs — [#402](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/402).
 
 # Fields
 
@@ -38,7 +40,13 @@ MaxRiskMeasureSettings
   - [`JuMPRiskMeasureSettings`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`Skewness`](@ref)
+  - [`VarianceSkewKurtosis`](@ref)
   - [`Frontier`](@ref)
+  - [`set_variance_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.1, Equation 8.7.
 """
 @concrete struct MaxRiskMeasureSettings <: JuMPRiskMeasureSettings
     """

@@ -469,7 +469,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all risk measure settings.
 
-Defines the interface for settings types that configure the behavior of risk measure estimators. All concrete risk measure settings types should subtype `AbstractRiskMeasureSettings` to ensure consistency and composability within the optimisation framework.
+A settings object carries the three things a risk measure needs that are not part of the risk itself: the combination weight `scale`, whether the measure contributes to the model's risk expression (`rke`), and the bound the optimiser enforces on the measure's own expression. All concrete risk measure settings types should subtype `AbstractRiskMeasureSettings`.
+
+# Interfaces
+
+In order to implement a new concrete settings type, subtype `AbstractRiskMeasureSettings` and give it these fields:
+
+## Required fields
+
+  - `scale::Number`: Combination weight, read by [`set_risk_expression!`](@ref) and by the value-level readers.
+  - `rke::Bool`: Whether the measure contributes to the model's aggregate risk expression.
+
+## Optional field
+
+  - A bound field. [`RiskMeasureSettings`](@ref) names it `ub` and bounds the expression from above; [`MaxRiskMeasureSettings`](@ref) names it `lb` and bounds it from below. [`HierarchicalRiskMeasureSettings`](@ref) has none, because a clustering optimiser builds no model to bound.
 
 # Related
 
@@ -497,7 +510,26 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for bound-transformation strategies applied to efficient frontier bounds.
 
-Concrete subtypes control how numeric bound values are transformed before being applied to JuMP risk expressions. All subtypes should subtype `FrontierBoundEstimator`.
+A bound and the risk expression it bounds are not always in the same units. A concrete subtype names the conversion between them, and it is used twice: once on a stated bound value, and once on each end of a [`Frontier`](@ref) sweep span. Because the span is transformed before it is divided, the sweep points are evenly spaced in the units of the **expression**, not in the units of the measure.
+
+# Interfaces
+
+In order to implement a new bound transformation, subtype `FrontierBoundEstimator` and implement:
+
+## Required method name
+
+  - `variance_risk_bounds_val(bound::MyBound, ub::Num_VecNum)`: Convert a stated bound into the units of the risk expression.
+
+### Arguments
+
+  - `bound`: The bound-transformation instance.
+  - `ub`: The bound value the caller stated.
+
+### Returns
+
+  - The converted bound, in the units of the risk expression.
+
+The [`Frontier`](@ref) arm of `variance_risk_bounds_val` is generic and needs no method. The sweep applies the same transformation to both ends of its span in [`rebuild_risk_frontier`](@ref), which reads `bound` off the `Frontier` and branches on it there.
 
 # Related
 
@@ -513,7 +545,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a square-root transformation to bound values before enforcing them.
 
-Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations).
+Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units: on a 250x5 sample a five-point sweep gave standard deviations `0.004539514, 0.005969048, 0.007398587, 0.008828127, 0.010257666`, evenly spaced to `4.1e-9`, whose squares are the variances `2.0607e-5, 3.5630e-5, 5.4739e-5, 7.7936e-5, 1.0522e-4`, which are **not** evenly spaced.
 
 # Related
 
@@ -556,7 +588,11 @@ struct SquaredBound <: FrontierBoundEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the number of points on the efficient frontier (Pareto Front).
+Sweeps the efficient frontier by solving the model once at each of `N` evenly spaced bound values.
+
+Stand this in a risk measure's bound slot instead of a number. The optimisation then reads the span off two corner portfolios, divides it into `N` levels, and returns one portfolio per level. The corners are a minimum-risk solve and a maximum-return solve, so the span covers the whole attainable range of the bound.
+
+The levels are evenly spaced in the units of the **risk expression** the bound is applied to, which `bound` names, and not in the units of the measure. See [`SquareRootBound`](@ref) for the case where the two differ.
 
 # Fields
 
@@ -601,6 +637,11 @@ Frontier
   - [`SquareRootBound`](@ref)
   - [`SquaredBound`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Sections 8.2.1 and 8.2.2, Equations 8.7 and 8.10.
 """
 @concrete struct Frontier <: AbstractAlgorithm
     """
@@ -631,22 +672,28 @@ end
 """
     _Frontier(; N = 20, factor, bound)
 
-Construct a range of N evenly-spaced frontier parameter values.
+Build a [`Frontier`](@ref) whose `factor` and `bound` a formulation chose, rather than the caller.
 
-Internal helper that generates a parameter grid (e.g., for risk bounds) used when sweeping the efficient frontier.
+The keyword constructor `Frontier(; N, bound)` pins `factor` to `1`, because a caller states a bound in the units of the measure and knows nothing of the model's internal scaling. A formulation does know: it reads the caller's `Frontier`, keeps its `N`, and rebuilds it with the conversion its own risk expression needs. That is what [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref) do.
+
+This builds a `Frontier`, not the sweep values. The values are built later, in [`rebuild_risk_frontier`](@ref), once the two corner portfolios are known: `bound` transforms each end of the span, `factor` multiplies both, and `range` divides the result into `N` levels.
 
 # Arguments
 
-  - `N`: Number of frontier points (default 20).
-  - `factor`: Scaling factor for the range.
-  - `bound`: Controls whether to sweep from min-to-max or max-to-min.
+  - `N`: Number of sweep points (default 20).
+  - `factor`: Multiplier applied to both ends of the span, after `bound` has transformed them.
+  - `bound`: [`FrontierBoundEstimator`](@ref) converting the span into the units of the risk expression.
 
 # Returns
 
-  - Vector of frontier parameter values.
+  - `Frontier`: The rebuilt sweep specification.
 
 # Related
 
+  - [`Frontier`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+  - [`second_moment_bound_val`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
   - [`MeanRisk`](@ref)
   - [`NearOptimalCentering`](@ref)
 """
@@ -682,8 +729,9 @@ const Front_NumVec = Union{<:VecNum, <:Frontier}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Settings type for configuring risk measure estimators.
-Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures used in optimisation routines.
+Weights a risk measure inside an aggregate, and bounds its risk expression from above.
+
+This is the settings type of every measure the optimiser minimises. `ub` is the maximum level of risk the solution may reach, the ``\\bar{\\phi}`` of Equation 8.10 of the reference below; sweeping it is how the book builds an efficient frontier, which is what a [`Frontier`](@ref) in that slot does. `scale` weights the measure against its siblings when several are given, and `rke` decides whether it reaches the aggregate at all.
 
 # Fields
 
@@ -720,6 +768,12 @@ RiskMeasureSettings
   - [`RiskMeasure`](@ref)
   - [`Frontier`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.2, Equation 8.10.
 """
 @concrete struct RiskMeasureSettings <: JuMPRiskMeasureSettings
     """
@@ -748,9 +802,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Settings type for configuring hierarchical risk measure estimators.
+Weights a hierarchical risk measure inside an aggregate, and carries no bound.
 
-Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper bound.
+A clustering optimiser computes each cluster's risk as a number rather than building one model over the whole universe, so there is no risk expression for a bound to constrain and no `ub` field to hold one. `scale` is the only setting a [`HierarchicalRiskMeasure`](@ref) has, and it means what it means everywhere else: the measure's weight against its siblings when several are given.
 
 # Fields
 
@@ -855,10 +909,50 @@ A scalariser is read at two levels, and they are not equally permissive.
 
 So a `HierarchicalScalariser` on a value-level call is not a misuse, and the word "hierarchical" in the subtype name describes which estimators accept it rather than where the number is meaningful.
 
+## The weights are the measures' own `scale`
+
+Every strategy below is a **weighted** aggregation, and it reads its weights from one place: the `scale` field of each measure's settings. Both levels apply it before the strategy runs — the model in [`set_risk_expression!`](@ref), which pushes `scale * r_expr`, and the value level in [`expected_risk`](@ref), which multiplies each element by `r.settings.scale`. Stating it once here is why no strategy below carries a weight vector of its own.
+
+## Two of the three model forms are exact only while the objective pushes
+
+[`SumScalariser`](@ref) builds an expression, so the model agrees with the value level whatever the objective is. The other two build a **variable** bounded below by the aggregation, and a minimising objective is what pulls it down onto the aggregation. Under [`MaximumReturn`](@ref) nothing pulls, so `model[:risk]` reports an upper bound: on a 250x5 sample [`MaxScalariser`](@ref) reported `0.0782482` against a true `0.0380465`, and [`LogSumExpScalariser`](@ref) at `gamma = 100` reported `0.0612520` against a true `0.0440182`.
+
+The bound the model **enforces** is unaffected. An `ub` on the aggregate constrains the variable, and the variable stands above the aggregation, so the aggregation satisfies the bound too. It is the reported figure that stands above it, and reading the aggregate back from [`expected_risk`](@ref) gives the exact one.
+
+# Interfaces
+
+In order to implement a new scalarisation strategy, subtype [`NonHierarchicalScalariser`](@ref) when the aggregation has a convex `JuMP` form and [`HierarchicalScalariser`](@ref) when it does not, then implement:
+
+## Required method name
+
+  - `scalarise(f, sca::MyScalariser, itr; by = nothing)`: Combine the per-measure values `f` returns into one.
+
+### Arguments
+
+  - `f`: Per-element evaluation closure.
+  - `sca`: The strategy instance.
+  - `itr`: Iterable of risk measures.
+  - `by`: Optional selection key, for a strategy that picks one element rather than combining all of them.
+
+### Returns
+
+  - The combined value, with the same shape as the values `f` returns.
+
+## Required for a `NonHierarchicalScalariser`
+
+  - `scalarise_risk_expression!(model::JuMP.Model, sca::MyScalariser)`: Collapse the model's `risk_vec` array into the single `risk` expression. A [`HierarchicalScalariser`](@ref) declares no such method, which is what the split means.
+
 # Related
 
   - [`NonHierarchicalScalariser`](@ref)
   - [`HierarchicalScalariser`](@ref)
+  - [`scalarise`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
+  - $(ref_dict[:diamondboyd2016]) The `cvxpy.transforms.scalarize` module, which this family ports.
 """
 abstract type Scalariser <: AbstractEstimator end
 """
@@ -898,9 +992,11 @@ abstract type HierarchicalScalariser <: Scalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that combines multiple risk measures using a weighted sum.
+Adds the scaled risk measures together.
 
-`SumScalariser` aggregates a vector of risk measures by computing the weighted sum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). This scalarisation strategy is used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+This is the default everywhere a `sca` keyword appears, and the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation. On a 250x5 sample the model and [`expected_risk`](@ref) agreed to `3.6e-9` relative.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -923,14 +1019,22 @@ Where:
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
+  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.weighted_sum`.
 """
 struct SumScalariser <: NonHierarchicalScalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that selects the risk expression whose scaled value is the largest.
+Reports the largest of the scaled risk measures, so the aggregate is the worst of them.
 
-`MaxScalariser` aggregates a vector of risk measures by selecting the maximum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+The model form is a free variable held above every entry of `risk_vec`, which the objective then pushes down onto the largest. Under a minimum-risk objective on a 250x5 sample the model and [`expected_risk`](@ref) agreed to `2.1e-7` relative; under a maximum-return objective on the same sample the model reported `0.0782482` against a true `0.0380465`, which is the shared caveat in [`Scalariser`](@ref). In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -953,16 +1057,24 @@ Where:
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
+  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.max`.
 """
 struct MaxScalariser <: NonHierarchicalScalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that selects the risk expression whose scaled value is the smallest.
+Reports the smallest of the scaled risk measures, so the aggregate is the mildest of them.
 
-`MinScalariser` aggregates a vector of risk measures by selecting the minimum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+It is this library's own extension: the source family carries a weighted sum, a maximum and a log-sum-exp, and no minimum. In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
 
 It is the one [`HierarchicalScalariser`](@ref), because minimising a minimum is not convex and a `JuMP` optimiser cannot build it. That bound is the **model's**: at the value level the measures are already numbers, so `MinScalariser` is admitted by every `sca` keyword and every `sca` result field there, on equal footing with the other three.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -990,11 +1102,9 @@ struct MinScalariser <: HierarchicalScalariser end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scalariser that aggregates multiple risk measures using the log-sum-exp function.
+Smooths the maximum of the scaled risk measures, so every measure keeps a share of the aggregate.
 
-`LogSumExpScalariser` combines a vector of risk measures by applying the log-sum-exp transformation to their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref).
-
-The parameter `gamma` controls the approximation accuracy to the maximum function: as `gamma → 0`, the function approaches the weighted sum; as `gamma → ∞`, it approaches the maximum. This behaviour is only true in `JuMP`-based optimisations. In clustering optimisations, each cluster's risk is computed separately, so there is no coherence between clusters.
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -1008,7 +1118,29 @@ Where:
   - ``i``: Subscript denoting the `i`-th risk measure.
   - ``r_i``: `i`-th risk measure value.
   - ``w_i``: Weight of the `i`-th risk measure.
-  - ``\\gamma``: Positive parameter controlling the interpolation between the weighted sum and the maximum functions.
+  - ``\\gamma``: Positive parameter setting how close the aggregate runs to the maximum.
+
+## What `gamma` does
+
+The aggregate is never below the maximum and never more than ``\\log N / \\gamma`` above it:
+
+```math
+\\begin{align}
+\\underset{i \\in (1,\\,N)}{\\max} \\left(w_i \\cdot r_i\\right) \\leq \\phi &\\leq \\underset{i \\in (1,\\,N)}{\\max} \\left(w_i \\cdot r_i\\right) + \\frac{\\log N}{\\gamma}\\,.
+\\end{align}
+```
+
+So a large ``\\gamma`` gives the maximum. On the scaled values `[0.1, 0.2, 0.05]`, ``\\gamma = 100`` returns `0.20000046` against a maximum of `0.2`, inside the bound ``\\log 3 / 100 = 0.010986``. In a model at ``\\gamma = 100`` under a minimum-risk objective the model and [`expected_risk`](@ref) agreed to `4.1e-9` relative, and under a maximum-return objective the model reported `0.0612520` against a true `0.0440182` — the shared caveat in [`Scalariser`](@ref).
+
+!!! warning
+
+    A small ``\\gamma`` does **not** give the weighted sum. The same three values return `1098.73` at ``\\gamma = 0.001``, against a weighted sum of `0.35`. The bound above shows why: the aggregate never falls below the maximum, and ``\\log N / \\gamma`` diverges. What survives is the shape — subtracting that divergent term leaves `0.11666861`, the weighted **mean** `0.11666667`. An additive constant does not move a minimiser, so the *portfolio* a small ``\\gamma`` selects tends to the weighted sum's, while the *number* reported does not. The model degenerates first: with the risks near `1e-2` and the objective near ``\\log 2``, a two-measure model at ``\\gamma = 1`` already failed to solve.
+
+!!! warning
+
+    The model form is an exponential cone, which cannot hold a quadratic risk expression. Both [`Variance`](@ref) formulations produce one, so a `Variance` under this scalariser aborts the solve with `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}}`. Use [`StandardDeviation`](@ref) instead, or [`SumScalariser`](@ref), which sums a quadratic expression directly. Nothing refuses the combination up front.
+
+In clustering optimisations each cluster's risk is computed separately, so there is no coherence between clusters, and the value level has no cone to build: it evaluates the measures first and reduces the numbers, where a large ``\\gamma`` is safe because `LogExpFunctions.logsumexp` shifts by the maximum before it exponentiates.
 
 # Fields
 
@@ -1042,6 +1174,12 @@ LogSumExpScalariser
   - [`MinScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:boydvandenberghe2004]) The log-sum-exp function and its bound on the maximum.
+  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.log_sum_exp`.
 """
 @concrete struct LogSumExpScalariser <: NonHierarchicalScalariser
     """
