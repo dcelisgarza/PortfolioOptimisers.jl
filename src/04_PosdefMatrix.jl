@@ -98,6 +98,11 @@ Posdef
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
   - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
+
+# References
+
+  - $(ref_dict[:higham2002])
+  - $(ref_dict[:qisun2006])
 """
 @concrete struct Posdef <: AbstractPosdefEstimator
     """
@@ -153,7 +158,7 @@ For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\math
 
 # Validation
 
-  - `X` is validated with [`assert_matrix_issquare`](@ref).
+  - `X` is validated with [`assert_matrix_issquare`](@ref). The check runs after the early return, so it is reached only when `X` is not already positive definite.
 
 # Returns
 
@@ -162,10 +167,9 @@ For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\math
 # Details
 
   - If `pdm` is `::Nothing`, or `X` is already positive definite, the function returns `X` without modification.
-  - If `X` is already positive definite, it is left unchanged.
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
-  - If the algorithm fails to converge, a warning is emitted.
+  - If the projected matrix is still not positive definite, a warning is emitted. The matrix is returned either way.
   - If `X` is not a correlation matrix, it is converted back.
   - Returns `X`.
 

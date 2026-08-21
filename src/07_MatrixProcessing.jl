@@ -66,6 +66,8 @@ Processing matrix in-place...
 
   - [`AbstractEstimator`](@ref)
   - [`MatrixProcessing`](@ref)
+  - [`matrix_processing!`](@ref)
+  - [`matrix_processing`](@ref)
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
@@ -137,6 +139,8 @@ Applying custom matrix processing algorithm in-place...
 
   - [`AbstractAlgorithm`](@ref)
   - [`MatrixProcessing`](@ref)
+  - [`matrix_processing_algorithm!`](@ref)
+  - [`matrix_processing_algorithm`](@ref)
 """
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 """
@@ -144,7 +148,7 @@ abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 
 No-op fallback for matrix processing algorithm routines.
 
-These methods are called internally when no matrix processing algorithm is specified (i.e., when the algorithm argument is `nothing`). They perform no operation and return `nothing`, ensuring that the matrix processing pipeline can safely skip optional algorithmic steps.
+These methods are called internally when no matrix processing algorithm is specified (i.e., when the algorithm argument is `nothing`). They perform no operation and return `sigma` unchanged, so the matrix processing pipeline can safely skip optional algorithmic steps.
 
 # Arguments
 
@@ -200,6 +204,10 @@ $(DocStringExtensions.FIELDS)
     ) -> MatrixProcessing
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - Every symbol in `order` names a field of `MatrixProcessing` other than `order` itself, so it is one of `:pdm`, `:dn`, `:dt` and `:alg`. An unrecognised symbol throws at construction.
 
 # Examples
 

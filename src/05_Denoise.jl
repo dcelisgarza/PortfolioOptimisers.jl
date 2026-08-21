@@ -132,24 +132,30 @@ abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by setting the smallest `num_factors` eigenvalues to zero. This removes the principal components that random matrix theory attributes to noise.
+Denoises by setting the smallest `num_factors` eigenvalues to zero. This removes the principal components that random matrix theory attributes to noise, then rescales the reconstruction back to unit diagonal.
 
 # Mathematical definition
 
-Let ``\\mathbf{V}`` be the eigenvector matrix and ``\\boldsymbol{\\lambda}`` the eigenvalues sorted ascending. For ``k`` noise eigenvalues (``\\lambda_i \\leq \\lambda_+``):
+Let ``\\mathbf{V}`` be the eigenvector matrix and ``\\boldsymbol{\\lambda}`` the eigenvalues sorted ascending. The noise eigenvalues (``\\lambda_i \\leq \\lambda_+``) are set to zero, the matrix is rebuilt from the signal components alone, and the result is rescaled to unit diagonal:
 
 ```math
 \\begin{align}
-\\tilde{\\mathbf{X}} &= \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal\\,.
+\\mathbf{C}_{\\mathrm{signal}} &= \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal\\,, \\\\
+\\tilde{X}_{ij} &= \\frac{(C_{\\mathrm{signal}})_{ij}}{\\sqrt{(C_{\\mathrm{signal}})_{ii} \\, (C_{\\mathrm{signal}})_{jj}}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\tilde{\\mathbf{X}}``: Denoised matrix (signal-only reconstruction).
+  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
+  - ``\\mathbf{C}_{\\mathrm{signal}}``: Signal-only reconstruction.
   - ``\\mathbf{V}_{\\mathrm{signal}}``: Eigenvector matrix of the signal components.
   - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues (``\\lambda_i > \\lambda_+``).
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+
+# Details
+
+  - The rescaling is not cosmetic. Discarding the noise eigenvalues shrinks the diagonal of ``\\mathbf{C}_{\\mathrm{signal}}`` below one, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``(C_{\\mathrm{signal}})_{11} = 0.7180`` and ``(C_{\\mathrm{signal}})_{12} = 0.7817``, against ``\\tilde{X}_{11} = \\tilde{X}_{12} = 1``.
 
 # Constructors
 
@@ -177,15 +183,17 @@ struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by replacing the smallest `num_factors` eigenvalues with their average. This flattens the principal components that random matrix theory attributes to noise, rather than discarding them.
+Denoises by replacing the smallest `num_factors` eigenvalues with their average. This flattens the principal components that random matrix theory attributes to noise, rather than discarding them, then rescales the reconstruction back to unit diagonal.
 
 # Mathematical definition
 
-Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replaced by their mean ``\\bar{\\lambda}_\\text{noise}``:
+Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replaced by their mean ``\\bar{\\lambda}_\\text{noise}``, the matrix is rebuilt from the flattened spectrum, and the result is rescaled to unit diagonal:
 
 ```math
 \\begin{align}
-\\tilde{\\lambda}_i &= \\begin{cases} \\bar{\\lambda}_\\text{noise} & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}\\,.
+\\tilde{\\lambda}_i &= \\begin{cases} \\bar{\\lambda}_\\text{noise} & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}\\,, \\\\
+\\mathbf{C} &= \\mathbf{V} \\, \\mathrm{Diag}(\\tilde{\\boldsymbol{\\lambda}}) \\, \\mathbf{V}^\\intercal\\,, \\\\
+\\tilde{X}_{ij} &= \\frac{C_{ij}}{\\sqrt{C_{ii} C_{jj}}}\\,.
 \\end{align}
 ```
 
@@ -194,7 +202,14 @@ Where:
   - ``\\tilde{\\lambda}_i``: Denoised ``i``-th eigenvalue.
   - ``\\lambda_i``: Original ``i``-th eigenvalue.
   - ``\\bar{\\lambda}_\\text{noise}``: Mean of the noise eigenvalues.
+  - ``\\mathbf{V}``: Eigenvector matrix of the input.
+  - ``\\mathbf{C}``: Reconstruction from the flattened spectrum.
+  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+
+# Details
+
+  - Flattening the noise eigenvalues preserves the trace but not the diagonal, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``C_{11} = 0.9715`` and ``C_{12} = 0.7524``, against ``\\tilde{X}_{11} = 1`` and ``\\tilde{X}_{12} = 0.7280``.
 
 # Constructors
 
@@ -222,25 +237,35 @@ struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Denoises by shrinking the smallest `num_factors` eigenvalues towards the diagonal. The shrinkage parameter `alpha` interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), giving a flexible way to regularise noisy eigenvalues.
+Denoises by shrinking the off-diagonal part of the noise block towards zero, keeping its diagonal whole. `alpha` is the weight kept on that off-diagonal part, so `alpha = 0` is total shrinkage and `alpha = 1` returns the input unchanged.
 
 # Mathematical definition
 
-Noise eigenvalues are shrunk towards the diagonal of the correlation matrix:
+The spectrum is split at the Marčenko-Pastur upper bound. The signal block is rebuilt whole, and only the off-diagonal part of the noise block is scaled by ``\\alpha``:
 
 ```math
 \\begin{align}
-\\tilde{\\lambda}_i &= (1 - \\alpha) \\lambda_i + \\alpha \\, X_{ii}, \\quad \\lambda_i \\leq \\lambda_+\\,.
+\\mathbf{C}_{\\mathrm{signal}} &= \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal\\,, \\\\
+\\mathbf{C}_{\\mathrm{noise}} &= \\mathbf{V}_{\\mathrm{noise}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{noise}}) \\, \\mathbf{V}_{\\mathrm{noise}}^\\intercal\\,, \\\\
+\\tilde{\\mathbf{X}} &= \\mathbf{C}_{\\mathrm{signal}} + \\alpha \\mathbf{C}_{\\mathrm{noise}} + (1 - \\alpha) \\, \\mathrm{Diag}(\\mathbf{C}_{\\mathrm{noise}})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\tilde{\\lambda}_i``: Shrunk ``i``-th eigenvalue.
-  - ``\\lambda_i``: Original ``i``-th noise eigenvalue (``\\lambda_i \\leq \\lambda_+``).
-  - ``\\alpha \\in [0, 1]``: Shrinkage intensity (``0`` = no shrinkage, ``1`` = full shrinkage).
-  - ``X_{ii}``: ``i``-th diagonal entry of the correlation matrix.
+  - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
+  - ``\\mathbf{C}_{\\mathrm{signal}}``: Reconstruction from the signal eigenpairs (``\\lambda_i > \\lambda_+``).
+  - ``\\mathbf{C}_{\\mathrm{noise}}``: Reconstruction from the noise eigenpairs (``\\lambda_i \\leq \\lambda_+``).
+  - ``\\mathbf{V}_{\\mathrm{signal}}``, ``\\mathbf{V}_{\\mathrm{noise}}``: The matching eigenvector blocks.
+  - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``, ``\\boldsymbol{\\lambda}_{\\mathrm{noise}}``: The matching eigenvalues.
+  - ``\\alpha \\in [0, 1]``: Weight kept on the off-diagonal part of the noise block. ``\\alpha = 0`` keeps only its diagonal, which is total shrinkage. ``\\alpha = 1`` keeps the block whole, so ``\\tilde{\\mathbf{X}} = \\mathbf{X}``.
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+
+The two ``\\alpha`` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic. The diagonal is pinned to one afterwards to shed the eigendecomposition round-off.
+
+# Details
+
+  - The polarity of `alpha` is the reverse of the reading its name suggests, and the default `alpha = 0.0` is therefore total shrinkage. On a 24x8 standard normal sample where every eigenvalue is noise, the off-diagonal mass of the input is `9.4205`; `alpha = 0.0` gives `0.0`, `alpha = 0.5` gives `4.7102`, and `alpha = 1.0` gives `9.4205`, which reproduces the input to `1.4e-15`.
 
 # Fields
 
@@ -533,8 +558,8 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 # Details
 
   - Minimises the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
-  - Uses the minimiser and effective sample ratio to compute the maximum feasable noise eigenvalue.
-  - Returns the maximum feasable noise eigenvalue.
+  - Uses the minimiser and effective sample ratio to compute the maximum feasible noise eigenvalue.
+  - Returns the maximum feasible noise eigenvalue.
 
 # Related
 
@@ -612,12 +637,12 @@ Where:
   - If `dn` is `::Nothing`, the function returns `X` without modification.
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Performs an eigenvector decomposition of `X`.
-  - Uses the Marčenko-Pastur distribution to compute the maximum feasable noise eigenvalue.
+  - Uses the Marčenko-Pastur distribution to compute the maximum feasible noise eigenvalue.
 
 Eigenvalues ``\\lambda \\leq \\lambda_+`` are classified as noise and processed by `dn.alg`.
 
   - Applies the denoising algorithm to `X` in `dn.alg` via [`_denoise!`](@ref) to the eigenvalues which are below this value.
-  - Applies the positive definite projection to `X` in `dn.pdm` via [`denoise!`](@ref).
+  - Applies the positive definite projection in `dn.pdm` to `X` via [`posdef!`](@ref).
   - If `X` was not originally a correlation matrix, it is converted back.
   - Returns `X`.
 

@@ -2190,6 +2190,13 @@ In order to implement a new vector-to-scalar measure that works seamlessly with 
   - [`MeanValue`](@ref)
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
+  - [`StdValue`](@ref)
+  - [`VarValue`](@ref)
+  - [`SumValue`](@ref)
+  - [`ProdValue`](@ref)
+  - [`ModeValue`](@ref)
+  - [`StandardisedValue`](@ref)
+  - [`Num_VecToScaM`](@ref)
   - [`CentralityConstraint`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
@@ -2197,19 +2204,24 @@ abstract type VectorToScalarMeasure <: AbstractAlgorithm end
 """
     const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 
-Union type representing either a numeric value or a `VectorToScalarMeasure`.
+Union type representing a numeric value, a `VectorToScalarMeasure`, or a `Function`.
 
-This type is used to allow functions and fields to accept both plain numbers and objects that implement the `VectorToScalarMeasure` interface, providing flexibility in handling scalar and vector-to-scalar computations.
+This type lets functions and fields accept all three, so a caller can give a fixed number, an object that implements the `VectorToScalarMeasure` interface, or a plain reduction function. [`vec_to_real_measure`](@ref) returns a `Number` unchanged, dispatches a `VectorToScalarMeasure` to its reduction, and applies a `Function` to the vector.
 
 # Related
 
   - [`VectorToScalarMeasure`](@ref)
+  - [`vec_to_real_measure`](@ref)
 """
 const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its minimum.
+
+# Constructors
+
+    MinValue() -> MinValue
 
 # Examples
 
@@ -2248,9 +2260,9 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
-## Curried parameters
+## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -2288,6 +2300,10 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted median.
 
+# Details
+
+  - The weighted case is not an order statistic. `Statistics.median(val, w)` is the weighted 0.5-quantile, so it **interpolates** between the two values that bracket half the weight mass. On `[1.0, 2.0, 3.0, 4.0]` with weights `[0.1, 0.2, 0.3, 0.4]` the result is `2.8333`, which is not an element of the input. The unweighted case, `w = nothing`, is the ordinary median and gives `2.5`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -2304,9 +2320,9 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
-## Curried parameters
+## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -2343,6 +2359,10 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its maximum.
+
+# Constructors
+
+    MaxValue() -> MaxValue
 
 # Examples
 
@@ -2382,9 +2402,9 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
-## Curried parameters
+## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -2443,9 +2463,9 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
-## Curried parameters
+## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -2487,6 +2507,10 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its sum.
 
+# Constructors
+
+    SumValue() -> SumValue
+
 # Examples
 
 ```jldoctest
@@ -2506,6 +2530,10 @@ struct SumValue <: VectorToScalarMeasure end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its product.
+
+# Constructors
+
+    ProdValue() -> ProdValue
 
 # Examples
 
@@ -2527,6 +2555,10 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its mode.
 
+# Constructors
+
+    ModeValue() -> ModeValue
+
 # Examples
 
 ```jldoctest
@@ -2547,6 +2579,28 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+z &= \\frac{\\hat{\\mu}}{\\tilde{\\sigma}}\\,, \\\\
+\\tilde{\\sigma} &= \\begin{cases} \\sqrt{\\varepsilon} & \\hat{\\sigma} = 0 \\\\ \\hat{\\sigma} & \\hat{\\sigma} \\neq 0 \\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``z``: Standardised value.
+  - ``\\hat{\\mu}``: The value computed by `mv`.
+  - ``\\hat{\\sigma}``: The value computed by `sv`, taken about ``\\hat{\\mu}``.
+  - ``\\tilde{\\sigma}``: The guarded denominator.
+  - ``\\varepsilon``: Machine epsilon of the element type of ``\\hat{\\sigma}``.
+
+# Details
+
+  - `sv` receives ``\\hat{\\mu}`` as its `mean` keyword, so the standard deviation is always taken about the mean that `mv` produced. Weighting `mv` without weighting `sv` therefore changes the denominator too.
+  - The guard fires on an **exact** zero only, not on a small denominator. On the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -2560,7 +2614,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-## Curried parameters
+## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
@@ -2600,7 +2654,11 @@ function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValu
     return StandardisedValue(mv, sv)
 end
 """
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
+    vec_to_real_measure(
+        measure::Num_VecToScaM,
+        val::Union{<:VecNum, NTuple{N, <:Number} where {N}};
+        kwargs...
+    ) -> Number
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -2608,12 +2666,23 @@ Reduce a vector of real values to a single real value using a specified measure.
 
 # Arguments
 
-  - `measure`: An instance of a concrete subtype of [`VectorToScalarMeasure`](@ref), or the predefined value to return.
-  - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
+  - `measure`: One of three things.
+
+      + `::VectorToScalarMeasure`: The reduction to apply to `val`.
+      + `::Number`: The value to return, whatever `val` holds.
+      + `::Function`: Applied to `val` directly, as `measure(val)`.
+
+  - `val`: A vector or tuple of real values to be reduced. It is ignored when `measure` is a `Number`.
+
+  - `kwargs...`: Forwarded to the underlying reduction. Only the [`StdValue`](@ref) and [`VarValue`](@ref) reductions read them.
 
 # Returns
 
   - `score::Number`: Computed value according to `measure`.
+
+# Details
+
+  - A tuple is accepted wherever a vector is. The weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` beside its weights.
 
 # Examples
 

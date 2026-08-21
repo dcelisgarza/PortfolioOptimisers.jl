@@ -15,3 +15,10 @@ Posdef
 posdef!
 posdef
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
