@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Distance-of-distances estimator for portfolio optimization.
+Measures how differently two assets relate to the whole universe, by applying a metric to a distance matrix.
 
-`DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a distance algorithm, allowing you to compute a "distance of distances" matrix. If `power` is not `nothing`, it computes the generalised distance matrix, which is then used to compute the distances of distances matrix.
+Two assets are close under this estimator when their *columns* of the base distance matrix are close — that is, when they stand at similar distances from every other asset. This is a second-order reading: it can separate two assets that are equally far apart under [`Distance`](@ref) but occupy different positions in the universe. It wraps a metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) around a base [`Distance`](@ref) built from `power` and `alg`.
 
 !!! note
 
@@ -20,8 +20,10 @@ Distance-of-distances estimator for portfolio optimization.
 Where:
 
   - ``_{g}\\tilde{d}_{i,\\,j}``: General distance of distances between assets ``i`` and ``j``.
-  - ``_{g}\\boldsymbol{D}_{i}``: Row ``i`` of the generalised distance matrix (see [`AbstractDistanceAlgorithm`](@ref)).
-  - ``\\lVert \\cdot \\rVert``: Metric used to compute the distance of distances.
+  - ``_{g}\\boldsymbol{D}_{i}``: Column ``i`` of the generalised distance matrix (see [`AbstractDistanceAlgorithm`](@ref)).
+  - ``\\lVert \\cdot \\rVert``: Metric used to compute the distance of distances, `metric`.
+
+The source states this at the default `metric`, the Euclidean norm. A base distance matrix is symmetric, so the column and the row give the same answer.
 
 # Fields
 
@@ -55,11 +57,24 @@ DistanceDistance
      alg ┴ SimpleDistance()
 ```
 
+!!! warning "The default metric leaves the unit interval"
+
+    The Euclidean norm of two columns of a bounded distance matrix is not itself bounded by `1`. On a 6-asset sample two thirds of the off-diagonal entries exceeded `1`, and the largest was `1.3946164799008962`.
+
+    [`ComplementSimilarity`](@ref) is therefore out of domain against this estimator's own default, and [`assert_similarity_domain`](@ref) refuses the pair on the PMFG path. Use [`ExponentialSimilarity`](@ref) or [`GeneralExponentialSimilarity`](@ref), which have no domain.
+
 # Related
 
-  - [`DistanceDistance`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`Distance`](@ref)
   - [`distance`](@ref)
+  - [`cor_and_dist`](@ref)
+  - [`assert_similarity_domain`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.1.1, Equation 12.1.
 """
 @concrete struct DistanceDistance <: AbstractDistanceEstimator
     """

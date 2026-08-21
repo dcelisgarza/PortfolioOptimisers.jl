@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the bases a linear constraint can be re-based into.
 
-A constraint can be re-based into another basis **if and only if it is a linear form in the weights**. Under a change of basis `\\boldsymbol{w}_b = \\mathbf{P}^\\intercal \\boldsymbol{w}`, the row `\\boldsymbol{a}` becomes `\\mathbf{P}\\boldsymbol{a}`, and nothing else about the problem changes.
+A constraint can be re-based into another basis **if and only if it is a linear form in the weights**. Under a change of basis ``\\boldsymbol{w}_b = \\mathbf{P}^\\intercal \\boldsymbol{w}``, the row ``\\boldsymbol{a}`` becomes ``\\mathbf{P}\\boldsymbol{a}``, and nothing else about the problem changes.
 
-The boundary is a property of the **mechanism**: a re-basis rewrites a row and leaves the model untouched, so a constraint that reaches the model through its own variables is outside it even where a change of basis is well defined for the quantity constrained. Cardinality, sub-group cardinality and buy-in thresholds index the binary held-indicators rather than the weights. A per-asset weight box has no counterpart because `lb \\leq \\mathbf{P}^\\intercal\\boldsymbol{w} \\leq ub` *is* a linear constraint and already has a home. Turnover and tracking error are norm forms: `\\lVert \\mathbf{P}^\\intercal(\\boldsymbol{w} - \\boldsymbol{w}_0) \\rVert` is meaningful, but it needs its own variables and cones, so it is re-basable in mathematics and not by this mechanism. A fee is priced per traded position and is subtracted from the return, so it is not a constraint on the weights at all. The list illustrates the rule rather than exhausting it, and these absences are a property of the constraint, not a gap in the implementation; see ADR 0047 and its 2026-08-16 amendment.
+The boundary is a property of the **mechanism**: a re-basis rewrites a row and leaves the model untouched, so a constraint that reaches the model through its own variables is outside it even where a change of basis is well defined for the quantity constrained. Cardinality, sub-group cardinality and buy-in thresholds index the binary held-indicators rather than the weights. A per-asset weight box has no counterpart because ``lb \\leq \\mathbf{P}^\\intercal\\boldsymbol{w} \\leq ub`` *is* a linear constraint and already has a home. Turnover and tracking error are norm forms: ``\\lVert \\mathbf{P}^\\intercal(\\boldsymbol{w} - \\boldsymbol{w}_0) \\rVert`` is meaningful, but it needs its own variables and cones, so it is re-basable in mathematics and not by this mechanism. A fee is priced per traded position and is subtracted from the return, so it is not a constraint on the weights at all. The list illustrates the rule rather than exhausting it, and these absences are a property of the constraint, not a gap in the implementation; see ADR 0047 and its 2026-08-16 amendment.
 
 Tracking a factor needs no re-basis: [`ReturnsTracking`](@ref) takes a benchmark *return series*, and a factor's return series is a column of the factor matrix, so it is passed directly.
 
@@ -35,10 +35,10 @@ The factor basis: a constraint written in factor names, re-based through a regre
 
 Where:
 
-  - `\\mathbf{M}`: `Na×Nf` loadings matrix, [`Regression`](@ref)'s `M`.
-  - `\\boldsymbol{w}`: `Na×1` asset weights.
-  - `\\boldsymbol{w}_f`: `Nf×1` factor weights (exposures).
-  - `\\boldsymbol{a}`: `Nf×1` row the user wrote in factor names.
+  - ``\\mathbf{M}``: ``Na \\times Nf`` loadings matrix, [`Regression`](@ref)'s `M`.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_f``: ``Nf \\times 1`` factor weights (exposures).
+  - ``\\boldsymbol{a}``: ``Nf \\times 1`` row the user wrote in factor names.
 
 The names resolve against the declared factor axis, `sets.dict[sets.fkey]`, and the loadings are `rr.M` rather than `rr.L` — `M`'s columns are the named original factors, and a constraint must be *written* in names a user can put in an equation, whereas `L`'s columns are principal components under [`DimensionReductionRegression`](@ref). Risk decomposition reads `L` and is correct to; the two are the two sides of one projection, not a drift between conventions.
 
@@ -73,6 +73,10 @@ Arm 3 is a capability the field adds rather than a fallback: `FactorSpace(; re =
   - [`UniverseSets`](@ref)
   - [`Regression`](@ref)
   - [`resolve_factor_regression`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6.
 """
 @concrete struct FactorSpace <: AbstractConstraintSpace
     """
@@ -157,6 +161,10 @@ julia> lcr.ineq.B
   - [`linear_constraints`](@ref)
   - [`UniverseSets`](@ref)
   - [`Pipeline`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6.
 """
 @concrete struct ExposureConstraintEstimator <: AbstractConstraintEstimator
     """

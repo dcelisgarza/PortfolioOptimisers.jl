@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for phylogeny matrix or vector results.
+Carries a validated phylogeny matrix or a centrality vector.
 
 `PhylogenyResult` stores the output of phylogeny-based estimation routines, such as network or clustering-based phylogeny matrices, or centrality vectors. It is used throughout the package to represent validated phylogeny structures for constraint generation, centrality analysis, and related workflows.
 
@@ -130,7 +130,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all centrality algorithm types in `PortfolioOptimisers.jl` from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
+Abstract supertype for the algorithms that score how central each asset is in a network.
+
+Every member wraps one routine of [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
 All concrete and/or abstract types implementing specific centrality algorithms (e.g., betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, stress) should be subtypes of `AbstractCentralityAlgorithm`.
 
@@ -153,12 +155,17 @@ The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@
   - [`Pagerank`](@ref)
   - [`RadialityCentrality`](@ref)
   - [`StressCentrality`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.3.
+  - $(ref_dict[:estrada2011]) Chapter 7.
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Ask for the centrality over the network's **topology alone**.
+Withdraws an algorithm's polarity declaration, so it reads the network's topology alone.
 
 An algorithm that declares a polarity is handed weights wherever the source carries them. `TopologyOnly` in its `ov` field withdraws that request: [`centrality_polarity`](@ref) then answers `nothing`, and [`centrality_graph`](@ref) routes to the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). The computation is the one that already runs for [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref), so this is a redirect and never a new estimator.
 
@@ -357,7 +364,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for betweenness centrality.
+Scores each asset by the share of the network's shortest paths that run through it.
 
 `BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
@@ -394,6 +401,11 @@ BetweennessCentrality
   - [`DistancePolarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
+
+# References
+
+  - $(ref_dict[:freeman1977])
+  - $(ref_dict[:brandes2001])
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
     """
@@ -421,7 +433,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for closeness centrality.
+Scores each asset by the reciprocal of its mean shortest-path distance to the others.
 
 `ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
@@ -458,6 +470,10 @@ ClosenessCentrality
   - [`DistancePolarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
+
+# References
+
+  - $(ref_dict[:freeman1979])
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
     """
@@ -484,9 +500,32 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for degree centrality.
+Counts the network edges that touch each asset, divided by the number of other assets.
 
-`DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
+`DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph. It is the simplest score of the family, and the shipped default of [`CentralityEstimator`](@ref)'s `ct`.
+
+# Mathematical definition
+
+The degree vector of an adjacency matrix ``\\mathbf{A}`` over ``n`` assets is
+
+```math
+\\begin{align}
+    \\mathbf{D}_n &= \\mathbf{A}\\,\\mathbf{1}_n\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{A}``: Binary adjacency matrix of the network.
+  - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
+
+`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. Measured over a 20-asset minimum spanning tree, the first six entries of ``\\mathbf{D}_n`` are `[3, 1, 2, 4, 3, 1]` and the returned scores are `[0.1579, 0.0526, 0.1053, 0.2105, 0.1579, 0.0526]`, a maximum absolute difference of `3.7894736842105265`. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
+
+The factor is the whole difference, and it re-ranks nothing. [`average_centrality`](@ref) is linear in the score vector, so a constant scale moves the average by that same constant.
+
+# The three `kind` values coincide on these structures
+
+`kind` selects the total, the in- or the out-degree. Every graph this library builds is **undirected**, where the three are one number: measured over the same tree, `kind = 0`, `1` and `2` agree exactly. The field is kept because `Graphs.jl` takes it, not because it selects anything here.
 
 Declares no polarity and runs on the plain graph: `Graphs.degree_centrality` counts edges and ignores what they weigh. It is therefore one of the algorithms for which the estimator's `sep` stays **live** — the unweighted route reads the separation closure [`phylogeny_matrix`](@ref) builds, so `HopCount(; n = 2)` does change this answer.
 
@@ -524,6 +563,11 @@ DegreeCentrality
   - [`centrality_polarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.3.1, Equation 13.3.
+  - $(ref_dict[:freeman1979])
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
     """
@@ -545,11 +589,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D).
+Scores each asset by the leading eigenvector of the network's adjacency matrix.
 
-`EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
+`EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbours.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\mathbf{EC}_n &= \\dfrac{1}{\\lambda_{\\mathrm{max}}}\\,\\mathbf{A}\\,\\mathbf{q}_{\\mathrm{max}}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{A}``: Adjacency matrix of the network, weighted on the similarity branch.
+  - ``\\lambda_{\\mathrm{max}}``: Largest eigenvalue of ``\\mathbf{A}``.
+  - ``\\mathbf{q}_{\\mathrm{max}}``: Eigenvector of ``\\lambda_{\\mathrm{max}}``.
+
+The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. Measured over a 20-asset triangulated maximally filtered graph, the returned vector matches the formula above to `4.163336342344337e-16`, has 2-norm `1.0` and runs from `0.0715` to `0.4576`.
 
 Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+
+The weights change the answer by less than the shortest-path algorithms do, and they do change it: over the same triangulated maximally filtered graph the weighted and unweighted vectors differ by a maximum absolute `0.009892049284000948` and correlate `0.9985`, on entries of size about `0.2`.
 
 # Fields
 
@@ -578,6 +640,11 @@ EigenvectorCentrality
   - [`SimilarityPolarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.eigenvector_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.3.2, Equation 13.4.
+  - $(ref_dict[:bonacich1987])
 """
 @concrete struct EigenvectorCentrality <: AbstractCentralityAlgorithm
     """
@@ -594,13 +661,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for Katz centrality.
+Scores each asset by every walk that reaches it, discounted geometrically by the walk's length.
 
 `KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
 
 Declares no polarity and runs on the plain graph: `Graphs.katz_centrality` binarises its input through `adjacency_matrix(g, Bool)`, and throws an `InexactError` when the graph is weighted. The unweighted route is real code here rather than an absent check.
 
 It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `KatzCentrality(; ov = TopologyOnly())` is a `MethodError`.
+
+# `alpha` must be below the reciprocal of the largest eigenvalue
+
+The Katz score sums ``\\sum_{k \\geq 1} \\alpha^{k}\\mathbf{A}^{k}``, which converges only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, where ``\\lambda_{\\mathrm{max}}`` is the largest eigenvalue of the adjacency matrix. Above that bound the linear solve still returns a vector, and the vector is not a centrality: measured over a 20-asset minimum spanning tree, ``\\lambda_{\\mathrm{max}} = 2.3585443300773266`` and the bound is `0.42399033473634745`. At `alpha = 0.3` every score is positive, between `0.13148` and `0.36762`. At `alpha = 0.5` the scores run `-0.45187` to `0.45187`, and a negative centrality has no reading.
+
+**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets.
 
 # Fields
 
@@ -621,9 +694,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> KatzCentrality(; alpha = 0.5)
+julia> KatzCentrality(; alpha = 0.1)
 KatzCentrality
-  alpha ┴ Float64: 0.5
+  alpha ┴ Float64: 0.1
 ```
 
 # Related
@@ -632,6 +705,10 @@ KatzCentrality
   - [`centrality_polarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
+
+# References
+
+  - $(ref_dict[:katz1953])
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
     """
@@ -649,11 +726,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for PageRank.
+Scores each asset by the stationary distribution of a damped random walk over the network.
 
 `Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
 
-Declares no polarity and runs on the plain graph: `Graphs.pagerank` ignores edge weights. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
+Declares no polarity and runs on the plain graph: `Graphs.pagerank` walks `outdegree` and `inneighbors` alone and never reads an edge weight. Measured over a 20-asset triangulated maximally filtered graph, the weighted and the plain graph give the identical vector, to `0.0`. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
 
 It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` is a `MethodError`.
 
@@ -693,6 +770,10 @@ Pagerank
   - [`centrality_polarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
+
+# References
+
+  - $(ref_dict[:brin1998])
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
     """
@@ -721,7 +802,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D).
+Scores each asset by its mean shortest-path distance, measured against the network's diameter.
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
@@ -754,6 +835,10 @@ RadialityCentrality
   - [`DistancePolarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.radiality_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D)
+
+# References
+
+  - $(ref_dict[:valente1998])
 """
 @concrete struct RadialityCentrality <: AbstractCentralityAlgorithm
     """
@@ -770,7 +855,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality).
+Counts the shortest paths of the network that pass through each asset.
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
 
@@ -807,6 +892,10 @@ StressCentrality
   - [`DistancePolarity`](@ref)
   - [`TopologyOnly`](@ref)
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
+
+# References
+
+  - $(ref_dict[:shimbel1953])
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
     """
@@ -921,7 +1010,7 @@ The line between the first two groups and the third is `Graphs.jl`'s own. The de
 
 # Arguments
 
-  - $(field_dict[:cta])
+  - $(arg_dict[:cta])
 
 # Returns
 
@@ -1034,6 +1123,11 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
   - [`KruskalTree`](@ref)
   - [`BoruvkaTree`](@ref)
   - [`PrimTree`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.4.1.
+  - $(ref_dict[:mantegna1999])
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 """
@@ -1058,7 +1152,7 @@ const Tree_SimMat = Union{<:AbstractNonNegativeSimilarityMatrixAlgorithm,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Kruskal's minimum spanning tree (MST).
+Grows the minimum spanning tree by taking the lightest edge that joins two components.
 
 `KruskalTree` specifies the use of [Kruskal's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst) for constructing a minimum spanning tree from a graph.
 
@@ -1088,6 +1182,10 @@ KruskalTree
 
   - [`AbstractTreeType`](@ref)
   - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
+
+# References
+
+  - $(ref_dict[:kruskal1956])
 """
 @concrete struct KruskalTree <: AbstractTreeType
     """
@@ -1109,7 +1207,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Boruvka's minimum spanning tree (MST).
+Grows the minimum spanning tree by joining every component to its own lightest neighbour at once.
 
 `BoruvkaTree` specifies the use of [Boruvka's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst) for constructing a minimum spanning tree from a graph.
 
@@ -1139,6 +1237,10 @@ BoruvkaTree
 
   - [`AbstractTreeType`](@ref)
   - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
+
+# References
+
+  - $(ref_dict[:boruvka1926])
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
     """
@@ -1160,7 +1262,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Prim's minimum spanning tree (MST).
+Grows the minimum spanning tree outward from a single starting vertex.
 
 `PrimTree` specifies the use of [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for constructing a minimum spanning tree from a graph.
 
@@ -1190,6 +1292,10 @@ PrimTree
 
   - [`AbstractTreeType`](@ref)
   - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
+
+# References
+
+  - $(ref_dict[:prim1957])
 """
 @concrete struct PrimTree <: AbstractTreeType
     """
@@ -1255,6 +1361,10 @@ All concrete and/or abstract types implementing network-based estimation algorit
 
   - [`NetworkEstimator`](@ref)
   - [`AbstractCentralityEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 """
@@ -1306,7 +1416,7 @@ const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for network-based phylogeny analysis.
+Builds an asset network from a covariance estimate, and says which pairs of assets it relates.
 
 `NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the separation algorithm that says how far apart two assets sit in the resulting graph.
 
@@ -1372,6 +1482,13 @@ NetworkEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`Tree_SimMat`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.4.
+  - $(ref_dict[:mantegna1999])
+  - $(ref_dict[:tumminello2005])
+  - $(ref_dict[:PMFG])
 """
 @propagatable @concrete struct NetworkEstimator <: AbstractNetworkEstimator
     """
@@ -1407,7 +1524,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for network-based clustering.
+Clusters assets by the pseudo-distances that a network's structure induces.
 
 `NetworkClustersEstimator` encapsulates the configuration for clustering assets from a network, pairing the [`NetworkEstimator`](@ref) that builds the graph with the clustering algorithm and the optimal-number-of-clusters estimator applied to the pseudo-distance matrix it induces.
 
@@ -1512,12 +1629,16 @@ All concrete and/or abstract types implementing centrality-based estimation algo
 
   - [`CentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.5.1.
 """
 abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for centrality-based analysis.
+Bundles a network source with the centrality algorithm that scores its assets.
 
 `CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
 
@@ -1591,6 +1712,10 @@ CentralityEstimator
 
   - [`AbstractCentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.5.1, Equation 13.6.
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
     """
@@ -2111,7 +2236,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Hop budget placed at a quantile of the observed hop separations.
+Places the hop budget at a quantile of the observed hop separations.
 
 The shipped [`HopCountAlgorithm`](@ref). `HopCount(; n = HopCountQuantile(; q = 0.25))` asks for the hop budget that relates about a quarter of the reachable pairs, instead of naming a number of hops that was right for one universe.
 
@@ -2187,7 +2312,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Path-length budget placed at a quantile of the observed path separations.
+Places the path-length budget at a quantile of the observed path separations.
 
 The shipped [`PathLengthAlgorithm`](@ref), and the direct answer to [`PathLength`](@ref)'s own complaint that nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits. `dmax = 0.37` is not a number a caller can reason about; "the budget that relates a quarter of the reachable pairs" is.
 
@@ -2630,6 +2755,25 @@ Compute the phylogeny matrix for a network estimator.
 
 Builds the network from `X` and returns the binary matrix of the pairs `nte.sep` counts as related, with self-loops removed. Which neighbourhood that is comes from the separation, through [`_phylogeny_matrix`](@ref): [`HopCount`](@ref) gives the **hop ball**, the clamped power sum `sum(A^i for i in 0:n)` the network family has always used; [`PathLength`](@ref) gives the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref).
 
+# The hop ball is the range connection matrix
+
+The hop branch computes the range connection matrix of walks of length at most `n`, which is [`NetworkEstimator`](@ref)'s Equations 13.1 and 13.2. Writing ``\\mathbf{A}`` for the binary adjacency matrix and ``\\mathbf{I}_n`` for the identity,
+
+```math
+\\begin{align}
+    \\mathbf{B}_{k} &= \\mathbf{1}_{x \\geq 1}\\left(\\mathbf{A}^{k} + \\mathbf{I}_n\\right) - \\mathbf{I}_n\\,, \\\\
+    \\mathbf{B}_{1,\\,l} &= \\mathbf{1}_{x \\geq 1}\\left(\\sum_{k=1}^{l} \\mathbf{B}_{k}\\right)\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{1}_{x \\geq 1}(\\cdot)``: Element-wise indicator of the entries that are at least one.
+  - ``\\mathbf{B}_{k}``: Pairs joined by at least one walk of length exactly ``k``.
+  - ``\\mathbf{B}_{1,\\,l}``: Pairs joined by at least one walk of length at most ``l``.
+
+The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell. Measured over a 20-asset minimum spanning tree, the two agree entry for entry at `n = 1, 2, 3, 4` — a maximum absolute difference of `0`, over `19`, `44`, `71` and `99` related pairs.
+
 # The result is `Int` under either separation
 
 Selection changes; the values do not. [`PhylogenyResult`](@ref)'s matrix is `Int` here as everywhere else, because no consumer of one wants a number: [`SemiDefinitePhylogeny`](@ref) is weight-inert (`A ⊙ W == 0` is the same constraint at any magnitude), [`IntegerPhylogeny`](@ref) counts an integer cardinality, and [`centrality_vector`](@ref) binarises before any centrality algorithm runs. The graded reading of a separation lives on [`Proximity`](@ref) instead.
@@ -2750,8 +2894,8 @@ The three-argument methods taking `ct` resolve [`centrality_polarity`](@ref) and
 
 # Arguments
 
-  - $(field_dict[:pler])
-  - $(field_dict[:cta])
+  - $(arg_dict[:pler])
+  - $(arg_dict[:cta])
   - `polarity`: Effective polarity of `ct`, from [`centrality_polarity`](@ref).
   - $(arg_dict[:nte])
   - `X`: Data matrix (observations × assets).
@@ -2880,7 +3024,20 @@ end
 
 Compute the weighted average centrality for a network and centrality algorithm.
 
-This function computes the centrality vector and returns the weighted average using the provided weights.
+This function computes the centrality vector and returns the weighted average using the provided weights. It is the average centrality measure of [`CentralityEstimator`](@ref)'s Equation 13.6,
+
+```math
+\\begin{align}
+    \\mathrm{CM}(\\boldsymbol{x}) &= \\boldsymbol{C}_n^{\\intercal} \\boldsymbol{x}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{C}_n``: Centrality score vector from [`centrality_vector`](@ref).
+  - ``\\boldsymbol{x}``: Portfolio weight vector.
+
+There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here. Measured over a 20-asset minimum spanning tree, the code and the formula agree exactly.
 
 # Arguments
 
@@ -2939,7 +3096,22 @@ end
 
 Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
 
-This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation.
+This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation. It is the percentage invested in connected assets of [`NetworkEstimator`](@ref)'s Equation 13.7,
+
+```math
+\\begin{align}
+    \\mathrm{CA}(\\boldsymbol{x}) &= \\dfrac{\\boldsymbol{1}_n^{\\intercal} \\left(\\mathbf{B}_{1,\\,l} \\odot \\lvert \\boldsymbol{x}\\boldsymbol{x}^{\\intercal} \\rvert\\right) \\boldsymbol{1}_n}{\\boldsymbol{1}_n^{\\intercal} \\lvert \\boldsymbol{x}\\boldsymbol{x}^{\\intercal} \\rvert \\boldsymbol{1}_n}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{B}_{1,\\,l}``: Phylogeny matrix from [`phylogeny_matrix`](@ref).
+  - ``\\odot``: Hadamard, element-wise product.
+  - ``\\boldsymbol{x}``: Portfolio weight vector.
+  - ``\\boldsymbol{1}_n``: Column vector of ones of length ``n``.
+
+Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero. Measured over a 20-asset minimum spanning tree at a two-hop budget, the code and the formula agree to `5.551115123125783e-17`.
 
 # Arguments
 

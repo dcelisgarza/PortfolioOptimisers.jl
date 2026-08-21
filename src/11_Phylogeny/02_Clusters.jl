@@ -132,9 +132,13 @@ const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for hierarchical clustering.
+Carries a clustering of the asset universe together with the matrices it was computed from.
 
-`Clusters` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
+Holds the result of either family, because `res` takes both shapes [`clusterise`](@ref) produces: a `Clustering.Hclust` from a hierarchical algorithm and a `Clustering.ClusteringResult` from a non-hierarchical one. `k` is the number of clusters selected by an [`AbstractOptimalNumberClustersEstimator`](@ref), and [`assignments`](@ref) is what reads a cluster label per asset off the pair — cutting the tree at `k` on the hierarchical branch, reading the field on the other.
+
+# `D` is what the clustering saw, unless `P` is present
+
+`S` and `D` are the similarity and distance matrices of the universe, and an ordinary [`ClustersEstimator`](@ref) clusters `D` itself and leaves `P` as `nothing`. A [`NetworkClustersEstimator`](@ref) instead accumulates a **pseudo-distance** matrix out of the network structure and clusters *that*, so it fills `P` and `res` is the clustering of `P`. Both matrices are kept because a consumer wants the network's clustering and the universe's own distances.
 
 # Fields
 
@@ -157,12 +161,16 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:S])
   - $(val_dict[:D])
   - $(val_dict[:S_D])
+  - $(val_dict[:S_P])
   - $(val_dict[:ck])
 
 # Related
 
   - [`AbstractClusteringResult`](@ref)
   - [`ClustersEstimator`](@ref)
+  - [`NetworkClustersEstimator`](@ref)
+  - [`clusterise`](@ref)
+  - [`assignments`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
     """
@@ -178,7 +186,7 @@ Keywords correspond to the struct's fields.
     """
     D
     """
-    $(field_dict[:phX])
+    $(field_dict[:clP])
     """
     P
     """
@@ -204,23 +212,25 @@ end
 """
     clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 
-Return the clustering result as-is.
+Return the clustering result `cle` unchanged.
 
-This function provides a generic interface for extracting or processing clustering results. By default, it simply returns the provided clustering result object unchanged. This allows for consistent downstream handling of clustering results in `PortfolioOptimisers.jl` workflows.
+Identity pass-through, so that every consumer takes an estimator or a precomputed result through one call. A [`ClustersEstimator`](@ref) reaching this function has already been run; a result reaching it is not run again.
 
 # Arguments
 
-  - `cle::AbstractClusteringResult`: The clustering result object.
+  - `cle`: Clustering result.
   - `args...`: Additional positional arguments, ignored.
   - `kwargs...`: Additional keyword arguments, ignored.
 
 # Returns
 
-  - The input `cle` object.
+  - `cle::AbstractClusteringResult`: The input, unchanged.
 
 # Related
 
   - [`AbstractClusteringResult`](@ref)
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
 """
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
@@ -228,9 +238,38 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for estimating the optimal number of clusters using the second-order difference method.
+Picks the number of clusters at which the within-cluster dispersion curve bends most sharply.
 
-The `SecondOrderDifference` algorithm selects the optimal number of clusters by maximizing the second-order difference of a clustering evaluation metric (such as within-cluster sum of squares or silhouette score) across different cluster counts. This approach helps identify the "elbow" point in the metric curve.
+The two-difference gap statistic. It reads the second-order difference of the within-cluster dispersion across cluster counts, so it finds the elbow of that curve without the Monte Carlo simulation the original gap statistic needs.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+c^{\\star} &= \\underset{c}{\\arg\\max} \\left(W_{c+2} + W_{c} - 2 W_{c+1}\\right)\\,,\\\\
+&\\mathrm{s.t.} \\quad 1 \\leq c \\leq \\sqrt{N}\\,,\\\\
+W_{c} &= \\sum_{j=1}^{c} g\\left(\\left\\{d_{uv} : u, v \\in \\mathcal{C}_{j},\\, u < v\\right\\}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``c^{\\star}``: Selected number of clusters.
+  - ``W_{c}``: Within-cluster dispersion of a cut into ``c`` clusters.
+  - ``\\mathcal{C}_{j}``: Set of assets in the ``j``-th cluster of that cut.
+  - ``d_{uv}``: Entry of the distance matrix the clustering ran on.
+  - ``g``: Vector-to-scalar measure `alg`, applied to one cluster's pairwise distances. A cluster of one asset has no pairwise distance and contributes ``0``.
+  - ``N``: Number of assets.
+
+The selected ``c`` is the **left end** of the triple, not its centre. That is the source's own statement of the problem, and the code maximises it as written.
+
+# The measure decides what "dispersion" means, and the default is not the source's
+
+The source takes ``W_{c}`` as the **mean** of a cluster's pairwise distances, which is `alg = MeanValue()`. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances, which is a different statistic and selects a different ``c``: on a 400x40 sample the two answer **6 and 4**.
+
+!!! warning
+
+    `StandardisedValue()` is undefined for a cluster of exactly two assets. Two assets carry **one** pairwise distance, and the corrected standard deviation of a single value is `NaN`, so ``W_{c}`` is `NaN` for every cut in which such a cluster appears. The gap series is then `NaN` throughout and the returned `k` is the **length of that series** rather than a maximiser of anything. A universe with a tightly correlated pair reaches this: over 20 assets with two such pairs every cut from `2` to `6` clusters carries a two-asset cluster, the default answers `k = 4` off the fallback, and `MeanValue()` answers `k = 2` off a real argmax. Pass `alg = MeanValue()` when the universe may cluster that finely.
 
 # Fields
 
@@ -243,6 +282,12 @@ $(DocStringExtensions.FIELDS)
     ) -> SecondOrderDifference
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -261,7 +306,18 @@ SecondOrderDifference
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
+  - [`SilhouetteScore`](@ref)
   - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+  - [`StandardisedValue`](@ref)
+  - [`optimal_number_clusters`](@ref)
+  - [`factory`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.2.1.2, Equation 12.15.
+  - $(ref_dict[:yue2008])
+  - $(ref_dict[:tibshirani2001])
 """
 @propagatable @concrete struct SecondOrderDifference <:
                                AbstractOptimalNumberClustersAlgorithm
@@ -280,9 +336,37 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
+Picks the number of clusters whose assets sit best inside their own cluster.
 
-`SilhouetteScore` selects the optimal number of clusters by maximizing the silhouette score, which measures how well each object lies within its cluster compared to other clusters. The score can be computed using different distance metrics.
+Each asset gets a silhouette, which compares how far it sits from its own cluster against how far it sits from the nearest other one. `alg` reduces the whole vector of them to one number per cluster count, and the count with the largest number wins.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{i} &= \\frac{b_{i} - a_{i}}{\\max\\left(a_{i},\\, b_{i}\\right)}\\,,\\\\
+a_{i} &= \\sum_{j \\in \\mathcal{C}_{I},\\, j \\neq i} \\frac{d_{ij}}{\\left|\\mathcal{C}_{I}\\right| - 1}\\,,\\\\
+b_{i} &= \\underset{J \\neq I}{\\min} \\sum_{j \\in \\mathcal{C}_{J}} \\frac{d_{ij}}{\\left|\\mathcal{C}_{J}\\right|}\\,,\\\\
+c^{\\star} &= \\underset{c}{\\arg\\max} \\; g\\left(\\boldsymbol{s}\\right)\\,, \\quad 1 \\leq c \\leq \\sqrt{N}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s_{i}``: Silhouette of asset ``i``, in ``\\left[-1,\\, 1\\right]``. It is ``1`` when the asset is clustered well and ``-1`` when it is clustered wrongly.
+  - ``a_{i}``: Mean distance from asset ``i`` to the other members of its own cluster ``\\mathcal{C}_{I}``.
+  - ``b_{i}``: Smallest mean distance from asset ``i`` to the members of any other cluster.
+  - ``d_{ij}``: Entry of the distance matrix the clustering ran on.
+  - ``\\boldsymbol{s}``: Vector of silhouettes over all assets, one per asset.
+  - ``g``: Vector-to-scalar measure `alg`.
+  - ``c^{\\star}``: Selected number of clusters.
+  - ``N``: Number of assets.
+
+# The default reduction is the source's standardised score
+
+`alg = StandardisedValue()` divides the mean of ``\\boldsymbol{s}`` by its corrected standard deviation, which is the source's *quality measure* term for term. The standardisation is what makes scores comparable across cluster counts, so it is the reduction the selection wants; the field is a knob only because a caller may want the plain mean instead. The two disagree in general, and the standardised form is the one this default computes.
+
+Unlike [`SecondOrderDifference`](@ref), the reduction here runs over **one vector of length** ``N``, never over one cluster at a time, so no cluster size makes it undefined.
 
 # Fields
 
@@ -295,6 +379,12 @@ $(DocStringExtensions.FIELDS)
     ) -> SilhouetteScore
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -313,8 +403,17 @@ SilhouetteScore
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
+  - [`SecondOrderDifference`](@ref)
   - [`VectorToScalarMeasure`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
+  - [`StandardisedValue`](@ref)
+  - [`optimal_number_clusters`](@ref)
+  - [`factory`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.2.1.1, Equations 12.13-12.14.
+  - $(ref_dict[:rousseeuw1987])
+  - $(ref_dict[:lopezdeprado2019])
 """
 @propagatable @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
     """
@@ -331,9 +430,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for selecting the optimal number of clusters.
+Decides how many clusters to cut a dendrogram or a partition into.
 
-`OptimalNumberClusters` encapsulates the configuration for determining the optimal number of clusters, including the maximum allowed clusters and the algorithm used for selection.
+Pairs a selection rule with a ceiling on the answer. `alg` is either an [`AbstractOptimalNumberClustersAlgorithm`](@ref), which chooses the count from the data, or an `Integer`, which states it outright.
+
+# A stated `k` is a request, not a guarantee
+
+`max_k` caps every branch, and the cap is itself capped: the ceiling in force is `min(floor(Int, sqrt(N)), max_k)`, so a `max_k` above ``\\sqrt{N}`` buys nothing. A stated `k` above that ceiling is lowered to it.
+
+A stated `k` is also checked against the tree on the hierarchical branch. A cut into `k` clusters that no node of the dendrogram supports is not honoured; [`optimal_number_clusters`](@ref) searches upward and downward for the nearest `k` that is, and takes the nearer of the two. The data-driven branches apply the same test through [`valid_k_clusters`](@ref), which walks the scoring array from its largest entry down until one passes.
 
 # Fields
 
@@ -352,6 +457,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:max_k])
   - $(val_dict[:kalg])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -372,6 +483,15 @@ OptimalNumberClusters
 
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+  - [`SecondOrderDifference`](@ref)
+  - [`SilhouetteScore`](@ref)
+  - [`optimal_number_clusters`](@ref)
+  - [`valid_k_clusters`](@ref)
+  - [`factory`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.2.1.
 """
 @propagatable @concrete struct OptimalNumberClusters <:
                                AbstractOptimalNumberClustersEstimator
@@ -400,9 +520,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for hierarchical clustering.
+Builds a dendrogram by merging the two nearest clusters until one remains.
 
-`HClustAlgorithm` specifies the linkage method used for hierarchical clustering, such as `:ward`, `:single`, `:complete`, or `:average`.
+`linkage` is the criterion that says how near two clusters are once they hold more than one asset. `:single` takes the smallest distance between their members and `:complete` the largest; `:average` takes the mean over all cross pairs; `:ward` merges the pair that raises the total within-cluster variance least. The symbol is passed straight to `Clustering.hclust`, so every criterion that package accepts is available.
 
 # Fields
 
@@ -428,6 +548,13 @@ HClustAlgorithm
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`ClustersEstimator`](@ref)
+  - [`DBHT`](@ref)
+  - [`clusterise`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.1.1, Equations 12.6-12.12.
+  - $(ref_dict[:mullner2011])
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
     """
@@ -444,9 +571,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for clustering.
+Turns a return matrix into a clustering of the asset universe.
 
-`ClustersEstimator` encapsulates all configuration required for clustering, including the covariance estimator, distance estimator, res algorithm, and optimal number of clusters estimator.
+Holds the four steps in the order they run: `ce` estimates the covariance, `de` turns it into a distance matrix, `alg` clusters that matrix, and `onc` decides how many clusters to keep. [`clusterise`](@ref) runs them and returns a [`Clusters`](@ref).
+
+# The universe is clustered, not the observations
+
+Every step reads an `assets x assets` matrix, so the number of observations leaves the picture at `ce`. That is why `alg` and `onc` carry no `@fprop` tag: an [`ObsWeights`](@ref) weights observations, and there is no observation left for it to weight once `de` has run. `ce` and `de` are tagged, and they are where a weight belongs.
 
 # Fields
 
@@ -462,6 +593,13 @@ $(DocStringExtensions.FIELDS)
     ) -> ClustersEstimator
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+  - `de`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -504,7 +642,15 @@ ClustersEstimator
 
   - [`AbstractClustersEstimator`](@ref)
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
+  - [`Clusters`](@ref)
+  - [`clusterise`](@ref)
+  - [`factory`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.1.1.
 """
 @propagatable @concrete struct ClustersEstimator <: AbstractClustersEstimator
     """

@@ -15,3 +15,10 @@ validate_k_value
 valid_k_clusters
 assignments
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

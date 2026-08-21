@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for constructing asset set membership matrices from asset groupings.
+Names the group name key a binary asset-group membership matrix is built from.
 
-`AssetSetsMatrixEstimator` is a container type for specifying the key or group name used to generate a binary asset-group membership matrix from a [`UniverseSets`](@ref) object. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
+The key is read out of a [`UniverseSets`](@ref) by [`asset_sets_matrix`](@ref), which returns one row per distinct group value and one column per asset. A row of that matrix is the set indicator a group weight constraint sums the weights over.
 
 # Fields
 
@@ -43,6 +43,10 @@ julia> asset_sets_matrix(est, sets)
   - [`UniverseSets`](@ref)
   - [`asset_sets_matrix`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2-9.4.
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
     """
@@ -145,7 +149,7 @@ Construct a binary asset-group membership matrix from asset set groupings.
 
 # Returns
 
-  - `A::BitMatrix`: A binary matrix of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` belongs to group `i`.
+  - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` belongs to group `i`.
 
 # Details
 

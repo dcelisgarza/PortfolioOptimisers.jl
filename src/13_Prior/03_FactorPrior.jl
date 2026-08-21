@@ -89,6 +89,11 @@ FactorPrior
   - [`StepwiseRegression`](@ref)
   - [`SimpleVariance`](@ref)
   - [`prior`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.4 and 4.5.
+  - $(ref_dict[:fan2008])
 """
 @propagatable @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
     """
@@ -178,12 +183,22 @@ Which factor moments arrive is the caller's decision, and it is the only thing t
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\mathbf{M} \\boldsymbol{f} + \\boldsymbol{b}\\\\
-\\hat{\\mathbf{\\Sigma}} &= \\mathbf{M} \\mathbf{\\Sigma}_f \\mathbf{M}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,,
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,, \\\\
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
 \\end{align}
 ```
 
-where ``\\mathbf{\\Sigma}_\\varepsilon`` is the diagonal matrix of residual variances and is present only when `rsd` is `true`.
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` asset expected returns vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` asset covariance matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix, `rr.M`.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts, `rr.b`.
+  - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` factor expected returns vector, `f_mu`.
+  - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
+
+The returned `chol` is the ``N \\times (K + N)`` matrix ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]`` transposed, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It therefore satisfies ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` before matrix processing.
 
 # Arguments
 
@@ -307,23 +322,20 @@ The factor model maps factor moments to asset space via the loadings matrix ``\\
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,.
-\\end{align}
-```
-
-```math
-\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,, \\\\
 \\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix, `rr.M`.
   - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` vector of factor expected returns.
-  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts, `rr.b`.
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances (when `rsd = true`).
+
+The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come from `pe.pe` fit on `F`, and the loadings from `pe.re` fit on `(X, F)`. The two equations are [`factor_lift`](@ref).
 
 # Arguments
 

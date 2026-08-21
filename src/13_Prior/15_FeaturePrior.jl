@@ -326,12 +326,14 @@ Keywords correspond to the struct's fields.
 
 # Why the diagonal includes self
 
-The diagonal is not a convention, it selects between two different algorithms. On a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref):
+The diagonal is not a convention, it selects between two different algorithms. Measured on a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref), with the decay held flat at [`NoDecay`](@ref) so that the diagonal is the only thing that changes between the two columns:
 
 | pair            | zero diagonal | self included |
 |:--------------- | -------------:| -------------:|
 | `1`-`3`, 2 hops | **0.0**       | 0.333         |
 | `1`-`2`, 1 hop  | 0.5           | 0.196         |
+
+The default [`LinearDecay`](@ref) grades the same graph rather than flattening it, so its numbers differ — `0.436` and `0.239` over a two-hop budget — while the ordering is the one the right-hand column shows.
 
 With a zero diagonal the two **non-adjacent** endpoints come out identical and the adjacent pairs maximally far: rows are compared on who their neighbours are, never on whether they are each other's. That is *structural equivalence* — similarity of role — which is a real notion but the opposite of the proximity the name promises.
 
@@ -341,7 +343,7 @@ Including self also keeps subproblems well defined. An asset view of a spanning 
 
 `pl` is bound by [`NwE_ClE`](@ref): a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are *estimators*, so both refit.
 
-A partition carries much less than a graph, and the shortfall is measurable rather than stylistic. Its matrix is `P * transpose(P)` with the diagonal restored, so row `i` is the co-membership indicator of asset `i` and the distance between two rows depends on nothing but cluster membership and cluster size. On a seven-asset universe clustered `[1, 1, 1, 2, 2, 3, 3]` the whole distance matrix takes **three** distinct values. Worse, `phylogeny_matrix`'s `- I` makes each row of a *pair* a lone `1` pointing at the other member, so the two rows are orthogonal and a size-two cluster's **within**-cluster distance equals its **across**-cluster distance — this producer restores the diagonal, which repairs exactly that case, but the coarseness remains.
+A partition carries much less than a graph, and the shortfall is measurable rather than stylistic. Its matrix is `P * transpose(P)` with the diagonal restored, so row `i` is the co-membership indicator of asset `i` and two rows are either identical or disjoint. On a seven-asset universe clustered `[1, 1, 1, 2, 2, 3, 3]` the whole distance matrix takes **two** distinct values under the default [`AngularDist`](@ref): `0.0` within a cluster and `0.5` across one, whatever the cluster sizes. The raw `phylogeny_matrix` output, whose `- I` this producer undoes, takes three — `0.0`, `0.333` and `0.5` — because that `- I` makes each row of a *pair* a lone `1` pointing at the other member, so the two rows are orthogonal and a size-two cluster's **within**-cluster distance equals its **across**-cluster distance. Restoring the diagonal repairs exactly that case; the coarseness remains.
 
 This is the single-partition case of the round-trip argument that closed the endogenous branch for [`AssetSetsFeatures`](@ref): clustering a re-encoded clustering largely returns the clustering. Prefer a graph source unless the partition is what you actually want to measure.
 

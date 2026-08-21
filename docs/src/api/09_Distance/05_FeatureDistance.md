@@ -21,3 +21,10 @@ stack_observations
 collapse_weights
 assert_feature_matrix_supplied
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

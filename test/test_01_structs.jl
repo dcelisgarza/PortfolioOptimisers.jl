@@ -44,10 +44,6 @@
                                                       2),
                        PortfolioOptimisers.norm_error(LInfNorm(), [0.5, 0.5] - [0.6, 0.4],
                                                       2))
-        @test isapprox(PortfolioOptimisers.norm_error(LInfNorm(pos = false), [0.5, 0.5],
-                                                      [0.6, 0.4], 2),
-                       PortfolioOptimisers.norm_error(LInfNorm(pos = false),
-                                                      [0.5, 0.5] - [0.6, 0.4], 2))
     end
     @testset "ReturnsResult" begin
         X = rand(3, 4)

@@ -10,3 +10,10 @@ VecOptBt
 Bt_VecOptBt
 threshold_constraints
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

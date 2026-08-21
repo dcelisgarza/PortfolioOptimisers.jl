@@ -56,6 +56,5 @@ rs = [EqualRisk(), Variance(), StandardDeviation(), UncertaintySetVariance(),
       MedianAbsoluteDeviation(),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm()),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = -10)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm(; pos = false)),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = 10)),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm())]

@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Distance estimator. If `power` is not `nothing`, computes the generalised distance estimator, which raises the quantity the algorithm is built on to the integer power ``p``.
+Pairs a distance algorithm with an optional integer power, and applies it to a correlation matrix or to the data.
+
+This is the estimator every clustering, network and phylogeny routine reaches for a distance matrix. `alg` chooses the transform; `power` raises the quantity that transform is built on to the integer power ``p``, which sharpens the contrast between a strong relationship and a weak one.
 
 !!! note
 
@@ -13,10 +15,10 @@ The four correlation-based algorithms (see [`RhoDistanceAlgorithm`](@ref)) raise
 
 ```math
 \\begin{align}
-_{g}d_{i,\\,j}^{\\mathrm{S}} &= \\sqrt{s\\left(1 - \\rho_{i,\\,j}^{p}\\right)}\\\\
-_{g}d_{i,\\,j}^{\\mathrm{SA}} &= \\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert^{p}}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{S}} &= \\sqrt{\\mathrm{clamp}\\left(s\\left(1 - \\rho_{i,\\,j}^{p}\\right),\\, 0,\\, 1\\right)}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{SA}} &= \\sqrt{\\mathrm{clamp}\\left(1 - \\lvert\\rho_{i,\\,j}\\rvert^{p},\\, 0,\\, 1\\right)}\\\\
 _{g}d_{i,\\,j}^{\\mathrm{L}} &= \\max\\left(-\\log{\\lvert\\rho_{i,\\,j}\\rvert^{p}},\\, 0\\right)\\\\
-_{g}d_{i,\\,j}^{\\mathrm{C}} &= \\sqrt{1 - \\rho_{i,\\,j}^{p}}\\\\
+_{g}d_{i,\\,j}^{\\mathrm{C}} &= \\sqrt{\\mathrm{clamp}\\left(1 - \\rho_{i,\\,j}^{p},\\, 0,\\, 1\\right)}\\\\
     s &= \\begin{cases}
         1/2 & \\text{if } p \\mod 2 \\neq 0\\\\
         1 & \\text{otherwise}
@@ -39,6 +41,8 @@ Where:
   - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
   - ``p``: Integer power.
   - ``s``: Scaling factor of [`SimpleDistance`](@ref) alone (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``). The halving is dropped for even ``p`` because ``\\rho_{i,\\,j}^{p}`` is then non-negative, so ``1 - \\rho_{i,\\,j}^{p}`` already lies in ``[0,\\,1]``.
+
+The clamp is inert for the first two algorithms at every ``p``: ``s(1 - \\rho_{i,\\,j}^{p})`` and ``1 - \\lvert\\rho_{i,\\,j}\\rvert^{p}`` never leave ``[0,\\,1]``. It **binds** for [`CorrelationDistance`](@ref) at every odd ``p``, where ``\\rho_{i,\\,j}^{p}`` keeps its sign and the radicand runs over ``[0,\\,2]``; that algorithm's own docstring measures the truncation.
 
 [`CanonicalDistance`](@ref) is a redirect and owns no formula. It forwards `power` to the algorithm it selects.
 
@@ -82,6 +86,10 @@ Distance
   - [`CorrelationDistance`](@ref)
   - [`CanonicalDistance`](@ref)
   - [`VariationInfoDistance`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 6.2.
 """
 @concrete struct Distance <: AbstractDistanceEstimator
     """

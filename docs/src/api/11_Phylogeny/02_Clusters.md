@@ -20,3 +20,10 @@ Int_ONC
 ClTypes
 ClE_Cl
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

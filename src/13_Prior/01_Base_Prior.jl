@@ -835,7 +835,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for low order prior results.
+Carries the returns, mean and covariance a low order prior estimator produced.
 
 `LowOrderPrior` stores the output of low order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, and optional factor moments. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics.
 
@@ -1123,27 +1123,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for high order prior results.
+Carries the coskewness and cokurtosis a high order prior estimator produced, over the low order prior it wraps.
 
 `HighOrderPrior` stores the output of high order prior estimation routines, including low order prior results, cokurtosis tensor, elimination and summation matrices, coskewness tensor, quadratic skewness matrix, and matrix processing estimator. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
-
-## The factor block
-
-A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the carrier has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
-
-`fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the low order carrier's own factor block, and the constructor **enforces that the two are the same object** — see the validation below.
-
-`fpr` is this carrier's own field, so it resolves ahead of the `forward(pr)` block and names the **high** order factor block, where before nesting it resolved through to the low order one. Reads through it are unaffected by that shift: the nested carrier forwards to its own `pr`, which the invariant pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way and `hop.fpr` is simply "the factor prior at this order".
-
-### Which read is idiomatic
-
-**`pr.fpr.kt` is the public read**, on the same terms as on [`LowOrderPrior`](@ref) — see the fuller reasoning there. The seven flat names here are a **frozen compatibility surface**: `f_kt`, `f_sk`, `f_V`, `f_D2`, `f_L2`, `f_S2` and `f_skmp`, and no more will be added. A field added to this carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart.
-
-As there, the two reads differ where the block is absent — `pr.f_kt` returns `nothing`, `pr.fpr.kt` throws — so guard first and then read through `fpr`.
 
 # Constructors
 
@@ -1161,12 +1147,27 @@ As there, the two reads differ where the block is absent — `pr.f_kt` returns `
 
 Keywords correspond to the struct's fields.
 
+## The factor block
+
+A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the carrier has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
+
+`fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the low order carrier's own factor block, and the constructor **enforces that the two are the same object** — see the validation below.
+
+`fpr` is this carrier's own field, so it resolves ahead of the `forward(pr)` block and names the **high** order factor block, where before nesting it resolved through to the low order one. Reads through it are unaffected by that shift: the nested carrier forwards to its own `pr`, which the invariant pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way and `hop.fpr` is simply "the factor prior at this order".
+
+### Which read is idiomatic
+
+**`pr.fpr.kt` is the public read**, on the same terms as on [`LowOrderPrior`](@ref) — see the fuller reasoning there. The seven flat names here are a **frozen compatibility surface**: `f_kt`, `f_sk`, `f_V`, `f_D2`, `f_L2`, `f_S2` and `f_skmp`, and no more will be added. A field added to this carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart.
+
+As there, the two reads differ where the block is absent — `pr.f_kt` returns `nothing`, `pr.fpr.kt` throws — so guard first and then read through `fpr`.
+
 ## Validation
 
 Defining `N = length(pr.mu)`.
 
   - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty, and `size(kt) == (N^2, N^2)`, `size(L2) == size(S2) == (div(N * (N + 1), 2), N^2)`.
   - If `sk` or `V` are provided, both must be provided, non-empty, and `size(sk) == (N, N^2)`, `size(V) == (N, N)`.
+  - If that first triple is provided and `sk` is too, `D2` must be provided, non-empty, and `size(D2) == size(transpose(L2))`. `D2` carries no other rule: it is the one moment field the constructor accepts on its own, and a carrier holding it alone is legal.
   - If `fpr` is provided, `pr.fpr` must be provided and `fpr.pr === pr.fpr` — the factor distribution the factor co-moments were computed against is the low order carrier's own factor block, not a second copy of it. The converse does not hold: a low order factor block with no factor co-moments is ordinary, so `fpr === nothing` is always allowed. Everything internal to the factor block, including its own shapes against its own `N`, is validated by its own constructor.
 
 # Examples
@@ -1260,11 +1261,11 @@ HighOrderPrior
         S2_flag = isa(S2, MatNum)
         if kt_flag || L2_flag || S2_flag
             @argcheck(kt_flag,
-                      ArgumentError("kt must be provided when L2 or S2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+                      ArgumentError("kt must be provided when L2 or S2 is provided, isa(kt, MatNum) = $(kt_flag), isa(L2, MatNum) = $(L2_flag), isa(S2, MatNum) = $(S2_flag)"))
             @argcheck(L2_flag,
-                      ArgumentError("L2 must be provided when kt or S2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+                      ArgumentError("L2 must be provided when kt or S2 is provided, isa(kt, MatNum) = $(kt_flag), isa(L2, MatNum) = $(L2_flag), isa(S2, MatNum) = $(S2_flag)"))
             @argcheck(S2_flag,
-                      ArgumentError("S2 must be provided when kt or L2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+                      ArgumentError("S2 must be provided when kt or L2 is provided, isa(kt, MatNum) = $(kt_flag), isa(L2, MatNum) = $(L2_flag), isa(S2, MatNum) = $(S2_flag)"))
             @argcheck(!isempty(kt),
                       IsEmptyError("$(err_name_dict[:kt]) (`kt`) cannot be empty"))
             @argcheck(!isempty(L2),
@@ -1277,7 +1278,7 @@ HighOrderPrior
                       DimensionMismatch("size(L2) ($(size(L2))) and size(S2) ($(size(S2))) must be ($(div(N * (N + 1), 2)), $(N^2))"))
             if sk_flag
                 @argcheck(isa(D2, MatNum),
-                          ArgumentError("D2 must be provided when sk is provided, isnothing(D2) = $(isnothing(D2)), isnothing(sk) = $(sk_flag)"))
+                          ArgumentError("D2 must be provided when sk is provided, isa(D2, MatNum) = $(isa(D2, MatNum)), isa(sk, MatNum) = $(sk_flag)"))
                 @argcheck(!isempty(D2),
                           IsEmptyError("$(err_name_dict[:D2]) (`D2`) cannot be empty"))
                 @argcheck(size(D2) == size(transpose(L2)),
@@ -1287,9 +1288,9 @@ HighOrderPrior
         V_flag = isa(V, MatNum)
         if sk_flag || V_flag
             @argcheck(sk_flag,
-                      ArgumentError("sk must be provided when V is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
+                      ArgumentError("sk must be provided when V is provided, isa(sk, MatNum) = $(sk_flag), isa(V, MatNum) = $(V_flag)"))
             @argcheck(V_flag,
-                      ArgumentError("V must be provided when sk is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
+                      ArgumentError("V must be provided when sk is provided, isa(sk, MatNum) = $(sk_flag), isa(V, MatNum) = $(V_flag)"))
             @argcheck(!isempty(sk),
                       IsEmptyError("$(err_name_dict[:sk]) (`sk`) cannot be empty"))
             @argcheck(!isempty(V),

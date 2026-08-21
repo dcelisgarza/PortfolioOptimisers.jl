@@ -20,11 +20,22 @@ Unlike `Distances.CosineDist` (``1 - \\cos``), the angular distance satisfies th
 
 A zero feature vector has no direction, so the cosine is undefined. By convention two zero vectors are at distance `0` from each other (they are identical) and at distance `1` from every non-zero vector (maximally dissimilar), which keeps ``S = \\cos(\\pi D)`` true on every entry of the matching similarity matrix.
 
+!!! note "A self-pair is not exactly zero elementwise"
+
+    `AngularDist()(a, a)` returns up to `6.707879276254074e-9` rather than `0`. The cosine of a vector with itself rounds to `0.9999999999999999`, and ``\\arccos`` has an infinite derivative at `1`, so a `1e-16` error there becomes a `1e-8` error in the distance.
+
+    `Distances.pairwise` writes an exact zero diagonal, so the matrix entry points — which are the only route [`FeatureDistance`](@ref) takes — never see it. Call the metric directly on a pair of identical vectors and the residual is there.
+
 # Related
 
   - [`AngularSimilarity`](@ref)
   - [`FeatureDistance`](@ref)
+  - [`default_similarity`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
+
+# References
+
+  - $(ref_dict[:vandongen2012])
 """
 struct AngularDist <: Distances.Metric end
 function (::AngularDist)(a, b)
@@ -45,6 +56,12 @@ Distances.result_type(::AngularDist, a::Type, b::Type) = promote_type(a, b, Floa
 # post-processing in place beats the elementwise loop at every size, so there is no second
 # path and nothing to tune. The elementwise method above remains the contract; the
 # `"AngularDist gemm path matches the elementwise method"` testset pins the two together.
+#
+# "Exactly" is the algebraic identity, not the floating-point result. Off the diagonal the
+# two paths agreed to 1.1102230246251565e-16 on an 8x5 feature matrix. On the diagonal they
+# differ by up to 6.707879276254074e-9, and there the gemm path is the correct one: it
+# writes an exact zero, while the elementwise method takes `acos` of a cosine that rounded
+# to 0.9999999999999999. That is why the two are pinned with a tolerance.
 #
 # `_pairwise!` receives the data already permuted to columns-as-observations, so a zero
 # *column* of `a` is a zero feature vector. The `CosineDist` kernel divides by its norm and
@@ -86,9 +103,9 @@ abstract type AbstractCollapseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Collapse algorithm aggregating by the mean.
+Aggregates along the observation axis with the possibly weighted arithmetic mean.
 
-Aggregates along the observation axis with the possibly weighted arithmetic mean. This is the only collapse algorithm accepted by [`AggregateDistances`](@ref), because a convex combination of metrics is itself a metric.
+This is the only collapse algorithm [`AggregateDistances`](@ref) accepts, because a convex combination of metrics is itself a metric. [`AggregateFeatures`](@ref) accepts it too, so it is the one member both consumers share, and the default of both.
 
 # Related
 
@@ -101,9 +118,9 @@ struct MeanCollapse <: AbstractCollapseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Collapse algorithm aggregating by the median.
+Aggregates along the observation axis with the possibly weighted median, which resists an outlying observation.
 
-Aggregates along the observation axis with the possibly weighted median, which is robust to outlying observations. Only [`AggregateFeatures`](@ref) accepts it: it aggregates the features and applies the metric afterwards, so the result is a metric. [`AggregateDistances`](@ref) rejects it at construction, because an entrywise median of distance matrices need not satisfy the triangle inequality.
+Only [`AggregateFeatures`](@ref) accepts it: it aggregates the features and applies the metric afterwards, so the result is a metric. [`AggregateDistances`](@ref) rejects it at construction, because an entrywise median of distance matrices need not satisfy the triangle inequality.
 
 # Related
 
@@ -131,9 +148,9 @@ abstract type AbstractFeatureCollapseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature collapse algorithm keeping the most recent observation.
+Discards the window and measures the last observation's feature matrix alone.
 
-Discards the window and computes the distance from the last observation's feature matrix alone. The cheapest algorithm in the family and the default, because it is the only one whose result depends on no aggregation choice.
+The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice.
 
 # Related
 
@@ -146,9 +163,9 @@ struct LastObservation <: AbstractFeatureCollapseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature collapse algorithm aggregating the features, then measuring.
+Collapses the window to one `assets × features` matrix, then applies the metric once.
 
-Collapses the window to a single `assets × features` matrix by aggregating each feature along the observation axis, then applies the metric once. The metric is applied *after* the aggregation, so the result is a metric for both [`MeanCollapse`](@ref) and [`MedianCollapse`](@ref).
+Each feature is aggregated along the observation axis. The metric runs *after* the aggregation, so the result is a metric for both [`MeanCollapse`](@ref) and [`MedianCollapse`](@ref), and this is the only consumer that takes the median.
 
 # Fields
 
@@ -205,9 +222,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature collapse algorithm measuring each observation, then aggregating the distances.
+Measures every observation, then aggregates the resulting distance matrices.
 
-Computes one distance matrix per observation and aggregates them into a single `assets × assets` matrix. Costs `observations` metric evaluations against [`AggregateFeatures`](@ref)'s one, and accumulates into a single buffer rather than materialising the whole stack.
+Produces one distance matrix per observation and combines them into a single `assets × assets` matrix. Costs `observations` metric evaluations against [`AggregateFeatures`](@ref)'s one, and accumulates into a single buffer rather than materialising the whole stack.
 
 Only [`MeanCollapse`](@ref) is accepted: a convex combination of metrics is a metric, an entrywise median of them is not. Because the metric is applied *before* the aggregation, the zero-feature convention is applied per observation — an asset that is zero at some observations but not others is treated as zero only in the observations where it is.
 
@@ -273,9 +290,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature collapse algorithm stacking the observations into one feature vector.
+Concatenates the window into one long feature vector per asset, so nothing is averaged away.
 
-Concatenates the window along the feature axis, turning `observations × assets × features` into an `assets × (observations · features)` matrix, and applies the metric once. Nothing is averaged away, so two assets are close only when their whole trajectories agree — which is also why the result is dominated by whichever observations carry the largest magnitudes, and why heterogeneous features should be standardised before it is used.
+Turns `observations × assets × features` into an `assets × (observations · features)` matrix along the feature axis, and applies the metric once. Two assets are close only when their whole trajectories agree — which is also why the result is dominated by whichever observations carry the largest magnitudes, and why heterogeneous features should be standardised before it is used.
 
 Equals none of the other members of the family in general, but agrees with all of them when `observations == 1`.
 
@@ -290,9 +307,9 @@ struct StackObservations <: AbstractFeatureCollapseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Feature-based distance estimator for portfolio optimization.
+Turns a feature matrix into a distance matrix, by applying a metric to the rows of that matrix.
 
-Turns a feature matrix — assets described by their exposures, memberships, loadings or adjacencies rather than by their returns — into an `assets × assets` distance matrix, by applying a metric to the rows of that matrix. It is a peer of [`Distance`](@ref) and [`DistanceDistance`](@ref): unlike them, it never consults a correlation matrix, so it is usable where returns are uninformative or unavailable.
+A feature matrix describes assets by their exposures, memberships, loadings or adjacencies rather than by their returns. This estimator is a peer of [`Distance`](@ref) and [`DistanceDistance`](@ref): unlike them, it never consults a correlation matrix, so it is usable where returns are uninformative or unavailable.
 
 # Mathematical definition
 

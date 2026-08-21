@@ -8,3 +8,10 @@ coskewness_residuals
 cokurtosis_residuals
 prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

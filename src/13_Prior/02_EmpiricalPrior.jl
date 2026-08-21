@@ -57,6 +57,11 @@ EmpiricalPrior
   - [`SimpleExpectedReturns`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`prior`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.
+  - $(ref_dict[:meucci2005]) Chapter 3.
 """
 @propagatable @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -95,7 +100,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
 
 # Mathematical definition
 
-The empirical prior directly estimates first and second moments from the sample:
+`pe.me` computes the mean and `pe.ce` computes the covariance, so both moments are whatever those estimators return. Under the default pair — [`SimpleExpectedReturns`](@ref) and [`PortfolioOptimisersCovariance`](@ref) with no observation weights — they reduce to the sample moments:
 
 ```math
 \\begin{align}
@@ -106,10 +111,12 @@ The empirical prior directly estimates first and second moments from the sample:
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` covariance matrix.
   - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
   - $(math_dict[:T])
+
+Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a denoised covariance move both away from the display above rather than refining it.
 
 # Arguments
 
@@ -150,7 +157,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
 
 # Mathematical definition
 
-Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
+`pe.me` and `pe.ce` are applied to the **log-returns** ``\\log(1 + x_t)`` rather than to `X` itself. The two log-moments are scaled by the investment horizon ``h``, then converted back to arithmetic returns:
 
 ```math
 \\begin{align}
@@ -170,9 +177,11 @@ Where:
 
   - ``\\tilde{\\boldsymbol{\\mu}}``, ``\\tilde{\\mathbf{\\Sigma}}``: Horizon-scaled log-return mean and covariance.
   - ``h``: Investment horizon.
-  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Sample mean and covariance of log-returns ``\\log(1 + x_t)``.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Mean and covariance of the log-returns ``\\log(1 + x_t)``, computed by `pe.me` and `pe.ce`.
   - ``\\hat{\\mu}_i``: Arithmetic mean return for asset ``i``.
   - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
+
+`X` in the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix the caller supplied. Only the moments are computed in log space.
 
 # Arguments
 

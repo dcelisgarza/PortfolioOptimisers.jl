@@ -141,8 +141,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a **rule**, called as `dmax(nte, X, g; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, `g` being the structure the consumer already built, and must return a `Number`.",#
                                  :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
                                  :clres => "`res`: Clustering result.",#
-                                 :S => "`S`: Similarity matrix",#
-                                 :D => "`D`: Distance matrix",#
+                                 :S => "`S`: Similarity matrix.",#
+                                 :D => "`D`: Distance matrix.",#
                                  :ck => "`k`: Optimal number of clusters.",#
                                  :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
                                  :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(assets))`.",#
@@ -150,7 +150,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :clalg => "`alg`: Clustering algorithm.",#
                                  :onc => "`onc`: Optimal number of clusters estimator.",#
                                  :phX_Xv => "`X`: Phylogeny matrix or vector.",#
-                                 :phX => "`X`: Phylogeny matrix.",#
+                                 :clP => "`P`: Pseudo-distance matrix the clustering was run on, `nothing` when the clustering ran on `D` itself. A [`NetworkClustersEstimator`](@ref) builds it by accumulating the network structure out of the distance or similarity matrix; see [`clusterise`](@ref).",#
                                  :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                                  :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
                                  ## Separation and separation decay
@@ -211,7 +211,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  # Errors
                                  :msg => "`msg`: Error message describing the condition that triggered the exception.",#
                                  # Solver
-                                 :name => "`name`: Symbol or string identifier for logging purposes.",#
+                                 :name => "`name`: Symbol or string identifier. It is also the **key** under which [`optimise_JuMP_model!`](@ref) files this solver's failure in [`JuMPResult`](@ref)'s `trials`, so two solvers that share a name share one entry and the later failure overwrites the earlier one. Give each solver of a vector its own name, because the default `\"\"` is shared by all of them.",#
                                  :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
                                  :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
                                  :check_sol => "`check_sol`: Named tuple of keyword arguments splatted into [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible) after each solve. It decides which solver statuses count as a solved model. The default `(;)` accepts JuMP's own defaults, `allow_local = true` and `allow_almost = false`: the termination status must be `OPTIMAL` or `LOCALLY_SOLVED`, and the primal status must be `FEASIBLE_POINT`. The strictness is deliberate — a solution the solver itself flags as approximate is rejected rather than silently accepted, so a solver stage that fails this check falls through to the next solver in the vector. The common relaxation is `check_sol = (; allow_local = true, allow_almost = true)`, which also accepts `ALMOST_OPTIMAL`, `ALMOST_LOCALLY_SOLVED` and `NEARLY_FEASIBLE_POINT`; it is what the examples, the user guide and the test suite pass, because a first-order solver reaching its tolerance on a well-posed portfolio problem is usually good enough. Go the other way with `allow_local = false` to reject `LOCALLY_SOLVED` and demand a certified global optimum, and add `dual = true` to also require a feasible dual point.",#
@@ -400,7 +400,6 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :mu_ret_slot => "`mu`: Optional expected returns vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`ArithRetMu`](@ref) and [`resolve_deferred_quantities`](@ref)). A `ucs` that carries its own centre outranks it, and it outranks the prior's own vector (ADR 0050). If `nothing`, the prior supplies it.",#
                                  :ddof => "`ddof`: Degrees-of-freedom correction.",#
                                  :flag => "`flag`: Algorithm selection flag.",#
-                                 :pos => "`pos`: Order of the infinity norm the functor takes. `true` uses ``+\\infty``, the largest absolute deviation. `false` uses ``-\\infty``, the smallest absolute deviation. The JuMP model encodes ``+\\infty`` for both values, so `false` makes the functor and the model disagree.",#
                                  # Turnover.
                                  :w_tn => "`w`: Reference portfolio weight vector. Deviations are measured against it, and it is never the candidate weight vector an optimiser solves for.",#
                                  :w_ref => "`w`: Reference portfolio weights vector.",#
@@ -547,7 +546,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :left_node => "`left`: Left child node.",#
                                  :right_node => "`right`: Right child node.",#
                                  :height_node => "`height`: Height of the node in the dendrogram.",#
-                                 :level_node => "`level`: Level of the node in the hierarchical structure.",#
+                                 :level_node => "`level`: Number of leaves in the subtree rooted at the node, `1` for a leaf. It is the fourth column of a linkage matrix, and [`pre_order`](@ref) sizes its traversal stack from it.",#
                                  # Other.
                                  :dlb => "`dlb`: Default lower bound.",#
                                  :dub => "`dub`: Default upper bound.",#
@@ -628,20 +627,20 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
                                  :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                                  # Constraint generation.
-                                 :rkb_val => "`val`: Vector of risk budget allocations.",#
-                                 :rkbe_val => "`val`: Mapping of names to risk budget values.",#
+                                 :rkb_val => "`val`: Vector of non-negative risk budgets, one per entry of the axis the budget is written against. [`risk_budget_constraints`](@ref) normalises it to sum to one; a hand-built vector is stored as given, and the model reads it inside a logarithmic barrier, so only its **relative** entries matter.",#
+                                 :rkbe_val => "`val`: Mapping of names to risk budget values. A name may be an asset or a group, and a group assigns its value to every asset in it.",#
                                  :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
                                  :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
                                  :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
                                  :us_ufkey => "`ufkey`: Key prefix for unique-entry factor group variants in `dict`. Validated at construction, never recomputed by a view.",#
                                  :us_zkey => "`zkey`: Key in `dict` identifying the declared feature axis — the node list a graded feature program writes its columns against. Optional, like `fkey`, and it carries no prefix convention: nothing is partitioned over the feature axis, so it has no unique-entry sibling and no length rule beyond `allunique`.",#
-                                 :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
-                                 :A_phylo => "`A`: Phylogeny constraint matrix.",#
-                                 :B_phylo => "`B`: Group sizes or allocations vector.",#
-                                 :scale_phylo => "`scale`: Non-negative big-M scaling factor for the MIP formulation.",#
-                                 :cc_A => "`A`: Centrality estimator.",#
-                                 :cc_B => "`B`: Centrality threshold or reduction measure.",#
-                                 :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
+                                 :p_phylo => "`p`: Non-negative penalty factor on the trace of the semidefinite matrix variable. It is read **only** when the model does not already minimise a variance: a variance objective is itself a trace against that variable, so it pulls the relaxation down on its own and no second term is added.",#
+                                 :A_phylo => "`A`: Symmetric relatedness matrix with a zero diagonal. A network source gives the range connection matrix, a clustering source the adjacency label matrix. Stored as given.",#
+                                 :A_iphylo => "`A`: Row set of the relatedness matrix, stored as `unique(A + I; dims = 1)` and **not** as the matrix passed in. The identity puts each asset in its own row, and the deduplication drops rows that repeat. One row per distinct neighbourhood or cluster survives, which is why the stored matrix is usually shorter than it is wide.",#
+                                 :B_phylo => "`B`: Right-hand side of `A * z <= B`, where `z` is the held indicator: the largest number of assets that may be held out of each row of `A`. A scalar applies to every row. A vector states one bound per row, so its length must match the row count of the stored `A` and not the number of assets. On an estimator the rows do not exist yet, so a vector is only checked against the largest number of clusters the clustering estimator can return.",#
+                                 :cc_A => "`A`: Centrality estimator. Its centrality vector is the row of the generated linear constraint.",#
+                                 :cc_B => "`B`: Right-hand side of the constraint. A number is the threshold itself. A [`VectorToScalarMeasure`](@ref) derives the threshold from the centrality vector `A` produces, so the constraint always has a feasible point.",#
+                                 :cc_comp => "`comp`: Comparison operator for the centrality constraint. `==` builds an equality row, every other operator an inequality row.",#
                                  :lce_val => "`val`: Constraint equation(s) to parse.",#
                                  :ece_lce => "`lce`: Wrapped linear constraint estimator(s) or precomputed constraint, written in the names of the space's basis. Exactly what `lcse` itself accepts, so no shape can reach the optimiser un-re-based.",#
                                  :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
@@ -649,8 +648,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                                  :asets_vals => "`vals`: Either group name keys whose partitions are stacked into the feature axis, at least two (one partition alone is one-hot, which makes the distance two-valued for every metric), or an ordered edge-authoring program of `Pair`s over the declared feature axis `sets.dict[sets.zkey]`. The two are dispatched on element type and are different contracts — see [`asset_sets_features`](@ref).",#
                                  :asets_strict => "`strict`: Whether an unresolvable *name* in a graded `vals` program throws instead of warning. Governs names only: nothing structural is refused, so an all-zero row and a one-column matrix are both legal. Ignored on the group-name-key path, where an absent key is an unconditional `KeyError`.",#
-                                 :thr_val => "`val`: Asset-specific threshold value(s).",#
-                                 :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
+                                 :thr_val => "`val`: Asset-specific minimum-holding threshold value(s).",#
+                                 :thr_res_val => "`val`: Minimum-holding threshold(s) on the portfolio weights. A held position must reach its threshold; a position below it is driven to zero. The threshold binds the **held** weight, never the trade, so a reference portfolio does not enter it.",#
                                  # Entropy pooling.
                                  :sc1 => "`sc1`: Scaling parameter for the objective function.",#
                                  :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
@@ -761,9 +760,10 @@ const val_dict = unique_key_dict(:val_dict,
                                  :a_sim_pos => "`a_sim > 0`.",#
                                  :beta_i_beta => "`0 < beta_i < beta < 1`.",#
                                  :b_sim_pos => "`b_sim > 0`.",#
-                                 :S_D => "size(S) == size(D)`.",#
+                                 :S_D => "`size(S) == size(D)`.",#
+                                 :S_P => "If `P` is not `nothing`, `!isempty(P)` and `size(S) == size(P)`.",#
                                  :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
-                                 :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                                 :kalg => "If `alg` is an `Integer`, `alg >= 1`.",#
                                  :dbhtpower => "`power > 0`.",#
                                  :dbhtcoef => "`isfinite(coef) && coef > 0`.",#
                                  :Xe => "`!isempty(X)`.",#
@@ -929,6 +929,9 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
                                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                                  :meucci2005 => "[meucci2005](@cite) A. Meucci. *Risk and Asset Allocation* (Springer Berlin Heidelberg, 2005).",#
+                                 :fan2008 => "[fan2008](@cite) J. Fan, Y. Fan and J. Lv. *High dimensional covariance matrix estimation using a factor model*. Journal of Econometrics 147, 186–197 (2008).",#
+                                 :martelliniziemann2010 => "[martelliniziemann2010](@cite) L. Martellini and V. Ziemann. *Improved estimates of higher-order comoments and implications for portfolio selection*. The Review of Financial Studies 23, 1467–1502 (2010).",#
+                                 :boudt2015 => "[boudt2015](@cite) K. Boudt, W. Lu and B. Peeters. *Higher order comoments of multifactor models and asset allocation*. Finance Research Letters 13, 225–233 (2015).",#
                                  :jorion1986 => "[jorion1986](@cite) P. Jorion. *Bayes-Stein estimation for portfolio analysis*. The Journal of Financial and Quantitative Analysis 21, 279–292 (1986).",#
                                  :bodnar2019 => "[bodnar2019](@cite) T. Bodnar, O. Okhrin and N. Parolya. *Optimal shrinkage estimator for high-dimensional mean vector*. Journal of Multivariate Analysis 170, 63–79 (2019).",#
                                  :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).",#
@@ -936,7 +939,32 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :sibuya1960 => "[sibuya1960](@cite) M. Sibuya. *Bivariate extreme statistics, I*. Annals of the Institute of Statistical Mathematics 11, 195–210 (1960).",#
                                  :luca2011 => "[luca2011](@cite) G. De Luca and P. Zuccolotto. *A tail dependence-based dissimilarity measure for financial time series clustering*. Advances in Data Analysis and Classification 5, 323–340 (2011).",#
                                  :hacinegharbi2012 => "[hacinegharbi2012](@cite) A. Hacine-Gharbi, P. Ravier, R. Harba and T. Mohamadi. *Low bias histogram-based estimation of mutual information for feature selection*. Pattern Recognition Letters 33, 1302–1308 (2012).",#
-                                 :hacinegharbi2018 => "[hacinegharbi2018](@cite) A. Hacine-Gharbi and P. Ravier. *A binning formula of bi-histogram for joint entropy estimation using mean square error minimization*. Pattern Recognition Letters 101, 21–28 (2018).")
+                                 :hacinegharbi2018 => "[hacinegharbi2018](@cite) A. Hacine-Gharbi and P. Ravier. *A binning formula of bi-histogram for joint entropy estimation using mean square error minimization*. Pattern Recognition Letters 101, 21–28 (2018).",#
+                                 :vandongen2012 => "[vandongen2012](@cite) S. Van Dongen and A. J. Enright. *Metric distances derived from cosine similarity and Pearson and Spearman correlations*. arXiv preprint arXiv:1208.3145 (2012).",#
+                                 :rousseeuw1987 => "[rousseeuw1987](@cite) P. J. Rousseeuw. *Silhouettes: a graphical aid to the interpretation and validation of cluster analysis*. Journal of Computational and Applied Mathematics 20, 53–65 (1987).",#
+                                 :lopezdeprado2019 => "[lopezdeprado2019](@cite) M. López de Prado and M. J. Lewis. *Detection of false investment strategies using unsupervised learning methods*. Quantitative Finance 19, 1555–1565 (2019).",#
+                                 :yue2008 => "[yue2008](@cite) S. Yue, X. Wang and M. Wei. *Application of two-order difference to gap statistic*. Transactions of Tianjin University 14, 217–221 (2008).",#
+                                 :tibshirani2001 => "[tibshirani2001](@cite) R. Tibshirani, G. Walther and T. Hastie. *Estimating the number of clusters in a data set via the gap statistic*. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 63, 411–423 (2001).",#
+                                 :mullner2011 => "[mullner2011](@cite) D. Müllner. *Modern hierarchical, agglomerative clustering algorithms*. arXiv preprint arXiv:1109.2378 (2011).",#
+                                 :virtanen2020 => "[virtanen2020](@cite) P. Virtanen, R. Gommers, T. E. Oliphant, M. Haberland, T. Reddy, D. Cournapeau, E. Burovski, P. Peterson, W. Weckesser, J. Bright, S. J. van der Walt, M. Brett, J. Wilson, K. J. Millman, N. Mayorov, A. R. Nelson, E. Jones, R. Kern, E. Larson, C. J. Carey, İ. Polat, Y. Feng, E. W. Moore, J. VanderPlas, D. Laxalde, J. Perktold, R. Cimrman, I. Henriksen, E. A. Quintero, C. R. Harris, A. M. Archibald, A. H. Ribeiro, F. Pedregosa and P. van Mulbregt. *SciPy 1.0: fundamental algorithms for scientific computing in Python*. Nature Methods 17, 261–272 (2020).",#
+                                 :lloyd1982 => "[lloyd1982](@cite) S. P. Lloyd. *Least squares quantization in PCM*. IEEE Transactions on Information Theory 28, 129–137 (1982).",#
+                                 :freeman1977 => "[freeman1977](@cite) L. C. Freeman. *A set of measures of centrality based on betweenness*. Sociometry 40, 35–41 (1977).",#
+                                 :freeman1979 => "[freeman1979](@cite) L. C. Freeman. *Centrality in social networks conceptual clarification*. Social Networks 1, 215–239 (1979).",#
+                                 :brandes2001 => "[brandes2001](@cite) U. Brandes. *A faster algorithm for betweenness centrality*. The Journal of Mathematical Sociology 25, 163–177 (2001).",#
+                                 :bonacich1987 => "[bonacich1987](@cite) P. Bonacich. *Power and centrality: a family of measures*. American Journal of Sociology 92, 1170–1182 (1987).",#
+                                 :katz1953 => "[katz1953](@cite) L. Katz. *A new status index derived from sociometric analysis*. Psychometrika 18, 39–43 (1953).",#
+                                 :brin1998 => "[brin1998](@cite) S. Brin and L. Page. *The anatomy of a large-scale hypertextual Web search engine*. Computer Networks and ISDN Systems 30, 107–117 (1998).",#
+                                 :valente1998 => "[valente1998](@cite) T. W. Valente and R. K. Foreman. *Integration and radiality: measuring the extent of an individual's connectedness and reachability in a network*. Social Networks 20, 89–105 (1998).",#
+                                 :shimbel1953 => "[shimbel1953](@cite) A. Shimbel. *Structural parameters of communication networks*. The Bulletin of Mathematical Biophysics 15, 501–507 (1953).",#
+                                 :estrada2011 => "[estrada2011](@cite) E. Estrada. *The Structure of Complex Networks: Theory and Applications* (Oxford University Press, 2011).",#
+                                 :mantegna1999 => "[mantegna1999](@cite) R. N. Mantegna. *Hierarchical structure in financial markets*. The European Physical Journal B 11, 193–197 (1999).",#
+                                 :kruskal1956 => "[kruskal1956](@cite) J. B. Kruskal. *On the shortest spanning subtree of a graph and the traveling salesman problem*. Proceedings of the American Mathematical Society 7, 48–50 (1956).",#
+                                 :boruvka1926 => "[boruvka1926](@cite) O. Borůvka. *O jistém problému minimálním*. Práce Moravské Přírodovědecké Společnosti 3, 37–58 (1926).",#
+                                 :prim1957 => "[prim1957](@cite) R. C. Prim. *Shortest connection networks and some generalizations*. The Bell System Technical Journal 36, 1389–1401 (1957).",#
+                                 :tumminello2005 => "[tumminello2005](@cite) M. Tumminello, T. Aste, T. Di Matteo and R. N. Mantegna. *A tool for filtering information in complex systems*. Proceedings of the National Academy of Sciences 102, 10421–10426 (2005).",#
+                                 :graphpo1 => "[graphpo1](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization*. Available at SSRN 4602019 (2023).",#
+                                 :graphpo2 => "[graphpo2](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization Part II*. Available at SSRN 4667426 (2023).",#
+                                 :riccascozzari2024 => "[riccascozzari2024](@cite) F. Ricca and A. Scozzari. *Portfolio optimization through a network approach: network assortative mixing and portfolio diversification*. European Journal of Operational Research 312, 700–717 (2024).")
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -4069,7 +4097,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-infinity norm (maximum absolute deviation) error estimator.
 
-`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and divides it by ``T - d``. The `pos` field selects the order of the norm: `true` takes ``+\\infty`` and `false` takes ``-\\infty``, the *smallest* absolute deviation.
+`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and divides it by ``T - d``.
 
 # Mathematical definition
 
@@ -4081,7 +4109,7 @@ L-infinity norm (maximum absolute deviation) error estimator.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error. `pos = true` takes ``+\\infty``, the largest absolute deviation. `pos = false` takes ``-\\infty``, the smallest absolute deviation.
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.
   - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
   - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
   - $(math_dict[:T])
@@ -4093,7 +4121,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LInfNorm(; ddof::Integer = 0, pos::Bool = true) -> LInfNorm
+    LInfNorm(; ddof::Integer = 0) -> LInfNorm
 
 Keywords correspond to the struct's fields.
 
@@ -4106,13 +4134,8 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> LInfNorm()
 LInfNorm
-  ddof ┼ Int64: 0
-   pos ┴ Bool: true
+  ddof ┴ Int64: 0
 ```
-
-!!! warning
-
-    The JuMP model encodes ``+\\infty`` for both values of `pos`, because `set_risk_constraints!` and `set_tracking_error_constraints!` both build a `JuMP.MOI.NormInfinityCone`. With `pos = false` the functor takes the smallest absolute deviation while the model still bounds the largest, so the two disagree. On a 40×3 sample the model reported `0.0004210905887530551` against the functor's `6.1799508716302665e-6`, a factor of 68. The smallest absolute deviation is not a convex function of the weights, so no cone represents it. Use `pos = true` until the meaning of `pos = false` is settled.
 
 # Related
 
@@ -4129,17 +4152,13 @@ LInfNorm
     $(field_dict[:ddof])
     """
     ddof
-    """
-    $(field_dict[:pos])
-    """
-    pos
-    function LInfNorm(ddof::Integer, pos::Bool)::LInfNorm
+    function LInfNorm(ddof::Integer)::LInfNorm
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(ddof), typeof(pos)}(ddof, pos)
+        return new{typeof(ddof)}(ddof)
     end
 end
-function LInfNorm(; ddof::Integer = 0, pos::Bool = true)::LInfNorm
-    return LInfNorm(ddof, pos)
+function LInfNorm(; ddof::Integer = 0)::LInfNorm
+    return LInfNorm(ddof)
 end
 """
     norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
@@ -4307,22 +4326,10 @@ function norm_error(f::LpNorm, a, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a, f.p) / norm_factor(f, T)
 end
 function norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
-    ty = promote_type(eltype(a), eltype(b))
-    p = if f.pos
-        typemax(ty)
-    else
-        typemin(ty)
-    end
-    return LinearAlgebra.norm(a - b, p) / norm_factor(f, T)
+    return LinearAlgebra.norm(a - b, Inf) / norm_factor(f, T)
 end
 function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
-    ty = eltype(a)
-    p = if f.pos
-        typemax(ty)
-    else
-        typemin(ty)
-    end
-    return LinearAlgebra.norm(a, p) / norm_factor(f, T)
+    return LinearAlgebra.norm(a, Inf) / norm_factor(f, T)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,

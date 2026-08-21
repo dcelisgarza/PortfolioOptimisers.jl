@@ -26,3 +26,10 @@ NoDecay
 separation_decay
 PortfolioOptimisers.assert_separation_decay
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -3,41 +3,61 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods.
 
+The root is chosen inside [`CliqHierarchyTree2s`](@ref), which builds the clique hierarchy of the planar graph. A hierarchy needs one node with no parent, and the planar clique tree can present several candidates, so the choice of which of them becomes the root is a member of this family.
+
 # Related
 
   - [`UniqueRoot`](@ref)
   - [`EqualRoot`](@ref)
   - [`DBHT`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+
+# References
+
+  - $(ref_dict[:NHPG])
+  - $(ref_dict[:DBHTs])
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A DBHT root selection method that enforces a unique root in the hierarchy.
+Takes one clique of the planar hierarchy as its single root.
 
 # Related
 
   - [`DBHTRootMethod`](@ref)
   - [`EqualRoot`](@ref)
   - [`DBHT`](@ref)
+  - [`CliqueRoot`](@ref)
+
+# References
+
+  - $(ref_dict[:NHPG])
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A DBHT root selection method that creates a root from the adjacency tree of all root candidates. This can be used to represent multiple equally plausible roots in the DBHT hierarchy.
+Builds one root from the adjacency tree of every root candidate.
+
+This keeps several equally plausible roots of the DBHT hierarchy rather than choosing between them.
 
 # Related
 
   - [`DBHTRootMethod`](@ref)
   - [`UniqueRoot`](@ref)
   - [`DBHT`](@ref)
+  - [`CliqueRoot`](@ref)
+
+# References
+
+  - $(ref_dict[:NHPG])
 """
 struct EqualRoot <: DBHTRootMethod end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
+Clusters assets by the bubble hierarchy of a triangulated maximally filtered graph.
 
 `DBHT` is a composable clustering algorithm type for constructing hierarchical clusterings using the Direct Bubble Hierarchical Tree (DBHT) method, as described in [DBHTs](@cite).
 
@@ -98,16 +118,22 @@ function DBHT(;
     return DBHT(sim, root)
 end
 """
-    PMFG_T2s(W::MatNum; nargout::Integer = 3)
+    PMFG_T2s(W::MatNum, nargout::Integer = 3)
 
 Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate a Maximal Planar Graph with the largest total weight, also known as the Planar Maximally Filtered Graph (PMFG). All weights must be non-negative.
 
 This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and LoGo algorithms, providing the planar graph structure and clique information required for hierarchical clustering and sparse inverse covariance estimation.
 
+`nargout` is a **positional** argument, and every caller passes it positionally.
+
+# The TMFG approximates the PMFG, and is not it
+
+The planar maximally filtered graph is the exact solution of the weighted maximal planar graph problem, which is costly. The triangulation this function builds is the cheap greedy approximation to it, so the name of the function is the problem and the algorithm is the approximation. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree: measured over a 20-asset sample, the graph holds `54` edges.
+
 # Arguments
 
   - `W`: `N × N` matrix of non-negative, finite weights (e.g. a similarity matrix from an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), or an absolute correlation matrix).
-  - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
+  - `nargout`: Number of outputs to build. `cliques` is built when `nargout > 3` and `cliqueTree` when `nargout > 4`; each is `nothing` otherwise. The first three outputs are always built.
 
 # Validation
 
@@ -150,6 +176,7 @@ These two checks are kept for the case those cannot cover: that family is open *
 # References
 
   - $(ref_dict[:PMFG])
+  - $(ref_dict[:tumminello2005])
 """
 function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     N = size(W, 1)
@@ -1727,18 +1754,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all inverse matrix sparsification algorithms.
 
+A member of this family imposes a sparsity pattern on the **inverse** of a covariance matrix rather than on the matrix itself. The covariance that comes back is dense; what is sparse is its precision, and the zeros there are the conditional independences the information filtering network selected.
+
 # Related
 
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
   - [`LoGo`](@ref)
+
+# References
+
+  - $(ref_dict[:J_LoGo])
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-LoGo (Local-Global) sparse inverse covariance estimation algorithm.
+Sparsifies the inverse covariance matrix on the cliques of an information filtering network.
 
 `LoGo` is a composable algorithm type for estimating sparse inverse covariance matrices using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition, as described in [J_LoGo](@cite). It combines a distance estimator and a similarity matrix algorithm, both validated and extensible, to produce a robust, interpretable sparse precision matrix for use in portfolio optimization and risk management.
+
+# What is sparse is the precision, not the covariance
+
+[`J_LoGo`](@ref) sums the inverse of each clique block and subtracts the inverse of each separator block, and the matrix that comes out is **exactly zero** wherever the network carries no edge. Measured over a 20-asset sample, the triangulated maximally filtered graph holds `54` edges — the `3n - 6` of a maximal planar graph — and the largest absolute entry of the precision matrix away from those edges is `0.0`.
+
+`sigma` is then replaced by the inverse of that precision matrix, so what the caller receives is dense. The filtering is a statement about which pairs are conditionally independent given the rest, and it survives only in the precision.
 
 # Fields
 
@@ -1829,6 +1868,8 @@ const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
 
 Validate compatibility of the distance estimator and covariance matrix for LoGo sparse inverse covariance estimation by checking `size(sigma, 1) == size(X, 2)`.
 
+The check runs for a [`VariationInfoDistance`](@ref) estimator alone, which is the only family that reads `X` rather than the correlation matrix. Every other estimator takes the no-op fallback, so a mismatched `X` passes.
+
 # Arguments
 
   - `de`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
@@ -1882,7 +1923,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 
 # Details
 
-  - If `rho` is a covariance matrix, it is converted to a correlation matrix using `StatsBase.cov2cor`.
+  - If `sigma` is a covariance matrix, a correlation matrix is derived from it with `StatsBase.cov2cor` and used for the distance and the similarity. `sigma` itself stays a covariance, and it is what [`J_LoGo`](@ref) decomposes.
   - Computes the distance matrix using the configured distance estimator.
   - Computes the similarity matrix using the configured similarity algorithm.
   - Constructs the PMFG and extracts cliques and separators.
@@ -1893,7 +1934,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 # Validation
 
   - `size(sigma, 1) == size(sigma, 2)`.
-  - `size(sigma, 1) == size(X, 2)`.
+  - `size(sigma, 1) == size(X, 2)`, **only when `je.de` reads `X`**. [`LoGo_dist_assert`](@ref) carries the check, and it has a method for the variation-of-information estimators alone; every other estimator takes the no-op fallback. A default `LoGo()` therefore accepts a `20 × 20` `sigma` beside a `400 × 10` `X` and returns without raising, because [`CanonicalDistance`](@ref) derives the distance from the correlation matrix and never touches `X`.
 
 # Returns
 
@@ -1960,14 +2001,13 @@ end
     matrix_processing_algorithm!(je::LoGo, sigma::MatNum,
                                  X::MatNum; dims::Int = 1, kwargs...)
 
-Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
+Apply the LoGo (Local-Global) transformation in-place to the covariance matrix, as a step of the matrix processing pipeline.
 
 This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of `PortfolioOptimisers.jl`. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is not `nothing`, the result is projected to the nearest positive definite matrix.
 
 # Arguments
 
-  - `je`: LoGo algorithm instance (`LoGo`).
-  - `pdm`: Optional positive definite matrix estimator (e.g., `Posdef()`), or `nothing`.
+  - `je`: LoGo algorithm instance (`LoGo`). Its own `pdm` field carries the positive definite repair, so there is no `pdm` argument here.
   - `sigma`: Covariance matrix (`N × N`), updated in-place.
   - `X`: Data matrix (`T × N` or `N × T`).
   - $(arg_dict[:dims])

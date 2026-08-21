@@ -97,9 +97,9 @@ const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for generating semi-definite phylogeny-based constraints.
+Forbids co-movement between related assets through a semidefinite relaxation, refitting the structure from returns.
 
-`SemiDefinitePhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using a semi-definite matrix representation. The estimator wraps a phylogeny or clustering estimator and a non-negative penalty parameter `p`, which controls the strength of the constraint.
+The estimator holds the source that builds the relatedness matrix and the penalty factor `p`. [`phylogeny_constraints`](@ref) refits the source against a returns matrix and returns a [`SemiDefinitePhylogeny`](@ref), which carries the equations this constraint solves.
 
 Which pairs a network source relates — and therefore how strong the constraint is — comes from its [`AbstractSeparationAlgorithm`](@ref), not from anything set here. The constraint is **weight-inert**: `A ⊙ W == 0` is the same constraint at any magnitude, so the separation changes the *cardinality* of the forbidden set and nothing else.
 
@@ -117,6 +117,8 @@ $(DocStringExtensions.FIELDS)
         pl::NwE_ClE = NetworkEstimator(),
         p::Number = 0.05
     ) -> SemiDefinitePhylogenyEstimator
+
+Keywords correspond to the struct's fields. The default `p = 0.05` is the value the source's own worked example uses.
 
 ## Validation
 
@@ -162,6 +164,12 @@ SemiDefinitePhylogenyEstimator
   - [`AbstractPhylogenyEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
   - [`phylogeny_constraints`](@ref)
+
+# References
+
+  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo2])
+  - $(ref_dict[:cajas2025]) Sections 13.1.7.2 and 13.2.4.2.
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
@@ -198,9 +206,47 @@ const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for the result of semi-definite phylogeny-based constraint generation.
+Drives the product of weights of every related pair of assets to zero through a semidefinite relaxation.
 
-`SemiDefinitePhylogeny` stores the constraint matrix `A` and penalty parameter `p` resulting from a semi-definite phylogeny constraint estimator. This type is used to encapsulate the output of phylogeny-based constraint routines, enabling composable and modular constraint handling in portfolio optimisation workflows.
+Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster.
+
+# Mathematical definition
+
+The relaxation replaces the outer product of the weights with a symmetric matrix variable and bounds it below through a Schur complement. Where the objective is already a trace against that variable — a variance — the constraint form applies:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\, \\mathbf{W}}{\\min}\\quad & \\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})\\\\
+\\textrm{s.t.}\\quad & \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0\\,,\\\\
+& \\mathbf{A} \\odot \\mathbf{W} = 0\\,,\\\\
+& \\mathbf{W} \\in \\mathbb{S}^{N}\\,,\\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+For every other risk measure nothing in the objective pulls the relaxation down, so a penalty term does it instead:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\, \\mathbf{W}}{\\min}\\quad & \\phi(\\boldsymbol{w}) + p\\, \\mathrm{tr}(\\mathbf{W})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathbf{W}``: Symmetric ``N \\times N`` matrix variable that relaxes ``\\boldsymbol{w}\\boldsymbol{w}^\\intercal / k``.
+  - ``\\mathbf{A}``: Relatedness matrix, the `A` field.
+  - ``p``: Penalty factor, the `p` field.
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{\\Sigma}``: Covariance matrix.
+  - ``\\phi``: Risk measure of the optimiser.
+  - ``\\odot``: Hadamard product.
+  - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
+  - ``\\mathcal{W}``: Rest of the feasible set.
+
+The two branches are what the code does: [`set_sdp_phylogeny_constraints!`](@ref) always writes `A ⊙ W == 0` and adds `p * tr(W)` to the objective penalty **only** when the model carries no variance. On a 250×6 sample the Hadamard constraint holds to `2.1e-18` under a variance objective and to `3.1e-21` under a conditional-value-at-risk objective.
+
+`p` therefore sets the size of the **relaxation gap**, not the strength of the constraint. `A ⊙ W == 0` is weight-inert: it is the same constraint at any magnitude of `A`. What `p` buys is how closely `W` tracks the outer product it stands for. On the same sample the largest entry of ``\\mathbf{W} - \\boldsymbol{w}\\boldsymbol{w}^\\intercal`` is `2.7e-5` under the variance objective, where the objective itself closes the gap, against `0.0274` under conditional value at risk at the default `p = 0.05` — three orders of magnitude wider. A wider gap lets a pair of related assets both hold weight while their entry of `W` absorbs the product.
 
 # Fields
 
@@ -208,10 +254,16 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
+    SemiDefinitePhylogeny(
+        A::MatNum_PhRMatNum,
+        p::Number
+    ) -> SemiDefinitePhylogeny
     SemiDefinitePhylogeny(;
         A::MatNum_PhRMatNum,
         p::Number = 0.05
     ) -> SemiDefinitePhylogeny
+
+Keywords correspond to the struct's fields. The default `p = 0.05` is the value the source's own worked example uses.
 
 ## Validation
 
@@ -235,6 +287,12 @@ SemiDefinitePhylogeny
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
+
+# References
+
+  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo2])
+  - $(ref_dict[:cajas2025]) Sections 13.1.7.2 and 13.2.4.2.
 """
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
     """
@@ -351,9 +409,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for generating integer phylogeny-based constraints.
+Caps how many related assets may be held at once, refitting the structure from returns.
 
-`IntegerPhylogenyEstimator` constructs constraints based on phylogenetic or clustering structures among assets, using integer or discrete representations. The estimator wraps a phylogeny or clustering estimator, a non-negative integer or vector of integers `B` specifying group sizes or allocations, and a big-M parameter `scale` used for formulating the MIP constraints.
+The estimator holds the source that builds the relatedness matrix and the cap `B`. [`phylogeny_constraints`](@ref) refits the source against a returns matrix and returns an [`IntegerPhylogeny`](@ref), which carries the equations this constraint solves.
 
 Which pairs a network source relates comes from its [`AbstractSeparationAlgorithm`](@ref), and `B` is an integer cardinality counted over them. The relatedness itself stays binary under either separation: [`PhylogenyResult`](@ref)'s matrix is `Int`, and a graded one would not be countable here.
 
@@ -369,9 +427,10 @@ $(DocStringExtensions.FIELDS)
 
     IntegerPhylogenyEstimator(;
         pl::NwE_ClE = NetworkEstimator(),
-        B::Int_VecInt = 1,
-        scale::Number = 100_000.0
+        B::Int_VecInt = 1
     ) -> IntegerPhylogenyEstimator
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -386,33 +445,32 @@ $(DocStringExtensions.FIELDS)
 ```jldoctest
 julia> IntegerPhylogenyEstimator()
 IntegerPhylogenyEstimator
-     pl ┼ NetworkEstimator
-        │    ce ┼ PortfolioOptimisersCovariance
-        │       │   ce ┼ Covariance
-        │       │      │    me ┼ SimpleExpectedReturns
-        │       │      │       │   w ┴ nothing
-        │       │      │    ce ┼ GeneralCovariance
-        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │       │      │       │    w ┴ nothing
-        │       │      │   alg ┴ FullMoment()
-        │       │   mp ┼ MatrixProcessing
-        │       │      │     pdm ┼ Posdef
-        │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │       │      │      dn ┼ nothing
-        │       │      │      dt ┼ nothing
-        │       │      │     alg ┼ nothing
-        │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-        │    de ┼ Distance
-        │       │   power ┼ nothing
-        │       │     alg ┴ CanonicalDistance()
-        │   alg ┼ KruskalTree
-        │       │     args ┼ Tuple{}: ()
-        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │   sep ┼ HopCount
-        │       │   n ┴ Int64: 1
-      B ┼ Int64: 1
-  scale ┴ Float64: 100000.0
+  pl ┼ NetworkEstimator
+     │    ce ┼ PortfolioOptimisersCovariance
+     │       │   ce ┼ Covariance
+     │       │      │    me ┼ SimpleExpectedReturns
+     │       │      │       │   w ┴ nothing
+     │       │      │    ce ┼ GeneralCovariance
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │    w ┴ nothing
+     │       │      │   alg ┴ FullMoment()
+     │       │   mp ┼ MatrixProcessing
+     │       │      │     pdm ┼ Posdef
+     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │       │      │      dn ┼ nothing
+     │       │      │      dt ┼ nothing
+     │       │      │     alg ┼ nothing
+     │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+     │    de ┼ Distance
+     │       │   power ┼ nothing
+     │       │     alg ┴ CanonicalDistance()
+     │   alg ┼ KruskalTree
+     │       │     args ┼ Tuple{}: ()
+     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │   sep ┼ HopCount
+     │       │   n ┴ Int64: 1
+   B ┴ Int64: 1
 ```
 
 # Related
@@ -421,6 +479,13 @@ IntegerPhylogenyEstimator
   - [`AbstractPhylogenyConstraintEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
   - [`phylogeny_constraints`](@ref)
+
+# References
+
+  - $(ref_dict[:riccascozzari2024])
+  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo2])
+  - $(ref_dict[:cajas2025]) Sections 13.1.7.1 and 13.2.4.1.
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
@@ -431,29 +496,51 @@ IntegerPhylogenyEstimator
     $(field_dict[:B_phylo])
     """
     B
-    """
-    $(field_dict[:scale_phylo])
-    """
-    scale
-    function IntegerPhylogenyEstimator(pl::NwE_ClE, B::Int_VecInt,
-                                       scale::Number)::IntegerPhylogenyEstimator
+    function IntegerPhylogenyEstimator(pl::NwE_ClE,
+                                       B::Int_VecInt)::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pl, B)
         end
-        return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
+        return new{typeof(pl), typeof(B)}(pl, B)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_VecInt = 1,
-                                   scale::Number = 100_000.0)::IntegerPhylogenyEstimator
-    return IntegerPhylogenyEstimator(pl, B, scale)
+function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
+                                   B::Int_VecInt = 1)::IntegerPhylogenyEstimator
+    return IntegerPhylogenyEstimator(pl, B)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for the result of integer phylogeny-based constraint generation.
+Caps at `B` the number of related assets a mixed-integer model may hold at once.
 
-`IntegerPhylogeny` stores the constraint matrix `A`, group sizes or allocations `B`, and scaling parameter `scale` resulting from an integer phylogeny constraint estimator. This type encapsulates the output of integer/discrete phylogeny-based constraint routines, enabling composable and modular constraint handling in portfolio optimisation workflows.
+Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster.
+
+# Mathematical definition
+
+The cap is a mutually exclusive investment constraint on the held binary:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}}\\quad & \\phi(\\boldsymbol{w})\\\\
+\\textrm{s.t.}\\quad & \\mathbf{A} \\boldsymbol{z} \\leq \\boldsymbol{B}\\,,\\\\
+& \\boldsymbol{\\ell} \\odot \\boldsymbol{z} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u} \\odot \\boldsymbol{z}\\,,\\\\
+& \\boldsymbol{z} \\in \\{0, 1\\}^{N}\\,,\\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{z}``: Held binary, one entry per asset.
+  - ``\\mathbf{A}``: Stored relatedness rows, the `A` field.
+  - ``\\boldsymbol{B}``: Cap, the `B` field.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper weight bounds.
+  - ``\\phi``: Objective function of the optimiser.
+  - ``\\odot``: Hadamard product.
+  - ``\\mathcal{W}``: Rest of the feasible set.
+
+The constructor stores `unique(A + I; dims = 1)`, **not** the matrix it is given. The identity adds each asset to its own row, and the deduplication drops repeated rows, so one row survives per distinct neighbourhood or cluster. This is why the stored `A` is usually shorter than it is wide, and why a vector `B` is checked against the stored row count rather than against the number of assets. A network source with `B = 1` then forbids holding two assets that are neighbours; a clustering source with `B = 1` holds at most one asset per cluster.
 
 # Fields
 
@@ -461,11 +548,16 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
+    IntegerPhylogeny(
+        A::MatNum_PhRMatNum,
+        B::Int_VecInt
+    ) -> IntegerPhylogeny
     IntegerPhylogeny(;
         A::MatNum_PhRMatNum,
-        B::Int_VecInt = 1,
-        scale::Number = 100_000.0
+        B::Int_VecInt = 1
     ) -> IntegerPhylogeny
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -478,11 +570,10 @@ $(DocStringExtensions.FIELDS)
 # Examples
 
 ```jldoctest
-julia> IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2, scale = 100_000.0)
+julia> IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2)
 IntegerPhylogeny
-      A ┼ 1×2 Matrix{Float64}
-      B ┼ Int64: 2
-  scale ┴ Float64: 100000.0
+  A ┼ 1×2 Matrix{Float64}
+  B ┴ Int64: 2
 ```
 
 # Related
@@ -492,21 +583,24 @@ IntegerPhylogeny
   - [`IntegerPhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
+
+# References
+
+  - $(ref_dict[:riccascozzari2024])
+  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo2])
+  - $(ref_dict[:cajas2025]) Sections 13.1.7.1 and 13.2.4.1.
 """
 @concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult
     """
-    $(field_dict[:A_phylo])
+    $(field_dict[:A_iphylo])
     """
     A
     """
     $(field_dict[:B_phylo])
     """
     B
-    """
-    $(field_dict[:scale_phylo])
-    """
-    scale
-    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)::IntegerPhylogeny
+    function IntegerPhylogeny(A::MatNum, B::Int_VecInt)::IntegerPhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)),
                   ArgumentError("all diagonal entries of A must be zero"))
         @argcheck(LinearAlgebra.issymmetric(A),
@@ -517,16 +611,14 @@ IntegerPhylogeny
             @argcheck(size(A, 1) == length(B),
                       DimensionMismatch("size(A, 1) ($(size(A, 1))) must match length(B) ($(length(B)))"))
         end
-        return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
+        return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt,
-                          scale::Number)::IntegerPhylogeny
-    return IntegerPhylogeny(A.X, B, scale)
+function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt)::IntegerPhylogeny
+    return IntegerPhylogeny(A.X, B)
 end
-function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
-                          scale::Number = 100_000.0)::IntegerPhylogeny
-    return IntegerPhylogeny(A, B, scale)
+function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1)::IntegerPhylogeny
+    return IntegerPhylogeny(A, B)
 end
 """
     phylogeny_constraints(plc::Option{<:PlCE_PlC}, X::MatNum; dims::Int = 1, kwargs...)
@@ -571,7 +663,7 @@ end
 function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::MatNum; dims::Int = 1,
                                kwargs...)
     return IntegerPhylogeny(; A = phylogeny_matrix(plc.pl, X; dims = dims, kwargs...),
-                            B = plc.B, scale = plc.scale)
+                            B = plc.B)
 end
 function phylogeny_constraints(plc::Option{<:AbstractPhylogenyConstraintResult}, args...;
                                kwargs...)
@@ -587,18 +679,45 @@ Abstract supertype for all centrality-based constraint types.
 
 All concrete types implementing centrality-based portfolio constraints should be subtypes of `AbstractCentralityConstraint`.
 
+A subtype states a bound on a linear function of the weights whose coefficients come from a graph, so [`centrality_constraints`](@ref) reduces it to a [`LinearConstraint`](@ref) before the model sees it.
+
 # Related
 
   - [`CentralityConstraint`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
+  - [`centrality_constraints`](@ref)
+  - [`LinearConstraint`](@ref)
 """
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for generating centrality-based portfolio constraints.
+Bounds the average centrality of the portfolio against a threshold read off the centrality vector itself.
 
-`CentralityConstraint` constructs constraints based on asset centrality measures within a phylogeny or network structure. It wraps a centrality estimator `A`, a [`VectorToScalarMeasure`](@ref) measure or threshold `B`, and a comparison operator `comp` [`ComparisonOperator`](@ref).
+The constraint diversifies by the influence an asset has in the network, rather than by its weight. [`centrality_constraints`](@ref) turns it into one row of a [`LinearConstraint`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}}\\quad & \\phi(\\boldsymbol{w})\\\\
+\\textrm{s.t.}\\quad & \\boldsymbol{c}^\\intercal \\boldsymbol{w} \\mathbin{\\square} \\bar{c}\\,,\\\\
+& \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{c}``: Centrality vector the estimator in `A` computes.
+  - ``\\bar{c}``: Threshold, the `B` field.
+  - ``\\square``: Comparison operator, the `comp` field.
+  - ``\\phi``: Objective function of the optimiser.
+  - ``\\mathcal{W}``: Rest of the feasible set.
+
+The source states this constraint as an equality against a desired average centrality. `comp` widens that: `==` builds an equality row and every other operator an inequality row.
+
+When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph and the constraint always has a feasible point. The measure reads the centrality vector, never the row after `comp` has flipped its sign: `MinValue()` gives the smallest entry under `<=` and under `>=` alike. On an eight-asset degree vector both give `0.14285714285714285`, and `MaxValue()` gives `0.42857142857142855`.
 
 # Fields
 
@@ -611,6 +730,8 @@ $(DocStringExtensions.FIELDS)
         B::Num_VecToScaM = MinValue(),
         comp::ComparisonOperator = <=
     ) -> CentralityConstraint
+
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -656,6 +777,12 @@ CentralityConstraint
   - [`VectorToScalarMeasure`](@ref)
   - [`ComparisonOperator`](@ref)
   - [`centrality_constraints`](@ref)
+  - [`LinearConstraint`](@ref)
+
+# References
+
+  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:cajas2025]) Section 13.1.6.
 """
 @concrete struct CentralityConstraint <: AbstractCentralityConstraint
     """
@@ -740,9 +867,13 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 # Details
 
   - For each constraint, computes the centrality vector using the estimator in `cc.A`.
-  - Applies the comparison operator and reduction measure or threshold in `cc.B` and `cc.comp`.
+  - Derives the threshold from `cc.B`. A number is the threshold itself; a [`VectorToScalarMeasure`](@ref) is applied to the centrality vector.
+  - Negates the row and the threshold together for an operator that points the other way, so every inequality is stored in the `A w <= B` form.
+  - Skips a constraint whose centrality vector is empty or all zero.
   - Aggregates constraints into equality and inequality forms.
   - Returns `nothing` if no valid constraints are generated.
+
+The threshold is derived **before** the negation, and negated once with the row. Deriving it from the negated row instead negates it a second time, which cancels the flip and turns a `MinValue()` into a `MaxValue()` with the wrong sign.
 
 # Related
 
@@ -766,8 +897,11 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs.
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(cc.comp)
-        A .*= d
+        # The measure reads the centrality vector, never the sign-flipped row. `d` negates the
+        # row and the right-hand side together, once each; deriving the threshold from `d * A`
+        # negates it a second time, which cancels the flip and swaps a min for a max.
         B = d * vec_to_real_measure(cc.B, A)
+        A .*= d
         if flag_ineq
             append!(A_ineq, A)
             append!(B_ineq, B)

@@ -2756,3 +2756,37 @@ end
     @test size(c3z) == size(c3p) == (N - 4, 3)
     @test size(cqz) == size(cqp) == (N - 3, 4)
 end
+@testset "An integer phylogeny carries no scale of its own" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    `IntegerPhylogeny` and `IntegerPhylogenyEstimator` each carried a `scale` field, a
+    big-M holdover from before the model owned the constraint scale. Nothing read it:
+    `set_iplg_constraints!` takes `sc = get_constraint_scale(model)` and emits
+    `sc * (A * ib ⊖ B) <= 0`, so the field reached no constraint. Measured before its
+    removal, `scale = 100_000.0`, `scale = 1.0` and `scale = -7.5` gave bit-identical
+    weights on a minimum-conditional-value-at-risk model, and the constructor validated
+    nothing there, so the negative value constructed. Issue #395 removed the field.
+
+    The field set is pinned here rather than a single `scale` absence, so that any field
+    added to either type is a deliberate edit to this test. The polarity that matters is
+    a second, *private* scale returning beside the model-wide one that every other
+    constraint family shares.
+    =#
+    @test fieldnames(IntegerPhylogenyEstimator) == (:pl, :B)
+    @test fieldnames(IntegerPhylogeny) == (:A, :B)
+    # The keyword is gone from both keyword constructors.
+    @test_throws MethodError IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1,
+                                                       scale = 100_000.0)
+    @test_throws MethodError IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2,
+                                              scale = 100_000.0)
+    # The positional constructors take the two fields and no third.
+    @test isa(IntegerPhylogenyEstimator(NetworkEstimator(), 1), IntegerPhylogenyEstimator)
+    @test isa(IntegerPhylogeny([0.0 1.0; 1.0 0.0], 2), IntegerPhylogeny)
+    # The refit from estimator to result carries only what the constraint reads.
+    X = randn(StableRNG(987654321), 200, 5)
+    ip = phylogeny_constraints(IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1),
+                               X)
+    @test isa(ip, IntegerPhylogeny)
+    @test propertynames(ip) == (:A, :B)
+    @test ip.B == 1
+end

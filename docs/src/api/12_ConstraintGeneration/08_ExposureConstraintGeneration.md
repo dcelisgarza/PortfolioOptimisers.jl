@@ -14,3 +14,10 @@ constraint_space_basis
 project_linear_constraint
 rebase_linear_constraints
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

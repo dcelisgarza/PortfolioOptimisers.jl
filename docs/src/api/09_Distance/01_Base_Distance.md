@@ -10,3 +10,10 @@ CanonicalDistance
 AbstractDistanceEstimator
 AbstractDistanceAlgorithm
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
