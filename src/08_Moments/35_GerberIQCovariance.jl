@@ -94,7 +94,7 @@ Computes or returns the Gerber Information Quality delay parameter `e`, potentia
 
 # Returns
 
-  - `tau::Number`: The lookback parameter for use in the decay equation.
+  - `e::Number`: The delay parameter for use in the decay equation. Observations no older than `e` periods are not discounted. This is not the source's window-duration truncation ``\\tau``, which the estimator does not expose.
 
 # References
 
@@ -255,9 +255,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for Gerber IQ estimators for scaling the threshold parameters for defining significant co-movements.
+Abstract supertype for the Gerber IQ estimators that discount an observation by its age.
 
-All concrete and/or abstract types implementing threshold scalers for Gerber Information Quality parameter estimators should be subtypes of `GerberIQDecayEstimator`.
+All concrete and/or abstract types implementing temporal decay for Gerber Information Quality parameter estimators should be subtypes of `GerberIQDecayEstimator`.
 
 # Interfaces
 
@@ -369,7 +369,7 @@ Keywords correspond to the struct's fields.
 
 Implements the exponential decay for Gerber IQ covariance.
 
-!!! Warning
+!!! warning
 
     The functor is not meant to be called directly unless all parameters are numeric. Otherwise, call [`regenerate_decay`](@ref) first.
 
@@ -1012,7 +1012,7 @@ Keywords correspond to the struct's fields.
 
 # Details
 
-The diagram shows a visual representation of the regions defined by `PartialGerberIQ`. In this case `c = 1`, `dp2 = 2`, `dn2 = 2`, `dp1 = 3`, and `dn1 = 3`. In this version, the limits are allowed to cross over the zero line. Thus, the constructor ensures `dp1 >= dp2` and `dn1 >= dn2` by swapping values if necessary to ensure consistency.
+The diagram shows a visual representation of the regions defined by `FullGerberIQ`. In this case `c = 1`, `dp2 = 2`, `dn2 = 2`, `dp1 = 3`, and `dn1 = 3`. In this version, the limits are allowed to cross over the zero line. Thus, the constructor ensures `dp1 >= dp2` and `dn1 >= dn2` by swapping values if necessary to ensure consistency.
 
   - The dashed lines indicate the limits of the areas where movements are considered small.
   - Only the [`Gerber1`](@ref) algorithm takes these regions into account as part of the neutral count.
@@ -1438,6 +1438,33 @@ Keywords correspond to the struct's fields.
   - `c >= 0`: `c` must be non-negative.
   - `c <= kind.d` (or equivalent for the chosen `kind`): via [`gerber_iq_assert_c_d`](@ref).
 
+# Examples
+
+```jldoctest
+julia> GerberIQCovariance()
+GerberIQCovariance
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ nothing
+        │           w ┼ nothing
+        │   corrected ┴ Bool: true
+     me ┼ SimpleExpectedReturns
+        │   w ┴ nothing
+    pdm ┼ Posdef
+        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      c ┼ Float64: 0.5
+  decay ┼ ExpGerberIQDecay
+        │   e ┼ nothing
+        │   y ┴ nothing
+     sc ┼ nothing
+   kind ┼ BasicGerberIQ
+        │   d ┼ Float64: 2.0
+        │   n ┴ Float64: 0.5
+    alg ┼ Gerber1()
+     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`BaseGerberIQCovariance`](@ref)
@@ -1675,7 +1702,7 @@ GerberIQ correlation:
 \\rho_{ij} &= \\begin{cases}
 (H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-}) & \\text{Gerber0} \\\\
 (H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-} + H_{ij}^{0}) & \\text{Gerber1} \\\\
-\\rho^{\\mathrm{G0}}_{ij} / \\sqrt{\\rho^{\\mathrm{G0}}_{ii}\\,\\rho^{\\mathrm{G0}}_{jj}} & \\text{Gerber2}
+h_{ij} / \\sqrt{h_{ii}\\,h_{jj}} & \\text{Gerber2}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -1685,7 +1712,8 @@ Where:
   - ``\\rho_{ij}``: GerberIQ correlation between assets ``i`` and ``j``.
   - ``H_{ij}^{+}``, ``H_{ij}^{-}``: Weighted concordant and discordant accumulators.
   - ``H_{ij}^{0}``: Weighted neutral (neither concordant nor discordant) accumulator (Gerber1 only).
-  - ``\\rho^{\\mathrm{G0}}_{ij}``: Gerber0 correlation (used for Gerber2 normalisation).
+  - ``h_{ij} = H_{ij}^{+} - H_{ij}^{-}``: The **raw** weighted difference, which is what Gerber2 standardises. Gerber2 does **not** normalise the Gerber0 ratio; the two agree only where ``H^{+} + H^{-}`` is constant across pairs.
+  - ``\\sqrt{h_{ii}\\,h_{jj}}``: Geometric mean of the diagonal, with the roots clamped below at ``\\sqrt{\\varepsilon}``.
 
 # Arguments
 
@@ -1710,7 +1738,7 @@ Where:
  6. For each [`GerberCovarianceAlgorithm`](@ref), the GerberIQ statistics is computed as follows:
     a. [`Gerber0`](@ref): `(pos - neg) / (pos + neg)`
     b. [`Gerber1`](@ref): `(pos - neg) / (pos + neg + nn)`
-    c. [`Gerber2`](@ref): The numerator is computes as when using [`Gerber0`](@ref), but the resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
+    c. [`Gerber2`](@ref): The entry is the raw difference `pos - neg`, and the resulting matrix is then standardised by dividing each element by the geometric mean of the corresponding diagonal elements. The numerator is not the [`Gerber0`](@ref) ratio.
 
 # Related
 

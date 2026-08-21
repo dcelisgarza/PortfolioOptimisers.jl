@@ -13,3 +13,10 @@ calc_asset_fees
 calc_asset_fixed_fees
 needs_previous_weights(fe::FeesE_Fees)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

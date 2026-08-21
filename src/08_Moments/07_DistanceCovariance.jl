@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Configures and applies distance-based covariance estimators.
+Measures linear and non-linear codependence from doubly-centred pairwise distance matrices.
 
-`DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy.
+The statistic is the distance covariance, which is zero if and only if the two series are independent. `metric`, `args` and `kwargs` configure the pairwise distance; `w` weights the observations and `ex` selects the parallel execution strategy.
 
 # Fields
 
@@ -23,7 +23,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -46,26 +46,33 @@ DistanceCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
   - [`factory`](@ref)
+  - [`cor_distance`](@ref)
+  - [`cov_distance`](@ref)
+
+# References
+
+  - $(ref_dict[:szekely2007])
+  - $(ref_dict[:cajas2025]) Section 6.1.5, equations 6.9 to 6.13.
 """
 @propagatable @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
     """
-    $(arg_dict[:metric])
+    $(field_dict[:metric])
     """
     metric
     """
-    $(arg_dict[:metric_args])
+    $(field_dict[:metric_args])
     """
     args
     """
-    $(arg_dict[:metric_kwargs])
+    $(field_dict[:metric_kwargs])
     """
     kwargs
     """
-    $(arg_dict[:oow])
+    $(field_dict[:oow])
     """
     @wprop w
     """
-    $(arg_dict[:ex])
+    $(field_dict[:ex])
     """
     ex
     function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
@@ -89,7 +96,7 @@ end
 
 Compute pairwise distance matrices between two vectors using the configured metric.
 
-Internal helper used in distance correlation computation. Handles weighted and unweighted cases.
+Internal helper used in distance correlation computation. Without weights it applies the metric to `v1` and `v2` directly. With weights it applies the metric to the element-wise products `v1 .* w` and `v2 .* w`, so an observation's weight scales its coordinate before the distance is taken.
 
 # Arguments
 
@@ -116,7 +123,8 @@ function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
            Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
 end
 """
-    cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+    cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Compute the distance correlation between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -170,6 +178,7 @@ Where:
   - `ce`: Distance covariance estimator.
   - `v1`: First data vector.
   - `v2`: Second data vector.
+  - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
@@ -209,7 +218,8 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 """
-    cor_distance(ce::DistanceCovariance, X::MatNum)
+    cor_distance(ce::DistanceCovariance, X::MatNum,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -219,6 +229,7 @@ This function computes the distance correlation between each pair of columns in 
 
   - `ce`: Distance covariance estimator.
   - `X`: Data matrix (observations × assets).
+  - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
@@ -297,7 +308,8 @@ function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     return cor_distance(ce, X, w)
 end
 """
-    cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+    cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Compute the distance covariance between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -309,7 +321,7 @@ Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as i
 
 ```math
 \\begin{align}
-\\widehat{\\mathrm{dCov}}(X, Y) &= \\sqrt{\\left|\\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\right|}\\,.
+\\widehat{\\mathrm{dCov}}(X, Y) &= \\sqrt{\\frac{\\mathbf{A}:\\mathbf{B}}{n^2}}\\,.
 \\end{align}
 ```
 
@@ -319,11 +331,14 @@ Where:
   - ``n``: Number of observations.
   - ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``: Frobenius inner product of doubly-centered distance matrices.
 
+The square root takes no absolute value. It needs none: the doubly-centred V-statistic is non-negative for a metric of strong negative type, which the Euclidean default is.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
   - `v1`: First data vector.
   - `v2`: Second data vector.
+  - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
@@ -361,7 +376,8 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
     return sqrt(dcov2_xy)
 end
 """
-    cov_distance(ce::DistanceCovariance, X::MatNum)
+    cov_distance(ce::DistanceCovariance, X::MatNum,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -371,6 +387,7 @@ This function computes the distance covariance between each pair of columns in `
 
   - `ce`: Distance covariance estimator.
   - `X`: Data matrix (observations × assets).
+  - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 

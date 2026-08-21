@@ -245,7 +245,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ignargs => "`args`: Additional positional arguments (ignored).",
                                  :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
                                  :rd => "`rd`: The returns result to use.",
-                                 :window => "`window`: Observation window.",
+                                 :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
                                  # Prior results.
                                  :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
                                  :w_prior => "`w`: Observation weights the prior was computed under `observations × 1` (see [`ObsWeights`](@ref)), or `nothing` if it was computed unweighted. Binds `ens`, `kld` and `ow`, which are diagnostics of it (see [`forward_prior`](@ref)).",#
@@ -400,9 +400,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :mu_ret_slot => "`mu`: Optional expected returns vector `assets × 1`. Also admits a **Deferred Quantity** — an expected returns estimator or a prior estimator that computes the vector against the optimisation's own prior, at [`factory`](@ref) time (see [`ArithRetMu`](@ref) and [`resolve_deferred_quantities`](@ref)). A `ucs` that carries its own centre outranks it, and it outranks the prior's own vector (ADR 0050). If `nothing`, the prior supplies it.",#
                                  :ddof => "`ddof`: Degrees-of-freedom correction.",#
                                  :flag => "`flag`: Algorithm selection flag.",#
-                                 :pos => "`pos`: Whether to consider only positive deviations.",#
+                                 :pos => "`pos`: Order of the infinity norm the functor takes. `true` uses ``+\\infty``, the largest absolute deviation. `false` uses ``-\\infty``, the smallest absolute deviation. The JuMP model encodes ``+\\infty`` for both values, so `false` makes the functor and the model disagree.",#
                                  # Turnover.
-                                 :w_tn => "`w`: Current portfolio weights vector.",#
+                                 :w_tn => "`w`: Reference portfolio weight vector. Deviations are measured against it, and it is never the candidate weight vector an optimiser solves for.",#
                                  :w_ref => "`w`: Reference portfolio weights vector.",#
                                  :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
                                  :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
@@ -931,7 +931,12 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :meucci2005 => "[meucci2005](@cite) A. Meucci. *Risk and Asset Allocation* (Springer Berlin Heidelberg, 2005).",#
                                  :jorion1986 => "[jorion1986](@cite) P. Jorion. *Bayes-Stein estimation for portfolio analysis*. The Journal of Financial and Quantitative Analysis 21, 279–292 (1986).",#
                                  :bodnar2019 => "[bodnar2019](@cite) T. Bodnar, O. Okhrin and N. Parolya. *Optimal shrinkage estimator for high-dimensional mean vector*. Journal of Multivariate Analysis 170, 63–79 (2019).",#
-                                 :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).")
+                                 :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).",#
+                                 :shannon1948 => "[shannon1948](@cite) C. E. Shannon. *A mathematical theory of communication*. The Bell System Technical Journal 27, 379–423 (1948).",#
+                                 :sibuya1960 => "[sibuya1960](@cite) M. Sibuya. *Bivariate extreme statistics, I*. Annals of the Institute of Statistical Mathematics 11, 195–210 (1960).",#
+                                 :luca2011 => "[luca2011](@cite) G. De Luca and P. Zuccolotto. *A tail dependence-based dissimilarity measure for financial time series clustering*. Advances in Data Analysis and Classification 5, 323–340 (2011).",#
+                                 :hacinegharbi2012 => "[hacinegharbi2012](@cite) A. Hacine-Gharbi, P. Ravier, R. Harba and T. Mohamadi. *Low bias histogram-based estimation of mutual information for feature selection*. Pattern Recognition Letters 33, 1302–1308 (2012).",#
+                                 :hacinegharbi2018 => "[hacinegharbi2018](@cite) A. Hacine-Gharbi and P. Ravier. *A binning formula of bi-histogram for joint entropy estimation using mean square error minimization*. Pattern Recognition Letters 101, 21–28 (2018).")
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1646,7 +1651,9 @@ end
 """
     did_you_mean(name::AbstractString, candidates) -> String
 
-Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).
+Return a "did you mean" suffix naming the closest match to `name` among `candidates`, or an empty string when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score` threshold (or `candidates` is empty). The suffix reads `" (did you mean X?)"`, with the match in place of X.
+
+Do not wrap the suffix in a code span that also carries escaped backticks. `JuliaFormatter` mis-pairs the backticks and deletes the spaces around the neighbouring code spans, which breaks the rendering.
 
 Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the active [`STRING_DISTANCE`](@ref) config — global default via [`set_string_distance!`](@ref), task-scoped override via [`with_string_distance`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
 
@@ -2585,6 +2592,12 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for custom value algorithms. These are user defined algorithms that return a custom value for an estimator.
 
 The interfaces users must implement depend on the estimator type.
+
+# Related
+
+  - [`AbstractAlgorithm`](@ref)
+  - [`CVal_Func_Num_VecNum`](@ref)
+  - [`CustomValueExpectedReturns`](@ref)
 """
 abstract type AbstractCustomValue <: AbstractAlgorithm end
 """
@@ -3754,11 +3767,23 @@ Abstract supertype for all norm-based error algorithms.
 
 All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
 
+# Interfaces
+
+In order to implement a new norm-based error algorithm which will work seamlessly with the library, subtype `NormError` with all necessary parameters struct, and implement the following method:
+
+  - `norm_factor(f::NormError, T::Number) -> Number`: Returns the divisor that scales the norm. The `T === nothing` case is already covered by a generic method that returns `1`.
+
+The functor side is [`norm_error`](@ref), and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three must agree.
+
 # Related
 
   - [`L2Norm`](@ref)
   - [`SquaredL2Norm`](@ref)
   - [`L1Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
+  - [`norm_error`](@ref)
+  - [`norm_factor`](@ref)
 """
 abstract type NormError <: AbstractEstimator end
 """
@@ -3784,6 +3809,8 @@ Where:
   - $(math_dict[:T])
   - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
 
+The source states the denominator as ``\\sqrt{T}``. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the source.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -3793,6 +3820,8 @@ $(DocStringExtensions.FIELDS)
     L2Norm(;
         ddof::Integer = 1
     ) -> L2Norm
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -3809,9 +3838,15 @@ L2Norm
 # Related
 
   - [`NormError`](@ref)
-  - [`SquaredSOCRiskExpr`](@ref)
+  - [`SquaredL2Norm`](@ref)
   - [`L1Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
   - [`norm_error`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.16.
 """
 @concrete struct L2Norm <: NormError
     """
@@ -3859,9 +3894,15 @@ $(DocStringExtensions.FIELDS)
         ddof::Integer = 1,
     ) -> SquaredL2Norm
 
+Keywords correspond to the struct's fields.
+
 ## Validation
 
   - `0 <= ddof`.
+
+# Details
+
+  - The value is the square of the [`L2Norm`](@ref) error. A `settings.ub` on a [`TrackingRiskMeasure`](@ref) therefore carries squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
 
 # Examples
 
@@ -3876,7 +3917,13 @@ SquaredL2Norm
   - [`NormError`](@ref)
   - [`L2Norm`](@ref)
   - [`L1Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
   - [`norm_error`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.16.
 """
 @concrete struct SquaredL2Norm <: NormError
     """
@@ -3929,7 +3976,13 @@ L1Norm()
   - [`NormError`](@ref)
   - [`L2Norm`](@ref)
   - [`SquaredL2Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
   - [`norm_error`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.17.
 """
 struct L1Norm <: NormError end
 """
@@ -3937,7 +3990,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-p norm error estimator.
 
-Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+`LpNorm` takes the Lp-norm of the difference between the portfolio and the benchmark returns, and divides it by ``(T - d)^{1/p}``. It generalises [`L1Norm`](@ref) and [`L2Norm`](@ref) to a free norm order.
 
 # Mathematical definition
 
@@ -3970,6 +4023,11 @@ Keywords correspond to the struct's fields.
 
   - `0 <= ddof`.
 
+# Details
+
+  - The constructor does not bound `p`. The JuMP model does: both `set_risk_constraints!` and `set_tracking_error_constraints!` need `1 < p` for the power cone, and throw a `DomainError` otherwise. The functor accepts any `p` that `LinearAlgebra.norm` accepts.
+  - `norm_factor` computes the divisor with `cbrt` when `p == 3`, the default.
+
 # Examples
 
 ```jldoctest
@@ -3984,7 +4042,10 @@ LpNorm
   - [`NormError`](@ref)
   - [`L1Norm`](@ref)
   - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
   - [`LInfNorm`](@ref)
+  - [`norm_error`](@ref)
+  - [`norm_factor`](@ref)
 """
 @concrete struct LpNorm <: NormError
     """
@@ -4008,7 +4069,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-infinity norm (maximum absolute deviation) error estimator.
 
-Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and divides it by ``T - d``. The `pos` field selects the order of the norm: `true` takes ``+\\infty`` and `false` takes ``-\\infty``, the *smallest* absolute deviation.
 
 # Mathematical definition
 
@@ -4020,7 +4081,7 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 
 Where:
 
-  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error. `pos = true` takes ``+\\infty``, the largest absolute deviation. `pos = false` takes ``-\\infty``, the smallest absolute deviation.
   - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
   - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
   - $(math_dict[:T])
@@ -4049,12 +4110,19 @@ LInfNorm
    pos ┴ Bool: true
 ```
 
+!!! warning
+
+    The JuMP model encodes ``+\\infty`` for both values of `pos`, because `set_risk_constraints!` and `set_tracking_error_constraints!` both build a `JuMP.MOI.NormInfinityCone`. With `pos = false` the functor takes the smallest absolute deviation while the model still bounds the largest, so the two disagree. On a 40×3 sample the model reported `0.0004210905887530551` against the functor's `6.1799508716302665e-6`, a factor of 68. The smallest absolute deviation is not a convex function of the weights, so no cone represents it. Use `pos = true` until the meaning of `pos = false` is settled.
+
 # Related
 
   - [`NormError`](@ref)
   - [`LpNorm`](@ref)
   - [`L1Norm`](@ref)
   - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`norm_error`](@ref)
+  - [`norm_factor`](@ref)
 """
 @concrete struct LInfNorm <: NormError
     """
@@ -4079,10 +4147,11 @@ end
     norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
     norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
     norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::Option{<:NormError}, a, T::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
-`norm_error` computes the tracking error using either the Euclidean (L2) norm for [`L2Norm`](@ref), squared Euclidean (L2) norm for [`SquaredL2Norm`](@ref), or the L1 (norm-one) distance for [`L1Norm`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+`norm_error` takes the norm that `f` selects, and divides it by the [`norm_factor`](@ref) that the same `f` declares. Each [`NormError`](@ref) subtype names one pair. The three-argument form takes the norm of `a - b`. The two-argument form takes the norm of `a` alone, for a caller that already holds the deviation vector; `f = nothing` there means an unweighted L2 norm.
 
 # Mathematical definition
 
@@ -4106,8 +4175,8 @@ Where:
 
 # Arguments
 
-  - `f`: Tracking formulation algorithm.
-  - `a`: Portfolio weights.
+  - `f`: Norm-based error algorithm, a [`NormError`](@ref) subtype.
+  - `a`: Portfolio weights, or the deviation vector in the two-argument form.
   - `b`: Benchmark weights.
   - `T`: Optional number of observations.
 
@@ -4131,9 +4200,12 @@ julia> PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2)
 
 # Related
 
-  - [`L2Norm`](@ref)
-  - [`L1Norm`](@ref)
   - [`NormError`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
   - [`Option`](@ref)
   - [`norm_factor`](@ref)
 """
@@ -4147,7 +4219,7 @@ The factor is the single place where the optional observation count `T` is turne
 
 # Arguments
 
-  - `f`: Tracking formulation algorithm. `nothing` means an unweighted L2 norm.
+  - `f`: Norm-based error algorithm, a [`NormError`](@ref) subtype. `nothing` means an unweighted L2 norm.
   - `T`: Optional number of observations.
 
 # Returns

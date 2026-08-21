@@ -194,7 +194,7 @@ discipline). Only ever called on the failing path.
 
 # Returns
 
-  - `seen::Set{String}`: A collection of names.
+  - The first element that repeats an earlier one, or `nothing` when every element is unique.
 
 # Related
 
@@ -883,21 +883,25 @@ end
     predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idx = Colon(), cols = Colon()) -> PredictionResult
 
-Apply a fitted pipeline to an unseen data test_idx and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
+Apply a fitted pipeline to an unseen window of data and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
 
-The `test_idx` selects observation rows of `data` (integer indices, timestamps, or `:` for all rows). The test_idx is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistics of the test test_idx leak into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
+`test_idx` selects the observation rows of the window and `cols` selects its asset columns. The window is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistic of the test window leaks into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
 
 Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) step; a pipeline that produced no optimisation result cannot predict.
+
+A vector of index vectors predicts on each window in turn and returns one result per window, which is the shape the cross-validation machinery consumes.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
-  - `data`: Price- or returns-level data containing the test_idx ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
-  - `test_idx`: Observation test_idx into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
+  - `data`: Price- or returns-level data containing the window ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
+  - `test_idx`: Observation window into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
+  - `test_idxs`: Several such windows, as a vector of index vectors.
+  - `cols`: Asset window into the columns of `data`. Integer indices, or `:` (all assets).
 
 # Returns
 
-  - `pred::PredictionResult`: The weights-level prediction on the transformed test_idx.
+  - `pred::PredictionResult`: The weights-level prediction on the transformed window, or one such result per window when several are given.
 
 # Related
 

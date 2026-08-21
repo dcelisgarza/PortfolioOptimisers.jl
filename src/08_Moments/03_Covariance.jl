@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A simple wrapper around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. It uses ideas from SCIML to simplify the standard API of [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.cov).
+Adapts any `StatsBase.CovarianceEstimator` to the library's calling convention, carrying its observation weights alongside it.
+
+The estimator and the weights travel together in one object, so a caller passes one value where the `StatsBase` API takes a separate estimator and weight vector at every call site.
 
 # Fields
 

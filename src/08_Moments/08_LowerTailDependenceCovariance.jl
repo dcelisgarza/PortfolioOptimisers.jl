@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lower tail dependence covariance estimator.
+Measures co-movement in the lower tail: the share of an asset's worst returns that fall on the same dates as another's.
 
-`LowerTailDependenceCovariance` implements a robust covariance estimator based on lower tail dependence, which measures the co-movement of asset returns in the lower quantiles (i.e., during joint drawdowns or adverse events). This estimator is particularly useful for capturing dependence structures relevant to risk management and stress scenarios.
+The statistic is the empirical lower tail dependence coefficient at level `alpha`. It captures the dependence that matters for joint drawdowns and for stress scenarios, which a full-sample correlation averages away.
 
 # Fields
 
@@ -42,7 +42,14 @@ LowerTailDependenceCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`lower_tail_dependence`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
+
+# References
+
+  - $(ref_dict[:sibuya1960])
+  - $(ref_dict[:luca2011])
+  - $(ref_dict[:cajas2025]) Section 6.1.7, equation 6.20.
 """
 @propagatable @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
     """
@@ -69,8 +76,8 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
 """
-    lower_tail_dependence(X::MatNum; alpha::Number = 0.05,
-                          ex::FLoops.Transducers.Executor = SequentialEx())
+    lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
+                          ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
 
 Compute the lower tail dependence matrix for a set of asset returns.
 
@@ -86,7 +93,7 @@ For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil`
 \\end{align}
 ```
 
-The resulting matrix is symmetric with entries clamped to ``[0,\\, 1]``.
+The resulting matrix is symmetric with entries clamped to ``[\\sqrt{\\varepsilon},\\, 1]``, where ``\\varepsilon`` is the machine epsilon of `eltype(X)`. **The floor is not zero.** A pair whose tails never coincide is reported as `1.4901161193847656e-8` for a `Float64` input, so a caller may divide by an entry or take its logarithm.
 
 Where:
 
@@ -103,6 +110,10 @@ Where:
   - `alpha`: Quantile level for the lower tail.
   - `ex`: Parallel execution strategy.
 
+# Validation
+
+  - `ceil(Int, T * alpha) > 0`. A smaller `alpha` selects no observation, and the function then returns a zero matrix rather than an estimate. [`LowerTailDependenceCovariance`](@ref) rules this out at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`.
+
 # Returns
 
   - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
@@ -111,7 +122,7 @@ Where:
 
 For each pair of assets `(i, j)`, the LTD is estimated as the proportion of observations where both asset `i` and asset `j` have returns less than or equal to their respective empirical `alpha`-quantiles, divided by the number of observations in the lower tail (`ceil(Int, T * alpha)`, where `T` is the number of observations).
 
-The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
+The resulting matrix is symmetric and all values are clamped to `[sqrt(eps(eltype(X))), 1]`. The lower bound is deliberate: it keeps an entry usable as a divisor.
 
 # Related
 
@@ -122,7 +133,9 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
-    rho = Matrix{eltype(X)}(undef, N, N)
+    # `zeros`, not `undef`: when `alpha` is small enough that `k` is zero the loop below
+    # never runs, and an uninitialised matrix would reach the caller as an estimate.
+    rho = zeros(eltype(X), N, N)
     if k > 0
         Xs = copy(X)
         mask = falses(T, N)

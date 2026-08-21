@@ -457,7 +457,7 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`FullMoment` is used to indicate that all deviations are included in the moment estimation process.
+Keeps every deviation from the target, so the moment is two-sided.
 
 # Mathematical definition
 
@@ -492,7 +492,7 @@ struct FullMoment <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`SemiMoment` is used for semi-moment estimators, where only observations below a target are considered.
+Clips every deviation above the target to zero, so the moment reads the downside alone.
 
 # Mathematical definition
 
@@ -1452,9 +1452,7 @@ macro windowed_estimator(head, body)
                                      LineNumberNode(@__LINE__), field)),
                            Expr(:string, :(field_dict[:oow])),
                            Expr(:macrocall, Symbol("@wprop"), LineNumberNode(@__LINE__),
-                                :w),
-                           "Window specification: an integer (last `window` observations) or a vector of indices.",
-                           :window,
+                                :w), Expr(:string, :(field_dict[:window])), :window,
                            Expr(:function,
                                 Expr(:call, name, Expr(:(::), field, ftype),
                                      :(w::Option{<:ObsWeights}),

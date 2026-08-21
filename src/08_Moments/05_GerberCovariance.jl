@@ -46,7 +46,9 @@ abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Gerber covariance algorithm.
+Normalises the net co-movement vote by the observations on which both assets crossed their threshold.
+
+The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d})``, where an observation votes only when both assets cross a threshold, concordantly for ``n_{c}`` and discordantly for ``n_{d}``. This is the original Gerber statistic.
 
 # Constructors
 
@@ -74,7 +76,9 @@ struct Gerber0 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Gerber covariance algorithm.
+Normalises the net co-movement vote by every observation on which at least one asset crossed its threshold.
+
+The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d} + n_{n})``. The extra term ``n_{n}`` counts the observations on which exactly one of the two assets crossed, so the denominator is larger than [`Gerber0`](@ref)'s and the statistic is bounded more tightly.
 
 # Constructors
 
@@ -102,7 +106,9 @@ struct Gerber1 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Gerber covariance algorithm.
+Normalises the raw net co-movement vote by the geometric mean of its own diagonal.
+
+The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij} = n_{c} - n_{d}``. The diagonal is therefore unit by construction, rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref).
 
 # Constructors
 

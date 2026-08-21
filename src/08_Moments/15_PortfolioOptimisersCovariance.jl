@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Composite covariance estimator with post-processing.
+Runs any covariance estimator, then applies a matrix post-processing step to its result.
 
-`PortfolioOptimisersCovariance` is a flexible container type that combines any covariance estimator with a matrix post-processing step.
+`ce` computes the raw matrix and `mp` repairs or filters it — positive-definite repair, denoising, and detoning — so the composite is the estimator the rest of the library takes as its default.
 
 # Fields
 

@@ -28,12 +28,18 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
 
   - [`BaseSmythBrobyCovariance`](@ref)
   - [`SmythBrobyCovariance`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm.
+Divides the difference of the concordant and discordant Smyth-Broby kernel sums by their sum.
+
+The kernel is [`sb_delta`](@ref), and an observation votes only when both standardised returns reach `c2`. This is the canonical statistic of the source reduced to a two-term denominator.
 
 # Constructors
 
@@ -52,12 +58,18 @@ SmythBroby0()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby1`](@ref)
   - [`SmythBroby2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Smyth-Broby covariance algorithm.
+Divides the difference of the concordant and discordant Smyth-Broby kernel sums by their sum plus the neutral sum.
+
+The neutral sum accumulates the kernel over the observations on which exactly one asset reaches `c2`. This is the canonical Smyth-Broby statistic.
 
 # Constructors
 
@@ -76,12 +88,18 @@ SmythBroby1()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBroby1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Smyth-Broby covariance algorithm.
+Normalises the raw difference of the Smyth-Broby kernel sums by the geometric mean of its own diagonal.
+
+The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij}`` the raw difference, so the diagonal is unit by construction rather than by a per-pair denominator.
 
 # Constructors
 
@@ -100,12 +118,18 @@ SmythBroby2()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby1`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBroby2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm scaled by vote counts.
+Weights each Smyth-Broby kernel sum by its own observation count, then divides the difference by the sum.
+
+The weighting reintroduces the Gerber vote count that [`SmythBroby0`](@ref) discards, so a pair that co-moves often scores above one that co-moves rarely but sharply.
 
 # Constructors
 
@@ -124,12 +148,18 @@ SmythBrobyGerber0()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyGerber0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Smyth-Broby covariance algorithm scaled by vote counts.
+Weights each Smyth-Broby kernel sum by its own count, then divides the difference by the sum plus the neutral term.
+
+The neutral term carries its own count as well, so all three terms of the denominator are scaled alike. This is the estimator's default algorithm.
 
 # Constructors
 
@@ -148,12 +178,18 @@ SmythBrobyGerber1()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyGerber1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Smyth-Broby covariance algorithm scaled by vote counts.
+Weights each Smyth-Broby kernel sum by its own count, and standardises the raw difference by its own diagonal.
+
+The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij}`` the count-weighted raw difference.
 
 # Constructors
 
@@ -172,12 +208,18 @@ SmythBrobyGerber2()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber1`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyGerber2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm using vote counts only.
+Counts concordant and discordant observations, discards the kernel, and divides their difference by their sum.
+
+Dropping [`sb_delta`](@ref) recovers a Gerber statistic evaluated on the Smyth-Broby admission rule rather than on the Gerber threshold.
 
 # Constructors
 
@@ -196,12 +238,18 @@ SmythBrobyCount0()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCount1`](@ref)
   - [`SmythBrobyCount2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyCount0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Smyth-Broby covariance algorithm using vote counts only.
+Counts concordant, discordant and neutral observations, discards the kernel, and divides the net count by the total.
+
+Dropping [`sb_delta`](@ref) recovers a Gerber statistic evaluated on the Smyth-Broby admission rule rather than on the Gerber threshold.
 
 # Constructors
 
@@ -220,12 +268,18 @@ SmythBrobyCount1()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCount0`](@ref)
   - [`SmythBrobyCount2`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Smyth-Broby covariance algorithm using vote counts only.
+Counts concordant and discordant observations, discards the kernel, and standardises the net count by its own diagonal.
+
+The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij}`` the raw difference of the two counts.
 
 # Constructors
 
@@ -244,6 +298,10 @@ SmythBrobyCount2()
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCount0`](@ref)
   - [`SmythBrobyCount1`](@ref)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -316,6 +374,10 @@ SmythBrobyCovariance
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
+
+# References
+
+  - $(ref_dict[:smyth2022enhanced])
 """
 @propagatable @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
     """
@@ -583,7 +645,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Co-movement policy for [`gerber_comovement!`](@ref) implementing the Smyth-Broby family.
 
-Observations are centered and standardised per asset, thresholded by `c1 * sigma` (noise gate), the `[c2, c3]` significance zone, and classified by the sign of the product of standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)).
+The noise gate thresholds the raw, uncentred return by `c1 * sigma`. Observations that pass it are centered and standardised per asset, restricted to the `[c2, c3]` significance zone, and classified by the sign of the product of standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)).
 
 # Fields
 
@@ -736,7 +798,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fold one observation of a pair into the co-movement accumulator.
 
-The Smyth-Broby method skips observations inside the noise gate (`|x| < c1 * sigma` for both assets), centers and standardises the returns, skips observations outside the `[c2, c3]` significance zone, and classifies the rest as concordant, discordant, or neutral by the sign of the product of standardised returns. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
+The Smyth-Broby method skips observations inside the noise gate (`|x| < c1 * sigma` for both assets, on the raw uncentred return), then centers and standardises the returns. It skips an observation whose standardised return exceeds `c3` on either asset or falls below `c2` on both, and classifies the rest as concordant, discordant, or neutral by the sign of the product of standardised returns. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
 
 # Arguments
 
@@ -824,28 +886,44 @@ All nine variants share the pairwise kernel [`gerber_comovement!`](@ref) through
 
 # Mathematical definition
 
-For each pair ``(i, j)``, accumulate over admissible observations ``t``:
+For each pair ``(i, j)`` an observation ``t`` passes two admission tests. The **noise gate** compares the **raw, uncentred** return against ``c_1 \\sigma``, and rejects ``t`` only when both assets fall inside it:
 
 ```math
 \\begin{align}
-\\text{pos} &= \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} > 0]\\,, \\quad
-\\text{neg} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} < 0]\\,,
+|x_{ti}| < c_1 \\sigma_i \\quad \\text{and} \\quad |x_{tj}| < c_1 \\sigma_j\\,.
 \\end{align}
 ```
 
-with ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i`` and ``\\delta`` the [`sb_delta`](@ref) kernel. The `Gerber`-suffixed markers additionally track the counts ``c^{+}, c^{-}`` of concordant and discordant observations and score pairs by ``\\text{pos} \\cdot c^{+}`` and ``\\text{neg} \\cdot c^{-}``; the `Count`-suffixed markers use the bare counts. The variant number selects the reduction:
+The **significance zone** compares the **centred, standardised** return ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``, and rejects ``t`` when either asset exceeds ``c_3`` or both fall below ``c_2``. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic.
+
+An admitted observation is concordant when both ``|\\tilde{r}|`` reach ``c_2`` and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``, discordant when both reach ``c_2`` and the product is negative, and neutral otherwise. Accumulate the kernel and the count of each class over the admitted observations:
+
+```math
+\\begin{align}
+\\text{pos} &= \\sum_t \\delta_t \\, \\mathbf{1}[t \\in C]\\,, \\quad \\text{neg} = \\sum_t \\delta_t \\, \\mathbf{1}[t \\in D]\\,, \\quad \\text{nn} = \\sum_t \\delta_t \\, \\mathbf{1}[t \\in N]\\,, \\\\
+c^{+} &= |C|\\,, \\quad c^{-} = |D|\\,, \\quad c^{0} = |N|\\,,
+\\end{align}
+```
+
+with ``\\delta_t = \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n)`` the [`sb_delta`](@ref) kernel, and ``C``, ``D``, ``N`` the concordant, discordant and neutral observation sets. The marker prefix selects the three scores ``(p, q, u)``:
+
+  - `SmythBroby*`: ``(\\text{pos},\\, \\text{neg},\\, \\text{nn})``.
+  - `SmythBrobyGerber*`: ``(\\text{pos} \\, c^{+},\\, \\text{neg} \\, c^{-},\\, \\text{nn} \\, c^{0})``. Every term carries its own count, the neutral one included.
+  - `SmythBrobyCount*`: ``(c^{+},\\, c^{-},\\, c^{0})``.
+
+The variant number selects the reduction, with ``h_{ij} = p - q`` the raw difference:
 
 ```math
 \\begin{align}
 \\hat{\\rho}_{ij} &= \\begin{cases}
-(\\text{pos} - \\text{neg}) / (\\text{pos} + \\text{neg}) & 0 \\\\
-(\\text{pos} - \\text{neg}) / (\\text{pos} + \\text{neg} + \\text{nn}) & 1 \\\\
-(\\text{pos} - \\text{neg}) / \\sqrt{\\hat{\\rho}_{ii} \\, \\hat{\\rho}_{jj}} & 2
+(p - q) / (p + q) & 0 \\\\
+(p - q) / (p + q + u) & 1 \\\\
+h_{ij} / \\sqrt{h_{ii} \\, h_{jj}} & 2
 \\end{cases}\\,.
 \\end{align}
 ```
 
-Where `nn` accumulates neutral (one-sided) observations for variant 1, and variant 2 standardises the raw matrix by the geometric mean of its diagonal.
+Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides the **raw** difference matrix by the geometric mean of its own diagonal, with the roots clamped below at ``\\sqrt{\\varepsilon}``. It does **not** normalise the variant 0 ratio: the two agree only where ``p + q`` is constant across pairs.
 
 # Arguments
 

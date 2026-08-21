@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A covariance estimator that returns the correlation matrix as both the covariance and correlation.
+Answers both `cov` and `cor` with the wrapped estimator's correlation matrix.
 
-`CorrelationCovariance` wraps another covariance estimator and delegates both `cov` and `cor` calls to the underlying estimator's `cor` method. This is useful when a correlation matrix is needed in contexts that accept a covariance estimator.
+Use it where a caller demands a covariance estimator but the computation wants the correlation — a clustering distance, for instance, which reads a scale-free matrix.
 
 # Fields
 
