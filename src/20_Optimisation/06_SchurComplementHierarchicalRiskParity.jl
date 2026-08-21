@@ -354,6 +354,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`SchurComplementHierarchicalRiskParity` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `params` recurses through [`port_opt_view`](@ref) with that matrix. `opt` recurses with the index alone.
+  - `fb` is carried through unchanged.
+
 # Examples
 
 ```jldoctest
@@ -472,6 +480,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementParams`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
                                ClusteringOptimisationEstimator

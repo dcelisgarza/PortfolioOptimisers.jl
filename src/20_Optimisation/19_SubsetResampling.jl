@@ -159,12 +159,22 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`SubsetResampling` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `pe` already holds a prior **result**, the method replaces `X` with `pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `pe`, `wb`, `fees` and `sets` recurse through [`port_opt_view`](@ref) with the index alone.
+  - `opt` recurses with that matrix.
+  - The remaining fields are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
   - [`SubsetResamplingResult`](@ref)
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     """

@@ -54,6 +54,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `ro`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`HierarchicalEqualRiskContribution` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `ri` and `ro` recurse through [`port_opt_view`](@ref) with that matrix. `opt` recurses with the index alone.
+  - When `ri` and `ro` are the **same object**, the method views it once and shares the result, so the two fields stay aliased on the subset as they were on the whole universe.
+  - `scai`, `scao`, `ex` and `fb` are carried through unchanged.
+
 # Examples
 
 ```jldoctest
@@ -183,6 +192,7 @@ Where:
   - [`HierarchicalRiskParity`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`HierarchicalOptimiser`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct HierarchicalEqualRiskContribution <:
                                ClusteringOptimisationEstimator

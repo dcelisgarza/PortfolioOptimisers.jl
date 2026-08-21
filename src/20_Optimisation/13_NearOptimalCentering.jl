@@ -230,6 +230,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`NearOptimalCentering` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix.
+  - The six weight vectors `w_min`, `w_min_ini`, `w_opt`, `w_opt_ini`, `w_max` and `w_max_ini` are sliced to the selected assets.
+  - `obj`, `bins`, `ucs_flag`, `alg` and `fb` are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
@@ -239,6 +248,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`RiskJuMPOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
   - [`NearOptimalCenteringAlgorithm`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
     """

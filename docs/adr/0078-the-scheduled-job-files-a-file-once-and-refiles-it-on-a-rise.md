@@ -91,9 +91,12 @@ rank key = (has_reviewed_jet_report, max_excess)
 ```
 
 A file with a reviewed-real JET report outranks every complexity-only file, because a suspected
-defect outranks a refactor. The JET pool is 1 to 10 files, so it drains in the first run or two.
-The excess **ratio** is used rather than the raw value, because a cyclomatic 12 and an argument
-count 12 are not the same distance past their own thresholds.
+defect outranks a refactor. The JET pool is **73** files, not the 1 to 10 that carry a suspected
+*real* finding: a report no Dismissal covers counts as reviewed-real by arithmetic, and no
+Dismissal has shipped yet. So the JET key orders most of the queue rather than draining in a run or
+two, and it drains fastest as the first Dismissals land. The excess **ratio** is used rather than
+the raw value, because a cyclomatic 12 and an argument count 12 are not the same distance past
+their own thresholds.
 
 ### Deduplication searches `state:all`, so a file is filed once
 

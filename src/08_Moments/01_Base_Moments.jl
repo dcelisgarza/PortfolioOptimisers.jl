@@ -1311,12 +1311,12 @@ function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
                 :(DocStringExtensions.FIELDS),
                 "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
                 :(val_dict[:oow]),
-                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
+                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\nWhen [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:\n\n  - `$(field)`: Recursively indexed via [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
     for m in methods
         push!(parts, "  - ", m, "\n")
     end
     push!(parts,
-          "  - [`factory`](@ref)\n  - [`port_opt_view`](@ref)\n  - [`windowed_preamble`](@ref)\n")
+          "  - [`factory`](@ref)\n  - [`port_opt_view`](@ref)\n  - [`obs_weights_view`](@ref)\n  - [`windowed_preamble`](@ref)\n")
     return Expr(:string, parts...)
 end
 """

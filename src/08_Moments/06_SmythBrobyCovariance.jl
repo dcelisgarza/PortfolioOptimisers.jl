@@ -335,6 +335,21 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:c3c2])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -374,6 +389,8 @@ SmythBrobyCovariance
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 

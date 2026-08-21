@@ -154,6 +154,13 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -182,6 +189,7 @@ Coskewness
   - [`negative_spectral_coskewness`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 

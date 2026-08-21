@@ -2366,6 +2366,12 @@ When [`factory`](@ref) is called on this type, the following `@wprop`-tagged fie
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -2381,6 +2387,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct MeanValue <: VectorToScalarMeasure
     """
@@ -2426,6 +2433,12 @@ When [`factory`](@ref) is called on this type, the following `@wprop`-tagged fie
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -2441,6 +2454,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct MedianValue <: VectorToScalarMeasure
     """
@@ -2508,6 +2522,12 @@ When [`factory`](@ref) is called on this type, the following `@wprop`-tagged fie
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -2523,6 +2543,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct StdValue <: VectorToScalarMeasure
     """
@@ -2569,6 +2590,12 @@ When [`factory`](@ref) is called on this type, the following `@wprop`-tagged fie
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -2584,6 +2611,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct VarValue <: VectorToScalarMeasure
     """

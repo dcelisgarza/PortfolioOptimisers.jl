@@ -27,6 +27,12 @@ When [`factory`](@ref) is called on this type, the following `@wprop`-tagged fie
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -46,6 +52,7 @@ DistanceCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
   - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
   - [`cor_distance`](@ref)
   - [`cov_distance`](@ref)
 

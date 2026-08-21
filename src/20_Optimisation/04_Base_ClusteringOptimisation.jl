@@ -289,6 +289,21 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - `z_src in (:prior, :data)`.
   - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -365,6 +380,8 @@ HierarchicalOptimiser
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
     """

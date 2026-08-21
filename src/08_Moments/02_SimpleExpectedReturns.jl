@@ -21,6 +21,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -39,6 +51,8 @@ SimpleExpectedReturns
   - [`Option`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     """

@@ -184,6 +184,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -199,6 +211,8 @@ AggregateFeatures
   - [`AbstractCollapseAlgorithm`](@ref)
   - [`AggregateDistances`](@ref)
   - [`FeatureDistance`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct AggregateFeatures <: AbstractFeatureCollapseAlgorithm
     """
@@ -246,6 +260,18 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - `alg` is not a [`MedianCollapse`](@ref).
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -265,6 +291,8 @@ ERROR: ArgumentError: alg must not be a MedianCollapse: an entrywise median of d
   - [`AbstractCollapseAlgorithm`](@ref)
   - [`AggregateFeatures`](@ref)
   - [`FeatureDistance`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct AggregateDistances <: AbstractFeatureCollapseAlgorithm
     """
@@ -346,6 +374,12 @@ Keywords correspond to the struct's fields.
 
   - `sim` is defaulted from `metric` via [`default_similarity`](@ref), so the resolved value is visible on the printed object rather than hidden inside the distance kernel.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
+
 # Details
 
   - Any `Distances.SemiMetric` is accepted, including user-defined ones. Every metric yields a similarity, so no combination throws **on this path**; a metric returning a distance above `1` gives similarities outside ``[-1,\\,1]`` under the default [`ComplementSimilarity`](@ref), which [`plot_clusters`](@ref) silently clips. The threshold is `1`, not "the metric is unbounded" — `Distances.CosineDist` and `Distances.CorrDist` are bounded by `2` and cross it routinely.
@@ -381,6 +415,7 @@ FeatureDistance
   - [`Distance`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
+  - [`factory`](@ref)
 """
 @propagatable @concrete struct FeatureDistance <: AbstractDistanceEstimator
     """

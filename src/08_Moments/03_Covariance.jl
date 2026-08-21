@@ -23,6 +23,26 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Details
 
   - `ce` can be used to specify any subtype of `StatsBase.CovarianceEstimator`. This allows users to leverage packages such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl), which implement custom covariance estimators.
@@ -48,6 +68,9 @@ GeneralCovariance
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct GeneralCovariance <: AbstractCovarianceEstimator
     """
@@ -202,6 +225,20 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -222,6 +259,8 @@ Covariance
   - [`SimpleExpectedReturns`](@ref)
   - [`FullMoment`](@ref)
   - [`SemiMoment`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct Covariance <: AbstractCovarianceEstimator
     """

@@ -324,6 +324,18 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pl`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pl`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Why the diagonal includes self
 
 The diagonal is not a convention, it selects between two different algorithms. Measured on a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref), with the decay held flat at [`NoDecay`](@ref) so that the diagonal is the only thing that changes between the two columns:
@@ -400,6 +412,8 @@ PhylogenyFeatures
   - [`FeaturePrior`](@ref)
   - [`FeatureDistance`](@ref)
   - [`NwE_ClE`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct PhylogenyFeatures <: AbstractFeatureMatrixEstimator
     """
@@ -588,6 +602,20 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `ze`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+`FeaturePrior` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `pe` and `sets` recurse through [`port_opt_view`](@ref).
+  - `ze` goes through [`feature_estimator_view`](@ref) instead. A feature matrix carries assets on one axis and features on the other, so the asset selection reaches only the axis that holds assets.
+
 # Details
 
   - **Moments first, features second.** The wrapped prior is computed before `ze` runs, because a producer may need the result — [`RegressionFeatures`](@ref) reads `pr.rr`.
@@ -643,6 +671,8 @@ EmpiricalPrior
   - [`LowOrderPrior`](@ref)
   - [`FeatureDistance`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct FeaturePrior <: AbstractLowOrderPriorEstimator_AF
     """

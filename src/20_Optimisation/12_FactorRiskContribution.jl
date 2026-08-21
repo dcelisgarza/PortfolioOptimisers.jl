@@ -155,6 +155,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`FactorRiskContribution` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `re` recurses with the index alone, which slices its loadings to the selected assets and leaves the factor axis whole.
+  - `wi` is carried through unchanged, because it holds initial **factor** weights. The optimisation re-bases the weight variable onto the factor axis, so the asset selection does not index `wi`.
+  - `obj`, `frc_ple`, `sets`, `flag` and `fb` are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
@@ -164,6 +173,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`RiskBudgeting`](@ref)
   - [`factor_risk_contribution`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     """

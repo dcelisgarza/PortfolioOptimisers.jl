@@ -273,6 +273,15 @@ Keywords correspond to the struct's fields.
 
     `mu`, `sigma` and `chol` are stated independently, so nothing makes them agree with each other. A caller who wants one consistent set names `pe` alone and lets it fill all three from a single fit. A caller who states them by hand must make sure that they agree.
 
+## View parameters
+
+`DistributionValueatRisk` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `mu` is sliced to the selected assets. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - `pe` and `dist` are carried through unchanged. `dist` describes the standardised loss, so it carries no asset axis.
+
 # Examples
 
 ```jldoctest
@@ -294,6 +303,7 @@ DistributionValueatRisk
   - [`SigmaSlot`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`Option`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
@@ -462,6 +472,18 @@ Keywords correspond to the struct's fields.
   - `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Functor
 
     (r::ValueatRisk)(x::VecNum)
@@ -498,6 +520,8 @@ ValueatRisk
   - [`DistributionValueatRisk`](@ref)
   - [`ConditionalValueatRisk`](@ref)
   - [`ValueatRiskRange`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
@@ -610,6 +634,18 @@ Keywords correspond to the struct's fields.
   - `0 < beta < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `alg`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Functor
 
     (r::ValueatRiskRange)(x::VecNum)
@@ -645,6 +681,8 @@ ValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`ValueatRisk`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 

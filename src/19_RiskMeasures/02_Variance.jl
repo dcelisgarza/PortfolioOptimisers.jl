@@ -234,6 +234,15 @@ Keywords correspond to the struct's fields.
 
     `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
 
+## View parameters
+
+`Variance` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - The method refuses an `rc` that is a [`LinearConstraint`](@ref). A group constraint cannot be restricted to a part of its own group, and the restriction would break factor risk contribution.
+  - `settings`, `rc` and `alg` are carried through unchanged.
+
 # `JuMP` Formulations
 
 !!! info
@@ -329,6 +338,7 @@ julia> r(w)
   - [`set_risk_constraints!`](@ref)
   - [`scalarise_risk_expression!`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
 
 # References
@@ -473,6 +483,14 @@ Keywords correspond to the struct's fields.
 
     `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
 
+## View parameters
+
+`StandardDeviation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - `settings` is carried through unchanged.
+
 ## `JuMP` Formulation
 
 ```math
@@ -538,6 +556,7 @@ julia> r(w)
   - [`Variance`](@ref)
   - [`UncertaintySetVariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
 
 # References

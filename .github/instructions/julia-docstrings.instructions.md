@@ -203,17 +203,33 @@ When a struct is decorated with `@propagatable`, its fields carry stackable tags
 
 A field may carry any combination (`@fprop @vprop field`, in either order) — the field sets of the channels genuinely diverge, so a field can be factory-propagated but view-passthrough, or vice versa. **Document each channel in its own subsection inside `# Constructors`**, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`), in the order below.
 
-**A subsection documents a channel, not a tag.** A channel is gated on more than one tag, so the field list of a subsection is the union of the tags that channel reads. Write a subsection when at least one field carries a tag that gates it, and omit it otherwise.
+**A subsection documents a channel, not a tag.** A channel is gated on more than one tag, so the field list of a subsection is the union of the tags that channel reads. Write a subsection when at least one field carries a tag that gates it, and omit it otherwise. The view channel carries one more trigger: a hand-written [`port_opt_view`](@ref) method earns the subsection even when no field carries `@vprop`.
 
 `## Propagated parameters` — the **factory** channel, gated on `@fprop` and `@wprop`. Lists each field and how it is propagated:
 
 - **Observation-weight fields** (`@wprop`; type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
 - **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
 
-`## View parameters` — the **view** channel, gated on `@vprop`. Lists each field and how it is viewed:
+`## View parameters` — the **view** channel. Write it when the type has a [`port_opt_view`](@ref) method, whether [`@propagatable`](@ref) generates that method from a `@vprop` tag or the file defines one by hand. The two cases carry different content.
+
+**A generated method** — at least one field carries `@vprop`. List each tagged field and how it is viewed:
 
 - **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed via [`port_opt_view`](@ref). ``
 - **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices via [`port_opt_view`](@ref). ``
+
+**A hand-written method** — no field carries `@vprop`, and the file defines `port_opt_view(x::MyType, i, args...)`. A field list misdescribes such a method: it reads arguments no tag can name, and it applies rules no tag can encode. Open the subsection with
+
+> `MyType` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+and follow that with a bullet list of high-level details, written in the shape of the `# Details` section of a function docstring. Cover these points, in this order, and only where the method has something to say:
+
+- Which arguments beyond `i` the method reads, and what it does with them.
+- Which fields recurse through [`port_opt_view`](@ref), and with which arguments.
+- Which fields are sliced, and along which axis when that axis is not the asset axis.
+- Which fields pass through unchanged, where a reader would expect otherwise.
+- Any rule the method enforces or preserves that a field list cannot show.
+
+Describe the method, do not transcribe it. A field carried through with nothing to say about it needs no bullet.
 
 `## Observation weight parameters` — the **observation** channel, gated on `@wprop` alone. A type with no `@wprop` field never gains this subsection, whatever else it carries. Lists each field and how it is indexed:
 

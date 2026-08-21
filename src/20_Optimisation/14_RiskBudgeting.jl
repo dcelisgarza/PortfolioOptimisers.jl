@@ -257,11 +257,20 @@ Keywords correspond to the struct's fields.
 
   - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `rkb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     """
@@ -442,6 +451,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`RiskBudgeting` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
+  - `wi` is sliced to the selected assets.
+  - `fb` is carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
@@ -453,6 +471,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`RelaxedRiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     """

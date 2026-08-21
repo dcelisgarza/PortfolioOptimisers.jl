@@ -40,6 +40,27 @@ Keywords correspond to the struct's fields.
   - If any view constraint is not `nothing`, `sets` must not be `nothing`.
   - If `w` is not `nothing`, it must be non-empty and match the number of observations.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `pe`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+
 # Details
 
   - If `w` is not `nothing`, it is normalised to sum to 1; otherwise, uniform weights are used when `prior` is called.
@@ -125,6 +146,9 @@ MeucciEntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct MeucciEntropyPoolingPrior <:
                                AbstractLowOrderPriorEstimator_AF

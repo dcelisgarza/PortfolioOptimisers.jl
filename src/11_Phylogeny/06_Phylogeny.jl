@@ -1435,6 +1435,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+  - `de`: Recursively updated via [`factory`](@ref).
+
 # The separation lives here, not on the consumer
 
 `sep` says which pairs the network relates, and every consumer that reads a *closure* of this graph needs that answer: [`phylogeny_matrix`](@ref) and the phylogeny constraint families, both [`clusterise`](@ref) methods, and [`Proximity`](@ref). It therefore sits on the estimator that builds the graph rather than on any one of them — a rule visible only to the feature producer would be structurally invisible to the constraint path, which receives nothing but this estimator.
@@ -1482,6 +1489,7 @@ NetworkEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`Tree_SimMat`](@ref)
+  - [`factory`](@ref)
 
 # References
 
@@ -1542,6 +1550,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `nte`: Recursively updated via [`factory`](@ref).
+
 The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.sep.n`, so the separation budget reaches this estimator through its network estimator rather than being restated here. That also fixes which separations this estimator accepts: `nte.sep` must be a [`HopCount`](@ref), since a power count is what the sums are indexed by. A [`PathLength`](@ref) is constructible here but has no [`clusterise`](@ref) method.
 
 # Examples
@@ -1593,6 +1607,7 @@ NetworkClustersEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref)
   - [`Tree_SimMat`](@ref)
+  - [`factory`](@ref)
 """
 @propagatable @concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
     """
