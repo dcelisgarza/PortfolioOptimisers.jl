@@ -18,3 +18,10 @@ variance_risk_bounds_val
 rc_variance_constraints!
 set_ucs_variance_risk!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

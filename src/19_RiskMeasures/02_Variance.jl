@@ -829,6 +829,8 @@ julia> r(w)
 # References
 
   - $(ref_dict[:robustaa])
+  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:cajas2025]) Section 11.3.
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
     """

@@ -383,6 +383,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :s_mip => "`s`: Cardinality slack of the MIP formulation. It caps the number of flagged observations at `(alpha - s) * T`. If `nothing`, the model uses `1e-5`.",#
                                  :slv => "`slv`: Solver or vector of solvers.",#
                                  :p_rm => "`p`: Power or order parameter.",#
+                                 :p_owa => "`p`: Vector of p-norm orders used to approximate the ordered weights array risk.",#
                                  :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
                                  # Deferred Quantity slots. Each admits the value itself or the Estimator that
                                  # computes it, resolved against the optimisation's own prior. See
@@ -749,6 +750,7 @@ const val_dict = unique_key_dict(:val_dict,
                                  :beta => "`0 < beta < 1`.",#
                                  :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
                                  :dopower => "If `power` is not `nothing`, `power >= 1`.",#
+                                 :p_owa => "`!isempty(p)` and `all(x -> x > 1, p)`.",#
                                  :settings => "If not `nothing`, `!isempty(settings)`.",#
                                  :S => "`!isempty(S)`.",#
                                  :D => "`!isempty(D)`.",#
@@ -882,6 +884,8 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :gerber_analysis => "[gerber_analysis](@cite) E. Flint and D. Polakow. *Deconstructing the Gerber statistic*. Finance Research Letters 56, 104144 (2023).",#
                                  :gerber2025squeezing => "[gerber2025squeezing](@cite) S. Gerber, W. Smyth, H. Markowitz, Y. Miao, P. Ernst and P. Sargen. *Squeezing financial noise: A novel approach to covariance matrix estimation*. Available at SSRN 4986939 (2025).",#
                                  :J_LoGo => "[J_LoGo](@cite) W. Barfuss, G. P. Massara, T. Di Matteo and T. Aste. *Parsimonious modeling with information filtering networks*. Phys. Rev. E 94, 062306 (2016).",#
+                                 :fengpalomar2016 => "[fengpalomar2016](@cite) Y. Feng and D. P. Palomar. *A signal processing perspective of financial engineering*. Foundations and Trends in Signal Processing 9, 1–231 (2016).",#
+                                 :gmd => "[gmd](@cite) S. Yitzhaki. *Stochastic dominance, mean variance, and Gini's mean difference*. The American Economic Review 72, 178–185 (1982).",#
                                  :knuth2019 => "[knuth2019](@cite) K. H. Knuth. *Optimal data-based binning for histograms and histogram-based probability density models*. Digital Signal Processing 95, 102581 (2019).",#
                                  :kunsch1989 => "[kunsch1989](@cite) H. R. Künsch. *The jackknife and the bootstrap for general stationary observations*. The Annals of Statistics 17, 1217–1241 (1989).",#
                                  :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Modern portfolio theory*. Journal of Finance 7, 77–91 (1952).",#
@@ -889,9 +893,11 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :mpdist => "[mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).",#
                                  :NHPG => "[NHPG](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Nested hierarchies in planar graphs*. Discrete Applied Mathematics 159, 2135–2146 (2011).",#
                                  :owa1 => "[owa1](@cite) D. Cajas. *OWA portfolio optimization: A disciplined convex programming framework*. Available at SSRN 3988927 (2021).",#
+                                 :owaog => "[owaog](@cite) W. Ogryczak and T. Śliwiński. *On solving linear programs with the ordered weighted averaging objective*. European Journal of Operational Research 148, 80–91 (2003).",#
                                  :owa2 => "[owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).",#
                                  :owa3 => "[owa3](@cite) D. Cajas. *Efficient Gini Mean Difference and Tail Gini Portfolio Optimization based on P-Norms*. Available at SSRN 4711326 (2024).",#
                                  :PMFG => "[PMFG](@cite) G. P. Massara, T. Di Matteo and T. Aste. *Network Filtering for Big Data: Triangulated Maximally Filtered Graph*. Journal of Complex Networks 5, 161–178 (2016).",#
+                                 :tgini => "[tgini](@cite) W. Ogryczak and A. Ruszczyński. *Dual stochastic dominance and quantile risk measures*. International Transactions in Operational Research 9, 661–680 (2002).",#
                                  :politis1992circular => "[politis1992circular](@cite) D. N. Politis and J. P. Romano. *A circular block-resampling procedure for stationary data*. In: *Exploring the Limits of Bootstrap* (John Wiley & Sons, 1992); pp. 263–270.",#
                                  :politis1994stationary => "[politis1994stationary](@cite) D. N. Politis and J. P. Romano. *The stationary bootstrap*. Journal of the American Statistical Association 89, 1303–1313 (1994).",#
                                  :quintile => "[quintile](@cite) R. Zhou and D. P. Palomar. *Understanding the Quintile Portfolio*. IEEE Transactions on Signal Processing 68, 4030–4040 (2020).",#

@@ -634,6 +634,15 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 # Related
 
   - [`set_risk_constraints!`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+
+# References
+
+  - $(ref_dict[:robustaa])
+  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:cajas2025]) Section 11.3.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
                                 prefix::Symbol = Symbol(""))

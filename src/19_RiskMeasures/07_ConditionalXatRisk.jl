@@ -92,6 +92,7 @@ ConditionalValueatRisk
 # References
 
   - $(ref_dict[:cvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.2.4.
 """
 @propagatable @concrete struct ConditionalValueatRisk <: RiskMeasure
     """
@@ -392,6 +393,7 @@ ConditionalValueatRiskRange
 # References
 
   - $(ref_dict[:cvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.3.
 """
 @propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     """
