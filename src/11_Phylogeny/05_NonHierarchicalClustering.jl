@@ -11,9 +11,7 @@ Runs [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clus
 
 Whatever `kwargs` holds is splatted into the call. The constructor checks only that a `weights` entry is a non-empty `AbstractVector`; it does not check the length, and `Clustering.kmeans` wants **one weight per point**, which here means one per asset.
 
-!!! warning
-
-    `factory(::KMeansAlgorithm, ::StatsBase.AbstractWeights)` writes an [`ObsWeights`](@ref) into that entry, and an `ObsWeights` has one weight per **observation**. The resulting algorithm cannot run: a `T`-length vector raises `DimensionMismatch: Incorrect length of weights.`, and an `N`-length `StatsBase.AbstractWeights` raises a `MethodError`, because `Clustering.kmeans` wants a plain vector. Nothing propagates weights here — [`ClustersEstimator`](@ref) leaves `alg` untagged — so the method is reached only by an explicit call.
+[`factory`](@ref) never writes observation weights into `kwargs`. An observation weight has no meaning here, because every step after `ce` reads an `assets x assets` matrix.
 
 # Fields
 
@@ -73,7 +71,7 @@ KMeansAlgorithm
                              kwargs::NamedTuple)
         if haskey(kwargs, :weights)
             @argcheck(isa(kwargs.weights, AbstractVector),
-                      ArgumentError("kwargs.weights must be an AbstractVector of observation weights, one element per observation. Got\nkwargs.weights => $(typeof(kwargs.weights))"))
+                      ArgumentError("kwargs.weights must be an AbstractVector of point weights, one element per asset. Got\nkwargs.weights => $(typeof(kwargs.weights))"))
             @argcheck(!isempty(kwargs.weights), IsEmptyError)
         end
         return new{typeof(rng), typeof(seed), typeof(kwargs)}(rng, seed, kwargs)
@@ -83,25 +81,6 @@ function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
                          seed::Option{<:Integer} = nothing,
                          kwargs::NamedTuple = (;))::KMeansAlgorithm
     return KMeansAlgorithm(rng, seed, kwargs)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`KMeansAlgorithm`](@ref) with `w` written into the `kwargs` field as `weights`.
-
-!!! warning
-
-    The result cannot be run. `Clustering.kmeans` wants one weight per **point**, which here is one per asset, and `w` carries one per **observation**; it also wants a plain vector rather than a `StatsBase.AbstractWeights`. See [`KMeansAlgorithm`](@ref). Nothing in the library reaches this method: [`ClustersEstimator`](@ref)'s `alg` field carries no `@fprop` tag, so [`factory`](@ref) leaves the algorithm alone.
-
-# Related
-
-  - [`KMeansAlgorithm`](@ref)
-  - [`ClustersEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)::KMeansAlgorithm
-    return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
-                           kwargs = (; alg.kwargs..., weights = w))
 end
 """
     get_k_clusters_from_alg(alg, D, k)
@@ -146,7 +125,7 @@ Clusters the distance matrix once per candidate count, scores the results, and r
 
 [`valid_k_clusters`](@ref) has no counterpart here. It rejects a count the dendrogram cannot be cut at, and a flat partition has no dendrogram, so the argmax is taken as it stands.
 
-The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so the two-asset degeneracy of the hierarchical branch cannot arise here.
+The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here.
 
 # Arguments
 

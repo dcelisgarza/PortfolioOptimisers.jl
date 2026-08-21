@@ -19,6 +19,13 @@
     @test PortfolioOptimisers.vec_to_real_measure(MedianValue(), A) == median(A)
     @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), A) ==
           mean(A) / std(A)
+    # A single value has no corrected standard deviation. The denominator is one, so the
+    # reduction gives the mean itself instead of a `NaN`.
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [0.37]) == 0.37
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), (0.37,)) == 0.37
+    # An exact-zero standard deviation keeps its own guard.
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==
+          2 / sqrt(eps(Float64))
     msv = StandardisedValue()
     @test factory(msv) === msv
     msv = factory(StandardisedValue(), W)

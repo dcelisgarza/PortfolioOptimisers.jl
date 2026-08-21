@@ -345,6 +345,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
                                  :op => "`op`: Comparison operator (`==`, `<=`, or `>=`).",#
                                  :rhs => "`rhs`: Right-hand side value of the constraint.",#
+                                 :rhs_rho => "`rhs`: Right-hand side of the constraint. A view over a single asset pair carries one value. A view over a pair of groups carries one value per spanned pair, in the order of `ij`.",#
                                  :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
                                  :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
                                  # Risk measure settings.
@@ -569,7 +570,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :scai => "`scai`: Inner scalariser.",#
                                  :scao => "`scao`: Outer scalariser.",#
                                  :params => "`params`: Schur complement decomposition parameters.",#
-                                 :gamma_schur => "`gamma`: Schur complement decomposition parameter.",#
+                                 :gamma_schur => "`gamma`: Schur complement interpolation parameter, in `[0, 1]`. At `0` no augmentation happens and the allocation is exactly [`HierarchicalRiskParity`](@ref) under `r`. A larger value subtracts more of the cross-cluster block from each sub-cluster covariance, which moves the allocation towards the minimum variance portfolio. Under [`MonotonicSchurComplement`](@ref) it is the **upper end** of the searched range, not the value used.",#
+                                 :gamma_schur_res => "`gamma`: The Schur complement interpolation parameter the allocation ran at. It parallels `r`: one value for the single-bundle path, one per bundle for the multi-bundle path. Under [`MonotonicSchurComplement`](@ref) this is the value the search chose, which is at most the `gamma` the estimator asked for.",#
+                                 :flag_schur => "`flag`: Whether to repair an augmented covariance block that is not positive definite. When `true`, `pdm` repairs it, and a failed repair raises. When `false`, no repair happens and the allocation is abandoned instead, which is what the [`MonotonicSchurComplement`](@ref) search needs; a caller that keeps the weights gets an error naming the `gamma` that failed.",#
                                  :r_res_schur => "`r`: The risk measure the optimisation ran under, stored **resolved**. It parallels `gamma`: one measure for the single-bundle path, a vector of them for the multi-bundle path. Schur carries **no** scalariser, because it carries no vector of measures to combine — `SchurComplementParams.r` is bounded to a standard deviation or a variance.",#
                                  :tol => "`tol`: Convergence tolerance.",#
                                  :iter => "`iter`: Maximum number of iterations.",#
@@ -883,6 +886,7 @@ The `const` definition below is the single source of truth. A key must appear on
 """
 const ref_dict = unique_key_dict(:ref_dict,
                                  :brinson_attribution => "[brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).",#
+                                 :bergstra2012 => "[bergstra2012](@cite) J. Bergstra and Y. Bengio. *Random search for hyper-parameter optimization*. Journal of Machine Learning Research 13, 281–305 (2012).",#
                                  :DBHTs => "[DBHTs](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Hierarchical information clustering by means of topologically embedded graphs*. PloS one 7, e31929 (2012).",#
                                  :drcvar => "[drcvar](@cite) P. Mohajerin Esfahani and D. Kuhn. *Data-driven distributionally robust optimization using the Wasserstein metric: performance guarantees and tractable reformulations*. Mathematical Programming 171, 115–166 (2018).",#
                                  :freedman1981 => "[freedman1981](@cite) D. Freedman and P. Diaconis. *On the histogram as a density estimator: L2 theory*. Zeitschrift für Wahrscheinlichkeitstheorie und verwandte Gebiete 57, 453–476 (1981).",#
@@ -999,7 +1003,11 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :idzorek2007 => "[idzorek2007](@cite) T. Idzorek. *A step-by-step guide to the Black-Litterman model: incorporating user-specified confidence levels*. In: *Forecasting Expected Returns in the Financial Markets* (Academic Press, 2007); pp. 17–38.",#
                                  :walters2011 => "[walters2011](@cite) J. Walters. *The Black-Litterman model in detail*. SSRN Electronic Journal (2011).",#
                                  :boydvandenberghe2004 => "[boydvandenberghe2004](@cite) S. Boyd and L. Vandenberghe. *Convex Optimization* (Cambridge University Press, Cambridge, UK, 2004).",#
-                                 :diamondboyd2016 => "[diamondboyd2016](@cite) S. Diamond and S. Boyd. *CVXPY: A Python-embedded modeling language for convex optimization*. Journal of Machine Learning Research 17, 1–5 (2016).")
+                                 :diamondboyd2016 => "[diamondboyd2016](@cite) S. Diamond and S. Boyd. *CVXPY: A Python-embedded modeling language for convex optimization*. Journal of Machine Learning Research 17, 1–5 (2016).",#
+                                 :lopezdeprado2016 => "[lopezdeprado2016](@cite) M. López de Prado. *Building diversified portfolios that outperform out of sample*. The Journal of Portfolio Management 42, 59–69 (2016).",#
+                                 :raffinot2017 => "[raffinot2017](@cite) T. Raffinot. *Hierarchical clustering-based asset allocation*. The Journal of Portfolio Management 44, 89–99 (2017).",#
+                                 :raffinot2018 => "[raffinot2018](@cite) T. Raffinot. *The hierarchical equal risk contribution portfolio*. SSRN Electronic Journal (2018).",#
+                                 :cotton2024 => "[cotton2024](@cite) P. Cotton. *Schur Complementary Allocation: A Unification of Hierarchical Risk Parity and Minimum Variance Portfolios*. arXiv preprint arXiv:2411.05807 (2024).")
 
 """
 $(DocStringExtensions.TYPEDEF)

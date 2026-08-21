@@ -3,9 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that determine the size of each asset subset.
 
+A subtype reaches a [`MultipleRandomised`](@ref) through its `subset_size` field, and is called on the
+returns data to give the value.
+
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`SubsetSizeEC`](@ref)
 """
 abstract type SubsetSizeEstimator <: AbstractEstimator end
 """
@@ -13,9 +17,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that determine the number of random subsets to draw.
 
+A subtype reaches a [`MultipleRandomised`](@ref) through its `n_subsets` field, and is called on the
+returns data to give the value.
+
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`NumberSubsetsEC`](@ref)
 """
 abstract type NumberSubsetsEstimator <: AbstractEstimator end
 """
@@ -23,9 +31,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that determine the rolling window size.
 
+A subtype reaches a [`MultipleRandomised`](@ref) through its `window_size` field, and is called on the
+returns data to give the value.
+
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`WindowSizeEC`](@ref)
 """
 abstract type WindowSizeEstimator <: AbstractEstimator end
 """
@@ -109,6 +121,10 @@ $(DocStringExtensions.FIELDS)
   - [`WalkForwardEstimator`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025]) Chapter 8.
 """
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
     """
@@ -246,10 +262,16 @@ function n_splits(mre::MultipleRandomised, rd::Prices_RR)
     if !isnothing(mre.window_size) && isa(mre.cv, DateWalkForward)
         throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling [`split`](@ref)."))
     end
-    if !isnothing(mre.window_size)
-        rd = port_opt_view(rd, 1:(mre.window_size), :)
+    # Both quantities are resolved against the FULL `rd`, exactly as `split` resolves them, and
+    # only then is the window view taken. Reading the fields directly instead throws on every
+    # documented non-integer form: a float or a callable `window_size` cannot index, and a
+    # callable `n_subsets` cannot multiply.
+    n_subsets = get_n_subsets(mre.n_subsets, rd)
+    window_size = get_window_size(mre.window_size, rd)
+    if !isnothing(window_size)
+        rd = port_opt_view(rd, 1:window_size, :)
     end
-    return mre.n_subsets * n_splits(mre.cv, rd)
+    return n_subsets * n_splits(mre.cv, rd)
 end
 function n_splits(mrr::MultipleRandomisedResult)
     return length(mrr.path_ids)
@@ -534,7 +556,7 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
             rdi = rd
         else
             start_obs = rand(rng, 1:(T - window_size))
-            idx = start_obs:(start_obs + window_size)
+            idx = start_obs:(start_obs + window_size - 1)
             rdi = port_opt_view(rd, idx, :)
         end
         start_obs -= 1

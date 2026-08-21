@@ -182,6 +182,10 @@ Structural axes: **low-order** is mean plus covariance, **high-order** adds cosk
 - **MeucciEntropyPoolingPrior**: the earlier entropy pooling estimator, whose CVaR route root-finds the Value at Risk level rather than writing a formulation.
 - **OpinionPoolingPrior**: consensus across several priors — `LinearOpinionPooling`, `LogarithmicOpinionPooling`.
 
+**Group Pair View**
+An entropy pooling correlation or covariance view whose two sides are groups rather than single assets, `"(gA, gB) == 0.35"`. The two groups must be of equal length, and the view **spans** one asset pair per position: it emits one constraint row per pair, and a `prior(gA, gB)` reference inside it resolves to that pair's own prior value. See ADR 0079.
+*Avoid*: reading it as a statement about one summary of the correlation block; no such aggregate is defined.
+
 **Tail View**
 A view on a quantile risk measure of the posterior — CVaR or EVaR — as opposed to a view on a moment. It is the one view family that is not a linear function of the posterior probabilities.
 *Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.

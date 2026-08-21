@@ -93,6 +93,19 @@ ADR 0011 fixes `fb` as the **last** field of each concrete result and keeps it o
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    HierarchicalResult(;
+        pr::Option{<:AbstractPriorResult},
+        clr::Option{<:AbstractClusteringResult},
+        wb::Option{<:WeightBounds},
+        fees::Option{<:Fees},
+        retcode::OptimisationReturnCode,
+        w::Option{<:VecNum}
+    ) -> HierarchicalResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`BaseHierarchicalOptimisationResult`](@ref)
@@ -146,9 +159,22 @@ Result type for [`HierarchicalRiskParity`](@ref).
 
 Carries the shared core as `hr`, plus the one measure and the one scalariser its estimator holds, both stored **resolved**.
 
+Every property of the core forwards through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` read as if the fields were flat.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HierarchicalRiskParityResult(;
+        hr::HierarchicalResult,
+        r::BaseRM_VecBaseRM,
+        sca::Scalariser,
+        fb::Option{<:OptE_Opt}
+    ) -> HierarchicalRiskParityResult
+
+Keywords correspond to the struct's fields.
 
 # Related
 
@@ -200,9 +226,24 @@ Carries the shared core as `hr`, plus the **two** measures and **two** scalarise
 
 The differing arity against [`HierarchicalRiskParityResult`](@ref) is why the shared `HierarchicalResult` split into two leaves rather than growing `Option` slots or union-typed fields.
 
+Every property of the core forwards through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` read as if the fields were flat.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HierarchicalEqualRiskContributionResult(;
+        hr::HierarchicalResult,
+        ri::BaseRM_VecBaseRM,
+        ro::BaseRM_VecBaseRM,
+        scai::Scalariser,
+        scao::Scalariser,
+        fb::Option{<:OptE_Opt}
+    ) -> HierarchicalEqualRiskContributionResult
+
+Keywords correspond to the struct's fields.
 
 # Related
 
@@ -287,6 +328,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
 
   - `x_src in (:prior, :data)`.
   - `z_src in (:prior, :data)`.
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
 ## Propagated parameters
@@ -508,25 +550,27 @@ function time_dependent_field_defaults(::HierarchicalOptimiser)::NamedTuple
     return hierarchical_optimiser_td_defaults()
 end
 """
-    unitary_expected_risks(r, X, ...)
+    unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
+                           fees::Option{<:Fees} = nothing) -> Vector
 
-Compute the expected risk for unitary (equal-weight) portfolios within each cluster.
+Compute the expected risk of each asset held alone.
 
-Returns a vector of risk values, one per cluster, where each risk is computed for the equal-weight portfolio within that cluster.
+The ``i``-th entry is the risk of the portfolio whose weight vector is one in position ``i`` and zero everywhere else, so the result has one entry per **asset**, not per cluster. For [`Variance`](@ref) the vector is the diagonal of the covariance matrix. The hierarchical optimisers invert this vector to build a naive risk parity allocation inside a cluster.
 
 # Arguments
 
-  - `r`: Risk measure.
-  - `X`: Asset return matrix.
-  - Additional cluster and weight parameters.
+  - `r`: Risk measure, already resolved by [`factory`](@ref).
+  - `X`: Asset return matrix, observations by assets.
+  - `fees`: Fees to charge against each unit portfolio, or `nothing`.
 
 # Returns
 
-  - Vector of expected risk values per cluster.
+  - `rk::Vector`: Expected risk of each asset held alone, of length `size(X, 2)`.
 
 # Related
 
   - [`unitary_expected_risks!`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
@@ -541,26 +585,29 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
     return rk
 end
 """
-    unitary_expected_risks!(wk, rk, r, ...)
+    unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
+                            X::MatNum, fees::Option{<:Fees} = nothing) -> Nothing
 
-Compute and store the expected risk for each cluster's unitary portfolio in-place.
+Write the expected risk of each asset held alone into `rk`.
 
-Fills `rk` with the expected risk for the equal-weight portfolio within each cluster, and `wk` with the corresponding weights.
+The in-place form of [`unitary_expected_risks`](@ref), for a caller that reuses one buffer across several risk measures.
 
 # Arguments
 
-  - `wk`: Output weight vector (in-place).
-  - `rk`: Output risk vector (in-place).
-  - `r`: Risk measure.
-  - Additional cluster and weight parameters.
+  - `wk`: Scratch weight vector, of length `size(X, 2)`. It must arrive all zero, and it leaves all zero: each iteration raises one entry to one and lowers it again.
+  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full.
+  - `r`: Risk measure, already resolved by [`factory`](@ref).
+  - `X`: Asset return matrix, observations by assets.
+  - `fees`: Fees to charge against each unit portfolio, or `nothing`.
 
 # Returns
 
-  - `nothing` (fills `wk` and `rk` in-place).
+  - `nothing`. The result is `rk`.
 
 # Related
 
   - [`unitary_expected_risks`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,

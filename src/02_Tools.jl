@@ -2712,7 +2712,7 @@ Algorithm for reducing a vector of real values to its optionally weighted mean d
 ```math
 \\begin{align}
 z &= \\frac{\\hat{\\mu}}{\\tilde{\\sigma}}\\,, \\\\
-\\tilde{\\sigma} &= \\begin{cases} \\sqrt{\\varepsilon} & \\hat{\\sigma} = 0 \\\\ \\hat{\\sigma} & \\hat{\\sigma} \\neq 0 \\end{cases}\\,.
+\\tilde{\\sigma} &= \\begin{cases} 1 & \\hat{\\sigma} \\ \\mathrm{undefined} \\\\ \\sqrt{\\varepsilon} & \\hat{\\sigma} = 0 \\\\ \\hat{\\sigma} & \\mathrm{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
@@ -2727,7 +2727,8 @@ Where:
 # Details
 
   - `sv` receives ``\\hat{\\mu}`` as its `mean` keyword, so the standard deviation is always taken about the mean that `mv` produced. Weighting `mv` without weighting `sv` therefore changes the denominator too.
-  - The guard fires on an **exact** zero only, not on a small denominator. On the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
+  - The zero guard fires on an **exact** zero only, not on a small denominator. On the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
+  - A one-value vector has no corrected standard deviation, so ``\\hat{\\sigma}`` is `NaN`. The denominator is then ``1`` and the result is the mean itself. This makes the reduction defined on every non-empty vector.
 
 # Fields
 
@@ -2754,6 +2755,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 ```jldoctest
 julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0.7])
 1.2299003291330186
+
+julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [0.37])
+0.37
 ```
 
 # Related
@@ -2887,7 +2891,13 @@ function vec_to_real_measure(msv::StandardisedValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     m = vec_to_real_measure(msv.mv, val)
     s = vec_to_real_measure(msv.sv, val; mean = m)
-    s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
+    s = if isnan(s)
+        one(s)
+    elseif iszero(s)
+        sqrt(eps(eltype(s)))
+    else
+        s
+    end
     return m / s
 end
 function vec_to_real_measure(::SumValue,

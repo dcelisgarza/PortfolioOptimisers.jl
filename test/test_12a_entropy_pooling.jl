@@ -233,6 +233,45 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                              rho_views = rho_views), rd).w, rtol = 5e-2)
 
+    # A view over a pair of groups emits one constraint row per spanned pair, so a
+    # `prior(gA, gB)` reference must give each row that pair's own prior value. Issue #403.
+    gsets = UniverseSets(;
+                         dict = Dict("nx" => rd.nx, "gA" => rd.nx[1:2], "gB" => rd.nx[3:4]))
+    rho0 = StatsBase.cov2cor(pr0.sigma)
+    @test PortfolioOptimisers.get_pr_value(pr0, [1, 2], [3, 4], Val(:rho)) ==
+          [rho0[1, 3], rho0[2, 4]]
+    @test PortfolioOptimisers.get_pr_value(pr0, [1, 2], [3, 4], Val(:cov)) ==
+          [pr0.sigma[1, 3], pr0.sigma[2, 4]]
+    # The `:cov` tag answers with a covariance, never a correlation.
+    @test PortfolioOptimisers.get_pr_value(pr0, [1, 2], [3, 4], Val(:cov)) !=
+          PortfolioOptimisers.get_pr_value(pr0, [1, 2], [3, 4], Val(:rho))
+
+    rho_views = LinearConstraintEstimator(; val = "(gA, gB) == prior(gA, gB)*1.1")
+    pr = prior(EntropyPoolingPrior(; sets = gsets, rho_views = rho_views), rd)
+    rho1 = StatsBase.cov2cor(pr.sigma)
+    @test isapprox(rho1[1, 3], rho0[1, 3] * 1.1, rtol = 5e-5)
+    @test isapprox(rho1[2, 4], rho0[2, 4] * 1.1, rtol = 5e-5)
+    # The two pairs take different targets, so a single aggregate cannot serve both.
+    @test !isapprox(rho1[1, 3], rho1[2, 4]; rtol = 1e-2)
+
+    cov_views = LinearConstraintEstimator(; val = "(gA, gB) == prior(gA, gB)*1.1")
+    pr = prior(EntropyPoolingPrior(; sets = gsets, cov_views = cov_views), rd)
+    @test isapprox(pr.sigma[1, 3], pr0.sigma[1, 3] * 1.1, rtol = 5e-3)
+    @test isapprox(pr.sigma[2, 4], pr0.sigma[2, 4] * 1.1, rtol = 5e-3)
+
+    # Every entry of a vector right-hand side must stay inside [-1, 1].
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = gsets,
+                                                         rho_views = LinearConstraintEstimator(;
+                                                                                               val = "(gA, gB) == prior(gA, gB)*3")),
+                                     rd)
+    # A vector right-hand side needs one value per spanned pair.
+    @test_throws DimensionMismatch RhoParsingResult(["(A, B)"], [1.0], "==", [0.1, 0.2],
+                                                    "1.0*(A, B) == [0.1, 0.2]", [(1, 2)])
+    @test_throws DimensionMismatch RhoParsingResult(["([A, B], [C, D])"], [1.0], "==",
+                                                    [0.1, 0.2, 0.3],
+                                                    "1.0*([A, B], [C, D]) == [0.1, 0.2, 0.3]",
+                                                    [([1, 2], [3, 4])])
+
     pr = prior(HighOrderPriorEstimator(;
                                        pe = EntropyPoolingPrior(; alg = H2_EntropyPooling(),
                                                                 sets = sets,

@@ -13,6 +13,7 @@ $(DocStringExtensions.FIELDS)
 
   - Produced by correlation view parsing routines, typically when the constraint involves asset pairs (e.g., `"(A, B) == 0.5"`).
   - The `ij` field enables downstream routines to map parsed correlation views to the appropriate entries in the correlation matrix.
+  - A view over a pair of groups spans one asset pair per element of its `ij` entry, and emits one constraint row per pair. Its `rhs` is therefore a vector of the same length, one right-hand side per row. A view over a single asset pair keeps a scalar `rhs`.
   - Used internally for entropy pooling, Black-Litterman, and other advanced portfolio models that support correlation views.
 
 # Related
@@ -35,7 +36,7 @@ $(DocStringExtensions.FIELDS)
     """
     op
     """
-    $(field_dict[:rhs])
+    $(field_dict[:rhs_rho])
     """
     rhs
     """
@@ -46,11 +47,17 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ij])
     """
     ij
-    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
-                              eqn::AbstractString,
+    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString,
+                              rhs::Union{<:Number, <:VecNum}, eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
                                                          <:Tuple{<:VecInt, <:VecInt}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
+        if isa(rhs, AbstractVector)
+            @argcheck(!isempty(ij) &&
+                      all(x -> isa(x[1], AbstractVector) && length(x[1]) == length(rhs),
+                          ij),
+                      DimensionMismatch("A vector `rhs` carries one value per spanned asset pair, so every entry of `ij` must be a group pair of the same length. Got\nlength(rhs) => $(length(rhs))\nij => $(ij)"))
+        end
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
@@ -1993,7 +2000,8 @@ Replace correlation prior references in view parsing results with their correspo
 # Details
 
   - Prior references are matched using the pattern `prior(<asset1>, <asset2>)`.
-  - The right-hand side of the constraint is adjusted by subtracting the prior correlation value times its coefficient.
+  - The right-hand side of the constraint is adjusted by subtracting the prior value times its coefficient.
+  - A `prior(gA, gB)` reference over a pair of groups resolves to one value per spanned asset pair, so the right-hand side becomes a vector of that length. The view emits one constraint row per pair, and each row takes its own entry.
   - Variables corresponding to prior references are removed from the constraint.
   - Throws an error if no non-prior variables remain.
   - Returns a `RhoParsingResult` containing the updated variables, coefficients, operator, right-hand side, equation string, and correlation indices.
@@ -2015,7 +2023,7 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
     variables, coeffs = res.vars, res.coef
     jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
-    rhs::typeof(res.rhs) = res.rhs
+    rhs = res.rhs
     non_prior = false
     for (i, (v, c)) in enumerate(zip(variables, coeffs))
         m = match(prior_pattern, v)
@@ -2076,7 +2084,9 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
                 continue
             end
         end
-        rhs -= get_pr_value(pr, j, k, Val(key)) * c
+        # A group pair view emits one row per spanned pair, so `get_pr_value` answers with one
+        # value per pair. Broadcast, so a scalar `rhs` widens to that vector.
+        rhs = rhs ⊖ get_pr_value(pr, j, k, Val(key)) ⊙ c
         push!(idx_rm, i)
     end
     if isempty(idx_rm)
@@ -2152,43 +2162,51 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:co
     return pr.sigma[i, j]
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:rho}, args...)
+    get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}, args...)
 
-Extract the normalised average correlation between asset groups `i` and `j` from a prior result.
+Extract the prior correlations or covariances of the asset pairs that two groups span.
 
-`get_pr_value` returns the Frobenius norm of the correlation sub-matrix divided by the group length for vector index sets `i` and `j`. This variant handles grouped asset correlation views.
+`get_pr_value` returns one value per spanned pair, in the order of `zip(i, j)`. A view over a pair of groups emits one constraint row per spanned pair, so a `prior(gA, gB)` reference inside such a view must give the row that pair's own prior value. These methods are used internally to replace `prior(gA, gB)` references in correlation and covariance view constraints.
 
 # Arguments
 
   - `pr`: Prior result containing asset return information.
   - `i`: Vector of indices for the first asset group.
   - `j`: Vector of indices for the second asset group.
+  - `::Val{:rho}`: Dispatch tag for correlation extraction.
+  - `::Val{:cov}`: Dispatch tag for covariance extraction.
   - `args...`: Additional arguments (ignored).
 
 # Returns
 
-  - `rho::Number`: Normalised average correlation between asset groups `i` and `j`.
+  - `val::Vector{<:Number}`: Correlation or covariance of each spanned pair, one entry per element of `zip(i, j)`.
 
 # Related
 
   - [`LowOrderPrior`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
+  - [`RhoParsingResult`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
-    return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
+function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:rho}, args...)
+    rho = StatsBase.cov2cor(pr.sigma)
+    return [rho[a, b] for (a, b) in zip(i, j)]
+end
+function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}, args...)
+    return [pr.sigma[a, b] for (a, b) in zip(i, j)]
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
-Parse and add correlation view constraints to the entropy pooling constraint dictionary.
+Parse and add covariance view constraints to the entropy pooling constraint dictionary.
 
-`ep_cov_views!` parses correlation view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that correlation views do not inadvertently alter lower moments.
+`ep_cov_views!` parses covariance view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that covariance views do not inadvertently alter lower moments.
 
 # Arguments
 
-  - `cov_views`: Correlation view constraints.
+  - `cov_views`: Covariance view constraints.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
@@ -2201,14 +2219,16 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
 # Details
 
   - Parses view equations and replaces groupings by assets.
-  - Replaces prior references in views with their actual prior correlation values.
+  - Replaces prior references in views with their actual prior covariance values.
+  - A view over a pair of groups emits one constraint row per spanned asset pair, and each row takes that pair's own right-hand side.
   - Converts parsed views to linear constraints and adds them to `epc`.
-  - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to covariance constraints.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
-  - [`replace_prior_views`](@ref)
+  - [`replace_coprior_views`](@ref)
+  - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2257,13 +2277,15 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
 
   - Parses view equations and replaces groupings by assets.
   - Replaces prior references in views with their actual prior correlation values.
+  - A view over a pair of groups emits one constraint row per spanned asset pair, and each row takes that pair's own right-hand side.
   - Converts parsed views to linear constraints and adds them to `epc`.
   - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
-  - [`replace_prior_views`](@ref)
+  - [`replace_coprior_views`](@ref)
+  - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2277,7 +2299,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     for rho_view in rho_views
         @argcheck(length(rho_view.vars) == 1,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
-        @argcheck(-one(eltype(X)) <= rho_view.rhs <= one(eltype(X)),
+        @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
         d = ifelse(rho_view.op == ">=", -1, 1)
         i, j = rho_view.ij[1]

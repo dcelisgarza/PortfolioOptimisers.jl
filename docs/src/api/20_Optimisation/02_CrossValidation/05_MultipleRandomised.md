@@ -21,3 +21,10 @@ get_n_subsets
 sample_unique_assets
 get_subset_size
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

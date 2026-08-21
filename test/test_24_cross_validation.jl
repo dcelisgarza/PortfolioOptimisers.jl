@@ -500,6 +500,31 @@
             @test length(train_idx) == length(test_idx) == N
             @test N > 0
         end
+
+        # A `Period` train_size starts its first window at the first date whose training
+        # window fits, not at the first date of the range. The count of windows is therefore
+        # taken over a span of `last_allowed_start - first_start + 1` positions. Reading that
+        # span as a plain difference loses one window whenever the difference is an exact
+        # multiple of `test_size`, which every case below is.
+        for (train_size, test_size) in
+            ((Month(12), 5), (Day(23), 2), (Day(90), 2), (Day(90), 4)),
+            reduce_test in (false, true)
+
+            cv = DateWalkForward(train_size, test_size; period = Month(1), adjuster = ldm,
+                                 reduce_test = reduce_test)
+            (; train_idx, test_idx) = split(cv, rd)
+            N = n_splits(cv, rd)
+            @test length(train_idx) == length(test_idx) == N
+        end
+
+        # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
+        # is `div(a - 1, b)` and never a guarded division.
+        for a in 1:40, b in 1:7
+            @test PortfolioOptimisers.special_div(a, b) == div(a - 1, b)
+            @test PortfolioOptimisers.special_div(a, b) ==
+                  length(1:b:a) - 1 ==
+                  count(k -> 1 + k * b <= a, 0:a) - 1
+        end
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -592,11 +617,37 @@
 
         cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
                                 rng = StableRNG(666), seed = 42, n_subsets = 5,
-                                subset_size = 7, window_size = 340)
+                                subset_size = 7, window_size = 341)
         cv_res = split(cv, rd)
         (; train_idx, test_idx, asset_idx, path_ids) = cv_res
         @test_throws ArgumentError n_splits(cv, rd)
         @test n_splits(cv_res) == length(path_ids)
+
+        # `window_size` is a count of observations, so the window a path is drawn from spans
+        # exactly that many rows. An inner walk-forward that consumes the whole window makes the
+        # count observable: the first training index to the last test index is `window_size`.
+        for w in (109, 150)
+            cvw = MultipleRandomised(IndexWalkForward(w - 10, 10); rng = StableRNG(666),
+                                     seed = 42, n_subsets = 4, subset_size = 7,
+                                     window_size = w)
+            resw = split(cvw, rd)
+            for p in unique(resw.path_ids)
+                sel = resw.path_ids .== p
+                @test maximum(last.(resw.test_idx[sel])) -
+                      minimum(first.(resw.train_idx[sel])) + 1 == w
+            end
+            @test n_splits(cvw, rd) == n_splits(resw) == length(resw.path_ids)
+        end
+
+        # Every documented `window_size` and `n_subsets` form must reach `n_splits`, not only
+        # `split`: a float or a callable window cannot index, and a callable count cannot
+        # multiply.
+        for (ws, nss) in ((0.25, 4), (x -> 150, 4), (150, x -> 4), (nothing, x -> 4))
+            cvn = MultipleRandomised(IndexWalkForward(50, 20); rng = StableRNG(666),
+                                     seed = 42, n_subsets = nss, subset_size = 7,
+                                     window_size = ws)
+            @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
+        end
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))

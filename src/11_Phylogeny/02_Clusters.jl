@@ -267,9 +267,9 @@ The selected ``c`` is the **left end** of the triple, not its centre. That is th
 
 The source takes ``W_{c}`` as the **mean** of a cluster's pairwise distances, which is `alg = MeanValue()`. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances, which is a different statistic and selects a different ``c``: on a 400x40 sample the two answer **6 and 4**.
 
-!!! warning
+!!! note
 
-    `StandardisedValue()` is undefined for a cluster of exactly two assets. Two assets carry **one** pairwise distance, and the corrected standard deviation of a single value is `NaN`, so ``W_{c}`` is `NaN` for every cut in which such a cluster appears. The gap series is then `NaN` throughout and the returned `k` is the **length of that series** rather than a maximiser of anything. A universe with a tightly correlated pair reaches this: over 20 assets with two such pairs every cut from `2` to `6` clusters carries a two-asset cluster, the default answers `k = 4` off the fallback, and `MeanValue()` answers `k = 2` off a real argmax. Pass `alg = MeanValue()` when the universe may cluster that finely.
+    A cluster of exactly two assets carries **one** pairwise distance, and a single value has no corrected standard deviation. [`StandardisedValue`](@ref) divides by ``1`` in that case, so such a cluster contributes its mean pairwise distance to ``W_{c}``. The gap series stays finite, and the selected ``c`` is a real maximiser. The two measures still differ on every larger cluster.
 
 # Fields
 

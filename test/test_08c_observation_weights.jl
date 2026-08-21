@@ -95,9 +95,14 @@ const PO = PortfolioOptimisers
         # TypeError(::String)` and named neither the keyword nor the type received.
         bad = (; weights = 1.0)
         bad_tgt = LinearModel(; kwargs = bad)
-        for (sym, f) in (("kwargs.weights", () -> KMeansAlgorithm(; kwargs = bad)),
-                         ("tgt.kwargs.weights", () -> StepwiseRegression(; tgt = bad_tgt)),
-                         ("retgt.kwargs.weights", () -> DimensionReductionRegression(; retgt = bad_tgt)))
+        # `Clustering.kmeans` weights its points, which are the assets, so the k-means
+        # message names a point weight. The two regression kernels weight observations.
+        for (sym, quantity, f) in
+            (("kwargs.weights", "point weights", () -> KMeansAlgorithm(; kwargs = bad)),
+             ("tgt.kwargs.weights", "observation weights",
+              () -> StepwiseRegression(; tgt = bad_tgt)),
+             ("retgt.kwargs.weights", "observation weights",
+              () -> DimensionReductionRegression(; retgt = bad_tgt)))
             @test_throws ArgumentError f()
             msg = sprint(showerror, try
                              f()
@@ -106,7 +111,7 @@ const PO = PortfolioOptimisers
                          end)
             # The message must name the offending keyword and the type received.
             @test occursin(sym, msg)
-            @test occursin("observation weights", msg)
+            @test occursin(quantity, msg)
             @test occursin("Float64", msg)
         end
 

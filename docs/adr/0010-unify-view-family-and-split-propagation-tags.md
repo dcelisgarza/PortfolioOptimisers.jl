@@ -253,3 +253,28 @@ gains a field needs no edit.
 
 All 127 declarations satisfied both clauses when the check was introduced, so it ratchets
 rather than fixes: it cannot be broken silently from here.
+
+## Amendment (2026-08-21): the `KMeansAlgorithm` weight factory is removed
+
+The rollout list above keeps `KMeansAlgorithm` among the hand-written weight-replacement
+factories, beside `LinearModel` and `GeneralisedLinearModel`. The three looked alike: each
+splatted the incoming weights into a nested `kwargs` that a third-party kernel reads. The
+k-means one was not like the other two.
+
+`Clustering.kmeans` weights its **points**, and `get_k_clusters_from_alg` gives it the columns
+of an `assets x assets` distance matrix. A point is therefore an asset. The factory wrote an
+`ObsWeights` there, which holds one weight per **observation**, so the algorithm it returned
+could not run at either length: a `T`-length vector raises `DimensionMismatch`, and an
+`N`-length `StatsBase.AbstractWeights` raises a `MethodError`, because the kernel wants a plain
+vector. No call site reached the method, because `ClustersEstimator`'s `alg` field carries no
+`@fprop` tag.
+
+**The method is deleted.** The identity `factory(::AbstractClustersAlgorithm, args...)` covers
+the type, so the deletion removes no capability. Observation weights stop at `ce`: every step
+after it reads an `assets x assets` matrix, in which no observation survives to weight. The
+constructor's guard message named an observation weight, and now names a point weight, one per
+asset. Issue #393 settles this.
+
+The two regression factories are unaffected. `LinearModel` and `GeneralisedLinearModel` pass
+their weights to `StatsAPI.fit` with a GLM model type, which weights the rows of the design
+matrix, and a row there is an observation.

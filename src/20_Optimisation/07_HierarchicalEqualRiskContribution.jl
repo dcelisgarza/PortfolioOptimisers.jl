@@ -18,9 +18,48 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Hierarchical Equal Risk Contribution (HERC) portfolio optimiser.
+Splits weight down the dendrogram between clusters by their outer risk `ro`, then splits each cluster's share between its assets by their inner risk `ri`.
 
-`HierarchicalEqualRiskContribution` implements the Hierarchical Equal Risk Contribution algorithm. It clusters assets, then allocates weights so that each cluster contributes equally to total portfolio risk (using `ro`), and within each cluster, assets are weighted by inverse intra-cluster risk (using `ri`).
+This is the Hierarchical Equal Risk Contribution algorithm. It differs from [`HierarchicalRiskParity`](@ref) in two ways: it stops at the optimal number of clusters rather than at the individual assets, and it follows the dendrogram's own branch structure rather than halving a leaf order. The name is the source's; the resulting portfolio is **not** a risk parity portfolio, and the clusters do not contribute equally to risk.
+
+# Mathematical definition
+
+Cut the dendrogram at `opt.cle`'s optimal number of clusters ``K``. Every asset starts at ``w_i = 1``. The algorithm then runs two independent allocations.
+
+**Inside a cluster**, each asset takes a share in inverse proportion to its own inner risk:
+
+```math
+\\begin{align}
+\\rho_i(\\{j\\}) &= \\textrm{risk of asset } j \\textrm{ held alone under } \\rho_i\\,,\\\\
+w_j &= \\frac{\\rho_i(\\{j\\})^{-1}}{\\sum_{l \\in C_k} \\rho_i(\\{l\\})^{-1}} \\quad \\forall\\, j \\in C_k\\,.
+\\end{align}
+```
+
+**Between clusters**, the algorithm walks the ``K - 1`` internal nodes of the dendrogram in order of falling height. At each node it splits the weight of everything below that node between its two branches:
+
+```math
+\\begin{align}
+\\tilde{w}_j(C_k) &= \\frac{\\rho_o(\\{j\\})^{-1}}{\\sum_{l \\in C_k} \\rho_o(\\{l\\})^{-1}} \\quad \\forall\\, j \\in C_k\\,,\\\\
+\\tilde{\\rho}_o(C_k) &= \\rho_o\\left(\\tilde{\\boldsymbol{w}}(C_k)\\right)\\,,\\\\
+\\alpha &= \\frac{\\sum_{C_k \\subseteq B_2} \\tilde{\\rho}_o(C_k)}{\\sum_{C_k \\subseteq B_1} \\tilde{\\rho}_o(C_k) + \\sum_{C_k \\subseteq B_2} \\tilde{\\rho}_o(C_k)}\\,,\\\\
+\\boldsymbol{w}_{B_1} &\\leftarrow \\alpha \\, \\boldsymbol{w}_{B_1}\\,,\\\\
+\\boldsymbol{w}_{B_2} &\\leftarrow (1 - \\alpha) \\, \\boldsymbol{w}_{B_2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho_i``, ``\\rho_o``: The inner measure `ri` and the outer measure `ro`, resolved by [`factory`](@ref).
+  - ``C_k``: The ``k``-th cluster. ``K`` of them partition the universe.
+  - ``B_1``, ``B_2``: The left and right branches of the dendrogram node being split. Each is a union of whole clusters.
+  - ``\\tilde{\\boldsymbol{w}}(C_k)``: Naive risk parity weights inside cluster ``C_k`` under ``\\rho_o``, zero outside it.
+  - ``\\tilde{\\rho}_o(C_k)``: Risk of that sub-portfolio, the cluster's contribution to a branch's risk.
+  - ``\\alpha``: Fraction of the node's weight that goes to ``B_1``.
+  - ``w_j``: Weight of asset ``j``. The final vector is normalised to sum to one.
+
+The two allocations multiply: an asset's final weight is its share inside its cluster, times every split factor on the path from the root to that cluster. **This is not a flat inverse-risk allocation over the ``K`` clusters.** A recursion of binary splits agrees with one only when ``K = 2``. On a twelve-asset sample that clusters into three, the recursion gives cluster weights ``[0.7024, 0.1603, 0.1373]`` where a flat allocation would give ``[0.3697, 0.3394, 0.2908]``.
+
+When `ri` or `ro` is a vector, [`herc_scalarised_risk_i!`](@ref) and [`herc_scalarised_risk_o!`](@ref) combine the measures with `scai` and `scao` before the weights are formed.
 
 # Fields
 
@@ -156,34 +195,6 @@ HierarchicalEqualRiskContribution
     fb ┴ nothing
 ```
 
-# Mathematical definition
-
-Let ``K`` be the number of clusters. The inter-cluster (outer) step assigns equal risk contribution across all clusters using risk measure ``\\rho_o``:
-
-```math
-\\begin{align}
-w_{C_k} &= \\frac{\\tilde{\\rho}_o(C_k)^{-1}}{\\sum_{j=1}^{K} \\tilde{\\rho}_o(C_j)^{-1}}\\,.
-\\end{align}
-```
-
-Within each cluster ``C_k``, the intra-cluster (inner) step assigns weights proportional to inverse intra-cluster risk ``\\rho_i``:
-
-```math
-\\begin{align}
-w_i &\\propto \\tilde{\\rho}_i(\\{i\\})^{-1}, \\quad i \\in C_k\\,, \\\\
-\\sum_{i \\in C_k} w_i &= w_{C_k}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``w_{C_k}``: Weight allocated to cluster ``C_k``.
-  - ``\\tilde{\\rho}_o(C_k)``: Outer (inter-cluster) risk of cluster ``C_k``.
-  - ``\\tilde{\\rho}_i(\\{i\\})``: Inner (intra-cluster) risk of asset ``i``.
-  - ``K``: Number of clusters.
-  - ``w_i``: Final weight of asset ``i``.
-  - ``\\tilde{\\rho}``: Quasi-diagonal cluster portfolio risk.
-
 # Related
 
   - [`optimise`](@ref)
@@ -192,7 +203,16 @@ Where:
   - [`HierarchicalRiskParity`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`HierarchicalOptimiser`](@ref)
+  - [`unitary_expected_risks`](@ref)
+  - [`herc_risk`](@ref)
+  - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:raffinot2017])
+  - $(ref_dict[:raffinot2018])
+  - $(ref_dict[:cajas2025]) Section 12.2.
 """
 @propagatable @concrete struct HierarchicalEqualRiskContribution <:
                                ClusteringOptimisationEstimator
@@ -307,31 +327,39 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
 """
-    herc_scalarised_risk_o!(scalariser, wk, roku, rkbo, cl, ros, X, fees)
+    herc_scalarised_risk_o!(sca::Scalariser, wk::VecNum, roku::VecNum_MatNum,
+                            rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
+                            fees::Option{<:Fees}) -> Number
 
-Compute and accumulate the scalarised outer (inter-cluster) HERC risk in-place.
+Combine several outer measures into the one risk that cluster `cl` contributes to its branch.
 
-Updates `rkbo` with inverse-risk weights for cluster `cl` and accumulates the scaled risk contribution using the given scalariser strategy.
+Each measure builds its own naive risk parity sub-portfolio over `cl`, because the weights follow that measure's own unitary risks. The scalariser then combines the per-measure risks into one number.
 
 # Arguments
 
-  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
-  - `wk`: Cluster weight vector.
-  - `roku`: Unitary outer risk vector or matrix.
-  - `rkbo`: Outer risk buffer vector (modified in-place).
-  - `cl`: Cluster asset indices.
-  - `ros`: Vector of outer risk measures.
-  - `X`: Return matrix.
-  - `fees`: Optional fees.
+  - `sca`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Scratch weight vector for [`unitary_expected_risks!`](@ref), of length `size(X, 2)`.
+  - `roku`: Unitary outer risk buffer. A vector is overwritten per measure; a matrix already caches column `i` per measure, see [`herc_unitary_risks_o!`](@ref).
+  - `rkbo`: Weight buffer, written in place over the entries of `cl`. The caller zeroes those entries again after the split.
+  - `cl`: Asset indices of the cluster.
+  - `ros`: Vector of outer risk measures, already resolved by [`factory`](@ref).
+  - `X`: Asset return matrix, observations by assets.
+  - `fees`: Fees, or `nothing`.
 
 # Returns
 
-  - Scalarised outer cluster risk scalar.
+  - `risk::Number`: The combined outer risk of the cluster.
+
+# Details
+
+  - Each measure's contribution is multiplied by its own `settings.scale` before the scalariser sees it.
 
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`herc_scalarised_risk_i!`](@ref)
+  - [`herc_unitary_risks_o!`](@ref)
+  - [`unitary_expected_risks!`](@ref)
 """
 function herc_scalarised_risk_o!(sca::Scalariser, wk::VecNum, roku::VecNum_MatNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
@@ -390,30 +418,37 @@ function herc_unitary_risks_o!(::VecNum, rku::MatNum, i::Any, ::OptimisationRisk
     return view(rku, :, i)
 end
 """
-    herc_scalarised_risk_i!(scalariser, wk, riku, cl, ris, X, fees)
+    herc_scalarised_risk_i!(sca::Scalariser, wk::VecNum, riku::VecNum_MatNum,
+                            cl::VecInt, ris::VecOptRM, X::MatNum,
+                            fees::Option{<:Fees}) -> VecNum
 
-Compute the scalarised inner (intra-cluster) HERC risk for cluster `cl`.
-
-Aggregates inner risk measures across the assets in cluster `cl` using the given scalariser, returning the per-asset risk vector used for intra-cluster weight allocation.
+Combine several inner measures into the one weight vector that shares a cluster's weight between its assets.
 
 # Arguments
 
-  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
-  - `wk`: Cluster weight vector.
-  - `riku`: Unitary inner risk vector or matrix.
-  - `cl`: Cluster asset indices.
-  - `ris`: Vector of inner risk measures.
-  - `X`: Return matrix.
-  - `fees`: Optional fees.
+  - `sca`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Scratch weight vector for [`unitary_expected_risks!`](@ref), of length `size(X, 2)`.
+  - `riku`: Unitary inner risk buffer. A vector is overwritten per measure; a matrix caches column `i` per measure, see [`herc_unitary_risks_i!`](@ref).
+  - `cl`: Asset indices of the cluster.
+  - `ris`: Vector of inner risk measures, already resolved by [`factory`](@ref).
+  - `X`: Asset return matrix, observations by assets.
+  - `fees`: Fees, or `nothing`.
 
 # Returns
 
-  - Per-asset inner risk vector for assets in `cl`.
+  - `w::VecNum`: The intra-cluster weights, of length `length(cl)`. They sum to one under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref), and to the total of the measures' `settings.scale` under [`SumScalariser`](@ref). [`LogSumExpScalariser`](@ref) gives a total that varies with the cluster, but only in the far decimals: two measures at unit scale gave **3.772618**, **3.772634** and **3.772624** on the three clusters of a twelve-asset sample. `_optimise` normalises the whole weight vector at the end, so a total that is the same for every cluster cancels, and the three scalarisers put the same weight on each cluster to **1e-6**.
+
+# Details
+
+  - The two methods **normalise at different points**, and the difference is deliberate. [`SumScalariser`](@ref) and [`LogSumExpScalariser`](@ref) normalise each measure's inverse-risk vector first and combine the resulting weight vectors. [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) select one measure — the one whose total scaled risk over `cl` is largest or smallest — and normalise that measure's vector alone, because selecting between already-normalised vectors would compare quantities that all sum to one.
+  - Each measure's contribution is multiplied by its own `settings.scale`.
 
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`herc_scalarised_risk_o!`](@ref)
+  - [`herc_unitary_risks_i!`](@ref)
+  - [`unitary_expected_risks!`](@ref)
 """
 function herc_scalarised_risk_i!(sca::Union{SumScalariser, LogSumExpScalariser}, wk::VecNum,
                                  riku::VecNum_MatNum, cl::VecInt, ris::VecOptRM, X::MatNum,
@@ -438,27 +473,33 @@ function herc_scalarised_risk_i!(sca::Union{MaxScalariser, MinScalariser}, wk::V
     return risk
 end
 """
-    herc_risk(hec, pr, cls)
+    herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResult,
+              cls::VecVecInt) -> Tuple
 
-Compute per-cluster risk contributions for HERC weight allocation.
-
-Evaluates the inner and outer risk measures for all clusters in `cls`, returning the risk arrays needed to allocate intra- and inter-cluster weights.
+Compute the intra-cluster weights and the per-cluster outer risks that HERC allocates with.
 
 # Arguments
 
-  - `hec`: [`HierarchicalEqualRiskContribution`](@ref) optimiser instance.
-  - `pr`: Prior result containing asset moments and return data.
-  - `cls`: Vector of vectors of asset indices per cluster.
+  - `hec`: The optimiser. Its `ri`/`ro` arity and its executor `ex` select the method.
+  - `pr`: Prior result. Its `X` is the return matrix and its moments resolve the measures.
+  - `cls`: Asset indices of each cluster, one entry per cluster.
 
 # Returns
 
-  - `(riku, roku)`: Inner and outer per-asset risk arrays.
+  - `(w, rkcl, fees, ri, ro)::Tuple`: The intra-cluster weights over the whole universe, each cluster's outer risk, the resolved fees, and the two resolved risk measures.
+
+# Details
+
+  - Eight methods cover the four arity pairs of `ri` and `ro` against a sequential or a parallel executor. A parallel executor gets one buffer column per cluster, so no two iterations write the same entry.
+  - When `hec.ri === hec.ro` the measure is resolved once and the unitary risks are computed once, because the two allocations then read the same vector.
+  - `w` covers the whole universe. Each cluster's entries sum to one, so a cluster's share still has to be applied on top.
 
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`herc_scalarised_risk_i!`](@ref)
   - [`herc_scalarised_risk_o!`](@ref)
+  - [`unitary_expected_risks`](@ref)
 """
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
