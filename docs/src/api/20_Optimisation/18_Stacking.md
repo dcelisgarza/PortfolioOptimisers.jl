@@ -18,3 +18,10 @@ optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                   save::Bool = true, kwargs...)
 assert_special_nco_requirements_stacking_opti
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

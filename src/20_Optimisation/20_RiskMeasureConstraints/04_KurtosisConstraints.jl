@@ -148,7 +148,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
     qsqrt_kurtosis_risk = state_set!(model, prefix, :ckurtosis_rsoc_, i,
                                      JuMP.@constraint(model,
                                                       [sc * tkurtosis
-                                                       0.5
+                                                       sc * 0.5
                                                        sc * x_kurt] in
                                                       JuMP.RotatedSecondOrderCone()))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)

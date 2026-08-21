@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Per-term settings bundle carried by every [`JuMPReturnsEstimator`](@ref).
+Carries one return term's own weight in the return sum, its own lower bound, and the two charges netted out of it.
 
 A [`JuMPOptimiser`](@ref) takes one return term or a vector of them, and the model's single
 scalar return expression is the weighted sum ``\\mathrm{ret} = \\sum_i s_i\\, \\mathrm{ret}_i``
@@ -147,12 +147,28 @@ const ArithRetMu = Union{<:Num_VecNum, <:AbstractExpectedReturnsEstimator,
 """
 $(DocStringExtensions.TYPEDEF)
 
-JuMP return term that computes portfolio returns as the arithmetic (dot-product)
-mean return: ``r = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
+Computes the portfolio return as the arithmetic mean return, the dot product of the expected returns and the weights.
 
 Optionally supports an uncertainty set on the mean vector (box, ellipsoidal or
 ``\\ell_1``). When `ucs` is set the optimiser maximises the **worst-case** expected return
 over the set instead of the point estimate `μ`, giving a robust return.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r(\\boldsymbol{w})``: Expected portfolio return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+
+Each `ucs` shape replaces this expression with its own worst case; the four are stated on
+the [`set_ucs_return_constraints!`](@ref) methods.
 
 # Fields
 
@@ -191,6 +207,11 @@ Keywords correspond to the struct's fields.
   - [`bounds_returns_estimator`](@ref)
   - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.1.1.
+  - $(ref_dict[:markowitz1952])
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     """
@@ -377,13 +398,54 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-JuMP return term that computes portfolio returns as the logarithmic (geometric)
-mean return: ``r = \\prod_{t=1}^T (1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})^{1/T} - 1``.
+Computes the portfolio return as the **mean logarithmic return**, the Kelly criterion's objective.
 
 Optionally supports observation weights.
 
 Unlike [`ArithmeticReturn`](@ref) this term holds **no per-asset quantity at all**, which is
 why the plural noun of this family is the *return term* rather than the characteristic.
+
+# Mathematical definition
+
+The value the term reports is the mean of the log gross returns:
+
+```math
+\\begin{align}
+r(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\ln\\left(1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}\\right)\\,.
+\\end{align}
+```
+
+The model raises it as an exponential cone programme, one cone per observation:
+
+```math
+\\begin{align}
+(q_t,\\; k,\\; k + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}) &\\in \\mathcal{K}_{\\exp} \\quad \\forall t = 1,\\dots,T\\,, \\\\
+r(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} q_t\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r(\\boldsymbol{w})``: Mean logarithmic portfolio return.
+  - $(math_dict[:x_t_obs])
+  - $(math_dict[:w_port])
+  - $(math_dict[:T])
+  - $(math_dict[:k_budget])
+  - ``q_t``: Auxiliary model variable that the cone bounds by ``k \\ln(1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w} / k)``.
+  - ``\\mathcal{K}_{\\exp}``: Exponential cone.
+
+!!! warning
+
+    This is the mean **logarithmic** return, not the geometric mean net return
+    ``\\prod_t (1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})^{1/T} - 1``. The two are one
+    ``\\exp(\\cdot) - 1`` apart, so they order portfolios alike but carry different units. On a
+    200-observation sample the term reports **0.0019487260** where the geometric mean is
+    **0.0019506260**. `settings.lb` and [`MaximumRatio`](@ref)'s `rf` are therefore stated in
+    log units. Apply `exp(r) - 1` to read the value as a net return.
+
+The cone is a relaxation that a maximising objective closes: on that sample the model's own
+`:ret` is **0.0019487202** against the value-level **0.0019487260**, a gap of **5.8e-9**.
+[`expected_return`](@ref) computes the same quantity in closed form.
 
 # Fields
 
@@ -408,6 +470,14 @@ Keywords correspond to the struct's fields.
   - [`bounds_returns_estimator`](@ref)
   - [`ArithmeticReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+  - [`expected_return`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.1.2, equations 8.2 and 8.5.
+  - $(ref_dict[:kelly1956])
+  - $(ref_dict[:thorp2008])
+  - $(ref_dict[:chares2009])
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     """
@@ -579,12 +649,35 @@ $(DocStringExtensions.TYPEDEF)
 
 Objective function that minimises portfolio risk.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min}\\; R(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:R_w])
+
+The objective reads no return expression, so it admits a [`NoReturn`](@ref) term and a zero
+`:ret`. It also states no floor on the return, so a term's `settings.lb` is the only thing
+that keeps the solution off a portfolio whose expected return is negative.
+
 # Related
 
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
+  - [`JuMPReturnsSettings`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.1, equation 8.7.
+  - $(ref_dict[:markowitz1952])
 """
 struct MinimumRisk <: ObjectiveFunction end
 """
@@ -596,7 +689,7 @@ Objective function that maximises risk-adjusted utility.
 
 ```math
 \\begin{align}
-\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})\\,.
+\\underset{\\boldsymbol{w}}{\\max}\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - l\\, R(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
@@ -606,6 +699,11 @@ Where:
   - $(math_dict[:w_port])
   - ``l``: Risk-aversion coefficient.
   - $(math_dict[:R_w])
+
+The risk carries the coefficient **whole**: the model builds `ret - l * risk`, with no factor
+of one half. A caller porting a ``\\tfrac{\\lambda}{2}`` convention halves its own ``\\lambda``. At
+`l = 3.0` on a five-asset sample the model's own objective is **0.0015922030484060072**, which
+is `ret - 3.0 * risk` exactly; the halved form would give **0.0018692372364207165**.
 
 # Fields
 
@@ -627,6 +725,11 @@ Keywords correspond to the struct's fields.
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.3, equation 8.12.
+  - $(ref_dict[:markowitz1952])
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
     """
@@ -650,7 +753,7 @@ Objective function that maximises the risk-adjusted Sharpe-type ratio.
 
 ```math
 \\begin{align}
-\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}\\,.
+\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}\\,.
 \\end{align}
 ```
 
@@ -660,6 +763,18 @@ Where:
   - $(math_dict[:w_port])
   - ``r_f``: Risk-free rate.
   - $(math_dict[:R_w])
+
+The quotient is not convex, so the model solves the equivalent fractional programme instead.
+It homogenises the whole feasible set by a scalar ``k \\geq 0``, optimises in
+``\\boldsymbol{y} = k \\boldsymbol{w}``, and de-homogenises with
+``\\boldsymbol{w} = \\boldsymbol{y} / k``. One of two normalisations pins ``k``:
+
+  - **Return form.** ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{y} - r_f k = \\mathrm{ohf}``, and the model minimises the risk. This is the branch [`set_max_ratio_return_constraints!`](@ref) registers as `sr_ret`.
+  - **Risk form.** ``R(\\boldsymbol{y}) \\leq \\mathrm{ohf}``, and the model maximises ``\\mathrm{ret} - r_f k``. This is the branch registered as `sr_risk`.
+
+The return form fails whenever the portfolio's expected return cannot exceed ``r_f``, so the
+risk form takes over there, and wherever a term raises a cone the return form cannot carry.
+[`set_max_ratio_return_constraints!`](@ref) states the exact test.
 
 The ratio is taken at the **aggregate** level: its numerator is the model's single `ret`
 expression, whatever number of terms built it. `rf` is therefore a single rate on that
@@ -686,6 +801,15 @@ Keywords correspond to the struct's fields.
   - [`MaximumUtility`](@ref)
   - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
+  - [`set_max_ratio_return_constraints!`](@ref)
+  - [`set_maximum_ratio_normalisation!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.4, equations 8.13 to 8.16.
+  - $(ref_dict[:sharpe1964])
+  - $(ref_dict[:schaibleibaraki1983])
+  - $(ref_dict[:charnescooper1962])
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
     """
@@ -693,7 +817,7 @@ Keywords correspond to the struct's fields.
     """
     rf
     """
-    Optional objective homogenisation factor for numerical stability of the ratio problem. Defaults to `nothing` (auto-determined).
+    $(field_dict[:ohf])
     """
     ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
@@ -709,7 +833,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
+Objective function that maximises the model's return expression.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max}\\; \\mathrm{ret}(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathrm{ret}(\\boldsymbol{w})``: The model's single scalar return expression, the weighted sum over the return terms.
+
+The objective reads the aggregate expression, not ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``:
+a [`LogarithmicReturn`](@ref) term contributes a mean logarithmic return, and several terms
+contribute their weighted sum. It states no ceiling on the risk, so a risk measure's
+`settings.ub` is the only thing that keeps the solution off the single highest-return asset.
 
 # Related
 
@@ -717,6 +859,12 @@ Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\interc
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
   - [`ObjectiveFunction`](@ref)
+  - [`MaximumElementReturn`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.2, equation 8.10.
+  - $(ref_dict[:markowitz1952])
 """
 struct MaximumReturn <: ObjectiveFunction end
 """
@@ -735,14 +883,28 @@ Not part of the user-facing API.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    MaximumElementReturn(i::Integer) -> MaximumElementReturn
+
+The argument corresponds to the struct's field. The type takes a positional argument alone,
+because it carries one field and no caller outside the frontier builds it.
+
+## Validation
+
+  - `i > 0`. The other half of the domain, `i <= length(ret)`, is checked at model build by
+    [`assert_no_return_objective_compatibility`](@ref), which is the first site that sees the
+    return terms.
+
 # Related
 
   - [`MaximumReturn`](@ref)
   - [`compute_ret_lbs`](@ref)
+  - [`assert_no_return_objective_compatibility`](@ref)
 """
 @concrete struct MaximumElementReturn <: ObjectiveFunction
     """
-    `i`: Index of the return term to maximise.
+    $(field_dict[:i_ret_term])
     """
     i
     function MaximumElementReturn(i::Integer)

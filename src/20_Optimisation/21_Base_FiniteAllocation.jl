@@ -5,11 +5,19 @@ Abstract supertype for finite allocation portfolio optimisation estimators.
 
 Finite allocation estimators convert continuous portfolio weights into discrete share quantities given an investment budget and asset prices.
 
-# Related Types
+The library ships two: [`DiscreteAllocation`](@ref), which solves a mixed-integer programme, and [`GreedyAllocation`](@ref), which walks the target weights. Both take a [`FiniteAllocationInput`](@ref) as the second argument to [`optimise`](@ref), and both split the portfolio into a long and a short sub-problem.
+
+# Related
 
   - [`OptimisationEstimator`](@ref)
   - [`DiscreteAllocation`](@ref)
   - [`GreedyAllocation`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+  - [`FiniteAllocationOptimisationResult`](@ref)
+
+# References
+
+  - $(ref_dict[:martin2021])
 """
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 """
@@ -17,11 +25,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for finite allocation optimisation result types.
 
-# Related Types
+Every subtype carries `shares`, `cost`, `w`, `cash` and a trailing `fb`, in that order, which is what lets the generic [`factory`](@ref) rebuild any of them by swapping the last field alone.
+
+# Related
 
   - [`OptimisationResult`](@ref)
   - [`DiscreteAllocationResult`](@ref)
   - [`GreedyAllocationResult`](@ref)
+  - [`FiniteAllocationOptimisationEstimator`](@ref)
+  - [`factory`](@ref)
 """
 abstract type FiniteAllocationOptimisationResult <: OptimisationResult end
 """
@@ -71,10 +83,24 @@ Keywords correspond to the struct's fields.
   - `cash > 0`.
   - `horizon` must not be `nothing` when `fees` is provided.
 
+# Examples
+
+```jldoctest
+julia> FiniteAllocationInput(; w = [0.6, 0.4], prices = [10.0, 20.0], cash = 1000.0)
+FiniteAllocationInput
+        w ┼ Vector{Float64}: [0.6, 0.4]
+   prices ┼ Vector{Float64}: [10.0, 20.0]
+     cash ┼ Float64: 1000.0
+  horizon ┼ nothing
+     fees ┴ nothing
+```
+
 # Related
 
   - [`DiscreteAllocation`](@ref)
   - [`GreedyAllocation`](@ref)
+  - [`FiniteAllocationOptimisationEstimator`](@ref)
+  - [`setup_alloc_optim`](@ref)
   - [`optimise`](@ref)
 """
 @concrete struct FiniteAllocationInput <: AbstractEstimator
@@ -140,27 +166,44 @@ function factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOp
 end
 
 """
-    setup_alloc_optim(w, p, cash, ...)
+    setup_alloc_optim(w::VecNum, p::VecNum, cash::Number,
+                      T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing)
 
-Set up the data structures needed for finite allocation optimisation.
+Split a portfolio into its long and its short side, and share the cash between them.
 
-Separates the portfolio into long and short positions, computes budgets and cash allocations for each side, and returns indices and cash values for downstream allocation routines.
+Both finite allocators solve one sub-problem per side. This routine charges the fees against the cash, computes the budget of each side, and gives each side the share of the cash its budget calls for.
 
 # Arguments
 
-  - `w`: Portfolio weights vector.
-  - `p`: Asset price vector.
-  - `cash`: Total cash available.
-  - Additional parameters for budget configuration.
+  - `w::VecNum`: Target portfolio weights over the whole universe.
+  - `p::VecNum`: Asset prices, in the same order as `w`.
+  - `cash::Number`: Cash available before fees.
+  - `T::Option{<:Number} = nothing`: Time horizon over which the fees are charged.
+  - `fees::Option{<:Fees} = nothing`: Fees to charge. Ignored unless `T` is also given.
 
 # Returns
 
-  - Named tuple or multiple values with allocation setup data.
+  - `cash::Number`: Cash after the fees are charged.
+  - `bgt::Number`: Total budget, `sum(w)`.
+  - `lbgt::Number`: Long-side budget, the sum of the non-negative weights.
+  - `sbgt::Number`: Short-side budget, the **negated** sum of the negative weights, so it is non-negative.
+  - `lidx`: Mask of the long side, `w .>= 0`.
+  - `sidx`: Mask of the short side. Empty when the portfolio is long only.
+  - `lcash::Number`: `cash * lbgt`, before [`adjust_long_cash`](@ref) corrects it.
+  - `scash::Number`: `cash * sbgt`. Zero when the portfolio is long only.
+
+# Details
+
+  - A zero weight counts as long, because the test is `w .>= 0`.
+  - The fees are charged once against the whole `cash`, before the split, so both sides see the net figure.
+  - `lcash` is the long side's share of the **gross** cash. It is only correct once the short side has reported what it did not spend, which is why [`adjust_long_cash`](@ref) runs between the two sub-problems.
 
 # Related
 
   - [`adjust_long_cash`](@ref)
   - [`finite_sub_allocation`](@ref)
+  - [`finite_sub_allocation!`](@ref)
+  - [`FiniteAllocationInput`](@ref)
 """
 function setup_alloc_optim(w::VecNum, p::VecNum, cash::Number,
                            T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing)
@@ -185,26 +228,33 @@ function setup_alloc_optim(w::VecNum, p::VecNum, cash::Number,
     return cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash
 end
 """
-    adjust_long_cash(bgt, lcash, scash)
+    adjust_long_cash(bgt::Number, lcash::Number, scash::Number) -> Number
 
-Adjust the long-side cash allocation based on budget and short-side cash.
+Correct the long side's cash with the cash the short side did not spend.
 
-Redistributes cash between long and short portfolio sides to satisfy the overall budget constraint.
+Runs between the two sub-problems, once the short side has reported its leftover cash. The correction has opposite signs above and below a unit budget, so the long side never spends cash the portfolio does not hold.
 
 # Arguments
 
-  - `bgt`: Portfolio budget (sum of weights target).
-  - `lcash`: Long-side cash allocation.
-  - `scash`: Short-side cash allocation.
+  - `bgt::Number`: Total budget, `sum(w)`.
+  - `lcash::Number`: Long side's share of the gross cash, from [`setup_alloc_optim`](@ref).
+  - `scash::Number`: Cash the short side did not spend.
 
 # Returns
 
-  - Adjusted long-side cash.
+  - `res::Number`: The corrected long-side cash.
+
+# Details
+
+  - `scash == 0`: `lcash` is returned unchanged. A long-only portfolio takes this branch.
+  - `bgt >= 1`: `lcash` exceeds the cash actually available, so the unspent short cash is **subtracted**. It is not available to the long side.
+  - `bgt < 1`: `lcash` falls short of the cash actually available, so the unspent short cash is **added** without exceeding the true budget.
 
 # Related
 
   - [`setup_alloc_optim`](@ref)
   - [`finite_sub_allocation`](@ref)
+  - [`finite_sub_allocation!`](@ref)
 """
 function adjust_long_cash(bgt::Number, lcash::Number, scash::Number)
     if iszero(scash)

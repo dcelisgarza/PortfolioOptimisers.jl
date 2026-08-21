@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for Near Optimal Centering algorithm variants.
 
-# Related Types
+# Related
 
   - [`ConstrainedNearOptimalCentering`](@ref)
   - [`UnconstrainedNearOptimalCentering`](@ref)
@@ -19,13 +19,10 @@ shared [`assemble_jump_model!`](@ref), so every [`JuMPOptimiser`](@ref) setting 
 centring model. Use this variant when a setting must bind on the centring solve itself. See
 [`UnconstrainedNearOptimalCentering`](@ref) for what the default variant does not read.
 
-# Related Types
+# Related
 
   - [`NearOptimalCenteringAlgorithm`](@ref)
   - [`UnconstrainedNearOptimalCentering`](@ref)
-
-# Related
-
   - [`assemble_near_optimal_centering_model!`](@ref)
 """
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
@@ -62,13 +59,10 @@ per position held, so it needs the cardinality binaries `set_mip_constraints!` p
 set: [`set_near_optimal_objective_function!`](@ref) folds no Objective Penalty into the
 barrier, so a Custom Objective Term prices the anchor sub-problems, not the centring solve.
 
-# Related Types
+# Related
 
   - [`NearOptimalCenteringAlgorithm`](@ref)
   - [`ConstrainedNearOptimalCentering`](@ref)
-
-# Related
-
   - [`assemble_near_optimal_centering_model!`](@ref)
   - [`set_near_optimal_objective_function!`](@ref)
   - [`near_optimal_centering_setup`](@ref)
@@ -164,7 +158,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Near Optimal Centering (NOC) portfolio optimiser.
 
-`NearOptimalCentering` finds a portfolio that is centrally located within the region of near-optimal solutions. It first solves the minimum-risk, maximum-risk, and user-specified optimal-objective sub-problems, then maximises the minimum distance to the efficient frontier boundaries, yielding a portfolio that is robust to small perturbations in risk-return space.
+`NearOptimalCentering` first solves three anchor sub-problems -- minimum risk, maximum return, and the user's own objective -- and reads a near optimal region off them. It then finds the analytic centre of that region, which is the point that maximises the product of the margins of its inequalities. The answer is robust to small perturbations in risk-return space.
 
 # Fields
 
@@ -204,11 +198,32 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 # Mathematical definition
 
-Let ``\\boldsymbol{w}_{\\min}``, ``\\boldsymbol{w}_{\\mathrm{opt}}``, and ``\\boldsymbol{w}_{\\max}`` be the minimum-risk, user-optimal, and maximum-risk portfolios. The NOC solves:
+Three anchor portfolios bound the region: ``\\boldsymbol{w}_{\\min}`` of minimum risk, ``\\boldsymbol{w}_{\\max}`` of maximum return, and ``\\boldsymbol{w}_{\\mathrm{opt}}``, which solves the user's own objective. The **near optimal region** is the set of portfolios whose return is no worse than ``\\epsilon_{1}`` and whose risk is no worse than ``\\epsilon_{2}``:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\max} \\; \\min\\left\\{\\frac{\\boldsymbol{w} - \\boldsymbol{w}_{\\min}}{\\boldsymbol{w}_{\\mathrm{opt}} - \\boldsymbol{w}_{\\min}},\\; \\frac{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}}{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}_{\\mathrm{opt}}}\\right\\} \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} &\\geq \\epsilon_{1}\\,, \\\\
+\\rho(\\boldsymbol{w}) &\\leq \\epsilon_{2}\\,, \\\\
+\\boldsymbol{w} &\\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+The two margins are a fraction of the span the anchors describe, and `bins` is the number of parts that span is divided into:
+
+```math
+\\begin{align}
+\\epsilon_{1} &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w}_{\\mathrm{opt}} - \\frac{\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w}_{\\max} - \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w}_{\\min}}{m}\\,, \\\\
+\\epsilon_{2} &= \\rho(\\boldsymbol{w}_{\\mathrm{opt}}) + \\frac{\\rho(\\boldsymbol{w}_{\\max}) - \\rho(\\boldsymbol{w}_{\\min})}{m}\\,.
+\\end{align}
+```
+
+The NOC portfolio is the **analytic centre** of that region, which is the point that maximises the product of the margins of its inequalities. Equivalently, it minimises the logarithmic barrier:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} \\; &- \\ln\\left(\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\epsilon_{1}\\right) - \\ln\\left(\\epsilon_{2} - \\rho(\\boldsymbol{w})\\right) \\\\
+&- \\sum_{i=1}^{N} \\ln\\left(w_{i}\\right) - \\sum_{i=1}^{N} \\ln\\left(w_{u,i} - w_{i}\\right) \\\\
+\\text{s.t.} \\quad &\\boldsymbol{w} \\in \\mathcal{W}\\,.
 \\end{align}
 ```
 
@@ -216,11 +231,21 @@ Where:
 
   - ``\\boldsymbol{w}``: Portfolio weight vector.
   - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
-  - ``\\boldsymbol{w}_{\\min}``: Minimum-risk portfolio weights.
-  - ``\\boldsymbol{w}_{\\mathrm{opt}}``: User-optimal portfolio weights.
-  - ``\\boldsymbol{w}_{\\max}``: Maximum-risk portfolio weights.
+  - ``\\boldsymbol{w}_{\\min}``: Minimum-risk anchor weights, `w_min`.
+  - ``\\boldsymbol{w}_{\\mathrm{opt}}``: Anchor weights of the user's objective, `w_opt`.
+  - ``\\boldsymbol{w}_{\\max}``: Maximum-return anchor weights, `w_max`.
+  - ``\\boldsymbol{w}_{u}``: Upper weight bound, `opt.wb.ub`.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated expected return vector.
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``m``: Number of bins, `bins`. It defaults to ``T / N``, so a wider universe or a shorter history gives a wider region.
+  - ``N``: Number of assets.
 
-The solution yields a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
+# Details
+
+  - Every logarithm is modelled as an exponential cone, so the barrier is a conic problem rather than a nonlinear one.
+  - The last barrier term is the upper weight bound. It has no counterpart in the published model, which states the region with a lower bound alone.
+  - The three anchors are solved as [`MeanRisk`](@ref) sub-problems, unless the caller supplies them.
+  - The solution is centrally located within the near optimal region, so it is robust to small perturbations of the objective.
 
 ## Propagated parameters
 
@@ -248,7 +273,16 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`RiskJuMPOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
   - [`NearOptimalCenteringAlgorithm`](@ref)
+  - [`NearOptimalSetup`](@ref)
+  - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2019noc])
+  - $(ref_dict[:cajas2025]) Section 11.4.
+  - $(ref_dict[:degraaf2016])
+  - $(ref_dict[:boydvandenberghe2004]) Section 8.5.3.
 """
 @propagatable @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
     """
@@ -1031,7 +1065,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
                                idx::VecInt, args...)
     risk_frontier = copy(risk_frontier)
-    r = factory(view(noc.r, idx), pr, noc.opt.slv)
+    r = factory(view(noc.r, risk_frontier_owners(risk_frontier, idx)), pr, noc.opt.slv)
     for (i, ri) in zip(idx, r)
         risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
                                                   i)

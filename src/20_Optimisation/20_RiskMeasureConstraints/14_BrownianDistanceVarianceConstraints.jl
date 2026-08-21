@@ -102,7 +102,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExp
     state_set!(model, prefix, :rsoc_Dt,
                JuMP.@constraint(model,
                                 [sc * tDt;
-                                 0.5;
+                                 sc * 0.5;
                                  sc * vec(Dt)] in JuMP.RotatedSecondOrderCone()))
     return state_set!(model, prefix, :bdvariance_risk,
                       JuMP.@expression(model, iT2 * (tDt + iT2 * sum(Dt)^2)))

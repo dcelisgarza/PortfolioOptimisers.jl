@@ -879,6 +879,19 @@ The headline performance statistics of a realised return series.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    PerformanceSummaryResult(
+        n_periods, periods_per_year, alpha, compound,
+        ann_return, ann_volatility, sharpe, sharpe_stderr,
+        sortino, calmar, max_drawdown, cvar
+    ) -> PerformanceSummaryResult
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a
+Result, so [`performance_summary`](@ref) builds it and a caller reads it; there is no keyword
+constructor, and the type validates nothing of its own. The four inputs it carries first are
+the arguments that produced the statistics after them.
+
 # Related
 
   - [`performance_summary`](@ref)
@@ -972,11 +985,13 @@ The standard error of the Sharpe ratio is the Bailey and Lopez de Prado [sharpe_
 
 ```math
 \\begin{align}
-\\mathrm{sharpe\\_stderr} &= \\sqrt{\\dfrac{p}{T - 1} \\left(1 - g_{1} \\dfrac{m}{s} + \\dfrac{g_{2}}{4} \\dfrac{m^{2}}{s^{2}}\\right)}\\,.
+\\mathrm{sharpe\\_stderr} &= \\sqrt{\\dfrac{p}{T - 1} \\left(1 - g_{1} \\dfrac{m}{s} + \\dfrac{g_{2} + 2}{4} \\dfrac{m^{2}}{s^{2}}\\right)}\\,.
 \\end{align}
 ```
 
-A non-normal return series makes a Sharpe ratio less precise than the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
+The kurtosis term is ``(g_{2} + 2)/4`` because the source states it as ``(\\gamma_{2} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{2}``, and `StatsBase.kurtosis` returns the **excess** moment ``g_{2} = \\gamma_{2} - 3``. The two forms agree, and only this one reduces to the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series: over 200,000 samples of 250 normal returns at a per-period Sharpe ratio of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**, against **0.06721661** from this expression evaluated at the population moments and **0.06337243** from the same expression without the ``+2``.
+
+A non-normal return series makes a Sharpe ratio less precise than the naive expression suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
 
 # Arguments
 
@@ -1035,8 +1050,11 @@ function performance_summary(ret::VecNum; periods_per_year::Number = 252,
     # The per-period Sharpe ratio, corrected by the third and fourth standardised
     # moments. `T - 1` matches the corrected `std` used for `sharpe` itself.
     sr_p = s > zero(s) ? m / s : NaN
+    # `StatsBase.kurtosis` is the EXCESS moment, and the source's coefficient is
+    # `(gamma_2 - 1) / 4` on the raw one, so the `+ 2` converts between them. Without it a
+    # normal series loses the whole `SR^2 / 2` term the naive expression carries.
     var_sr = (one(sr_p) - StatsBase.skewness(ret) * sr_p +
-              StatsBase.kurtosis(ret) / 4 * sr_p^2) / (T - 1)
+              (StatsBase.kurtosis(ret) + 2) / 4 * sr_p^2) / (T - 1)
     sharpe_se = var_sr > zero(var_sr) ? sqrt(var_sr * ann) : NaN
     return PerformanceSummaryResult(T, ann, alpha, compound, ann_ret, ann_vol, sharpe,
                                     sharpe_se, sortino, calmar, max_dd, cvar_val)

@@ -89,6 +89,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A risk expression that is identically zero is refused with [`MinimumRisk`](@ref) and with
+    [`MaximumRatio`](@ref). Every feasible portfolio is optimal under the first, and the second
+    is unbounded. A [`NoRisk`](@ref) measure and `settings.rke = false` on every measure are
+    the two routes to it.
 
 ## Propagated parameters
 
@@ -222,6 +226,9 @@ Objective ``f`` depends on [`ObjectiveFunction`](@ref):
   - [`MaximumUtility`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} + \\lambda \\rho(\\boldsymbol{w})``
   - [`MaximumRatio`](@ref) (Sharpe): ``f(\\boldsymbol{w}) = -(\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - r_f) / \\rho(\\boldsymbol{w})``
 
+The ratio is not solved in that form. The model homogenises it into a linear problem with an
+auxiliary scalar `k`, and de-homogenises the weights afterwards. See [`MaximumRatio`](@ref).
+
 Where:
 
   - ``\\boldsymbol{w}``: Portfolio weight vector.
@@ -250,11 +257,13 @@ Where:
   - [`MeanRiskResult`](@ref)
   - [`ObjectiveFunction`](@ref)
   - [`RiskMeasure`](@ref)
+  - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 
 # References
 
   - $(ref_dict[:markowitz1952])
+  - $(ref_dict[:cajas2025]) Chapter 8.
 """
 @propagatable @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     """
@@ -465,25 +474,42 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
     return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(ret_axis, nothing))
 end
 """
-    _rebuild_risk_frontier(pr, fees, ...)
+    _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees}, r::RiskMeasure,
+                           risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
+                           i::Integer = 1)
 
-Internal helper to rebuild the risk frontier from a prior result.
+Resolve one [`Frontier`](@ref) risk bound into the span of numbers the sweep writes.
 
-Recomputes the risk range used for the efficient frontier given updated prior information and fee structures.
+The span runs between the risk of the two corner portfolios, `w_min` and `w_max`, measured by
+`r` itself. `bound` transforms each end, `factor` multiplies both, and `range` divides the
+result into `N` levels. A measure whose bigger value is better has its ends swapped, so the
+span ascends either way.
 
 # Arguments
 
-  - `pr`: Prior result with asset moments.
-  - `fees`: Optional fees configuration.
-  - Additional parameters.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:fees_opt])
+  - `r::RiskMeasure`: The measure that owns entry `i`, already through [`factory`](@ref).
+  - `risk_frontier::VecPair`: The `:risk_frontier` registry.
+  - `w_min::VecNum`: Weights of the minimum-risk corner portfolio.
+  - `w_max::VecNum`: Weights of the maximum-return corner portfolio.
+  - `i::Integer = 1`: Position of the entry in the registry.
 
 # Returns
 
-  - Tuple of risk bound values for the frontier.
+  - The rebuilt entry. Its keys, expression, polarity and owner are entry `i`'s own; only the
+    bound changes.
+
+# Details
+
+  - Every part of the entry is read from position `i`. Reading the expression or the polarity
+    from position `1` would bound the first measure's expression twice and never bound the
+    second measure at all.
 
 # Related
 
   - [`rebuild_risk_frontier`](@ref)
+  - [`Frontier`](@ref)
   - [`MeanRisk`](@ref)
 """
 function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
@@ -504,30 +530,47 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
         factor * rk_min^2, factor * rk_max^2
     end
     ub = range(rk_min, rk_max; length = N)
-    return risk_frontier[i].first =>
-        (risk_frontier[1].second[1], ub, risk_frontier[1].second[3])
+    (expr, _, flag, owner) = risk_frontier[i].second
+    return risk_frontier[i].first => (expr, ub, flag, owner)
 end
 """
-    rebuild_risk_frontier(model, mr, ...)
+    rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
+                          fees::Option{<:Fees}, risk_frontier::VecPair, idx, attrs)
 
-Rebuild the efficient frontier risk bounds from a solved JuMP model.
+Resolve every unresolved [`Frontier`](@ref) risk bound into a span of numbers.
 
-Extracts and recomputes risk bound values from the optimised model for use in subsequent frontier sweeps.
+Two corner portfolios bound every span, and both are solved once here: a minimum-risk solve
+and a maximum-return solve. [`_rebuild_risk_frontier`](@ref) then turns each entry's own
+measure and each entry's own `Frontier` into that entry's span.
 
 # Arguments
 
-  - `model`: Solved JuMP model.
-  - `mr`: MeanRisk optimiser configuration.
-  - Additional parameters.
+  - $(arg_dict[:model])
+  - `mr::MeanRisk`: MeanRisk estimator configuration.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:fees_opt])
+  - `risk_frontier::VecPair`: The `:risk_frontier` registry.
+  - `idx`: Registry positions that still need a rebuild.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
 # Returns
 
-  - Updated risk bounds for the frontier.
+  - The registry, with every entry of `idx` resolved.
+
+# Details
+
+  - The measure of an entry is read through [`risk_frontier_owners`](@ref), not by indexing
+    `mr.r` with `idx`. The registry holds one entry per **bounded** measure, so the two index
+    spaces coincide only when every measure carries a `Frontier` bound.
+  - Both corner solves must succeed. Either failure throws, because a span read off a failed
+    solve is not a span.
 
 # Related
 
   - [`MeanRisk`](@ref)
   - [`_rebuild_risk_frontier`](@ref)
+  - [`risk_frontier_owners`](@ref)
+  - [`compute_risk_ubs`](@ref)
 """
 function rebuild_risk_frontier(model::JuMP.Model,
                                mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
@@ -546,7 +589,7 @@ function rebuild_risk_frontier(model::JuMP.Model,
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    r = factory(view(mr.r, idx), pr, mr.opt.slv)
+    r = factory(view(mr.r, risk_frontier_owners(risk_frontier, idx)), pr, mr.opt.slv)
     for (i, ri) in zip(idx, r)
         risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, sol_min.w,
                                                   sol_max.w, i)
@@ -604,6 +647,36 @@ function unresolved_risk_frontier(model::JuMP.Model)
         end
     end
     return risk_frontier, idx
+end
+"""
+    risk_frontier_owners(risk_frontier::VecPair, idx::VecInt)
+
+Map registry positions to the positions of the risk measures that own them.
+
+The `:risk_frontier` registry is **not** parallel to the risk measure vector. A measure
+registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref), and a memoised
+measure such as [`UlcerIndex`](@ref) registers one entry for several copies of itself. So a
+registry position is not a measure position, and indexing the measure vector with `idx` picks
+the wrong measure whenever the two counts differ. Every entry carries its owner
+([`set_risk_frontier_owner!`](@ref)); this reads it.
+
+# Arguments
+
+  - `risk_frontier::VecPair`: The `:risk_frontier` registry.
+  - `idx::VecInt`: Registry positions, as [`unresolved_risk_frontier`](@ref) returns them.
+
+# Returns
+
+  - `owners::Vector{Int}`: One measure position per entry of `idx`, in the same order.
+
+# Related
+
+  - [`unresolved_risk_frontier`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
+"""
+function risk_frontier_owners(risk_frontier::VecPair, idx::VecInt)::Vector{Int}
+    return [risk_frontier[i].second[4] for i in idx]
 end
 """
     compute_risk_ubs(model, opt, ...)

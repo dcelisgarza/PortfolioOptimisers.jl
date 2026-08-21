@@ -962,7 +962,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     theta = model[:theta]
     JuMP.@variable(model, t)
     JuMP.@constraint(model,
-                     [sc * t; 0.5; sc * (theta[2:end] - theta[1:(end - 1)])] in
+                     [sc * t; sc * 0.5; sc * (theta[2:end] - theta[1:(end - 1)])] in
                      JuMP.RotatedSecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
@@ -986,7 +986,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     JuMP.@variable(model, t)
-    JuMP.@constraint(model, [sc * t; 0.5; sc * theta] in JuMP.RotatedSecondOrderCone())
+    JuMP.@constraint(model, [sc * t; sc * 0.5; sc * theta] in JuMP.RotatedSecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end

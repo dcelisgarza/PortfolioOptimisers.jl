@@ -8,3 +8,10 @@ roundmult
 finite_sub_allocation!
 optimise(::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, ::FiniteAllocationInput)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

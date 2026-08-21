@@ -105,6 +105,63 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Number of entries the `:risk_frontier` Model State registry holds, or `0` when it holds none.
+
+Read before a risk measure builds its constraints, so that the entries it adds can be told
+from the entries its predecessors added.
+
+# Related
+
+  - [`set_risk_frontier_owner!`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+function risk_frontier_length(model::JuMP.Model)::Int
+    return shared_has(model, :risk_frontier) ? length(shared_get(model, :risk_frontier)) : 0
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Stamp `i` as the owning risk measure of every `:risk_frontier` entry after position `first`.
+
+[`rebuild_risk_frontier`](@ref) resolves a [`Frontier`](@ref) bound into a span of numbers, and
+it needs the risk measure the span belongs to. The registry is **not** parallel to the measure
+vector: a measure registers an entry only when its `settings.ub` is a [`Front_NumVec`](@ref),
+and a memoised measure such as [`UlcerIndex`](@ref) registers one entry for every copy of
+itself in that vector. So the position of an entry does not name its measure, and the owner is
+recorded rather than derived. This mirrors the return side, whose `:ret_frontier` entry has
+carried its own term index from the start.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `first::Integer`: The registry length before measure `i` built its constraints, as
+    [`risk_frontier_length`](@ref) reads it.
+  - `i::Integer`: The position of the measure in the risk measure vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`risk_frontier_length`](@ref)
+  - [`rebuild_risk_frontier`](@ref)
+  - [`set_risk_upper_bound!`](@ref)
+"""
+function set_risk_frontier_owner!(model::JuMP.Model, first::Integer, i::Integer)
+    if !shared_has(model, :risk_frontier)
+        return nothing
+    end
+    risk_frontier = shared_get(model, :risk_frontier)
+    for j in (first + 1):length(risk_frontier)
+        keys, vals = risk_frontier[j]
+        risk_frontier[j] = keys => (vals[1], vals[2], vals[3], Int(i))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Dispatch to index-aware `set_risk_constraints!` for a single risk measure or iterate over a
 vector of risk measures.
 
@@ -115,6 +172,10 @@ The single-measure overload also drops the measure's `scale` through
 [`unit_scale_risk_measure`](@ref). `scale` weights a measure inside an aggregate built from
 several measures, and one measure is not an aggregate, so the weight is inert. The vector
 overload keeps every element's `scale`.
+
+Both overloads stamp the owning measure onto the `:risk_frontier` entries that measure
+registered ([`set_risk_frontier_owner!`](@ref)). This is the only depth at which the measure
+and its entries are both in hand.
 
 # Arguments
 
@@ -134,6 +195,7 @@ overload keeps every element's `scale`.
 
   - [`RiskMeasure`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_risk_frontier_owner!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -150,9 +212,11 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # `b1` is typed and named, not absorbed by an `args...` tail. The tail let a caller pass
     # a `Fees` in the slot after `fees` and lose it silently — which is exactly what
     # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
+    first = risk_frontier_length(model)
     set_risk_constraints!(model, 1,
                           unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
                           pr, pl, fees, b1; kwargs...)
+    set_risk_frontier_owner!(model, first, 1)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
@@ -160,8 +224,10 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
                                fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing;
                                kwargs...)
     for (i, r) in enumerate(rs)
+        first = risk_frontier_length(model)
         set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr), opt, pr, pl,
                               fees, b1; kwargs...)
+        set_risk_frontier_owner!(model, first, i)
     end
     return nothing
 end
@@ -240,7 +306,10 @@ Add an upper-bound constraint on a risk expression to `model`.
 
 The `Nothing` overload does nothing (no bound was requested). The `Front_NumVec` overload
 records the expression and its frontier bound vector in the `:risk_frontier` Model State entry for later
-use in Pareto frontier solves. The `Number` overload adds the constraint
+use in Pareto frontier solves. That entry is `(bound_var_key, bound_key) => (r_expr, ub, flag, owner)`,
+and `owner` is written here as `0`. The measure that registered the entry is not known at this
+depth, so [`set_risk_frontier_owner!`](@ref) stamps it from the loop that enumerates the
+measures. The `Number` overload adds the constraint
 `sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
 warning: a non-`nothing` bound with an optimiser outside [`NonFRCJuMPOpt`](@ref) is
 ignored, which would otherwise happen silently.
@@ -286,12 +355,13 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
                                               Tuple{<:JuMP.AbstractJuMPScalar,
-                                                    <:Front_NumVec, Bool}}[(bound_var_key, bound_key) => (r_expr,
-                                                                                                          ub,
-                                                                                                          flag)])
+                                                    <:Front_NumVec, Bool, Int}}[(bound_var_key, bound_key) => (r_expr,
+                                                                                                               ub,
+                                                                                                               flag,
+                                                                                                               0)])
     else
         risk_frontier = shared_get(model, :risk_frontier)
-        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag))
+        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag, 0))
     end
     return nothing
 end

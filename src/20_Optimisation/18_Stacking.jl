@@ -3,25 +3,56 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for stacking-based portfolio optimisation estimators.
 
-# Related Types
+A stacking estimator treats each of several inner optimisers as one synthetic asset, and lets an outer optimiser allocate across that synthetic universe. It is the portfolio form of stacked generalisation: the outer model learns how much to trust each inner model, rather than the inner models being averaged by a fixed rule.
+
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`Stacking`](@ref)
+  - [`StackingResult`](@ref)
+
+# References
+
+  - $(ref_dict[:wolpert1992])
 """
 abstract type BaseStackingOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Stacking portfolio optimisation.
+Result type for [`Stacking`](@ref).
+
+`resi` holds one entry per inner optimiser, in the order of the estimator's `opti`. `reso` is the outer optimisation over the synthetic universe those entries define, so `reso.w` has one entry per inner optimiser rather than one per asset. `w` is the combination of the two.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    StackingResult(;
+        pr::Option{<:AbstractPriorResult},
+        wb::Option{<:WeightBounds},
+        fees::Option{<:Fees},
+        resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+        reso::OptimisationResult,
+        cv::Option{<:OptimisationCrossValidation},
+        retcode::OptRetCode_VecOptRetCode,
+        w::VecNum_VecVecNum,
+        fb::Option{<:OptE_Opt}
+    ) -> StackingResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`Stacking`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`NestedClusteredResult`](@ref)
+  - [`combination_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:wolpert1992])
 """
 @concrete struct StackingResult <: NonJuMPOptimisationResult
     """
@@ -192,6 +223,8 @@ Where:
 
 The outer problem is built from ``\\boldsymbol{w}_k``, never from ``s_k \\boldsymbol{w}_k``: the weight acts at the combination alone, so a cross-validated run and a fold-less one agree on it (see [`combination_weights`](@ref)).
 
+``\\boldsymbol{w}^*`` then passes through `wf` and `wb` (see [`finalise_weight_bounds`](@ref)), which is what the result's `w` and `retcode` carry.
+
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
@@ -218,6 +251,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`BaseStackingOptimisationEstimator`](@ref)
   - [`NestedClustered`](@ref)
   - [`port_opt_view`](@ref)
+  - [`combination_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:wolpert1992])
 """
 @propagatable @concrete struct Stacking <: BaseStackingOptimisationEstimator
     """
@@ -524,10 +562,15 @@ Run the Stacking portfolio optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Returns
+
+  - `res::StackingResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any inner optimisation, the outer optimisation, or the weight finalisation failed.
+
 # Related
 
   - [`Stacking`](@ref)
   - [`StackingResult`](@ref)
+  - [`combination_weights`](@ref)
 """
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,

@@ -62,3 +62,52 @@ end
     @test length(pts) == 4
     @test all(p -> p === (), pts)
 end
+
+# A `:risk_frontier` entry is `(bound_var_key, bound_key) => (expr, points, flag, owner)`.
+# The registry is **not** parallel to the risk measure vector: a measure registers an entry
+# only when its `settings.ub` is a `Front_NumVec`. So an entry names its owner rather than
+# standing at the owner's position, and the rebuild reads both the owner and the expression
+# off the entry it is rebuilding.
+@testset "Frontier rebuild: an entry is rebuilt from itself, not from entry 1" begin
+    X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02; -0.01 0.02 -0.02;
+         0.02 -0.03 0.01; 0.01 0.01 0.01; -0.03 0.02 -0.01; 0.02 0.01 0.02]
+    pr = prior(EmpiricalPrior(), X)
+    w_min = fill(1 / 3, 3)
+    w_max = [0.7, 0.2, 0.1]
+    front = Frontier(; N = 3)
+    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
+                (:b_ub_var, :b_ub) => (:EXPR_TWO, front, false, 2)]
+    rs = factory([Variance(), ConditionalValueatRisk()], pr)
+
+    entry = PO._rebuild_risk_frontier(pr, nothing, rs[2], registry, w_min, w_max, 2)
+    # The keys, the expression, the polarity and the owner are entry 2's own. Only the bound
+    # changes. Reading the expression off entry 1 bounds the first measure twice and leaves
+    # the second measure unbounded.
+    @test entry.first == (:b_ub_var, :b_ub)
+    @test entry.second[1] === :EXPR_TWO
+    @test entry.second[3] === false
+    @test entry.second[4] === 2
+    # The span is measure 2's own risk at the two corner portfolios.
+    @test collect(entry.second[2]) ≈
+          range(expected_risk(rs[2], w_min, X), expected_risk(rs[2], w_max, X); length = 3)
+
+    entry1 = PO._rebuild_risk_frontier(pr, nothing, rs[1], registry, w_min, w_max, 1)
+    @test entry1.second[1] === :EXPR_ONE
+    @test entry1.second[3] === true
+    @test entry1.second[4] === 1
+end
+
+@testset "Frontier rebuild: registry positions map to their owning measures" begin
+    front = Frontier(; N = 2)
+    # Measure 1 carries no bound, so the only entry belongs to measure 2. Indexing the
+    # measure vector with the registry position picks measure 1 and builds the span from the
+    # wrong measure.
+    registry = [(:b_ub_var, :b_ub) => (:EXPR_TWO, front, true, 2)]
+    @test PO.risk_frontier_owners(registry, [1]) == [2]
+
+    # Three measures, two of them bounded, and the second bounded one is the third measure.
+    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
+                (:c_ub_var, :c_ub) => (:EXPR_THREE, front, true, 3)]
+    @test PO.risk_frontier_owners(registry, [1, 2]) == [1, 3]
+    @test PO.risk_frontier_owners(registry, [2]) == [3]
+end

@@ -63,8 +63,10 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Specifies the portfolio budget constraint as a closed interval ``[\\mathrm{lb}, \\mathrm{ub}]``
-on the sum of weights. At least one of `lb` or `ub` must be provided.
+Bounds the sum of the portfolio weights inside a closed interval, rather than pinning it to one value.
+
+At least one of `lb` or `ub` must be given; the absent side is left unbounded. The same type
+serves the net budget `bgt`, the short budget `sbgt` and the gross budget `gbgt`.
 
 # Fields
 
@@ -177,7 +179,7 @@ Power-law market-impact budget ([`BudgetMarketImpact`](@ref)):
 
 ```math
 \\begin{align}
-\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^\\beta + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^\\beta \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^{1/\\beta} + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^{1/\\beta} \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
 \\end{align}
 ```
 
@@ -187,8 +189,11 @@ Where:
   - $(math_dict[:k_budget])
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market-impact cost coefficient vectors.
-  - ``\\beta \\in (0, 1]``: Market-impact power exponent.
+  - ``\\beta \\in (0, 1)``: Reciprocal of the market impact exponent, so the realised power law is ``1/\\beta``.
   - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
+
+The power is raised through a three-dimensional power cone, one per asset per sign, so the
+model stays convex. [`BudgetMarketImpact`](@ref) states the full system.
 
 # Arguments
 
@@ -214,24 +219,48 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Budget constraint that accounts for linear transaction costs.
+Charges the portfolio budget for transaction costs that grow linearly with the traded volume.
+
+Models the cost of the bid-ask spread, of slippage, of a borrowing charge, or of a management
+fee. The cost is charged **against the budget**: the weights and their costs must together
+meet `bgt`, so a portfolio that trades more may hold less.
 
 # Mathematical definition
 
-Models the portfolio budget as:
-
 ```math
 \\begin{align}
-\\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n
-\\in [\\mathrm{lb}, \\mathrm{ub}]\\,.
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
+\\boldsymbol{w} - \\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
+\\boldsymbol{w}_p &\\leq \\boldsymbol{u}_p\\,, \\\\
+\\boldsymbol{w}_n &\\leq \\boldsymbol{u}_n\\,, \\\\
+\\boldsymbol{w}_p,\\; \\boldsymbol{w}_n &\\geq \\boldsymbol{0}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
-  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
+  - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+
+A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
+**7.1e-9** on a five-asset sample: `sum(w) + 0.01 * sum(abs.(w - w0))` lands on
+**0.999999992894044**.
+
+!!! warning
+
+    ``\\boldsymbol{w}_p`` and ``\\boldsymbol{w}_n`` are not forced to be complementary, so the
+    relaxation is exact only while the objective prefers a **larger** invested budget. Under
+    [`MinimumRisk`](@ref) it does not: a larger cost shrinks
+    ``\\boldsymbol{1}^\\intercal \\boldsymbol{w}`` and so shrinks the risk, and the solver inflates
+    both increments to their `up` and `un` caps. On the sample above, minimising the variance
+    gives `sum(w) = 0.9514` with a charged cost of **0.0486** against a traded cost of
+    **0.0014**. Give the return term a lower bound through `settings.lb`, exactly as the source
+    formulation does, whenever the objective minimises a risk measure.
 
 # Fields
 
@@ -273,10 +302,16 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - [`BudgetRange`](@ref)
   - [`BudgetMarketImpact`](@ref)
   - [`port_opt_view`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, equations 9.14 and 9.15.
 """
 @propagatable @concrete struct BudgetCosts <: BudgetCostEstimator
     """
-    Budget target or range.
+    $(field_dict[:bgt_cost_target])
     """
     bgt
     """
@@ -284,19 +319,19 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     """
     @vprop w
     """
-    Cost coefficients for positive weight changes. Non-negative.
+    $(field_dict[:vp_cost])
     """
     @vprop vp
     """
-    Cost coefficients for negative weight changes. Non-negative.
+    $(field_dict[:vn_cost])
     """
     @vprop vn
     """
-    Upper limit on positive weight changes. Non-negative.
+    $(field_dict[:up_cost])
     """
     @vprop up
     """
-    Upper limit on negative weight changes. Non-negative.
+    $(field_dict[:un_cost])
     """
     @vprop un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
@@ -345,9 +380,58 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Budget constraint that accounts for non-linear (power-law) market impact costs. Extends
-[`BudgetCosts`](@ref) with a `beta` exponent controlling the concavity of the market
-impact function.
+Charges the portfolio budget and the return for market impact costs that follow an empirical power law.
+
+Extends [`BudgetCosts`](@ref) with a power cone, so the charge grows as the traded volume
+raised to ``1/\\mathrm{beta}``. Unlike a linear cost, the charge is **also subtracted from the
+return expression** of every term whose `settings.mic` is `true`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{\\iota}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{\\iota}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
+(\\iota_{p,i},\\; 1,\\; w_{p,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
+(\\iota_{n,i},\\; 1,\\; w_{n,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
+\\boldsymbol{w} - \\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
+\\boldsymbol{w}_p &\\leq \\boldsymbol{u}_p\\,, \\\\
+\\boldsymbol{w}_n &\\leq \\boldsymbol{u}_n\\,, \\\\
+\\boldsymbol{w}_p,\\; \\boldsymbol{w}_n &\\geq \\boldsymbol{0}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:N])
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{\\iota}_p``, ``\\boldsymbol{\\iota}_n``: Auxiliary variables the power cone bounds below by ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market impact cost coefficients for positive and negative trades.
+  - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
+  - ``\\mathcal{K}_{\\mathrm{pow}}^\\beta``: Three-dimensional power cone of exponent ``\\beta``.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+
+!!! note
+
+    **`beta` is the reciprocal of the power law's exponent.** The cone gives
+    ``\\iota_i \\geq w_i^{1/\\beta}``, so the default `beta = 2/3` charges the volume raised to
+    **3/2**, the value the empirical literature reports. The cone needs `0 < beta < 1`; the
+    constructor refuses both endpoints, because a solver reports `SLOW_PROGRESS` on either.
+
+A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
+**9.4e-10** on a five-asset sample: `sum(w) + 0.01 * sum(abs.(w - w0) .^ 1.5)` lands on
+**0.9999999990596528**.
+
+!!! warning
+
+    The auxiliary variables carry no upper bound, so the charge is exact only while the
+    objective prefers a **larger** invested budget. Under [`MinimumRisk`](@ref) the solver
+    treats them as riskless assets and concentrates the whole budget in them: on the sample
+    above, minimising the variance gives `sum(w) = 0.0051`. Give the return term a lower bound
+    through `settings.lb`, exactly as the source formulation instructs, whenever the objective
+    minimises a risk measure.
 
 # Fields
 
@@ -374,7 +458,7 @@ Keywords correspond to the struct's fields.
   - If `vn` is a vector: `!isempty(vn)` and all elements `>= 0`. If scalar: `>= 0`.
   - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
   - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
-  - `0 <= beta <= 1`.
+  - `0 < beta < 1`.
 
 ## View parameters
 
@@ -391,10 +475,18 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - [`BudgetRange`](@ref)
   - [`BudgetCosts`](@ref)
   - [`port_opt_view`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`add_market_impact_cost!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.3, equations 9.22 and 9.23.
+  - $(ref_dict[:grinoldkahn1999])
+  - $(ref_dict[:toth2011])
 """
 @propagatable @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     """
-    Budget target or range.
+    $(field_dict[:bgt_cost_target])
     """
     bgt
     """
@@ -402,23 +494,23 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     """
     @vprop w
     """
-    Cost coefficients for positive weight changes. Non-negative.
+    $(field_dict[:vp_cost])
     """
     @vprop vp
     """
-    Cost coefficients for negative weight changes. Non-negative.
+    $(field_dict[:vn_cost])
     """
     @vprop vn
     """
-    Upper limit on positive weight changes. Non-negative.
+    $(field_dict[:up_cost])
     """
     @vprop up
     """
-    Upper limit on negative weight changes. Non-negative.
+    $(field_dict[:un_cost])
     """
     @vprop un
     """
-    Market impact exponent in `(0, 1]`.
+    $(field_dict[:beta_mic])
     """
     beta
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
@@ -452,7 +544,9 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
         else
             @argcheck(un >= zero(un), DomainError(un, "un must be >= 0"))
         end
-        @argcheck(zero(beta) <= beta <= one(beta), DomainError)
+        @argcheck(zero(beta) < beta < one(beta),
+                  DomainError(beta,
+                              "beta must satisfy 0 < beta < 1; the power cone is degenerate at both endpoints, and a solver reports SLOW_PROGRESS. The realised power law exponent is 1/beta, so beta = 2/3 charges the volume raised to 3/2"))
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
                    typeof(beta)}(bgt, w, vp, vn, up, un, beta)
     end
@@ -709,19 +803,29 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     return nothing
 end
 """
-    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w)
+    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w, cp, cn)
 
-Set cost-budget constraints in the JuMP model.
+Charge the trading costs against the portfolio budget.
 
-Various overloads handle different cost types (fixed value or [`BudgetRange`](@ref)).
+Registers the `cost_bgt_expr` expression and the constraint that the weights and their costs
+must together meet the budget. Two overloads handle the two budget shapes: a fixed value pins
+the sum, and a [`BudgetRange`](@ref) bounds it on either side.
+
+The **charged quantity** is a positional argument, not a field read from the model, because
+the two cost families charge different quantities. [`BudgetCosts`](@ref) charges the raw
+increments `wp` and `wn`; [`BudgetMarketImpact`](@ref) charges the power-cone variables `wip`
+and `win`, which bound the increments raised to `1/beta`. Both pass the same coefficient
+vectors.
 
 # Arguments
 
-  - `model`: JuMP optimisation model.
-  - `vp`: Positive cost vector or scalar.
-  - `vn`: Negative cost vector or scalar.
+  - $(arg_dict[:model])
+  - `vp`: Cost coefficients for positive trades; a vector or a scalar.
+  - `vn`: Cost coefficients for negative trades; a vector or a scalar.
   - `val_or_bgt`: Fixed budget value or [`BudgetRange`](@ref).
   - `w`: Portfolio weight vector.
+  - `cp`: The positive-side quantity the coefficients charge.
+  - `cn`: The negative-side quantity the coefficients charge.
 
 # Returns
 
@@ -730,27 +834,26 @@ Various overloads handle different cost types (fixed value or [`BudgetRange`](@r
 # Related
 
   - [`set_budget_costs!`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
-                                      val::Number, w::VecNum)
+                                      val::Number, w::VecNum, cp::VecNum, cn::VecNum)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    wp = shared_get(model, :wp)
-    wn = shared_get(model, :wn)
-    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
+    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, cp) + dot_scalar(vn, cn))
     JuMP.@constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
-                                      bgt::BudgetRange, w::VecNum)
+                                      bgt::BudgetRange, w::VecNum, cp::VecNum, cn::VecNum)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    wp = shared_get(model, :wp)
-    wn = shared_get(model, :wn)
     lb = bgt.lb
     ub = bgt.ub
-    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
+    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, cp) + dot_scalar(vn, cn))
     if !isnothing(lb)
         JuMP.@constraint(model, cost_bgt_lb, sc * (sum(w) + cost_bgt_expr - k * lb) >= 0)
     end
@@ -774,7 +877,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
                           sc * (wn ⊖ un) <= 0
                           sc * (w - wb - wp + wn) == 0
                       end)
-    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
+    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wp, wn)
     return nothing
 end
 function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
@@ -800,7 +903,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
                           [i = 1:N],
                           [sc * win[i], 1, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
                       end)
-    set_cost_budget_constraints!(model, wip, win, bgt.bgt, w)
+    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win)
     return nothing
 end
 

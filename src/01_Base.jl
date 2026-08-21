@@ -129,8 +129,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :plr => "`plr`: Phylogeny result.",#
                                  :nte => "`nte`: Network estimator.",#
                                  :cte => "`cte`: Centrality estimator.",#
+                                 :cte_jmp => "`cte`: Centrality constraint(s). A `CentralityConstraint`, a vector of them, or an already-generated `LinearConstraint`. Resolved by `centrality_constraints` into the `ctr` slot of [`ProcessedJuMPOptimiserAttributes`](@ref).",#
                                  :cta => "`ct`: Centrality algorithm.",#
-                                 :ctr => "`ct`: Centrality result.",#
+                                 :ctr => "`ctr`: Centrality constraint result. The `LinearConstraint` the centrality constraints resolve to.",#
                                  :ctargs => "`args`: Positional arguments for the centrality function.",#
                                  :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                                  :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
@@ -207,6 +208,14 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :alpha => "`alpha`: Quantile level for the lower tail.",#
                                  :beta => "`beta`: Quantile level for the upper tail.",#
                                  :l => "`l`: Risk aversion parameter.",#
+                                 :ohf => "`ohf`: Objective homogenisation factor for the ratio problem, or `nothing` to size it from the resolved characteristic.",#
+                                 :i_ret_term => "`i`: Index of the return term to maximise.",#
+                                 :bgt_cost_target => "`bgt`: Budget target or range that the weights and their trading costs must meet together.",#
+                                 :vp_cost => "`vp`: Cost coefficients for positive weight changes. Non-negative.",#
+                                 :vn_cost => "`vn`: Cost coefficients for negative weight changes. Non-negative.",#
+                                 :up_cost => "`up`: Upper limit on positive weight changes. Non-negative.",#
+                                 :un_cost => "`un`: Upper limit on negative weight changes. Non-negative.",#
+                                 :beta_mic => "`beta`: Reciprocal of the market impact exponent, `0 < beta < 1`. The realised exponent is `1/beta`.",#
                                  :rf => "`rf`: Risk-free rate.",#
                                  :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update runs on excess returns, so a prior mean that arrives as a total return loses the rate first. The rate is added back exactly once, to the posterior asset expected returns. That round trip leaves the wrapped prior estimators alone, so a risk-free rate one of them applied internally stays where it is.",#
                                  # Errors
@@ -582,8 +591,6 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
                                  # Optimiser config.
                                  :kwargs => "`kwargs`: Additional keyword arguments.",#
-                                 # Index.
-                                 :idx => "`idx`: Index vector.",#
                                  # Risk measure.
                                  :r => "`r`: Risk measure or vector of risk measures.",#
                                  # Weight bounds.
@@ -839,6 +846,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Portfolio returns and dimensions.
                        :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
                        :T => "``T``: Number of observations.",#
+                       :x_t_obs => "``\\boldsymbol{x}_t``: Asset returns for observation ``t``, the ``t``-th row of the returns matrix.",#
                        :N => "``N``: Number of assets.",#
                        # Risk measure parameters.
                        :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
@@ -944,6 +952,7 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
                                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                                  :meucci2005 => "[meucci2005](@cite) A. Meucci. *Risk and Asset Allocation* (Springer Berlin Heidelberg, 2005).",#
+                                 :demiguel2009 => "[demiguel2009](@cite) V. DeMiguel, L. Garlappi, F. J. Nogales and R. Uppal. *A Generalized Approach to Portfolio Optimization: Improving Performance by Constraining Portfolio Norms*. Management Science 55, 798–812 (2009).",#
                                  :fan2008 => "[fan2008](@cite) J. Fan, Y. Fan and J. Lv. *High dimensional covariance matrix estimation using a factor model*. Journal of Econometrics 147, 186–197 (2008).",#
                                  :martelliniziemann2010 => "[martelliniziemann2010](@cite) L. Martellini and V. Ziemann. *Improved estimates of higher-order comoments and implications for portfolio selection*. The Review of Financial Studies 23, 1467–1502 (2010).",#
                                  :boudt2015 => "[boudt2015](@cite) K. Boudt, W. Lu and B. Peeters. *Higher order comoments of multifactor models and asset allocation*. Finance Research Letters 13, 225–233 (2015).",#
@@ -1007,7 +1016,29 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :lopezdeprado2016 => "[lopezdeprado2016](@cite) M. López de Prado. *Building diversified portfolios that outperform out of sample*. The Journal of Portfolio Management 42, 59–69 (2016).",#
                                  :raffinot2017 => "[raffinot2017](@cite) T. Raffinot. *Hierarchical clustering-based asset allocation*. The Journal of Portfolio Management 44, 89–99 (2017).",#
                                  :raffinot2018 => "[raffinot2018](@cite) T. Raffinot. *The hierarchical equal risk contribution portfolio*. SSRN Electronic Journal (2018).",#
-                                 :cotton2024 => "[cotton2024](@cite) P. Cotton. *Schur Complementary Allocation: A Unification of Hierarchical Risk Parity and Minimum Variance Portfolios*. arXiv preprint arXiv:2411.05807 (2024).")
+                                 :cotton2024 => "[cotton2024](@cite) P. Cotton. *Schur Complementary Allocation: A Unification of Hierarchical Risk Parity and Minimum Variance Portfolios*. arXiv preprint arXiv:2411.05807 (2024).",#
+                                 :kelly1956 => "[kelly1956](@cite) J. L. Kelly. *A new interpretation of information rate*. Bell System Technical Journal 35, 917–926 (1956).",#
+                                 :thorp2008 => "[thorp2008](@cite) E. O. Thorp. *The Kelly criterion in blackjack, sports betting, and the stock market*. In: *Handbook of Asset and Liability Management*, Vol. 1 (North-Holland, 2008); pp. 385–428.",#
+                                 :chares2009 => "[chares2009](@cite) R. Chares. *Cones and interior-point algorithms for structured convex optimization involving powers and exponentials*. Ph.D. Thesis, Université catholique de Louvain, Louvain-la-Neuve, Belgium (2009).",#
+                                 :sharpe1964 => "[sharpe1964](@cite) W. F. Sharpe. *Capital asset prices: a theory of market equilibrium under conditions of risk*. The Journal of Finance 19, 425–442 (1964).",#
+                                 :schaibleibaraki1983 => "[schaibleibaraki1983](@cite) S. Schaible and T. Ibaraki. *Fractional programming*. European Journal of Operational Research 12, 325–338 (1983).",#
+                                 :charnescooper1962 => "[charnescooper1962](@cite) A. Charnes and W. W. Cooper. *Programming with linear fractional functionals*. Naval Research Logistics Quarterly 9, 181–186 (1962).",#
+                                 :grinoldkahn1999 => "[grinoldkahn1999](@cite) R. C. Grinold and R. N. Kahn. *Active Portfolio Management: A Quantitative Approach for Producing Superior Returns and Controlling Risk*. 2 Edition (McGraw-Hill, New York, 1999).",#
+                                 :toth2011 => "[toth2011](@cite) B. Tóth, Y. Lempérière, C. Deremble, J. de Lataillade, J. Kockelkoren and J.-P. Bouchaud. *Anomalous price impact and the critical nature of liquidity in financial markets*. Physical Review X 1, 021006 (2011).",#
+                                 :lopezdeprado2019robust => "[lopezdeprado2019robust](@cite) M. López de Prado. *A robust estimator of the efficient frontier*. SSRN Electronic Journal (2019).",#
+                                 :wolpert1992 => "[wolpert1992](@cite) D. H. Wolpert. *Stacked generalization*. Neural Networks 5, 241–259 (1992).",#
+                                 :shen2017 => "[shen2017](@cite) W. Shen and J. Wang. *Portfolio selection via subset resampling*. In: *Proceedings of the Thirty-First AAAI Conference on Artificial Intelligence* (2017); pp. 1517–1523.",#
+                                 :martin2021 => "[martin2021](@cite) R. A. Martin. *PyPortfolioOpt: portfolio optimization in Python*. Journal of Open Source Software 6, 3066 (2021).",#
+                                 :maillard2008 => "[maillard2008](@cite) S. Maillard, T. Roncalli and J. Teiletche. *On the properties of equally-weighted risk contributions portfolios*. Available at SSRN 1271972 (2008).",#
+                                 :bruderroncalli2012 => "[bruderroncalli2012](@cite) B. Bruder and T. Roncalli. *Managing risk exposures using the risk budgeting approach*. Available at SSRN 2009778 (2012).",#
+                                 :mausserromanko2014 => "[mausserromanko2014](@cite) H. Mausser and O. Romanko. *Computing equal risk contribution portfolios*. IBM Journal of Research and Development 58, 5:1–5:12 (2014).",#
+                                 :roncalliweisang2012 => "[roncalliweisang2012](@cite) T. Roncalli and G. Weisang. *Risk parity portfolios with risk factors*. Available at SSRN 2155159 (2012).",#
+                                 :meucci2007 => "[meucci2007](@cite) A. Meucci. *Risk contributions from generic user-defined factors*. Available at SSRN 930034 (2007).",#
+                                 :mosek2023c => "[mosek2023c](@cite) MOSEK ApS. *MOSEK Portfolio Optimization Cookbook* (2023).",#
+                                 :cajas2019noc => "[cajas2019noc](@cite) D. Cajas. *Robust portfolio selection with near optimal centering*. Available at SSRN 3572435 (2019).",#
+                                 :degraaf2016 => "[degraaf2016](@cite) T. de Graaf. *Robust Mean-Variance Optimization*. Master's Thesis, Leiden University (2016).",#
+                                 :gambetakwon2020 => "[gambetakwon2020](@cite) V. Gambeta and R. Kwon. *Risk return trade-off in relaxed risk parity portfolio optimization*. Journal of Risk and Financial Management 13, 237 (2020).",#
+                                 :richardroncalli2019 => "[richardroncalli2019](@cite) J.-C. Richard and T. Roncalli. *Constrained Risk Budgeting Portfolios: Theory, Algorithms, Applications & Puzzles*. arXiv preprint arXiv:1902.05710 (2019).")
 
 """
 $(DocStringExtensions.TYPEDEF)

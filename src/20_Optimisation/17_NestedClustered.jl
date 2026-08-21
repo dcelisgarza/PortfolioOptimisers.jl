@@ -1,16 +1,42 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Nested Clustered Optimisation.
+Result type for [`NestedClustered`](@ref).
+
+`clr` holds the clustering the algorithm found, and `resi` holds one intra-cluster optimisation per cluster, in cluster order. `reso` is the inter-cluster optimisation over the synthetic universe those clusters define, so `reso.w` has one entry per cluster rather than one per asset. `w` is the product of the two.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    NestedClusteredResult(;
+        pr::Option{<:AbstractPriorResult},
+        clr::Option{<:AbstractClusteringResult},
+        wb::Option{<:WeightBounds},
+        fees::Option{<:Fees},
+        resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+        reso::OptimisationResult,
+        cv::Option{<:OptimisationCrossValidation},
+        retcode::OptRetCode_VecOptRetCode,
+        w::VecNum_VecVecNum,
+        fb::Option{<:OptE_Opt}
+    ) -> NestedClusteredResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`NestedClustered`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`StackingResult`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2019robust])
+  - $(ref_dict[:mlp1]) Chapter 7.
+  - $(ref_dict[:cajas2025]) Section 12.3.
 """
 @concrete struct NestedClusteredResult <: NonJuMPOptimisationResult
     """
@@ -96,7 +122,7 @@ Checks that the inner optimiser does not use pre-computed prior results or regre
 
 # Returns
 
-  - `nothing` on success; throws `ArgCheck` error otherwise.
+  - `nothing` on success; throws an `ArgumentError` otherwise.
 
 # Related
 
@@ -120,11 +146,12 @@ Checks that risk budgeting-based JuMP optimisers do not use variance for risk co
 
 # Returns
 
-  - `nothing`.
+  - `nothing` on success; throws an `ArgumentError` otherwise.
 
 # Related
 
   - [`NestedClustered`](@ref)
+  - [`assert_external_optimiser`](@ref)
 """
 function assert_rc_variance(::Any)::Nothing
     return nothing
@@ -153,11 +180,12 @@ Checks that factor risk contribution optimisers do not use phylogeny-based const
 
 # Returns
 
-  - `nothing`.
+  - `nothing` on success; throws an `ArgumentError` otherwise.
 
 # Related
 
   - [`NestedClustered`](@ref)
+  - [`assert_external_optimiser`](@ref)
 """
 function assert_rc_pl(::Any)::Nothing
     return nothing
@@ -209,7 +237,7 @@ Checks that the outer optimiser does not use pre-computed prior results, regress
 
 # Returns
 
-  - `nothing` on success; throws `ArgCheck` error otherwise.
+  - `nothing` on success; throws an `ArgumentError` otherwise.
 
 # Related
 
@@ -369,6 +397,8 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
  2. **Outer**: form a ``T \\times K`` synthetic returns matrix from cluster portfolios and solve ``\\boldsymbol{a} = \\mathrm{opto}(\\mathbf{X}_{\\mathrm{cluster}})`` (allocation across clusters).
  3. **Combine**: ``w_i = a_k \\cdot w_{C_k, i}`` for ``i \\in C_k``.
 
+Step 1 is the book's *intra-cluster asset allocation* and step 2 its *inter-cluster asset allocation*. The combined weights then pass through `wf` and `wb` (see [`finalise_weight_bounds`](@ref)), which is what the result's `w` and `retcode` carry.
+
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
@@ -395,6 +425,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`HierarchicalRiskParity`](@ref)
   - [`Stacking`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2019robust])
+  - $(ref_dict[:mlp1]) Chapter 7.
+  - $(ref_dict[:cajas2025]) Section 12.3.
 """
 @propagatable @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     """
@@ -746,6 +782,10 @@ Run the Nested Clustered Optimisation portfolio optimisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Returns
+
+  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any intra-cluster optimisation, the inter-cluster optimisation, or the weight finalisation failed.
 
 # Related
 

@@ -30,7 +30,7 @@
     @test isapprox(sum(res_ga.cost), 4206.9 * 0.5, rtol = 4e-2)
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-4)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.01233765662751128, rtol = 2e-3)
+    @test isapprox(rmsd(res.w, res_ga.w), 0.01048359738507303, rtol = 2e-3)
     @test all(isapprox.(mod.(round.(mod.(abs.(res_ga.shares), 1), sigdigits = 1), ga.unit),
                         0, atol = 1e-10))
 
@@ -53,7 +53,7 @@
     @test isapprox(sum(res_ga.cost), 4206.9 * 1.2, rtol = 1e-2)
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-3)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.020004798951174352, rtol = 5e-5)
+    @test isapprox(rmsd(res.w, res_ga.w), 0.01640695936037548, rtol = 5e-5)
 
     mr = MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 252 / 100),
                   opt = JuMPOptimiser(; bgt = 0.8, slv = slv))
@@ -81,7 +81,7 @@
                                             cash = 4206.9))
     @test isapprox(sum(res_ga.cost), 4206.9 * 0.8, rtol = 1e-2)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.0029764410704340794, rtol = 5e-3)
+    @test isapprox(rmsd(res.w, res_ga.w), 0.0010146002336457861, rtol = 5e-3)
     @test all(isapprox.(mod.(round.(mod.(abs.(res_ga.shares), 1), sigdigits = 1), ga.unit),
                         0, atol = 1e-10))
 
@@ -98,4 +98,31 @@
     @test isa(res_shortcut, DiscreteAllocationResult)
     @test isnothing(res_shortcut.fb)
     @test isapprox(res_shortcut.shares .* vec(values(X[end])), res_shortcut.cost)
+
+    # The greedy second pass buys `unit` shares at a time, so the affordability test must be
+    # on `p[i] * unit`, not on `p[i]`. Testing one share alone overdrew the budget for every
+    # `unit > 1` -- at `unit = 10` below it spent 15195.0 of a 10000.0 budget -- and refused
+    # affordable buys for every `unit < 1`.
+    w_ov = [0.35, 0.25, 0.20, 0.12, 0.08]
+    p_ov = [131.7, 47.3, 903.5, 12.9, 268.4]
+    cash_ov = 10_000.0
+    for u in (0.3, 1, 2, 5, 10)
+        r_ov = optimise(GreedyAllocation(; unit = u),
+                        FiniteAllocationInput(; w = w_ov, prices = p_ov, cash = cash_ov))
+        spent = dot(collect(r_ov.shares), p_ov)
+        @test spent <= cash_ov + eps(cash_ov)
+        @test r_ov.cash >= 0
+        @test isapprox(spent + r_ov.cash, cash_ov)
+    end
+    # `unit = 1` is the default and is unchanged by the fix: there, one share is one purchase.
+    r_unit1 = optimise(GreedyAllocation(),
+                       FiniteAllocationInput(; w = w_ov, prices = p_ov, cash = cash_ov))
+    @test collect(r_unit1.shares) == [26.0, 52.0, 2.0, 93.0, 3.0]
+    @test isapprox(r_unit1.cash, 304.30000000000075)
+
+    # `roundmult` truncates towards zero to a multiple of `prec` and then rounds that
+    # product. It is not a round to the nearest multiple: 8.0 is the nearest multiple of 2.
+    @test PortfolioOptimisers.roundmult(7.5, 2) == 6.0
+    @test PortfolioOptimisers.roundmult(26.58, 1) == 26.0
+    @test PortfolioOptimisers.roundmult(7.5, 2) != round(7.5 / 2) * 2
 end

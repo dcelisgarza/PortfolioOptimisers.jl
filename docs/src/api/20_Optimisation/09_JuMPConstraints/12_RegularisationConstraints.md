@@ -14,3 +14,10 @@ L2Reg_VecL2Reg
 VecLpReg
 LpReg_VecLpReg
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
