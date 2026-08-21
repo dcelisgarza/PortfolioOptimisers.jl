@@ -549,4 +549,27 @@
         z_h = PortfolioOptimisers.compute_value_at_risk_cz(rr.alg.dist, rr.beta)
         @test isapprox(expected_risk(rr, w, pr), (z - z_h) * sd)
     end
+    @testset "MaxRiskMeasureSettings validates its lower bound (#402)" begin
+        # A vector bound is a sweep axis, one solve per entry, so an empty vector is a
+        # sweep of zero points. `MaxRiskMeasureSettings(; lb = Float64[])` constructed,
+        # and the optimisation that read it returned an empty result: no weights, no
+        # return code, no warning. The sibling `RiskMeasureSettings` refuses the same
+        # shape at construction.
+        @test_throws PortfolioOptimisers.IsEmptyError MaxRiskMeasureSettings(;
+                                                                             lb = Float64[])
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = Inf)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = -Inf)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = NaN)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = [Inf, NaN])
+
+        # The guard is `assert_nonempty_finite_val`, not the sibling's
+        # `assert_nonempty_nonneg_finite_val`, because a negative floor is meaningful for
+        # a quantity the optimisation maximises.
+        @test MaxRiskMeasureSettings(; lb = -1e-8).lb == -1e-8
+        @test MaxRiskMeasureSettings(; lb = [-1e-8, 1e-8]).lb == [-1e-8, 1e-8]
+
+        # `nothing` and a `Frontier` reach the `args...` fallback unchanged.
+        @test isnothing(MaxRiskMeasureSettings().lb)
+        @test isa(MaxRiskMeasureSettings(; lb = Frontier(; N = 3)).lb, Frontier)
+    end
 end

@@ -336,3 +336,74 @@ end
         @test sort(findall(>(1e-6), w_signed)) == collect((N - q + 1):N)
     end
 end
+@testset "Weight finalisation" begin
+    using PortfolioOptimisers, JuMP, Test, Clarabel, LinearAlgebra
+    slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    w0 = [0.5, 0.3, 0.15, 0.05]
+    wb = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.4, 4))
+    @testset "The objective is the norm the docstring states" begin
+        # Two of the four names say "Squared". The cone bounds the norm itself, so the
+        # objective value is the L2 norm and not its square; the minimiser is the same.
+        for (alg, obj) in
+            ((RelativeErrorWeightFinaliser(), w -> norm(w ./ w0 .- one(eltype(w0)), 1)),
+             (SquaredRelativeErrorWeightFinaliser(),
+              w -> norm(w ./ w0 .- one(eltype(w0)), 2)),
+             (AbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 1)),
+             (SquaredAbsoluteErrorWeightFinaliser(), w -> norm(w - w0, 2)))
+            model = JuMP.Model()
+            JuMP.@expression(model, sc, 1.0)
+            JuMP.@expression(model, so, 1.0)
+            JuMP.@variable(model, w[1:4])
+            JuMP.@constraint(model, sc * (sum(w) - sum(w0)) == 0)
+            JuMP.@constraint(model, sc * (w .- wb.lb) >= 0)
+            JuMP.@constraint(model, sc * (w .- wb.ub) <= 0)
+            PortfolioOptimisers.set_clustering_weight_finaliser_alg!(model, alg, copy(w0))
+            JuMP.set_optimizer(model, Clarabel.Optimizer)
+            JuMP.set_attribute(model, "verbose", false)
+            JuMP.optimize!(model)
+            @test isapprox(JuMP.objective_value(model), obj(JuMP.value.(model[:w]));
+                           rtol = 1e-6)
+        end
+    end
+    @testset "A repaired vector keeps its budget and lands in the bounds" begin
+        for wf in (IterativeWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
+            w = PortfolioOptimisers.opt_weight_bounds(wf, wb, copy(w0))
+            @test isapprox(sum(w), sum(w0))
+            @test all(wb.lb .- 1e-8 .<= w .<= wb.ub .+ 1e-8)
+        end
+        # Weights already inside the bounds come back untouched, without a solve.
+        wok = [0.25, 0.25, 0.25, 0.25]
+        @test PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb,
+                                                    copy(wok)) == wok
+    end
+    @testset "An unsatisfiable bound set still reports success" begin
+        # `finalise_weight_bounds` tests finiteness alone, so an exhausted iterative loop
+        # returns a bound-violating vector under a success code.
+        wbi = WeightBounds(; lb = fill(0.3, 4), ub = fill(0.9, 4))
+        retcode, w = PortfolioOptimisers.finalise_weight_bounds(IterativeWeightFinaliser(),
+                                                                wbi, copy(w0))
+        @test isa(retcode, OptimisationSuccess)
+        @test !all(wbi.lb .<= w)
+        @test isapprox(sum(w), sum(w0))
+    end
+    @testset "The relative formulations write eps into a zero weight" begin
+        wz = [0.6, 0.4, 0.0, 0.0]
+        wzc = copy(wz)
+        PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv),
+                                              WeightBounds(; lb = fill(0.05, 4),
+                                                           ub = fill(0.5, 4)), wzc)
+        @test wzc[3:4] == fill(eps(eltype(wz)), 2)
+    end
+end
+@testset "assert_special_nco_requirements over a vector" begin
+    using PortfolioOptimisers, Test
+    # The vector arity broadcast, so the `::Nothing` annotation could not convert the
+    # `Vector{Nothing}` the broadcast returned, and every vector threw.
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))
+    @test isnothing(PortfolioOptimisers.assert_special_nco_requirements(mr))
+    @test isnothing(PortfolioOptimisers.assert_special_nco_requirements([mr, mr]))
+    @test isnothing(PortfolioOptimisers.assert_special_nco_requirements(TimeDependent([mr,
+                                                                                       mr];
+                                                                                      default = mr)))
+end

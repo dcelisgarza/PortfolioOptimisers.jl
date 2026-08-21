@@ -19,12 +19,18 @@ Abstract supertype for all cross-validation result types.
 
   - [`CrossValidationEstimator`](@ref)
   - [`OptimisationCrossValidationResult`](@ref)
+  - [`NonOptimisationCrossValidationResult`](@ref)
 """
 abstract type CrossValidationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cross-validation algorithm types.
+
+# Related
+
+  - [`CrossValidationEstimator`](@ref)
+  - [`CrossValidationResult`](@ref)
 """
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 """
@@ -64,6 +70,9 @@ schemes produce time-ordered, non-overlapping folds (e.g. walk-forward).
 # Related
 
   - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`SequentialCrossValidationResult`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
 """
 abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
 """
@@ -75,6 +84,9 @@ sequential schemes may produce randomly sampled or combinatorial folds.
 # Related
 
   - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+  - [`KFold`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
 """
 abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
 """
@@ -97,6 +109,8 @@ Abstract supertype for sequential optimisation cross-validation results.
 # Related
 
   - [`OptimisationCrossValidationResult`](@ref)
+  - [`SequentialCrossValidationEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
 """
 abstract type SequentialCrossValidationResult <: OptimisationCrossValidationResult end
 """
@@ -107,8 +121,21 @@ Abstract supertype for non-sequential optimisation cross-validation results.
 # Related
 
   - [`OptimisationCrossValidationResult`](@ref)
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+  - [`KFoldResult`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
 """
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
+# The split has already happened, so the count is the length of the enumeration the result
+# carries, and the data argument the estimator methods take is not read. This is the
+# `n_splits(cv)` and `n_splits(cv, rd)` pair that the `n_splits` docstring promises for a
+# result type; every concrete `OptimisationCrossValidationResult` carries `test_idx`.
+function n_splits(res::OptimisationCrossValidationResult)
+    return length(res.test_idx)
+end
+function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
+    return n_splits(res)
+end
 """
     OptCVER
 
@@ -185,14 +212,26 @@ abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimato
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for sequential non-optimisation cross-validation estimators.
+Abstract supertype for sequential non-optimisation cross-validation estimators. Sequential
+schemes produce time-ordered, non-overlapping folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationSequentialCrossValidationEstimator <:
               NonOptimisationCrossValidationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators.
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. Non-
+sequential schemes may produce randomly sampled or combinatorial folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
               NonOptimisationCrossValidationEstimator end
@@ -201,12 +240,24 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for result types produced by non-optimisation cross-validation
 routines.
+
+# Related
+
+  - [`CrossValidationResult`](@ref)
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationResult`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for sequential non-optimisation cross-validation result types.
+
+# Related
+
+  - [`NonOptimisationCrossValidationResult`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
 """
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
@@ -214,6 +265,11 @@ abstract type NonOptimisationSequentialCrossValidationResult <:
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for non-sequential non-optimisation cross-validation result types.
+
+# Related
+
+  - [`NonOptimisationCrossValidationResult`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationEstimator`](@ref)
 """
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
@@ -410,6 +466,15 @@ path, where a path's folds are assembled in split order rather than chronologica
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    PredictionResult(;
+        res::NonFiniteAllocationOptimisationResult,
+        rd::PredictionReturnsResult
+    ) -> PredictionResult
+
+Keywords correspond to the struct's fields. Both are required, because a fold prediction is meaningless without either half.
+
 # Related
 
   - [`MultiPeriodPredictionResult`](@ref)
@@ -510,6 +575,19 @@ A feature matrix is **not** among them. It is not carried through the folds at a
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    MultiPeriodPredictionResult(;
+        pred::VecPredRes,
+        id::Any = nothing
+    ) -> MultiPeriodPredictionResult
+
+Keywords correspond to the struct's fields. `pred` is required: the constructor stacks the folds' returns data into `mrd`, and the stack of no folds has no columns, no names, and no clock.
+
+## Validation
+
+  - `!isempty(pred)`.
+
 # Related
 
   - [`PredictionResult`](@ref)
@@ -532,6 +610,7 @@ $(DocStringExtensions.FIELDS)
     """
     id
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
+        @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
         X = mapreduce_RetMtx(rd)
@@ -549,8 +628,7 @@ $(DocStringExtensions.FIELDS)
         return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
     end
 end
-function MultiPeriodPredictionResult(;
-                                     pred::VecPredRes = Vector{PredictionResult}(undef, 0),
+function MultiPeriodPredictionResult(; pred::VecPredRes,
                                      id::Any = nothing)::MultiPeriodPredictionResult
     return MultiPeriodPredictionResult(pred, id)
 end
@@ -614,6 +692,14 @@ represents one random asset-subset path.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    PopulationPredictionResult(;
+        pred::VecPredRes_MultiPredRes = Vector{PredRes_MultiPredRes}(undef, 0)
+    ) -> PopulationPredictionResult
+
+Keywords correspond to the struct's fields. An empty `pred` is admitted: a population from which every path was dropped is a valid, if empty, answer.
+
 # Related
 
   - [`PredictionResult`](@ref)
@@ -631,8 +717,8 @@ $(DocStringExtensions.FIELDS)
     end
 end
 function PopulationPredictionResult(;
-                                    pred::VecPredRes_MultiPredRes = Vector{<:PredRes_MultiPredRes}(undef,
-                                                                                                   0))::PopulationPredictionResult
+                                    pred::VecPredRes_MultiPredRes = Vector{PredRes_MultiPredRes}(undef,
+                                                                                                 0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
 function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
@@ -753,7 +839,6 @@ The fold does not collapse `rd.Z`. Only one weight vector is in scope here, whic
 """
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
-    nb = rd.nb
     B = !isa(rd.B, MatNum) ? rd.B : rd.B * res.w
     iv = rd.iv
     ivpa = rd.ivpa
@@ -874,6 +959,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
 end
 """
     fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult; train_idx, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
 
@@ -885,15 +971,20 @@ The two-argument methods operate on a single pre-defined train/test split or on 
 # Arguments
 
   - `opt`: Optimisation estimator or an existing optimisation result.
-  - `rd::ReturnsResult`: FullMoment returns data.
+  - `rd::ReturnsResult`: Returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
+  - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
   - `train_idx::VecInt`: Training indices.
   - `test_idx`: Test indices (vector or vector of vectors).
   - `cols`: Column selector (default `:` for all assets).
 
 # Returns
 
-  - [`MultiPeriodPredictionResult`](@ref) or [`PredictionResult`](@ref).
+  - [`MultiPeriodPredictionResult`](@ref), [`PopulationPredictionResult`](@ref), or [`PredictionResult`](@ref).
+
+# Details
+
+  - A combinatorial `cv` takes its own method, because its folds recombine into several paths rather than one. That method regroups the fold predictions by path and returns one [`MultiPeriodPredictionResult`](@ref) per path, wrapped in a [`PopulationPredictionResult`](@ref).
 
 # Related
 
@@ -917,11 +1008,12 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     return StatsAPI.predict(res, rd, test_idx, cols)
 end
 """
-    sort_predictions!(res::Union{test_idx, CrossValidationResult}, pred::VecPredRes) -> VecPredRes
+    sort_predictions!(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
+    sort_predictions!(res::CrossValidationResult, predictions::VecPredRes) -> VecPredRes
 
 Sort prediction results to match the order of test indices.
 
-Reorders `predictions` so that they align with the original time ordering of `test_idx`.
+Reorders `predictions` so that they align with the original time ordering of `test_idx`. The key is the first observation of each fold, so the folds come back in the order the timeline visits them.
 
 # Arguments
 
@@ -930,16 +1022,25 @@ Reorders `predictions` so that they align with the original time ordering of `te
       + `::VecVecInt`: Vector of test index vectors.
       + `::CrossValidationResult`: Cross validation result object, uses the test indices stored in `res.test_idx`.
 
-  - `pred`: Vector of prediction results.
+  - `predictions`: Vector of prediction results, one per fold, in split order.
+
+# Validation
+
+  - Every element of `test_idx` holds unique indices.
 
 # Returns
 
   - Sorted predictions vector.
 
+# Details
+
+  - [`CombinatorialCrossValidationResult`](@ref) has its own method with a different shape and a different job. Its folds do not form one timeline, so that method takes a vector of per-split vectors and regroups them by path into [`MultiPeriodPredictionResult`](@ref)s rather than sorting one timeline.
+
 # Related
 
   - [`fit_and_predict`](@ref)
   - [`path_fit_and_predict`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
 """
 function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
     @argcheck(all(x -> allunique(x), test_idx), "Test indices must be unique.")
@@ -950,12 +1051,30 @@ function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
 """
-    cv_sequential_info(prev_w_flag::Bool, time_dep_flag::Bool)
+    cv_sequential_info(prev_w_flag::Bool)
 
 Build the informational message emitted when a cross-validation run falls back to sequential
-execution because the optimiser needs the previous fold's weights and/or is time dependent.
+execution because the optimiser needs the previous fold's weights.
 Shared by the [`run_folds`](@ref) walk fallback used in walk-forward and multiple-randomised
 cross-validation.
+
+Time dependence alone does not force the fallback and takes no argument here. A
+[`TimeDependent`](@ref) schedule is known for every fold before the loop starts, so
+[`fold_loop`](@ref) resolves it in parallel.
+
+# Arguments
+
+  - `prev_w_flag::Bool`: The value of [`needs_previous_weights`](@ref) for the optimiser, which the message quotes back to the user.
+
+# Returns
+
+  - `String`: The message.
+
+# Related
+
+  - [`run_folds`](@ref)
+  - [`fold_loop`](@ref)
+  - [`needs_previous_weights`](@ref)
 """
 function cv_sequential_info(prev_w_flag::Bool)
     return "Running cross-validation sequentially because the optimiser must use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights,\n\t- a time-dependent constraint whose entries need previous weights (e.g. a PreviousWeightsFunction).\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s). Time-dependent constraints alone do not force sequential processing."

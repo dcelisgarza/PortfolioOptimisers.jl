@@ -5,7 +5,7 @@ Weights a risk measure inside an aggregate, and bounds its risk expression from 
 
 This is the settings type of a quantity the optimisation wants **more** of, so its bound is a floor rather than a ceiling — the shape of the return floor ``\\bar{\\mu}`` in Equation 8.7 of the reference below. [`Skewness`](@ref) is its one holder, and a stated `lb` reaches the model only through [`VarianceSkewKurtosis`](@ref), where that skewness term is built: `Skewness` is a [`NonOptimisationRiskMeasure`](@ref), so no optimiser takes it on its own. On a 250x5 sample the bound binds at the value stated — `1e-9`, `1e-8` and `5e-8` realised `1.0000006e-9`, `1.0000009e-8` and `5.0000003e-8`, each above the unconstrained optimum of `-6.16e-9`.
 
-Unlike the `ub` of [`RiskMeasureSettings`](@ref), `lb` is **not** validated. A negative floor is meaningful here and works: `lb = -1e-8` returns the unconstrained `-6.1627e-9`, which satisfies it. An empty vector is meaningful to nobody, and it constructs — [#402](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/402).
+Unlike the `ub` of [`RiskMeasureSettings`](@ref), `lb` is not checked for non-negativity. A negative floor is meaningful here and works: `lb = -1e-8` returns the unconstrained `-6.1627e-9`, which satisfies it.
 
 # Fields
 
@@ -24,6 +24,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `isfinite(scale)`.
+  - `lb` is validated with [`assert_nonempty_finite_val`](@ref).
 
 # Examples
 
@@ -63,6 +64,7 @@ MaxRiskMeasureSettings
     rke
     function MaxRiskMeasureSettings(scale::Number, lb::Option{<:RkRtBounds},
                                     rke::Bool)::MaxRiskMeasureSettings
+        assert_nonempty_finite_val(lb, :lb)
         @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale), typeof(lb), typeof(rke)}(scale, lb, rke)
     end

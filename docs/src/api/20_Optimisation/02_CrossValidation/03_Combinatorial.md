@@ -13,3 +13,10 @@ average_train_size
 recombined_paths
 optimal_number_folds
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
