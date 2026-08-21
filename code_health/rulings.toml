@@ -1,0 +1,191 @@
+# The hand-written half of the code-health gate.
+#
+# Nothing in this file is measured. Every entry is a human judgement, and the three generated files
+# beside it are rewritten by their scripts. ADR 0073 splits the four files on exactly that line, so
+# no human paragraph shares a file a refresh overwrites.
+#
+# The four sections, and what each one binds:
+#
+#   [thresholds]        which files the scheduled job files as work. Never the pass rule.
+#   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
+#   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
+#   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
+#
+# An Exemption and a Dismissal both cite a Rationale by name. Citing an approved Rationale is
+# bookkeeping and any contributor may do it. Adding a `[rationale.…]` block is a claim that some
+# code is correct, and it needs the maintainer.
+
+# --- thresholds ------------------------------------------------------------
+#
+# ADR 0076 keeps these out of the pass rule. The ratchet stops decay, and the scheduled job drives
+# improvement. A file far above every threshold is green while its number holds steady.
+#
+# Issue #356 moved the argument count from 5 to 10. The cliff in this repository's own distribution
+# sits between 9 and 10, and at 10 each of the three metrics reports the same 21 files, which is
+# what makes the scheduled job's `max(value/threshold)` ranking comparable across metrics. It was
+# chosen once from the cliff. It is not a rule to re-derive, because a re-derived threshold never
+# terminates.
+
+[thresholds]
+cyclomatic = 10
+cognitive = 15
+argcount = 10
+jet_reviewed = 1
+
+# --- unmeasured paths ------------------------------------------------------
+#
+# ADR 0072 measures `src/` and `ext/`. Every other tracked `.jl` file must be named here, and a
+# tracked file that is neither turns the gate red. The assertion is the point: a new top-level
+# directory cannot fall through unmeasured and silent.
+
+[[unmeasured_path]]
+path = "test/"
+reason = "Test code. The narrower scope of ADR 0072 replaces the whole-tree scope this map charted."
+
+[[unmeasured_path]]
+path = "examples/"
+reason = "Generated notebooks and their sources. They are documentation, not library code."
+
+[[unmeasured_path]]
+path = "user_guide/"
+reason = "Documentation sources, rendered into docs/src/user_guide by CI."
+
+[[unmeasured_path]]
+path = "docs/"
+reason = "The documentation build's own programs."
+
+[[unmeasured_path]]
+path = "research/"
+reason = """
+Prototypes. They are the subject of the live prototypes-to-seams effort, which will rewrite or \
+delete many of them, and the scheduled job files each offending file at most once ever. An issue \
+against a file that is about to be deleted spends a permanent slot. A prototype is measured on the \
+day it becomes source: moving a file into `src/` faces the entry test of ADR 0074, because an \
+Unmeasured Path holds no row for a rename to pair with."""
+
+# --- rationales ------------------------------------------------------------
+#
+# One named paragraph, cited by many entries. A new block here needs the maintainer.
+
+[rationale.keyword-constructor-arity]
+text = """
+An estimator's constructor takes one argument per field. This library's house style is a keyword \
+constructor over a wide configuration object, so the argument count of such a constructor is a \
+count of the estimator's configuration and not a measure of the constructor's difficulty. A branch \
+is extractable where an argument per field is not, so the same definition stays a candidate under \
+cyclomatic and cognitive complexity. Issue #356 measured the alternatives and rejected both: \
+counting positional slots alone leaves 86 of the 196 files above the old threshold of 5, and \
+dropping every struct constructor leaves 87, against 101. Keyword arguments and estimator \
+constructors own the extreme tail, not the bulk."""
+
+# --- exemptions ------------------------------------------------------------
+#
+# Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
+# issue candidacy alone. It never moves a baseline number, so the ratchet still sees the definition.
+#
+# The seventeen below are issue #356's, written before the scheduled job first runs. They name
+# every constructor standing above the argument-count threshold of 10, not only the one that drives
+# its file, because `src/20_Optimisation/10_JuMPOptimiser.jl` holds a second at 19. Nineteen
+# definitions sit over seventeen keys, because the key holds no line.
+
+[[exemption]]
+path = "src/03_Preprocessing.jl"
+definition = "ReturnsResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/08_Moments/35_GerberIQCovariance.jl"
+definition = "FullGerberIQ"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/08_Moments/35_GerberIQCovariance.jl"
+definition = "PartialGerberIQ"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/13_Prior/01_Base_Prior.jl"
+definition = "LowOrderPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/13_Prior/08_FactorBlackLittermanPrior.jl"
+definition = "FactorBlackLittermanPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/13_Prior/09_AugmentedBlackLittermanPrior.jl"
+definition = "AugmentedBlackLittermanPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/13_Prior/11_MeucciEntropyPoolingPrior.jl"
+definition = "MeucciEntropyPoolingPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/13_Prior/12_EntropyPoolingPrior.jl"
+definition = "EntropyPoolingPrior"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl"
+definition = "ARCHUncertaintySet"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/04_Base_ClusteringOptimisation.jl"
+definition = "HierarchicalOptimiser"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/10_JuMPOptimiser.jl"
+definition = "JuMPOptimiser"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/10_JuMPOptimiser.jl"
+definition = "ProcessedJuMPOptimiserAttributes"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/13_NearOptimalCentering.jl"
+definition = "NearOptimalCentering"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/13_NearOptimalCentering.jl"
+definition = "NearOptimalSetup"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/17_NestedClustered.jl"
+definition = "NestedClustered"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/18_Stacking.jl"
+definition = "Stacking"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/20_Optimisation/19_SubsetResampling.jl"
+definition = "SubsetResampling"
+metric = "arg"
+rationale = "keyword-constructor-arity"

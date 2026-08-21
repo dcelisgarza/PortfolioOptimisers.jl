@@ -1,0 +1,89 @@
+name: JET
+
+# The JET half of the code-health gate. One `report_package` call costs about six minutes of wall
+# time and 2.4 GiB of peak resident memory, and the script makes three calls.
+#
+# This workflow carries a `paths:` filter and Complexity.yml deliberately does not. JET's number
+# cannot change unless the source, the load set or the analyser pin changed, and this repository
+# produces a great many docs-only commits, so the filter skips most six-minute runs and misses no
+# code change. ADR 0077.
+#
+# Caveat for whoever configures branch protection: a workflow skipped by a `paths:` filter leaves
+# its check pending rather than skipped, and a pending REQUIRED check blocks a pull request. No
+# check is required in this repository today.
+
+on:
+  push:
+    branches:
+      - main
+      - dev*
+      - agents/*
+    tags: ["*"]
+    paths:
+      - 'src/**'
+      - 'ext/**'
+      - 'code_health/**'
+      - 'Project.toml'
+      - '.github/workflows/JET.yml'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'ext/**'
+      - 'code_health/**'
+      - 'Project.toml'
+      - '.github/workflows/JET.yml'
+
+# The gate only measures. It writes nothing back to the repository, so a fork pull request needs no
+# more than this and nothing anywhere tests for a fork. ADR 0075.
+permissions:
+  contents: read
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  #
+  # Five pushes to a pull request in ten minutes would otherwise mean five full JET runs, four of
+  # them already obsolete when they finish.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout comes BEFORE setup-julia, which inverts Aqua.yml's order, because the Julia
+      # version is read out of the checkout. The bare checkout measures the merge commit.
+      - uses: actions/checkout@v7
+      - name: Read the Julia pin from the Manifest
+        id: pin
+        run: |
+          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The code-health gate is pinned to Julia $v."
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      - name: Instantiate the gate's environment
+        run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
+      - name: JET baseline
+        run: julia --project=code_health code_health/jet.jl check
+      # A run that trips publishes the Refresh Artifact. A provenance mismatch writes no file, so
+      # `if-no-files-found: ignore` publishes nothing: a poisoned baseline must never sit one
+      # download away from a commit. ADR 0075.
+      - name: Publish the Refresh Artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jet-refresh
+          path: code_health/_refresh/*.toml
+          if-no-files-found: ignore
+      - name: Measure fresh numbers for a dispatched run
+        if: success() && github.event_name == 'workflow_dispatch'
+        run: julia --project=code_health code_health/jet.jl refresh
+      - name: Publish the fresh numbers
+        if: success() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jet-fresh
+          path: code_health/jet_baseline.toml

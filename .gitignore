@@ -5,6 +5,9 @@
 .DS_Store
 .benchmarkci
 Manifest.toml
+# The code-health gate pins every version it depends on, and a committed Manifest is
+# what makes that pin total. It is the only Manifest this repository tracks. ADR 0077.
+!code_health/Manifest.toml
 benchmark/*.json
 coverage
 docs/build/
@@ -21,3 +24,6 @@ node_modules
 *ipynb
 __pycache__/
 *.pyc
+# The Refresh Artifact is staged here by a failing check and uploaded by CI. It is never
+# committed; the contributor puts the downloaded file at its committed path instead.
+code_health/_refresh/
