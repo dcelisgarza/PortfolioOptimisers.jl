@@ -55,6 +55,16 @@ path = "docs/"
 reason = "The documentation build's own programs."
 
 [[unmeasured_path]]
+path = "code_health/"
+reason = """
+The gate's own scripts. They are tooling rather than library code, so ADR 0072's scope of `src/` \
+and `ext/` does not reach them, and a ratchet on the instrument would measure the instrument \
+rather than the subject. They are still formatted by `FormatCheck.yml` and by the pre-commit hook \
+like every other `.jl` file. This entry is the ruling ADR 0072 asks for: a new directory of \
+tracked `.jl` files turns the gate red until someone rules on it, and the first run of the gate \
+ruled on itself."""
+
+[[unmeasured_path]]
 path = "research/"
 reason = """
 Prototypes. They are the subject of the live prototypes-to-seams effort, which will rewrite or \
