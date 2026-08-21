@@ -29,3 +29,10 @@ port_opt_view(re::Regression, i, args...)
 regression_criterion_func
 regression_threshold
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

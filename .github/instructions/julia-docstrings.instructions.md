@@ -193,24 +193,36 @@ end
 
 ### `@propagatable` concrete struct types
 
-When a struct is decorated with `@propagatable`, fields carry two orthogonal, stackable tags inside the struct body:
+When a struct is decorated with `@propagatable`, its fields carry stackable tags inside the struct body. Three of them drive a generated method whose behaviour a reader of the type needs to know:
 
 - `@fprop` — **factory propagation**: the field is automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `factory_child` for dispatch rules).
-- `@vprop` — **view propagation**: the field is automatically subset when [`port_opt_view`](@ref) is called on the enclosing struct (recursing into composed children, slicing data arrays).
+- `@vprop` — **view propagation**: the field is automatically subset along the **asset** axis when [`port_opt_view`](@ref) is called on the enclosing struct (recursing into composed children, slicing data arrays).
+- `@wprop` — **observation weights**: the field holds the weights themselves. It drives **two** channels, and they do different things to it: [`factory`](@ref) **replaces** it with an incoming [`ObsWeights`](@ref) value, and [`obs_weights_view`](@ref) **indexes** the value already there, along the **observation** axis.
 
-A field may carry neither, either, or both (`@fprop @vprop field`, in either order) — the factory- and view-relevant field sets genuinely diverge (a field can be factory-propagated but view-passthrough, or vice versa). Document each in its own subsection inside `# Constructors`, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`).
+(`@pprop` and `@cprop` drive prior selection. They are documented on the prior families, not here.)
 
-For `@fprop`-tagged fields, add a `## Propagated parameters` subsection listing each field and how it is propagated:
+A field may carry any combination (`@fprop @vprop field`, in either order) — the field sets of the channels genuinely diverge, so a field can be factory-propagated but view-passthrough, or vice versa. **Document each channel in its own subsection inside `# Constructors`**, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`), in the order below.
 
-- **Observation-weight fields** (type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
-- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
+**A subsection documents a channel, not a tag.** A channel is gated on more than one tag, so the field list of a subsection is the union of the tags that channel reads. Write a subsection when at least one field carries a tag that gates it, and omit it otherwise.
 
-For `@vprop`-tagged fields, add a `## View parameters` subsection listing each field and how it is viewed:
+`## Propagated parameters` — the **factory** channel, gated on `@fprop` and `@wprop`. Lists each field and how it is propagated:
+
+- **Observation-weight fields** (`@wprop`; type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
+- **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
+
+`## View parameters` — the **view** channel, gated on `@vprop`. Lists each field and how it is viewed:
 
 - **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed via [`port_opt_view`](@ref). ``
 - **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices via [`port_opt_view`](@ref). ``
 
-List fields in the same order they appear in the struct body, and add [`factory`](@ref) and/or [`port_opt_view`](@ref) to `# Related` to match the tags present.
+`## Observation weight parameters` — the **observation** channel, gated on `@wprop` alone. A type with no `@wprop` field never gains this subsection, whatever else it carries. Lists each field and how it is indexed:
+
+- **Observation-weight fields** (`@wprop`): write `` `fieldname`: Indexed to the selected observations via [`obs_weights_view`](@ref). ``
+- **Estimator, algorithm, or result fields** (`@fprop`): write `` `fieldname`: Recursively indexed via [`obs_weights_view`](@ref). ``
+
+> **The same field appears in two subsections, saying two different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. That is not a duplication to collapse: it is the one place a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling appears in both too, and recurses in both.
+
+List fields in the same order they appear in the struct body, and add [`factory`](@ref), [`port_opt_view`](@ref) and/or [`obs_weights_view`](@ref) to `# Related` to match the subsections present.
 
 ````julia
 """
@@ -248,6 +260,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `nested_est`: Recursively viewed via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `nested_est`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `weight_field`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 

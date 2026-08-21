@@ -57,6 +57,8 @@ Keywords correspond to the struct's fields.
 
 Both checks run in the keyword constructor as well as in the inner one. `@concrete` emits a generic single-argument constructor that a scalar `val` matches ahead of the inner `VecNum` method, so a scalar reaches the struct without passing either check unless the keyword constructor applies them itself.
 
+A scalar `val` is a real input, not a mistake to refuse: a scalar [`RiskBudgetEstimator`](@ref) resolves to one, because [`risk_budget_constraints`](@ref) normalises the budget to sum to one and a scalar divided by itself is `1.0`. Such a budget states one allocation over a one-entry axis, and an optimiser accepts it only for a one-asset universe.
+
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
@@ -114,6 +116,8 @@ Resolves a risk budget written in asset or group names against a universe.
 
 [`risk_budget_constraints`](@ref) turns it into a [`RiskBudget`](@ref): every name in `val` is mapped to its indices in the selected universe, an unnamed asset takes `dval`, and the result is normalised to sum to one. A group name assigns its value to every asset in the group.
 
+A **scalar** `val` is accepted, and resolves to a scalar rather than to a uniform vector. The normalisation divides the scalar by itself, so every scalar resolves to the same `RiskBudget(1.0)` and the number written here reaches nothing. Only a one-entry axis can consume such a budget: [`RiskBudgeting`](@ref) reads the budget against an `N`-vector of weights. Write the uniform budget as `nothing`, which [`risk_budget_constraints`](@ref) turns into `1/N` over `N` entries, or as [`UniformValues`](@ref), which resolves to the same vector through this estimator.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -143,6 +147,24 @@ julia> RiskBudgetEstimator(; val = [\"A\" => 0.2, \"B\" => 0.3, \"C\" => 0.5])
 RiskBudgetEstimator
    val ┼ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
   dval ┴ nothing
+```
+
+Two different scalars resolve to the same budget, and the uniform budget over the universe is written as `nothing`:
+
+```jldoctest
+julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
+
+julia> risk_budget_constraints(RiskBudgetEstimator(; val = 0.2), sets)
+RiskBudget
+  val ┴ Float64: 1.0
+
+julia> risk_budget_constraints(RiskBudgetEstimator(; val = 0.9), sets)
+RiskBudget
+  val ┴ Float64: 1.0
+
+julia> risk_budget_constraints(nothing; N = 3)
+RiskBudget
+  val ┴ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.3333333333333333, 0.0, 3)
 ```
 
 # Related

@@ -78,3 +78,59 @@ gone from the API page. They were private helpers.
 
 ADRs 0002, 0010, 0012 and 0013 decide what the tags *mean*. This decides how the set is
 spelled. Nothing in them is contradicted.
+
+## Amendment (2026-08-21)
+
+**The field transform is a function of the channel as well as the tag.** The decision above says
+`prop_tag_expr(tag, fname, xf, mod, thread)` holds "one branch per tag, shared by every channel".
+That is no longer true. The signature is now
+`prop_tag_expr(channel, tag, fname, xf, mod, thread)`, and one tag may carry a different transform
+in each channel that names it.
+
+### What forced it
+
+A fourth channel, `obs`, generates `obs_weights_view(x, i)` — the observation-axis counterpart of
+`port_opt_view`. Its row is what the decision above promised a new channel would be:
+
+```julia
+obs = (gate = (:wprop,), precedence = (:wprop, :fprop))
+```
+
+It reads the tags a weights-carrying struct already has, and it needs both of them to mean
+something **other** than what they mean to `factory`:
+
+| Tag | `factory` transform | `obs` transform |
+| --- | --- | --- |
+| `@wprop` | `_wprop` — **replaces** the field with an incoming `ObsWeights` | `nothing_scalar_array_getindex` — **indexes** the value already there |
+| `@fprop` | `factory_child` | `obs_weights_view` |
+
+A transform keyed on the tag alone cannot express that. The alternative was a sixth tag, written
+beside `@wprop` on every weights field — a second spelling of the same fact, which is the tax this
+ADR exists to remove.
+
+### Why the channel could not be one of the three that existed
+
+`factory` writes **one** value into **every** `@wprop` field of a tree at once, so it cannot index a
+field and leave a sibling `nothing`. A `SimpleVariance` holding a weighted mean and an unweighted
+dispersion comes back from `factory` with both weighted, which is a different estimator.
+
+`port_opt_view` threads one index into every `@vprop` field, and at its call sites — the
+meta-optimisers and the cross-validation splitters — that index selects **assets**. An observation
+weight is one value per row of the sample. The axis is a per-type convention rather than a property
+of the channel, which is why the two verbs are told apart by name and not by argument.
+
+### What the amendment changes
+
+- `prop_tag_expr` takes the channel first. Its error names the channel as well as the tag.
+- `check_prop_tag_macros` probes **every channel that names a tag**, not the tag once. A tag added
+  to a second channel with no transform there refuses to precompile, exactly as a tag with no
+  transform at all already did.
+- `PROP_TAG_NAMES` is unchanged. No tag was added, and no struct in `src/` gained an annotation.
+
+### What it does not change
+
+The claim that a new propagation channel is a table row still holds, and this channel is the
+evidence: one row, one gate, one precedence, plus the transforms the row needs. The hazard analysis
+above is unchanged at both ends — a tag with no table row is not a tag, and a row with no transform
+errors rather than taking another tag's. ADRs 0002, 0010, 0012 and 0013 still decide what the tags
+mean; this still decides how the set is spelled. The set is now two-dimensional.

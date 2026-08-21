@@ -10,6 +10,10 @@ All concrete and/or abstract types implementing implied volatility estimation al
   - [`ImpliedVolatilityRegression`](@ref)
   - [`ImpliedVolatilityPremium`](@ref)
   - [`ImpliedVolatility`](@ref)
+
+# References
+
+  - $(ref_dict[:andersen2006])
 """
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 """
@@ -57,6 +61,15 @@ ImpliedVolatilityRegression
   - [`ImpliedVolatilityAlgorithm`](@ref)
   - [`ImpliedVolatilityPremium`](@ref)
   - [`ImpliedVolatility`](@ref)
+  - [`predict_realised_vols`](@ref)
+  - [`realised_vol`](@ref)
+  - [`implied_vol`](@ref)
+
+# References
+
+  - $(ref_dict[:christensenprabhala1998])
+  - $(ref_dict[:christensenhansen2002])
+  - $(ref_dict[:andersen2006])
 """
 @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
     """
@@ -87,15 +100,20 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implied volatility algorithm that scales implied volatility by a user-supplied premium factor.
+Implied volatility algorithm that divides the latest implied volatility by a volatility risk premium adjustment.
 
-The premium factor can be a scalar or a vector (one per asset) and is used to convert raw implied volatilities into predicted realised volatilities.
+The adjustment factor is not a field of this type. The caller passes it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory: `ivpa = nothing` raises an `ArgumentError`.
 
 # Related
 
   - [`ImpliedVolatilityAlgorithm`](@ref)
   - [`ImpliedVolatilityRegression`](@ref)
   - [`ImpliedVolatility`](@ref)
+  - [`predict_realised_vols`](@ref)
+
+# References
+
+  - $(ref_dict[:egbersswinkels2015])
 """
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
@@ -145,6 +163,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:andersen2006])
 """
 @propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """
@@ -183,7 +205,13 @@ end
 
 Compute realised volatility over non-overlapping rolling windows.
 
-This function reshapes the last `chunk * ws` rows of `X` into blocks of size `ws` and computes the standard deviation within each block using the estimator `ce`. The result is a matrix of size `(chunk, N)` representing rolling realised volatilities.
+This function splits the last `chunk * ws` rows of `X` into `chunk` non-overlapping blocks of `ws` rows each, and computes the standard deviation of every asset within each block using the estimator `ce`. The result is a matrix of size `(chunk, N)` representing rolling realised volatilities. Block `c` ends at row `T - (chunk - c) * ws`, which is the row [`implied_vol`](@ref) reads for the same window.
+
+# Observation weights are sliced to the block
+
+`ce` describes the whole sample, so its observation weights are one value per row of `X` and cannot be applied to a block of `ws` rows. [`obs_weights_view`](@ref) indexes every weights field of `ce` to the block before the block is measured, and indexes each field on its own, so an estimator with a weighted mean and an unweighted dispersion keeps that shape. An unweighted `ce` is returned unchanged, so no unweighted result moves.
+
+Any estimator declared with [`@propagatable`](@ref) gets that method generated from the [`@wprop`](@ref) tag its weights field already carries, so both shipped variance estimators answer with nothing written by hand. A variance estimator that holds weights outside that tag must define its own method; without one its weights keep their full-sample length against a block of `ws` rows, and the call raises.
 
 # Arguments
 
@@ -202,6 +230,7 @@ This function reshapes the last `chunk * ws` rows of `X` into blocks of size `ws
 
   - [`ImpliedVolatilityRegression`](@ref)
   - [`implied_vol`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                       chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
@@ -210,9 +239,11 @@ function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
         T, N = size(X)
         chunk = div(T, ws)
     end
-    return dropdims(Statistics.std(ce,
-                                   reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk,
-                                           N); dims = 1); dims = 1)
+    offset = T - chunk * ws
+    return mapreduce(vcat, 1:chunk) do c
+        rows = (offset + (c - 1) * ws + 1):(offset + c * ws)
+        return Statistics.std(obs_weights_view(ce, rows), view(X, rows, :); dims = 1)
+    end
 end
 """
     implied_vol(X::MatNum, ws::Integer, chunk::Option{<:Integer} = nothing,
@@ -446,8 +477,8 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     X, iv = dims_oriented(dims, X, iv)
     sigma = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
-    iv = predict_realised_vols(ce.alg, X, iv, ivpa)
-    StatsBase.cov2cor!(sigma, iv)
+    iv = predict_realised_vols(ce.alg, iv, X, ivpa)
+    StatsBase.cor2cov!(sigma, iv)
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
@@ -483,7 +514,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     X, iv = dims_oriented(dims, X, iv)
     rho = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
-    iv = predict_realised_vols(ce.alg, X, iv, ivpa)
+    iv = predict_realised_vols(ce.alg, iv, X, ivpa)
     StatsBase.cor2cov!(rho, iv)
     StatsBase.cov2cor!(rho)
     matrix_processing!(ce.mp, rho, X; kwargs...)

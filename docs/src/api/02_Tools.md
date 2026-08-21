@@ -71,6 +71,8 @@ dot_scalar
 port_opt_view(x, i, args...)
 port_opt_view(x::VecScalar, i, args...)
 port_opt_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i, args...; kwargs...)
+obs_weights_view(x, ::Any)
+obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}}, i)
 nothing_scalar_array_view
 nothing_scalar_array_view_odd_order
 nothing_scalar_array_getindex

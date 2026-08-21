@@ -89,7 +89,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
                                  ## Regression
                                  :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
-                                 :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                                 :L => "`L`: Reduced dimensionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
                                  :b => "`b`: Regression intercept vector.",#
                                  :crit => "`crit`: Factor selection criterion.",#
                                  :realg => "`alg`: Regression algorithm.",#
@@ -628,7 +628,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                                  # Constraint generation.
                                  :rkb_val => "`val`: Vector of non-negative risk budgets, one per entry of the axis the budget is written against. [`risk_budget_constraints`](@ref) normalises it to sum to one; a hand-built vector is stored as given, and the model reads it inside a logarithmic barrier, so only its **relative** entries matter.",#
-                                 :rkbe_val => "`val`: Mapping of names to risk budget values. A name may be an asset or a group, and a group assigns its value to every asset in it.",#
+                                 :rkbe_val => "`val`: Mapping of names to risk budget values. A name may be an asset or a group, and a group assigns its value to every asset in it. A scalar is accepted and resolves to `RiskBudget(1.0)` whatever the scalar was, so only a one-entry axis can consume it. Write the uniform budget as `nothing`.",#
                                  :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
                                  :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
                                  :us_fkey => "`fkey`: Key in `dict` identifying the factor list. Optional — a consumer that needs it and does not find it throws at the point of need.",#
@@ -775,6 +775,7 @@ const val_dict = unique_key_dict(:val_dict,
                                  :sepq => "`0 <= q <= 1`.",#
                                  :A => "`!isempty(A)`.",#
                                  :B => "`!isempty(B)`.",#
+                                 :A_B => "`size(A, 1) == length(B)`, one row of `A` per entry of `B`.",#
                                  :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
                                  :decay => "`decay > 0`.",#
                                  :rf => "`isfinite(rf)`.",#
@@ -964,7 +965,22 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :tumminello2005 => "[tumminello2005](@cite) M. Tumminello, T. Aste, T. Di Matteo and R. N. Mantegna. *A tool for filtering information in complex systems*. Proceedings of the National Academy of Sciences 102, 10421–10426 (2005).",#
                                  :graphpo1 => "[graphpo1](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization*. Available at SSRN 4602019 (2023).",#
                                  :graphpo2 => "[graphpo2](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization Part II*. Available at SSRN 4667426 (2023).",#
-                                 :riccascozzari2024 => "[riccascozzari2024](@cite) F. Ricca and A. Scozzari. *Portfolio optimization through a network approach: network assortative mixing and portfolio diversification*. European Journal of Operational Research 312, 700–717 (2024).")
+                                 :riccascozzari2024 => "[riccascozzari2024](@cite) F. Ricca and A. Scozzari. *Portfolio optimization through a network approach: network assortative mixing and portfolio diversification*. European Journal of Operational Research 312, 700–717 (2024).",#
+                                 :efroymson1960 => "[efroymson1960](@cite) M. A. Efroymson. *Multiple regression analysis*. In: *Mathematical Methods for Digital Computers*, edited by A. Ralston and H. S. Wilf (John Wiley & Sons, 1960); pp. 191–203.",#
+                                 :hocking1976 => "[hocking1976](@cite) R. R. Hocking. *The analysis and selection of variables in linear regression*. Biometrics 32, 1–49 (1976).",#
+                                 :akaike1974 => "[akaike1974](@cite) H. Akaike. *A new look at the statistical model identification*. IEEE Transactions on Automatic Control 19, 716–723 (1974).",#
+                                 :hurvich1989 => "[hurvich1989](@cite) C. M. Hurvich and C.-L. Tsai. *Regression and time series model selection in small samples*. Biometrika 76, 297–307 (1989).",#
+                                 :schwarz1978 => "[schwarz1978](@cite) G. Schwarz. *Estimating the dimension of a model*. The Annals of Statistics 6, 461–464 (1978).",#
+                                 :theil1961 => "[theil1961](@cite) H. Theil. *Economic Forecasts and Policy*. 2 Edition (North-Holland, 1961).",#
+                                 :nelder1972 => "[nelder1972](@cite) J. A. Nelder and R. W. Wedderburn. *Generalized linear models*. Journal of the Royal Statistical Society: Series A (General) 135, 370–384 (1972).",#
+                                 :pearson1901 => "[pearson1901](@cite) K. Pearson. *On lines and planes of closest fit to systems of points in space*. The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science 2, 559–572 (1901).",#
+                                 :hotelling1933 => "[hotelling1933](@cite) H. Hotelling. *Analysis of a complex of statistical variables into principal components*. Journal of Educational Psychology 24, 417–441 (1933).",#
+                                 :tipping1999 => "[tipping1999](@cite) M. E. Tipping and C. M. Bishop. *Probabilistic principal component analysis*. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 61, 611–622 (1999).",#
+                                 :fekedulegn2002 => "[fekedulegn2002](@cite) B. D. Fekedulegn, J. J. Colbert, R. R. Hicks, Jr. and M. E. Schuckers. *Coping with multicollinearity: an example on application of principal components regression in dendroecology*. Research Paper NE-RP-721 (U.S. Department of Agriculture, Forest Service, Northeastern Research Station, 2002).",#
+                                 :christensenprabhala1998 => "[christensenprabhala1998](@cite) B. J. Christensen and N. R. Prabhala. *The relation between implied and realized volatility*. Journal of Financial Economics 50, 125–150 (1998).",#
+                                 :christensenhansen2002 => "[christensenhansen2002](@cite) B. J. Christensen and C. S. Hansen. *New evidence on the implied-realized volatility relation*. The European Journal of Finance 8, 187–205 (2002).",#
+                                 :andersen2006 => "[andersen2006](@cite) T. G. Andersen, T. Bollerslev, P. F. Christoffersen and F. X. Diebold. *Volatility and correlation forecasting*. In: *Handbook of Economic Forecasting*, Vol. 1, edited by G. Elliott, C. W. Granger and A. Timmermann (North-Holland, 2006); Chapter 15, pp. 777–878.",#
+                                 :egbersswinkels2015 => "[egbersswinkels2015](@cite) T. Egbers and L. Swinkels. *Can implied volatility predict returns on the currency carry trade?*. Journal of Banking & Finance 59, 14–26 (2015).")
 
 """
 $(DocStringExtensions.TYPEDEF)

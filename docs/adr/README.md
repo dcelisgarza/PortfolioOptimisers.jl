@@ -81,7 +81,7 @@ decision that moved many times, so read the amendments as well as the body.
 | 0058 | [The `dims` guard and the orientation are one call](0058-the-dims-guard-and-the-orientation-are-one-call.md) | | `dims_oriented(dims, A)` validates and orients, so a caller cannot orient without validating. |
 | 0059 | [A drawdown tail measure is its returns twin on another series](0059-a-drawdown-tail-measure-is-its-returns-twin-on-another-series.md) | | `risk_series` is the one place the substitution is made. Each builder is written once. |
 | 0060 | [A constructor docstring block is a copy, and a census gates it](0060-a-constructor-docstring-block-is-a-copy-and-a-census-gates-it.md) | | The block stays hand-written. A test parses the source text and makes the drift loud. |
-| 0061 | [The propagation tag set is data](0061-the-propagation-tag-set-is-data.md) | | `PROP_TAG_NAMES` is the table. The recognition layer derives from it. |
+| 0061 | [The propagation tag set is data](0061-the-propagation-tag-set-is-data.md) | 1 · 2026-08-21 | `PROP_TAG_NAMES` is the table. The recognition layer derives from it, and the field transform is keyed on the channel as well as the tag. |
 | 0062 | [The frontier sweep is one seam](0062-the-frontier-sweep-is-one-seam.md) | | The sweep lives in the Model State interface, beside the two frontier readers. |
 | 0063 | [The risk-free rate is added once per prior](0063-the-risk-free-rate-is-added-once-per-prior.md) | | One round trip: `remove_rf` before the update, `apply_rf` after it. Nothing else touches the field. |
 | 0064 | [The entropy pooling prior dispatches on its algorithm](0064-the-entropy-pooling-prior-dispatches-on-its-algorithm.md) | | `prior` has one method on the bare estimator, which forwards the algorithm as a value. |

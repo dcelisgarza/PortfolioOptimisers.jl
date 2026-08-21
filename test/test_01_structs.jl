@@ -2318,4 +2318,70 @@
         @test v.dict["features"] === alt.dict["features"]
         @test v.zkey == "features"
     end
+    @testset "PartialLinearConstraint" begin
+        # The form is `A * x <= B`, so a half with more bounds than rows -- or more rows
+        # than bounds -- is satisfied by no `x`. The pair is refused at construction, where
+        # the message names the fields, rather than at model assembly, where it does not.
+        @test_throws DimensionMismatch PartialLinearConstraint(;
+                                                               A = [1.0 0.0 0.0;
+                                                                    0.0 1.0 0.0],
+                                                               B = [0.5, 0.4, 0.3])
+        @test_throws DimensionMismatch PartialLinearConstraint(;
+                                                               A = [1.0 0.0 0.0;
+                                                                    0.0 1.0 0.0], B = [0.5])
+        @test_throws IsEmptyError PartialLinearConstraint(;
+                                                          A = Matrix{Float64}(undef, 0, 0),
+                                                          B = [0.5])
+        @test_throws IsEmptyError PartialLinearConstraint(; A = [1.0 0.0], B = Float64[])
+        # A conformable pair still constructs, and a one-row half is the common case.
+        plc = PartialLinearConstraint(; A = [1.0 0.0 0.0], B = [0.5])
+        @test size(plc.A, 1) == length(plc.B)
+        # The rule survives a lazy transpose, which is the shape the generators build.
+        plc = PartialLinearConstraint(; A = transpose(reshape([1.0, 0.0, 0.0], 3, 1)),
+                                      B = [0.5])
+        @test size(plc.A, 1) == length(plc.B)
+        # `merge_partial_linear_constraints` sums both counts, so a merge of conformable
+        # halves is conformable.
+        merged = PortfolioOptimisers.merge_partial_linear_constraints([PartialLinearConstraint(;
+                                                                                               A = [1.0 0.0],
+                                                                                               B = [0.5]),
+                                                                       PartialLinearConstraint(;
+                                                                                               A = [0.0 1.0;
+                                                                                                    1.0 1.0],
+                                                                                               B = [0.25,
+                                                                                                    0.75])])
+        @test size(merged.A, 1) == length(merged.B) == 3
+    end
+    @testset "A scalar risk budget resolves to RiskBudget(1.0)" begin
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        #=
+        `risk_budget_constraints` normalises the budget to sum to one, and a scalar
+        divided by itself is `1.0`. So a scalar states one allocation over a one-entry
+        axis, whatever the scalar was, and only a one-asset universe can consume it.
+        This is documented behaviour, and this testset is what makes it visible: the
+        routing tests assert the target of the step, not the value it produces.
+        =#
+        for v in (0.2, 0.9)
+            rkb = risk_budget_constraints(RiskBudgetEstimator(; val = v), sets)
+            @test rkb.val == 1.0
+        end
+        # The uniform budget over the universe is written as `nothing`.
+        @test risk_budget_constraints(nothing; N = 3).val == fill(inv(3), 3)
+        # `UniformValues()` reaches the same vector through the estimator.
+        rkb = risk_budget_constraints(RiskBudgetEstimator(; val = UniformValues()), sets)
+        @test isapprox(rkb.val, fill(inv(3), 3))
+        # A named budget resolves per asset: the unnamed one takes `dval`, which defaults
+        # to 1/N, and the result is normalised.
+        rkb = risk_budget_constraints(RiskBudgetEstimator(;
+                                                          val = Dict("A" => 0.2,
+                                                                     "B" => 0.8)), sets)
+        @test isapprox(rkb.val, [0.15, 0.6, 0.25])
+        #=
+        The keyword constructor repeats the inner constructor's guards because a scalar
+        matches the generic constructor `@concrete` emits ahead of the inner `VecNum`
+        method. Without the repeat, a negative scalar would construct.
+        =#
+        @test_throws DomainError RiskBudget(; val = -1.0)
+        @test_throws DomainError RiskBudget(; val = [0.5, -1.0])
+    end
 end

@@ -16,3 +16,10 @@ get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria, value::Ve
 get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum, included::VecInt, t::Number)
 get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum, included::VecInt, t::Number)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

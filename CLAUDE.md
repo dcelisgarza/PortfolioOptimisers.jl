@@ -68,6 +68,18 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   file, so an export is a deliberate edit to that list. **Do not restate the count here or
   anywhere else.** It has moved four times, and each written copy went stale where it stood.
 
+## Defects you find
+
+- **Fix a defect as soon as you find it when the fix is small, or when it belongs to the work in
+  hand.** Cover it with a test, and name the fix in your report. A defect you walk past is a defect
+  the next reader must find again.
+- **File an issue when the fix is large, or when it needs the maintainer's decision.** Put every
+  piece of context you hold into the issue: the reproduction, the file and the line, the cause you
+  found, the fix you would make, and the reason you did not make it. Someone else must be able to
+  work from the issue alone.
+- **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
+  the report for that work, and name that work in the issue.
+
 ## Repo etiquette
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.

@@ -6,3 +6,10 @@ cokurtosis
 CokurtosisEstimator
 _cokurtosis
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

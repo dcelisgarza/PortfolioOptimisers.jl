@@ -101,13 +101,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression algorithm types.
 
-All concrete and/or abstract types implementing stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionAlgorithm`.
+All concrete and/or abstract types implementing stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionAlgorithm`. A stepwise algorithm decides the *direction* the factor set moves in, and an [`AbstractStepwiseRegressionCriterion`](@ref) decides which move is an improvement.
 
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
   - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`ForwardSelection`](@ref)
+  - [`BackwardElimination`](@ref)
+
+# References
+
+  - $(ref_dict[:efroymson1960])
 """
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 """
@@ -115,12 +121,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criterion types.
 
-All concrete and/or abstract types representing criteria for stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionCriterion`. These criteria are used to evaluate model quality and guide variable selection during stepwise regression, such as AIC, BIC, or R².
+All concrete and/or abstract types representing criteria for stepwise regression algorithms should be subtypes of `AbstractStepwiseRegressionCriterion`. A criterion scores a fitted model, and the stepwise algorithm keeps the move that improves the score.
 
 # Related
 
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref)
+  - [`PValue`](@ref)
+
+# References
+
+  - $(ref_dict[:hocking1976])
 """
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
 """
@@ -138,9 +150,9 @@ abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regression target type for standard linear models.
+Fits each response by ordinary least squares through `GLM.LinearModel`.
 
-`LinearModel` is used to specify a standard linear regression target (i.e., ordinary least squares) when constructing regression estimators. It encapsulates keyword arguments for configuring the underlying linear model fitting routine, enabling flexible extension and dispatch within the regression estimation framework.
+The `kwargs` field is forwarded verbatim to `GLM`, so any option that routine accepts — observation weights among them — reaches the fit. This is the default target of every regression estimator in the library.
 
 # Fields
 
@@ -237,9 +249,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regression target type for generalised linear models (GLMs).
+Fits each response by a generalised linear model through `GLM.GeneralizedLinearModel`.
 
-`GeneralisedLinearModel` is used to specify a generalised linear regression target (e.g., logistic, Poisson, etc.) when constructing regression estimators. It encapsulates positional and keyword arguments for configuring the underlying GLM fitting routine, enabling flexible extension and dispatch within the regression estimation framework.
+The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares.
 
 # Fields
 
@@ -268,6 +280,10 @@ GeneralisedLinearModel
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+
+# References
+
+  - $(ref_dict[:nelder1972])
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
     """
@@ -343,14 +359,17 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all stepwise regression criteria in `PortfolioOptimisers.jl` where model fit is evaluated by either minimising or maximising the criterion value.
+Abstract supertype for all stepwise regression criteria that score a fitted model with one number.
 
-All concrete and/or abstract types representing stepwise regression criteria (such as AIC, BIC, R², or Adjusted R²) should be subtypes of `AbstractMinMaxValStepwiseRegressionCriterion`.
+All concrete and/or abstract types representing stepwise regression criteria (such as AIC, BIC, R², or Adjusted R²) should be subtypes of `AbstractMinMaxValStepwiseRegressionCriterion`. Its two subfamilies carry the polarity of that number, which is what [`regression_threshold`](@ref) and the `get_*_reg_incl*!` helpers dispatch on. [`PValue`](@ref) is not a member: it reads the coefficient p-values of the fitted model instead of one score.
 
-# Related Types
+# Related
 
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+  - [`regression_criterion_func`](@ref)
+  - [`regression_threshold`](@ref)
 """
 abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
@@ -388,9 +407,9 @@ abstract type AbstractMaxValStepwiseRegressionCriteria <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Akaike Information Criterion (AIC) for stepwise regression.
+Selects factors by minimising the Akaike Information Criterion.
 
-`AIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. Lower values indicate better model fit, penalising model complexity to avoid overfitting.
+The criterion trades the fitted likelihood against the number of estimated parameters, so a lower value is a better model. [`regression_criterion_func`](@ref) maps it to `StatsAPI.aic`.
 
 # Mathematical definition
 
@@ -403,7 +422,7 @@ Akaike Information Criterion (AIC) for stepwise regression.
 Where:
 
   - ``\\mathrm{AIC}``: Akaike Information Criterion.
-  - ``k``: Number of model parameters.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the residual variance.
   - ``\\hat{L}``: Maximum likelihood of the model.
 
 # Related
@@ -412,14 +431,18 @@ Where:
   - [`AICC`](@ref)
   - [`BIC`](@ref)
   - [`regression_criterion_func(::AIC)`](@ref)
+
+# References
+
+  - $(ref_dict[:akaike1974])
 """
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Corrected Akaike Information Criterion (AICC) for stepwise regression.
+Selects factors by minimising the Akaike Information Criterion corrected for a small sample.
 
-`AICC` is a minimisation-based criterion similar to AIC, but includes a correction for small sample sizes. Lower values indicate better model fit, balancing fit and complexity.
+The correction term grows as ``T`` approaches ``k``, so `AICC` penalises a large model more heavily than [`AIC`](@ref) does on a short sample. [`regression_criterion_func`](@ref) maps it to `StatsAPI.aicc`.
 
 # Mathematical definition
 
@@ -433,8 +456,12 @@ Where:
 
   - ``\\mathrm{AICC}``: Corrected Akaike Information Criterion.
   - ``\\mathrm{AIC}``: Standard Akaike Information Criterion.
-  - ``k``: Number of model parameters.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the residual variance.
   - $(math_dict[:T])
+
+# Details
+
+  - The correction term divides by ``T - k - 1``. The criterion is undefined when ``T = k + 1`` and changes sign below it, so `AICC` needs a sample longer than the largest model the search can reach.
 
 # Related
 
@@ -442,14 +469,18 @@ Where:
   - [`AIC`](@ref)
   - [`BIC`](@ref)
   - [`regression_criterion_func(::AICC)`](@ref)
+
+# References
+
+  - $(ref_dict[:hurvich1989])
 """
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bayesian Information Criterion (BIC) for stepwise regression.
+Selects factors by minimising the Bayesian Information Criterion.
 
-`BIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. It penalises model complexity more strongly than AIC. Lower values indicate better model fit.
+The penalty is ``k \\ln T`` rather than ``2k``, which is heavier than [`AIC`](@ref)'s for ``T \\geq 8``, so the search usually stops with fewer factors. [`regression_criterion_func`](@ref) maps it to `StatsAPI.bic`.
 
 # Mathematical definition
 
@@ -462,7 +493,7 @@ Bayesian Information Criterion (BIC) for stepwise regression.
 Where:
 
   - ``\\mathrm{BIC}``: Bayesian Information Criterion.
-  - ``k``: Number of model parameters.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the residual variance.
   - $(math_dict[:T])
   - ``\\hat{L}``: Maximum likelihood of the model.
 
@@ -472,14 +503,18 @@ Where:
   - [`AIC`](@ref)
   - [`AICC`](@ref)
   - [`regression_criterion_func(::BIC)`](@ref)
+
+# References
+
+  - $(ref_dict[:schwarz1978])
 """
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Coefficient of determination (R²) for stepwise regression.
+Selects factors by maximising the coefficient of determination.
 
-`RSquared` is a maximisation-based criterion used to evaluate model quality in stepwise regression algorithms. Higher values indicate better model fit, representing the proportion of variance explained by the model.
+The score is the share of the response variance the model explains, so a higher value is a better fit. [`regression_criterion_func`](@ref) maps it to `GLM.r2`.
 
 # Mathematical definition
 
@@ -498,19 +533,28 @@ Where:
   - ``\\hat{y}_t``: Fitted response at time ``t``.
   - ``\\bar{y}``: Mean of observed responses.
 
+# Details
+
+  - ``R^2`` never falls when a factor is added, so it penalises no complexity at all. Under [`ForwardSelection`](@ref) it admits **every** factor and under [`BackwardElimination`](@ref) it removes **none**. On a 200×5 sample where [`AIC`](@ref) kept factors 1, 3 and 4 and [`BIC`](@ref) kept 1 and 3, `RSquared` kept all five in both directions. Use [`AdjustedRSquared`](@ref), [`AIC`](@ref), [`AICC`](@ref) or [`BIC`](@ref) when the criterion must pay for size.
+  - `GLM` defines this quantity for a fitted [`LinearModel`](@ref) only. Paired with a [`GeneralisedLinearModel`](@ref) target, the criterion throws a `MethodError` from `GLM` when the first candidate model is scored.
+
 # Related
 
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
   - [`AdjustedRSquared`](@ref)
   - [`regression_criterion_func(::RSquared)`](@ref)
+
+# References
+
+  - $(ref_dict[:hocking1976])
 """
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Adjusted coefficient of determination (Adjusted R²) for stepwise regression.
+Selects factors by maximising the coefficient of determination adjusted for the model size.
 
-`AdjustedRSquared` is a maximisation-based criterion that adjusts R² for the number of predictors in the model, providing a more accurate measure of model quality when comparing models with different numbers of predictors.
+The adjustment discounts ``R^2`` by the degrees of freedom the predictors consume, so unlike [`RSquared`](@ref) the score can fall when a factor is added. This makes it usable as a stopping rule.
 
 # Mathematical definition
 
@@ -524,14 +568,22 @@ Where:
 
   - ``\\bar{R}^2``: Adjusted coefficient of determination.
   - ``R^2``: Standard coefficient of determination.
-  - ``k``: Number of predictors.
+  - ``k``: Number of predictors, excluding the intercept. [`AIC`](@ref), [`AICC`](@ref) and [`BIC`](@ref) write ``k`` for a different count: the predictors, plus the intercept, plus the residual variance.
   - $(math_dict[:T])
+
+# Details
+
+  - `GLM` defines this quantity for a fitted [`LinearModel`](@ref) only. Paired with a [`GeneralisedLinearModel`](@ref) target, the criterion throws a `MethodError` from `GLM` when the first candidate model is scored.
 
 # Related
 
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
   - [`RSquared`](@ref)
   - [`regression_criterion_func(::AdjustedRSquared)`](@ref)
+
+# References
+
+  - $(ref_dict[:theil1961])
 """
 struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
 """
@@ -548,6 +600,22 @@ This utility dispatches on the concrete criterion subtype of [`AbstractStepwiseR
 # Returns
 
   - `f::Function`: The function that computes the criterion value for a fitted model.
+
+# Details
+
+The map is:
+
+| Criterion                  | Function        |
+|:-------------------------- |:--------------- |
+| [`AIC`](@ref)              | `StatsAPI.aic`  |
+| [`AICC`](@ref)             | `StatsAPI.aicc` |
+| [`BIC`](@ref)              | `StatsAPI.bic`  |
+| [`RSquared`](@ref)         | `GLM.r2`        |
+| [`AdjustedRSquared`](@ref) | `GLM.adjr2`     |
+
+`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted [`LinearModel`](@ref) and a fitted [`GeneralisedLinearModel`](@ref) alike. `GLM.r2` and `GLM.adjr2` accept the linear model only, so [`RSquared`](@ref) and [`AdjustedRSquared`](@ref) throw a `MethodError` under a [`GeneralisedLinearModel`](@ref) target.
+
+[`PValue`](@ref) has no method here. It reads the coefficient p-values of the fitted model, not one score, so its stepwise methods are separate.
 
 # Related
 
@@ -575,9 +643,9 @@ end
 """
     regression_threshold(alg)
 
-Return the threshold value for stepwise regression selection criteria.
+Return the starting threshold for a forward stepwise regression search.
 
-Returns the threshold value associated with a stepwise regression criterion. Dispatches on the criterion type to return either a minimum or maximum value.
+The value is the worst score the criterion can take, so the first candidate model always improves on it. Dispatches on the polarity of the criterion.
 
 # Arguments
 
@@ -585,7 +653,11 @@ Returns the threshold value associated with a stepwise regression criterion. Dis
 
 # Returns
 
-  - Threshold value.
+  - `t::Number`: `Inf` for a minimisation criterion, `-Inf` for a maximisation criterion.
+
+# Details
+
+Only [`ForwardSelection`](@ref) reads this. [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
 
 # Related
 
@@ -601,9 +673,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for regression results.
+Holds the loadings matrix, the intercept vector and the reduced-basis loadings of a fitted factor model.
 
-`Regression` stores the results of a regression-based moment estimation, including the main coefficient matrix, an optional auxiliary matrix, and the intercept vector. This type is used as the standard output for regression estimators, enabling consistent downstream processing and analysis.
+`M` and `b` are the loadings matrix ``B`` and the intercept vector ``\\alpha`` of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors.
 
 # Fields
 
@@ -623,7 +695,12 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(M)`.
   - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
-  - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
+  - If provided, `size(L, 1) == size(M, 1)`. The constructor does **not** reject an empty `L`, so an `L` with the right number of rows and no columns is accepted.
+
+# Details
+
+  - **An unset `L` reads back as `M`.** A `@forward_properties` `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, and a consumer that decomposes risk in the factor basis needs no `Nothing` branch. [`StepwiseRegression`](@ref) leaves `L` unset; [`DimensionReductionRegression`](@ref) sets it. Use `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does.
+  - `size(L, 2)` is therefore the width of the basis risk is decomposed in: the original factors under a stepwise regression, and the retained principal components under a dimension reduction regression.
 
 # Examples
 
@@ -638,6 +715,13 @@ Regression
 # Related
 
   - [`AbstractRegressionResult`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
 @concrete struct Regression <: AbstractRegressionResult
     """

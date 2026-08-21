@@ -5,7 +5,7 @@ Abstract supertype for all dimension reduction regression algorithm targets.
 
 All concrete and/or abstract types implementing dimension reduction algorithms for regression (such as PCA or PPCA) should be subtypes of `DimensionReductionTarget`.
 
-These types are used to specify the dimension reduction method when constructing a [`DimensionReductionRegression`](@ref) estimator.
+These types are used to specify the dimension reduction method when constructing a [`DimensionReductionRegression`](@ref) estimator. A target must answer `StatsAPI.fit(tgt, X)` with a model that `StatsAPI.predict` and `MultivariateStats.projection` both accept.
 
 # Related
 
@@ -13,6 +13,7 @@ These types are used to specify the dimension reduction method when constructing
   - [`PCA`](@ref)
   - [`PPCA`](@ref)
   - [`AbstractRegressionAlgorithm`](@ref)
+  - [`prep_dim_red_reg`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 """
@@ -45,9 +46,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Principal Component Analysis (PCA) dimension reduction target.
+Replaces the factors with the principal components of their standardised covariance.
 
-`PCA` is used to specify principal component analysis as the dimension reduction method for regression-based moment estimation. The `kwargs` field stores keyword arguments to be passed to the underlying PCA implementation (e.g., from `MultivariateStats.jl`).
+The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PCA, X; kwargs...)`, and it is the only place the retained width is set: `pratio` caps the share of variance the retained components must explain and `maxoutdim` caps their number. The default `kwargs = (;)` takes that library's own defaults, which on a factor matrix of full rank can retain every component and reduce nothing.
 
 # Fields
 
@@ -74,6 +75,11 @@ PCA
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`PPCA`](@ref)
+
+# References
+
+  - $(ref_dict[:pearson1901])
+  - $(ref_dict[:hotelling1933])
 """
 @concrete struct PCA <: DimensionReductionTarget
     """
@@ -115,9 +121,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
+Replaces the factors with the latent components of a Gaussian latent-variable model.
 
-`PPCA` is used to specify probabilistic principal component analysis as the dimension reduction method for regression-based moment estimation. The `kwargs` field stores keyword arguments to be passed to the underlying PPCA implementation (e.g., from `MultivariateStats.jl`).
+The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s: on six factors of full rank `PCA()` retained six components and `PPCA()` retained five.
 
 # Fields
 
@@ -144,6 +150,10 @@ PPCA
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`PCA`](@ref)
+
+# References
+
+  - $(ref_dict[:tipping1999])
 """
 @concrete struct PPCA <: DimensionReductionTarget
     """
@@ -185,9 +195,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for dimension reduction regression-based moment estimation.
+Estimates a loadings matrix by regressing each asset on the leading components of the factors.
 
-`DimensionReductionRegression` is a flexible estimator type for performing regression with dimension reduction, such as PCA or PPCA, as a preprocessing step. It allows users to specify the expected returns estimator, variance estimator, dimension reduction target (e.g., `PCA`, `PPCA`), and the regression target (e.g., `LinearModel`).
+`drtgt` reduces the standardised factors to a smaller orthogonal basis, `retgt` fits each asset in that basis, and the coefficients are then mapped back to the original factors. `ve` supplies the mean and the standard deviation that mapping divides by; the expected returns estimator it reads is `ve.me`, and a `nothing` there falls back to `SimpleExpectedReturns()`. Unlike [`StepwiseRegression`](@ref), every asset keeps every factor.
 
 # Fields
 
@@ -202,6 +212,24 @@ $(DocStringExtensions.FIELDS)
     ) -> DimensionReductionRegression
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `retgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(retgt.kwargs.weights)`.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+  - `drtgt`: Recursively updated via [`factory`](@ref).
+  - `retgt`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -219,13 +247,25 @@ DimensionReductionRegression
         │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
+# Details
+
+  - **The standardisation and the recovery read different statistics.** [`prep_dim_red_reg`](@ref) always standardises `F` with the plain sample mean and the corrected sample standard deviation, while `regression` divides the recovered coefficients by `re.ve` and centres the intercept with `re.ve.me`. The two agree for the default `ve`, and only for it. They part whenever `ve` carries observation weights or sets `corrected = false` — including after [`factory`](@ref), which puts the incoming weights into `ve`. On a 250×6 sample with a weighted `ve` a coefficient of `0.8043` came back as `0.7822`, about 2.8 % out.
+
 # Related
 
-  - [`DimensionReductionRegression`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`Regression`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.20.
+  - $(ref_dict[:fekedulegn2002])
 """
 @propagatable @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
     """
@@ -281,12 +321,19 @@ This helper function standardizes the factor matrix `X` (using Z-score normaliza
   - Fits the dimension reduction model specified by `drtgt` to the standardized data.
   - Projects the standardized data into the reduced space.
   - Prepends a column of ones to the projected data for use as an intercept in regression.
+  - The standardisation always uses the **plain** sample mean and the **corrected** sample standard deviation of `X`. This function takes no estimator, so it cannot honour the `ve` of the calling [`DimensionReductionRegression`](@ref), and a weighted `ve` therefore recovers the coefficients with a scale this function never applied.
 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
   - [`PCA`](@ref)
   - [`PPCA`](@ref)
+  - [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.13, 4.16-4.17.
+  - $(ref_dict[:fekedulegn2002])
 """
 function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
     N = size(X, 1)
@@ -309,7 +356,7 @@ This function fits a regression model (as specified by `retgt`) to the response 
 
 ```math
 \\begin{align}
-\\hat{y} &= \\hat{\\beta}_0 + \\mathbf{X}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}\\,, \\\\
+\\hat{y} &= \\hat{\\beta}_{0,\\mathrm{pc}} + \\mathbf{X}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}\\,, \\\\
 \\hat{\\boldsymbol{\\beta}} &= \\mathbf{V}_p \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}} \\oslash \\boldsymbol{\\sigma}\\,, \\\\
 \\hat{\\beta}_0 &= \\bar{y} - \\hat{\\boldsymbol{\\beta}}^{\\intercal} \\boldsymbol{\\mu}\\,.
 \\end{align}
@@ -318,13 +365,15 @@ This function fits a regression model (as specified by `retgt`) to the response 
 Where:
 
   - ``\\hat{y}``: Fitted response.
+  - ``\\hat{\\beta}_{0,\\mathrm{pc}}``: Intercept of the fit in the reduced space, which this method discards.
   - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced (PC) space.
   - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original factor space.
   - ``\\hat{\\beta}_0``: Intercept adjusted to the original space.
-  - ``\\mathbf{X}_1``: Projected factor matrix in the reduced space.
+  - ``\\mathbf{X}_1``: Projected factor matrix in the reduced space, with its leading column of ones.
   - ``\\mathbf{V}_p``: PCA/PPCA projection matrix.
-  - ``\\boldsymbol{\\sigma}``: Factor standard deviations.
-  - ``\\boldsymbol{\\mu}``: Factor means.
+  - ``\\boldsymbol{\\sigma}``: Factor standard deviations, from the caller's `re.ve`.
+  - ``\\boldsymbol{\\mu}``: Factor means, from the caller's `re.ve.me`.
+  - ``\\bar{y}``: Mean of the response, weighted by `re.retgt.kwargs.weights` when that entry is present.
   - ``\\oslash``: Element-wise division.
 
 # Arguments
@@ -346,11 +395,18 @@ Where:
   - Extracts the coefficients for the principal components (excluding the intercept).
   - Transforms the coefficients back to the original factor space using `Vp` and rescales by `sigma`.
   - Computes the intercept so that predictions are unbiased with respect to the means.
+  - The source's Equation 4.20 states ``\\hat{\\beta}_{0,\\mathrm{pc}} = \\bar{y}``, which is why the discarded reduced-space intercept costs nothing. The identity is exact only because the projected columns are centred: on a 250×6 sample the fitted intercept matched ``\\bar{y}`` to `2.1e-17` unweighted, and parted from the weighted mean by `1.7e-3` once `re.retgt.kwargs.weights` was set.
+  - `sigma` must be the same scale that standardised the factors. See the caveat on [`prep_dim_red_reg`](@ref).
 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.18-4.20.
+  - $(ref_dict[:fekedulegn2002])
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
@@ -375,7 +431,7 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
 
 # Arguments
 
-  - `re`: Dimension reduction regression estimator specifying the expected returns estimator, variance estimator, dimension reduction target, and regression target.
+  - `re`: Dimension reduction regression estimator specifying the variance estimator, the dimension reduction target and the regression target.
   - `X`: Response matrix (observations × targets/assets).
   - `F`: Factor matrix (observations × factors).
 
@@ -389,15 +445,23 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
 
 # Details
 
-  - For each column in `X`, the factors in `F` are standardized, projected using the dimension reduction model, and a regression is fitted in the reduced space.
+  - The reduction is fitted **once**, on `F` alone, and every column of `X` is regressed on the same projected matrix.
   - The resulting coefficients are transformed back to the original factor space and rescaled.
   - The output `Regression` object contains the intercepts, coefficient matrix in the original space, and the projected coefficients.
+  - `L` is recovered as ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``, which undoes the rescaling and the projection in turn, so it returns the reduced-space coefficients the fits produced. Checked at `6.7e-16` against them on a 250×6 sample. `size(L, 2)` is therefore the number of retained components, which is the width risk is decomposed in.
+  - The expected returns estimator is `re.ve.me`. A `nothing` there falls back to `SimpleExpectedReturns()`; there is no separate field for it.
+  - `mu` and `sigma` come from `re.ve`, which is not the scale [`prep_dim_red_reg`](@ref) standardised with. See its caveat.
 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
   - [`Regression`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.22.
+  - $(ref_dict[:fekedulegn2002])
 """
 function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     cols = size(F, 2) + 1

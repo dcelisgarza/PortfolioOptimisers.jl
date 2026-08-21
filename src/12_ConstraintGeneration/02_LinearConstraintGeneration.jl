@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the coefficient matrix `A` and the right-hand side vector `B` of one half of a linear constraint block.
 
-The half is an inequality or an equality according to the field of [`LinearConstraint`](@ref) that carries it, `ineq` or `eq`. The constructor checks that neither `A` nor `B` is empty. It does not check that `size(A, 1) == length(B)`, so a caller who assembles the pair by hand must keep them conformable.
+The half is an inequality or an equality according to the field of [`LinearConstraint`](@ref) that carries it, `ineq` or `eq`. The constructor checks that neither `A` nor `B` is empty, and that `size(A, 1) == length(B)`. The form is ``\\mathbf{A} \\boldsymbol{x} \\leq \\boldsymbol{B}``, so a pair with more bounds than rows, or more rows than bounds, is satisfied by no `x`.
 
 # Fields
 
@@ -22,6 +22,7 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:A])
   - $(val_dict[:B])
+  - $(val_dict[:A_B])
 
 # Examples
 
@@ -53,6 +54,8 @@ PartialLinearConstraint
     function PartialLinearConstraint(A::MatNum, B::VecNum)::PartialLinearConstraint
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
+        @argcheck(size(A, 1) == length(B),
+                  DimensionMismatch("a linear constraint half must have one row of `A` per entry of `B`. Got\nsize(A, 1) => $(size(A, 1))\nlength(B) => $(length(B))"))
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
