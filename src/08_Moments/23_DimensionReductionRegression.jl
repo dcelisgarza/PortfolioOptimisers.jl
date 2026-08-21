@@ -249,7 +249,7 @@ DimensionReductionRegression
 
 # Details
 
-  - **The standardisation and the recovery read different statistics.** [`prep_dim_red_reg`](@ref) always standardises `F` with the plain sample mean and the corrected sample standard deviation, while `regression` divides the recovered coefficients by `re.ve` and centres the intercept with `re.ve.me`. The two agree for the default `ve`, and only for it. They part whenever `ve` carries observation weights or sets `corrected = false` — including after [`factory`](@ref), which puts the incoming weights into `ve`. On a 250×6 sample with a weighted `ve` a coefficient of `0.8043` came back as `0.7822`, about 2.8 % out.
+  - **The standardisation and the recovery read the same statistics.** [`prep_dim_red_reg`](@ref) computes the factor mean from `re.ve.me` and the factor standard deviation from `re.ve`, and `regression` recovers the coefficients with those same two vectors. `ve` therefore governs the whole path, and a weighted `ve` — the one [`factory`](@ref) builds from the incoming observation weights — is honoured end to end. This is the requirement of Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]).
 
 # Related
 
@@ -299,35 +299,39 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
     return DimensionReductionRegression(ve, drtgt, retgt)
 end
 """
-    prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
+    prep_dim_red_reg(re::DimensionReductionRegression, X::MatNum)
 
 Prepare data for dimension reduction regression.
 
-This helper function standardizes the factor matrix `X` (using Z-score normalization), fits the specified dimension reduction model (e.g., PCA or PPCA), and projects the standardized data into the reduced-dimensional space. It returns the projected data (with an intercept column) and the projection matrix.
+This helper function standardises the factor matrix `X`, fits the dimension reduction model of `re.drtgt` (e.g., PCA or PPCA), and projects the standardised data into the reduced-dimensional space. It returns the projected data (with an intercept column), the projection matrix, and the two statistics that did the standardisation.
 
 # Arguments
 
-  - `drtgt`: Dimension reduction target (e.g., `PCA()`, `PPCA()`).
+  - `re`: Dimension reduction regression estimator. Its `ve` supplies the standard deviation, and its `ve.me` the mean. A `nothing` in `ve.me` falls back to `SimpleExpectedReturns()`.
   - `X`: Factor matrix (observations × factors) to be reduced.
 
 # Returns
 
   - `x1::MatNum`: Projected factor matrix with an intercept column prepended.
   - `Vp::MatNum`: Projection matrix from the fitted dimension reduction model.
+  - `mu::VecNum`: Factor means used to centre `X`.
+  - `sigma::VecNum`: Factor standard deviations used to scale `X`.
 
 # Details
 
-  - Standardizes `X` using Z-score normalization (mean 0, variance 1).
-  - Fits the dimension reduction model specified by `drtgt` to the standardized data.
-  - Projects the standardized data into the reduced space.
+  - Centres `X` with [`demean_returns`](@ref) and scales it by the standard deviation of `re.ve`, so the standardised factors have mean 0 and variance 1 under those estimators.
+  - Floors every entry of `sigma` at `eps(eltype(sigma))`, so a constant factor cannot divide by zero.
+  - Fits the dimension reduction model specified by `re.drtgt` to the standardised data.
+  - Projects the standardised data into the reduced space.
   - Prepends a column of ones to the projected data for use as an intercept in regression.
-  - The standardisation always uses the **plain** sample mean and the **corrected** sample standard deviation of `X`. This function takes no estimator, so it cannot honour the `ve` of the calling [`DimensionReductionRegression`](@ref), and a weighted `ve` therefore recovers the coefficients with a scale this function never applied.
+  - Returns `mu` and `sigma` so that the caller recovers the coefficients with the scale this function applied. Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]) need the two to be the same statistic.
 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
   - [`PCA`](@ref)
   - [`PPCA`](@ref)
+  - [`demean_returns`](@ref)
   - [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref)
 
 # References
@@ -335,14 +339,18 @@ This helper function standardizes the factor matrix `X` (using Z-score normaliza
   - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.13, 4.16-4.17.
   - $(ref_dict[:fekedulegn2002])
 """
-function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
+function prep_dim_red_reg(re::DimensionReductionRegression, X::MatNum)
     N = size(X, 1)
-    X_std = StatsBase.standardize(StatsBase.ZScoreTransform, transpose(X); dims = 2)
-    model = StatsAPI.fit(drtgt, X_std)
+    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
+    sigma = vec(Statistics.std(re.ve, X; dims = 1))
+    sigma .= max.(sigma, eps(eltype(sigma)))
+    mu = Statistics.mean(me, X; dims = 1)
+    X_std = permutedims(demean_returns(X, me; dims = 1, mean = mu) ./ transpose(sigma))
+    model = StatsAPI.fit(re.drtgt, X_std)
     Xp = transpose(StatsAPI.predict(model, X_std))
     Vp = MultivariateStats.projection(model)
     x1 = [ones(eltype(X), N) Xp]
-    return x1, Vp
+    return x1, Vp, vec(mu), sigma
 end
 """
     _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
@@ -396,7 +404,7 @@ Where:
   - Transforms the coefficients back to the original factor space using `Vp` and rescales by `sigma`.
   - Computes the intercept so that predictions are unbiased with respect to the means.
   - The source's Equation 4.20 states ``\\hat{\\beta}_{0,\\mathrm{pc}} = \\bar{y}``, which is why the discarded reduced-space intercept costs nothing. The identity is exact only because the projected columns are centred: on a 250×6 sample the fitted intercept matched ``\\bar{y}`` to `2.1e-17` unweighted, and parted from the weighted mean by `1.7e-3` once `re.retgt.kwargs.weights` was set.
-  - `sigma` must be the same scale that standardised the factors. See the caveat on [`prep_dim_red_reg`](@ref).
+  - `mu` and `sigma` must be the statistics that standardised the factors. [`prep_dim_red_reg`](@ref) returns them for this reason.
 
 # Related
 
@@ -450,7 +458,7 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
   - The output `Regression` object contains the intercepts, coefficient matrix in the original space, and the projected coefficients.
   - `L` is recovered as ``(\\mathbf{M} \\odot \\boldsymbol{\\sigma}^{\\intercal}) \\mathbf{V}_p^{+\\intercal}``, which undoes the rescaling and the projection in turn, so it returns the reduced-space coefficients the fits produced. Checked at `6.7e-16` against them on a 250×6 sample. `size(L, 2)` is therefore the number of retained components, which is the width risk is decomposed in.
   - The expected returns estimator is `re.ve.me`. A `nothing` there falls back to `SimpleExpectedReturns()`; there is no separate field for it.
-  - `mu` and `sigma` come from `re.ve`, which is not the scale [`prep_dim_red_reg`](@ref) standardised with. See its caveat.
+  - `mu` and `sigma` come back from [`prep_dim_red_reg`](@ref), so the recovery divides by the same scale that standardised the factors.
 
 # Related
 
@@ -467,11 +475,7 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     cols = size(F, 2) + 1
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
-    f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
-    mu = Statistics.mean(me, F; dims = 1)
-    sigma = vec(Statistics.std(re.ve, F; dims = 1))
-    mu = vec(mu)
+    f1, Vp, mu, sigma = prep_dim_red_reg(re, F)
     for i in axes(rr, 1)
         rr[i, :] = _regression(re, view(X, :, i), mu, sigma, f1, Vp)
     end

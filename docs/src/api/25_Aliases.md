@@ -200,8 +200,6 @@ CoSk
 CoKt
 LinMod
 GLinMod
-R2
-AdjR2
 ```
 
 ## Filters

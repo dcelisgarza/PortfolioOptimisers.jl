@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects factors by the statistical significance of their coefficients.
 
-A candidate model is admissible when **every** one of its coefficient p-values is at or below `t`, the intercept excluded. This is the only criterion that reads the fitted coefficients rather than one model-wide score, so it is not an [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref) and it takes its own stepwise methods.
+A candidate model is admissible when **every** one of its coefficient p-values is at or below `t`, the intercept excluded. This is the only criterion that reads the fitted coefficients rather than one model-wide score, so it is not a [`MinMaxValStepwiseRegressionCriterion`](@ref) and it takes its own stepwise methods.
 
 # Fields
 
@@ -61,7 +61,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Grows the factor set from empty, adding the factor that most improves the criterion.
 
-At each step the algorithm fits one model per excluded factor, keeps the best of them, and stops when no addition improves on the score of the set it already holds. Under an [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that criterion can take, so the first addition always happens; under [`PValue`](@ref) the step instead admits a candidate whose p-values all clear `t`.
+At each step the algorithm fits one model per excluded factor, keeps the best of them, and stops when no addition improves on the score of the set it already holds. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that criterion can take, so the first addition always happens; under [`PValue`](@ref) the step instead admits a candidate whose p-values all clear `t`.
 
 # Related
 
@@ -107,7 +107,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     StepwiseRegression(;
-        crit::AbstractStepwiseRegressionCriterion = PValue(),
+        crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
+                    AbstractStepwiseRegressionCriterion} = PValue(),
         alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
         tgt::AbstractRegressionTarget = LinearModel()
     ) -> StepwiseRegression
@@ -116,6 +117,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - If `crit` is a `Symbol`, `crit in STEPWISE_REGRESSION_CRITERIA`. The constructor stores `Val(crit)`.
+  - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
   - If `tgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(tgt.kwargs.weights)`.
 
 ## Propagated parameters
@@ -163,9 +166,16 @@ StepwiseRegression
     $(field_dict[:retgt])
     """
     @fprop tgt
-    function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
+    function StepwiseRegression(crit::Union{MinMaxValStepwiseRegressionCriterion,
+                                            AbstractStepwiseRegressionCriterion},
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
+        if isa(crit, Val{:adjr2}) &&
+           isa(tgt, GeneralisedLinearModel) &&
+           !isnothing(tgt.variant)
+            @argcheck(tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS,
+                      "The :adjr2 criterion reads StatsAPI.adjr2, which accepts a variant in $ADJUSTED_PSEUDO_R2_VARIANTS. Got\ntgt.variant => $(tgt.variant)")
+        end
         if haskey(tgt.kwargs, :weights)
             @argcheck(isa(tgt.kwargs.weights, ObsWeights),
                       ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
@@ -176,9 +186,16 @@ StepwiseRegression
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
-function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
+function StepwiseRegression(;
+                            crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
+                                        AbstractStepwiseRegressionCriterion} = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
+    if isa(crit, Symbol)
+        @argcheck(crit in STEPWISE_REGRESSION_CRITERIA,
+                  "crit must be one of $STEPWISE_REGRESSION_CRITERIA. Got\ncrit => $crit")
+        crit = Val(crit)
+    end
     return StepwiseRegression(crit, alg, tgt)
 end
 """
@@ -299,17 +316,17 @@ function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::Ve
     return included
 end
 """
-    get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
+    get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion,
                                value::VecNum, excluded::VecInt,
                                included::VecInt, t::Number)
 
-Helper for forward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
+Helper for forward stepwise regression with minimum-value criteria (e.g., a p-value, `:aic`).
 
-This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is minimized (such as AIC or BIC). It finds the variable with the lowest value, and if this value is less than the current `t`, moves it from `excluded` to `included` and updates the threshold.
+This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is minimized (such as `:aic` or `:bic`). It finds the variable with the lowest value, and if this value is less than the current `t`, moves it from `excluded` to `included` and updates the threshold.
 
 # Arguments
 
-  - `::AbstractMinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
+  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
   - `value`: Vector of criterion values for each variable.
   - `excluded`: Indices of currently excluded variables (modified in-place).
   - `included`: Indices of currently included variables (modified in-place).
@@ -329,12 +346,11 @@ This function updates the `included` and `excluded` variable sets in forward ste
 # Related
 
   - [`StepwiseRegression`](@ref)
-  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`regression`](@ref)
 """
-function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
-                                    value::VecNum, excluded::VecInt, included::VecInt,
-                                    t::Number)
+function get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion, value::VecNum,
+                                    excluded::VecInt, included::VecInt, t::Number)
     val, idx = findmin(value)
     if val < t
         i = searchsortedfirst(excluded, idx)
@@ -344,7 +360,7 @@ function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
     return t
 end
 """
-    get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
+    get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion,
                                value::VecNum, excluded::VecInt,
                                included::VecInt, t::Number)
 
@@ -354,7 +370,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 
 # Arguments
 
-  - `::AbstractMaxValStepwiseRegressionCriteria`: Stepwise regression criterion type where higher values are better.
+  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion type where higher values are better.
   - `value`: Vector of criterion values for each variable.
   - `excluded`: Indices of currently excluded variables (modified in-place).
   - `included`: Indices of currently included variables (modified in-place).
@@ -374,12 +390,11 @@ This function updates the `included` and `excluded` variable sets in forward ste
 # Related
 
   - [`StepwiseRegression`](@ref)
-  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`regression`](@ref)
 """
-function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
-                                    value::VecNum, excluded::VecInt, included::VecInt,
-                                    t::Number)
+function get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
+                                    excluded::VecInt, included::VecInt, t::Number)
     val, idx = findmax(value)
     if val > t
         i = searchsortedfirst(excluded, idx)
@@ -389,12 +404,12 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
     return t
 end
 """
-    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+    _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                       <:ForwardSelection}, x::VecNum, F::MatNum)
 
 Perform forward stepwise regression using a general criterion (minimization or maximization).
 
-This method implements forward selection for stepwise regression, where variables (columns of `F`) are added to the model one at a time based on a user-specified criterion. The criterion can be either minimized (e.g., p-value, AIC) or maximized (e.g., R²). At each step, the variable with the best criterion value (lowest for minimization, highest for maximization) is considered for inclusion if it improves upon the current threshold. The process continues until no remaining variable meets the criterion for inclusion.
+This method implements forward selection for stepwise regression, where variables (columns of `F`) are added to the model one at a time based on a user-specified criterion. The criterion can be either minimized (e.g., a p-value, `:aic`) or maximized (e.g., `:r2`). At each step, the variable with the best criterion value (lowest for minimization, highest for maximization) is considered for inclusion if it improves upon the current threshold. The process continues until no remaining variable meets the criterion for inclusion.
 
 # Arguments
 
@@ -416,21 +431,21 @@ This method implements forward selection for stepwise regression, where variable
 # Related
 
   - [`StepwiseRegression`](@ref)
-  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
-  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`ForwardSelection`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                             <:ForwardSelection}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
-    criterion_func = regression_criterion_func(re.crit)
+    criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
     excluded = collect(indices)
-    value = fill(ifelse(isa(re.crit, AbstractMinValStepwiseRegressionCriterion),
+    value = fill(ifelse(isa(re.crit, MinValStepwiseRegressionCriterion),
                         typemax(promote_type(eltype(F), eltype(x))),
                         typemin(promote_type(eltype(F), eltype(x)))), N)
     for _ in eachindex(x)
@@ -504,16 +519,16 @@ function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x:
     return included
 end
 """
-    get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
+    get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
                            included::VecInt, t::Number)
 
-Helper for backward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
+Helper for backward stepwise regression with minimum-value criteria (e.g., a p-value, `:aic`).
 
-This function updates the `included` variable set in backward stepwise regression when the selection criterion is minimized (such as AIC or BIC). Each entry of `value` is the score of the model that **omits** that variable, so the lowest entry names the removal that helps most. It finds that variable, and if its value is less than the current `t`, removes it from `included` and updates the threshold.
+This function updates the `included` variable set in backward stepwise regression when the selection criterion is minimized (such as `:aic` or `:bic`). Each entry of `value` is the score of the model that **omits** that variable, so the lowest entry names the removal that helps most. It finds that variable, and if its value is less than the current `t`, removes it from `included` and updates the threshold.
 
 # Arguments
 
-  - `::AbstractMinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
+  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
   - `value`: Vector of criterion values for each variable.
   - `included`: Indices of currently included variables (modified in-place).
   - `t`: Current threshold value for exclusion.
@@ -534,7 +549,7 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
+function get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
                                 included::VecInt, t::Number)
     val, idx = findmin(value)
     if val < t
@@ -545,7 +560,7 @@ function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, val
     return t
 end
 """
-    get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
+    get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
                            included::VecInt, t::Number)
 
 Helper for backward stepwise regression with maximum-value criteria (e.g., R²).
@@ -554,7 +569,7 @@ This function updates the `included` variable set in backward stepwise regressio
 
 # Arguments
 
-  - `::AbstractMaxValStepwiseRegressionCriteria`: Stepwise regression criterion type where higher values are better.
+  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion type where higher values are better.
   - `value`: Vector of criterion values for each variable.
   - `included`: Indices of currently included variables (modified in-place).
   - `t`: Current threshold value for exclusion.
@@ -575,7 +590,7 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
+function get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
                                 included::VecInt, t::Number)
     val, idx = findmax(value)
     if val > t
@@ -586,7 +601,7 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, valu
     return t
 end
 """
-    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+    _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                       <:BackwardElimination}, x::VecNum, F::MatNum)
 
 Perform backward stepwise regression using a general criterion (minimization or maximization).
@@ -606,7 +621,7 @@ This method implements backward elimination for stepwise regression, where all v
 # Details
 
   - Starts with all variables included, and with the threshold set to the criterion value of the full model.
-  - `value[j]` is the score of the model that **omits** `j`, so the reading of "best" is inverted with respect to the forward direction: for a minimisation criterion the code removes the factor with the **lowest** value, and for a maximisation criterion the one with the **highest**. On a 200×5 sample the five reduced-model AIC values were `[493.57, 271.05, 327.82, 274.62, 271.34]` against a full-model AIC of `272.25`; the code removed factor 2, the lowest, and factor 1 — the highest, and the response's true signal factor — was the one kept.
+  - `value[j]` is the score of the model that **omits** `j`, so the reading of "best" is inverted with respect to the forward direction: for a minimisation criterion the code removes the factor with the **lowest** value, and for a maximisation criterion the one with the **highest**. On a 200×5 sample the five reduced-model `:aic` values were `[493.57, 271.05, 327.82, 274.62, 271.34]` against a full-model `:aic` score of `272.25`; the code removed factor 2, the lowest, and factor 1 — the highest, and the response's true signal factor — was the one kept.
   - The criterion function is determined by the estimator's `crit` field.
   - The process stops on the first iteration that removes nothing, or when no variables remain.
   - Supports both minimization and maximization criteria via dispatch.
@@ -614,20 +629,20 @@ This method implements backward elimination for stepwise regression, where all v
 # Related
 
   - [`StepwiseRegression`](@ref)
-  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
-  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`BackwardElimination`](@ref)
   - [`get_backward_reg_incl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                             <:BackwardElimination}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
     fri = StatsAPI.fit(re.tgt, [ovec F], x)
-    criterion_func = regression_criterion_func(re.crit)
+    criterion_func = regression_criterion_func(re.crit, re.tgt)
     t = criterion_func(fri)
-    value = fill(ifelse(isa(re.crit, AbstractMinValStepwiseRegressionCriterion),
+    value = fill(ifelse(isa(re.crit, MinValStepwiseRegressionCriterion),
                         typemax(promote_type(eltype(F), eltype(x))),
                         typemin(promote_type(eltype(F), eltype(x)))), N)
     for _ in eachindex(x)

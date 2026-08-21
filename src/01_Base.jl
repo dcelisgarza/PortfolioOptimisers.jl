@@ -91,7 +91,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
                                  :L => "`L`: Reduced dimensionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
                                  :b => "`b`: Regression intercept vector.",#
-                                 :crit => "`crit`: Factor selection criterion.",#
+                                 :crit => "`crit`: Factor selection criterion. A [`PValue`](@ref), or a `Val` of one symbol of [`STEPWISE_REGRESSION_CRITERIA`](@ref).",#
+                                 :r2variant => "`variant`: Name of the pseudo-``R^2`` variant a maximisation criterion reads, or `nothing` to take the default of the criterion.",#
                                  :realg => "`alg`: Regression algorithm.",#
                                  :retgt => "`tgt`: Regression model target.",#
                                  :dretgt => "`retgt`: Regression model target.",#
@@ -980,7 +981,14 @@ const ref_dict = unique_key_dict(:ref_dict,
                                  :christensenprabhala1998 => "[christensenprabhala1998](@cite) B. J. Christensen and N. R. Prabhala. *The relation between implied and realized volatility*. Journal of Financial Economics 50, 125–150 (1998).",#
                                  :christensenhansen2002 => "[christensenhansen2002](@cite) B. J. Christensen and C. S. Hansen. *New evidence on the implied-realized volatility relation*. The European Journal of Finance 8, 187–205 (2002).",#
                                  :andersen2006 => "[andersen2006](@cite) T. G. Andersen, T. Bollerslev, P. F. Christoffersen and F. X. Diebold. *Volatility and correlation forecasting*. In: *Handbook of Economic Forecasting*, Vol. 1, edited by G. Elliott, C. W. Granger and A. Timmermann (North-Holland, 2006); Chapter 15, pp. 777–878.",#
-                                 :egbersswinkels2015 => "[egbersswinkels2015](@cite) T. Egbers and L. Swinkels. *Can implied volatility predict returns on the currency carry trade?*. Journal of Banking & Finance 59, 14–26 (2015).")
+                                 :egbersswinkels2015 => "[egbersswinkels2015](@cite) T. Egbers and L. Swinkels. *Can implied volatility predict returns on the currency carry trade?*. Journal of Banking & Finance 59, 14–26 (2015).",#
+                                 :cheung2007 => "[cheung2007](@cite) W. Cheung. *The augmented Black-Litterman model: a ranking-free approach to factor-based portfolio construction and beyond*. Quantitative Finance 13, 301–316 (2013).",#
+                                 :kolmritter2016 => "[kolmritter2016](@cite) P. N. Kolm and G. Ritter. *On the Bayesian interpretation of Black-Litterman*. European Journal of Operational Research 258, 564–572 (2017).",#
+                                 :dietrichlist2017 => "[dietrichlist2017](@cite) F. Dietrich and C. List. *Probabilistic opinion pooling generalized. Part one: general agendas*. Social Choice and Welfare 48, 747–786 (2017).",#
+                                 :martinisprenger2017 => "[martinisprenger2017](@cite) C. Martini and J. Sprenger. *Opinion Aggregation and Individual Expertise*. In: *Scientific Collaboration and Collective Knowledge* (Oxford University Press, 2017).",#
+                                 :good1952 => "[good1952](@cite) I. J. Good. *Rational decisions*. Journal of the Royal Statistical Society: Series B (Methodological) 14, 107–114 (1952).",#
+                                 :idzorek2007 => "[idzorek2007](@cite) T. Idzorek. *A step-by-step guide to the Black-Litterman model: incorporating user-specified confidence levels*. In: *Forecasting Expected Returns in the Financial Markets* (Academic Press, 2007); pp. 17–38.",#
+                                 :walters2011 => "[walters2011](@cite) J. Walters. *The Black-Litterman model in detail*. SSRN Electronic Journal (2011).")
 
 """
 $(DocStringExtensions.TYPEDEF)

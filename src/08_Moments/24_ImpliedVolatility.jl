@@ -93,7 +93,8 @@ ImpliedVolatilityRegression
 end
 function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                      ws::Number = 20,
-                                     #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
+                                     #  crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
+                                     #              AbstractStepwiseRegressionCriterion} = :r2,
                                      re::AbstractRegressionTarget = LinearModel())::ImpliedVolatilityRegression
     return ImpliedVolatilityRegression(ve, ws, re)
 end

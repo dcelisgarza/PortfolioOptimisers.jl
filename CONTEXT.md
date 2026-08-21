@@ -149,7 +149,7 @@ Third- and fourth-order co-moment tensors, with `FullMoment`/`SemiMoment` and Wi
 **Regression Estimator**
 Builds a factor model mapping factor returns to asset returns, underpinning factor priors. Families:
 
-- **StepwiseRegression**: greedy feature selection — `ForwardSelection` or `BackwardElimination`, driven by a criterion (`PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`).
+- **StepwiseRegression**: greedy feature selection — `ForwardSelection` or `BackwardElimination`, driven by a criterion (`PValue`, or one of the symbols `:aic`, `:aicc`, `:bic`, `:r2`, `:adjr2`).
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 

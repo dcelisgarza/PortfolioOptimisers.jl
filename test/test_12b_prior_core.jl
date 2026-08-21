@@ -631,14 +631,14 @@ end
 
     pr = prior(EntropyPoolingPrior(;
                                    pe = FactorPrior(;
-                                                    re = StepwiseRegression(; crit = BIC())),
+                                                    re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, opt = opt, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
-                                                                                      crit = BIC())),
+                                                                                      crit = :bic)),
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-5)
 
@@ -659,14 +659,14 @@ end
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
-                                                    re = StepwiseRegression(; crit = BIC())),
+                                                    re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, opt = opt, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
-                                                                                      crit = BIC())),
+                                                                                      crit = :bic)),
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-5)
 
@@ -1013,6 +1013,33 @@ end
                                                                                                         val = "AAPL == prior(AAPL)*2"))]),
                     rd)
     @test all(isfinite, pr_unif.mu)
+
+    # Regression: `robust_probabilities` must not write into the vector it is handed.
+    # It did `ow .*= exp.(-p * kldivs)`, and when the opinion weights already sum to one
+    # `ow` *is* `pe.w`, the estimator's own field: one `prior` call left `[0.5, 0.5]` as
+    # `[0.49996615, 0.49996620]`, so the stored weights no longer summed to one and the
+    # second call pooled a uniform-prior remainder the caller never asked for.
+    op_a = EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(;
+                                                                    val = "AAPL == prior(AAPL)*1.5"))
+    op_b = EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(;
+                                                                    val = "AAPL == prior(AAPL)*2"))
+    opp_p = OpinionPoolingPrior(; pes = [op_a, op_b], w = [0.5, 0.5], p = 5)
+    w_before = copy(opp_p.w)
+    pr_p1 = prior(opp_p, rd)
+    @test opp_p.w == w_before
+    pr_p2 = prior(opp_p, rd)
+    @test opp_p.w == w_before
+    @test pr_p1.mu == pr_p2.mu
+    @test pr_p1.ow == pr_p2.ow
+
+    # Same defect, other face: the uniform-weight branch builds `ow` as an immutable
+    # `range` whose entries sum to exactly one, so `.*=` could not write to it at all and
+    # a penalty with no `w` threw `CanonicalIndexError` before reaching the pooling.
+    pr_unif_p = prior(OpinionPoolingPrior(; pes = [op_a, op_b], p = 5), rd)
+    @test all(isfinite, pr_unif_p.mu)
+    @test isapprox(sum(pr_unif_p.ow), 1)
 end
 
 @testset "Factor block guard on wrapped priors" begin
@@ -1279,6 +1306,25 @@ end
     wide = BlackLittermanViews(; P = ones(1, size(rd.F, 2) + 1), Q = [0.0001])
     @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; views = wide), rd)
     @test_throws DimensionMismatch prior(BlackLittermanPrior(; views = wide), rd)
+
+    # Regression: a precomputed views object must feel the same `views_conf` bound the
+    # equation-shaped routes enforce. `assert_bl_views_conf(_, ::BlackLittermanViews)`
+    # checked only the length, so a confidence outside (0, 1) reached `calc_omega`, whose
+    # `1/v - 1` scale is then negative — `views_conf = 2.5` gave a view variance of
+    # -8.6e-7 and the estimator answered from it rather than raising.
+    two = BlackLittermanViews(;
+                              P = vcat(reshape(Float64.(rd.nx .== rd.nx[1]), 1, :),
+                                       reshape(Float64.(rd.nx .== rd.nx[2]), 1, :)),
+                              Q = [0.0002, 0.0003])
+    @test_throws DomainError BlackLittermanPrior(; views = two, views_conf = [2.5, 0.5])
+    @test_throws DomainError BlackLittermanPrior(; views = two, views_conf = [-1.0, 0.5])
+    @test_throws DomainError BlackLittermanPrior(; views = two, views_conf = [1.0, 0.5])
+    @test_throws DomainError BlackLittermanPrior(; views = two, views_conf = [0.0, 0.5])
+    # A confidence inside the interval still constructs, and every view variance is positive.
+    ok = BlackLittermanPrior(; views = two, views_conf = [0.4, 0.5])
+    @test all(>(0),
+              diag(PortfolioOptimisers.calc_omega(ok.views_conf, two.P,
+                                                  prior(EmpiricalPrior(), rd).sigma)))
 end
 
 @testset "The carrier records the original returns matrix" begin

@@ -299,4 +299,53 @@ pass `pr.X`, which is the documented `MatNum` arity.
     vw = VectorOnlyObsWeights()
     @test_throws PO.ObservationWeightsError build(ConditionalValueatRisk(; w = vw))
     @test_throws PO.ObservationWeightsError build(ConditionalDrawdownatRisk(; w = vw))
+
+    @testset "DimensionReductionRegression standardises and recovers with one scale" begin
+        # `prep_dim_red_reg` used to standardise with `StatsBase.ZScoreTransform` -- the
+        # plain mean and the corrected standard deviation -- while `regression` divided the
+        # recovered coefficients by `re.ve` and centred the intercept with `re.ve.me`. The
+        # two agreed for the default `ve` and for nothing else, so every weighted path
+        # recovered a coefficient in no unit at all. See issue #398.
+        #
+        # The invariant is the one Equations 4.13, 4.15 and 4.20 of the source impose: the
+        # prediction in the original factor space must equal the prediction in the reduced
+        # space. It holds only when the divisor is the scale that standardised.
+        rng2 = StableRNG(987654321)
+        F = randn(rng2, 250, 6) ./ 100
+        Y = F * randn(rng2, 6, 3) .+ randn(rng2, 250, 3) ./ 500
+        pw = pweights(range(; start = 1, stop = 5, length = 250))
+
+        function prediction_gap(re, Y, F)
+            reg = regression(re, Y, F)
+            f1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+            # The two statistics are the ones `regression` recovers with.
+            @test isapprox(mu, vec(PO.Statistics.mean(re.ve.me, F; dims = 1)))
+            @test isapprox(sigma, vec(PO.Statistics.std(re.ve, F; dims = 1)))
+            gap = zero(eltype(F))
+            for i in axes(Y, 2)
+                y = view(Y, :, i)
+                coefs = PO.StatsAPI.coef(PO.StatsAPI.fit(re.retgt, f1, y))
+                pred = reg.b[i] .+ F * view(reg.M, i, :)
+                gap = max(gap, maximum(abs, f1 * coefs .- pred))
+            end
+            return gap
+        end
+
+        # `ve` is `@fprop`-tagged, so `factory` puts the incoming weights into it.
+        re_w = factory(DimensionReductionRegression(), pw)
+        @test !isnothing(re_w.ve.w)
+        @test prediction_gap(DimensionReductionRegression(), Y, F) < 1e-12
+        @test prediction_gap(re_w, Y, F) < 1e-12
+        # `corrected = false` is the other way the two scales used to part.
+        re_c = DimensionReductionRegression(; ve = SimpleVariance(; corrected = false))
+        @test prediction_gap(re_c, Y, F) < 1e-12
+
+        # A constant factor has zero standard deviation. The floor at `eps` keeps the
+        # division finite rather than answering `NaN`.
+        Fc = copy(F)
+        Fc[:, 3] .= 0.01
+        reg_c = regression(DimensionReductionRegression(), Y, Fc)
+        @test all(isfinite, reg_c.M)
+        @test all(isfinite, reg_c.b)
+    end
 end

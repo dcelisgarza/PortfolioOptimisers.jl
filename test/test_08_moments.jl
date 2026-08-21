@@ -572,17 +572,17 @@
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = ForwardSelection()),
-               StepwiseRegression(; alg = ForwardSelection(), crit = AIC()),
-               StepwiseRegression(; alg = ForwardSelection(), crit = AICC()),
-               StepwiseRegression(; alg = ForwardSelection(), crit = BIC()),
-               StepwiseRegression(; alg = ForwardSelection(), crit = RSquared()),
-               StepwiseRegression(; alg = ForwardSelection(), crit = AdjustedRSquared()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = :aic),
+               StepwiseRegression(; alg = ForwardSelection(), crit = :aicc),
+               StepwiseRegression(; alg = ForwardSelection(), crit = :bic),
+               StepwiseRegression(; alg = ForwardSelection(), crit = :r2),
+               StepwiseRegression(; alg = ForwardSelection(), crit = :adjr2),
                StepwiseRegression(; alg = BackwardElimination()),
-               StepwiseRegression(; alg = BackwardElimination(), crit = AIC()),
-               StepwiseRegression(; alg = BackwardElimination(), crit = AICC()),
-               StepwiseRegression(; alg = BackwardElimination(), crit = BIC()),
-               StepwiseRegression(; alg = BackwardElimination(), crit = RSquared()),
-               StepwiseRegression(; alg = BackwardElimination(), crit = AdjustedRSquared()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = :aic),
+               StepwiseRegression(; alg = BackwardElimination(), crit = :aicc),
+               StepwiseRegression(; alg = BackwardElimination(), crit = :bic),
+               StepwiseRegression(; alg = BackwardElimination(), crit = :r2),
+               StepwiseRegression(; alg = BackwardElimination(), crit = :adjr2),
                DimensionReductionRegression(),
                DimensionReductionRegression(; retgt = GeneralisedLinearModel(;)),
                DimensionReductionRegression(; drtgt = PPCA()),
@@ -605,6 +605,57 @@
             res = rr.M === rr.L
             isa(re, StepwiseRegression) ? (@test res) : (@test !res)
         end
+    end
+    @testset "Regression criteria under a GeneralisedLinearModel target (#399)" begin
+        # Every criterion must score a fitted GeneralisedLinearModel. `:r2` and `:adjr2`
+        # used to throw a MethodError, because GLM defines them for a LinearModel only.
+        for crit in PortfolioOptimisers.STEPWISE_REGRESSION_CRITERIA,
+            alg in (ForwardSelection(), BackwardElimination())
+
+            re = StepwiseRegression(; crit = crit, alg = alg,
+                                    tgt = GeneralisedLinearModel())
+            @test isa(regression(re, rd), Regression)
+        end
+        # The default variant is :devianceratio, which matches the classical R² of the
+        # LinearModel path for the default Normal() response.
+        for crit in PortfolioOptimisers.MAX_VAL_STEPWISE_REGRESSION_CRITERIA
+            r1 = regression(StepwiseRegression(; crit = crit,
+                                               tgt = GeneralisedLinearModel()), rd)
+            r2 = regression(StepwiseRegression(; crit = crit,
+                                               tgt = GeneralisedLinearModel(;
+                                                                            variant = :devianceratio)),
+                            rd)
+            @test isapprox(r1.M, r2.M)
+        end
+        # Every variant of the wider set is accepted by :r2.
+        for variant in PortfolioOptimisers.PSEUDO_R2_VARIANTS
+            re = StepwiseRegression(; crit = :r2,
+                                    tgt = GeneralisedLinearModel(; variant = variant))
+            @test isa(regression(re, rd), Regression)
+        end
+        # :adjr2 accepts the narrower set only.
+        for variant in PortfolioOptimisers.ADJUSTED_PSEUDO_R2_VARIANTS
+            re = StepwiseRegression(; crit = :adjr2,
+                                    tgt = GeneralisedLinearModel(; variant = variant))
+            @test isa(regression(re, rd), Regression)
+        end
+        for variant in setdiff(PortfolioOptimisers.PSEUDO_R2_VARIANTS,
+                               PortfolioOptimisers.ADJUSTED_PSEUDO_R2_VARIANTS)
+            @test_throws ArgumentError StepwiseRegression(; crit = :adjr2,
+                                                          tgt = GeneralisedLinearModel(;
+                                                                                       variant = variant))
+        end
+        # The criterion symbol and the variant symbol are both checked at construction.
+        @test_throws ArgumentError StepwiseRegression(; crit = :nonesuch)
+        @test_throws ArgumentError GeneralisedLinearModel(; variant = :nonesuch)
+        # The criterion is stored as a Val, so the estimator stays type stable.
+        @test isa(StepwiseRegression(; crit = :aic).crit,
+                  PortfolioOptimisers.MinValStepwiseRegressionCriterion)
+        @test isa(StepwiseRegression(; crit = :r2).crit,
+                  PortfolioOptimisers.MaxValStepwiseRegressionCriterion)
+        # factory carries the variant through.
+        @test PortfolioOptimisers.factory(GeneralisedLinearModel(; variant = :McFadden),
+                                          pw).variant == :McFadden
     end
     @testset "Coskewness" begin
         skes = [Coskewness(; alg = FullMoment()), Coskewness(; alg = SemiMoment())]

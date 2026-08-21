@@ -13,14 +13,14 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
 
     pr = prior(EntropyPoolingPrior(;
                                    pe = FactorPrior(;
-                                                    re = StepwiseRegression(; crit = BIC())),
+                                                    re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
-                                                                                      crit = BIC())),
+                                                                                      crit = :bic)),
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-6)
 
@@ -41,14 +41,14 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
-                                                    re = StepwiseRegression(; crit = BIC())),
+                                                    re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, mu_views = mu_views), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
                                              pe = FactorPrior(;
                                                               re = StepwiseRegression(;
-                                                                                      crit = BIC())),
+                                                                                      crit = :bic)),
                                              sets = sets, opt = jopt, mu_views = mu_views),
                          rd).w, rtol = 5e-6)
 

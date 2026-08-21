@@ -11,3 +11,10 @@ OpinionPoolingAlgorithm
 robust_probabilities
 compute_pooling
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

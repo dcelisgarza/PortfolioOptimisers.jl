@@ -7,21 +7,22 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Mathematical definition
 
+This type stores the pair ``(\\mathbf{P}, \\boldsymbol{q})`` of the view creation model:
+
 ```math
 \\begin{align}
-\\mathbf{P}\\,\\boldsymbol{\\mu} &= \\boldsymbol{q}\\,, \\\\
-\\boldsymbol{\\Omega} &= \\mathrm{diag}(\\tau\\,\\mathbf{P}\\boldsymbol{\\Sigma}\\mathbf{P}^{\\intercal})\\,.
+\\mathbf{P}\\,\\boldsymbol{\\mu}_{e} &= \\boldsymbol{q} + \\boldsymbol{\\nu}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathbf{P}``: ``K \\times N`` views matrix (each row encodes one view).
-  - ``\\boldsymbol{\\mu}``: ``N \\times 1`` prior mean vector.
+  - ``\\boldsymbol{\\mu}_{e}``: ``N \\times 1`` prior expected excess returns vector.
   - ``\\boldsymbol{q}``: ``K \\times 1`` vector of view expected returns.
-  - ``\\boldsymbol{\\Omega}``: ``K \\times K`` diagonal view uncertainty matrix.
-  - ``\\tau``: Scaling parameter for the prior covariance.
-  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
+  - ``\\boldsymbol{\\nu}``: ``K \\times 1`` estimation error of the views.
+
+The view uncertainty matrix ``\\boldsymbol{\\Omega}`` is **not** stored here. It is derived from ``\\mathbf{P}`` and the covariance of the distribution the views update, by [`calc_omega`](@ref) and [`bl_preroll`](@ref).
 
 # Fields
 
@@ -56,6 +57,12 @@ BlackLittermanViews
 # Related
 
   - [`black_litterman_views`](@ref)
+  - [`calc_omega`](@ref)
+
+# References
+
+  - $(ref_dict[:black1992])
+  - $(ref_dict[:cajas2025]) Section 5.1.3, Equations 5.5 and 5.7.
 """
 @concrete struct BlackLittermanViews <: AbstractResult
     """
@@ -274,6 +281,8 @@ Validate Black-Litterman view confidence specification.
 
 `assert_bl_views_conf` checks that the view confidence parameter(s) provided for Black-Litterman prior construction are valid. It supports scalar and vector confidence values, and works with views specified as equations, constraint estimators, or canonical views objects. The function enforces that confidence values are strictly between 0 and 1, and that the number of confidence values matches the number of views when a vector is not `nothing`.
 
+The unit-interval bound is load-bearing rather than cosmetic. [`calc_omega`](@ref) maps a confidence ``v`` to the scale ``1/v - 1``, which is negative for every ``v > 1`` and for every ``v < 0``. A view uncertainty matrix with a negative diagonal entry is not a covariance, and the estimator returns an answer built from it rather than raising.
+
 # Arguments
 
   - `views_conf`: Scalar or vector of confidence values.
@@ -289,18 +298,19 @@ Validate Black-Litterman view confidence specification.
 
       + `::Nothing`, no-op.
       + `::Number`, `0 < views_conf < 1`.
-      + `::VecNum`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+      + `::VecNum`, `all(x -> 0 < x < 1, views_conf)`.
 
   - `views`:
 
       + `::Str_Expr`, `length(views_conf) == 1`.
       + `::VecStr_Expr`, `length(views_conf) == length(views)`.
       + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
-      + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
+      + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`, then the unit-interval bound.
 
 # Related
 
   - [`BlackLittermanViews`](@ref)
+  - [`calc_omega`](@ref)
 """
 function assert_bl_views_conf(::Nothing, args...)::Nothing
     return nothing
@@ -326,8 +336,15 @@ function assert_bl_views_conf(views_conf::Num_VecNum,
     return assert_bl_views_conf(views_conf, views.val)
 end
 function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)::Nothing
-    return @argcheck(length(views_conf) == length(views.Q),
-                     DimensionMismatch("length(views_conf) ($(length(views_conf))) must match length(views.Q) ($(length(views.Q)))"))
+    @argcheck(length(views_conf) == length(views.Q),
+              DimensionMismatch("length(views_conf) ($(length(views_conf))) must match length(views.Q) ($(length(views.Q)))"))
+    # Precomputed views resolve no names, so this is the only site that sees their confidences.
+    # Without the bound a confidence outside `(0, 1)` reaches `calc_omega`, whose `1/v - 1` scale
+    # is then negative, and the estimator answers from a view uncertainty matrix that is not a
+    # covariance. The equation-shaped view routes above already refuse the same input.
+    @argcheck(all(x -> zero(x) < x < one(x), views_conf),
+              DomainError("all views_conf values must be in (0, 1), got $views_conf"))
+    return nothing
 end
 
 export black_litterman_views, BlackLittermanViews

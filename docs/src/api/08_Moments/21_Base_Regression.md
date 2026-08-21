@@ -7,11 +7,14 @@ StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
 GeneralisedLinearModel
 factory(re::GeneralisedLinearModel, w::ObsWeights)
 StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-AIC
-AICC
-BIC
-RSquared
-AdjustedRSquared
+PSEUDO_R2_VARIANTS
+ADJUSTED_PSEUDO_R2_VARIANTS
+MIN_VAL_STEPWISE_REGRESSION_CRITERIA
+MAX_VAL_STEPWISE_REGRESSION_CRITERIA
+STEPWISE_REGRESSION_CRITERIA
+MinValStepwiseRegressionCriterion
+MaxValStepwiseRegressionCriterion
+MinMaxValStepwiseRegressionCriterion
 Regression
 regression(re::Regression, args...)
 regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
@@ -21,11 +24,9 @@ RegE_Reg
 AbstractRegressionAlgorithm
 AbstractStepwiseRegressionAlgorithm
 AbstractStepwiseRegressionCriterion
-AbstractMinMaxValStepwiseRegressionCriterion
 AbstractRegressionTarget
-AbstractMinValStepwiseRegressionCriterion
-AbstractMaxValStepwiseRegressionCriteria
 port_opt_view(re::Regression, i, args...)
+default_regression_criterion_variant
 regression_criterion_func
 regression_threshold
 ```
