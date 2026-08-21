@@ -309,24 +309,75 @@ nothing raises `@error "File exists but no references were collected"` in
     # A page cites either in its own prose or through a docstring it pulls in with a
     # `@docs` block, and it needs a non-canonical bibliography block exactly then.
     @testset "an API page carries a bibliography block iff it cites" begin
+        # A `@docs` entry can wrap over several lines, so accumulate lines until the
+        # text parses. Treating each line as its own entry leaves a wrapped signature as
+        # two fragments, neither of which resolves to anything.
         function docs_block_names(text)
-            acc, inside = String[], false
+            acc, inside, buf = String[], false, ""
             for line in split(text, '\n')
                 if startswith(line, "```@docs")
                     inside = true
                 elseif inside && startswith(line, "```")
                     inside = false
+                    if !isempty(buf)
+                        push!(acc, buf)
+                        buf = ""
+                    end
                 elseif inside && !isempty(strip(line))
-                    push!(acc, strip(line))
+                    buf = if isempty(buf)
+                        String(strip(line))
+                    else
+                        buf * " " * String(strip(line))
+                    end
+                    ex = Meta.parse(buf; raise = false)
+                    if !(isa(ex, Expr) && ex.head === :incomplete)
+                        push!(acc, buf)
+                        buf = ""
+                    end
                 end
             end
             return acc
         end
+        # The bare name an entry documents: `cov`, `PortfolioOptimisers.densify` and
+        # `cov(ce::DistanceCovariance, X::MatNum)` all reduce to one symbol.
+        function leaf_name(x)
+            if isa(x, Symbol)
+                return x
+            elseif isa(x, QuoteNode)
+                return leaf_name(x.value)
+            elseif isa(x, Expr)
+                return leaf_name(x.head === :. ? x.args[2] : x.args[1])
+            else
+                return nothing
+            end
+        end
+        # An entry that carries a signature splices THAT method's docstring, so the
+        # signature has to take part in the lookup. Asking for the binding alone returns
+        # every method's docstring concatenated, and then a page that lists a shared
+        # generic function -- `cov`, `cor`, `ucs`, `factory` -- collects the citations of
+        # methods it never renders. That is what let a stray block through: the page
+        # looked like it cited, so check 4 passed while the docs build raised the error
+        # this testset exists to pre-empt.
         function docstring_text(name)
-            sym = Symbol(first(split(replace(name, "PortfolioOptimisers." => ""), '(')))
+            ex = Meta.parse(name; raise = false)
+            (isa(ex, Expr) && ex.head === :incomplete) && return ""
+            iscall = isa(ex, Expr) && ex.head === :call
+            sym = leaf_name(iscall ? ex.args[1] : ex)
+            isa(sym, Symbol) || return ""
             isdefined(PO, sym) || return ""
+            # `Documenter` looks for an exact signature match and falls back to `<:`,
+            # which is what `Base.Docs.doc(binding, sig)` does.
+            sig = if iscall
+                try
+                    Core.eval(PO, Base.Docs.signature(ex))
+                catch
+                    Union{}
+                end
+            else
+                Union{}
+            end
             return try
-                string(Base.Docs.doc(Base.Docs.Binding(PO, sym)))
+                string(Base.Docs.doc(Base.Docs.Binding(PO, sym), sig))
             catch
                 ""
             end

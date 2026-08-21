@@ -10,10 +10,3 @@ cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBa
 cor_distance(ce::DistanceCovariance, X::MatNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 cov_distance(ce::DistanceCovariance, X::MatNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

@@ -11,10 +11,3 @@ sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
 mu_delta_box_set
 sigma_delta_box_set
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

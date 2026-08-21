@@ -58,10 +58,3 @@ Moments other than the expected return can be estimated using the entire spectru
 FullMoment
 SemiMoment
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

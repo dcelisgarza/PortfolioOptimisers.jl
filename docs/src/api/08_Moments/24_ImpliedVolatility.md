@@ -17,10 +17,3 @@ cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
 cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

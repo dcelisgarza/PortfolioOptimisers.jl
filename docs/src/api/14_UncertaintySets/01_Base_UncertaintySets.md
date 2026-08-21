@@ -38,10 +38,3 @@ vec_quantile_bounds
 ellipsoidal_set
 box_quantile_bounds
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

@@ -533,10 +533,13 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
-function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
+# The empirical order statistic is the `MIPValueatRisk` estimand, so the two functors
+# below name that formulation. Leaving `alg` free makes them overlap the parametric
+# method further down, which no rule of specificity can order.
+function (r::ValueatRisk{<:Any, <:Any, Nothing, <:MIPValueatRisk})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
-function (r::ValueatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
+function (r::ValueatRisk{<:Any, <:Any, <:ObsWeights, <:MIPValueatRisk})(x::VecNum)
     w = get_observation_weights(r.w, x)
     sw = sum(w)
     order = sortperm(x)
@@ -702,13 +705,16 @@ function range_tails(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValuea
                                alg = r.alg),
             gain = ValueatRisk(; settings = settings, alpha = r.beta, w = r.w, alg = r.alg))
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
+# The empirical order statistic is the `MIPValueatRisk` estimand, so the two functors
+# below name that formulation. Leaving `alg` free makes them overlap the parametric
+# method further down, which no rule of specificity can order.
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing, <:MIPValueatRisk})(x::VecNum)
     x = copy(x)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
     gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights})(x::VecNum)
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights, <:MIPValueatRisk})(x::VecNum)
     w = get_observation_weights(r.w, x)
     sw = sum(w)
     order = sortperm(x)
