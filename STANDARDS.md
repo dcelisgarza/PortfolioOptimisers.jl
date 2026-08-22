@@ -96,7 +96,7 @@ Every Gate below is a real check that fails on a real breach.
 | `pre-commit run -a` | formatting, explicit imports, markdown lint, YAML, TOML, JSON, line endings | `pre-commit run -a` |
 | JuliaFormatter | 92-column margin, `yas` style, from `.JuliaFormatter.toml` | inside `pre-commit`, and `.github/workflows/FormatCheck.yml` |
 | ExplicitImports | no implicit imports or non-public qualified accesses | inside `pre-commit` |
-| markdownlint | markdown structure, from `.markdownlint.json` | inside `pre-commit` |
+| markdownlint | markdown structure, from `.markdownlint.json`, over the files `.markdownlintignore` leaves in scope | inside `pre-commit` |
 | `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions; every citation in `src/` and `ext/` resolves, every `ref_dict` entry has a user, no reference prose is pasted inline, and an API page carries a bibliography block exactly when it cites; a name an extension declares itself carries a docstring once that extension's file is marked `swept` in [`sweep/manifest.toml`](sweep/manifest.toml) | run the file |
 | `test/test_41_constructor_docstring_drift.jl` | a `# Constructors` block matches the signature it copies | run the file |
 | `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |

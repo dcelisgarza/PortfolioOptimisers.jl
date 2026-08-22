@@ -5,14 +5,14 @@
 julia = "1.12.7"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "ee6bf56011"
+commit = "a6d87c662e"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 365, cog_sum = 331, arg_sum = 820, macros = [] }
-"src/01_Base.jl" = { cyc = 28, cog = 54, arg = 7, cyc_sum = 202, cog_sum = 160, arg_sum = 178, macros = ["@define_pretty_show"] }
-"src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 229, cog_sum = 213, arg_sum = 251, macros = ["@propagatable"] }
-"src/03_Preprocessing.jl" = { cyc = 19, cog = 28, arg = 15, cyc_sum = 161, cog_sum = 160, arg_sum = 137, macros = [] }
+"src/01_Base.jl" = { cyc = 28, cog = 54, arg = 7, cyc_sum = 200, cog_sum = 156, arg_sum = 178, macros = ["@define_pretty_show"] }
+"src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 239, cog_sum = 233, arg_sum = 256, macros = ["@propagatable"] }
+"src/03_Preprocessing.jl" = { cyc = 19, cog = 28, arg = 15, cyc_sum = 160, cog_sum = 159, arg_sum = 137, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
 "src/05_Denoise.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 16, cog_sum = 8, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
@@ -37,8 +37,8 @@ commit = "ee6bf56011"
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 3, cog_sum = 1, arg_sum = 6, macros = ["@propagatable"] }
 "src/08_Moments/19_Coskewness.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 12, cog_sum = 9, arg_sum = 28, macros = ["@propagatable"] }
 "src/08_Moments/20_Cokurtosis.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 9, cog_sum = 5, arg_sum = 23, macros = ["@propagatable"] }
-"src/08_Moments/21_Base_Regression.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 28, cog_sum = 16, arg_sum = 23, macros = ["@forward_properties"] }
-"src/08_Moments/22_StepwiseRegression.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 40, cog_sum = 46, arg_sum = 41, macros = ["@propagatable"] }
+"src/08_Moments/21_Base_Regression.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 34, cog_sum = 17, arg_sum = 36, macros = ["@forward_properties"] }
+"src/08_Moments/22_StepwiseRegression.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 44, cog_sum = 49, arg_sum = 41, macros = ["@propagatable"] }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 16, cog_sum = 9, arg_sum = 23, macros = ["@propagatable"] }
 "src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 7, cyc_sum = 18, cog_sum = 7, arg_sum = 44, macros = ["@propagatable"] }
 "src/08_Moments/25_CorrelationCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 1, arg_sum = 9, macros = ["@propagatable"] }
@@ -64,7 +64,7 @@ commit = "ee6bf56011"
 "src/11_Phylogeny/02_Clusters.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 17, cog_sum = 9, arg_sum = 20, macros = ["@propagatable"] }
 "src/11_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 56, cog_sum = 88, arg_sum = 31, macros = [] }
 "src/11_Phylogeny/04_DBHT.jl" = { cyc = 7, cog = 14, arg = 8, cyc_sum = 105, cog_sum = 137, arg_sum = 107, macros = [] }
-"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 19, cog_sum = 17, arg_sum = 20, macros = [] }
+"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 18, cog_sum = 17, arg_sum = 20, macros = [] }
 "src/11_Phylogeny/06_Phylogeny.jl" = { cyc = 8, cog = 9, arg = 6, cyc_sum = 134, cog_sum = 51, arg_sum = 251, macros = ["@propagatable"] }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = [] }
 "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 144, cog_sum = 174, arg_sum = 76, macros = ["@forward_properties"] }
@@ -83,7 +83,7 @@ commit = "ee6bf56011"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 15, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 13, cyc_sum = 6, cog_sum = 5, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 128, cog_sum = 131, arg_sum = 177, macros = [] }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 132, cog_sum = 134, arg_sum = 183, macros = [] }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 15, cog = 18, arg = 15, cyc_sum = 54, cog_sum = 61, arg_sum = 52, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 16, cog = 18, arg = 14, cyc_sum = 111, cog_sum = 92, arg_sum = 187, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 25, macros = ["@propagatable"] }
@@ -127,10 +127,10 @@ commit = "ee6bf56011"
 "src/19_RiskMeasures/26_AdjustRiskContributions.jl" = { cyc = 1, cog = 0, arg = 3, cyc_sum = 5, cog_sum = 0, arg_sum = 15, macros = [] }
 "src/19_RiskMeasures/27_ExpectedRisk.jl" = { cyc = 5, cog = 4, arg = 9, cyc_sum = 44, cog_sum = 24, arg_sum = 128, macros = [] }
 "src/19_RiskMeasures/28_RiskMeasureTools.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 22, cog_sum = 2, arg_sum = 33, macros = [] }
-"src/20_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 196, cog_sum = 142, arg_sum = 166, macros = [] }
-"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { cyc = 21, cog = 30, arg = 11, cyc_sum = 89, cog_sum = 92, arg_sum = 107, macros = ["@forward_properties"] }
+"src/20_Optimisation/01_Base_Optimisation.jl" = { cyc = 9, cog = 10, arg = 7, cyc_sum = 197, cog_sum = 144, arg_sum = 166, macros = [] }
+"src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl" = { cyc = 21, cog = 30, arg = 11, cyc_sum = 91, cog_sum = 93, arg_sum = 110, macros = ["@forward_properties"] }
 "src/20_Optimisation/02_CrossValidation/02_KFold.jl" = { cyc = 6, cog = 9, arg = 3, cyc_sum = 11, cog_sum = 11, arg_sum = 9, macros = [] }
-"src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { cyc = 9, cog = 14, arg = 6, cyc_sum = 40, cog_sum = 38, arg_sum = 42, macros = [] }
+"src/20_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { cyc = 11, cog = 21, arg = 6, cyc_sum = 42, cog_sum = 43, arg_sum = 44, macros = [] }
 "src/20_Optimisation/02_CrossValidation/04_WalkForward.jl" = { cyc = 8, cog = 15, arg = 9, cyc_sum = 50, cog_sum = 64, arg_sum = 63, macros = [] }
 "src/20_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { cyc = 6, cog = 10, arg = 7, cyc_sum = 38, cog_sum = 31, arg_sum = 66, macros = [] }
 "src/20_Optimisation/02_CrossValidation/06_Validation.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 9, macros = [] }
@@ -139,15 +139,15 @@ commit = "ee6bf56011"
 "src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 10, cyc_sum = 45, cog_sum = 48, arg_sum = 60, macros = [] }
 "src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 7, cog = 11, arg = 3, cyc_sum = 17, cog_sum = 23, arg_sum = 9, macros = [] }
 "src/20_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 6, cog_sum = 6, arg_sum = 16, macros = [] }
-"src/20_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 37, cog_sum = 22, arg_sum = 44, macros = ["@propagatable"] }
+"src/20_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 36, cog_sum = 21, arg_sum = 44, macros = ["@propagatable"] }
 "src/20_Optimisation/04_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 11, cyc_sum = 25, cog_sum = 16, arg_sum = 41, macros = ["@forward_properties", "@propagatable"] }
 "src/20_Optimisation/05_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 22, cog_sum = 15, arg_sum = 31, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 8, cyc_sum = 54, cog_sum = 61, arg_sum = 63, macros = ["@propagatable"] }
+"src/20_Optimisation/06_SchurComplementHierarchicalRiskParity.jl" = { cyc = 10, cog = 24, arg = 8, cyc_sum = 55, cog_sum = 61, arg_sum = 63, macros = ["@propagatable"] }
 "src/20_Optimisation/07_HierarchicalEqualRiskContribution.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 48, cog_sum = 35, arg_sum = 88, macros = ["@propagatable"] }
 "src/20_Optimisation/08_Base_JuMPOptimisation.jl" = { cyc = 8, cog = 12, arg = 5, cyc_sum = 124, cog_sum = 54, arg_sum = 206, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 13, arg = 15, cyc_sum = 88, cog_sum = 43, arg_sum = 129, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 6, cyc_sum = 116, cog_sum = 77, arg_sum = 193, macros = [] }
-"src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 74, cog_sum = 56, arg_sum = 101, macros = ["@propagatable"] }
+"src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 74, cog_sum = 56, arg_sum = 105, macros = ["@propagatable"] }
 "src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 24, cog_sum = 15, arg_sum = 21, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 7, cog = 8, arg = 2, cyc_sum = 17, cog_sum = 17, arg_sum = 7, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 5, cog_sum = 4, arg_sum = 4, macros = [] }
@@ -155,11 +155,11 @@ commit = "ee6bf56011"
 "src/20_Optimisation/09_JuMPConstraints/08_ThresholdConstraints.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 3, arg_sum = 15, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 4, cog_sum = 1, arg_sum = 6, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 14, cog_sum = 5, arg_sum = 21, macros = [] }
-"src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 10, cog_sum = 4, arg_sum = 51, macros = [] }
+"src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 12, cog_sum = 4, arg_sum = 57, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 18, cog_sum = 4, arg_sum = 40, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 7, cog_sum = 1, arg_sum = 9, macros = [] }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { cyc = 100, cog = 96, arg = 44, cyc_sum = 140, cog_sum = 126, arg_sum = 116, macros = ["@forward_properties"] }
-"src/20_Optimisation/11_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 40, cog_sum = 23, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
+"src/20_Optimisation/11_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 41, cog_sum = 23, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 18, cog_sum = 11, arg_sum = 33, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { cyc = 12, cog = 14, arg = 14, cyc_sum = 80, cog_sum = 52, arg_sum = 202, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/14_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 41, cog_sum = 18, arg_sum = 73, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
@@ -168,7 +168,7 @@ commit = "ee6bf56011"
 "src/20_Optimisation/17_NestedClustered.jl" = { cyc = 9, cog = 8, arg = 15, cyc_sum = 73, cog_sum = 42, arg_sum = 66, macros = ["@propagatable"] }
 "src/20_Optimisation/18_Stacking.jl" = { cyc = 9, cog = 11, arg = 13, cyc_sum = 45, cog_sum = 34, arg_sum = 44, macros = ["@propagatable"] }
 "src/20_Optimisation/19_SubsetResampling.jl" = { cyc = 6, cog = 7, arg = 15, cyc_sum = 41, cog_sum = 32, arg_sum = 61, macros = ["@propagatable"] }
-"src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 34, cog_sum = 19, arg_sum = 95, macros = [] }
+"src/20_Optimisation/20_RiskMeasureConstraints/01_BaseRiskConstraints.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 39, cog_sum = 23, arg_sum = 98, macros = [] }
 "src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl" = { cyc = 6, cog = 4, arg = 11, cyc_sum = 42, cog_sum = 15, arg_sum = 145, macros = [] }
 "src/20_Optimisation/20_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 25, cog_sum = 11, arg_sum = 102, macros = [] }
 "src/20_Optimisation/20_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { cyc = 3, cog = 3, arg = 8, cyc_sum = 13, cog_sum = 7, arg_sum = 48, macros = [] }

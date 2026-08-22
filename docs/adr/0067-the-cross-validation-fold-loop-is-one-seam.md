@@ -106,7 +106,7 @@ which forwarded it again to `parallel_folds`. A keyword *value* of type `Type` o
 allocation as a constant through constant propagation, and one forwarding hop is enough to lose
 it. JET recorded the loss exactly:
 
-```
+```text
 Core.kwcall(::@NamedTuple{ElT::UnionAll, prev_w_flag::Bool}, ::typeof(run_folds), …)
   ↳ #run_folds#1375(::Type{PredictionResult}, ::Bool, …)   # still concrete
     ↳ Core.kwcall(::NamedTuple{(:ElT,), <:Tuple{Type}}, ::typeof(parallel_folds), …)

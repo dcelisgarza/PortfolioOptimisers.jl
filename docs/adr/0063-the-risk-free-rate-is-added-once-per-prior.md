@@ -24,11 +24,11 @@ The round trip was never written down, and the code did not agree on it. The sha
 the kernel and no member could opt out of it. Each member then wrote arithmetic of its own on
 top:
 
-| member                         | `l === nothing`                                    | `l` set                |
-| ------------------------------ | -------------------------------------------------- | ---------------------- |
-| `BlackLittermanPrior`          | the kernel's add, once                             | no `l` field           |
-| `BayesianBlackLittermanPrior`  | its own add, once, no kernel call                  | no `l` field           |
-| `FactorBlackLittermanPrior`    | `.- rf` on the wrapped mean, then the kernel's add | the kernel's add, once |
+| member                         | `l === nothing`                                    | `l` set                             |
+| ------------------------------ | -------------------------------------------------- | ----------------------------------- |
+| `BlackLittermanPrior`          | the kernel's add, once                             | no `l` field                        |
+| `BayesianBlackLittermanPrior`  | its own add, once, no kernel call                  | no `l` field                        |
+| `FactorBlackLittermanPrior`    | `.- rf` on the wrapped mean, then the kernel's add | the kernel's add, once              |
 | `AugmentedBlackLittermanPrior` | `.- rf`, the kernel's add, then a second add       | the kernel's add, then a second add |
 
 Three defects follow.

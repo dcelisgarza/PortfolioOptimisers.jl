@@ -58,12 +58,12 @@ seconds. It names no type, so a type added tomorrow is covered the day its docst
 A census that fails on noise is a census that gets deleted. Four differences are cosmetic and
 are absorbed:
 
-| Difference             | Documented          | Code           | Absorbed by                    |
-| ---------------------- | ------------------- | -------------- | ------------------------------ |
-| module qualification   | `ThreadedEx()`      | `FLoops.ThreadedEx()` | `normex` drops the `A.b` prefix |
-| the `pi` spelling      | `pi`                | `π`            | `normex` rewrites `:pi` to `:π` |
-| numeric literal width  | `1`                 | `1.0`          | every literal goes through `Float64` |
-| operator spacing       | `2/3`               | `2 / 3`        | `string` re-prints canonically |
+| Difference            | Documented     | Code                  | Absorbed by                          |
+| --------------------- | -------------- | --------------------- | ------------------------------------ |
+| module qualification  | `ThreadedEx()` | `FLoops.ThreadedEx()` | `normex` drops the `A.b` prefix      |
+| the `pi` spelling     | `pi`           | `π`                   | `normex` rewrites `:pi` to `:π`      |
+| numeric literal width | `1`            | `1.0`                 | every literal goes through `Float64` |
+| operator spacing      | `2/3`          | `2 / 3`               | `string` re-prints canonically       |
 
 Anything else is drift.
 

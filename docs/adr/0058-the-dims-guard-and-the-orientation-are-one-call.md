@@ -33,7 +33,7 @@ end
 Because the guard was a separate statement from the orientation it guards, each leaf re-decided
 whether to write it at all. Five did not, and they answered `dims = 3` with the *input*:
 
-```
+```julia-repl
 julia> X = reshape(1.0:12.0, 4, 3);   # a statistic must be (1, 3)
 
 julia> size(mean(SimpleExpectedReturns(), X; dims = 3))

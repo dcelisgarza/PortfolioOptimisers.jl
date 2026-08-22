@@ -22,7 +22,7 @@ inverse-volatility long-only (21) and long-short (25), market-exposure (30), mar
 
 The obvious reading is wrong. Every one of the seven is
 
-```
+```text
 maximize   mu' w - eps * ||sd .* w||_inf
 subject to <linear constraints>
 ```
@@ -61,7 +61,7 @@ immediately *decouples* into its eqs. (27)/(28), and its Remark 12 then admits t
 recombination is optimal only when the two legs happen to have complementary support.
 Modelling the worst case directly —
 
-```
+```text
 min_{mu in A2} mu'w = mu'w - ep*[max_i(-sd_i w_i)]_+ - en*[max_i(sd_i w_i)]_+
 ```
 
@@ -113,7 +113,7 @@ Closing it needs a per-asset *sign* bit. `short_mip_threshold_constraints` alrea
 `ilb`/`isb`, the long and short indicators it builds for thresholds and fixed fees — and its
 `miprb_flag` block already emits half of what is needed:
 
-```
+```text
 lw - ss * il <= 0      # complementarity: short => lw == 0
 sw - ss * is <= 0      # complementarity: long  => sw == 0
 ```
@@ -121,7 +121,7 @@ sw - ss * is <= 0      # complementarity: long  => sw == 0
 So `xbgt` is not a new builder. It rides that one, emitting the complementarity pair
 regardless of `miprb_flag` and adding only the two constraints that close the slack:
 
-```
+```text
 lw - w - ss * (1 - ilb) <= 0   # ilb = 1 => lw <= w,  with lw >= w  => lw == max(w, 0)
 sw + w - ss * (1 - isb) <= 0   # isb = 1 => sw <= -w, with sw >= -w => sw == max(-w, 0)
 ```
