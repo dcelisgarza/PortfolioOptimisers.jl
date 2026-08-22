@@ -535,6 +535,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :r_kwargs => "`r_kwargs`: Keyword arguments passed to the risk measure.",#
                                  :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
                                  :p_cv => "`p`: Hyperparameter search grid.",#
+                                 # Data carrier fields.
+                                 :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).",#
+                                 :nz_feat => "`nz`: Names or identifiers of feature columns (features × 1).",#
                                  # Prediction result fields.
                                  :pred_nx => "`nx`: Asset name vector.",#
                                  :pred_nf => "`nf`: Factor name vector.",#
