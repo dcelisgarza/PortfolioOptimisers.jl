@@ -938,6 +938,163 @@
         @test all(iszero, diag(vm))
         @test all(!iszero, diag(mm))
     end
+    @testset "The distance sweep of #448" begin
+        #=
+        Every claim the two distance files make, pinned by running it. The four closed forms,
+        the two identities that relate them, the `_absguard` boundary, the clamp, the
+        `_as_correlation` round trip, every `CanonicalDistance` redirect, and the agreement of
+        `cor_and_dist` with `distance`.
+        =#
+        rngd = StableRNG(987654321)
+        Xs = randn(rngd, 200, 5)
+        rhos = cor(Xs)
+        # --- the four closed forms, against the formula written by hand ---
+        hS(r, p) =
+            if isnothing(p)
+                sqrt(clamp((1 - r) / 2, 0, 1))
+            else
+                sqrt(clamp((1 - r^p) * (isodd(p) ? 0.5 : 1.0), 0, 1))
+            end
+        hSA(r, p) =
+            if isnothing(p)
+                sqrt(clamp(1 - abs(r), 0, 1))
+            else
+                sqrt(clamp(1 - abs(r)^p, 0, 1))
+            end
+        hL(r, p) = isnothing(p) ? max(-log(abs(r)), 0) : max(-log(abs(r)^p), 0)
+        hC(r, p) = isnothing(p) ? sqrt(clamp(1 - r, 0, 1)) : sqrt(clamp(1 - r^p, 0, 1))
+        for (a, h) in
+            ((SimpleDistance(), hS), (SimpleAbsoluteDistance(), hSA), (LogDistance(), hL),
+             (CorrelationDistance(), hC)), p in (nothing, 1, 2, 3, 4)
+
+            R = isa(a, Union{SimpleAbsoluteDistance, LogDistance}) ? abs.(rhos) : rhos
+            @test distance(Distance(; power = p, alg = a), rhos) ==
+                  [h(R[i, j], p) for i in axes(R, 1), j in axes(R, 2)]
+        end
+        # --- `power = 1` is the neutral position of the knob, for every algorithm ---
+        for a in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                  CorrelationDistance())
+            @test distance(Distance(; power = 1, alg = a), rhos) ==
+                  distance(Distance(; alg = a), rhos)
+        end
+        # --- `SimpleDistance`'s scale is 1 / (1 - min rho^p) over |rho| <= 1 ---
+        for p in 1:6
+            b = [-1.0, 0.0, 1.0] .^ p
+            sc = 1 / (1 - minimum(b))
+            @test distance(Distance(; power = p, alg = SimpleDistance()), rhos) ==
+                  sqrt.(clamp.(sc .* (1 .- rhos .^ p), 0, 1))
+        end
+        # --- the two identities, on a non-negative correlation where they hold ---
+        rhop = abs.(rhos)
+        DS = distance(Distance(; alg = SimpleDistance()), rhop)
+        DC = distance(Distance(; alg = CorrelationDistance()), rhop)
+        DA = distance(Distance(; alg = SimpleAbsoluteDistance()), rhop)
+        @test isapprox(DC, sqrt(2) .* DS)
+        @test DC == DA
+        # --- and their failure on the negative half: `CorrelationDistance` saturates at 1 ---
+        DCs = distance(Distance(; alg = CorrelationDistance()), rhos)
+        neg = rhos .< 0
+        @test any(neg)
+        @test all(isone, DCs[neg])
+        @test all(!isone, sqrt.(1 .- rhos[neg]))
+        # --- `_absguard` is an allocation guard, not a branch in the mathematics ---
+        nonneg = [1.0 0.5; 0.5 1.0]
+        withzero = [1.0 0.0; 0.0 1.0]
+        signed = [1.0 -0.5; -0.5 1.0]
+        @test PortfolioOptimisers._absguard(nonneg) === nonneg
+        @test PortfolioOptimisers._absguard(withzero) === withzero
+        @test PortfolioOptimisers._absguard(signed) !== signed
+        for M in (nonneg, withzero, signed, rhos, [1.0 -0.0; -0.0 1.0])
+            @test PortfolioOptimisers._absguard(M) == abs.(M)
+        end
+        # --- `LogDistance` at an exactly-zero correlation is `Inf`, and `max` does not hide it ---
+        @test distance(Distance(; alg = LogDistance()), withzero)[1, 2] == Inf
+        @test distance(Distance(; power = 3, alg = LogDistance()), withzero)[1, 2] == Inf
+        # --- the guard reads the magnitude: -0.5 and +0.5 give the same distance ---
+        @test distance(Distance(; alg = LogDistance()), signed) ==
+              distance(Distance(; alg = LogDistance()), nonneg)
+        # --- the clamp keeps a correlation from round-off a real number ---
+        for alg in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                    CorrelationDistance())
+            for M in ([1.0 1+1e-12; 1+1e-12 1.0], [1.0 -1-1e-12; -1-1e-12 1.0])
+                D = distance(Distance(; alg = alg), M)
+                @test all(isfinite, D)
+                @test all(>=(0), D)
+            end
+        end
+        # --- `_as_correlation` round-trips, mutates nothing, and passes a correlation through ---
+        sdv = [2.0, 0.5, 3.0, 1.5, 0.25]
+        Sig = StatsBase.cor2cov(rhos, sdv)
+        Sigkeep = copy(Sig)
+        @test isapprox(PortfolioOptimisers._as_correlation(Sig), rhos)
+        @test Sig == Sigkeep
+        @test PortfolioOptimisers._as_correlation(rhos) === rhos
+        for a in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                  CorrelationDistance()), p in (nothing, 2, 3)
+
+            @test isapprox(distance(Distance(; power = p, alg = a), Sig),
+                           distance(Distance(; power = p, alg = a), rhos))
+        end
+        # --- the element type survives the transform, `SimpleDistance` included ---
+        rho32 = Float32.(rhos)
+        for a in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                  CorrelationDistance()), p in (nothing, 2, 3)
+
+            @test eltype(distance(Distance(; power = p, alg = a), rho32)) === Float32
+        end
+        @test eltype(distance(Distance(; alg = SimpleDistance()), [1 0; 0 1])) === Float64
+        # --- every `CanonicalDistance` redirect, wrapped and bare ---
+        cemi = MutualInfoCovariance(; bins = 7, normalise = false)
+        celtd = LowerTailDependenceCovariance()
+        cedc = DistanceCovariance()
+        cepl = Covariance()
+        can = Distance(; alg = CanonicalDistance())
+        for (ce, expect) in ((cemi, VariationInfoDistance(; bins = 7, normalise = false)),
+                             (PortfolioOptimisersCovariance(; ce = cemi),
+                              VariationInfoDistance(; bins = 7, normalise = false)), (celtd, LogDistance()),
+                             (PortfolioOptimisersCovariance(; ce = celtd), LogDistance()),
+                             (cedc, CorrelationDistance()),
+                             (PortfolioOptimisersCovariance(; ce = cedc), CorrelationDistance()),
+                             (cepl, SimpleDistance()),
+                             (PortfolioOptimisersCovariance(; ce = cepl), SimpleDistance()))
+            @test distance(can, ce, Xs) == distance(Distance(; alg = expect), ce, Xs)
+        end
+        # --- the `bins` and `normalise` copy is load-bearing ---
+        Ddefault = distance(Distance(; alg = VariationInfoDistance()), cemi, Xs)
+        @test !isapprox(distance(can, cemi, Xs), Ddefault)
+        @test !isapprox(distance(can, PortfolioOptimisersCovariance(; ce = cemi), Xs),
+                        Ddefault)
+        # --- `cor_and_dist` returns the `D` that `distance` returns, on every route ---
+        for ce in (cepl, cemi, PortfolioOptimisersCovariance(; ce = cemi), celtd,
+                   PortfolioOptimisersCovariance(; ce = celtd), cedc,
+                   PortfolioOptimisersCovariance(; ce = cedc),
+                   PortfolioOptimisersCovariance(; ce = cepl)),
+            de in (Distance(; alg = SimpleDistance()),
+                   Distance(; power = 3, alg = SimpleAbsoluteDistance()), can,
+                   Distance(; power = 2, alg = CanonicalDistance()))
+
+            r, D = cor_and_dist(de, ce, Xs)
+            @test D == distance(de, ce, Xs)
+            @test r == cor(ce, Xs)
+        end
+        # --- `dims` on the variation-of-information route, and the `power` it raises ---
+        devi = Distance(; alg = VariationInfoDistance(; bins = 7, normalise = false))
+        devi3 = Distance(; power = 3,
+                         alg = VariationInfoDistance(; bins = 7, normalise = false))
+        D1 = distance(devi, nothing, Xs; dims = 1)
+        @test D1 == distance(devi, nothing, permutedims(Xs); dims = 2)
+        @test D1 == PortfolioOptimisers.variation_info(Xs, 7, false)
+        @test distance(devi3, nothing, Xs; dims = 1) == D1 .^ 3
+        @test isapprox(distance(Distance(), cepl, Xs; dims = 1),
+                       distance(Distance(), cepl, permutedims(Xs); dims = 2))
+        @test_throws DomainError distance(devi, nothing, Xs; dims = 3)
+        @test_throws DomainError cor_and_dist(devi, cepl, Xs; dims = 3)
+        @test_throws DomainError distance(Distance(), cepl, Xs; dims = 3)
+        @test_throws DomainError cor_and_dist(Distance(), cepl, Xs; dims = 3)
+        # --- the constructor refuses a power below one ---
+        @test_throws DomainError Distance(; power = 0)
+        @test_throws DomainError Distance(; power = -2)
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`

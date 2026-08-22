@@ -92,7 +92,7 @@ Where:
 
 The clamp is a numerical guard and nothing more, as in [`SimpleDistance`](@ref): ``1 - \\lvert\\rho_{i,\\,j}\\rvert`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``.
 
-The absolute value is taken over the **whole** matrix or not at all. A matrix with no negative entry is passed through untouched, which is why a non-negative codependence measure reaches this algorithm unchanged.
+The magnitude comes from [`_absguard`](@ref), which is an **allocation guard and not a branch in the mathematics**. A matrix with no negative entry is returned as the same object, and `abs.` of such a matrix equals it entry for entry, so both routes give the identical result for every input, `-0.0` included. A non-negative codependence measure therefore reaches this algorithm unchanged, and pays no allocation for the guard.
 
 # Related
 
@@ -133,7 +133,7 @@ The floor at zero is not cosmetic. A covariance estimator that shrinks, denoises
 
 Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone. It is also the entry that the two bounded similarity members cannot take, so [`assert_similarity_domain`](@ref) refuses this algorithm under [`MaximumDistanceSimilarity`](@ref) on the PMFG path.
 
-The absolute value is taken over the **whole** matrix or not at all, as in [`SimpleAbsoluteDistance`](@ref).
+The magnitude comes from [`_absguard`](@ref), as in [`SimpleAbsoluteDistance`](@ref). It is an allocation guard and not a branch in the mathematics: a matrix with no negative entry is returned as the same object, and the result is identical to taking `abs.` unconditionally.
 
 # Related
 
@@ -226,6 +226,17 @@ Where:
   - ``I(X_{i};X_{j})``: Mutual information between assets ``i`` and ``j``.
 
 Equation 6.25 of the source normalises by ``\\max(H(X_{i}),\\, H(X_{j}))`` instead. This algorithm divides by the joint entropy, which keeps the result a metric on ``[0,\\,1]``. See [`variation_info`](@ref), which computes it.
+
+# Algorithm
+
+This is the only algorithm of the family that runs a procedure rather than applying a closed form to a correlation entry. [`variation_info`](@ref) carries out the steps; `bins` and `normalise` are the two fields below.
+
+ 1. Take the number of histogram bins from `bins`. An `Integer` is that count; a bin-width rule computes the count from the sample size and the pairwise correlation.
+ 2. Build the joint histogram of the two asset columns over that bin count, giving the joint distribution.
+ 3. Reduce the joint histogram along each axis, giving the two marginal distributions.
+ 4. Take the Shannon entropy of each marginal and of the joint histogram, giving ``H(X_{i})``, ``H(X_{j})`` and ``H(X_{i},\\,X_{j})``.
+ 5. Form the mutual information ``I(X_{i};X_{j}) = H(X_{i}) + H(X_{j}) - H(X_{i},\\,X_{j})``, and from it the variation of information of the first formula above.
+ 6. When `normalise` is `true`, divide by the joint entropy ``H(X_{i}) + H(X_{j}) - I(X_{i};X_{j})``, giving the second formula.
 
 # Fields
 

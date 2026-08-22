@@ -88,8 +88,8 @@
 "src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 34, swept = false }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 15, swept = false }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { map = 3, units = 7, swept = false }
-"src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, swept = false }
-"src/09_Distance/02_Distance.jl" = { map = 2, units = 13, swept = false }
+"src/09_Distance/01_Base_Distance.jl" = { map = 2, units = 8, algorithm = 1, swept = true }
+"src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, swept = false }
 "src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, swept = false }
 "src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, swept = false }

@@ -814,6 +814,7 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
                                  :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
                                  :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
+                                 :Ddist => "`D::MatNum`: Distance matrix `assets x assets`, in the units the distance algorithm defines.",#
                                  :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
                                  :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
                                  :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
