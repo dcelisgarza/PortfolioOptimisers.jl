@@ -155,6 +155,20 @@ function declaration_macros(files)
     return sort!(collect(intersect(declared, called)))
 end
 
+"""
+    names_path(title, path) -> Bool
+
+Whether an issue title names `path` as a whole word. Both scheduled jobs search the titles they
+already hold rather than asking the tracker a second time, so the search happens here.
+
+The test is a token match rather than a substring: a substring test would let a title naming
+`src/A.jl.orig` skip `src/A.jl` for ever. ADR 0078 states it for the code-health job and ADR 0084
+reuses it for the sweep job, so it is defined once.
+"""
+function names_path(title::AbstractString, path::AbstractString)
+    return any(==(path), split(title, r"[\s`,;()\[\]]+"; keepempty = false))
+end
+
 # --- git -------------------------------------------------------------------
 
 """

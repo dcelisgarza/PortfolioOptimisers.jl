@@ -171,9 +171,17 @@ The same rule governs the doctests, for the same class of reason. See the `run-d
 ## [Dismissing a JET report](@id code_health_dismissal)
 
 A Dismissal records that a report is not a real defect. It is keyed by the **Report Fingerprint**:
-the attribution file, the report kind, and the report message. It carries **no line number and no
-stack trace**, so it survives an edit that moves the code. See
-`docs/adr/0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md`.
+the attribution file, the report kind, and the report message. On a `BuiltinErrorReport` the
+message carries the **builtin** as well: JET prints a bare constant for that kind, so without it
+one Dismissal would cover every builtin error in the file. The fingerprint carries **no line number
+and no stack trace**, so it survives an edit that moves the code. See
+`docs/adr/0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md` and its amendment.
+
+**Take the message from the gate, not from an issue.** Run
+`julia --project=code_health code_health/jet.jl check` and copy the text it prints. The scheduled
+job writes an issue body once and never updates it, so an older issue can quote a message that an
+earlier fingerprint rule produced. A Dismissal copied from such a body matches nothing. That is
+safe — the reviewed count simply does not fall — but it wastes a review.
 
 Every Dismissal cites a named **Rationale**: one paragraph explaining why that class of report is
 not a defect. One Rationale serves the dozens of Dismissals a systematic class needs.

@@ -213,3 +213,76 @@ implies a two-sided judgement, and nothing ever records "this is real". "Class" 
 "kind", which is a component of the fingerprint. "Signature" is JET's own name for the offending
 expression, which is the exact part cut out of the key. "Suppression" says the report is hidden,
 whereas the claim being made is stronger: there is no defect.
+
+## Amendment (2026-08-22)
+
+**For a `BuiltinErrorReport`, the message component is JET's message followed by the builtin.**
+Every other kind keeps `print_report_message` unchanged. Issue #357.
+
+### The first example above is not a message
+
+The body gives this as an example of "the message":
+
+```text
+invalid builtin function call: getfield(x::FillArrays.Fill{Union{}, 1}, f::Symbol)
+```
+
+It is not one. `JETInterface.print_report_message(io, r::BuiltinErrorReport) = print(io, r.msg)`
+(`src/analyzers/jetanalyzer.jl:1146` in JET 0.12.1), and the usual `r.msg` is the constant
+`GENERAL_BUILTIN_ERROR_MSG = "invalid builtin function call"`. Everything after the colon is the
+signature render, which this ADR cuts on purpose. The second example is correct:
+`MethodErrorReport` does carry the call signature and the union-split marker in its message.
+
+### One constant covered five different builtins
+
+Measured against the committed baseline, over all three runs of the load set:
+
+| Fact | Value |
+| --- | --- |
+| `BuiltinErrorReport` reports | 200 of 364 |
+| Carrying the bare constant | 175 |
+| Builtins behind that one constant | `getfield` 163, `memoryrefget` 5, `typeassert` 4, `apply_type` 2, `fieldtype` 1 |
+| Carrying a richer message | 25, each with exactly one builtin |
+| Distinct fingerprints, before and after | 176 → 179 |
+| Files where one Dismissal covered two builtins | 3 |
+
+So a Dismissal keyed `(file, "BuiltinErrorReport", "invalid builtin function call")` covered every
+general builtin error in the file, not the `getfield` class the body describes. It still failed
+closed, because `reviewed = raw − matched dismissals` never rises above `raw`. The cost was the
+other direction: a new builtin report of a different shape, in a file already carrying that
+Dismissal, would have been absorbed with no signal. That is the one place the instrument could
+lose a finding silently.
+
+### `r.f` is the discriminator, and it re-admits nothing
+
+`BuiltinErrorReport` declares two fields, `f` and `msg`. `r.f` is the builtin itself, and it
+renders as `getfield`, `memoryrefget` or `bitcast`. It carries no gensym, no local variable name
+and no type render, so appending it narrows the class without restoring any of the fragile text
+this ADR cut. The fingerprint stays at three components and `rulings.toml` keeps its shape.
+
+The append is unconditional for the kind. A rule that fired only on the bare constant would name a
+JET internal string inside `code_health/jet.jl`, which is the standing chore this ADR avoided when
+it cut the signature render instead of masking it. The measured cost of firing always is four
+reports: JET's intrinsic message already opens with the builtin, so `bitcast: target type not a
+leaf primitive type` becomes `bitcast: target type not a leaf primitive type: bitcast`.
+
+The kind is matched by its **name**, not by its type. A type in a method signature resolves at load
+time, and JET's stubs define no such type on an unsupported Julia, so a signature would replace
+`assert_environment`'s deliberate message with an `UndefVarError`.
+
+### What this amendment does not cover
+
+`UnsoundBuiltinErrorReport` carries the same shape — a constant message and a field `f` — but JET
+emits it only from `_report_builtin_error_sound!`, which runs in `:sound` mode. `report_package`
+runs `:basic`, so the kind cannot reach this gate's baseline and no rule is written for it. A
+future JET kind whose message is a bare constant gets its own ticket, the way this one did. The
+alternative, a general rule over any kind whose message is constant, was rejected: it needs a human
+to re-read every kind's message at each JET bump, and this ADR does not create standing chores.
+
+### No number moved
+
+`rulings.toml` carries no Dismissal, so `reviewed` equals `raw` for every file in every run. The
+fingerprint binds the subtraction alone, so changing it left all 588 baseline rows unchanged —
+196 files times three runs.
+The change was therefore free at the moment it was made, and it would have been a migration after
+the first Dismissal was written.
