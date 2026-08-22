@@ -704,6 +704,10 @@ rather than settled here by a gate that demands more than its Authority states.
     # row to a name no docstring can ever carry.
     function isdefinition(x)
         Meta.isexpr(x, :function) && return true
+        # A `macro` is a definition and it binds a name, so its body reaches `registers_row`
+        # like any other. `test_45_sweep_census.jl` counts a documented macro as a unit, and
+        # these two checks read the same units it does.
+        Meta.isexpr(x, :macro) && return true
         Meta.isexpr(x, :(=)) || return false
         lhs = x.args[1]
         while Meta.isexpr(lhs, :where)
@@ -713,7 +717,9 @@ rather than settled here by a gate that demands more than its Authority states.
     end
 
     # The name a definition binds. A definition reaches here through four declaration forms:
-    # bare, `@concrete struct`, a short form, and a macro-prefixed one.
+    # bare, `@concrete struct`, a short form, and a macro-prefixed one. A `macro` declaration
+    # binds its name through its `:call` node, exactly as a `function` does, and it is named
+    # here without its `@`.
     function bound_name(x)
         x isa Symbol && return x
         x isa Expr || return nothing
@@ -726,7 +732,7 @@ rather than settled here by a gate that demands more than its Authority states.
         end
         x.head === :struct && return bound_name(x.args[2])
         x.head in
-        (:function, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
+        (:function, :macro, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
             return bound_name(x.args[1])
         return nothing
     end

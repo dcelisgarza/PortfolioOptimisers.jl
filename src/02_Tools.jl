@@ -370,7 +370,8 @@ end
     nothing_scalar_array_view(
         x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
                  <:AbstractEstimatorValueAlgorithm,
-                 <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm},
+                 <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm,
+                 <:StatsBase.CovarianceEstimator},
         ::Any
     ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
@@ -387,11 +388,11 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
 The method that Julia selects is the algorithm. Each step is one method, and no method allocates a copy of the data.
 
- 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator or an algorithm: return `x` itself.
+ 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator, an algorithm or a `StatsBase.CovarianceEstimator`: return `x` itself.
  2. `x` is a vector: return `view(x, i)`, one entry per selected asset.
  3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `view(x.v, i)` and whose scalar part `x.s` is carried through. The scalar part carries no asset axis.
  4. `x` is a matrix: return `view(x, i, i)`, which selects the **same** index on **both** axes. This is the rule for a square per-asset matrix, such as a covariance matrix or a similarity matrix. A matrix whose two axes are different needs [`nothing_scalar_array_view_odd_order`](@ref) instead.
- 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the views into a new vector. The outer vector is rebuilt, so its own length is unchanged.
+ 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the views into a new vector. The outer vector is rebuilt, so its own length is unchanged. The vector's **element type** selects this step, and it must be a subtype of the `Union` the signature names. A vector holding both a vector and a matrix has the element type `Array{T}`, which is a subtype of neither `AbstractVector` nor `AbstractMatrix`, so it resolves on step 2 and the index selects the elements of the outer vector.
 
 # Arguments
 
@@ -402,7 +403,7 @@ The method that Julia selects is the algorithm. Each step is one method, and no 
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm}`: Returns `x` unchanged.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm, <:StatsBase.CovarianceEstimator}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
@@ -765,7 +766,7 @@ The method that Julia selects is the algorithm. It is the copying twin of [`noth
  2. `x` is a vector: return `x[i]`, a new vector with one entry per selected asset.
  3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `x.v[i]` and whose scalar part `x.s` is carried through.
  4. `x` is a matrix: return `x[i, i]`, which selects the **same** index on **both** axes. This is the rule for a square per-asset matrix. A matrix whose two axes are different needs [`nothing_scalar_array_getindex_odd_order`](@ref) instead.
- 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the results into a new vector.
+ 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the results into a new vector. The vector's **element type** selects this step, and it must be a subtype of the `Union` the signature names. A vector holding both a vector and a matrix has the element type `Array{T}`, which is a subtype of neither `AbstractVector` nor `AbstractMatrix`, so it resolves on step 2 and the index selects the elements of the outer vector.
 
 The type list of step 1 is **shorter** than the one [`nothing_scalar_array_view`](@ref) carries: an estimator, an algorithm and a `StatsBase.CovarianceEstimator` reach the view verb and not this one, because only the view verb is the leaf of [`port_opt_view`](@ref).
 
@@ -930,7 +931,9 @@ end
 """
     traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing) -> AbstractVector
 
-Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
+Recursively traverse all subtypes of the given abstract type `t` and collect all struct types into `ctarr`.
+
+A **struct type** is not the same as a concrete type. `InteractiveUtils.subtypes` reports a parametric struct as its `UnionAll`, and a `UnionAll` is not concrete, so a parametric struct is collected under its bare name and `isconcretetype` is `false` for it. What every entry does satisfy is `isstructtype`. A caller that needs concrete types must instantiate the parameters itself.
 
 # Algorithm
 
@@ -938,7 +941,7 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
  2. Read `sts`, the direct subtypes of `t`, with `InteractiveUtils.subtypes`.
  3. For each subtype `st` of `sts`, take one of two branches:
      1. `st` is not a struct type, so it is a further abstract type: call this function again on `st` with the same `ctarr`.
-     2. `st` is a struct type: push `st` onto `ctarr`.
+     2. `st` is a struct type: push `st` onto `ctarr`. The test is `isstructtype` and not `isconcretetype`, which is why a parametric struct is collected.
  4. Return `ctarr`.
 
 The recursion descends the whole tree below `t`, so an abstract type at any depth is opened and never collected. The order of `ctarr` is the depth-first order of the tree, which follows the order that `InteractiveUtils.subtypes` reports.
@@ -946,11 +949,11 @@ The recursion descends the whole tree below `t`, so an abstract type at any dept
 # Arguments
 
   - `t`: An abstract type whose subtypes will be traversed.
-  - `ctarr`: Optional An array to collect the concrete types. If not provided, a new empty array is created.
+  - `ctarr`: Optional. An array to collect the struct types into. If not provided, a new empty array is created.
 
 # Returns
 
-  - `types::Vector{Any}`: An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
+  - `types::Vector{Any}`: An array holding every struct type that is a subtype, direct or indirect, of `t`. A parametric struct appears as its `UnionAll`.
 
 # Examples
 
@@ -1285,7 +1288,7 @@ The map preserves the order, so the ``k``-th entry here is the macro name of the
   - [`PROP_TAG_NAMES`](@ref)
   - [`prop_tag`](@ref)
 """
-const PROP_TAG_MACRO_NAMES = map(tag -> Symbol("@", tag), PROP_TAG_NAMES)
+const PROP_TAG_MACRO_NAMES = Symbol.("@", PROP_TAG_NAMES)
 
 """
     PROP_TAG_CHANNELS
@@ -2112,6 +2115,10 @@ Runs once at the end of the module. Throws an
 [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) listing
 every violation, so the package refuses to precompile rather than shipping a dead tag.
 
+The three tables are arguments, and each one defaults to the table the module ships. The
+shipped tables are complete, so the call the module makes never reports a violation; a caller
+that passes a table of its own drives each of the three clauses and reads the message it gives.
+
 # Algorithm
 
  1. Make `violations`, an empty vector of strings.
@@ -2124,6 +2131,17 @@ every violation, so the package refuses to precompile rather than shipping a dea
 
 Step 2.3 probes **each** channel that names the tag, not the tag alone. This is what catches a tag added to a second channel with no transform there, which the whole-tag probe of an earlier design let through.
 
+# Arguments
+
+  - `tags`: The tag names to check.
+  - `macro_names`: The stub macro name of each tag, in the order of `tags`.
+  - `channels`: The channel table whose `precedence` tuples are read.
+  - `mod::Module`: The module the stub macros are looked up in, and the module that qualifies the names [`prop_tag_expr`](@ref) emits.
+
+# Returns
+
+  - `nothing`: Every row of `tags` is complete.
+
 # Related
 
   - [`PROP_TAG_NAMES`](@ref)
@@ -2132,21 +2150,22 @@ Step 2.3 probes **each** channel that names the tag, not the tag alone. This is 
   - [`check_propagatable_contracts`](@ref)
   - [`@propagatable`](@ref)
 """
-function check_prop_tag_macros()
+function check_prop_tag_macros(tags = PROP_TAG_NAMES, macro_names = PROP_TAG_MACRO_NAMES,
+                               channels = PROP_TAG_CHANNELS, mod::Module = @__MODULE__)
     violations = String[]
-    for (tag, macro_name) in zip(PROP_TAG_NAMES, PROP_TAG_MACRO_NAMES)
-        if !isdefined(@__MODULE__, macro_name)
+    for (tag, macro_name) in zip(tags, macro_names)
+        if !isdefined(mod, macro_name)
             push!(violations, "`:$(tag)` declares no `$(macro_name)` stub macro.")
         end
-        if !any(tag in channel.precedence for channel in PROP_TAG_CHANNELS)
+        if !any(tag in channel.precedence for channel in channels)
             push!(violations, "`:$(tag)` appears in no channel of `PROP_TAG_CHANNELS`.")
         end
-        for channel in keys(PROP_TAG_CHANNELS)
-            if !(tag in getproperty(PROP_TAG_CHANNELS, channel).precedence)
+        for channel in keys(channels)
+            if !(tag in getproperty(channels, channel).precedence)
                 continue
             end
             try
-                prop_tag_expr(channel, tag, :probe, :probe, @__MODULE__, ())
+                prop_tag_expr(channel, tag, :probe, :probe, mod, ())
             catch
                 push!(violations,
                       "`:$(tag)` has no field transform in channel `:$(channel)`.")
@@ -2543,6 +2562,17 @@ calls this at the end of its own module to get the same guarantee.
 
 Step 3 collects and never stops, so one run reports the violations of every registered type. The registry is filled by [`propagatable_register!`](@ref) at each declaration, so this function must run **after** the last one, which is why the module calls it at its end.
 
+Both the registry and the pool are arguments, and each defaults to the value the module ships. A caller that passes a registry of its own reads the message a broken contract gives, without registering a broken type.
+
+# Arguments
+
+  - `contracts`: The pairs of a type and its `@pprop`-tagged field names to check.
+  - `pool`: The property names a prior result can carry.
+
+# Returns
+
+  - `nothing`: Every pair of `contracts` satisfies the contract.
+
 # Related
 
   - [`@propagatable`](@ref)
@@ -2550,10 +2580,10 @@ Step 3 collects and never stops, so one run reports the violations of every regi
   - [`propagatable_contract_violations`](@ref)
   - [`@windowed_estimator`](@ref)
 """
-function check_propagatable_contracts()
-    pool = prior_result_property_pool()
+function check_propagatable_contracts(contracts = PROPAGATABLE_CONTRACTS,
+                                      pool = prior_result_property_pool())
     msgs = String[]
-    for (T, pprops) in PROPAGATABLE_CONTRACTS
+    for (T, pprops) in contracts
         append!(msgs, propagatable_contract_violations(T, pprops, pool))
     end
     if !isempty(msgs)

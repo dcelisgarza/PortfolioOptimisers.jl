@@ -45,7 +45,7 @@
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
 "src/01_Base.jl" = { map = 1, units = 136, swept = false }
-"src/02_Tools.jl" = { map = 1, units = 69, swept = false }
+"src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_Preprocessing.jl" = { map = 2, units = 44, swept = false }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, swept = false }
 "src/05_Denoise.jl" = { map = 2, units = 10, swept = false }
