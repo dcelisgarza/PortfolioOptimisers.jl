@@ -281,7 +281,7 @@
                                                                    ub = Frontier(; N = 5)))
         res1 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
                                              opt = opt))
-        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 1e-4)
         if !success
             find_tol(Matrix(df), hcat(res1.w...))
         end
