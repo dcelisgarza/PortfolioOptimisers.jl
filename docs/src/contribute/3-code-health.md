@@ -69,9 +69,17 @@ Assign yourself the issue. One issue is one **file**, and one session is one iss
 carries the path, every breached metric with its value, its baseline and its threshold, the worst
 definitions by name and line, and the JET reports by kind and site.
 
-### 2. Reproduce the numbers
+### 2. Confirm the file is still an offender
 
 Run the check that the issue's metric belongs to, from the repository root.
+
+!!! note "A `check` answers green or red. It prints no per-file number."
+
+    Every check is a **ratchet**, so it compares each file against its recorded number and reports
+    only a rise. A green run is the normal state while an issue is open, and it tells you that
+    nobody has made the file worse since the issue was filed. The numbers themselves come from the
+    issue body. To re-measure one file, use `measure_file` below for a complexity number, and
+    [Dismissing a JET report](@ref code_health_dismissal) for the JET reports.
 
 ```bash
 julia --project=code_health code_health/complexity.jl check
@@ -80,10 +88,10 @@ julia --project=code_health code_health/jet.jl check
 COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl check
 ```
 
-The complexity check takes about 5 seconds and the Expansion Bound about 80 seconds, so you can run
-either as often as you like. **The JET check takes 5 minutes 46 seconds and peaks at 2.4 GiB.**
+The complexity check takes about 15 seconds and the Expansion Bound about 30 seconds, so you can run
+either as often as you like. **The JET check takes about 6 minutes 30 seconds and peaks at 2.6 GiB.**
 
-The coverage check takes about 20 seconds, and it needs an `lcov.info` that it cannot make itself.
+The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
 In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job
 wrote. Locally, run the suite with coverage on and process it, or download the `lcov` artifact from
 any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
@@ -103,9 +111,12 @@ COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage
 
 For a fast complexity reading on one file while you refactor, measure the file directly.
 
+`measure_file` returns a `FileMeasure` and prints nothing on its own, so display it. It then names
+the file's total and every definition with its value and its line, in line order.
+
 ```bash
 julia --project=code_health -e 'using CodeComplexity;
-    measure_file(CyclomaticComplexity(), "src/path/to/File.jl")'
+    display(measure_file(CyclomaticComplexity(), "src/path/to/File.jl"))'
 ```
 
 ### 3. Work JET first
@@ -128,6 +139,17 @@ so only the worst definition moves it. Fix the worst one, remeasure, and repeat 
 number falls below the threshold or you reach a definition you judge irreducible.
 
 If a definition cannot fall, see [Exempting a complexity number](@ref code_health_exemption) below.
+
+!!! warning "When the worst definition is a macro, run the Expansion Bound too"
+
+    A **Declaration Macro** is measured where it is declared, and a second number holds what it
+    emits. The two move independently, so a refactor that lowers the declaration can raise the
+    emission and trip `expansion.jl` while `complexity.jl` goes green. That is not a hypothetical
+    shape: the first file the job filed, `src/02_Tools.jl`, takes both its cyclomatic and its
+    cognitive maximum from `@forward_properties`, which the Expansion Bound also holds.
+
+    Run both checks after every such refactor, and record any accepted rise in the Expansion Bound
+    the same way. ADR 0072 owns the rule.
 
 ### 5. Close the issue with a commit
 
@@ -177,11 +199,30 @@ one Dismissal would cover every builtin error in the file. The fingerprint carri
 and no stack trace**, so it survives an edit that moves the code. See
 `docs/adr/0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md` and its amendment.
 
-**Take the message from the gate, not from an issue.** Run
-`julia --project=code_health code_health/jet.jl check` and copy the text it prints. The scheduled
-job writes an issue body once and never updates it, so an older issue can quote a message that an
-earlier fingerprint rule produced. A Dismissal copied from such a body matches nothing. That is
-safe — the reviewed count simply does not fall — but it wastes a review.
+**Take the message from a live measurement, not from an issue body.** The scheduled job writes an
+issue body once and never updates it, so an older issue can quote a message that an earlier
+fingerprint rule produced. A Dismissal copied from such a body matches nothing. That is safe — the
+reviewed count simply does not fall — but it wastes a review.
+
+No verb of `jet.jl` prints a live report. `check` answers green or red, and its red names a file
+and two numbers. Call the script's own `measure` instead, which is what the scheduled job does,
+and print the reports of the file you are working on. It costs one full JET measurement.
+
+```bash
+julia --project=code_health -e '
+    include("code_health/CodeHealth.jl")
+    module Jet
+    include(joinpath(pwd(), "code_health", "jet.jl"))
+    end
+    m = Jet.measure()
+    for r in m.reviewed["src/02_Tools.jl"]
+        println(r.run, "  ", r.kind, ": ", r.message)
+    end'
+```
+
+Copy the `kind` and the `message` into the Dismissal exactly. The `run` and the line are context,
+and neither belongs to the fingerprint. Bind the measurement to `m`, as above: `measure` runs the
+whole analysis on every call, so a second call costs a second six minutes.
 
 Every Dismissal cites a named **Rationale**: one paragraph explaining why that class of report is
 not a defect. One Rationale serves the dozens of Dismissals a systematic class needs.
@@ -234,8 +275,8 @@ number returns to the queue rather than becoming permanent.
 ## When to stop
 
 **The loop terminates on its own.** The scheduled job files each file once, so the queue is finite
-and then the job goes quiet. It stands at 80 files today: 30 above a complexity threshold and 73
-carrying a JET report no Dismissal covers, with 23 in both groups. It shrinks as Dismissals land,
+and then the job goes quiet. It stands at 81 files today: 31 above a complexity threshold and 72
+carrying a JET report no Dismissal covers, with 22 in both groups. It shrinks as Dismissals land,
 because a dismissed report stops making its file a candidate. You do not need to decide when the whole effort
 is over. You only decide when *one* issue is over.
 
@@ -310,8 +351,10 @@ Read that pair carefully before you reach for an Exemption. **An Exemption is pe
 definition.** The same definition can be irreducible on one metric and plainly reducible on
 another, and exempting the whole definition would silence work that is genuinely available.
 
-The general shape in this repository: at the frozen thresholds each metric reports **21** of the 196
-files, **38** files breach at least one, and **30** remain once the Exemptions drop. Of the 21
-argument-count offenders, 11 are struct inner constructors and are exempted up front, so argument
-count contributes about 10 candidate files rather than the 101 it contributed at the textbook
-threshold of 5.
+The general shape in this repository: at the frozen thresholds cyclomatic reports **22** of the 196
+files, cognitive **22** and argument count **21**, **39** files breach at least one, and **31**
+remain once the Exemptions drop. Of the 21 argument-count offenders, 11 are struct inner
+constructors and are exempted up front, so argument count contributes 10 candidate files rather
+than the 101 it contributed at the textbook threshold of 5.
+
+Those counts move with the code. They are a shape to expect, not a number to check against.

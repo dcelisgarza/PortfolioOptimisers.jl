@@ -609,3 +609,245 @@ not two.
         @test isempty(undocumented)
     end
 end
+
+#=
+The two new documentation sections and the sweep manifest (issue #437, under the map of maps
+#404).
+
+#405 added `# Algorithm` and `# JuMP formulation` to the docstring standard, and its
+resolution said the child maps would apply them "file by file, gated by the manifest's
+`swept` flag". Nothing gated them. `test_26_docs.jl` read the manifest in exactly one
+testset, `Extension docs completeness`, and that testset asks a question about an extension.
+So the first child map to set `swept = true` on a `src/` row would write both sections by
+hand, and nothing would hold them there afterwards.
+
+Both are PRESENCE checks in the sense the block above defines, so both read the `swept` flag.
+No file is swept today, so this testset asserts the exemption and nothing else, exactly as
+`Extension docs completeness` did on the day it landed.
+
+------------------------------------------- why the two sections get two different checks
+
+The sections are not gated the same way, and the reason is the trigger, not the section.
+
+  `# JuMP formulation` HAS A MECHANICAL TRIGGER IN THE CODE. A body that calls
+  `JuMP.@constraint` or `JuMP.@constraints` registers a row, and the parser sees the call.
+  The trigger needs no judgement and no exemption list, so this section gets the strongest
+  check available: a PER-UNIT PRESENCE RULE. Measured over the tree, 82 functions register a
+  row and every one of the 82 is documented in its own file, so the rule demands the section
+  of 82 docstrings and of nothing else.
+
+  `# Algorithm` HAS NO SUCH TRIGGER. The standard says a procedure carries it, a closed form
+  stays in `# Mathematical definition`, and a SELECTOR TAG carries neither. `AbstractAlgorithm`
+  holds 277 of the library's 720 types and most of them are selector tags, so "every
+  documented unit carries `# Algorithm`" would red the build on sight, and the exemption
+  cannot be written as a parser rule without first defining a selector tag mechanically.
+  What is left is a RATCHET: a swept file's count of docstrings carrying the section may not
+  FALL. It needs no judgement about which unit deserves the section, and it catches the
+  deletion this ticket exists to stop.
+
+The third shape considered was a per-unit presence rule for `# Algorithm` with a written
+exemption list. It is the most exact and the most expensive, it needs a definition of a
+selector tag that a parser can apply, and it would carry an exemption row per marker type.
+It was set aside for that cost. It stays available: the ratchet is a floor, and a later
+ticket can raise it to a presence rule without moving the manifest key.
+
+------------------------------------------------- what a row-registering docstring is
+
+A docstring does not always sit on the method that registers the row. Two shapes exist in
+the tree and the attribution must read both.
+
+  - `src/20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl` documents
+    `set_weight_constraints!(args...)`, a dispatch-error stub that registers nothing. The
+    methods that register `w_lb` and `w_ub` follow it and carry no docstring of their own.
+  - `src/20_Optimisation/20_RiskMeasureConstraints/06_XatRiskConstraints.jl` documents five
+    separate methods of `set_risk_constraints!`, each immediately above the method it
+    describes, and each of the five registers its own rows.
+
+So a docstring speaks for its own definition AND for every later definition of the same name
+until the next docstring of that name -- which is how the file reads. Attributing per name
+rather than per definition is what makes the first shape visible: read per definition, four
+of the thirteen files under `09_JuMPConstraints/` register rows under no documented
+definition at all, `04_WeightConstraints.jl` among them.
+
+A function this file documents nowhere is skipped rather than reported, because the docstring
+the rule addresses is in another file and that file has a `swept` flag of its own. No such
+case exists in the tree today. It is the accepted blind spot, in the manner of the two
+`test_45_sweep_census.jl` names.
+
+--------------------------------------------------------------- what is NOT gated here
+
+The standard's trigger sentence is "any code that ADDS ROWS to a `JuMP.Model`", and this
+check gates exactly that. 40 further documented functions touch the model without
+registering a row: they create a variable, register an expression, or set the objective.
+`set_model_scales!` is one of them, and it is the function whose `sc` and `so` were swapped
+for nine callers -- the defect #404's charter names when it says the JuMP layer is
+undocumented as a model. Whether the trigger should widen to cover them is a change to the
+STANDARD, which is #405's charter and not this gate's, so it is raised as its own ticket
+rather than settled here by a gate that demands more than its Authority states.
+=#
+@testset "Swept file section completeness" begin
+    using Test, TOML
+
+    ROOT = normpath(joinpath(@__DIR__, ".."))
+    rows = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+    swept = sort([f for (f, r) in rows if r["swept"]])
+
+    # The same instrument `test_45_sweep_census.jl` counts units with: one parse per file,
+    # no package loaded, and a count that cannot move under a reformat.
+    doc_macro = GlobalRef(Core, Symbol("@doc"))
+    isdocstring(x) = Meta.isexpr(x, :macrocall) &&
+                     !isempty(x.args) &&
+                     (x.args[1] === doc_macro || x.args[1] === Symbol("@doc"))
+
+    # A definition, not a local assignment. `Au = ...` inside a body whose right-hand side
+    # holds a `JuMP.@constraint` is a local, and reading it as a definition attributes the
+    # row to a name no docstring can ever carry.
+    function isdefinition(x)
+        Meta.isexpr(x, :function) && return true
+        Meta.isexpr(x, :(=)) || return false
+        lhs = x.args[1]
+        while Meta.isexpr(lhs, :where)
+            lhs = lhs.args[1]
+        end
+        return Meta.isexpr(lhs, :call)
+    end
+
+    # The name a definition binds. A definition reaches here through four declaration forms:
+    # bare, `@concrete struct`, a short form, and a macro-prefixed one.
+    function bound_name(x)
+        x isa Symbol && return x
+        x isa Expr || return nothing
+        if Meta.isexpr(x, :macrocall)
+            for a in x.args[2:end]
+                n = bound_name(a)
+                isnothing(n) || return n
+            end
+            return nothing
+        end
+        x.head === :struct && return bound_name(x.args[2])
+        x.head in
+        (:function, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
+            return bound_name(x.args[1])
+        return nothing
+    end
+
+    # A docstring that interpolates parses to an `Expr(:string, ...)`, and a section heading
+    # is a literal line inside it, so the literal pieces alone carry every heading.
+    function docstring_text(x)
+        for a in x.args[2:end]
+            a isa AbstractString && return String(a)
+            Meta.isexpr(a, :string) &&
+                return join(p isa AbstractString ? p : " " for p in a.args)
+        end
+        return ""
+    end
+
+    # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
+    has_section(text, name) = any(==(string("# ", name)), rstrip.(split(text, '\n')))
+
+    constraint_macros = (Symbol("@constraint"), Symbol("@constraints"))
+    function registers_row(node)
+        node isa Expr || return false
+        if Meta.isexpr(node, :macrocall) && !isempty(node.args)
+            m = node.args[1]
+            s = if m isa GlobalRef
+                m.name
+            elseif m isa Symbol
+                m
+            elseif Meta.isexpr(m, :.) && m.args[end] isa QuoteNode
+                m.args[end].value
+            else
+                nothing
+            end
+            s in constraint_macros && return true
+        end
+        return any(registers_row, node.args)
+    end
+
+    #=
+    Returns the file's documented units in source order -- the name each one documents and
+    its text -- and the indices of those that own a row-registering definition. A docstring
+    takes charge of its own name when it is read, and holds it until the next docstring of
+    that name, which is the attribution the two shapes above need.
+    =#
+    function scan(path)
+        names, texts, registering = Symbol[], String[], Int[]
+        in_force = Dict{Symbol, Int}()
+        function walk(node)
+            node isa Expr || return nothing
+            if isdocstring(node)
+                d = length(node.args) >= 4 ? node.args[4] : nothing
+                nm = isnothing(d) ? nothing : bound_name(d)
+                if !isnothing(nm)
+                    push!(names, nm)
+                    push!(texts, docstring_text(node))
+                    in_force[nm] = length(names)
+                end
+            elseif isdefinition(node)
+                nm = bound_name(node)
+                if !isnothing(nm) && haskey(in_force, nm) && registers_row(node)
+                    push!(registering, in_force[nm])
+                end
+            end
+            foreach(walk, node.args)
+            return nothing
+        end
+        walk(Meta.parseall(read(path, String)))
+        return names, texts, unique!(sort!(registering))
+    end
+
+    @testset "a swept file's row-registering docstring carries # JuMP formulation" begin
+        offenders = String[]
+        for f in swept
+            names, texts, registering = scan(joinpath(ROOT, f))
+            for u in registering
+                has_section(texts[u], "JuMP formulation") ||
+                    push!(offenders, string(f, "  ", names[u]))
+            end
+        end
+        if !isempty(offenders)
+            @warn """$(length(offenders)) docstring(s) in a file marked `swept = true` in
+                     `sweep/manifest.toml` document a function that registers a row through
+                     `JuMP.@constraint` or `JuMP.@constraints` and carry no
+                     `# JuMP formulation` section. The section names one bullet per row, by
+                     the row's JuMP name:\n  $(join(offenders, "\n  "))"""
+        end
+        @test isempty(offenders)
+    end
+
+    @testset "a swept file's # Algorithm count does not fall" begin
+        # The key is demanded only of a swept row, so an unswept row is untouched and the
+        # session that flips the flag writes the count in the same edit.
+        no_key = filter(f -> !haskey(rows[f], "algorithm"), swept)
+        if !isempty(no_key)
+            @warn """$(length(no_key)) row(s) marked `swept = true` in
+                     `sweep/manifest.toml` carry no `algorithm` key. A swept row records the
+                     count of its docstrings that carry a `# Algorithm` section, and the
+                     count may not fall afterwards:\n  $(join(no_key, "\n  "))"""
+        end
+        @test isempty(no_key)
+
+        fallen = Tuple{String, Int, Int}[]
+        for f in swept
+            haskey(rows[f], "algorithm") || continue
+            _, texts, _ = scan(joinpath(ROOT, f))
+            measured = count(t -> has_section(t, "Algorithm"), texts)
+            measured < rows[f]["algorithm"] &&
+                push!(fallen, (f, rows[f]["algorithm"], measured))
+        end
+
+        @test isempty(fallen)
+        if !isempty(fallen)
+            println("Files whose count of `# Algorithm` sections has fallen below the ",
+                    "count their `sweep/manifest.toml` row records. Restore the section, ",
+                    "or lower the count deliberately in the same commit that removes it:")
+            for (f, was, now) in fallen
+                row = rows[f]
+                println("  ", f, "  ", was, " -> ", now)
+                println("    \"", f, "\" = { map = ", row["map"], ", units = ",
+                        row["units"], ", algorithm = ", now, ", swept = ", row["swept"],
+                        " }")
+            end
+        end
+    end
+end

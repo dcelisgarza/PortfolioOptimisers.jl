@@ -6,6 +6,12 @@
 #          definition and the three checks that read this file.
 #   swept  whether the file has passed its child map's three-condition sweep.
 #
+# A row whose `swept` is true carries one more key:
+#
+#   algorithm  the count of the file's docstrings that carry a `# Algorithm` section.
+#              `test/test_26_docs.jl` holds it as a floor: the measured count may not fall
+#              below it. The session that flips `swept` writes the count in the same edit.
+#
 # #404's standing rule is: any addition joins its child map, and a closed child map -- and the
 # umbrella -- is reopened. `CLAUDE.md`, section "Functionality you add", states the steps a person
 # takes. A Julia test cannot read the state of an issue, so the census makes the

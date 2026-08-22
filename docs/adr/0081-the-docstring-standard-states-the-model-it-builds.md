@@ -101,3 +101,46 @@ sentence that a second field starts to share moves into `arg_dict` at that momen
 the names that the body registers through `JuMP.@constraint`. That census was offered while #404
 was charted and set aside as the largest build; it stands in the map's *Not yet specified*, to be
 revisited once enough `# JuMP formulation` blocks exist to show whether they drift.
+
+## Amendment (2026-08-22)
+
+The gate this decision promised is built, and it is two checks rather than one.
+
+The Consequences above say that "a file's `swept` flag in the sweep manifest is what makes the new
+rules binding on that file". Nothing read that flag for either section.
+[#437](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/437) built the gate as the
+`Swept file section completeness` testset of `test/test_26_docs.jl`, and it does not treat the two
+sections alike. **The trigger, not the section, decides the shape of the check.**
+
+**`# JuMP formulation` gets a per-unit presence rule.** A body that calls `JuMP.@constraint` or
+`JuMP.@constraints` registers a row, and the parser sees the call, so the trigger needs no
+judgement and no exemption list. Measured over `src/` and `ext/`, **82 functions register a row and
+every one of the 82 is documented in its own file**, so the rule demands the section of 82
+docstrings and of nothing else.
+
+The attribution is **per name, not per definition**, because a docstring is often not on the method
+that registers the row. `04_WeightConstraints.jl` documents a dispatch-error stub and the methods
+that register `w_lb` and `w_ub` follow it undocumented; `06_XatRiskConstraints.jl` documents five
+separate methods of `set_risk_constraints!`, each registering its own rows. A docstring therefore
+speaks for its own definition and for every later definition of that name until the next docstring
+of that name. Read per definition instead, four of the thirteen files under `09_JuMPConstraints/`
+register rows under no documented definition at all.
+
+**`# Algorithm` gets a per-file floor.** This decision's own exemption is a *selector tag*, and no
+parser rule defines one, so a presence rule cannot be written without first defining a selector tag
+mechanically. A row marked `swept = true` in `sweep/manifest.toml` therefore carries one more key,
+`algorithm = N`, and the measured count of the file's `# Algorithm` sections may not fall below it.
+It is a floor and not an equality, because an equality would red an *improvement*: adding the
+section to an existing unit adds no unit, so the row's `units` count would not move and the only
+red would ask for a number to be updated. The floor leaves the stronger rule available — a later
+ticket can raise it to a presence rule without moving the key.
+
+**The gate covers the trigger this decision wrote, and no more.** 40 further documented functions
+touch the model without registering a row: they create a variable, register an expression, or set
+the objective. `set_model_scales!` is one of them, and so are
+`set_risk_constraints!` for `BrownianDistanceVariance` and the scalarisers — **two of the four
+`## Relaxation` cases this decision cites sit on the exempt side of the trigger it wrote**. Whether
+the trigger should widen is a change to this decision, so it is raised as
+[#443](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/443) rather than settled by a
+gate that demands more than its Authority states. This is a known unenforced state, in the sense of
+`STANDARDS.md`, and not a hidden one.

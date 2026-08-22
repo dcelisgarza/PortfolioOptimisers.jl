@@ -109,9 +109,43 @@
         return n
     end
 
-    # Print the row a human must paste back into the manifest.
-    row_line(f, m, u, s) = string("\"", f, "\" = { map = ", m, ", units = ", u,
-                                  ", swept = ", s, " }")
+    #=
+    Print the row a human must paste back into the manifest. A swept row also carries the
+    `algorithm` key that `test_26_docs.jl` ratchets, so the printer takes it: a line pasted
+    without it would delete the ratchet's floor and the deletion would read as a correction.
+    An unswept row has no such key, and a file that has no row at all is never swept.
+    =#
+    function row_line(f, m, u, s; algorithm = nothing)
+        a = isnothing(algorithm) ? "" : string(", algorithm = ", algorithm)
+        return string("\"", f, "\" = { map = ", m, ", units = ", u, a, ", swept = ", s,
+                      " }")
+    end
+
+    #=
+    The map a file belongs to is NOT derivable from its path, so the census prints the
+    CANDIDATES and a person chooses by subject. Each of the nine subdirectories of `src/`
+    and `ext/` maps to exactly one child map, and there the answer is printed outright. The
+    top level of `src/` holds sixteen files across FIVE maps, and the numeric prefix does
+    not rescue the lookup: the blocks are not contiguous. `10_` sits between map 2 and map
+    8, and `25_` returns to map 1. #428 measured this.
+
+    The candidates are the maps the file's own directory already uses, so nothing here
+    repeats the cut. A brand-new directory has no sibling row, and then every map is a
+    candidate.
+    =#
+    all_maps() = sort(parse.(Int, collect(keys(map_names))))
+    function candidate_maps(f)
+        d = dirname(f)
+        ms = sort(unique(r["map"] for (g, r) in rows if dirname(g) == d))
+        return isempty(ms) ? all_maps() : ms
+    end
+
+    # The printer below runs only when the census is already red, so these two hold it to
+    # its contract on a green run. A file's own directory must offer that file's map, and
+    # the top level of `src/` must offer more than one -- which is the whole reason a
+    # candidate list is printed rather than an answer.
+    @test all(f -> rows[f]["map"] in candidate_maps(f), collect(keys(rows)))
+    @test length(candidate_maps("src/00_Nothing.jl")) > 1
 
     # ------------------------------------------------------- 1. a file that has no row
 
@@ -122,7 +156,19 @@
                 "each one to a child map of #404, reopen that map if it is closed, then ",
                 "add its row:")
         for f in missing_rows
-            println("  ", row_line(f, "?", count_units(joinpath(root, f)), false))
+            cands = candidate_maps(f)
+            units = count_units(joinpath(root, f))
+            if length(cands) == 1
+                m = only(cands)
+                println("  ", row_line(f, m, units, false), "   [map ", m, ": ",
+                        map_names[string(m)], "]")
+            else
+                println("  ", row_line(f, "?", units, false))
+                println("    The directory offers no single map. Choose by subject:")
+                for m in cands
+                    println("      map ", m, ": ", map_names[string(m)])
+                end
+            end
         end
     end
 
@@ -156,7 +202,9 @@
             row = rows[f]
             println("  ", f, "  ", was, " -> ", now, "   [map ", row["map"], ": ",
                     map_names[string(row["map"])], "]")
-            println("    ", row_line(f, row["map"], now, row["swept"]))
+            println("    ",
+                    row_line(f, row["map"], now, row["swept"];
+                             algorithm = get(row, "algorithm", nothing)))
         end
     end
 
@@ -182,4 +230,7 @@
     # A `swept` that is not a Bool would read as true under a later gate.
     @test all(r -> r["swept"] isa Bool, values(rows))
     @test all(r -> r["units"] isa Int, values(rows))
+    # `test_26_docs.jl` ratchets this key on a swept row, and demands it there. A `Float64`
+    # or a string would compare against a measured `Int` in ways that no reader expects.
+    @test all(r -> !haskey(r, "algorithm") || r["algorithm"] isa Int, values(rows))
 end
