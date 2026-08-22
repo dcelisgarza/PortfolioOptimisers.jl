@@ -238,5 +238,9 @@ rationale = "keyword-constructor-arity"
 #
 # The list is empty. #408 built the machinery; the thirteen child maps of #404 write the rows as
 # they sweep. A row is written when a line cannot be reached, never when reaching it is merely
-# awkward, and issue #411 settles whether a line reached only by its own `jldoctest` counts as
-# covered at all.
+# awkward.
+#
+# A line reached only by its own `jldoctest` is not exempt. Coverage is the test suite's number:
+# the `doctest` job of `Docs.yml` carries no instrumentation, and a doctest asserts a rendering
+# rather than a result. "The doctest reaches it" is therefore not a rationale, and the sweep writes
+# the test. ADR 0082, issue #411.

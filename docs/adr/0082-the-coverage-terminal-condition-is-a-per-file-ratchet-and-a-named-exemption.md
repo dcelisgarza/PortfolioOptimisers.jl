@@ -144,6 +144,35 @@ Two blocking gates on one number disagree the first time Codecov's report and th
 job, a base commit whose report never finished. `codecov.yml`'s `ignore` list is the Unmeasured Paths
 of ADR 0072 stated the other way round, and the two lists move together.
 
+### A line reached only by its own `jldoctest` is a miss
+
+Coverage is the test suite's number. The `doctest` job of `Docs.yml` runs
+`doctest(PortfolioOptimisers)` under `--project=docs`. It passes no `--code-coverage` flag, it runs
+`julia-actions/julia-processcoverage` over nothing, and it uploads nothing. `coverage.jl` reads the
+`lcov.info` that the test job wrote, and reads nothing else. A line whose only exercise is its own
+example is therefore a miss. This is the intended answer, not an accident of the wiring.
+
+Three reasons.
+
+- **A `jldoctest` block asserts a rendering, not a result.** The job sets `set_compact_show!(false)`
+  to hold the printed form stable. A block that prints a struct exercises `show`, and it proves
+  nothing about the mathematics that built the struct. Check 2 of
+  [#404](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/404) asks for the opposite:
+  compute the number, then compare it with the number the code returns.
+- **Counting the examples would shrink the sweep's work list without doing the work.** The lines it
+  would mark covered are the lines a child map must read hardest, because a function that no test
+  calls is a function whose result nobody has checked.
+- **The sweep writes the test anyway.** A child map that reaches such a line already holds the value
+  it computed for check 2, and turning that value into a `@test` is one line.
+
+**A Coverage Exemption never cites an example.** "The doctest reaches it" states that the line is
+easy to reach, not that it cannot be reached, so the row is refused.
+
+Instrumenting the `doctest` job was weighed and set aside. It buys a lower miss count rather than
+more checked mathematics, and it costs a second `lcov.info` to merge and a second Codecov upload. A
+separate Codecov flag that measures the examples without counting them was set aside for the same
+reason, plus a second number on the badge page that no gate reads.
+
 ### The gate runs in its own job, fed by an artifact
 
 `ReusableTest.yml` gains a `coverage` job. The test job uploads `lcov.info` as an artifact, and the
@@ -177,9 +206,6 @@ is partial, and a ratchet fed partial data reports a fall that is not one.
 - **The `<toplevel>` key is coarse.** Every uncovered line of a file that lies outside a named
   definition shares one row. This is accepted: such lines are few, and splitting them would need a
   key that a reformat can break.
-- **Whether a line reached only by its own `jldoctest` counts as covered is not settled here.** The
-  `doctest` job of `Docs.yml` runs no coverage instrumentation and uploads nothing, so such a line
-  is a miss today.
-  [Issue #411](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/411) settles it, and it
-  changes what a Coverage Exemption must say about such a line. The exemption list ships empty, so
-  nothing in this ADR depends on the answer.
+- **A line reached only by its own example stands as a miss**, and no Coverage Exemption may cite
+  an example. The sweep writes the test instead. CI does exercise such a line on every push, so the
+  number understates what runs, and that cost is accepted.

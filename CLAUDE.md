@@ -83,6 +83,24 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
 - **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
   the report for that work, and name that work in the issue.
 
+## Functionality you add
+
+Every file under `src/` and `ext/` carries a row in [`sweep/manifest.toml`](sweep/manifest.toml)
+naming the child map of the systematic audit that owns it. `test/test_45_sweep_census.jl` reds the
+build when a file carries no row, and when a file's unit count leaves its row.
+
+Wire your addition into the audit in the same change:
+
+1. Add or correct the file's row. The census prints the line to paste. Take `map` from the row of a
+   neighbouring file in the same directory, and set `swept = false`.
+2. Cover every line of a new file, or give it a Coverage Exemption. ADR 0082 owns that rule.
+3. Reopen the child map that owns the file, and reopen its umbrella, issue #404.
+4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the
+   code it joins.
+
+Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
+child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.
+
 ## Repo etiquette
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.

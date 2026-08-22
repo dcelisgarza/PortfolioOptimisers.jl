@@ -57,7 +57,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
-| Adding a file, a type or a function under `src/` or `ext/` | [`sweep/manifest.toml`](sweep/manifest.toml) — its header states the rule, and issue #404 owns it | `test/test_45_sweep_census.jl` |
+| Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl` |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
