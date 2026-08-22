@@ -1,3 +1,8 @@
+# Two half-implemented estimators, used to reach the dispatch-error stubs of the
+# preprocessing interface. Neither implements `fit_preprocessing` or `apply_preprocessing`,
+# which is the mistake the stubs exist to name.
+struct UnimplementedPreprocessing <: PortfolioOptimisers.AbstractPreprocessingEstimator end
+struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreprocessingResult end
 @testset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
           Statistics, LinearAlgebra
@@ -304,5 +309,208 @@
                                       rds)
             @test sel.Z == Zs[[1, 3], :]
         end
+    end
+
+    @testset "prices_to_returns closed form" begin
+        # A two-row example, computed by hand. `TimeSeries.percentchange` routes the simple
+        # branch through `expm1(ln P_t - ln P_{t-1})` rather than the quotient the docstring
+        # states, so the two agree to floating point and not to the last bit.
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
+        P = TimeArray(ts, [100.0 50.0; 110.0 45.0; 121.0 54.0], [:a, :b])
+        simple = [110/100-1 45/50-1; 121/110-1 54/45-1]
+        logret = [log(110 / 100) log(45 / 50); log(121 / 110) log(54 / 45)]
+
+        rs = prices_to_returns(P)
+        @test rs.X ≈ simple
+        @test rs.X ==
+              expm1.(log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0]))
+        @test rs.nx == ["a", "b"]
+        @test rs.ts == ts[2:3]
+
+        rl = prices_to_returns(P; ret_method = :log)
+        @test rl.X ≈ logret
+        @test rl.X == log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0])
+
+        # `padding` keeps the first observation and fills its return with `NaN`, so the
+        # returns keep the length of the price clock.
+        rp = prices_to_returns(P; padding = true)
+        @test rp.ts == ts
+        @test all(isnan, rp.X[1, :])
+        @test rp.X[2:3, :] ≈ simple
+
+        # A `NaN` price becomes `missing`, and its row is dropped before the conversion. The
+        # surviving returns therefore span the gap: the 01-03 return is measured against
+        # 01-01, not against the row that went.
+        Pm = TimeArray(ts, [100.0 50.0; NaN 45.0; 121.0 54.0], [:a, :b])
+        rm = prices_to_returns(Pm)
+        @test rm.ts == [ts[3]]
+        @test rm.X ≈ [121/100-1 54/50-1]
+
+        # `map_func` is applied to every row of the merged table, before the collapse. A
+        # common scale factor leaves a return unchanged; a shift does not.
+        @test prices_to_returns(P; map_func = (t, v) -> (t, 2 .* v)).X ≈ simple
+        @test prices_to_returns(P; map_func = (t, v) -> (t, v .+ 100.0)).X ≈
+              [210/200-1 145/150-1; 221/210-1 154/145-1]
+
+        # Both branches run through a logarithm, so both need a positive price. The simple
+        # branch throws too, although the closed form it documents is defined there.
+        @test_throws DomainError prices_to_returns(TimeArray(ts,
+                                                             [100.0 50.0; -110.0 45.0;
+                                                              121.0 54.0], [:a, :b]))
+        @test_throws DomainError prices_to_returns(TimeArray(ts,
+                                                             [100.0 50.0; -110.0 45.0;
+                                                              121.0 54.0], [:a, :b]);
+                                                   ret_method = :log)
+        # A zero price is an infinity rather than a throw, on either branch.
+        zero_px = TimeArray(ts, [100.0 50.0; 0.0 45.0; 121.0 54.0], [:a, :b])
+        @test prices_to_returns(zero_px).X[:, 1] == [-1.0, Inf]
+        @test prices_to_returns(zero_px; ret_method = :log).X[:, 1] == [-Inf, Inf]
+
+        # Every asset column can go while a factor column survives. The result then carries
+        # no asset data at all, rather than an empty matrix.
+        ts5 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Pa = TimeArray(ts5, reshape([100.0, NaN, NaN, NaN, 104.0], 5, 1), [:a])
+        Pf = TimeArray(ts5, reshape(Float64.(101:105), 5, 1), [:f1])
+        rdrop = prices_to_returns(Pa, Pf; missing_row_percent = 0.3)
+        @test isnothing(rdrop.nx)
+        @test isnothing(rdrop.X)
+        @test rdrop.nf == ["f1"]
+    end
+
+    @testset "port_opt_view carries a benchmark of either width" begin
+        port_opt_view = PortfolioOptimisers.port_opt_view
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Xv = Float64.(reshape(1:20, 5, 4))
+        X = TimeArray(ts, Xv, [:a1, :a2, :a3, :a4])
+        Bwide = TimeArray(ts, Float64.(reshape(101:120, 5, 4)), [:b1, :b2, :b3, :b4])
+        Bnarrow = TimeArray(ts, reshape(Float64.(201:205), 5, 1), [:bm])
+        i = ts[[2, 4]]
+        j = [1, 3]
+
+        # One benchmark column per asset: the asset index selects the same columns of B.
+        vw = port_opt_view(PricesResult(; X = X, B = Bwide), i, j)
+        @test string.(TimeSeries.colnames(vw.B)) == ["b1", "b3"]
+        @test values(vw.B) == values(Bwide)[[2, 4], j]
+        @test values(vw.X) == Xv[[2, 4], j]
+
+        # One shared benchmark column: `j` addresses the assets, so B keeps its single
+        # column. Indexing it by `j` would read past the one column it has.
+        vn = port_opt_view(PricesResult(; X = X, B = Bnarrow), i, j)
+        @test string.(TimeSeries.colnames(vn.B)) == ["bm"]
+        @test values(vn.B) == values(Bnarrow)[[2, 4], :]
+
+        # A time-varying feature matrix cannot be sliced without the surviving timestamps,
+        # because its observation axis is parallel to the price clock positionally.
+        Z3 = reshape(Float64.(1:40), 5, 4, 2)
+        @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(Z3, nothing, ts)
+    end
+
+    @testset "the preprocessing interface refuses a half-implemented estimator" begin
+        pr = PricesResult(;
+                          X = TimeArray(collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3)),
+                                        Float64.(reshape(1:6, 3, 2)), [:a, :b]))
+        @test_throws ArgumentError fit_preprocessing(UnimplementedPreprocessing(), pr)
+        @test_throws ArgumentError apply_preprocessing(UnimplementedPreprocessing(), pr)
+        @test_throws ArgumentError apply_preprocessing(UnimplementedPreprocessingResult(),
+                                                       pr)
+    end
+
+    @testset "Imputer fits on the training window and never refits" begin
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        # `a` is never observed, `b` is observed everywhere, and `c` is observed in the
+        # training window alone.
+        vals = Union{Float64, Missing}[missing 1.0 10.0
+                                       missing 3.0 12.0
+                                       missing 5.0 14.0
+                                       missing 7.0 missing
+                                       missing 9.0 missing
+                                       missing 11.0 missing]
+        pr = PricesResult(; X = TimeArray(ts, vals, [:a, :b, :c]))
+        tr = PortfolioOptimisers.port_opt_view(pr, ts[1:3], :)
+        te = PortfolioOptimisers.port_opt_view(pr, ts[4:6], :)
+
+        res = fit_preprocessing(Imputer(), tr)
+        # An asset with no observed price in the training window gets no fill value, so it
+        # takes no entry in the result and is left untouched at apply time.
+        @test string.(res.nx) == ["b", "c"]
+        @test res.v == [3.0, 12.0]
+
+        applied = apply_preprocessing(res, te)
+        # `c` has no observed price in the test window at all, so its three missing entries
+        # can only take the training median. This is the contract the fit/apply split exists
+        # for: the fill value never comes from the window being transformed.
+        @test values(applied.X)[:, 3] == fill(12.0, 3)
+        @test all(ismissing, values(applied.X)[:, 1])
+        @test values(applied.X)[:, 2] == [7.0, 9.0, 11.0]
+
+        # A fitted name the window does not carry is skipped rather than searched for, so a
+        # narrowed universe still applies.
+        narrow = PricesResult(;
+                              X = TimeArray(ts[4:6],
+                                            Union{Float64, Missing}[7.0, missing, 11.0],
+                                            [:b]))
+        @test values(apply_preprocessing(res, narrow).X) == [7.0, 3.0, 11.0]
+    end
+
+    @testset "the missing-data path on both axes" begin
+        find_complete_indices = PortfolioOptimisers.find_complete_indices
+        is_missing_value = PortfolioOptimisers.is_missing_value
+
+        # `missing` and `NaN` are the two conventions for an absent price, and one predicate
+        # accepts both. A non-number is never missing.
+        @test is_missing_value(missing)
+        @test is_missing_value(NaN)
+        @test !is_missing_value(1.0)
+        @test !is_missing_value("a")
+
+        # `dims = 1` reports the complete columns, `dims = 2` the complete rows. One entry
+        # is enough to remove the whole column or row.
+        Xm = [1.0 2.0 NaN; 4.0 missing 6.0]
+        @test find_complete_indices(Xm) == [1]
+        @test find_complete_indices(Xm; dims = 2) == Int[]
+        @test find_complete_indices([1.0 2.0; 3.0 4.0]) == [1, 2]
+        @test find_complete_indices([1.0 2.0; 3.0 4.0]; dims = 2) == [1, 2]
+
+        # `MissingDataFilter` splits the two axes across the fit/apply seam: `col_thr`
+        # selects the universe at fit time and `row_thr` drops rows at apply time.
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        vals = Union{Float64, Missing}[missing 1.0 10.0
+                                       missing missing 11.0
+                                       missing 3.0 12.0
+                                       missing 4.0 13.0
+                                       missing 5.0 14.0]
+        pr = PricesResult(; X = TimeArray(ts, vals, [:a, :b, :c]))
+
+        # `a` is missing in 5 of 5 rows and `b` in 1 of 5, so a threshold of 0.5 keeps both
+        # `b` and `c`.
+        fitted = fit_preprocessing(MissingDataFilter(; col_thr = 0.5, row_thr = 1.0), pr)
+        @test string.(fitted.nx) == ["b", "c"]
+        @test fitted.row_thr == 1.0
+        # `row_thr = 1.0` admits a row in which every surviving asset is missing, so the
+        # window keeps all five rows.
+        @test TimeSeries.timestamp(apply_preprocessing(fitted, pr).X) == ts
+
+        # Two surviving assets, so `row_thr = 0.4` admits at most 0.8 missing entries per
+        # row: the second row, which holds one, goes.
+        tight = fit_preprocessing(MissingDataFilter(; col_thr = 0.5, row_thr = 0.4), pr)
+        applied = apply_preprocessing(tight, pr)
+        @test TimeSeries.timestamp(applied.X) == ts[[1, 3, 4, 5]]
+        @test values(applied.X) == [1.0 10.0; 3.0 12.0; 4.0 13.0; 5.0 14.0]
+
+        # A universe that keeps nothing is refused rather than returned empty.
+        allmissing = PricesResult(;
+                                  X = TimeArray(ts,
+                                                Union{Float64, Missing}[missing missing
+                                                                        missing missing
+                                                                        missing missing
+                                                                        missing missing
+                                                                        missing missing],
+                                                [:a, :b]))
+        @test_throws PortfolioOptimisers.IsEmptyError fit_preprocessing(MissingDataFilter(;
+                                                                                          col_thr = 0.5),
+                                                                        allmissing)
+        # A window that carries none of the fitted universe is refused the same way.
+        other = PricesResult(; X = TimeArray(ts, Float64.(reshape(1:5, 5, 1)), [:zz]))
+        @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(fitted, other)
     end
 end

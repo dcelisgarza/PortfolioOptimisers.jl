@@ -1445,6 +1445,8 @@ Where:
   - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
   - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
 
+`TimeSeries.percentchange` computes both branches through logarithms: the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is ``\\mathrm{expm1}`` of it. The two agree with the forms above to floating point rather than to the last bit, and both need a **positive** price. A negative price throws a `DomainError` from inside the logarithm, on the simple branch as well, and a zero price gives ``\\pm\\infty``.
+
 A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns in the `B` field of the [`ReturnsResult`](@ref); it is not subtracted here. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is done later, by [`returns_result_picker`](@ref), and only when the optimisation tracks the benchmark.
 
 # Algorithm
@@ -1460,7 +1462,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
 10. Drop each column whose count of missing rows exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
 11. Drop every column that is still typed as missing, then every row that still holds a missing entry.
-12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above.
+12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
 13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
 14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
 15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`.
