@@ -3,6 +3,22 @@
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\boldsymbol{a} \\otimes \\boldsymbol{b})_{ij} &= a_{i} b_{j}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``: Vectorised first array `A`, of length ``n``.
+  - ``\\boldsymbol{b}``: Vectorised second array `B`, of length ``m``.
+  - ``a_{i}``, ``b_{j}``: Entries of ``\\boldsymbol{a}`` and ``\\boldsymbol{b}`` in linear index order.
+
+The result is the outer product ``\\boldsymbol{a} \\boldsymbol{b}^\\intercal``, an ``n \\times m`` matrix. `A` and `B` may carry any shape, because both are read in linear index order.
+
 # Arguments
 
   - `A::ArrNum`: First array.
@@ -30,6 +46,25 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
     ⊙(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) multiplication.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\boldsymbol{a} \\odot \\boldsymbol{b})_{i} &= a_{i} b_{i}\\,, \\\\
+(\\boldsymbol{a} \\odot \\beta)_{i} &= a_{i} \\beta\\,, \\\\
+(\\alpha \\odot \\boldsymbol{b})_{i} &= \\alpha b_{i}\\,, \\\\
+\\alpha \\odot \\beta &= \\alpha \\beta\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
+  - ``\\alpha``, ``\\beta``: Scalar operands.
+  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+
+Both array operands must carry the same length. A scalar operand multiplies every entry of the array operand.
 
 # Arguments
 
@@ -78,6 +113,25 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 
 Elementwise (Hadamard) division.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\boldsymbol{a} \\oslash \\boldsymbol{b})_{i} &= \\frac{a_{i}}{b_{i}}\\,, \\\\
+(\\boldsymbol{a} \\oslash \\beta)_{i} &= \\frac{a_{i}}{\\beta}\\,, \\\\
+(\\alpha \\oslash \\boldsymbol{b})_{i} &= \\frac{\\alpha}{b_{i}}\\,, \\\\
+\\alpha \\oslash \\beta &= \\frac{\\alpha}{\\beta}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
+  - ``\\alpha``, ``\\beta``: Scalar operands.
+  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+
+Both array operands must carry the same length. The division is not guarded, so a zero divisor gives an infinity or a `NaN`.
+
 # Arguments
 
   - `A`: Dividend (array or scalar).
@@ -125,6 +179,25 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 
 Elementwise (Hadamard) addition.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\boldsymbol{a} \\oplus \\boldsymbol{b})_{i} &= a_{i} + b_{i}\\,, \\\\
+(\\boldsymbol{a} \\oplus \\beta)_{i} &= a_{i} + \\beta\\,, \\\\
+(\\alpha \\oplus \\boldsymbol{b})_{i} &= \\alpha + b_{i}\\,, \\\\
+\\alpha \\oplus \\beta &= \\alpha + \\beta\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
+  - ``\\alpha``, ``\\beta``: Scalar operands.
+  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+
+Both array operands must carry the same length. A scalar operand is added to every entry of the array operand, which the built-in `+` refuses.
+
 # Arguments
 
   - `A`: First summand (array or scalar).
@@ -171,6 +244,25 @@ julia> PortfolioOptimisers.:⊕(2, 3)
     ⊖(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) subtraction.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\boldsymbol{a} \\ominus \\boldsymbol{b})_{i} &= a_{i} - b_{i}\\,, \\\\
+(\\boldsymbol{a} \\ominus \\beta)_{i} &= a_{i} - \\beta\\,, \\\\
+(\\alpha \\ominus \\boldsymbol{b})_{i} &= \\alpha - b_{i}\\,, \\\\
+\\alpha \\ominus \\beta &= \\alpha - \\beta\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.
+  - ``\\alpha``, ``\\beta``: Scalar operands.
+  - ``i``: Linear index, ``i = 1,\\ldots,n``.
+
+Both array operands must carry the same length. A scalar operand is subtracted from every entry of the array operand, which the built-in `-` refuses.
 
 # Arguments
 
@@ -221,6 +313,28 @@ Efficient scalar and vector dot product utility.
   - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{dot\\_scalar}(\\alpha, \\boldsymbol{b}) &= \\alpha \\sum_{i=1}^{n} b_{i}\\,, \\\\
+\\mathrm{dot\\_scalar}(\\boldsymbol{a}, \\beta) &= \\beta \\sum_{i=1}^{n} a_{i}\\,, \\\\
+\\mathrm{dot\\_scalar}(\\boldsymbol{a}, \\boldsymbol{b}) &= \\boldsymbol{a}^\\intercal \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\alpha``, ``\\beta``: Scalar operand, a number or a `JuMP` scalar.
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Vector operand of length ``n``.
+
+The first two forms are the dot product of the vector with a constant vector of value ``\\alpha``, so the scalar stands for a uniform vector. The sum replaces that constant vector, so no ``n``-length array is built.
+
+# Arguments
+
+  - `a`: First operand, a scalar or a vector.
+  - `b`: Second operand, a scalar or a vector.
+
 # Returns
 
   - `res::Number`: The resulting scalar.
@@ -268,6 +382,16 @@ end
     ) -> [nothing_scalar_array_view(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method, and no method allocates a copy of the data.
+
+ 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm, a set of dynamic weights, an estimator or an algorithm: return `x` itself.
+ 2. `x` is a vector: return `view(x, i)`, one entry per selected asset.
+ 3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `view(x.v, i)` and whose scalar part `x.s` is carried through. The scalar part carries no asset axis.
+ 4. `x` is a matrix: return `view(x, i, i)`, which selects the **same** index on **both** axes. This is the rule for a square per-asset matrix, such as a covariance matrix or a similarity matrix. A matrix whose two axes are different needs [`nothing_scalar_array_view_odd_order`](@ref) instead.
+ 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the views into a new vector. The outer vector is rebuilt, so its own length is unchanged.
 
 # Arguments
 
@@ -355,6 +479,11 @@ The threaded tail `args...` (typically the returns matrix `X` for the JuMP famil
 any `kwargs` are accepted and dropped here, so a macro-threaded
 `port_opt_view(child, i, X)` never `MethodError`s on a leaf field.
 
+# Algorithm
+
+ 1. Drop `args...` and `kwargs...`. This method is the leaf of the recursion, so it threads nothing further.
+ 2. Return [`nothing_scalar_array_view`](@ref) of `x` at `i`, whose own algorithm names the rule for each leaf type.
+
 # Related
 
   - [`factory`](@ref)
@@ -368,6 +497,18 @@ port_opt_view(x, i, args...; kwargs...) = nothing_scalar_array_view(x, i)
 First-class [`port_opt_view`](@ref) method for [`VecScalar`](@ref): slices the vector
 component and preserves the scalar component, delegating to
 [`nothing_scalar_array_view`](@ref).
+
+# Algorithm
+
+ 1. Drop `args...`.
+ 2. Return [`nothing_scalar_array_view`](@ref) of `x` at `i`, whose [`VecScalar`](@ref) method views `x.v` at `i` and carries `x.s` through.
+
+This method exists so that a [`VecScalar`](@ref) reaching the verb with a threaded tail resolves here rather than through the universal leaf method. Both routes give the same value.
+
+# Related
+
+  - [`VecScalar`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
 """
 port_opt_view(x::VecScalar, i, args...) = nothing_scalar_array_view(x, i)
 """
@@ -382,6 +523,12 @@ These methods serve every propagation family. Because many optional fields are t
 disambiguate a `nothing` argument from the family-specific `Option{T}` passthroughs and
 from the universal leaf fallback. Both carry a fixed second positional so they dominate
 the universal `port_opt_view(x, i, args...)` method.
+
+# Algorithm
+
+ 1. Return `nothing`. Neither method reads its index, its tail or its keywords.
+
+The two methods differ only in whether they accept a tail, and both are needed: a call site that threads no tail resolves on the first, and one that threads a returns matrix resolves on the second.
 
 # Examples
 
@@ -400,6 +547,13 @@ Generic vector method for [`port_opt_view`](@ref): view each element of `x` at t
 This is the index-selection twin of the vector [`factory`](@ref) method, and it is the **one forwarding contract** for every vector-valued propagation field. The tail `args...` (typically the returns matrix `X`) and every keyword reach each element unchanged, so a family that admits a vector of estimators, algorithms, or results needs no method of its own.
 
 Without it such a vector falls through to the universal leaf method `port_opt_view(x, i, args...)`, which slices the vector itself through [`nothing_scalar_array_view`](@ref) — the asset index would select *elements* instead of assets. A family that needs more than the forward, such as a concrete element type ([`concrete_typed_array_if_abstract`](@ref)) or a passthrough, defines its own more specific method.
+
+# Algorithm
+
+ 1. For each element `xi` of `x`, call [`port_opt_view`](@ref) on `xi` at `i`, and forward `args...` and `kwargs...` unchanged.
+ 2. Collect the results into a new vector, in the order of `x`, and return it.
+
+The length of `x` is unchanged, because `i` reaches the elements and never the outer vector. The result is a comprehension, so its element type is whatever Julia infers; a family that needs a concrete element type wraps the call in [`concrete_typed_array_if_abstract`](@ref).
 
 # Arguments
 
@@ -436,6 +590,12 @@ Sub-select an estimator's **observation weights** to the observations `i`.
 
 [`factory`](@ref) reads the same `@wprop` tag on the same field, and does a different thing with it: it **replaces** the field with an incoming [`ObsWeights`](@ref) value, at every level of the tree at once. That is why a slice cannot go through `factory`. A [`SimpleVariance`](@ref) holding a weighted mean and an unweighted dispersion comes back from `factory` with both weighted, which is a different estimator; here each field is indexed on its own, so a field that held `nothing` still holds `nothing`.
 
+# Algorithm
+
+ 1. Return `x` unchanged. This universal fallback reads neither its index nor the fields of `x`.
+
+A [`@propagatable`](@ref) struct with at least one `@wprop`-tagged field carries a generated method that dominates this one. That method rebuilds the struct with the same constructor, indexing each `@wprop` field to `i` through [`nothing_scalar_array_getindex`](@ref) and recursing into each `@fprop` field through this verb.
+
 # Arguments
 
   - `x`: Estimator, algorithm, result, weights vector, or `nothing`. The argument is untyped, because the variance estimators subtype `StatsBase.CovarianceEstimator` while the expected returns estimators subtype [`AbstractEstimator`](@ref), and both reach this verb.
@@ -465,6 +625,18 @@ obs_weights_view(x, ::Any) = x
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Vector overload of [`obs_weights_view`](@ref). Applies the verb to every element, so an `@fprop`-tagged field holding a vector of composed children is not silently skipped.
+
+# Algorithm
+
+ 1. For each element `xi` of `x`, call [`obs_weights_view`](@ref) on `xi` at `i`.
+ 2. Collect the results into a new vector, in the order of `x`, and return it.
+
+The length of `x` is unchanged, because `i` selects observations inside each element and never elements of `x`. Without this method such a vector reaches the universal fallback and comes back with full-sample weights.
+
+# Related
+
+  - [`obs_weights_view`](@ref)
+  - [`@fprop`](@ref)
 """
 function obs_weights_view(x::AbstractVector{<:Union{Nothing, <:AbstractEstimator,
                                                     <:AbstractAlgorithm, <:AbstractResult}},
@@ -478,6 +650,16 @@ end
     get_window(window::VecInt, args...) -> VecInt
 
 Get the observation window index range for a data array.
+
+# Algorithm
+
+The type of `window` names the rule, and each rule is one step.
+
+ 1. `window` is `nothing` or a `Colon`: return `Colon()`, which selects every observation.
+ 2. `window` is an integer: read `start`, the first index of `X` along the observation axis, and `stop`, its last index. Return the range `max(start, stop - window + 1):stop`, which is the last `window` observations.
+ 3. `window` is a vector of integers: return `window` itself, so the caller states the observations directly.
+
+Step 2 clamps the lower end at `start`, so a `window` larger than the number of observations gives every observation rather than an error. The observation axis of a matrix is `dims`, and a vector carries one axis, so its method drops `dims`.
 
 # Arguments
 
@@ -520,6 +702,13 @@ Utility for safely viewing into possibly `nothing` or array values with two indi
 
   - If `x` is `nothing`, returns `nothing`.
   - Otherwise, returns `view(x, i, j)`.
+
+# Algorithm
+
+ 1. `x` is `nothing`: return `nothing`.
+ 2. `x` is a matrix: return `view(x, i, j)`, which selects `i` on the row axis and `j` on the column axis.
+
+The two axes take **different** indices, which is what separates this verb from [`nothing_scalar_array_view`](@ref). An odd-order co-moment matrix is ``N \\times N^{k}`` for an odd order ``k``, so the row index selects assets and the column index selects the tuples of assets that the columns hold. The caller supplies `j`, and this verb does not derive it; [`fourth_moment_index_generator`](@ref) is the counterpart that builds such a column index.
 
 # Arguments
 
@@ -567,6 +756,18 @@ end
     ) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. It is the copying twin of [`nothing_scalar_array_view`](@ref): every step returns a new array rather than a view.
+
+ 1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm or a set of dynamic weights: return `x` itself.
+ 2. `x` is a vector: return `x[i]`, a new vector with one entry per selected asset.
+ 3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `x.v[i]` and whose scalar part `x.s` is carried through.
+ 4. `x` is a matrix: return `x[i, i]`, which selects the **same** index on **both** axes. This is the rule for a square per-asset matrix. A matrix whose two axes are different needs [`nothing_scalar_array_getindex_odd_order`](@ref) instead.
+ 5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the results into a new vector.
+
+The type list of step 1 is **shorter** than the one [`nothing_scalar_array_view`](@ref) carries: an estimator, an algorithm and a `StatsBase.CovarianceEstimator` reach the view verb and not this one, because only the view verb is the leaf of [`port_opt_view`](@ref).
 
 # Arguments
 
@@ -635,6 +836,13 @@ Utility for safely indexing into possibly `nothing` or array values with two ind
   - If `x` is `nothing`, returns `nothing`.
   - Otherwise, returns `x[i, j]`.
 
+# Algorithm
+
+ 1. `x` is `nothing`: return `nothing`.
+ 2. `x` is a matrix: return `x[i, j]`, which selects `i` on the row axis and `j` on the column axis, and copies.
+
+This is the copying twin of [`nothing_scalar_array_view_odd_order`](@ref), and it takes **different** indices on the two axes for the same reason: an odd-order co-moment matrix is ``N \\times N^{k}`` for an odd order ``k``.
+
 # Arguments
 
   - `x`: Input value.
@@ -669,6 +877,29 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{idx} &= \\left( (c - 1) N + r \\right)_{c \\in \\boldsymbol{i},\\ r \\in \\boldsymbol{i}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:N])
+  - ``\\boldsymbol{i}``: The selected asset indices, of length ``n``.
+  - ``r``, ``c``: The row and the column of an asset pair in the ``N \\times N`` grid of pairs.
+
+``(c - 1) N + r`` is the column-major linear index of the pair ``(r, c)`` in that grid, which is the axis of the square cokurtosis matrix ``\\mathbf{K}``, of size ``N^{2} \\times N^{2}``. So `idx` selects the ``n^{2}`` pairs that the ``n`` selected assets make, on either axis of ``\\mathbf{K}``. `c` runs on the outside, so the order of `idx` is the column-major order of the sub-grid too.
+
+# Algorithm
+
+ 1. Make `idx`, an empty vector of integers, with room for `length(i)^2` entries.
+ 2. For each `c` in `i`, take the linear index range of column `c`, which is `((c - 1) * N + 1):(c * N)`, and select the entries `i` of that range.
+ 3. Append the selected entries to `idx`.
+ 4. Return `idx`.
+
 # Arguments
 
   - `N`: Size of the full covariance matrix.
@@ -700,6 +931,17 @@ end
     traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing) -> AbstractVector
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
+
+# Algorithm
+
+ 1. When `ctarr` is `nothing`, make it an empty `Vector{Any}`. The accumulator is threaded through the recursion, so one array collects every branch.
+ 2. Read `sts`, the direct subtypes of `t`, with `InteractiveUtils.subtypes`.
+ 3. For each subtype `st` of `sts`, take one of two branches:
+     1. `st` is not a struct type, so it is a further abstract type: call this function again on `st` with the same `ctarr`.
+     2. `st` is a struct type: push `st` onto `ctarr`.
+ 4. Return `ctarr`.
+
+The recursion descends the whole tree below `t`, so an abstract type at any depth is opened and never collected. The order of `ctarr` is the depth-first order of the tree, which follows the order that `InteractiveUtils.subtypes` reports.
 
 # Arguments
 
@@ -751,6 +993,15 @@ Convert an `AbstractArray` `A` to a concrete typed array, where each element is 
 
 This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
 
+# Algorithm
+
+ 1. Read the concrete type of every element of `A` with `typeof.(A)`.
+ 2. Build the element type `Union{typeof.(A)...}`, the union of exactly those types. An element type that no element carries is absent from the union.
+ 3. Splat `A` into a vector of that element type, which flattens `A` to one dimension.
+ 4. Reshape the vector back to `size(A)`, and return it.
+
+The elements are copied into a new array, and each keeps its own type. The union is built from the values, so the result is only as narrow as the array's contents allow: an `Any` array holding one `Int64` comes back as a `Vector{Int64}`.
+
 # Arguments
 
   - `A`: The input array.
@@ -784,6 +1035,12 @@ end
 Narrow the element type of `A` with [`concrete_typed_array`](@ref), but only when that element type is abstract.
 
 The generic vector methods of [`factory`](@ref) and [`port_opt_view`](@ref) rebuild a vector field element by element. A comprehension over a heterogeneous vector infers an abstract element type, which costs a dynamic dispatch at every later use. This is the opt-in narrowing step for the families that want the concrete element type back.
+
+# Algorithm
+
+ 1. Test `eltype(A)` with `isabstracttype`.
+ 2. The element type is abstract: return [`concrete_typed_array`](@ref) of `A`, which copies.
+ 3. The element type is concrete: return `A` itself, which copies nothing.
 
 # Arguments
 
@@ -834,6 +1091,19 @@ previous portfolio weights) down through a composed struct tree; `port_opt_view`
 
 The vector method is the **one forwarding contract** for every vector-valued propagation field: it applies `factory` to each element and forwards `args...` and `kwargs...` unchanged, so a family that admits a vector of estimators, algorithms, or results needs no method of its own. A family that needs more than the forward, such as a concrete element type ([`concrete_typed_array_if_abstract`](@ref)), defines its own more specific method.
 
+# Algorithm
+
+The scalar method:
+
+ 1. Return `a` unchanged, and drop `args...` and `kwargs...`. This method is the leaf of the recursion, and it is what makes an untagged type safe to call the verb on.
+
+The vector method:
+
+ 1. For each element `ai` of `a`, call `factory` on `ai`, and forward `args...` and `kwargs...` unchanged.
+ 2. Collect the results into a new vector, in the order of `a`, and return it.
+
+A [`@propagatable`](@ref) struct with at least one `@fprop`- or `@wprop`-tagged field carries a generated method that dominates the scalar method. That method rebuilds the struct with its keyword constructor, sending each `@fprop` field through [`factory_child`](@ref) and each `@wprop` field through [`_wprop`](@ref).
+
 # Arguments
 
   - `a`: Indicates no object should be constructed, or a vector whose elements are rebuilt one by one.
@@ -879,6 +1149,16 @@ Per-field recursion helper called by [`@propagatable`](@ref)-generated [`factory
 
 Dispatches on the field value type: estimators, algorithms, and results recurse via [`factory`](@ref); observation-weight fields (`::Nothing` or `::StatsBase.AbstractWeights`) are replaced by the incoming [`ObsWeights`](@ref) argument; everything else passes through unchanged.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `v` is an estimator, an algorithm or a result: return [`factory`](@ref) of `v`, forwarding `args...` and `kwargs...`. The recursion descends one level of the struct tree.
+ 2. `v` is an array of them: apply step 1 to each element, and collect the results into a new vector.
+ 3. `v` is anything else: return `v` unchanged. A data field, a scalar and a `nothing` all take this branch.
+
+Step 3 is why a `nothing` field is **not** filled in by this verb. A weights field that must be replaced when it holds `nothing` carries `@wprop` and reaches [`_wprop`](@ref) instead.
+
 # Related
 
   - [`@propagatable`](@ref)
@@ -905,6 +1185,15 @@ distinct from [`factory_child`](@ref) (used by [`@fprop`](@ref)), which recurses
 sub-estimators and leaves `nothing`/non-estimator values unchanged — a weights slot
 must not be confused with an optional sub-estimator that happens to be `nothing`.
 
+# Algorithm
+
+The method that Julia selects is the algorithm, and the selection reads `args...`, never the field.
+
+ 1. The first threaded positional argument is an [`ObsWeights`](@ref): return that value, whatever the field held.
+ 2. No such argument is threaded: return `field` unchanged.
+
+The field's own value never selects the branch, so a field holding `nothing` and a field holding weights are both replaced by an incoming [`ObsWeights`](@ref), and both are kept when none is threaded.
+
 # Related
 
   - [`@wprop`](@ref)
@@ -925,15 +1214,18 @@ so whichever fallback the consumer already applies — `sel` on the factory path
 The two paths are separate: a `JuMP` model builder reads the risk measure's slots directly
 and never calls [`factory`](@ref), so both entry points resolve.
 
-This method is the identity, and it is the arm for a second argument that is not a prior
-result: with no prior in hand nothing can be fitted, so the deferred state travels on.
-
 Given a prior result the rule has two halves. **Container recursion is derived** from
 [`deferred_slots`](@ref), so a type that only holds children needs no method at all. **A
 type that resolves a quantity of its own defines a method**, which overrides the derived one.
 Writing that half per type — rather than per field — is what lets slots that travel together
 be resolved together: a deferred `sigma` supplies `chol` from the same fit, so the pair is
 never mixed across two sources.
+
+# Algorithm
+
+ 1. Return `x` unchanged. This method is the arm for a second argument that is **not** a prior result: with no prior in hand nothing can be fitted, so the deferred state travels on.
+
+A more specific method dominates this one on a prior result: the one that [`deferred_slots`](@ref) derives for a container, and the hand-written one of a type that resolves a quantity of its own.
 
 # Related
 
@@ -981,6 +1273,12 @@ The macro name of every tag of [`PROP_TAG_NAMES`](@ref), in the same order.
 
 Derived from the tag names, so a row of the table carries no second spelling.
 [`prop_tag`](@ref) matches a `:macrocall` head against this tuple.
+
+# Algorithm
+
+ 1. Map each tag of [`PROP_TAG_NAMES`](@ref) to `Symbol("@", tag)`, which is the name Julia gives that tag's macro.
+
+The map preserves the order, so the ``k``-th entry here is the macro name of the ``k``-th tag there. [`prop_tag`](@ref) and [`check_prop_tag_macros`](@ref) both walk the two tuples together, and that pairing is what the shared order guarantees.
 
 # Related
 
@@ -1037,6 +1335,14 @@ hand, and a `GlobalRef` once another macro has expanded around it, so both spell
 resolve. A name outside [`PROP_TAG_MACRO_NAMES`](@ref) gives `nothing`, which is how the
 callers tell a tag from any other macro; no tag falls through to another tag.
 
+# Algorithm
+
+ 1. Read `name` from `x`. A `GlobalRef` gives its `name` field, a `Symbol` gives itself, and any other value returns `nothing` at once.
+ 2. Walk [`PROP_TAG_NAMES`](@ref) and [`PROP_TAG_MACRO_NAMES`](@ref) together. Return the tag whose macro name is identical to `name`.
+ 3. No macro name matches: return `nothing`.
+
+The comparison is `===` on a `Symbol`, so a macro whose name merely resembles a tag never matches.
+
 # Arguments
 
   - `x`: The first argument of a `:macrocall` expression.
@@ -1077,6 +1383,11 @@ Return `true` if `x` is a macro call to any tag of [`PROP_TAG_NAMES`](@ref).
 Used by [`peel_prop_tags`](@ref) and [`propagatable_parse_body`](@ref) to detect tagged
 fields in a struct body.
 
+# Algorithm
+
+ 1. Return `true` when all three hold: `x` is an `Expr`, its head is `:macrocall`, and [`prop_tag`](@ref) of its first argument is not `nothing`.
+ 2. Return `false` otherwise.
+
 # Arguments
 
   - `x`: Any expression appearing in a struct body.
@@ -1101,6 +1412,14 @@ Tags may be stacked in either order (`@pprop @fprop field`), which parses as nes
 `:macrocall` nodes; this unwraps them all and returns the bare field expression. Each tag
 is looked up with [`prop_tag`](@ref), so an untagged macro stops the peel and no tag is
 reached by falling through the others.
+
+# Algorithm
+
+ 1. Make `tags`, an empty `Set{Symbol}`.
+ 2. While [`is_prop_tag_call`](@ref) of `expr` holds, push [`prop_tag`](@ref) of its first argument onto `tags`, and replace `expr` with its **last** argument, which is the expression the tag wraps.
+ 3. Return `tags` and the peeled `expr`.
+
+`tags` is a set, so a tag written twice on one field is recorded once. The loop stops at the first node that is not a tag call, so a non-tag macro between two tags hides the tags below it.
 
 # Arguments
 
@@ -1134,6 +1453,23 @@ Return the expression that a tag substitutes for one field, inside a generated m
 This is the `name → field transform` half of the tag table: one branch per tag of
 [`PROP_TAG_NAMES`](@ref), read by [`prop_channel_pairs`](@ref) for every channel. A tag of
 the table with no branch here errors, so it cannot silently take another tag's transform.
+
+# Algorithm
+
+The channel is read first, and then the tag, because one tag has two transforms.
+
+ 1. `channel` is `:obs`:
+     1. `tag` is `:wprop`: return `nothing_scalar_array_getindex(xf, thread...)`. The field **is** the weights, so it is indexed to the selected observations. Indexing keeps the `AbstractWeights` subtype, which a view would not.
+     2. `tag` is `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
+ 2. `channel` is any other channel:
+     1. `tag` is `:fprop`: return `factory_child(xf, thread..., args...; kwargs...)`.
+     2. `tag` is `:vprop`: return `port_opt_view(xf, thread..., args...)`. This channel forwards no keywords.
+     3. `tag` is `:pprop`: return `sel(xf, getproperty(pr, fname))`, which is why the field name is an argument. The prior result supplies the property of the **same name**.
+     4. `tag` is `:cprop`: return `sel(xf, _ctx(args...))`, which reads the context out of the threaded arguments rather than the prior.
+     5. `tag` is `:wprop`: return `_wprop(xf, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref).
+ 3. No branch matched: raise an error naming the tag and the channel, and ask for a branch here.
+
+Steps 1.1 and 2.5 are the same tag with two transforms, so the channel decides what `@wprop` means. Every emitted name is qualified against `mod`, because the expansion is escaped into the caller's module.
 
 # Arguments
 
@@ -1192,6 +1528,13 @@ Return `true` if a channel of [`PROP_TAG_CHANNELS`](@ref) must emit a method.
 
 A channel is active when at least one field carries a tag of the channel's `gate`.
 
+# Algorithm
+
+ 1. Read the `gate` tuple of the channel from [`PROP_TAG_CHANNELS`](@ref).
+ 2. Return `true` when at least one tag of `gate` has a non-empty entry in `tagged`, and `false` otherwise.
+
+The `precedence` tuple is **not** read here, so a tag that a channel consults but does not gate on never makes that channel emit a method on its own. The `obs` channel gates on `@wprop` alone and consults `@fprop`, so a type carrying `@fprop` and no `@wprop` gains no `obs` method.
+
 # Arguments
 
   - `channel::Symbol`: A channel name of [`PROP_TAG_CHANNELS`](@ref).
@@ -1217,6 +1560,19 @@ Every declared field gets one pair, in declaration order. The field's tags are c
 the channel's `precedence` order; the first match gives the value through
 [`prop_tag_expr`](@ref), and a field carrying no tag of the channel is passed through
 unchanged.
+
+# Algorithm
+
+ 1. Read the `precedence` tuple of the channel from [`PROP_TAG_CHANNELS`](@ref).
+ 2. For each field name `fname` of `all_fields`, in declaration order:
+     1. Build `xf`, the expression `obj.fname` that reads the field off the incoming struct.
+     2. Find `idx`, the position of the **first** tag of `precedence` that `fname` carries.
+     3. When `idx` is `nothing`, the field carries no tag of this channel: the value is `xf` itself.
+     4. Otherwise the value is [`prop_tag_expr`](@ref) of that tag, in this channel.
+     5. Push `Expr(:kw, fname, value)` onto `pairs`.
+ 3. Return `pairs`.
+
+Step 2.2 is where the precedence decides one field's transform. A field carrying `@pprop` and `@fprop` takes the `@pprop` transform on the `prior` channel and the `@fprop` transform on the `factory` channel, because the two channels order the tags differently.
 
 # Arguments
 
@@ -1258,6 +1614,14 @@ Return `true` if `x` is a reference to Julia's `@doc` macro (bare `Symbol` or `G
 
 Used by [`propagatable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
 
+# Algorithm
+
+ 1. Return `true` when `x` is a `GlobalRef` whose `name` is `Symbol("@doc")`.
+ 2. Return `true` when `x` is equal to `Symbol("@doc")`.
+ 3. Return `false` otherwise.
+
+Both spellings are needed for the same reason [`prop_tag`](@ref) needs both: a struct body written by hand carries the bare `Symbol`, and one that another macro has already expanded carries the `GlobalRef`.
+
 # Related
 
   - [`propagatable_parse_body`](@ref)
@@ -1272,6 +1636,14 @@ Extract the field name `Symbol` from a bare field or `field::Type` expression.
 
 Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
 `field::Type` annotation, since only those forms are valid after [`@fprop`](@ref).
+
+# Algorithm
+
+ 1. `expr` is a `Symbol`: return it.
+ 2. `expr` is an `Expr` whose head is `:(::)`: return its first argument, which is the field name.
+ 3. `expr` is anything else: raise an error naming the expression.
+
+Step 3 is what separates this function from [`try_field_name`](@ref), which returns `nothing` in the same case. A tag states that the node **is** a field, so a node that is not one is a defect in the struct body and not a node to skip.
 
 # Arguments
 
@@ -1306,6 +1678,15 @@ Returns `(struct_node, rebuild_fn)` where `rebuild_fn(new_struct)` reconstructs 
 original macro chain with `new_struct` in place of the original struct. This allows
 [`@propagatable`](@ref) to inject modified struct definitions back into arbitrary macro
 wrappers such as `@concrete`.
+
+# Algorithm
+
+ 1. `expr` is not an `Expr`: raise an error naming its type.
+ 2. `expr` has head `:struct`: return `expr` itself and `identity`, which rebuilds nothing.
+ 3. `expr` has head `:macrocall`: take `inner`, its **last** argument, and call this function again on it. That call gives `struct_node` and `rebuild`. Read `prefix`, every argument of `expr` except the last. Return `struct_node` and the function `s -> Expr(:macrocall, prefix..., rebuild(s))`.
+ 4. `expr` has any other head: raise an error naming the head.
+
+Step 3 rebuilds the chain from the inside out, so a struct wrapped in several macros comes back wrapped in the same macros, in the same order, with the same arguments. The prefix carries the macro's own arguments and its `LineNumberNode`, so nothing of the call is lost.
 
 # Arguments
 
@@ -1349,6 +1730,15 @@ supertype-constrained name expression.
 Handles the forms `Name`, `Name{T, ...}`, and `Name{T, ...} <: SuperType` by
 recursively peeling `:curly` and `:<:` wrappers until a bare `Symbol` is reached.
 
+# Algorithm
+
+ 1. `n` is a `Symbol`: return it.
+ 2. `n` has head `:curly`: call this function again on its first argument, which drops the type parameters.
+ 3. `n` has head `:<:`: call this function again on its first argument, which drops the supertype.
+ 4. `n` is anything else: raise an error naming the expression.
+
+Steps 2 and 3 compose, so `Name{T} <: Super` peels the supertype first and then the parameters.
+
 # Arguments
 
   - `n`: A `Symbol`, or an `Expr` with head `:curly` or `:<:`.
@@ -1385,6 +1775,14 @@ Recognises bare `Symbol` fields and `field::Type` annotations. Returns `nothing`
 `LineNumberNode`s, inner constructors, and any other expression that does not declare
 a single named field.
 
+# Algorithm
+
+ 1. `expr` is a `Symbol`: return it.
+ 2. `expr` has head `:(::)` **and** its first argument is a `Symbol`: return that argument.
+ 3. `expr` is anything else: return `nothing`.
+
+Step 2 tests the first argument as well as the head, which [`extract_field_name`](@ref) does not. A node such as `::Type`, which annotates no name, therefore gives `nothing` here and reaches step 3.
+
 # Arguments
 
   - `expr`: Any expression appearing in a struct body.
@@ -1420,6 +1818,19 @@ Handles bare tagged fields (`@fprop field`, …), stacked tags
 (`"doc" \\n @fprop field`). Non-field nodes (line numbers, inner constructors) are carried
 through unchanged. The tags are the rows of [`PROP_TAG_NAMES`](@ref), so a new tag needs no
 change here.
+
+# Algorithm
+
+ 1. Make `tagged`, one empty vector per tag of [`PROP_TAG_NAMES`](@ref); `all_fields`, an empty vector; and `new_args`, an empty vector for the stripped body.
+ 2. For each node `arg` of the struct body, in declaration order, take one of three branches:
+     1. `arg` is a `@doc` macrocall, which is how a documented field parses. Peel the tags off `inner`, its last argument.
+         1. The field carries at least one tag: record the field name under each of its tags and in `all_fields`, then push a rebuilt `@doc` node whose last argument is the **stripped** field.
+         2. The field carries no tag: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` unchanged.
+     2. `arg` is a tag macrocall with no docstring: peel the tags, record the field name under each of them and in `all_fields`, and push the stripped field expression.
+     3. `arg` is anything else — a `LineNumberNode`, an untagged field, an inner constructor: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` unchanged.
+ 3. Return `tagged`, `all_fields`, and the new body as one `:block` expression.
+
+`all_fields` holds **every** declared field, tagged or not, and it is what makes the generated constructor call name every keyword. The returned body carries no tag, so the wrapped macros and Julia itself never see one.
 
 # Arguments
 
@@ -1498,7 +1909,34 @@ Marks the field as participating in [`factory`](@ref) propagation —
 `factory_child` will be called on it when `factory` is invoked on the
 enclosing struct.
 
-Raises an error if used outside a `@propagatable` struct body.
+# Algorithm
+
+The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:fprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+
+ 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
+
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
+
+      + `factory` channel: `factory_child(x.field, args...; kwargs...)`, which recurses into the child.
+      + `obs` channel: `obs_weights_view(x.field, i)`, which recurses into the child on the observation axis.
+
+ 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+
+Step 3 is the whole meaning of the tag. The same tag has two transforms, because a channel decides what a tag means. The `obs` channel does not gate on `@fprop`, so a struct whose only tag is `@fprop` gains no [`obs_weights_view`](@ref) method; the tag is consulted there only when a sibling field carries [`@wprop`](@ref).
+
+This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@vprop`](@ref)
+  - [`@wprop`](@ref)
+  - [`factory`](@ref)
+  - [`factory_child`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
 """
 macro fprop(expr)
     return error("@fprop may only appear inside a @propagatable struct body")
@@ -1515,7 +1953,25 @@ through the enclosing struct.
 Orthogonal to [`@fprop`](@ref); the two may be stacked on one field
 (`@fprop @vprop field`) when it participates in both factory and view propagation.
 
-Raises an error if used outside a `@propagatable` struct body.
+# Algorithm
+
+The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:vprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `view` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `port_opt_view(x.field, i, args...)`. The channel forwards the threaded tail and **no** keywords.
+ 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+
+Step 3 is the whole meaning of the tag. `@vprop` appears in one channel, so it carries one transform and no channel can give it a second meaning. The index that the method threads selects **assets**; the observation axis has its own verb, [`obs_weights_view`](@ref).
+
+This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@fprop`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
 """
 macro vprop(expr)
     return error("@vprop may only appear inside a @propagatable struct body")
@@ -1533,7 +1989,26 @@ Orthogonal to, and stackable with, [`@wprop`](@ref) (`@pprop @wprop w` gives a w
 field both a prior factory and an `ObsWeights` factory) or [`@fprop`](@ref); `@pprop` wins
 in the prior method. Mutually exclusive with [`@cprop`](@ref) on a single field. See ADR 0012.
 
-Raises an error if used outside a `@propagatable` struct body.
+# Algorithm
+
+The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:pprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `prior` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, getproperty(pr, :field))`. The prior result supplies the property of the **same name** as the field, so the tag names no source of its own.
+ 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+
+Step 3 is the whole meaning of the tag. `@pprop` is first in the `prior` channel's precedence, so a field carrying both `@pprop` and [`@fprop`](@ref) takes the prior transform on that channel and the factory transform on the `factory` channel. ADR 0012 owns that rule.
+
+This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@cprop`](@ref)
+  - [`@wprop`](@ref)
+  - [`factory`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
 """
 macro pprop(expr)
     return error("@pprop may only appear inside a @propagatable struct body")
@@ -1549,7 +2024,25 @@ value if present, else the threaded optimiser value (a solver) located by type i
 variadic tail. Used for `slv` fields, whose source is a threaded argument rather than the
 prior. Mutually exclusive with [`@pprop`](@ref) on a single field. See ADR 0012.
 
-Raises an error if used outside a `@propagatable` struct body.
+# Algorithm
+
+The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:cprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `prior` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, _ctx(args...))`. `_ctx` finds the value **by type** in the threaded tail, so the source is an argument and not the prior result.
+ 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+
+Step 3 is the whole meaning of the tag. `@cprop` follows [`@pprop`](@ref) in the `prior` channel's precedence, and the two are mutually exclusive on one field. ADR 0012 owns that rule.
+
+This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@pprop`](@ref)
+  - [`factory`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
 """
 macro cprop(expr)
     return error("@cprop may only appear inside a @propagatable struct body")
@@ -1569,7 +2062,35 @@ and must become the incoming weights — so it cannot share `@fprop`'s `nothing`
 without the two semantics colliding. Use `@wprop` for the `w`/weights field and `@fprop`
 for sub-estimators.
 
-Raises an error if used outside a `@propagatable` struct body.
+# Algorithm
+
+The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+
+ 1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:wprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
+
+ 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
+
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
+
+      + `factory` channel: `_wprop(x.field, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref) and keeps it when none is threaded.
+      + `obs` channel: `nothing_scalar_array_getindex(x.field, i)`, which **indexes** the value already there to the selected observations. Indexing rather than viewing is what keeps the `AbstractWeights` subtype.
+
+ 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+
+Step 3 is the whole meaning of the tag. **The two channels do different things to the same field**, which is the one place a reader learns that [`factory`](@ref) and [`obs_weights_view`](@ref) are not two names for one operation. `@wprop` is also the only tag that gates the `obs` channel, so a field opts a struct into [`obs_weights_view`](@ref) by carrying this tag and no second one.
+
+This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`@fprop`](@ref)
+  - [`@pprop`](@ref)
+  - [`factory`](@ref)
+  - [`_wprop`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`ObsWeights`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
 """
 macro wprop(expr)
     return error("@wprop may only appear inside a @propagatable struct body")
@@ -1590,6 +2111,18 @@ says it means. All the violations are collected and reported together.
 Runs once at the end of the module. Throws an
 [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) listing
 every violation, so the package refuses to precompile rather than shipping a dead tag.
+
+# Algorithm
+
+ 1. Make `violations`, an empty vector of strings.
+ 2. For each tag of [`PROP_TAG_NAMES`](@ref), with its macro name from [`PROP_TAG_MACRO_NAMES`](@ref):
+     1. The macro name is not defined in this module: push a message that the tag declares no stub macro.
+     2. The tag appears in the `precedence` of no channel of [`PROP_TAG_CHANNELS`](@ref): push a message that the tag appears in no channel.
+     3. For each channel whose `precedence` names the tag, call [`prop_tag_expr`](@ref) with the probe name `:probe`. When that call raises, push a message naming the tag and the channel.
+ 3. `violations` is not empty: throw an `ArgumentError` listing every one of them.
+ 4. Return `nothing`.
+
+Step 2.3 probes **each** channel that names the tag, not the tag alone. This is what catches a tag added to a second channel with no transform there, which the whole-tag probe of an earlier design let through.
 
 # Related
 
@@ -1657,6 +2190,13 @@ keyword constructor is written *below* the struct, so it does not exist yet and 
 checked here. [`check_propagatable_contracts`](@ref) does the checking once the module is
 complete.
 
+# Algorithm
+
+ 1. Push the pair `(T, pprops)` onto [`PROPAGATABLE_CONTRACTS`](@ref).
+ 2. Return `nothing`.
+
+`T` is `@nospecialize`d, so one method serves every registered type and the registration costs no compilation.
+
 # Related
 
   - [`@propagatable`](@ref)
@@ -1675,6 +2215,16 @@ Return the keyword names accepted by the outer constructors of `T`, unioned over
 A `kwargs...` slurp is dropped rather than counted. A slurp accepts `field = value` and then
 discards it, which is the silent failure this check exists to catch, so it must not satisfy
 the contract.
+
+# Algorithm
+
+ 1. Make `kws`, an empty vector of symbols.
+ 2. For each method `m` of the constructor `T`, append `Base.kwarg_decl(m)` to `kws`. The union runs over every outer constructor, so a keyword that any one of them names counts.
+ 3. Remove the repeats from `kws`.
+ 4. Remove every name whose string ends in `...`, which is how `Base.kwarg_decl` reports a slurp.
+ 5. Return `kws`.
+
+Step 4 is the whole point of the function. A constructor that carries `kwargs...` reports the slurp as a keyword name, and counting it would let every field satisfy the contract.
 
 # Related
 
@@ -1704,6 +2254,16 @@ Two clauses are checked, and both are properties of the code the macro emits:
 
 The messages carry a [`suggest_declared_key`](@ref) suggestion, so a transposed or mistyped
 field name names its intended neighbour.
+
+# Algorithm
+
+ 1. Make `msgs`, an empty vector of strings.
+ 2. Read `kws`, the keywords of the outer constructors of `T`, with [`propagatable_keywords`](@ref).
+ 3. For each field name of `T` that is absent from `kws`, push a message naming the type, the field and the [`suggest_declared_key`](@ref) suggestion drawn from `kws`.
+ 4. For each name of `pprops` that is absent from `pool`, push a message naming the type, the field and the suggestion drawn from `pool`.
+ 5. Return `msgs`.
+
+Every clause is collected, and none stops the walk, so one call reports every violation of one type at once. An empty result means that the type's contract holds.
 
 # Related
 
@@ -1820,6 +2380,40 @@ defined in external packages.
 
 Docstrings on the enclosing definition are forwarded correctly via
 `Base.@__doc__`.
+
+# Algorithm
+
+ 1. Find the struct with [`propagatable_find_struct`](@ref), which gives `struct_node` and `rebuild`, the function that puts a replacement struct back inside the same chain of wrapping macros.
+ 2. Read `type_head` and `body` off `struct_node`, and read `struct_name` off `type_head` with [`propagatable_bare_name`](@ref), which drops the type parameters and the supertype.
+ 3. Parse the body with [`propagatable_parse_body`](@ref), which gives `tagged`, the field names per tag; `all_fields`, every declared field in declaration order; and `new_body`, the body with every tag stripped.
+ 4. Build `new_struct` from `new_body`, and `chain` from `rebuild(new_struct)`. `chain` is the original declaration with the tags gone, so `@concrete` and Julia both see an ordinary struct.
+ 5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name against it. A bare name would resolve in the caller's module, where `function factory(…)` declares a new function of the caller's own and the method never reaches `PortfolioOptimisers.factory`. That failure is silent, because the declaration compiles and the type never joins the propagation chain. ADR 0002, decision 4, owns the rule.
+ 6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor whose pairs come from [`prop_channel_pairs`](@ref); otherwise the body is `x` itself. **This method is always emitted**, so an untagged [`@propagatable`](@ref) struct still answers [`factory`](@ref) with the identity.
+ 7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`, whose channel threads `i` before `args...`.
+ 8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`, whose channel threads `i` and takes no tail.
+ 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body first binds `xr` to [`resolve_deferred_quantities`](@ref) of `x` against `pr`, and **every field is then read off `xr` rather than off `x`**, so a Deferred Quantity is a plain value before selection runs. This method is more specific than the one of step 6, so a call that threads a prior chooses it.
+10. Build `pprop_tuple`, the `@pprop`-tagged field names as a tuple of quoted symbols.
+11. Return one escaped block holding, in order: `Base.@__doc__ chain`, so a docstring on the declaration reaches the struct; the emitted methods; and the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
+
+Steps 6 to 9 differ only in the method head and in the arguments that the channel threads. Each reads its gate and its tag precedence off [`PROP_TAG_CHANNELS`](@ref), so a new channel is a row of that table, a branch in [`prop_tag_expr`](@ref) and a stub macro, rather than an edit at seven sites. ADR 0061 owns that rule.
+
+# Related
+
+  - [`@fprop`](@ref)
+  - [`@vprop`](@ref)
+  - [`@pprop`](@ref)
+  - [`@cprop`](@ref)
+  - [`@wprop`](@ref)
+  - [`PROP_TAG_NAMES`](@ref)
+  - [`PROP_TAG_CHANNELS`](@ref)
+  - [`prop_channel_active`](@ref)
+  - [`prop_channel_pairs`](@ref)
+  - [`propagatable_parse_body`](@ref)
+  - [`propagatable_register!`](@ref)
+  - [`check_propagatable_contracts`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 macro propagatable(expr)
     struct_node, rebuild = propagatable_find_struct(expr)
@@ -1929,7 +2523,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Check the [`@propagatable`](@ref) contract of every type in [`PROPAGATABLE_CONTRACTS`](@ref).
 
-Runs once at the end of the module, so the contract behind 231 generated methods is enforced
+Runs once at the end of the module, so the contract behind every generated method is enforced
 where the structs are *declared* rather than at the first [`factory`](@ref) call. The
 violations of every type are collected and reported together, because a run that stops at the
 first one hides the rest. See [`propagatable_contract_violations`](@ref) for the two clauses.
@@ -1938,6 +2532,16 @@ Throws an [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.Arg
 listing every violation; the package refuses to precompile rather than shipping a type whose
 generated methods throw on first use. A package that declares its own `@propagatable` types
 calls this at the end of its own module to get the same guarantee.
+
+# Algorithm
+
+ 1. Read `pool`, the property names that a prior result can carry, with [`prior_result_property_pool`](@ref).
+ 2. Make `msgs`, an empty vector of strings.
+ 3. For each pair `(T, pprops)` of [`PROPAGATABLE_CONTRACTS`](@ref), append the messages that [`propagatable_contract_violations`](@ref) reports for that type.
+ 4. `msgs` is not empty: throw an `ArgumentError` naming the count and listing every message.
+ 5. Return `nothing`.
+
+Step 3 collects and never stops, so one run reports the violations of every registered type. The registry is filled by [`propagatable_register!`](@ref) at each declaration, so this function must run **after** the last one, which is why the module calls it at its end.
 
 # Related
 
@@ -1973,6 +2577,13 @@ Return `v` unchanged when it is not `nothing`; otherwise throw a
 `pathstr`, and the `nodestr` node that resolved to `nothing`. Called once per
 intermediate hop in the descent generated for a depth-≥2 locator.
 
+# Algorithm
+
+ 1. `v` is `nothing`: throw a [`PropertyPathError`](@ref) whose message names `pathstr`, the type `T` and the node `nodestr`.
+ 2. `v` is anything else: return `v`.
+
+The guard runs on the **intermediate** hops only, so a path whose last hop gives `nothing` returns that `nothing` rather than raising. That is deliberate: an absent leaf is a value, and an absent intermediate is a path that cannot be walked.
+
 # Related
 
   - [`@forward_properties`](@ref)
@@ -1992,6 +2603,17 @@ Flatten a [`@forward_properties`](@ref) locator into its path of field symbols.
 
 A bare identifier `a` becomes `[:a]`; a dotted expression `a.b.c` becomes
 `[:a, :b, :c]`. Any other expression raises an error.
+
+# Algorithm
+
+ 1. `expr` is a `Symbol`: return the one-element vector holding it.
+ 2. `expr` is an `Expr` with head `:.` and two arguments:
+     1. Read `leaf`, its second argument, and unwrap a `QuoteNode` to its value.
+     2. `leaf` is not a `Symbol`: raise an error naming the leaf.
+     3. Call this function again on the first argument, and append `leaf` to the result.
+ 3. `expr` is anything else: raise an error naming the expression.
+
+The recursion of step 2.3 is what makes the path any depth: `a.b.c` parses as `(a.b).c`, so the walk descends to the bare name and rebuilds the path from the left.
 
 # Related
 
@@ -2025,6 +2647,20 @@ receiver type `struct_name`) so a `nothing` node throws a path-naming
 [`PropertyPathError`](@ref). When `broadcast` is `true`, the final hop maps over
 the penultimate value if it is an `AbstractVector` (the scalar-or-vector
 solution case), otherwise it is a plain access.
+
+# Algorithm
+
+ 1. The path holds one name: return `getfield(x, name)` and stop. `getfield` is used rather than `getproperty`, so the generated `Base.getproperty` never re-enters itself.
+ 2. Build `pathstr`, the whole path joined by dots, for the error message.
+ 3. Start `stmts` with `__v = getfield(x, first_name)`.
+ 4. For each further hop `k` of the path:
+     1. Push `__v = forward_nonnothing(__v, struct_name, pathstr, nodestr)`, where `nodestr` names the part of the path walked so far.
+     2. `k` is the last hop and `broadcast` is `true`: push an assignment that reads the leaf with `getproperty.` when `__v` is an `AbstractVector`, and with `getproperty` otherwise.
+     3. Otherwise: push `__v = getproperty(__v, leaf)`.
+ 5. Push `__v` as the value of the block.
+ 6. Return the statements wrapped in a `let` block, so `__v` never escapes into the caller.
+
+Step 4.1 runs before **every** hop after the first, so the guard covers each intermediate exactly once and never the leaf. Only the leaf of step 4.2 broadcasts, so an intermediate vector is still a path error rather than a silent map.
 
 # Related
 
@@ -2103,6 +2739,24 @@ resolves **before** the field check.
     never `obj.field`**, since dot-access on the swapped field re-enters
     `getproperty` and recurses (`StackOverflowError`). Other fields may use
     dot-access freely.
+
+# Algorithm
+
+ 1. `block` is not a `begin … end` block: raise an error.
+ 2. Make three empty vectors: `swap_branches`, `getprop_branches` and `propname_contribs`.
+ 3. For each rule of the block, skipping a `LineNumberNode`:
+     1. The rule is not a call: raise an error naming it.
+     2. Read `marker`, the rule name, and `args`, its arguments. When the first argument is a `:parameters` node, read the `broadcast` option out of it and drop it from `args`. Any other option raises an error.
+     3. `marker` is `forward`: flatten the locator with [`forward_flatten_path`](@ref) and build `walk` with [`forward_walk_expr`](@ref). With no further argument, push a branch that returns `getproperty(walk, sym)` when `sym` is in `propertynames(walk)`, and contribute every one of those names. With further arguments, check that each is a bare identifier, push a branch that matches `sym` against that name set, and contribute the named subset.
+     4. `marker` is `alias`: check the exposed name, build `walk` from the locator, push a branch that matches the exposed name and returns `walk`, and contribute the name.
+     5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch returning `fn(x)`, and `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag and pushes the matching branch. Any other source raises an error. Contribute the exposed name.
+     6. `marker` is `swap`: as for `compute`, but a bare name is also a legal source, and the branch is pushed onto `swap_branches` rather than `getprop_branches`.
+     7. `marker` is anything else: raise an error naming it.
+ 4. Build `Base.getproperty(x::T, sym::Symbol)` in this order: the `swap` branches; the own-field check, which returns `getfield(x, sym)`; the remaining branches in declaration order; and `getfield(x, sym)` as the fallthrough, which raises the standard error for an absent field.
+ 5. Build `Base.propertynames(x::T)` from `fieldnames(T)` followed by every contributed name, and return the unique names as a tuple.
+ 6. Return both definitions in one escaped block.
+
+Step 4 is where the two orderings in the first paragraph come from: a `swap` runs **before** the own-field check, so it replaces a real field, and every other rule runs **after** it, so it can only add a name. Within each group the first branch that matches wins, and the order of the branches is the declaration order of the rules.
 
 # Details
 
@@ -2319,6 +2973,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its minimum.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{MinValue}(\\boldsymbol{v}) &= \\underset{i}{\\min}\\ v_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``v_{i}``: Its ``i``-th entry, ``i = 1,\\ldots,n``.
+
+The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
+
 # Constructors
 
     MinValue() -> MinValue
@@ -2343,6 +3012,25 @@ struct MinValue <: VectorToScalarMeasure end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted mean.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{MeanValue}(\\boldsymbol{v}) &= \\frac{1}{n} \\sum_{i=1}^{n} v_{i}\\,,
+&&w = \\mathrm{nothing}\\,, \\\\
+\\mathrm{MeanValue}(\\boldsymbol{v}) &= \\frac{\\sum_{i=1}^{n} w_{i} v_{i}}{\\sum_{i=1}^{n} w_{i}}\\,,
+&&\\mathrm{otherwise}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``v_{i}``: Its ``i``-th entry.
+  - ``w_{i}``: The ``i``-th observation weight, from the field `w`.
+
+The weighted form normalises by the total weight, so a weight vector scaled by a positive constant gives the same value. `w` must carry one entry per entry of ``\\boldsymbol{v}``.
 
 # Fields
 
@@ -2406,6 +3094,24 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted median.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{MedianValue}(\\boldsymbol{v}) &= Q_{\\boldsymbol{v}}(0.5)\\,, \\\\
+\\mathrm{MedianValue}(\\boldsymbol{v}) &= Q_{\\boldsymbol{v}, \\boldsymbol{w}}(0.5)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``\\boldsymbol{w}``: The observation weights, from the field `w`. The first line is the case `w = nothing`.
+  - ``Q_{\\boldsymbol{v}}(p)``: The ``p``-quantile of ``\\boldsymbol{v}``.
+  - ``Q_{\\boldsymbol{v}, \\boldsymbol{w}}(p)``: The weighted ``p``-quantile of ``\\boldsymbol{v}``, as `StatsBase` defines it.
+
+**Both forms are quantiles, and both interpolate.** Neither is an order statistic, so the result need not be an entry of ``\\boldsymbol{v}``. On a vector of even length the unweighted form averages the two middle entries, and the weighted form interpolates between the two entries that bracket half the weight mass. The `# Details` section carries a worked case of each.
 
 # Details
 
@@ -2474,6 +3180,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its maximum.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{MaxValue}(\\boldsymbol{v}) &= \\underset{i}{\\max}\\ v_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``v_{i}``: Its ``i``-th entry, ``i = 1,\\ldots,n``.
+
+The reduction carries no weights, so a weighted call gives the same value as an unweighted one.
+
 # Constructors
 
     MaxValue() -> MaxValue
@@ -2498,6 +3219,26 @@ struct MaxValue <: VectorToScalarMeasure end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted standard deviation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{StdValue}(\\boldsymbol{v}) &= \\sqrt{\\mathrm{VarValue}(\\boldsymbol{v})}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``\\mathrm{VarValue}(\\boldsymbol{v})``: The variance under the same `w` and the same `corrected`, whose four denominators [`VarValue`](@ref) states.
+
+`corrected` selects the denominator of the variance, and the square root carries that choice through. The unweighted default `corrected = true` divides by ``n - 1``.
+
+# Details
+
+  - **The unweighted default is safe; the weighted default is not.** `corrected = true` under a plain `StatsBase.Weights` raises an `ArgumentError`, because that type declares no bias correction. Pass an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or set `corrected = false`. [`VarValue`](@ref) carries the four denominators.
+  - `mean` reaches `Statistics.std` through the keywords, which is how [`StandardisedValue`](@ref) makes the deviation be taken about the mean that its `mv` produced.
 
 # Fields
 
@@ -2567,6 +3308,36 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted variance.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{VarValue}(\\boldsymbol{v}) &= \\frac{1}{d} \\sum_{i=1}^{n} w_{i} \\left(v_{i} - \\bar{v}\\right)^{2}\\,, \\\\
+\\bar{v} &= \\frac{\\sum_{i=1}^{n} w_{i} v_{i}}{\\sum_{i=1}^{n} w_{i}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``w_{i}``: The ``i``-th observation weight. The unweighted case is ``w_{i} = 1``.
+  - ``\\bar{v}``: The mean of ``\\boldsymbol{v}`` under those weights.
+  - ``d``: The denominator, which `corrected` and the **type** of `w` together select.
+
+``d`` takes one of four values:
+
+  - `w = nothing`: ``d = n - 1`` when `corrected` is `true`, and ``d = n`` when it is `false`.
+  - `w::AnalyticWeights`: ``d = \\sum w_{i} - \\sum w_{i}^{2} / \\sum w_{i}`` when `corrected` is `true`.
+  - `w::FrequencyWeights`: ``d = \\sum w_{i} - 1`` when `corrected` is `true`.
+  - `w::ProbabilityWeights`: ``d = \\left(\\sum w_{i}\\right)(m - 1) / m`` when `corrected` is `true`, where ``m`` is the count of non-zero weights.
+
+With `corrected = false` every weighted case takes ``d = \\sum w_{i}``.
+
+# Details
+
+  - **The weighted default raises.** A plain `StatsBase.Weights` declares no bias correction, so the default `corrected = true` under it raises an `ArgumentError` rather than returning a value. Pass one of the three corrected weight types above, or set `corrected = false`.
+  - The correction is a property of the **weights type**, not of the weight values, so two numerically identical weight vectors of different types give different variances.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -2635,6 +3406,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its sum.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{SumValue}(\\boldsymbol{v}) &= \\sum_{i=1}^{n} v_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``v_{i}``: Its ``i``-th entry.
+
+The reduction carries no weights. [`MeanValue`](@ref) is the weighted sum normalised by the total weight, so a weighted sum is that value multiplied by the total weight.
+
 # Constructors
 
     SumValue() -> SumValue
@@ -2659,6 +3445,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its product.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ProdValue}(\\boldsymbol{v}) &= \\prod_{i=1}^{n} v_{i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``v_{i}``: Its ``i``-th entry.
+
+The reduction carries no weights. One zero entry gives zero, and the product of many entries below one underflows, so this reduction is for a short vector of values near one.
+
 # Constructors
 
     ProdValue() -> ProdValue
@@ -2682,6 +3483,22 @@ struct ProdValue <: VectorToScalarMeasure end
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its mode.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ModeValue}(\\boldsymbol{v}) &= \\underset{u \\in \\boldsymbol{v}}{\\arg\\max}\\ \\left| \\left\\{ i : v_{i} = u \\right\\} \\right|\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: The vector to reduce, of length ``n``.
+  - ``u``: A value that ``\\boldsymbol{v}`` carries.
+  - ``\\left| \\cdot \\right|``: The count of a set.
+
+`StatsBase.mode` breaks a tie by the **first** value that reaches the highest count, so the result is a value of the input and never an average of two. The comparison is exact equality, so this reduction is for a vector of repeated exact values and not for a continuous one.
 
 # Constructors
 
@@ -2724,11 +3541,22 @@ Where:
   - ``\\tilde{\\sigma}``: The guarded denominator.
   - ``\\varepsilon``: Machine epsilon of the element type of ``\\hat{\\sigma}``.
 
+# Algorithm
+
+ 1. Reduce `val` with `mv`, giving `m`.
+ 2. Reduce `val` with `sv`, and pass `m` as the `mean` keyword, giving `s`. The deviation is therefore always taken about the mean that step 1 produced.
+ 3. Guard `s`:
+     1. `s` is `NaN`: replace it with `one(s)`.
+     2. `s` is an exact zero: replace it with `sqrt(eps(eltype(s)))`.
+     3. Otherwise: keep `s`.
+ 4. Return `m / s`.
+
 # Details
 
   - `sv` receives ``\\hat{\\mu}`` as its `mean` keyword, so the standard deviation is always taken about the mean that `mv` produced. Weighting `mv` without weighting `sv` therefore changes the denominator too.
   - The zero guard fires on an **exact** zero only, not on a small denominator. On the constant vector `[2.0, 2.0, 2.0]` the result is `1.342e8`, which is `2 / sqrt(eps(Float64))`.
   - A one-value vector has no corrected standard deviation, so ``\\hat{\\sigma}`` is `NaN`. The denominator is then ``1`` and the result is the mean itself. This makes the reduction defined on every non-empty vector.
+  - **A weighted `factory` call can make the reduction raise.** [`factory`](@ref) replaces the `w` field of both `mv` and `sv` with the incoming [`ObsWeights`](@ref), and `sv` keeps its default `corrected = true`. Under a plain `StatsBase.Weights` that combination raises an `ArgumentError`. Thread an `AnalyticWeights`, a `FrequencyWeights` or a `ProbabilityWeights`, or declare `sv = StdValue(; corrected = false)`. [`VarValue`](@ref) carries the four denominators.
 
 # Fields
 
@@ -2796,6 +3624,20 @@ Reduce a vector of real values to a single real value using a specified measure.
 
 `vec_to_real_measure` applies a reduction algorithm (such as minimum, mean, median, or maximum) to a vector of real numbers, as specified by the concrete subtype of [`VectorToScalarMeasure`](@ref). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. `measure` names the reduction, and the type parameter of a weighted measure names the branch.
+
+ 1. `measure` is a `Number`: return it, and read nothing of `val`.
+ 2. `measure` is a `Function`: return `measure(val)`.
+ 3. `measure` is a [`MinValue`](@ref), a [`MaxValue`](@ref), a [`SumValue`](@ref) or a [`ProdValue`](@ref): return `minimum`, `maximum`, `sum` or `prod` of `val`.
+ 4. `measure` is a [`ModeValue`](@ref): return `StatsBase.mode` of `val`.
+ 5. `measure` is a [`MeanValue`](@ref) or a [`MedianValue`](@ref): return `Statistics.mean` or `Statistics.median` of `val`, with the weights `measure.w` when the measure carries them. A tuple is `collect`ed first on the weighted branch.
+ 6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with the weights `measure.w` when the measure carries them, and with `kwargs...` forwarded. A tuple is `collect`ed first on the weighted branch.
+ 7. `measure` is a [`StandardisedValue`](@ref): follow that type's own algorithm, which reduces twice and guards the denominator.
+
+Step 1 is the case that makes a plain number a legal `measure`: a caller that already holds the value writes it where a reduction goes, and the seam needs no second signature.
+
 # Arguments
 
   - `measure`: One of three things.
@@ -2815,6 +3657,7 @@ Reduce a vector of real values to a single real value using a specified measure.
 # Details
 
   - A tuple is accepted wherever a vector is. The weighted reductions `collect` it first, because `Statistics` needs an `AbstractVector` beside its weights.
+  - The weighted reductions dispatch on the **type parameter** of the measure, `MeanValue{Nothing}` against `MeanValue{<:ObsWeights}`, so the branch is chosen at compile time and the field is never tested at run time.
 
 # Examples
 
