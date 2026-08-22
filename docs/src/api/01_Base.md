@@ -199,6 +199,7 @@ ret_dict
 field_dict
 math_dict
 err_name_dict
+ref_dict
 ```
 
 ## Iteration and indexing
@@ -208,4 +209,11 @@ Estimators, algorithms, and results behave as length-1 iterables and containers 
 ```@docs
 Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
 Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

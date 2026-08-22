@@ -19,6 +19,13 @@
     @test PortfolioOptimisers.vec_to_real_measure(MedianValue(), A) == median(A)
     @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), A) ==
           mean(A) / std(A)
+    # A single value has no corrected standard deviation. The denominator is one, so the
+    # reduction gives the mean itself instead of a `NaN`.
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [0.37]) == 0.37
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), (0.37,)) == 0.37
+    # An exact-zero standard deviation keeps its own guard.
+    @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==
+          2 / sqrt(eps(Float64))
     msv = StandardisedValue()
     @test factory(msv) === msv
     msv = factory(StandardisedValue(), W)
@@ -166,11 +173,20 @@ end
     @test !PO.prop_channel_active(:factory, untagged)
     @test !PO.prop_channel_active(:view, untagged)
     @test !PO.prop_channel_active(:prior, untagged)
-    # `@wprop` alone opens the factory channel and neither of the others.
+    @test PO.prop_channel_active(:obs, tagged)
+    @test !PO.prop_channel_active(:obs, untagged)
+    # `@wprop` alone opens the factory and observation channels, and neither of the others.
     wonly = merge(untagged, Dict(:wprop => [:w]))
     @test PO.prop_channel_active(:factory, wonly)
+    @test PO.prop_channel_active(:obs, wonly)
     @test !PO.prop_channel_active(:view, wonly)
     @test !PO.prop_channel_active(:prior, wonly)
+    # `@fprop` is in the observation channel's precedence but not its gate, so a struct with
+    # composed children and no weights of its own emits no `obs_weights_view` method and
+    # falls through to the identity.
+    fonly = merge(untagged, Dict(:fprop => [:a]))
+    @test PO.prop_channel_active(:factory, fonly)
+    @test !PO.prop_channel_active(:obs, fonly)
     # The precedence is data, and the prior channel puts `@pprop` above `@fprop` (ADR 0012).
     pairs = PO.prop_channel_pairs(:prior, tagged, all_fields, :xr, PO, (:pr,))
     @test [p.args[1] for p in pairs] == all_fields
@@ -183,6 +199,34 @@ end
     # The factory channel does not know `@pprop`, so the same field recurses there instead.
     factory_pair = only(PO.prop_channel_pairs(:factory, both, [:a], :x, PO, ()))
     @test factory_pair.args[2] == :($(PO).factory_child(x.a, args...; kwargs...))
+    #=
+    A tag means what its CHANNEL says it means. `@wprop` names the same field in the factory
+    channel and in the observation channel, and the two transforms differ: `factory`
+    REPLACES the field with an incoming `ObsWeights`, while `obs_weights_view` INDEXES the
+    value already there. This is why `prop_tag_expr` takes the channel as well as the tag,
+    and it is what lets a weights field join the observation-axis view with no second tag.
+    =#
+    obs_pairs = PO.prop_channel_pairs(:obs, tagged, all_fields, :x, PO, (:i,))
+    @test [p.args[1] for p in obs_pairs] == all_fields
+    # `@fprop` recurses, `@wprop` indexes, everything else is carried through.
+    @test obs_pairs[1].args[2] == :($(PO).obs_weights_view(x.a, i))
+    @test obs_pairs[2].args[2] == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_pairs[4].args[2] == :(x.plain)
+    # The same field, the same tag, a different channel, a different transform.
+    factory_w = PO.prop_channel_pairs(:factory, wonly, [:w], :x, PO, ())[1].args[2]
+    obs_w = PO.prop_channel_pairs(:obs, wonly, [:w], :x, PO, (:i,))[1].args[2]
+    @test factory_w == :($(PO)._wprop(x.w, args...; kwargs...))
+    @test obs_w == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test factory_w != obs_w
+    # Indexing, not viewing: a `view` of an `AbstractWeights` is a `SubArray`, which the
+    # weighted `Statistics.std` methods do not accept.
+    aw = StatsBase.AnalyticWeights(collect(1.0:10.0))
+    @test isa(PO.nothing_scalar_array_getindex(aw, 3:5), StatsBase.AnalyticWeights)
     # A table row with no field transform errors rather than taking another tag's transform.
-    @test_throws ErrorException PO.prop_tag_expr(:sixth, :a, :(x.a), PO, ())
+    @test_throws ErrorException PO.prop_tag_expr(:factory, :sixth, :a, :(x.a), PO, ())
+    # `@vprop` has no transform in the observation channel, and asking for one errors rather
+    # than silently taking the view channel's.
+    @test_throws ErrorException PO.prop_tag_expr(:obs, :vprop, :a, :(x.a), PO, (:i,))
+    # Every row is complete in every channel that names it.
+    @test isnothing(PO.check_prop_tag_macros())
 end

@@ -129,6 +129,60 @@ We try to keep a linear history in this repo, so it is important to keep your br
 
 - Then you can open a pull request and work with the reviewer to address any issues.
 
+## When a code-health gate turns red
+
+Two checks hold the numbers that [issue #250](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/250)
+asks to fall: `Complexity` and `JET`. Both are a **ratchet**. A file passes when its number has not
+risen above the number `code_health/` records for it, so neither check ever asks you to improve a
+number you did not cause. A file far above every threshold is green while its number holds steady.
+
+When one turns red, the run names every offending file, the metric, the baseline number and the new
+one. Take one of three routes, in order.
+
+ 1. **Lower the number.** This is the route to take whenever you can. The file's number is the
+    maximum over its definitions, so only the worst definition moves it.
+
+ 2. **Dismiss the report**, for `JET` alone. A Dismissal says that a class of report is not a real
+    defect. It cites a **Rationale** by name, and the two halves have different owners: citing an
+    approved Rationale is bookkeeping that any contributor may do, and adding a new Rationale is a
+    claim that some code is correct. See
+    [Dismissing a JET report](@ref code_health_dismissal).
+
+ 3. **Record the rise.** A number may rise, but only through a diff that a person approved. Run the
+    refresh with the flag that names the act:
+
+    ```bash
+    julia --project=code_health code_health/complexity.jl refresh --accept-rise
+    ```
+
+    You do not need to measure it yourself. **The run that trips uploads the file that clears it.**
+    Download the run's Refresh Artifact from its page, put the file at its committed path under
+    `code_health/`, and commit it. That needs no Julia at all.
+
+### What a contributor without write access cannot finish alone
+
+**Route 2, and only when the Rationale is new.** A new `[rationale.…]` block needs the maintainer,
+and CI flags a pull request that adds one. Cite an existing Rationale and nothing blocks you; write
+a new one and say so in the pull request, so a maintainer can rule on it.
+
+Routes 1 and 3 are open to everybody. A fork pull request runs both checks and can download both
+artifacts, because the artifact attaches to the run in this repository and this repository is
+public. One thing a fork contributor cannot do is **re-run** a check, so a transient failure needs a
+new push from you or a re-run by a maintainer.
+
+### Two red cases the artifact does not clear on its own
+
+- **A renamed file under `JET`.** The Report Fingerprint holds the file, so a rename breaks every
+  Dismissal on it. The refresh carries the row to the new path and **prints** the Dismissal lines
+  that now name a dead path; you edit `code_health/rulings.toml` yourself.
+- **A tracked `.jl` file that is neither measured nor a named Unmeasured Path.** Add an
+  `[[unmeasured_path]]` entry with a reason, or move the file under `src/` or `ext/`.
+
+In both, the artifact is correct and worth committing. It is not the whole fix.
+
+The maintenance loop that drives these numbers down, rather than merely holding them, is
+[Code health: the maintenance loop](@ref code_health).
+
 ## Writing documentation
 
 - Please document new features. The documentation must include:

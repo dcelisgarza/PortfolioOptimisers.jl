@@ -145,6 +145,33 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `r1`: Recursively updated via [`factory`](@ref).
   - `r2`: Recursively updated via [`factory`](@ref).
 
+# Examples
+
+```jldoctest
+julia> NonOptimisationRiskRatio()
+NonOptimisationRiskRatio
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
+        r1 ┼ Variance
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Float64: 1.0
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: true
+           │      sigma ┼ nothing
+           │       chol ┼ nothing
+           │         rc ┼ nothing
+           │        alg ┴ SquaredSOCRiskExpr()
+      sca1 ┼ SumScalariser()
+        r2 ┼ ConditionalValueatRisk
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Float64: 1.0
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: true
+           │      alpha ┼ Float64: 0.05
+           │          w ┴ nothing
+      sca2 ┴ SumScalariser()
+```
+
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)

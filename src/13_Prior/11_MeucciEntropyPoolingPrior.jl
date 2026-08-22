@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Entropy pooling prior estimator for asset returns.
+Reweights the observations of a prior so that its moments meet a set of views, and root-finds a CVaR view.
 
-`MeucciEntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports moment and view constraints (mean, variance, CVaR, covariance, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The estimator integrates asset sets, view constraints, and multiple entropy pooling algorithms (Optim.jl, JuMP.jl, CVaR root-finding), and allows for custom prior weights and solver configuration.
+`MeucciEntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the value at risk, the conditional value at risk, the variance, the covariance, the correlation, the skewness and the kurtosis, and it takes custom prior weights and solver configuration.
 
-This is the earlier of the library's two entropy pooling estimators, and it is kept because its CVaR route is a different *algorithm*, not a different formulation of the same problem: a CVaR view is a target hunted by the recursive algorithm of Meucci, Ardia and Keel, where [`ConditionalValueatRiskEntropyPooling`](@ref) root-finds the Value at Risk level and re-solves the whole entropy pooling problem at each candidate. That route takes equality CVaR views alone, one asset per view.
+This is the earlier of the library's two entropy pooling estimators, and it is kept because its CVaR route is a different *algorithm*, not a different formulation of the same problem: a CVaR view is a target hunted by the recursive algorithm of Meucci, Ardia and Keel, where [`ConditionalValueatRiskEntropyPooling`](@ref) root-finds the value at risk level and re-solves the whole entropy pooling problem at each candidate. That route takes equality CVaR views alone, one asset per view.
 
 Reach for [`EntropyPoolingPrior`](@ref) instead where a tail view has to be an inequality, name two assets, or land on the entropic value at risk: there each tail view is a constraint of the single entropy pooling problem, so one solve answers every view.
 
@@ -38,7 +38,29 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If any view constraint is not `nothing`, `sets` must not be `nothing`.
+  - If `var_views` is a vector, `!isempty(var_views)`.
   - If `w` is not `nothing`, it must be non-empty and match the number of observations.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `pe`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Details
 
@@ -125,6 +147,15 @@ MeucciEntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucciardiakeel2011])
+  - $(ref_dict[:vorobets2021])
 """
 @propagatable @concrete struct MeucciEntropyPoolingPrior <:
                                AbstractLowOrderPriorEstimator_AF
@@ -264,7 +295,7 @@ end
     forward(pe, me, ce)
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecMeucciEP = AbstractVector{<:MeucciEntropyPoolingPrior}
 
 Alias for an abstract vector of [`MeucciEntropyPoolingPrior`](@ref) elements.
 
@@ -278,16 +309,20 @@ const VecMeucciEP = AbstractVector{<:MeucciEntropyPoolingPrior}
                          w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
                          kwargs...)
 
-Solve entropy pooling views when no CVaR views are specified.
+Solve the entropy pooling problem when no CVaR views are specified.
 
-`ep_cvar_views_solve!` is an internal API compatibility method that solves the entropy pooling problem when no Conditional Value-at-Risk (CVaR) view constraints are present (`cvar_views = nothing`). It simply delegates to the main entropy pooling solver using the provided prior weights, constraint dictionary, and optimiser.
+`ep_cvar_views_solve!` is an internal API compatibility method that solves the entropy pooling problem when no conditional value at risk (CVaR) view constraints are present (`cvar_views = nothing`). It delegates to the main entropy pooling solver using the provided prior weights, constraint dictionary, and optimiser.
 
 # Arguments
 
   - `cvar_views`: Indicates that no CVaR view constraints are specified.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `::Any`: Prior result, ignored on this path.
+  - `::Any`: Asset set, ignored on this path.
   - `w`: Prior probability weights.
   - `opt`: Entropy pooling optimiser.
+  - `::Any`: CVaR-specific optimiser, ignored on this path.
+  - `::Any`: General optimiser, ignored on this path.
   - `kwargs...`: Additional keyword arguments forwarded to the solver.
 
 # Returns
@@ -344,6 +379,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
   - Parses CVaR view equations and replaces prior references.
   - Validates that only equality constraints are present and that each view targets a single asset.
   - Checks that views are not too extreme i.e. not greater than the worst realisation.
+  - The search runs over the value at risk levels `etas`, one per view, each bounded by `[0, B]`. This is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes instead; it reaches the same target and it takes more than one view.
   - For a single CVaR view, uses root-finding via [`ConditionalValueatRiskEntropyPooling`](@ref).
   - For multiple CVaR views, uses optimisation via [`OptimEntropyPooling`](@ref).
   - Throws errors if optimisation fails or views are infeasible.
@@ -354,6 +390,10 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
   - [`OptimEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`entropy_pooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucciardiakeel2011])
 """
 function ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::UniverseSets,
@@ -467,13 +507,13 @@ Compute entropy pooling prior moments for asset returns.
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
 
 # Related
 
@@ -523,14 +563,14 @@ Posterior moments are then computed as probability-weighted sample statistics us
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
-
 # Validation
 
   - If any view constraint is not `nothing`, `!isnothing(sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
 
 # Details
 
@@ -677,14 +717,14 @@ Where:
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
-
 # Validation
 
   - If any view constraint is not `nothing`, `!isnothing(pe.sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
 
 # Details
 

@@ -51,7 +51,25 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
-  - If `l` and `w` are not `nothing`, `length(w) == size(X, 2)`.
+
+`w` is **not** validated here. Its length is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set. The constructor also accepts an empty `w`, where the sibling [`AugmentedBlackLittermanPrior`](@ref) refuses one.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `re`: Recursively updated via [`factory`](@ref).
+  - `ve`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `re`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -137,6 +155,13 @@ FactorBlackLittermanPrior
   - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:black1992])
+  - $(ref_dict[:cajas2025]) Section 5.1, Equations 5.13 to 5.15, over the factor axis, and Section 4.1, Equations 4.2 and 4.3, for the lift onto the assets.
 """
 @propagatable @concrete struct FactorBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
     """
@@ -241,13 +266,13 @@ Black-Litterman views are applied directly to the factor space, updating factor 
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{\\alpha}\\,.
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{M} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{b} + r_{f}\\,.
 \\end{align}
 ```
 
 ```math
 \\begin{align}
-\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{M} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{M}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
 \\end{align}
 ```
 
@@ -255,11 +280,14 @@ Where:
 
   - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` posterior asset mean vector.
   - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` posterior asset covariance matrix.
-  - ``\\hat{\\boldsymbol{\\mu}}_{f,BL}``: ``K \\times 1`` Black-Litterman posterior factor mean.
-  - ``\\hat{\\mathbf{\\Sigma}}_{f,BL}``: ``K \\times K`` Black-Litterman posterior factor covariance.
-  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
-  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` regression intercept vector.
-  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal residual variance matrix (when `rsd = true`).
+  - ``\\hat{\\boldsymbol{\\mu}}_{f,BL}``: ``K \\times 1`` Black-Litterman posterior factor mean, `pr.fpr.mu`.
+  - ``\\hat{\\mathbf{\\Sigma}}_{f,BL}``: ``K \\times K`` Black-Litterman posterior factor covariance, `pr.fpr.sigma`.
+  - ``\\mathbf{M}``: ``N \\times K`` factor loadings matrix, `pr.rr.M`.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector, `pr.rr.b`.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal residual variance matrix, zero when `rsd = false`.
+  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref).
+
+The factor moments are the ordinary Black-Litterman posterior of [`vanilla_posteriors`](@ref), computed over the factor axis: ``\\mathbf{P}`` has ``K`` columns, and ``\\mathbf{\\Sigma}_f`` is the factor prior's covariance.
 
 # Arguments
 
@@ -270,15 +298,16 @@ Where:
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, Cholesky factor, weights, regression result, and factor prior details.
-
 # Validation
 
   - `dims in (1, 2)`.
   - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
-  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
+
+`pe.w` has no named check. When `pe.l` is set, a `pe.w` whose length is not `size(X, 2)` raises a bare `DimensionMismatch` from the multiplication inside [`equilibrium_mu`](@ref). When `pe.l` is `nothing`, `pe.w` is never read.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, Cholesky factor, weights, regression result, and factor prior details.
 
 # Details
 

@@ -64,3 +64,10 @@ NwE_ClE_Cl
 NwE_Pl_ClE_Cl
 HClE_HCl
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

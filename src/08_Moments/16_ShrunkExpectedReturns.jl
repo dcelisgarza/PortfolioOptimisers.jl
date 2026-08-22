@@ -8,6 +8,8 @@ All concrete and/or abstract types implementing shrinkage-based expected returns
 # Related
 
   - [`ShrunkExpectedReturns`](@ref)
+  - [`EquilibriumExpectedReturns`](@ref)
+  - [`ExcessExpectedReturns`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
@@ -24,6 +26,10 @@ All concrete and/or abstract types implementing specific shrinkage algorithms (e
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 """
@@ -38,14 +44,21 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
   - [`GrandMean`](@ref)
   - [`VolatilityWeighted`](@ref)
   - [`MeanSquaredError`](@ref)
+  - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 3.43.
+  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:fengpalomar2016])
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage target representing the grand mean of expected returns.
+Fills the shrinkage target with the grand mean of the sample expected returns.
 
-`GrandMean` computes the shrinkage target as the mean of all asset expected returns, resulting in a vector where each element is the same grand mean value. This is commonly used in shrinkage estimators to reduce estimation error by pulling individual expected returns toward the overall average.
+Every element of the target holds the same value, so a shrinkage estimator pulls each asset toward the average of the whole universe.
 
 # Constructors
 
@@ -62,14 +75,21 @@ GrandMean()
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
+  - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 3.43.
+  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:fengpalomar2016])
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage target representing the volatility-weighted mean of expected returns.
+Fills the shrinkage target with the inverse-covariance-weighted mean of the sample expected returns.
 
-`VolatilityWeighted` computes the shrinkage target as a weighted mean of expected returns, where weights are inversely proportional to asset volatility (from the inverse covariance matrix). This approach accounts for differences in asset risk when estimating the shrinkage target.
+The inverse covariance matrix supplies the weights. Under a diagonal covariance matrix each weight is the reciprocal of the asset's variance, so a riskier asset counts for less.
 
 # Constructors
 
@@ -86,14 +106,21 @@ VolatilityWeighted()
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
+  - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 3.43.
+  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:fengpalomar2016])
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage target representing the mean squared error of expected returns.
+Fills the shrinkage target with the trace of the covariance matrix divided by the number of observations.
 
-`MeanSquaredError` computes the shrinkage target as the trace of the covariance matrix divided by the number of observations, resulting in a vector where each element is the same value. This target is useful for certain shrinkage estimators that minimize mean squared error.
+Every element of the target holds the same value. The target reads a scale off the covariance matrix alone, so the sample expected returns do not enter it.
 
 # Constructors
 
@@ -110,14 +137,21 @@ MeanSquaredError()
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
+  - [`target_mean`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 3.43.
+  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:fengpalomar2016])
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage algorithm implementing the James-Stein estimator for expected returns.
+Blends the sample expected returns with the target under an intensity read off the covariance eigenvalues.
 
-`JamesStein` applies shrinkage to asset expected returns by pulling them toward a specified target (e.g., grand mean, volatility-weighted mean). The estimator reduces estimation error, especially in high-dimensional settings.
+The intensity grows with the number of assets and falls with the distance between the sample mean and the target.
 
 # Fields
 
@@ -145,6 +179,12 @@ JamesStein
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
+  - [`mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.1.
+  - $(ref_dict[:meucci2005])
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -161,9 +201,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
+Blends the sample expected returns with the target under an empirical Bayes intensity.
 
-`BayesStein` applies shrinkage to asset expected returns by pulling them toward a specified target (e.g., grand mean, volatility-weighted mean) using Bayesian principles. This estimator is useful for reducing estimation error, especially when sample sizes are small.
+The intensity falls with the inverse-covariance-weighted distance between the sample mean and the target, so a short sample shrinks harder.
 
 # Fields
 
@@ -191,6 +231,12 @@ BayesStein
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`JamesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
+  - [`mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.2.
+  - $(ref_dict[:jorion1986])
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -207,9 +253,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expected returns.
+Combines the sample expected returns and the target under two coefficients from random matrix theory.
 
-`BodnarOkhrinParolya` applies shrinkage to asset expected returns by pulling them toward a specified target (e.g., grand mean, volatility-weighted mean) using the Bodnar-Okhrin-Parolya approach. This estimator is designed for robust estimation in high-dimensional settings.
+The two coefficients are set separately and neither is a convex weight, so the result is not a blend between the sample mean and the target. It suits a universe whose asset count is close to its observation count.
 
 # Fields
 
@@ -237,6 +283,12 @@ BodnarOkhrinParolya
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
+  - [`mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.3.
+  - $(ref_dict[:bodnar2019])
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -254,9 +306,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for shrinkage-based expected returns estimators.
+Shrinks the sample expected returns toward a target chosen by the shrinkage algorithm.
 
-`ShrunkExpectedReturns` encapsulates all components required for shrinkage estimation of expected returns, including the mean estimator, covariance estimator, and shrinkage algorithm.
+It holds the three parts the shrinkage needs: a mean estimator, a covariance estimator and a shrinkage algorithm, which carries the target.
 
 # Fields
 
@@ -320,8 +372,13 @@ ShrunkExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
+  - [`target_mean`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.4.1.
 """
 @propagatable @concrete struct ShrunkExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
@@ -350,12 +407,36 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum, args...;
-                kwargs...)
+    target_mean(
+        tgt::GrandMean,
+        mu::ArrNum,
+        sigma::MatNum,
+        args...;
+        kwargs...
+    ) -> StepRangeLen
+
+    target_mean(
+        tgt::VolatilityWeighted,
+        mu::ArrNum,
+        sigma::MatNum,
+        isigma::Option{<:MatNum} = nothing;
+        kwargs...
+    ) -> StepRangeLen
+
+    target_mean(
+        tgt::MeanSquaredError,
+        mu::ArrNum,
+        sigma::MatNum,
+        args...;
+        T::Integer,
+        kwargs...
+    ) -> StepRangeLen
 
 Compute the shrinkage target vector for expected returns estimation.
 
-`target_mean` computes the target vector toward which expected returns are shrunk, based on the specified shrinkage target type. This function is used internally by shrinkage estimators such as James-Stein, Bayes-Stein, and Bodnar-Okhrin-Parolya.
+`target_mean` is the single owner of the three shrinkage targets. [`JamesStein`](@ref), [`BayesStein`](@ref) and [`BodnarOkhrinParolya`](@ref) all reach it, so each target is written once.
+
+Every element of the returned vector holds the same value, so the function returns a `StepRangeLen` rather than a dense vector.
 
 # Mathematical definition
 
@@ -407,25 +488,30 @@ Where:
 
   - `tgt`: The shrinkage target type.
 
-      + `tgt::GrandMean`: Returns a vector filled with the mean of `mu`.
-      + `tgt::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-      + `tgt::MeanSquaredError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+      + `tgt::GrandMean`: Fills the vector with the mean of `mu`.
+      + `tgt::VolatilityWeighted`: Fills the vector with the inverse-covariance-weighted mean of `mu`.
+      + `tgt::MeanSquaredError`: Fills the vector with the trace of `sigma` divided by `T`.
 
   - `mu`: 1D array of expected returns.
 
   - `sigma`: Covariance matrix of asset returns.
 
-  - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
+  - `isigma`: Inverse covariance matrix, taken **positionally** by the [`VolatilityWeighted`](@ref) method. If `nothing`, the method computes `sigma \\ LinearAlgebra.I` itself. The other two methods swallow it in `args...`.
+
+  - `T`: Number of observations. It is a **required** keyword of the [`MeanSquaredError`](@ref) method. The other two methods swallow it in `kwargs...`.
+
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `b::ArrNum`: Target vector for shrinkage estimation.
+  - `b::StepRangeLen`: Target vector for shrinkage estimation, of length `length(mu)`.
 
 # Related
 
   - [`GrandMean`](@ref)
   - [`VolatilityWeighted`](@ref)
   - [`MeanSquaredError`](@ref)
+  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
 function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
@@ -503,21 +589,23 @@ Where:
 
 # Returns
 
-  - `mu::ArrNum`: Shrunk expected returns vector.
+  - `mu::ArrNum`: Shrunk expected returns, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
 # Details
 
-  - Computes the sample mean and covariance.
+  - Computes the sample mean with `me.me` and the covariance with `me.ce`.
 
-  - Computes the shrinkage target using `target_mean`.
+  - Computes the shrinkage target `b` with [`target_mean`](@ref).
 
-  - Computes the shrinkage intensity `alpha` with:
+  - Computes the coefficients with:
 
-      + `JamesStein`: The centered mean and eigenvalues of the covariance matrix.
-      + `BayesStein`: A Bayesian formula involving the centered mean and inverse covariance.
-      + `BodnarOkhrinParolya`: A Bayesian formula involving the target mean, mean and inverse covariance.
+      + `JamesStein`: The eigenvalues of the covariance matrix and the squared distance between the sample mean and the target.
+      + `BayesStein`: The inverse-covariance-weighted squared distance between the sample mean and the target.
+      + `BodnarOkhrinParolya`: Three inverse-covariance-weighted quadratic forms in the sample mean and the target.
 
-  - Returns the shrunk mean vector.
+  - Combines the sample mean and the target.
+
+  - **No method clamps its coefficients.** `JamesStein` and `BayesStein` write `(1 - alpha) * mu + alpha * b`, but nothing holds `alpha` inside `[0, 1]`, so the result can sit outside the segment that joins the two. `BodnarOkhrinParolya` sets `alpha` and `beta` separately and they do not sum to one.
 
 # Related
 
@@ -571,6 +659,16 @@ Where:
   - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
   - $(math_dict[:T])
   - $(math_dict[:N])
+
+# Details
+
+  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``, and its own reference implementation uses ``\\hat{\\mathbf{\\Sigma}}``, as this method does. The correction raises ``\\alpha``.
+
+# Related
+
+  - [`BayesStein`](@ref)
+  - [`ShrunkExpectedReturns`](@ref)
+  - [`target_mean`](@ref)
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -636,6 +734,17 @@ Where:
 Where:
 
   - ``\\hat{\\boldsymbol{\\mu}}_{BOP}``: Bodnar-Okhrin-Parolya shrunk expected returns.
+
+# Details
+
+  - ``\\alpha`` and ``\\beta`` are set separately and do not sum to one, so the result is not a point on the segment that joins ``\\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{b}``.
+  - ``T > N`` is needed. The term ``N/(T-N)`` is undefined at ``T = N`` and changes sign above it.
+
+# Related
+
+  - [`BodnarOkhrinParolya`](@ref)
+  - [`ShrunkExpectedReturns`](@ref)
+  - [`target_mean`](@ref)
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)

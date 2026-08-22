@@ -29,3 +29,10 @@ _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Union{Val{true
 ucs_risk_measure
 ucs_variance
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

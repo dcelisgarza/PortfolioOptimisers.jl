@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Structured result for correlation view constraint equation parsing.
+Carries a parsed correlation or covariance view together with the asset pairs it names.
 
-`RhoParsingResult` is produced when parsing correlation view constraints, such as those used in entropy pooling prior models. It extends the standard [`ParsingResult`](@ref) by including an `ij` field, which stores the tuple of asset pairs (indices) relevant for the correlation view.
+It extends [`ParsingResult`](@ref) with an `ij` field, which holds one index pair per term of the view, so a downstream routine can place the view in the covariance matrix without parsing the equation again.
 
 # Fields
 
@@ -13,6 +13,7 @@ $(DocStringExtensions.FIELDS)
 
   - Produced by correlation view parsing routines, typically when the constraint involves asset pairs (e.g., `"(A, B) == 0.5"`).
   - The `ij` field enables downstream routines to map parsed correlation views to the appropriate entries in the correlation matrix.
+  - A view over a pair of groups spans one asset pair per element of its `ij` entry, and emits one constraint row per pair. Its `rhs` is therefore a vector of the same length, one right-hand side per row. A view over a single asset pair keeps a scalar `rhs`.
   - Used internally for entropy pooling, Black-Litterman, and other advanced portfolio models that support correlation views.
 
 # Related
@@ -35,7 +36,7 @@ $(DocStringExtensions.FIELDS)
     """
     op
     """
-    $(field_dict[:rhs])
+    $(field_dict[:rhs_rho])
     """
     rhs
     """
@@ -46,11 +47,17 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ij])
     """
     ij
-    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
-                              eqn::AbstractString,
+    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString,
+                              rhs::Union{<:Number, <:VecNum}, eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
                                                          <:Tuple{<:VecInt, <:VecInt}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
+        if isa(rhs, AbstractVector)
+            @argcheck(!isempty(ij) &&
+                      all(x -> isa(x[1], AbstractVector) && length(x[1]) == length(rhs),
+                          ij),
+                      DimensionMismatch("A vector `rhs` carries one value per spanned asset pair, so every entry of `ij` must be a group pair of the same length. Got\nlength(rhs) => $(length(rhs))\nij => $(ij)"))
+        end
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
@@ -58,67 +65,96 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for entropy pooling optimisers.
+Abstract supertype for the optimisers that solve an entropy pooling problem.
 
-`AbstractEntropyPoolingOptimiser` is the base type for all optimisers that compute entropy pooling weights subject to moment and view constraints. All concrete entropy pooling optimisers should subtype this type to ensure a consistent interface for entropy pooling routines and integration with portfolio optimisation workflows.
+A subtype names the numerical route to the posterior probabilities: which package drives the solve, and whether it solves the dual or the primal.
 
 # Related
 
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
-  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
 """
 abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for entropy pooling algorithms.
+Abstract supertype for the algorithms that decide how the views of an entropy pooling problem reach the optimiser.
 
-`AbstractEntropyPoolingAlgorithm` is the base type for all algorithms used in entropy pooling optimisation routines. All concrete entropy pooling algorithms should subtype this type to ensure a consistent interface for entropy pooling methods and integration with portfolio optimisation workflows.
+A subtype states whether every view is enforced in one optimisation or in stages, from the lower moments to the higher ones, and which probabilities each stage starts from.
 
 # Related
 
-  - [`AbstractEntropyPoolingOptimiser`](@ref)
-  - [`LogEntropyPooling`](@ref)
-  - [`ExpEntropyPooling`](@ref)
+  - [`H0_EntropyPooling`](@ref)
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+  - [`StagedEP`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:vorobets2021])
 """
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-One-shot entropy pooling. It sets and optimises all the constraints simultaneously. This introduces bias in the posterior probabilities, but is faster.
+Enforces every view in a single entropy pooling optimisation.
+
+This is the original formulation. It solves once, so it is the cheapest of the three algorithms, and it pins nothing: a higher moment view is free to move a lower moment of the same asset.
 
 # Related
 
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
   - [`H1_EntropyPooling`](@ref)
   - [`H2_EntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Uses the initial probabilities to optimise the posterior probabilities at every step. This reduces bias in the posterior probabilities, but is slower.
+Enforces the views in stages, and starts every stage from the prior probabilities.
+
+Each stage carries the constraints of the stages before it, so the posterior is the projection of the *prior* onto the whole view set. This is the first of the two sequential heuristics.
 
 # Related
 
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
   - [`H0_EntropyPooling`](@ref)
   - [`H2_EntropyPooling`](@ref)
+  - [`StagedEP`](@ref)
+
+# References
+
+  - $(ref_dict[:vorobets2021])
 """
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Uses the previous step's probabilities to optimise the next step's probabilities. This is faster but may introduce bias.
+Enforces the views in stages, and starts every stage from the previous stage's probabilities.
+
+Each stage carries the constraints of the stages before it, so the view set is the same as [`H1_EntropyPooling`](@ref)'s. What differs is the reference distribution: each stage projects the stage before it rather than the prior. This is the second of the two sequential heuristics.
 
 # Related
 
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
   - [`H0_EntropyPooling`](@ref)
   - [`H1_EntropyPooling`](@ref)
+  - [`StagedEP`](@ref)
+
+# References
+
+  - $(ref_dict[:vorobets2021])
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -135,9 +171,9 @@ const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for entropy pooling optimisation algorithms.
+Abstract supertype for the algorithms that decide how an entropy pooling optimiser evaluates its objective.
 
-`AbstractEntropyPoolingOptAlgorithm` is the base type for all optimisation algorithms used in entropy pooling routines. All concrete entropy pooling optimisation algorithms should subtype this type to ensure a consistent interface for entropy pooling optimisation and integration with portfolio optimisation workflows.
+Every subtype minimises the same Kullback-Leibler divergence of the posterior probabilities from the prior ones. They differ only in the arithmetic that evaluates it, so they answer the same problem with the same posterior.
 
 # Related
 
@@ -146,14 +182,18 @@ Abstract supertype for entropy pooling optimisation algorithms.
   - [`ExpEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Logarithmic entropy pooling optimisation algorithm.
+Evaluates the entropy pooling objective in log space.
 
-`LogEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the logarithmic entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the Kullback-Leibler divergence between the prior and posterior weights, subject to moment and view constraints, using a logarithmic objective.
+It carries the logarithms of the probabilities throughout, so it never exponentiates an intermediate quantity. Prefer it when a prior probability is small enough that the exponential form loses precision. It minimises the same Kullback-Leibler divergence as [`ExpEntropyPooling`](@ref) and reaches the same posterior.
 
 # Related
 
@@ -161,14 +201,18 @@ Logarithmic entropy pooling optimisation algorithm.
   - [`ExpEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exponential entropy pooling optimisation algorithm.
+Evaluates the entropy pooling objective through the exponential of the dual variables.
 
-`ExpEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the exponential entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the exponential divergence between the prior and posterior weights, subject to moment and view constraints, using an exponential objective.
+It recovers each posterior probability from the prior one and the dual variables directly, without carrying logarithms. It minimises the same Kullback-Leibler divergence as [`LogEntropyPooling`](@ref) and reaches the same posterior.
 
 # Related
 
@@ -176,14 +220,18 @@ Exponential entropy pooling optimisation algorithm.
   - [`LogEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
+Root-finds the value at risk level that meets a single conditional value-at-risk view.
 
-`ConditionalValueatRiskEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses root-finding algorithms from [`Roots.jl`](https://github.com/JuliaMath/Roots.jl) to solve entropy pooling problems with CVaR (Conditional Value-at-Risk) view constraints. This optimiser is designed for scenarios where CVaR views are specified and requires robust numerical methods to find the solution.
+The recursive route of [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It hunts the level instead: for each candidate it rebuilds the positive-part rows, re-solves the whole entropy pooling problem, and reads the tail mass off the posterior. This type holds the arguments of the [`Roots.jl`](https://github.com/JuliaMath/Roots.jl) call that drives the hunt. Where a group carries more than one view, [`OptimEntropyPooling`](@ref) takes over through the `dm_opt` field.
 
 # Fields
 
@@ -214,6 +262,10 @@ ConditionalValueatRiskEntropyPooling
   - [`JuMPEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
+
+# References
+
+  - $(ref_dict[:meucciardiakeel2011])
 """
 @concrete struct ConditionalValueatRiskEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -235,9 +287,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-[`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)-based entropy pooling optimiser.
+Solves the dual of the entropy pooling problem with Optim.jl.
 
-`OptimEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
+The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm.
 
 # Fields
 
@@ -258,8 +310,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `sc1 >= 0`
-  - `sc2 >= 0`
+  - `sc1 >= 0`.
+  - `sc2 >= 0`.
 
 # Examples
 
@@ -282,8 +334,13 @@ OptimEntropyPooling
   - [`JuMPEntropyPooling`](@ref)
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
   - [`NormError`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -314,6 +371,7 @@ OptimEntropyPooling
                                  alg::AbstractEntropyPoolingOptAlgorithm,
                                  err::Option{<:NormError})
         @argcheck(sc1 >= zero(sc1), DomainError(sc1, "sc1 must be >= 0"))
+        @argcheck(sc2 >= zero(sc2), DomainError(sc2, "sc2 must be >= 0"))
         return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg),
                    typeof(err)}(args, kwargs, sc1, sc2, alg, err)
     end
@@ -327,9 +385,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-[`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)-based entropy pooling optimiser.
+Solves the primal of the entropy pooling problem with JuMP.jl.
 
-`JuMPEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [JuMP.jl](https://github.com/jump-dev/JuMP.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
+The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) and takes either optimisation algorithm.
 
 # Fields
 
@@ -379,7 +437,12 @@ JuMPEntropyPooling
   - [`OptimEntropyPooling`](@ref)
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -599,7 +662,7 @@ end
 """
     ep_mu_views!(mu_views::Nothing, args...; kwargs...)
 
-No-op pass-through for mean view constraints when none are specified.
+Do nothing when no mean view constraints are specified.
 
 `ep_mu_views!` is an internal API compatibility method that does nothing when mean view constraints (`mu_views`) are not provided (`mu_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_mu_views!` without special-casing the absence of mean views.
 
@@ -671,7 +734,7 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
-    fix_mu!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
+    fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
             pr::AbstractPriorResult)
 
 Add constraints to fix the mean of specified assets in entropy pooling.
@@ -748,6 +811,7 @@ A significance level is a property of a view, not of the estimator that holds it
 
   - [`ValueatRiskView`](@ref)
   - [`AbstractEntropyPoolingTailViewEstimator`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 abstract type AbstractEntropyPoolingViewEstimator <: AbstractEstimator end
@@ -795,7 +859,12 @@ ValueatRiskView
 
   - [`AbstractEntropyPoolingViewEstimator`](@ref)
   - [`ep_var_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 @concrete struct ValueatRiskView <: AbstractEntropyPoolingViewEstimator
     """
@@ -816,8 +885,7 @@ function ValueatRiskView(; views::LinearConstraintEstimator,
     return ValueatRiskView(views, alpha)
 end
 """
-    const VV_VecVV = Union{<:LinearConstraintEstimator, <:ValueatRiskView,
-                           <:AbstractVector{<:ValueatRiskView}}
+    const VV_VecVV = Union{<:ValueatRiskView, <:AbstractVector{<:ValueatRiskView}}
 
 Alias for the shapes a `var_views` field accepts: one [`ValueatRiskView`](@ref), or a vector of them read under their own significance levels.
 
@@ -839,6 +907,10 @@ A tail view constrains a quantile-based risk measure of the posterior distributi
   - [`AbstractConditionalValueatRiskViewFormulation`](@ref)
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 abstract type AbstractEntropyPoolingViewFormulation <: AbstractAlgorithm end
 """
@@ -851,6 +923,10 @@ Abstract supertype for the formulations of a conditional value-at-risk view.
   - [`AbstractEntropyPoolingViewFormulation`](@ref)
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 abstract type AbstractConditionalValueatRiskViewFormulation <:
               AbstractEntropyPoolingViewFormulation end
@@ -864,6 +940,10 @@ Abstract supertype for the formulations of an entropic value-at-risk view.
   - [`AbstractEntropyPoolingViewFormulation`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 abstract type AbstractEntropicValueatRiskViewFormulation <:
               AbstractEntropyPoolingViewFormulation end
@@ -907,6 +987,10 @@ LinearConditionalValueatRiskView()
   - [`AbstractConditionalValueatRiskViewFormulation`](@ref)
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 struct LinearConditionalValueatRiskView <: AbstractConditionalValueatRiskViewFormulation end
 """
@@ -956,7 +1040,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `sbar` is an `Integer`, `sbar >= 1`.
-  - If `sbar` is not an `Integer`, `0 < sbar <= 1`.
+  - If `sbar` is not an `Integer`, `0 < sbar < 1`. Use an `Integer` to name the whole sample.
 
 # Examples
 
@@ -971,6 +1055,10 @@ IntegerConditionalValueatRiskView
   - [`AbstractConditionalValueatRiskViewFormulation`](@ref)
   - [`LinearConditionalValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct IntegerConditionalValueatRiskView <:
                  AbstractConditionalValueatRiskViewFormulation
@@ -1031,6 +1119,10 @@ ConicEntropicValueatRiskView()
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 struct ConicEntropicValueatRiskView <: AbstractEntropicValueatRiskViewFormulation end
 """
@@ -1107,6 +1199,10 @@ GridEntropicValueatRiskView
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct GridEntropicValueatRiskView <: AbstractEntropicValueatRiskViewFormulation
     """
@@ -1169,6 +1265,10 @@ A significance level is a property of a view, not of the estimator that holds it
   - [`ConditionalValueatRiskView`](@ref)
   - [`EntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 abstract type AbstractEntropyPoolingTailViewEstimator <: AbstractEntropyPoolingViewEstimator end
 """
@@ -1219,6 +1319,10 @@ ConditionalValueatRiskView
   - [`EntropicValueatRiskView`](@ref)
   - [`AbstractConditionalValueatRiskViewFormulation`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct ConditionalValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
     """
@@ -1301,6 +1405,10 @@ EntropicValueatRiskView
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 @concrete struct EntropicValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
     """
@@ -1329,10 +1437,10 @@ function EntropicValueatRiskView(; views::LinearConstraintEstimator, alpha::Numb
     return EntropicValueatRiskView(views, alpha, alg)
 end
 """
-    const CVV_VecCVV = Union{<:LinearConstraintEstimator, <:ConditionalValueatRiskView,
+    const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
                              <:AbstractVector{<:ConditionalValueatRiskView}}
 
-Alias for the shapes the `cvar_views` field of an [`EntropyPoolingPrior`](@ref) accepts: a bare constraint estimator read under the estimator's own settings, one [`ConditionalValueatRiskView`](@ref), or a vector of them.
+Alias for the shapes a `cvar_views` field accepts: one [`ConditionalValueatRiskView`](@ref), or a vector of them read under their own significance levels and formulations.
 
 # Related
 
@@ -1342,10 +1450,10 @@ Alias for the shapes the `cvar_views` field of an [`EntropyPoolingPrior`](@ref) 
 const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
                          <:AbstractVector{<:ConditionalValueatRiskView}}
 """
-    const EVV_VecEVV = Union{<:LinearConstraintEstimator, <:EntropicValueatRiskView,
+    const EVV_VecEVV = Union{<:EntropicValueatRiskView,
                              <:AbstractVector{<:EntropicValueatRiskView}}
 
-Alias for the shapes the `evar_views` field of an [`EntropyPoolingPrior`](@ref) accepts: a bare constraint estimator read under the estimator's own settings, one [`EntropicValueatRiskView`](@ref), or a vector of them.
+Alias for the shapes an `evar_views` field accepts: one [`EntropicValueatRiskView`](@ref), or a vector of them read under their own significance levels and formulations.
 
 # Related
 
@@ -1357,7 +1465,7 @@ const EVV_VecEVV = Union{<:EntropicValueatRiskView,
 """
     ep_var_views!(var_views::Nothing, args...; kwargs...)
 
-No-op pass-through for value at risk (VaR) view constraints when none are specified.
+Do nothing when no value at risk (VaR) view constraints are specified.
 
 `ep_var_views!` is an internal API compatibility method that does nothing when value at risk (VaR) view constraints (`var_views`) are not provided (`var_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_var_views!` without special-casing the absence of value at risk (VaR) views.
 
@@ -1383,13 +1491,13 @@ end
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets, alpha::Number; strict::Bool = false)
 
-Parse and add variance (VaR) view constraints to the entropy pooling constraint dictionary.
+Parse and add value at risk (VaR) view constraints to the entropy pooling constraint dictionary.
 
-`ep_var_views!` parses variance (VaR) view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method validates that only single-asset, non-negative, and unit-coefficient views are allowed, and throws informative errors for invalid or extreme views.
+`ep_var_views!` parses VaR view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. A VaR view is linear in the posterior probabilities: it constrains the probability mass at or below the target loss to be the significance level, so it needs no auxiliary variable. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method validates that only single-asset, non-negative, and unit-coefficient views are allowed, and throws informative errors for invalid or extreme views.
 
 # Arguments
 
-  - `var_views`: Variance (VaR) view constraints.
+  - `var_views`: VaR view constraints.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
@@ -1490,13 +1598,13 @@ end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling)
 
-Solve the dual of the exponential entropy pooling formulation using Optim.jl.
+Solve the dual of the entropy pooling problem using Optim.jl.
 
-`entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
+`entropy_pooling` computes posterior probabilities by minimising the Kullback-Leibler divergence of the posterior weights from the prior ones, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
 
 # Mathematical definition
 
-The dual of the entropy pooling KL divergence problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective (for `ExpEntropyPooling`) is:
+The dual of the entropy pooling problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective is:
 
 ```math
 \\begin{align}
@@ -1527,10 +1635,10 @@ Where:
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
 
-  - `opt: Optim.jl-based entropy pooling optimiser with exponential objective.
+  - `opt`: Optim.jl-based entropy pooling optimiser.
 
-      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
-      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Use the logarithmic formulation.
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Evaluate the objective through the exponential of the dual variables.
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Evaluate the objective in log space.
 
 # Returns
 
@@ -1540,14 +1648,21 @@ Where:
 
   - Constructs the constraint matrix and bounds from `epc`.
   - Relaxes fixed equality constraints via slack variables to make the problem more tractable.
+  - The two optimisation algorithms minimise the same objective and reach the same posterior. They differ only in the arithmetic that evaluates it.
   - Throws an error if optimisation fails.
 
 # Related
 
   - [`OptimEntropyPooling`](@ref)
   - [`ExpEntropyPooling`](@ref)
+  - [`LogEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`JuMPEntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -1671,9 +1786,9 @@ end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
 
-Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
+Solve the primal of the entropy pooling problem using JuMP.jl.
 
-`entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl), supporting relative entropy cones and slack variables for relaxed equality constraints. This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) when the optimiser is a [`JuMPEntropyPooling`](@ref).
+`entropy_pooling` computes posterior probabilities by minimising the Kullback-Leibler divergence of the posterior weights from the prior ones, subject to moment and view constraints. The optimisation is performed using [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl), supporting relative entropy cones and slack variables for relaxed equality constraints. This method is used internally by [`MeucciEntropyPoolingPrior`](@ref) and [`EntropyPoolingPrior`](@ref) when the optimiser is a [`JuMPEntropyPooling`](@ref).
 
 # Arguments
 
@@ -1683,8 +1798,8 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
 
   - `opt`: JuMP.jl-based entropy pooling optimiser.
 
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Use the logarithmic formulation.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Write the divergence against the prior probabilities directly.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Write the divergence against a unit reference and subtract the prior log-probabilities in the objective.
 
 # Returns
 
@@ -1701,8 +1816,14 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
 
   - [`JuMPEntropyPooling`](@ref)
   - [`ExpEntropyPooling`](@ref)
+  - [`LogEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
   - [`OptimEntropyPooling`](@ref)
+
+# References
+
+  - $(ref_dict[:meucci2008])
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
     return entropy_pooling(w, epc, AbstractEntropyPoolingTailView[], opt)
@@ -1817,7 +1938,7 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     return to_fix
 end
 """
-    fix_sigma!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
+    fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                pr::AbstractPriorResult)
 
 Add constraints to fix the variance of specified assets in entropy pooling.
@@ -1879,7 +2000,8 @@ Replace correlation prior references in view parsing results with their correspo
 # Details
 
   - Prior references are matched using the pattern `prior(<asset1>, <asset2>)`.
-  - The right-hand side of the constraint is adjusted by subtracting the prior correlation value times its coefficient.
+  - The right-hand side of the constraint is adjusted by subtracting the prior value times its coefficient.
+  - A `prior(gA, gB)` reference over a pair of groups resolves to one value per spanned asset pair, so the right-hand side becomes a vector of that length. The view emits one constraint row per pair, and each row takes its own entry.
   - Variables corresponding to prior references are removed from the constraint.
   - Throws an error if no non-prior variables remain.
   - Returns a `RhoParsingResult` containing the updated variables, coefficients, operator, right-hand side, equation string, and correlation indices.
@@ -1901,7 +2023,7 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
     variables, coeffs = res.vars, res.coef
     jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
-    rhs::typeof(res.rhs) = res.rhs
+    rhs = res.rhs
     non_prior = false
     for (i, (v, c)) in enumerate(zip(variables, coeffs))
         m = match(prior_pattern, v)
@@ -1962,7 +2084,9 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
                 continue
             end
         end
-        rhs -= get_pr_value(pr, j, k, Val(key)) * c
+        # A group pair view emits one row per spanned pair, so `get_pr_value` answers with one
+        # value per pair. Broadcast, so a scalar `rhs` widens to that vector.
+        rhs = rhs ⊖ get_pr_value(pr, j, k, Val(key)) ⊙ c
         push!(idx_rm, i)
     end
     if isempty(idx_rm)
@@ -2004,22 +2128,25 @@ function replace_coprior_views(res::VecPR, args...; kwargs...)
     return replace_coprior_views.(res, args...; kwargs...)
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:rho}, args...)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:cov}, args...)
 
-Extract the prior correlation value between assets `i` and `j` from a prior result.
+Extract the prior correlation or covariance between assets `i` and `j` from a prior result.
 
-`get_pr_value` returns the correlation coefficient between the assets indexed by `i` and `j` from the prior result object `pr`. This method is used internally to replace prior references in correlation view constraints and for moment extraction in entropy pooling and other prior-based routines.
+`get_pr_value` returns the entry of the prior correlation or covariance matrix that the dispatch tag names. These methods are used internally to replace `prior(a, b)` references in correlation and covariance view constraints.
 
 # Arguments
 
   - `pr`: Prior result containing asset return information.
   - `i`: Index of the first asset.
   - `j`: Index of the second asset.
+  - `::Val{:rho}`: Dispatch tag for correlation extraction.
+  - `::Val{:cov}`: Dispatch tag for covariance extraction.
   - `args...`: Additional arguments (ignored).
 
 # Returns
 
-  - `rho::Number`: Correlation coefficient between assets `i` and `j`.
+  - `val::Number`: Correlation coefficient or covariance between assets `i` and `j`.
 
 # Related
 
@@ -2035,43 +2162,51 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:co
     return pr.sigma[i, j]
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:rho}, args...)
+    get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}, args...)
 
-Extract the normalised average correlation between asset groups `i` and `j` from a prior result.
+Extract the prior correlations or covariances of the asset pairs that two groups span.
 
-`get_pr_value` returns the Frobenius norm of the correlation sub-matrix divided by the group length for vector index sets `i` and `j`. This variant handles grouped asset correlation views.
+`get_pr_value` returns one value per spanned pair, in the order of `zip(i, j)`. A view over a pair of groups emits one constraint row per spanned pair, so a `prior(gA, gB)` reference inside such a view must give the row that pair's own prior value. These methods are used internally to replace `prior(gA, gB)` references in correlation and covariance view constraints.
 
 # Arguments
 
   - `pr`: Prior result containing asset return information.
   - `i`: Vector of indices for the first asset group.
   - `j`: Vector of indices for the second asset group.
+  - `::Val{:rho}`: Dispatch tag for correlation extraction.
+  - `::Val{:cov}`: Dispatch tag for covariance extraction.
   - `args...`: Additional arguments (ignored).
 
 # Returns
 
-  - `rho::Number`: Normalised average correlation between asset groups `i` and `j`.
+  - `val::Vector{<:Number}`: Correlation or covariance of each spanned pair, one entry per element of `zip(i, j)`.
 
 # Related
 
   - [`LowOrderPrior`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
+  - [`RhoParsingResult`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
-    return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
+function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:rho}, args...)
+    rho = StatsBase.cov2cor(pr.sigma)
+    return [rho[a, b] for (a, b) in zip(i, j)]
+end
+function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}, args...)
+    return [pr.sigma[a, b] for (a, b) in zip(i, j)]
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
 
-Parse and add correlation view constraints to the entropy pooling constraint dictionary.
+Parse and add covariance view constraints to the entropy pooling constraint dictionary.
 
-`ep_cov_views!` parses correlation view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that correlation views do not inadvertently alter lower moments.
+`ep_cov_views!` parses covariance view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that covariance views do not inadvertently alter lower moments.
 
 # Arguments
 
-  - `cov_views`: Correlation view constraints.
+  - `cov_views`: Covariance view constraints.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
@@ -2084,14 +2219,16 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
 # Details
 
   - Parses view equations and replaces groupings by assets.
-  - Replaces prior references in views with their actual prior correlation values.
+  - Replaces prior references in views with their actual prior covariance values.
+  - A view over a pair of groups emits one constraint row per spanned asset pair, and each row takes that pair's own right-hand side.
   - Converts parsed views to linear constraints and adds them to `epc`.
-  - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to covariance constraints.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
-  - [`replace_prior_views`](@ref)
+  - [`replace_coprior_views`](@ref)
+  - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2107,7 +2244,7 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         d = ifelse(cov_view.op == ">=", -1, 1)
         i, j = cov_view.ij[1]
         Ai = d * cov_view.coef[1] * view(X, :, i) .* view(X, :, j)
-        Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ cov_view.rhs
+        Bi = d * (cov_view.coef[1] * (pr.mu[i] ⊙ pr.mu[j]) ⊕ cov_view.rhs)
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
@@ -2140,13 +2277,15 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
 
   - Parses view equations and replaces groupings by assets.
   - Replaces prior references in views with their actual prior correlation values.
+  - A view over a pair of groups emits one constraint row per spanned asset pair, and each row takes that pair's own right-hand side.
   - Converts parsed views to linear constraints and adds them to `epc`.
   - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
-  - [`replace_prior_views`](@ref)
+  - [`replace_coprior_views`](@ref)
+  - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2160,17 +2299,17 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     for rho_view in rho_views
         @argcheck(length(rho_view.vars) == 1,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
-        @argcheck(-one(eltype(X)) <= rho_view.rhs <= one(eltype(X)),
+        @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
         d = ifelse(rho_view.op == ">=", -1, 1)
         i, j = rho_view.ij[1]
         sigma_ij = if !isa(i, AbstractVector)
             sqrt(sigma[i] * sigma[j])
         else
-            LinearAlgebra.norm(sigma[i] .* sigma[j])
+            sqrt.(sigma[i] .* sigma[j])
         end
         Ai = d * rho_view.coef[1] * view(X, :, i) .* view(X, :, j)
-        Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma_ij
+        Bi = d * (rho_view.coef[1] * (pr.mu[i] ⊙ pr.mu[j]) ⊕ rho_view.rhs ⊙ sigma_ij)
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
@@ -2363,6 +2502,10 @@ A tail view constraint is the parsed, resolved form of a conditional or entropic
   - [`entropy_pooling`](@ref)
   - [`add_ep_tail_view!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 abstract type AbstractEntropyPoolingTailView <: AbstractResult end
 """
@@ -2396,13 +2539,13 @@ Solve an entropy pooling problem that carries tail view constraints.
       + `::JuMPEntropyPooling`: Builds every tail view into the model.
       + `::OptimEntropyPooling`: Solves the dual, which has no room for an auxiliary variable, so it accepts an empty `tvs` alone.
 
-# Returns
-
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
-
 # Validation
 
   - `isa(opt, OptimEntropyPooling)` requires `isempty(tvs)`.
+
+# Returns
+
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
 
 # Related
 
@@ -2410,6 +2553,10 @@ Solve an entropy pooling problem that carries tail view constraints.
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPTail])
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                          opt::OptimEntropyPooling)

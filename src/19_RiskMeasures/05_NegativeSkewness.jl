@@ -108,6 +108,11 @@ NegativeSkewness
   - [`HighOrderMoment`](@ref)
   - [`NSkeQuadFormulations`](@ref)
   - [`SOCRiskExpr`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:nskew])
 """
 @concrete struct NegativeSkewness <: RiskMeasure
     """

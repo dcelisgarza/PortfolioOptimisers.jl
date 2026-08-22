@@ -7,3 +7,10 @@ search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                         rd::ReturnsResult)
 make_p_grid
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

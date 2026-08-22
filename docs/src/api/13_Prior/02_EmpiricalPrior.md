@@ -7,3 +7,10 @@ prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int =
 prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
                dims::Int = 1, kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

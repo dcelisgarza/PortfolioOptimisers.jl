@@ -262,6 +262,10 @@ The separation between two assets is the length of the shortest path between the
 
 The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. [`PathLength`](@ref) measures the same structure in the distance estimator's units and carries its own budget in those, so no caller has to know which unit is in play.
 
+# The power sum is the source's range connection matrix
+
+[`phylogeny_matrix`](@ref)'s ``\\mathbf{P} = \\mathbb{1}_{x \\geq 1}\\left(\\sum_{i=0}^{n} \\mathbf{A}^{i}\\right) - \\mathbf{I}`` is the **range connection matrix** ``\\mathbf{B}_{1,n}`` of the source, spelled with one indicator instead of `n` of them. The source builds a per-length connection matrix ``\\mathbf{B}_{k} = \\mathbb{1}_{x \\geq 1}(\\mathbf{A}^{k} + \\mathbf{I}) - \\mathbf{I}`` and then indicates their sum; the library adds the powers first, and the ``\\mathbf{A}^{0} = \\mathbf{I}`` term the sum picks up is the term the trailing ``- \\mathbf{I}`` removes again. The two agree entry for entry: on the source's own six-node example the matrices are **identical for every** `n` from `1` to `5`.
+
 # The budget may be a rule instead of a number
 
 `n` also takes a [`HopCountAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `n(nte, X, g; dims = dims, kwargs...)` at the point of use, `g` being the structure the consumer already built. A caller who cannot state the budget in advance — because the universe is a cross-validation fold or a subproblem of a meta optimiser — states the *rule* that produces it instead of a number that was right for one universe. [`HopCountQuantile`](@ref) is the shipped rule.
@@ -309,6 +313,10 @@ HopCount
   - [`separation_budget`](@ref)
   - [`NetworkEstimator`](@ref)
   - [`Proximity`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.2, Equations 13.1-13.2.
 """
 @concrete struct HopCount <: AbstractSeparationAlgorithm
     """
@@ -335,6 +343,8 @@ $(DocStringExtensions.TYPEDEF)
 Separation measured as the length of the shortest weighted path between two assets.
 
 The separation between two assets is the sum of the **distances** along the shortest path joining them in the network, and the budget is `dmax` of the same units. It is the graded counterpart of [`HopCount`](@ref): both measure how far apart two assets sit in the same structure, but one counts the edges and the other adds up how long they are.
+
+It is a **library generalisation and rests on no published source**. [`HopCount`](@ref) has one — it is the range connection matrix of a walk length — but that literature counts edges throughout, and states no budget in the units a distance estimator emits.
 
 # The path runs over distances on both branches
 
@@ -793,13 +803,13 @@ The whole extension contract of [`AbstractSeparationDecayAlgorithm`](@ref): a ne
   - `d`: Separation between two assets, `d >= 0`. Real rather than integral, so a weighted path length is as admissible as a hop count.
   - `dmax`: Separation budget in scope. **Inert for members that do not need it** — only [`LinearDecay`](@ref) reads it. Inert arguments have precedent here: [`phylogeny_features`](@ref) ignores its `alg` entirely for a partition source.
 
-# Returns
-
-  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
-
 # Validation
 
 The contract is not checked here — this runs inside an `assets × assets` loop. Callers probe once up front with [`assert_separation_decay`](@ref) instead.
+
+# Returns
+
+  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
 
 # Examples
 
@@ -859,10 +869,6 @@ Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax
   - `ds`: Separations to probe. Need not be sorted. Precondition: `ds ⊆ [0, dmax]` — `ds` is what the guarded loop will ask about, and the loop never asks outside the budget.
   - `dmax`: Separation budget in scope, forwarded to [`separation_decay`](@ref) and probed as an endpoint in its own right.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Every probed value is finite.
@@ -870,6 +876,10 @@ Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax
   - `f(0) >= f(d)` for every probed `d`.
   - The probed values are monotone non-increasing in `d`.
   - `f(d) >= 0` for every probed `d`, and at `d = dmax` whether or not it was probed.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

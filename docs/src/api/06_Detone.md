@@ -11,7 +11,9 @@ detone!
 detone
 ```
 
+## References
+
 ```@bibliography
-Pages = ["06_Detone.md"]
+Pages = [@__FILE__]
 Canonical = false
 ```

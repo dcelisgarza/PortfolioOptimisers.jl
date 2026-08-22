@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Equal Risk Measure for hierarchical portfolio optimisation.
 
-`EqualRisk` assigns an equal risk contribution to each asset by returning the reciprocal of the number of assets. It is used in equal-risk-contribution (ERC) strategies.
+`EqualRisk` reports the same risk for every portfolio: the reciprocal of the length of the weight vector it is given. A hierarchical optimiser weights a cluster by the reciprocal of its risk, so a constant risk makes every split an even one.
 
 # Mathematical definition
 
@@ -11,15 +11,17 @@ For a portfolio of ``N`` assets with weights ``\\boldsymbol{w} \\in \\mathbb{R}^
 
 ```math
 \\begin{align}
-\\mathrm{ERC}(\\boldsymbol{w}) &= \\frac{1}{N}\\,.
+\\mathrm{EqR}(\\boldsymbol{w}) &= \\frac{1}{N}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{ERC}(\\boldsymbol{w})``: Equal risk contribution per asset.
+  - ``\\mathrm{EqR}(\\boldsymbol{w})``: Equal risk of the portfolio.
   - $(math_dict[:w_port])
   - $(math_dict[:N])
+
+``N`` is the length of the weight vector the functor receives, not the size of a cluster. A hierarchical optimiser passes the full-length weight vector with zeros outside the cluster, so every cluster reports the same ``1/N`` and every bisection splits the weight evenly.
 
 # Fields
 
@@ -37,7 +39,7 @@ Keywords correspond to the struct's fields.
 
     (r::EqualRisk)(w::VecNum)
 
-Returns the equal risk contribution for a weight vector `w`.
+Returns the reciprocal of the length of the weight vector `w`.
 
 ## Arguments
 

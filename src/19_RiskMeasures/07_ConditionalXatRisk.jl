@@ -11,7 +11,7 @@ Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio return
 
 ```math
 \\begin{align}
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-x_t - \\nu,\\, 0) \\right\\}\\,.
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - x_t,\\, 0) \\right\\}\\,.
 \\end{align}
 ```
 
@@ -88,6 +88,11 @@ ConditionalValueatRisk
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.2.4.
 """
 @propagatable @concrete struct ConditionalValueatRisk <: RiskMeasure
     """
@@ -215,6 +220,11 @@ DistributionallyRobustConditionalValueatRisk
   - [`ConditionalValueatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cvar])
+  - $(ref_dict[:drcvar])
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
     """
@@ -325,6 +335,8 @@ Where:
   - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail expected shortfall at level ``\\alpha``.
   - ``\\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail expected surplus at level ``\\beta``.
 
+$(math_dict[:negated_upper_tail])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -377,6 +389,11 @@ ConditionalValueatRiskRange
   - [`ConditionalValueatRisk`](@ref)
   - [`ValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+
+# References
+
+  - $(ref_dict[:cvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.3.
 """
 @propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     """
@@ -438,6 +455,8 @@ Where:
   - $(math_dict[:xret])
   - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x})``: Lower-tail DR-CVaR with Wasserstein parameters ``(l_a, r_a)``.
   - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})``: Upper-tail DR-CVaR with Wasserstein parameters ``(l_b, r_b)``.
+
+$(math_dict[:negated_upper_tail])
 
 # Fields
 
@@ -503,6 +522,11 @@ DistributionallyRobustConditionalValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cvar])
+  - $(ref_dict[:drcvar])
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
                                RiskMeasure
@@ -684,7 +708,7 @@ The CDaR is the CVaR of the drawdown series ``\\boldsymbol{d} = (d_1, \\ldots, d
 
 ```math
 \\begin{align}
-\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-d_t - \\nu,\\, 0) \\right\\}\\,.
+\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - d_t,\\, 0) \\right\\}\\,.
 \\end{align}
 ```
 
@@ -746,6 +770,11 @@ ConditionalDrawdownatRisk
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:cvar])
 """
 @propagatable @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     """
@@ -857,6 +886,12 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:cvar])
+  - $(ref_dict[:drcvar])
 """
 @propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
                                RiskMeasure
@@ -1009,7 +1044,7 @@ The Relative CDaR is the CVaR of the relative drawdown series ``\\boldsymbol{rd}
 
 ```math
 \\begin{align}
-\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-rd_t - \\nu,\\, 0) \\right\\}\\,.
+\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(\\nu - rd_t,\\, 0) \\right\\}\\,.
 \\end{align}
 ```
 
@@ -1019,7 +1054,7 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:rdt])
-  - ``\\nu``: Auxiliary variable (RLDaR threshold).
+  - ``\\nu``: Auxiliary variable (RDaR threshold).
 
 # Fields
 
@@ -1068,6 +1103,11 @@ RelativeConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
   - [`conditional_drawdown_at_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:cvar])
 """
 @propagatable @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     """

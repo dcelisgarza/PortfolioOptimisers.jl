@@ -24,3 +24,10 @@ _optimise(rw::RandomWeighted, rd::ReturnsResult)
 optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; dims::Int = 1, kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

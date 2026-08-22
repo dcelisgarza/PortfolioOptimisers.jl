@@ -1,0 +1,52 @@
+# Codecov's own configuration. ADR 0082.
+#
+# This file is the VISIBLE half of the coverage gate and it blocks nothing. The binding half is
+# `code_health/coverage.jl`, which reads the same `lcov.info` inside the test job and applies the
+# per-file ratchet of ADR 0076 against `code_health/coverage_baseline.toml`.
+#
+# The split is deliberate. Two blocking gates on one number disagree the first time Codecov's
+# report and the run's own lcov.info differ, and they differ for reasons that are nobody's defect: a
+# dropped upload, a retried job, a base commit whose report never finished. The ratchet reads the
+# file the run just wrote, so it is never uncertain about what it measured. Codecov keeps the badge,
+# the per-line view a reviewer actually reads, and the pull request comment that says which lines a
+# change left uncovered.
+#
+# Every status below is `informational: true`, so Codecov reports and never fails a check.
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    # One matrix cell uploads, so there is nothing to wait for.
+    after_n_builds: 1
+
+coverage:
+  precision: 2
+  round: down
+  range: "80...100"
+  status:
+    project:
+      default:
+        target: auto
+        informational: true
+    patch:
+      default:
+        # A line a change adds is a line the change can test. The terminal condition of #404 is
+        # 100 % less a reasoned exemption, so the patch target states that destination even while
+        # the library stands below it.
+        target: 100%
+        informational: true
+
+# The measured roots of ADR 0072, stated the other way round. Every entry here is an Unmeasured
+# Path in `code_health/rulings.toml`, and the two lists move together.
+ignore:
+  - "test/"
+  - "docs/"
+  - "examples/"
+  - "user_guide/"
+  - "research/"
+  - "code_health/"
+
+comment:
+  layout: "condensed_header, diff, files, condensed_footer"
+  behavior: default
+  require_changes: false

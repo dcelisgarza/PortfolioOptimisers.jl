@@ -156,7 +156,7 @@ $(DocStringExtensions.TYPEDEF)
 
 [`RankRule`](@ref) with the tail sizes given as *fractions* of the asset universe.
 
-`best` and `worst` are fractions in `(0, 1)`, converted to counts as `round(Int, fraction * n)` on the window being fitted. Everything else — orientation via [`bigger_is_better`](@ref), the `action` complement, count saturation, and the tie policy that excludes a straddling tied block — is identical to [`RankRule`](@ref).
+`best` and `worst` are fractions in `(0, 1)`, converted to counts as `round(Int, fraction * n, RoundNearestTiesUp)` on the window being fitted. An exact half rounds **up**, so `best = 0.625` on a 4-asset window takes 3 assets, not the 2 that Julia's default banker's rounding would give. Everything else — orientation via [`bigger_is_better`](@ref), the `action` complement, count saturation, and the tie policy that excludes a straddling tied block — is identical to [`RankRule`](@ref).
 
 Fractions and counts are separate types on purpose: `best = 1` (one asset) and `best = 1.0` (the whole universe) would otherwise differ only by a literal's type.
 
@@ -604,7 +604,9 @@ Greedy pairwise correlation pruning: drop assets until no surviving pair exceeds
 
 Correlated pairs are visited from most to least correlated, and the worse asset of each pair is removed. "Worse" means the higher drop score: the `RedundancySelector`'s `score` when it has one, otherwise each asset's summary correlation to the rest of the universe — so the asset that is redundant with *most* of the universe goes first.
 
-This algorithm never **chains**. If `ρ(A, B) = 0.97` and `ρ(B, C) = 0.97` but `ρ(A, C) = 0.10`, it drops `B` and keeps both `A` and `C`, honouring the literal promise that no surviving pair exceeds `t`. [`CorrelationComponents`](@ref) reads the same inputs transitively and keeps only one of the three.
+This algorithm never **chains**. At `t = 0.7`, a universe with `ρ(A, B) = 0.80`, `ρ(B, C) = 0.81` and `ρ(A, C) = 0.32` loses `B` and keeps both `A` and `C`, honouring the literal promise that no surviving pair exceeds `t`. [`CorrelationComponents`](@ref) reads the same three correlations transitively and keeps only `A`.
+
+How loose the middle correlation can be is bounded by the other two: two edges at `ρ` force the third above `ρ² - (1 - ρ²)`, so a chain of two `0.97` edges cannot have a third correlation below `0.88`. A weakly-connected chain therefore needs weak edges, and the two algorithms diverge most where `t` sits just under them.
 
 Delegates to [`find_uncorrelated_indices`](@ref).
 

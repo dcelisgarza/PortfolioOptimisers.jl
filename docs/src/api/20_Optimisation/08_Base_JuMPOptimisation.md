@@ -88,3 +88,10 @@ mark_state!
 nested_prefix
 nested_index
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

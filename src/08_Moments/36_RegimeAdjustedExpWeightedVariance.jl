@@ -38,7 +38,7 @@ julia> PortfolioOptimisers.regime_multiplier(MyRegimeMethod(), -1.5)
 1.5
 ```
 
-## Related
+# Related
 
   - [`LogRegimeAdjusted`](@ref)
   - [`FirstMomentRegimeAdjusted`](@ref)
@@ -106,7 +106,7 @@ LogRegimeAdjusted
   kappa ┴ Float64: -1.2703628454614782
 ```
 
-## Related
+# Related
 
   - [`RegimeAdjustedMethod`](@ref)
   - [`FirstMomentRegimeAdjusted`](@ref)
@@ -185,7 +185,7 @@ FirstMomentRegimeAdjusted
   x ┴ Float64: 0.7978845608028654
 ```
 
-## Related
+# Related
 
   - [`RegimeAdjustedMethod`](@ref)
   - [`LogRegimeAdjusted`](@ref)
@@ -228,7 +228,7 @@ Where:
   - ``z_t``: Standardised return at time ``t``.
   - ``\\mathrm{mult}``: Variance scaling multiplier.
 
-## Related
+# Related
 
   - [`RegimeAdjustedMethod`](@ref)
   - [`LogRegimeAdjusted`](@ref)
@@ -250,7 +250,7 @@ Computes the variance scaling multiplier for the log regime adjustment method.
 
   - `mult::Number`: Variance scaling multiplier `exp(method.x * regime_state)`.
 
-## Related
+# Related
 
   - [`LogRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -272,7 +272,7 @@ Computes the variance scaling multiplier for the first-moment regime adjustment 
 
   - `mult::Number`: Variance scaling multiplier equal to `regime_state` directly.
 
-## Related
+# Related
 
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -294,7 +294,7 @@ Computes the variance scaling multiplier for the root-mean-squared regime adjust
 
   - `mult::Number`: Variance scaling multiplier `sqrt(max(regime_state, 0))`.
 
-## Related
+# Related
 
   - [`RootMeanSquaredAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -400,7 +400,7 @@ julia> ce.min_obs
 40
 ```
 
-## Related
+# Related
 
   - [`RegimeAdjustedMethod`](@ref)
   - [`LogRegimeAdjusted`](@ref)
@@ -503,7 +503,7 @@ This type is an implementation detail and is not intended for direct use.
 
 $(DocStringExtensions.FIELDS)
 
-## Related
+# Related
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
@@ -569,7 +569,7 @@ standardised squared innovations.
 
   - `s::Number`: Mean of `z2_valid`.
 
-## Related
+# Related
 
   - [`RootMeanSquaredAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -593,7 +593,7 @@ squared innovations.
 
   - `s::Number`: Mean absolute deviation `mean(sqrt(max.(z², 0))) / method.x`.
 
-## Related
+# Related
 
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -617,7 +617,7 @@ innovations.
 
   - `s::Number`: Mean log deviation `mean(log(max.(z², min_val))) - method.kappa`.
 
-## Related
+# Related
 
   - [`LogRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -644,7 +644,7 @@ the result in `cache.X2`.
 
   - `X2::VecNum`: The HAC-adjusted squared returns stored in `cache.X2`.
 
-## Related
+# Related
 
   - [`RegimeAdjustedVarianceCache`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -688,7 +688,7 @@ then advances the smoothed regime state.
 
   - `nothing`.
 
-## Related
+# Related
 
   - [`RegimeAdjustedVarianceCache`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
@@ -816,7 +816,7 @@ result by the square of the regime multiplier derived from the smoothed regime s
     vector of length `assets`. Assets with fewer than `ce.min_obs` observations return
     `NaN`.
 
-## Related
+# Related
 
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
   - [`RegimeAdjustedVarianceCache`](@ref)

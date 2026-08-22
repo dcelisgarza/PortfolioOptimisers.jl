@@ -30,3 +30,10 @@ bootstrap_generator
 mu_bootstrap_generator
 sigma_bootstrap_generator
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

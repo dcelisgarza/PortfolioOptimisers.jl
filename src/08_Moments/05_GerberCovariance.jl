@@ -16,7 +16,8 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber_analysis])
 """
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
@@ -39,13 +40,15 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Gerber covariance algorithm.
+Normalises the net co-movement vote by the observations on which both assets crossed their threshold.
+
+The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d})``, where an observation votes only when both assets cross a threshold, concordantly for ``n_{c}`` and discordantly for ``n_{d}``. This is the original Gerber statistic.
 
 # Constructors
 
@@ -67,13 +70,15 @@ Gerber0()
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 struct Gerber0 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Gerber covariance algorithm.
+Normalises the net co-movement vote by every observation on which at least one asset crossed its threshold.
+
+The pairwise statistic is ``(n_{c} - n_{d}) / (n_{c} + n_{d} + n_{n})``. The extra term ``n_{n}`` counts the observations on which exactly one of the two assets crossed, so the denominator is larger than [`Gerber0`](@ref)'s and the statistic is bounded more tightly.
 
 # Constructors
 
@@ -95,13 +100,15 @@ Gerber1()
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 struct Gerber1 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Gerber covariance algorithm.
+Normalises the raw net co-movement vote by the geometric mean of its own diagonal.
+
+The pairwise statistic is ``h_{ij} / \\sqrt{h_{ii} h_{jj}}`` with ``h_{ij} = n_{c} - n_{d}``. The diagonal is therefore unit by construction, rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref).
 
 # Constructors
 
@@ -123,7 +130,7 @@ Gerber2()
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 struct Gerber2 <: GerberCovarianceAlgorithm end
 """
@@ -152,6 +159,21 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:gerbt])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -182,10 +204,12 @@ GerberCovariance
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 @propagatable @concrete struct GerberCovariance <: BaseGerberCovariance
     """
@@ -344,7 +368,7 @@ The algorithm proceeds as follows:
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
                 sd::ArrNum)
@@ -426,7 +450,7 @@ The algorithm proceeds as follows:
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
                 sd::ArrNum)
@@ -512,7 +536,7 @@ The algorithm proceeds as follows:
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
                 sd::ArrNum)
@@ -540,13 +564,13 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
-
-  - $(arg_dict[:rho])
-
 # Validation
 
   - $(val_dict[:dims])
+
+# Returns
+
+  - $(arg_dict[:rho])
 
 # Details
 
@@ -565,7 +589,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
@@ -591,13 +615,13 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
-
-  - $(arg_dict[:rho])
-
 # Validation
 
   - $(val_dict[:dims])
+
+# Returns
+
+  - $(arg_dict[:rho])
 
 # Details
 
@@ -617,7 +641,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
 # References
 
-  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
+  - $(ref_dict[:gerber])
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)

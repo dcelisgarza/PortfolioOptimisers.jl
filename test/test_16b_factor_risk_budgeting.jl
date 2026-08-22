@@ -21,7 +21,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             5e-4
         elseif i == 6
             # Host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
-            5e-4
+            1e-4
         elseif i == 9
             1
         elseif i ∈ (11, 15, 18, 19, 20, 22)
@@ -104,10 +104,12 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i == 22 || Sys.isapple() && i ∈ (18, 20) || Sys.iswindows() && i == 10
-            1e-3
-        elseif i ∈ (1, 10, 12) || Sys.isapple() && i ∈ (2, 6)
+        rtol = if i ∈ (12, 22) ||
+                  Sys.isapple() && i ∈ (18, 20) ||
+                  Sys.iswindows() && i == 10
             # 12 is host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
+            1e-3
+        elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
             5e-4
         elseif i ∈ (15, 16, 17, 19)
             5e-3

@@ -1,11 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for portfolio transaction fees constraints.
+Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe.
 
-`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Supports asset-specific fees via dictionaries, pairs, or vectors of pairs.
-
-This estimator can be converted into a concrete [`Fees`](@ref) constraint using the [`fees_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`UniverseSets`](@ref) object.
+Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name, and the matching `d*` field fills every asset the keys miss. [`fees_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Fees`](@ref), whose fee fields are plain per-asset vectors.
 
 !!! warning
 
@@ -154,9 +152,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for portfolio transaction fee constraints.
+Charges a portfolio a turnover fee, a long or short proportional fee, and a long or short fixed fee.
 
-`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fixed fees do not depend on the value of the asset weights, only whether it is positive or negative---up to a tolerance defined by how close the weight is to zero defined by `isapprox` and the `kwargs` field.
+Each of the three components keys on the **sign of the position**, not on the sign of the trade: an asset held long pays `l` and `fl`, an asset held short pays `s` and `fs`, whatever the direction of the rebalance that reached it. The turnover component is the one that keys on the trade, and it carries a [`Turnover`](@ref) whose `val` is read as a per-asset **fee rate** rather than as a bound.
+
+A fixed fee is charged per position held, whatever its size. The position must be non-zero to attract one, and `kwargs` is forwarded to `isapprox` to decide how near zero counts as zero.
 
 Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values. The portfolio fees are computed by [`calc_fees`](@ref) and asset fees by [`calc_asset_fees`](@ref).
 
@@ -174,8 +174,8 @@ For non-finite optimisations, the total portfolio transaction fees are computed 
 \\begin{align}
 F_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
 F_{\\text{Tn}}(\\boldsymbol{w}) &= \\boldsymbol{Tn} \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
+F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
 
@@ -187,10 +187,12 @@ This method lets us automatically adjust the available cash amount during the op
 \\begin{align}
 F_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
 F_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
+F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
+
+The fixed term carries no ``\\boldsymbol{X}``. A fixed fee is a currency amount already, so the price vector reaches only the two terms that are stated as a fraction of the position.
 
 ## Per asset fees
 
@@ -200,8 +202,8 @@ It is also possible to compute per-asset fees incurred using the same definition
 \\begin{align}
 \\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq \\boldsymbol{F}_{\\text{Tn}} + \\boldsymbol{F}_{\\text{p}} + \\boldsymbol{F}_{\\text{f}} \\\\
 \\boldsymbol{F}_{\\text{Tn}}(\\boldsymbol{w}) &= \\boldsymbol{Tn} \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
-\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot\\boldsymbol{f}_{\\text{f}}^{-}
+\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot\\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
 
@@ -211,8 +213,8 @@ The finite optimisation uses fees somewhat differently because it uses a finite 
 \\begin{align}
 \\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq \\boldsymbol{F}_{\\text{Tn}} + \\boldsymbol{F}_{\\text{p}} + \\boldsymbol{F}_{\\text{f}} \\\\
 \\boldsymbol{F}_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}} \\\\
-\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{-}
+\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} - \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0 \\land \\boldsymbol{w} \\neq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
 
@@ -226,7 +228,16 @@ Where:
   - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
   - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is encoded an instance of [`Turnover`](@ref), where `val` is the per asset fee.
   - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
+  - ``\\boldsymbol{w} \\neq 0``: Read as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms carry it: a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
+
+The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge.
+
+## The JuMP model charges the same fee only when the decomposition is pinned
+
+[`set_non_fixed_fees!`](@ref) writes the proportional terms against the model's `lw` and `sw` variables rather than against ``\\boldsymbol{w}``, and it writes no fixed term at all — a fixed fee needs a binary and is emitted by the MIP builder instead.
+
+Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. On a 200×5 sample with `bgt = 1`, `sbgt = 1`, `l = 0.002`, `s = 0.003` and an all-long solution, the model reported `0.007` against the functor's `0.002`: the budget pins `sum(sw)` to `sbgt` whether or not a short position is held. Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the two then agreed to `5e-18` on the same problem. A long-only model needs no pinning and agreed to `9e-9`.
 
 # Fields
 
@@ -242,6 +253,8 @@ $(DocStringExtensions.FIELDS)
         fs::Option{<:Num_VecNum} = nothing,
         kwargs::NamedTuple = (; atol = 1e-8)
     ) -> Fees
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -297,8 +310,14 @@ Fees
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`PartsBoundWeights`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.14. The book states the linear variable transaction cost, which is the turnover term with equal rates on the two sides of the trade. The long/short proportional and fixed fees here key on the sign of the **position** rather than of the trade, and are a generalisation of it.
 """
 @propagatable @concrete struct Fees <: AbstractResult
     """

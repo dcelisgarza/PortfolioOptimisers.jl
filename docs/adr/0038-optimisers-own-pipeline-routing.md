@@ -250,7 +250,7 @@ tuple's length is the contract: one target means the step needs no annotation, s
 the step must name one through its `PipelineStep` wrapper, none means the family computes
 nothing for the slot and is not a step.
 
-```
+```text
 WeightBoundsEstimator                  → (:wb,)
 LinearConstraintEstimator              → (:lcse,)
 ExposureConstraintEstimator            → (:lcse,)

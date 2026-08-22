@@ -9,7 +9,18 @@ using InteractiveUtils: InteractiveUtils
 const PO = PortfolioOptimisers
 
 # Snapshot of the OLD routing-union membership (pre-trait); the differential baseline.
-const _OLD_NETRETURNS = Any[WorstRealisation, ValueatRisk, ValueatRiskRange,
+# `ValueatRisk` and `ValueatRiskRange` split by formulation: `alg` selects the estimand, so
+# the MIP branch scores a net return series and the parametric branch reads the prior's
+# moments against the weights. Both branches are named, each in its own list. They are named
+# by a CONCRETE type: `typeintersect` on two `alg`-bounded `UnionAll`s is a type with an
+# uninhabited parameter rather than `Union{}`, so inference over a bound would report both
+# kinds for either branch.
+const _VAR_MIP = typeof(ValueatRisk(; alg = MIPValueatRisk()))
+const _VAR_RANGE_MIP = typeof(ValueatRiskRange(; alg = MIPValueatRisk()))
+const _VAR_DIST = typeof(ValueatRisk(; alg = DistributionValueatRisk()))
+const _VAR_RANGE_DIST = typeof(ValueatRiskRange(; alg = DistributionValueatRisk()))
+
+const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
                             ConditionalValueatRisk,
                             DistributionallyRobustConditionalValueatRisk,
                             DistributionallyRobustConditionalValueatRiskRange,
@@ -29,7 +40,8 @@ const _OLD_NETRETURNS = Any[WorstRealisation, ValueatRisk, ValueatRiskRange,
                             PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk]
 const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
                                     RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
-                                    Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis]
+                                    Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis,
+                                    _VAR_DIST, _VAR_RANGE_DIST]
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
                          UncertaintySetVariance, EqualRisk]
 
@@ -67,13 +79,20 @@ end
     end
 end
 
+# Every kind a type can answer. A measure whose formulation selects the estimand answers
+# more than one, and each must still be a concrete kind: an undeclared type infers
+# `Union{}` from the erroring default and fails here.
+function declared_kinds(@nospecialize(T))
+    return unique(Base.return_types(PO.risk_input_kind, (T,)))
+end
+
 @testset "risk_input_kind — every concrete measure is classified" begin
     for T in all_concrete(PO.AbstractBaseRiskMeasure)
         if T in _EXPLICIT
             continue
         end
-        k = declared_kind(T)
-        @test isconcretetype(k) && k <: PO.RiskInputKind
+        ks = declared_kinds(T)
+        @test !isempty(ks) && all(k -> isconcretetype(k) && k <: PO.RiskInputKind, ks)
     end
 end
 

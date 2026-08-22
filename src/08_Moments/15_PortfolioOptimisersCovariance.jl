@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Composite covariance estimator with post-processing.
+Runs any covariance estimator, then applies a matrix post-processing step to its result.
 
-`PortfolioOptimisersCovariance` is a flexible container type that combines any covariance estimator with a matrix post-processing step.
+`ce` computes the raw matrix and `mp` repairs or filters it — positive-definite repair, denoising, and detoning — so the composite is the estimator the rest of the library takes as its default.
 
 # Fields
 
@@ -17,6 +17,18 @@ $(DocStringExtensions.FIELDS)
     ) -> PortfolioOptimisersCovariance
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -44,6 +56,8 @@ PortfolioOptimisersCovariance
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
     """
@@ -77,13 +91,13 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# Returns
-
-  - `sigma::Matrix{<:Number}`: The processed covariance matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `sigma::Matrix{<:Number}`: The processed covariance matrix.
 
 # Related
 
@@ -114,13 +128,13 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: The processed correlation matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: The processed correlation matrix.
 
 # Related
 

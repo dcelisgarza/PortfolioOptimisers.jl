@@ -30,6 +30,30 @@ Two families need this:
 
 Setting `settings.ub` is legal but pointless: the bound applies to a quantity that is always zero.
 
+# Functor
+
+    (r::NoRisk)(x::VecNum)
+
+Returns zero, with the element type of the portfolio returns vector `x`.
+
+## Arguments
+
+  - `x::VecNum`: Portfolio returns vector.
+
+# Examples
+
+```jldoctest
+julia> r = NoRisk()
+NoRisk
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+
+julia> r([0.1, -0.2, 0.05])
+0.0
+```
+
 # Related
 
   - [`RiskMeasure`](@ref)

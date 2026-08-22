@@ -491,6 +491,22 @@ end
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
+    # `err` is stated in the units of `alg`, so a `SquaredL2Norm` bound is on the squared
+    # error. The model shares the `L2Norm` cone and square-roots the bound to match, which is
+    # what `tracking_error_soc_factor` is for.
+    sq = SquaredL2Norm()
+    opt = JuMPOptimiser(; pe = pr, slv = slv,
+                        tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 9e-6,
+                                           alg = sq))
+    mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+    res = optimise(mre)
+    @test PortfolioOptimisers.norm_error(sq, rd.X * res.w, wr, size(rd.X, 1)) <=
+          9e-6 * (1 + 1e-6)
+    # The square is what separates the two norms, not the cone.
+    @test isapprox(PortfolioOptimisers.norm_error(sq, rd.X * res.w, wr, size(rd.X, 1)),
+                   PortfolioOptimisers.norm_error(L2Norm(; ddof = sq.ddof), rd.X * res.w,
+                                                  wr, size(rd.X, 1))^2)
+
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 4.5e-3,
                                            alg = LpNorm()))

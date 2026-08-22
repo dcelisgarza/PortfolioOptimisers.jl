@@ -9,13 +9,13 @@ Converts the input vector of `key => values` pairs into a grid of Accessors.jl l
 
   - `estval`: Vector of `String => AbstractVector` pairs mapping parameter key paths to their candidate values.
 
-# Returns
-
-  - Grid of (lens, value) combinations.
-
 # Validation
 
   - The candidate count must not exceed `RESOURCE_LIMITS[].max_search_grid`, asserted by [`assert_search_grid_cap`](@ref) before the product is materialised.
+
+# Returns
+
+  - Grid of (lens, value) combinations.
 
 # Related
 

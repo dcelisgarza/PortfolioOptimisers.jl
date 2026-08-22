@@ -1,27 +1,53 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract type for estimators that construct uncertainty sets using bootstrap methods in portfolio optimisation.
+Fits an uncertainty set by resampling the return series, so the set assumes no law for the returns.
 
-Subtypes implement specific bootstrap algorithms (e.g., stationary, circular, moving block) to estimate uncertainty sets for risk or prior statistics.
+All concrete subtypes should subtype `BootstrapUncertaintySetEstimator`. It is the branch of [`AbstractUncertaintySetEstimator`](@ref) whose bounds come from a resample rather than from a closed form.
+
+# Interfaces
+
+A subtype implements the three methods of [`AbstractUncertaintySetEstimator`](@ref), and carries a [`ARCHBootstrapSet`](@ref) that says how the resample is drawn.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
+  - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`ARCHBootstrapSet`](@ref)
 """
 abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract type for bootstrap algorithms used in constructing uncertainty sets for time series data in portfolio optimisation.
+Selects how a block bootstrap draws its blocks, which is what keeps the serial dependence of a return series in the resample.
 
-Subtypes implement specific block bootstrap methods for dependent (time series) data.
+All concrete subtypes should subtype `ARCHBootstrapSet`. The three that ship differ in whether the block length is fixed or random, and in whether a block wraps around the end of the sample.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `ARCHBootstrapSet` and implement the following method:
+
+## `bootstrap_indices`
+
+  - `bootstrap_indices(alg::ARCHBootstrapSet, rng::Random.AbstractRNG, T::Integer, block_size::Integer) -> Vector{Int}`: Returns the row indices of one resample.
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `rng`: Random number generator.
+  - `T`: Number of observations in the sample being resampled.
+  - `block_size`: Block length, or the mean block length when the length is random.
+
+### Returns
+
+  - `idx::Vector{Int}`: `T` indices in `1:T`, which select the rows of one resample.
 
 # Related
 
   - [`StationaryBootstrap`](@ref)
   - [`CircularBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
+  - [`bootstrap_indices`](@ref)
 """
 abstract type ARCHBootstrapSet <: AbstractAlgorithm end
 """
@@ -34,6 +60,10 @@ Bootstrap algorithm for constructing uncertainty sets using a stationary bootstr
   - [`ARCHBootstrapSet`](@ref)
   - [`CircularBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:politis1994stationary])
 """
 struct StationaryBootstrap <: ARCHBootstrapSet end
 """
@@ -46,6 +76,10 @@ Bootstrap algorithm for constructing uncertainty sets using a circular block boo
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:politis1992circular])
 """
 struct CircularBootstrap <: ARCHBootstrapSet end
 """
@@ -58,6 +92,10 @@ Bootstrap algorithm for constructing uncertainty sets using a moving block boots
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
   - [`CircularBootstrap`](@ref)
+
+# References
+
+  - $(ref_dict[:kunsch1989])
 """
 struct MovingBootstrap <: ARCHBootstrapSet end
 """
@@ -136,7 +174,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
+Fits a box or an ellipsoidal uncertainty set from the spread of the statistics over a block bootstrap of the return series.
+
+It is the bootstrapping method of Equation 11.18 of the source, and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref) and cites its own paper for.
 
 # Fields
 
@@ -228,6 +268,10 @@ ARCHUncertaintySet
   - [`MovingBootstrap`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.18.
 """
 @concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
     """
@@ -313,7 +357,8 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `X`: Data matrix to be resampled, one row per observation.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -324,7 +369,7 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
   - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the expected return and covariance using the prior estimator in `ue.pe`.
+  - For each bootstrap sample, computes the expected return with `ue.me` and the covariance with `ue.ce`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
   - Stores the bootstrapped expected returns and covariances for uncertainty set estimation.
 
 # Related
@@ -354,7 +399,8 @@ Generates bootstrap samples of expected return vectors for returns data using th
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `X`: Data matrix to be resampled, one row per observation.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -364,7 +410,7 @@ Generates bootstrap samples of expected return vectors for returns data using th
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
   - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the expected return using the prior estimator in `ue.pe`.
+  - For each bootstrap sample, computes the expected return with `ue.me`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
   - Stores the bootstrapped expected returns for uncertainty set estimation.
 
 # Related
@@ -392,7 +438,8 @@ Generates bootstrap samples of covariance matrices for time series data using th
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `X`: Data matrix to be resampled, one row per observation.
+  - `kwargs...`: Additional keyword arguments passed to `ue.me` and `ue.ce`.
 
 # Returns
 
@@ -402,7 +449,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
   - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the covariance using the prior estimator in `ue.pe`.
+  - For each bootstrap sample, computes the covariance with `ue.ce`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
   - Stores the bootstrapped covariances for uncertainty set estimation.
 
 # Related

@@ -3,26 +3,55 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for subset resampling portfolio optimisation estimators.
 
-# Related Types
+A subset resampling estimator draws random asset subsets, solves one base optimiser on each, and averages the answers back into the full universe. The averaging is what damps the estimation error a single full-universe solve would carry through.
+
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`SubsetResampling`](@ref)
+  - [`SubsetResamplingResult`](@ref)
+
+# References
+
+  - $(ref_dict[:shen2017])
 """
 abstract type BaseSubsetResamplingOptimisationEstimator <:
               NonFiniteAllocationOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Subset Resampling portfolio optimisation.
+Result type for [`SubsetResampling`](@ref).
+
+`ress` and `idx` are aligned: `ress[m]` is the optimisation of the subset whose asset indices are `idx[:, m]`, and `w` is the average of those results embedded back into the full universe.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    SubsetResamplingResult(;
+        pr::Option{<:AbstractPriorResult},
+        wb::Option{<:WeightBounds},
+        fees::Option{<:Fees},
+        ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+        idx::MatNum,
+        retcode::OptRetCode_VecOptRetCode,
+        w::VecNum_VecVecNum,
+        fb::Option{<:OptE_Opt}
+    ) -> SubsetResamplingResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`SubsetResampling`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+
+# References
+
+  - $(ref_dict[:shen2017])
 """
 @concrete struct SubsetResamplingResult <: NonJuMPOptimisationResult
     """
@@ -38,11 +67,11 @@ $(DocStringExtensions.FIELDS)
     """
     fees
     """
-    Vector of sub-optimisation results for each subset.
+    Optimisation result of each asset subset, one entry per subset, in the column order of `idx`.
     """
     ress
     """
-    $(field_dict[:idx])
+    Asset indices of each subset, one **column** per subset, so `size(idx) == (subset_size, n_subsets)`.
     """
     idx
     """
@@ -134,22 +163,34 @@ Keywords correspond to the struct's fields.
 
 # Mathematical definition
 
-Draw ``M`` random subsets ``S_1, \\ldots, S_M`` of assets (size ``\\lfloor s \\cdot N \\rfloor``). Optimise on each:
+Draw ``M`` **distinct** random subsets ``S_1, \\ldots, S_M`` of the ``N`` assets, each of size ``k``. Optimise on each, embed the answer back into the full universe, and average:
 
 ```math
 \\begin{align}
+k &= \\begin{cases}
+       \\mathrm{subset\\_size} & \\text{if } \\mathrm{subset\\_size} \\in \\mathbb{Z}\\,, \\\\
+       \\max\\!\\left(\\mathrm{round}(s N),\\, 1\\right) & \\text{if } s = \\mathrm{subset\\_size} \\in (0, 1)\\,,
+     \\end{cases} \\\\
 \\boldsymbol{w}^* &= \\frac{1}{M} \\sum_{m=1}^{M} \\boldsymbol{e}_{S_m}(\\boldsymbol{w}_{S_m})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}^*``: Final averaged portfolio weights.
-  - ``M``: Number of random subsets.
-  - ``S_m``: ``m``-th randomly drawn asset subset (size ``\\lfloor s \\cdot N \\rfloor``).
-  - ``\\boldsymbol{w}_{S_m}``: Optimal weights from the optimiser applied to subset ``S_m``.
+  - ``\\boldsymbol{w}^*``: Averaged portfolio weights, before the weight finalisation below.
+  - ``M``: Number of random subsets, `n_subsets`.
+  - ``k``: Size of each subset, `subset_size` resolved against the universe.
+  - ``S_m``: ``m``-th randomly drawn asset subset.
+  - ``\\boldsymbol{w}_{S_m}``: Optimal weights from `opt` applied to subset ``S_m``.
   - ``\\boldsymbol{e}_{S_m}(\\cdot)``: Embedding operator that places subset weights into full ``N``-asset space (zero-filling excluded assets).
   - ``N``: Total number of assets.
+  - ``s``: Fractional `subset_size`.
+
+A fractional `subset_size` **rounds**; it does not truncate. At the default ``s = 0.8`` on ``N = 12`` assets the subsets hold ``10`` assets, not ``9``.
+
+``\\boldsymbol{w}^*`` then passes through `wf` and `wb` (see [`finalise_weight_bounds`](@ref)), which is what the result's `w` and `retcode` carry.
+
+The subsets are drawn without repetition, so `n_subsets` may not exceed ``\\binom{N}{k}``; the constructor's `max_comb` caps the enumeration this needs.
 
 ## Propagated parameters
 
@@ -159,12 +200,27 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`SubsetResampling` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `pe` already holds a prior **result**, the method replaces `X` with `pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `pe`, `wb`, `fees` and `sets` recurse through [`port_opt_view`](@ref) with the index alone.
+  - `opt` recurses with that matrix.
+  - The remaining fields are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
   - [`SubsetResamplingResult`](@ref)
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+
+# References
+
+  - $(ref_dict[:shen2017])
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     """
@@ -414,26 +470,34 @@ function subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode
     end
 end
 """
-    subset_resampling_finaliser(N, n_subsets, asset_idx, ...)
+    subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
+                                wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                ress::VecOpt, w::VecNum_VecVecNum)
 
-Aggregate and finalise portfolio weights from subset resampling.
+Average the subset weights back into the full universe and finalise them against the bounds.
 
-Combines optimised weights from multiple asset subsets, averaging over subsets to produce the final portfolio weights.
+Implements the averaging step of [`SubsetResampling`](@ref): each subset's weights are added into the full ``N``-asset vector at that subset's indices, the sum is divided by `n_subsets`, and the average passes through [`finalise_weight_bounds`](@ref).
 
 # Arguments
 
-  - `N`: Total number of assets.
-  - `n_subsets`: Number of asset subsets used in resampling.
-  - `asset_idx`: Matrix of asset indices for each subset.
-  - Additional weight and parameter inputs.
+  - `N::Integer`: Total number of assets in the universe.
+  - `n_subsets::Integer`: Number of asset subsets.
+  - `asset_idx::MatNum`: Asset indices, one column per subset.
+  - `wb::Option{<:WeightBounds}`: Weight bounds to finalise against, or `nothing`.
+  - `wf::WeightFinaliser`: Weight finaliser to repair a bounds violation with.
+  - `ress::VecOpt`: Subset optimisation results, in the column order of `asset_idx`.
+  - `w::VecNum_VecVecNum`: The first subset's weights. Its **shape alone** selects the method: a vector of vectors dispatches to the efficient-frontier route, which finalises each frontier point on its own.
 
 # Returns
 
-  - Final aggregated portfolio weight vector.
+  - `retcode`: The aggregate return code from [`subset_resampling_retcode`](@ref), or a vector of them on the frontier route.
+  - `w`: The averaged and finalised weights, or a vector of them on the frontier route.
 
 # Related
 
-  - [`MultipleRandomised`](@ref)
+  - [`SubsetResampling`](@ref)
+  - [`subset_resampling_retcode`](@ref)
+  - [`finalise_weight_bounds`](@ref)
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
@@ -517,10 +581,15 @@ Run the Subset Resampling portfolio optimisation.
   - `save`: Passed to the internal optimiser. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
+# Returns
+
+  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when any subset failed, or when the weight finalisation did.
+
 # Related
 
   - [`SubsetResampling`](@ref)
   - [`SubsetResamplingResult`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
@@ -531,4 +600,4 @@ function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                      save = save, kwargs...)
 end
 
-export SubsetResampling
+export SubsetResamplingResult, SubsetResampling

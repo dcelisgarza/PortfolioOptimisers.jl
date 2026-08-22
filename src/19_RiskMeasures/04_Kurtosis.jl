@@ -15,19 +15,19 @@ Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vec
 \\end{align}
 ```
 
-The square-root kurtosis (full moment) is:
+The fourth central moment (full moment) is:
 
 ```math
 \\begin{align}
-\\mathrm{Kurt}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4}\\,.
+m_4(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4\\,.
 \\end{align}
 ```
 
-Equivalently, using the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}`` and the Kronecker product ``\\otimes``:
+The same quantity in the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}``, with the Kronecker product ``\\otimes``, is:
 
 ```math
 \\begin{align}
-\\mathrm{Kurt}(\\boldsymbol{w}) &= \\sqrt[4]{(\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})}\\,.
+m_4(\\boldsymbol{w}) &= (\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})\\,.
 \\end{align}
 ```
 
@@ -35,14 +35,27 @@ For the semi (downside) variant, only non-positive deviations contribute:
 
 ```math
 \\begin{align}
-\\mathrm{SKurt}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4}\\,.
+m_4^{-}(\\boldsymbol{w}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4\\,.
+\\end{align}
+```
+
+The risk is the fourth moment itself under a quadratic formulation, and its square root under a second-order cone formulation. `alg2` selects between them, and `alg1` selects between the full and the semi moment:
+
+```math
+\\begin{align}
+\\mathrm{Kurt}(\\boldsymbol{w}) &= \\begin{cases}
+  \\sqrt{m_4(\\boldsymbol{w})} & \\text{(\\texttt{SOCRiskExpr})} \\\\
+  m_4(\\boldsymbol{w}) & \\text{(quadratic formulation)}
+\\end{cases}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: ``N \\times 1`` asset weights vector.
+  - $(math_dict[:w_port])
   - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
+  - $(math_dict[:T])
+  - ``\\delta_t``: Centred portfolio return at period ``t``.
   - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis matrix.
   - ``\\otimes``: Kronecker product.
 
@@ -97,11 +110,11 @@ Keywords correspond to the struct's fields.
 
 ## Exact
 
-This formulation is used when `N` is `nothing`.
+This formulation is used when `N` is `nothing`. It is the parametric model of [pkurt](@cite).
 
 ## Approximate
 
-This formulation is used when `N` is an integer, the larger the value of `N`, the more accurate and expensive it becomes.
+This formulation is used when `N` is an integer, the larger the value of `N`, the more accurate and expensive it becomes. It is the sum-of-squared-quadratic-forms model of [pkurtapprox](@cite).
 
 # Examples
 
@@ -129,7 +142,16 @@ Kurtosis
   - [`SemiMoment`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`QuadSecondMomentFormulations`](@ref)
+  - [`NegativeSkewness`](@ref)
   - [`resolve_deferred_quantities`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurtapprox])
 """
 @concrete struct Kurtosis <: RiskMeasure
     """

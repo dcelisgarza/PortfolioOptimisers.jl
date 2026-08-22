@@ -18,3 +18,10 @@ mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:L1UncertaintySetAlgorithm}, X::
 ucs(ue::CharacteristicUncertaintySet, X::MatNum,
              F::Option{<:MatNum} = nothing; kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -38,3 +38,10 @@ port_opt_view(r::HighOrderMoment, i, args...)
 supports_precomputed_returns(r::LoHiOrderMoment)
 moment_risk
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

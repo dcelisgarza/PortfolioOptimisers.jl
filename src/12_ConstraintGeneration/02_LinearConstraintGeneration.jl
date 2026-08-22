@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. It can represent equality or inequality constraints depending on whether the instance is stored in the `eq` or `ineq` fields of [`LinearConstraint`](@ref).
+Holds the coefficient matrix `A` and the right-hand side vector `B` of one half of a linear constraint block.
+
+The half is an inequality or an equality according to the field of [`LinearConstraint`](@ref) that carries it, `ineq` or `eq`. The constructor checks that neither `A` nor `B` is empty, and that `size(A, 1) == length(B)`. The form is ``\\mathbf{A} \\boldsymbol{x} \\leq \\boldsymbol{B}``, so a pair with more bounds than rows, or more rows than bounds, is satisfied by no `x`.
 
 # Fields
 
@@ -20,6 +22,7 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:A])
   - $(val_dict[:B])
+  - $(val_dict[:A_B])
 
 # Examples
 
@@ -34,6 +37,10 @@ PartialLinearConstraint
 
   - [`LinearConstraint`](@ref)
   - [`LinearConstraintEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
     """
@@ -47,6 +54,8 @@ PartialLinearConstraint
     function PartialLinearConstraint(A::MatNum, B::VecNum)::PartialLinearConstraint
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
+        @argcheck(size(A, 1) == length(B),
+                  DimensionMismatch("a linear constraint half must have one row of `A` per entry of `B`. Got\nsize(A, 1) => $(size(A, 1))\nlength(B) => $(length(B))"))
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
@@ -56,7 +65,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented by a [`PartialLinearConstraint`](@ref).
+Holds the inequality half and the equality half of a linear constraint block.
+
+Each half is a [`PartialLinearConstraint`](@ref), and either one may be absent.
 
 # Mathematical definition
 
@@ -74,6 +85,8 @@ Where:
   - $(math_dict[:ineq])
   - $(math_dict[:eq])
   - $(math_dict[:x])
+
+The model asserts `sc * (A * w - k * B) <= 0` for the inequality half and `== 0` for the equality half, where `sc` is the constraint scale and `k` is the homogenisation scalar of a ratio objective. The solution is de-homogenised before it is returned, so the returned weights satisfy the form above whatever the objective is.
 
 # Fields
 
@@ -113,6 +126,10 @@ LinearConstraint
 
   - [`PartialLinearConstraint`](@ref)
   - [`LinearConstraintEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
     """
@@ -208,14 +225,14 @@ That equivalence is what this function exists to preserve. A caller that compute
 
   - `lcs`: The constraints to merge.
 
-# Returns
-
-  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
-
 # Validation
 
   - `lcs` is non-empty.
   - Every merged half is written over the same number of variables.
+
+# Returns
+
+  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
 
 # Examples
 
@@ -268,11 +285,27 @@ $(DocStringExtensions.TYPEDEF)
 
 Structured result for standard linear constraint equation parsing.
 
-`ParsingResult` is the canonical output of [`parse_equation`](@ref) for standard linear constraints. It stores all information needed to construct constraint matrices for portfolio optimisation, including variable names, coefficients, the comparison operator, right-hand side value, and a formatted equation string.
+It is the canonical output of [`parse_equation`](@ref) for standard linear constraints, and it carries everything [`get_linear_constraints`](@ref) needs to assemble a row: the variable names, their coefficients, the comparison operator, the right-hand side value, and a formatted equation string.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ParsingResult(
+        vars::VecStr,
+        coef::VecNum,
+        op::AbstractString,
+        rhs::Number,
+        eqn::AbstractString
+    ) -> ParsingResult
+
+Positional arguments correspond to the struct's fields. There is no keyword constructor, because [`parse_equation`](@ref) is the producer of this type.
+
+## Validation
+
+  - `length(vars) == length(coef)`.
 
 # Related
 
@@ -387,9 +420,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for the universe axes and group information used in constraint generation.
+Declares the universes a portfolio problem is written against, and any groupings or partitions of them.
 
-`UniverseSets` provides a unified interface for specifying the universes a portfolio problem is written against and any groupings or partitions of them. It is used throughout constraint generation and estimator routines to expand group references, map group names to member lists, and validate membership.
+Constraint generation and the estimator routines read it to expand group references, to map a group name to its member list, and to validate membership.
 
 It **declares every axis it carries**: `xkey`/`uxkey` for assets, `fkey`/`ufkey` for factors, and `zkey` for features. Assets are the *primary* axis — `haskey(dict, xkey)` is required, and it is the axis a view slices. The factor and feature axes are **optional**: requiring either would invalidate every sets object built for a problem with no factor model or no feature program, so a consumer that needs one and does not find it throws at the point of need rather than at construction.
 
@@ -677,7 +710,14 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::UniverseSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; strict::Bool = false)
+    estimator_to_val(dict::MultiEstValType, sets::UniverseSets,
+                     val::Option{<:Number} = nothing,
+                     key::Option{<:AbstractString} = nothing;
+                     datatype::DataType = Float64, strict::Bool = false)
+    estimator_to_val(dict::PairStrNum, sets::UniverseSets,
+                     val::Option{<:Number} = nothing,
+                     key::Option{<:AbstractString} = nothing;
+                     datatype::DataType = Float64, strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -685,11 +725,11 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Arguments
 
-  - `arr`: The array to be modified in-place.
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
   - `sets`: The [`UniverseSets`](@ref) containing the asset universe and group definitions.
-  - `val`: The default value to assign to assets not specified in `dict`.
+  - `val`: The value assigned to every asset before `dict` is applied. `nothing` means `zero(datatype)`.
   - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
+  - `datatype`: Element type of the value the array is filled with when `val` is `nothing`.
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
 # Details
@@ -703,7 +743,7 @@ The function creates the vector and sets the values for assets or groups as spec
   - If a key in `dict` matches an asset in the universe, the corresponding entry in `arr` is set to the specified value.
   - If a key matches a group in `sets`, all assets in the group are set to the specified value using [`name_to_val!`](@ref).
   - If a key is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
-  - The operation is performed in-place on `arr`.
+  - The array is allocated by this method and filled in-place, one key at a time.
 
 # Returns
 
@@ -782,13 +822,13 @@ This method checks that the input vector `val` matches the length of the asset u
   - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
   - `kwargs...`: Additional keyword arguments (ignored).
 
-# Returns
-
-  - `val::VecNum`: The input vector, unchanged.
-
 # Validation
 
   - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
 
 # Related
 
@@ -819,13 +859,13 @@ This method checks that size of `dims` of the input matrix `val` matches the len
   - `dims`: Dimension along which to validate the matrix size.
   - `kwargs...`: Additional keyword arguments (ignored).
 
-# Returns
-
-  - `val::VecNum`: The input vector, unchanged.
-
 # Validation
 
   - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
 
 # Related
 
@@ -842,7 +882,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
+Fills every entry of a value vector with `1/N`, where `N` is the number of assets in the universe.
+
+The same value is produced whatever slot the algorithm sits in. `lb = UniformValues()` floors every weight at the equal-weight level and `ub = UniformValues()` caps every weight there; neither slot is a special case in [`estimator_to_val`](@ref).
 
 # Examples
 
@@ -1745,7 +1787,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
+Holds the linear constraint equations to parse, and the universe key their names resolve against.
+
+[`linear_constraints`](@ref) parses `val` and assembles the coefficient matrices of a [`LinearConstraint`](@ref) from it.
 
 # Fields
 
@@ -1787,6 +1831,10 @@ LinearConstraint
   - [`PartialLinearConstraint`](@ref)
   - [`parse_equation`](@ref)
   - [`linear_constraints`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1.
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
     """

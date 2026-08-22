@@ -34,7 +34,7 @@ julia> PortfolioOptimisers.min_active_assets(MyTarget())
 1
 ```
 
-## Related
+# Related
 
   - [`MahalanobisTarget`](@ref)
   - [`DiagonalTarget`](@ref)
@@ -55,7 +55,7 @@ Returns the minimum number of active assets required for this regime-adjustment 
 
   - `1::Int`: The default minimum is one active asset.
 
-## Related
+# Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`MahalanobisTarget`](@ref)
@@ -69,7 +69,7 @@ $(DocStringExtensions.TYPEDEF)
 Regime-adjustment target that uses a Mahalanobis-distance-based baseline covariance
 structure. Requires at least two active assets.
 
-## Related
+# Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`DiagonalTarget`](@ref)
@@ -90,7 +90,7 @@ Returns the minimum number of active assets required for the Mahalanobis target.
 
   - `2::Int`: At least two active assets are required.
 
-## Related
+# Related
 
   - [`MahalanobisTarget`](@ref)
   - [`RegimeAdjustedTarget`](@ref)
@@ -103,7 +103,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Regime-adjustment target that uses a diagonal baseline covariance structure.
 
-## Related
+# Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`MahalanobisTarget`](@ref)
@@ -140,7 +140,7 @@ PortfolioTarget
   w ┴ nothing
 ```
 
-## Related
+# Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`MahalanobisTarget`](@ref)
@@ -246,7 +246,7 @@ julia> ce.decay ≈ exp2(-inv(40.0))
 true
 ```
 
-## Related
+# Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`RegimeAdjustedMethod`](@ref)

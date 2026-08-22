@@ -47,7 +47,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Knuth's rule.
 
-`Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram [knuth2019](@cite). This method maximises the posterior probability of a piecewise-constant density model given the data, resulting in an adaptive binning strategy that balances bias and variance.
+`Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram [knuth2019](@cite). This method maximises the posterior probability of a piecewise-constant density model given the data, so the binning balances bias against variance.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -71,9 +75,19 @@ Knuth
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:knuth2019])
 """
 @concrete struct Knuth <: BinWidthBins
+    """
+    $(field_dict[:optargs])
+    """
     args
+    """
+    $(field_dict[:optkwargs])
+    """
     kwargs
     function Knuth(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -106,6 +120,10 @@ FreedmanDiaconis()
   - [`Knuth`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:freedman1981])
 """
 struct FreedmanDiaconis <: BinWidthBins end
 """
@@ -132,6 +150,10 @@ Scott()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`HacineGharbiRavier`](@ref)
+
+# References
+
+  - $(ref_dict[:scott1979])
 """
 struct Scott <: BinWidthBins end
 """
@@ -139,7 +161,33 @@ $(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 
-`HacineGharbiRavier` implements the Hacine-Gharbi–Ravier rule for selecting the number of bins in a histogram. This method adapts the bin count based on the correlation structure and sample size, and is particularly useful for information-theoretic measures such as mutual information and variation of information.
+`HacineGharbiRavier` selects the bin count from the sample size and the Pearson correlation of the pair, minimising the mean square error of the joint entropy estimate. It is the default for the information-theoretic measures, [`mutual_info`](@ref) and [`variation_info`](@ref).
+
+# Mathematical definition
+
+Two closed forms, selected by the pair's Pearson correlation ``\\rho``. For ``\\rho \\neq 1`` the bi-histogram formula applies:
+
+```math
+\\begin{align}
+M &= \\left[\\frac{1}{\\sqrt{2}} \\sqrt{1 + \\sqrt{1 + \\frac{24 T}{1 - \\rho^2}}}\\right]\\,.
+\\end{align}
+```
+
+For ``\\rho = 1`` the pair carries no joint information beyond one marginal, so the univariate formula applies:
+
+```math
+\\begin{align}
+z &= \\sqrt[3]{8 + 324 T + 12 \\sqrt{36 T + 729 T^2}}\\,, \\\\
+M &= \\left[\\frac{z}{6} + \\frac{2}{3 z} + \\frac{1}{3}\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``M``: Number of bins.
+  - $(math_dict[:T])
+  - ``\\rho``: Pearson correlation between the two series.
+  - ``[\\cdot]``: Rounding to the nearest integer.
 
 # Constructors
 
@@ -159,6 +207,13 @@ HacineGharbiRavier()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
+  - [`calc_num_bins`](@ref)
+
+# References
+
+  - $(ref_dict[:hacinegharbi2012])
+  - $(ref_dict[:hacinegharbi2018])
+  - $(ref_dict[:mlp1]) Chapter 3.
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
@@ -294,16 +349,19 @@ function bin_width(bins::Knuth, x::VecNum)
     return rx / floor(Int, first(Optim.minimizer(res)))
 end
 """
-    calc_num_bins(bins::Int_Bin, xj::VecNum,
-                  xi::VecNum, j::Integer, i::Integer, bin_width_func, T::Integer)
+    calc_num_bins(bins::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
+                  args...)
+    calc_num_bins(bins::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer,
+                  i::Integer, T::Integer)
+    calc_num_bins(bins::Integer, args...)
 
 Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
 
 This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
 
-  - For `BinWidthBins`, it computes the bin width using the provided `bin_width_func` and computes the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
-  - For `HacineGharbiRavier`, it uses the Hacine-Gharbi–Ravier rule, which adapts the bin count based on the correlation and sample size.
-  - For an integer, it returns the specified number of bins directly.
+  - For `BinWidthBins`, it calls [`bin_width`](@ref) on `bins` and divides each variable's range by the returned width, rounding to the nearest integer. For off-diagonal pairs it takes the larger of the two variables' bin counts. This method ignores `T`.
+  - For `HacineGharbiRavier`, it applies that rule's two closed forms, which read `T` and the pair's Pearson correlation.
+  - For an integer, it returns that number of bins directly and reads no other argument.
 
 # Arguments
 
@@ -312,7 +370,7 @@ This function determines the number of bins to use for histogram-based calculati
   - `xi`: Data vector for variable `i`.
   - `j`: Index of variable `j`.
   - `i`: Index of variable `i`.
-  - `T`: Number of observations (used by some algorithms).
+  - `T`: Number of observations. Read by [`HacineGharbiRavier`](@ref) alone.
 
 # Returns
 
@@ -472,8 +530,7 @@ function intrinsic_mutual_info(X::MatNum)
     return sum(mi)
 end
 """
-    variation_info(X::MatNum;
-                   bins::Int_Bin = HacineGharbiRavier(),
+    variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                    normalise::Bool = true)
 
 Compute the variation of information (VI) matrix for a set of variables.
@@ -509,6 +566,8 @@ Where:
   - ``\\widetilde{\\mathrm{VI}}(X, Y)``: Normalised variation of information.
   - ``H(X,Y) = H(X) + H(Y) - I(X;Y)``: Joint entropy.
 
+Equation 6.25 of the source normalises by ``\\max(H(X), H(Y))`` instead. This function divides by the joint entropy, which keeps the result a metric on ``[0, 1]``.
+
 # Arguments
 
   - `X`: Data matrix (observations × variables).
@@ -523,7 +582,7 @@ Where:
 
   - For each pair of variables, the function computes marginal entropies and the joint histogram using `calc_hist_data`.
   - The mutual information is computed using `intrinsic_mutual_info`.
-  - VI is calculated as `H(X) + H(Y) - 2 * LinearAlgebra.I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
+  - VI is calculated as `ex + ey - 2 * intrinsic_mutual_info(hxy)`. If `normalise` is `true`, it is divided by the joint entropy `ex + ey - intrinsic_mutual_info(hxy)`.
   - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
   - The diagonal is **pinned to exactly zero** rather than estimated. `VI(X, X)` is zero by definition, but the histogram estimate of `I(X; X)` does not reproduce the estimate of `H(X)` bit for bit, so computing it leaves roughly `1e-16` there — enough to stop the result being a valid distance matrix.
 
@@ -532,6 +591,10 @@ Where:
   - [`mutual_info`](@ref)
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 6.2.2, equation 6.24.
 """
 function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                         normalise::Bool = true)
@@ -629,8 +692,7 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
 end
 # COV_EXCL_STOP
 """
-    mutual_info(X::MatNum;
-                bins::Int_Bin = HacineGharbiRavier(),
+    mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                 normalise::Bool = true)
 
 Compute the mutual information (MI) matrix for a set of variables.
@@ -688,6 +750,11 @@ Where:
   - [`variation_info`](@ref)
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
+
+# References
+
+  - $(ref_dict[:shannon1948])
+  - $(ref_dict[:cajas2025]) Section 6.1.6, equations 6.18 and 6.19.
 """
 function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                      normalise::Bool = true)

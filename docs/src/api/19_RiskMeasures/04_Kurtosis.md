@@ -10,3 +10,10 @@ calc_deviations_vec(r::Kurtosis, x::VecNum)
 port_opt_view(r::Kurtosis, i, args...)
 supports_precomputed_returns(r::Kurtosis)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

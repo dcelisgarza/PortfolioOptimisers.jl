@@ -33,3 +33,10 @@ needs_previous_weights(r::ExpectedReturnRiskRatio)
 prrm_prediction_message
 brinson_attribution
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

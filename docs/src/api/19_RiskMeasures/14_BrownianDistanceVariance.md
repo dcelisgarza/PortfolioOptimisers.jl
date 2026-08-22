@@ -7,3 +7,10 @@ IneqBrownianDistanceVariance
 BDVarRkFormulations
 BrownianDistanceVariance
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

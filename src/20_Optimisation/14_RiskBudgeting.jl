@@ -143,7 +143,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk budgeting optimisation formulations.
 
-# Related Types
+# Related
 
   - [`LogRiskBudgeting`](@ref)
   - [`MixedIntegerRiskBudgeting`](@ref)
@@ -162,7 +162,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Log-barrier formulation for Risk Budgeting.
 
-Uses a logarithmic objective to enforce the risk budget constraints. Can provide an optional orthant vector to allow for negative weights in specific assets.
+Adds the constraint ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0``, whose Karush-Kuhn-Tucker conditions are the risk budgeting condition. The logarithm needs a positive argument, so the solution lies in one orthant. An optional orthant vector `z` states which one, asset by asset.
+
+The orthant vector is an extension of the published model, which reaches a long-short portfolio through [`MixedIntegerRiskBudgeting`](@ref) instead. Stating the orthant costs no binary variable, and it needs the signs to be known in advance.
 
 # Fields
 
@@ -184,6 +186,13 @@ Keywords correspond to the struct's fields.
 
   - [`RiskBudgetingFormulation`](@ref)
   - [`MixedIntegerRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.3, Equations 10.8-10.10.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
 """
 @concrete struct LogRiskBudgeting{T} <: RiskBudgetingFormulation
     """
@@ -215,10 +224,16 @@ Mixed-integer formulation for Risk Budgeting.
 
 Uses binary variables and big-M constraints to enforce the risk budget constraints. This can find the minimal risk portfolio which meets the risk budgeting constraints by exploring all possible sign combinations of weights. This can be very expensive for large universes.
 
-# Related Types
+# Related
 
   - [`RiskBudgetingFormulation`](@ref)
   - [`LogRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.4, Equation 10.11.
+  - $(ref_dict[:mosek2023c])
 """
 struct MixedIntegerRiskBudgeting <: RiskBudgetingFormulation end
 """
@@ -226,7 +241,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk budgeting algorithm specifications.
 
-# Related Types
+# Related
 
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
@@ -257,11 +272,26 @@ Keywords correspond to the struct's fields.
 
   - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `rkb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.1.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
 """
 @propagatable @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     """
@@ -330,6 +360,12 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - [`AssetRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`risk_budget_universe_key`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.2.2, Equation 10.21.
+  - $(ref_dict[:roncalliweisang2012])
 """
 @propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     """
@@ -410,29 +446,69 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 # Mathematical definition
 
-Risk budgeting allocates weights so that each asset ``i`` contributes a target fraction ``b_i`` of total portfolio risk:
+A positive homogeneous convex risk measure splits into the risk contributions of the assets, which is the Euler decomposition:
 
 ```math
 \\begin{align}
-w_i \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i} &= b_i \\, \\rho(\\boldsymbol{w}), \\quad \\sum_{i=1}^{N} b_i = 1, \\quad b_i \\geq 0\\,.
+\\rho(\\boldsymbol{w}) &= \\sum_{i=1}^{N} RC_{i}(\\boldsymbol{w})\\,, \\quad RC_{i}(\\boldsymbol{w}) = w_{i} \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_{i}}\\,.
 \\end{align}
 ```
 
-The logarithmic formulation (`LogRiskBudgeting`) solves the equivalent convex problem:
+A risk budgeting portfolio is one whose contributions stand in the stated proportions ``\\boldsymbol{b}``:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\min} \\; \\rho(\\boldsymbol{w}) - \\sum_{i=1}^{N} b_i \\ln w_i \\quad \\text{s.t.} \\quad \\boldsymbol{w} > \\boldsymbol{0}\\,.
+w_{i} \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_{i}} &= b_{i} \\, \\rho(\\boldsymbol{w})\\,, \\quad \\sum_{i=1}^{N} b_{i} = 1\\,, \\quad b_{i} \\geq 0\\,.
 \\end{align}
 ```
+
+That condition is not solved directly. [`LogRiskBudgeting`](@ref) solves the equivalent problem, in which a logarithmic **constraint** replaces it. Its solution ``\\boldsymbol{y}`` is determined up to scale, and the weights are recovered as ``\\boldsymbol{w} = \\boldsymbol{y} / k``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{y},\\, k}{\\min} \\; &\\rho(\\boldsymbol{y}) \\\\
+\\text{s.t.} \\quad &\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0\\,, \\\\
+&\\boldsymbol{1}^\\intercal \\boldsymbol{y} = k\\,, \\\\
+&\\boldsymbol{y} \\geq \\boldsymbol{0}\\,.
+\\end{align}
+```
+
+The right-hand side of the logarithmic constraint sets the scale of ``\\boldsymbol{y}`` alone, so `0` is used where the published model writes an arbitrary constant. The Karush-Kuhn-Tucker conditions of this problem are the risk budgeting condition above.
+
+The logarithm confines the solution to one orthant. [`MixedIntegerRiskBudgeting`](@ref) reaches a long-short portfolio by splitting the weight into two non-negative parts and taking the logarithm of their sum, and a binary vector holds one part at zero per asset:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{y}^{+},\\, \\boldsymbol{y}^{-},\\, \\boldsymbol{z},\\, k}{\\min} \\; &\\rho(\\boldsymbol{y}) \\\\
+\\text{s.t.} \\quad &\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}^{+} + \\boldsymbol{y}^{-}) \\geq 0\\,, \\\\
+&\\boldsymbol{y} = \\boldsymbol{y}^{+} - \\boldsymbol{y}^{-}\\,, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{y} \\geq k\\,, \\\\
+&\\boldsymbol{y}^{+} \\leq M \\boldsymbol{z}\\,, \\quad \\boldsymbol{y}^{-} \\leq M (\\boldsymbol{1} - \\boldsymbol{z})\\,, \\\\
+&\\boldsymbol{y}^{+},\\, \\boldsymbol{y}^{-} \\geq \\boldsymbol{0}\\,, \\quad \\boldsymbol{z} \\in \\{0, 1\\}^{N}\\,.
+\\end{align}
+```
+
+[`FactorRiskBudgeting`](@ref) states the budget over the factors instead. The weights are re-based onto the factor axis, ``\\boldsymbol{y} = (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f}``, and the logarithmic constraint is written on ``\\boldsymbol{b}_{f}^\\intercal \\ln(\\boldsymbol{y}_{f})``.
 
 Where:
 
-  - ``w_i``: Portfolio weight of asset ``i``.
-  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
-  - ``b_i``: Risk budget (target risk fraction) for asset ``i``.
-  - ``N``: Number of assets.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``w_{i}``: Portfolio weight of asset ``i``.
+  - ``\\boldsymbol{y}``: Unscaled weight vector, the decision variable. ``\\boldsymbol{w} = \\boldsymbol{y} / k``.
+  - ``k``: Scaling variable.
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``RC_{i}(\\boldsymbol{w})``: Risk contribution of asset ``i``.
+  - ``\\boldsymbol{b}``: Risk budget vector, `rba.rkb`.
+  - ``\\boldsymbol{b}_{f}``: Risk budget vector over the factors.
+  - ``\\boldsymbol{y}_{f}``: Factor exposure vector.
+  - ``\\mathbf{B}``: Loading matrix.
+  - ``\\boldsymbol{z}``: Binary vector. ``z_{i} = 1`` lets asset ``i`` be long, ``z_{i} = 0`` lets it be short.
+  - ``M``: Large constant of the big-M constraints.
+  - ``N``: Number of assets.
+
+# Details
+
+  - Every logarithm is modelled as an exponential cone.
+  - `k` is a **free** variable under this head, not `k >= 0` and not the literal `1`. The logarithmic constraint pins the scale on its own.
 
 ## Propagated parameters
 
@@ -441,6 +517,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+`RiskBudgeting` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
+  - `wi` is sliced to the selected assets.
+  - `fb` is carried through unchanged.
 
 # Related
 
@@ -453,6 +538,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`RelaxedRiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Chapter 10.
+  - $(ref_dict[:maillard2008])
+  - $(ref_dict[:bruderroncalli2012])
+  - $(ref_dict[:roncalliweisang2012])
 """
 @propagatable @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     """

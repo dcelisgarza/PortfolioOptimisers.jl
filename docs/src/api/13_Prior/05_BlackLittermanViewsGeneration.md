@@ -8,3 +8,10 @@ assert_bl_views_conf
 assert_bl
 Lc_BLV
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

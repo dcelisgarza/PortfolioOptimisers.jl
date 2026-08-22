@@ -20,15 +20,39 @@ Augmented prior moments (stacking asset and factor priors):
 ```math
 \\begin{align}
 \\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}\\,, \\\\
-\\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_a\\mathbf{M}^{\\intercal} \\\\ \\mathbf{M}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
+\\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\mathbf{M}\\boldsymbol{\\Sigma}_f \\\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal} & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
 \\end{align}
 ```
 
-Black-Litterman posterior on the augmented space with combined views ``(\\mathbf{P}_{aug}, \\boldsymbol{q}_{aug})``:
+The off-diagonal blocks are the cross-covariance the factor model implies, ``\\mathrm{cov}(\\mathbf{X}, \\mathbf{F}) = \\mathbf{M}\\boldsymbol{\\Sigma}_f``. They are built from the **factor** covariance and not from the asset one, so they carry factor variance alone while the leading block carries factor *and* residual variance. That asymmetry is what opens the gap described in the second warning below.
+
+The views are stacked block-diagonally, each set over its own axis:
 
 ```math
 \\begin{align}
-\\boldsymbol{\\mu}_{post} &= \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)\\,.
+\\mathbf{P}_{aug} &= \\begin{pmatrix}\\mathbf{P} & \\mathbf{0} \\\\ \\mathbf{0} & \\mathbf{P}_f\\end{pmatrix}\\,, \\quad
+\\boldsymbol{q}_{aug} = \\begin{pmatrix}\\boldsymbol{q} \\\\ \\boldsymbol{q}_f\\end{pmatrix}\\,, \\quad
+\\boldsymbol{\\Omega}_{aug} = \\begin{pmatrix}\\boldsymbol{\\Omega} & \\mathbf{0} \\\\ \\mathbf{0} & \\boldsymbol{\\Omega}_f\\end{pmatrix}\\,.
+\\end{align}
+```
+
+Black-Litterman posterior on the augmented space, by the ordinary master equations:
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{post} &= \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)\\,, \\\\
+\\boldsymbol{\\Sigma}_{post} &= \\boldsymbol{\\Sigma}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug} - \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\mathbf{P}_{aug}\\tau\\boldsymbol{\\Sigma}_{aug}\\,.
+\\end{align}
+```
+
+The two halves are then read off by truncation, and the asset half alone gains the intercept and the risk-free rate:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{1:N} + \\boldsymbol{b} + r_{f}\\,, \\quad
+\\hat{\\mathbf{\\Sigma}} = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{1:N,\\,1:N}\\,, \\\\
+\\hat{\\boldsymbol{\\mu}}_f &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{N+1:N+K}\\,, \\quad
+\\hat{\\mathbf{\\Sigma}}_f = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{N+1:N+K,\\,N+1:N+K}\\,.
 \\end{align}
 ```
 
@@ -36,18 +60,16 @@ Where:
 
   - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
   - ``\\mathbf{F}``: ``T \\times K`` factor returns matrix.
-  - ``\\mathbf{M}``: ``K \\times N`` factor loadings (regression coefficients).
-  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector.
-  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: Asset prior mean and covariance.
-  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: Factor prior mean and covariance.
+  - ``\\mathbf{M}``: ``N \\times K`` factor loadings (regression coefficients), `pr.rr.M`.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector, `pr.rr.b`.
+  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: Asset prior mean and covariance, from `a_pe`.
+  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: Factor prior mean and covariance, from `f_pe`.
   - ``\\boldsymbol{\\mu}_{aug}``, ``\\boldsymbol{\\Sigma}_{aug}``: Augmented (joint asset-factor) prior moments.
-  - ``\\boldsymbol{\\mu}_{post}``: Augmented posterior mean (asset component extracted as final result).
+  - ``\\boldsymbol{\\mu}_{post}``, ``\\boldsymbol{\\Sigma}_{post}``: Augmented posterior moments.
   - ``\\tau``: Scaling parameter for the prior uncertainty.
-  - ``\\mathbf{P}_{aug}``: Combined asset and factor views matrix.
-  - ``\\boldsymbol{q}_{aug}``: Combined asset and factor views vector.
-  - ``\\boldsymbol{\\Omega}_{aug}``: Combined view uncertainty matrix.
-
-Asset posterior extracted from the augmented result and adjusted for intercept and risk-free rate.
+  - ``\\mathbf{P}``, ``\\boldsymbol{q}``, ``\\boldsymbol{\\Omega}``: Asset views matrix, returns vector and uncertainty matrix, over the asset axis.
+  - ``\\mathbf{P}_f``, ``\\boldsymbol{q}_f``, ``\\boldsymbol{\\Omega}_f``: The same three over the factor axis.
+  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref).
 
 # Fields
 
@@ -91,6 +113,8 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
     The augmented covariance stacks the full asset covariance `sigma_a` — factor *and* residual variance — against a cross-covariance `M * sigma_f` that is pure factor. The Black-Litterman update therefore moves the asset half by `tau * sigma_a * P'(…)` and the factor half by `tau * sigma_f * M' * P'(…)`, and for the two to stay related by `M` it would need `sigma_a == M * sigma_f * M'`. That holds only when the factor model is exact. The gap scales with the residual variance and closes to machine precision when there is none; both view sets contribute, so muting either one does not remove it.
 
+    Measured on a `250 × 5` sample over three factors: the gap is `3.6e-4` on returns built with a residual, and `1.4e-15` on returns built as an exact factor model with the same loadings, views and seed.
+
     [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) satisfy the identity exactly, because they update the factor distribution alone and *project* it onto the assets rather than updating an asset block alongside it. [`BlackLittermanPrior`](@ref) breaks it for the opposite reason — it takes asset views only and never computes a posterior factor distribution at all.
 
 ## One sets, two axes
@@ -106,6 +130,25 @@ Each axis is required only by the views that resolve names against it. A [`Black
   - If `a_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `f_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+
+The **length** of `w` is not validated here. It is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `a_pe`: Recursively updated via [`factory`](@ref).
+  - `f_pe`: Recursively updated via [`factory`](@ref).
+  - `re`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `a_pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `re`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -204,6 +247,13 @@ AugmentedBlackLittermanPrior
   - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cheung2007])
+  - $(ref_dict[:cajas2025]) Section 5.2, Equations 5.17 to 5.19.
 """
 @propagatable @concrete struct AugmentedBlackLittermanPrior <:
                                AbstractLowOrderPriorEstimator_F
@@ -332,16 +382,17 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, regression result, and factor prior details.
-
 # Validation
 
   - `dims in (1, 2)`.
   - If `pe.a_views` is a [`LinearConstraintEstimator`](@ref), `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
   - If `pe.f_views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
-  - If `pe.l` and `pe.w` are not `nothing`, `length(pe.w) == size(X, 2)`.
+
+`pe.w` has no named check. When `pe.l` is set, a `pe.w` whose length is not `size(X, 2)` raises a bare `DimensionMismatch` from the multiplication inside [`equilibrium_mu`](@ref). When `pe.l` is `nothing`, `pe.w` is never read.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, regression result, and factor prior details.
 
 # Details
 

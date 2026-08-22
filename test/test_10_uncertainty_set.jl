@@ -292,7 +292,7 @@
         @test sd.class isa SigmaEllipsoidalUncertaintySet
         # General / ChiSq / Normal k-methods match k_ucs on the (possibly diagonalised) cov.
         for (method, samp) in ((GeneralKUncertaintyAlgorithm(), nothing),
-                               (ChiSqKUncertaintyAlgorithm(), 1:50), (NormalKUncertaintyAlgorithm(), Xs))
+                               (ChiSqKUncertaintyAlgorithm(), nothing), (NormalKUncertaintyAlgorithm(), Xs))
             for diag in (false, true)
                 e = PortfolioOptimisers.ellipsoidal_set(diag, method, q, samp, cov,
                                                         MuEllipsoidalUncertaintySet())
@@ -301,6 +301,50 @@
                 @test e.k == PortfolioOptimisers.k_ucs(method, q, samp, cov_ref)
             end
         end
+    end
+    @testset "The ellipsoid radius is the radius of THIS ellipsoid" begin
+        # Both radius routes once read a quantity that has nothing to do with the ellipsoid
+        # they size. ChiSq took its degrees of freedom from the number of simulations, and
+        # the normal mean route drew its errors from the return law N(mu, sigma) rather than
+        # from the estimator law N(mu, sigma / T). Both made k far too large.
+        rng = StableRNG(191919)
+        T, N = 300, 6
+        X = randn(rng, T, N) * 0.01 .+ 0.001
+        q = 0.05
+        pr = prior(EmpiricalPrior(), X)
+
+        # ChiSq: the degrees of freedom is the DIMENSION of the ellipsoid, so the two axes
+        # must disagree, and n_sim must not enter at all.
+        chisq = EllipsoidalUncertaintySetAlgorithm(; method = ChiSqKUncertaintyAlgorithm(),
+                                                   diagonal = true)
+        mu_set, sigma_set = ucs(NormalUncertaintySet(; alg = chisq, q = q, seed = 1), X)
+        @test isapprox(mu_set.k,
+                       sqrt(PortfolioOptimisers.Distributions.cquantile(PortfolioOptimisers.Distributions.Chisq(N),
+                                                                        q)))
+        @test isapprox(sigma_set.k,
+                       sqrt(PortfolioOptimisers.Distributions.cquantile(PortfolioOptimisers.Distributions.Chisq(N^2),
+                                                                        q)))
+        @test mu_set.k != sigma_set.k
+        for n_sim in (10, 5000)
+            other = ucs(NormalUncertaintySet(; alg = chisq, q = q, seed = 1, n_sim = n_sim),
+                        X)
+            @test other[1].k == mu_set.k
+            @test other[2].k == sigma_set.k
+        end
+
+        # NormalK on the mean axis: the empirical radius of a normal sample must land on the
+        # chi-squared closed form, which is the same quantity computed two ways.
+        normalk = EllipsoidalUncertaintySetAlgorithm(;
+                                                     method = NormalKUncertaintyAlgorithm(),
+                                                     diagonal = false)
+        k_emp = mu_ucs(NormalUncertaintySet(; alg = normalk, q = q, seed = 1,
+                                            n_sim = 20_000), X).k
+        @test isapprox(k_emp,
+                       sqrt(PortfolioOptimisers.Distributions.cquantile(PortfolioOptimisers.Distributions.Chisq(N),
+                                                                        q)); rtol = 0.05)
+        # It is a Mahalanobis radius against sigma / T, so it must not carry a factor of
+        # sqrt(T): drawing from the return law instead would put one there.
+        @test k_emp < sqrt(T) / 2
     end
     @testset "A set carries the quantity it bounds (ADR 0050)" begin
         pr_ref = prior(EmpiricalPrior(), rd.X)

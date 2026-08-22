@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional expected returns estimators, observation weights, and bias correction.
+Computes the marginal variance and standard deviation, optionally weighted and optionally bias-corrected.
+
+`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction.
 
 # Fields
 
@@ -19,7 +21,28 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-$(val_dict[:oow])
+  - $(val_dict[:oow])
+  - `corrected = true` needs a weight type that supports bias correction. See the note on the weighted formula in [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -49,6 +72,9 @@ SimpleVariance
   - [`std(ve::SimpleVariance, X::VecNum; mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct SimpleVariance <: AbstractVarianceEstimator
     """
@@ -189,7 +215,9 @@ Where:
   - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
   - ``T``: Number of observations.
   - ``w_t``: Observation weight at time ``t``.
-  - ``c``: Bias correction factor.
+  - ``c``: Bias correction factor, fixed by the **type** of `w`, not by the estimator.
+
+`corrected = false` sets ``c = 0`` for every weight type. `corrected = true` reads ``c`` from the weight type: `StatsBase.FrequencyWeights` gives ``c = 1``, `StatsBase.AnalyticWeights` gives ``c = \\sum_t w_t^2 / \\sum_t w_t``, and `StatsBase.ProbabilityWeights` gives ``c = \\sum_t w_t / T``. **A plain `StatsBase.Weights` supports no correction and throws an `ArgumentError`**, so `SimpleVariance(; w = StatsBase.Weights(...))` must also pass `corrected = false`.
 
 # Arguments
 
@@ -347,7 +375,9 @@ Where:
   - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
   - ``T``: Number of observations.
   - ``w_t``: Observation weight at time ``t``.
-  - ``c``: Bias correction factor.
+  - ``c``: Bias correction factor, fixed by the **type** of `w`, not by the estimator.
+
+`corrected = false` sets ``c = 0`` for every weight type. `corrected = true` reads ``c`` from the weight type: `StatsBase.FrequencyWeights` gives ``c = 1``, `StatsBase.AnalyticWeights` gives ``c = \\sum_t w_t^2 / \\sum_t w_t``, and `StatsBase.ProbabilityWeights` gives ``c = \\sum_t w_t / T``. **A plain `StatsBase.Weights` supports no correction and throws an `ArgumentError`**, so `SimpleVariance(; w = StatsBase.Weights(...))` must also pass `corrected = false`.
 
 # Arguments
 

@@ -7,3 +7,10 @@ PowerNormDrawdownatRisk
 RelativePowerNormDrawdownatRisk
 PRM
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

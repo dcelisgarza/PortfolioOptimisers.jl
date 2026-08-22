@@ -1,0 +1,108 @@
+name: Complexity
+
+# The CodeComplexity half of the code-health gate. It runs `complexity.jl check` and then
+# `expansion.jl check`, both unconditionally, for about 85 seconds.
+#
+# There is deliberately NO `paths:` filter here. The gate does more than measure: a tracked `.jl`
+# file that is neither in scope nor a named Unmeasured Path turns it red, and that check reads the
+# whole tree. A filter on `src/**` would never fire on a new `.jl` file added under `test/` or under
+# a new top-level directory, so the one commit that breaks the rule would be the commit that skips
+# the check. ADR 0072 and ADR 0077.
+
+on:
+  push:
+    branches:
+      - main
+      - dev*
+      - agents/*
+    tags: ["*"]
+  workflow_dispatch:
+  pull_request:
+
+# The gate only measures. It writes nothing back to the repository, so a fork pull request needs no
+# more than this and nothing anywhere tests for a fork. ADR 0075.
+permissions:
+  contents: read
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout comes BEFORE setup-julia, which inverts Aqua.yml's order, because the Julia
+      # version is read out of the checkout. ADR 0077.
+      #
+      # The bare checkout measures the MERGE commit, which is what every other check here does and
+      # what a gate should gate. ADR 0075.
+      - uses: actions/checkout@v7
+        with:
+          # Two commits are enough to diff a pull request's merge commit against its base, which is
+          # the merge commit's first parent. The step below needs nothing more.
+          fetch-depth: 2
+      # Citing an approved Rationale is bookkeeping that any contributor may do. Adding one is a
+      # claim that some code is correct, and it needs the maintainer, so CI flags the diff that
+      # adds a block. The flag lives here rather than in JET.yml because this workflow carries no
+      # `paths:` filter, so it also fires on a pull request that JET.yml skips. ADR 0071.
+      - name: Flag a new Rationale
+        if: github.event_name == 'pull_request'
+        run: |
+          added=$(git diff HEAD^1 HEAD -- code_health/rulings.toml |
+                  grep -E '^\+\[rationale\.' || true)
+          if [ -n "$added" ]; then
+            echo "::warning::This pull request adds a Rationale to code_health/rulings.toml."
+            echo "$added" | while read -r line; do
+              echo "::warning::$line - a new Rationale needs the maintainer's approval."
+            done
+          fi
+      - name: Read the Julia pin from the Manifest
+        id: pin
+        run: |
+          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The code-health gate is pinned to Julia $v."
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      - name: Instantiate the gate's environment
+        run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
+      - name: Complexity baseline
+        run: julia --project=code_health code_health/complexity.jl check
+      - name: Expansion Bound
+        if: ${{ !cancelled() }}
+        run: julia --project=code_health code_health/expansion.jl check
+      # A run that trips publishes the Refresh Artifact: the generated baseline as
+      # `refresh --accept-rise` would write it. `actions/upload-artifact` authenticates with the
+      # Actions runtime token rather than with GITHUB_TOKEN, and this repository is public, so a
+      # fork contributor can download it, drop it in place and commit it with no Julia at all.
+      # A provenance mismatch writes no file, so `if-no-files-found: ignore` publishes nothing.
+      # ADR 0075.
+      - name: Publish the Refresh Artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-refresh
+          path: code_health/_refresh/*.toml
+          if-no-files-found: ignore
+      # A green run publishes provenance in the step summary, and only a `workflow_dispatch` run
+      # also uploads the fresh numbers. A refresh otherwise costs a maintainer their own machine's
+      # time, and CI's environment is the pinned one, so a baseline taken here is strictly more
+      # reproducible than one taken on a laptop. Uploading on every green run was rejected: the
+      # artifacts would accumulate for no reader. ADR 0077.
+      - name: Measure fresh numbers for a dispatched run
+        if: success() && github.event_name == 'workflow_dispatch'
+        run: |
+          julia --project=code_health code_health/complexity.jl refresh
+          julia --project=code_health code_health/expansion.jl refresh
+      - name: Publish the fresh numbers
+        if: success() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-fresh
+          path: |
+            code_health/complexity_baseline.toml
+            code_health/expansion_bound.toml

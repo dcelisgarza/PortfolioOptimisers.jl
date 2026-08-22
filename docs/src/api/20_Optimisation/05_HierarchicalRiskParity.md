@@ -10,3 +10,10 @@ hrp_scalarised_risk
 optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

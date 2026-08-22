@@ -102,7 +102,9 @@ Positional and keyword arguments correspond to the struct's fields.
 ## Validation
 
   - `train_size`, `test_size`, and `purged_size` must be non-empty, non-negative, and finite.
-  - Ensures `train_size + purged_size < T` where `T` is the total number of observations.
+
+The rule `train_size + purged_size < T`, where `T` is the number of observations, belongs to the
+data rather than to the estimator, so [`Base.split`](@ref) checks it.
 
 # Examples
 
@@ -123,6 +125,11 @@ IndexWalkForward
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 15.1.
+  - $(ref_dict[:lopezdeprado2018]) Chapter 7.
 """
 @concrete struct IndexWalkForward <: WalkForwardEstimator
     """
@@ -170,6 +177,10 @@ indices. Each fold advances the test window by `test_size` observations.
 
   - `iwf::IndexWalkForward`: Index-based walk-forward cross-validation estimator.
   - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
+
+# Validation
+
+  - `train_size + purged_size < T`, where `T` is the number of observations in `rd`.
 
 # Returns
 
@@ -250,11 +261,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for date adjustment estimators in walk-forward cross-validation.
 
-Subtypes implement specific strategies for adjusting dates used in walk-forward splits.
+Subtypes implement specific strategies for adjusting dates used in walk-forward splits. A subtype
+reaches a [`DateWalkForward`](@ref) through its `adjuster` field, whose type bound is
+[`DateAdjType`](@ref).
 
 # Related
 
   - [`DateWalkForward`](@ref)
+  - [`DateAdjType`](@ref)
+  - [`walk_forward_date_range`](@ref)
 """
 abstract type DateAdjusterEstimator <: AbstractEstimator end
 """
@@ -349,6 +364,11 @@ DateWalkForward
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 15.1.
+  - $(ref_dict[:lopezdeprado2018]) Chapter 7.
 """
 @concrete struct DateWalkForward <: WalkForwardEstimator
     """
@@ -561,22 +581,27 @@ end
 """
     special_div(a::Integer, b::Integer)
 
-Perform integer division with a special case for zero divisor.
+Return the number of steps of size `b` that fit in the span `1:a`.
 
-Returns zero if `b` is zero, otherwise computes `div(a, b)`. Used internally in walk-forward date calculations to avoid division by zero.
+The result is the largest `k` for which `1 + k * b <= a`, which is `div(a - 1, b)` for a positive
+`a`. A walk-forward fold count uses it this way: the first window starts at the first position of
+the span and every later window starts `b` positions after the previous one, so the number of
+windows is `special_div(a, b) + 1`. The caller passes the **length** of the span, not the difference
+between its last and its first position. `b` must not be zero.
 
 # Arguments
 
-  - `a`: Dividend.
-  - `b`: Divisor.
+  - `a`: Length of the span of positions at which a window may start.
+  - `b`: Step between two window starts.
 
 # Returns
 
-  - `div(a, b)` or zero if `b == 0`.
+  - `Integer`: The number of steps after the first window, `div(a - 1, b)`.
 
 # Related
 
   - [`DateWalkForward`](@ref)
+  - [`n_splits`](@ref)
 """
 function special_div(a::Integer, b::Integer)
     q, r = divrem(a, b)
@@ -722,7 +747,7 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     if M > last_allowed_start
         return 0
     end
-    return special_div(last_allowed_start - M, test_size) + 1
+    return special_div(last_allowed_start - M + 1, test_size) + 1
 end
 function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),

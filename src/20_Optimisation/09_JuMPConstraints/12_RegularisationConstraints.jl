@@ -199,9 +199,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all portfolio weight regularisation estimators.
 
+A regularisation term penalises the norm of the weight vector, which is the Lagrangian form
+of a constraint on that norm.
+
 # Related
 
+  - [`L2Regularisation`](@ref)
   - [`LpRegularisation`](@ref)
+  - [`set_l2_regularisation!`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+
+# References
+
+  - $(ref_dict[:demiguel2009])
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
@@ -253,6 +263,10 @@ Keywords correspond to the struct's fields.
   - [`set_l2_regularisation!`](@ref)
   - [`_set_l2_regularisation!`](@ref)
   - [`LpRegularisation`](@ref)
+
+# References
+
+  - $(ref_dict[:demiguel2009])
 """
 @concrete struct L2Regularisation <: AbstractRegularisationEstimator
     """
@@ -391,7 +405,8 @@ function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
     t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
     state_set!(model, Symbol(""), :cl2_rsoc_, i,
                JuMP.@constraint(model,
-                                [sc * t_l2; 0.5; sc * w] in JuMP.RotatedSecondOrderCone()))
+                                [sc * t_l2; sc * 0.5; sc * w] in
+                                JuMP.RotatedSecondOrderCone()))
     l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
     return nothing
@@ -450,6 +465,10 @@ Keywords correspond to the struct's fields.
   - [`set_lp_regularisation!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`L2Regularisation`](@ref)
+
+# References
+
+  - $(ref_dict[:demiguel2009])
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     """
@@ -481,6 +500,7 @@ Represents a collection of Lp-norm regularisation terms to be added to the optim
 
   - [`LpRegularisation`](@ref)
   - [`LpReg_VecLpReg`](@ref)
+  - [`set_lp_regularisation!`](@ref)
 """
 const VecLpReg = AbstractVector{<:LpRegularisation}
 """
@@ -524,11 +544,6 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
         add_to_objective_penalty!(model, lp_expr)
     end
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Sets the L∞ regularisation term in the objective function. The penalty value is not adjusted so it must be consistent with the range of values the weights can take.
-"""
 function set_linf_regularisation!(model::JuMP.Model, linf::Number)
     w = get_w(model)
     sc = get_constraint_scale(model)

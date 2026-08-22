@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Covariance estimator based on mutual information.
+Measures codependence with mutual information, which captures a non-linear relationship a correlation misses.
 
-`MutualInfoCovariance` implements a robust covariance estimator that uses mutual information (MI) to capture both linear and nonlinear dependencies between asset returns. This estimator is particularly useful for identifying complex relationships that are not detected by traditional correlation-based methods. The MI matrix is optionally normalised and then rescaled by marginal standard deviations to produce a covariance matrix.
+The mutual information matrix is optionally normalised by the smaller of the two marginal entropies, then rescaled by the marginal standard deviations of `ve` to give a covariance matrix.
 
 # Mathematical definition
 
@@ -18,7 +18,7 @@ Where:
 
   - ``\\hat{\\boldsymbol{\\rho}}_{ij}``: Mutual information-based correlation between assets ``i`` and ``j``.
   - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Covariance between assets ``i`` and ``j``.
-  - ``\\mathrm{MI}(X_i, X_j)``: (Optionally normalised) mutual information between assets ``i`` and ``j``.
+  - ``\\mathrm{MI}(X_i, X_j)``: Mutual information between assets ``i`` and ``j``, computed by [`mutual_info`](@ref). When `normalise` is `true` it is divided by ``\\min(H(X_i), H(X_j))``, which bounds it to ``[0,\\, 1]``.
   - ``\\hat{\\sigma}_i``: Marginal standard deviation of asset ``i`` from the variance estimator `ve`.
 
 # Fields
@@ -39,6 +39,18 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:bins])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -57,6 +69,14 @@ MutualInfoCovariance
 
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
+  - [`mutual_info`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:shannon1948])
+  - $(ref_dict[:cajas2025]) Section 6.1.6, equations 6.18 and 6.19.
 """
 @propagatable @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
     """
@@ -99,13 +119,13 @@ This method computes the pairwise mutual information correlation matrix for the 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Related
 

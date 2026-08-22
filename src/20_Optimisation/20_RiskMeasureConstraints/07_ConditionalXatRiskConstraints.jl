@@ -1,50 +1,64 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add conditional risk constraints (CVaR, DRCVaR, CDaR, and their range/DR variants) to `model`.
+Add JuMP risk constraints for `ConditionalValueatRisk` (CVaR) to `model`.
 
-Each overload introduces auxiliary non-negative exceedance variables and constructs the
-appropriate weighted-sum CVaR (or CDaR) expression. The distributionally robust variants add
-infinity-norm cone constraints to handle distributional ambiguity over an `r.r`-radius ball.
-Range variants compute the difference between lower-tail and upper-tail conditional
-risk expressions.
+Selects the net portfolio returns with [`risk_series`](@ref) and delegates to
+[`set_conditional_risk_constraints!`](@ref), which writes the Rockafellar-Uryasev
+linearisation. The linearisation adds one scalar Value at Risk variable and `T` non-negative
+exceedance variables, and the risk is convex in the portfolio weights.
 
 # Mathematical definition
 
-Rockafellar-Uryasev CVaR linearisation:
-
 ```math
 \\begin{align}
-\\mathrm{CVaR}_\\alpha(\\boldsymbol{w}) &= \\mathrm{VaR} + \\frac{1}{\\alpha T} \\sum_{t=1}^T z_t\\,, \\\\
-z_t &\\geq -\\hat{r}_t - \\mathrm{VaR},\\quad z_t \\geq 0\\,.
+\\hat{r}_{t} &= \\boldsymbol{x}_{t}^{\\intercal} \\boldsymbol{w}\\\\
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}) &= \\begin{cases}
+\\underset{\\mathrm{VaR},\\, \\boldsymbol{z}}{\\min} & \\mathrm{VaR} + \\dfrac{1}{\\alpha T} \\sum\\limits_{t=1}^{T} z_{t}\\\\
+\\text{s.t.} & z_{t} + \\hat{r}_{t} + \\mathrm{VaR} \\geq 0 \\quad \\forall t = 1,\\, \\ldots,\\, T\\\\
+ & \\boldsymbol{z} \\geq \\boldsymbol{0}\\,.
+\\end{cases}
 \\end{align}
 ```
 
+When observation weights are present the two sums are weighted by them: the objective becomes
+``\\mathrm{VaR} + \\left(\\alpha \\sum_{t} q_{t}\\right)^{-1} \\boldsymbol{q}^{\\intercal} \\boldsymbol{z}``, where
+``\\boldsymbol{q}`` is the observation weight vector. `nothing` observation weights means
+unweighted, so the count `T` takes the place of the weight sum.
+
 Where:
 
-  - ``\\mathrm{CVaR}_\\alpha(\\boldsymbol{w})``: Conditional Value-at-Risk.
-  - ``\\mathrm{VaR}``: Value-at-Risk auxiliary variable.
+  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w})``: Is the conditional value at risk of the portfolio.
+  - ``\\mathrm{VaR}``: Is the scalar value at risk variable.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - ``z_t \\geq 0``: Auxiliary excess loss variables.
-  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
-
-where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+  - ``\\boldsymbol{z}``: Is the `T × 1` vector of non-negative exceedance variables.
+  - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns, negated when `loss` is `false`.
+  - ``\\boldsymbol{q}``: Is the `T × 1` vector of observation weights.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - $(arg_dict[:r_risk])
+  - `r::ConditionalValueatRisk`: The CVaR risk measure.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
+    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
+    builds the gain tail of [`ConditionalValueatRiskRange`](@ref) through.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The CVaR risk expression added to the model.
 
 # Related
 
+  - [`ConditionalValueatRisk`](@ref)
+  - [`set_conditional_risk_constraints!`](@ref)
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
@@ -158,8 +172,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `DistributionallyRobustConditionalValueatRisk` (DR-CVaR)
 to `model`.
 
-Adds an infinity-norm cone constraint over an `r.r`-radius Wasserstein ambiguity ball and
-auxiliary exceedance variables to encode the distributionally robust CVaR.
+Selects the net portfolio returns with [`risk_series`](@ref), builds the gross asset returns
+the transport cost is measured against, and delegates to
+[`set_dr_conditional_risk_constraints!`](@ref). That function writes the two infinity-norm
+cones of the `r.r`-radius Wasserstein ambiguity ball.
+
+The gain tail carries its own ambiguity ball, so its Model State entries are namespaced under
+a nested prefix rather than allowed to collide with those of the loss tail.
 
 # Arguments
 
@@ -169,13 +188,23 @@ auxiliary exceedance variables to encode the distributionally robust CVaR.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
+    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
+    builds the gain tail of
+    [`DistributionallyRobustConditionalValueatRiskRange`](@ref) through.
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The DR-CVaR risk expression added to the model.
 
 # Related
 
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`set_dr_conditional_risk_constraints!`](@ref)
+  - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -345,8 +374,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `ConditionalDrawdownatRisk` (CDaR) to `model`.
 
-Introduces a drawdown-at-risk variable and non-negative exceedance variables over the
-drawdown series. The CDaR risk expression is the expected shortfall over drawdowns.
+Selects the negated drawdown path with [`risk_series`](@ref) and delegates to
+[`set_conditional_risk_constraints!`](@ref). CDaR and CVaR are one Rockafellar-Uryasev
+linearisation over two different series, so only the series and the Model State entry names
+differ. The scalar variable is the drawdown at risk rather than the value at risk.
 
 # Arguments
 
@@ -356,13 +387,19 @@ drawdown series. The CDaR risk expression is the expected shortfall over drawdow
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The CDaR risk expression added to the model.
 
 # Related
 
   - [`ConditionalDrawdownatRisk`](@ref)
+  - [`set_conditional_risk_constraints!`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
   - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
@@ -381,8 +418,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `DistributionallyRobustConditionalDrawdownatRisk`
 (DR-CDaR) to `model`.
 
-Encodes a distributionally robust CDaR using Wasserstein ambiguity ball constraints
-applied to the drawdown series.
+Selects the negated drawdown path with [`risk_series`](@ref), builds the drawdowns-plus-one
+matrix the transport cost is measured against, and delegates to
+[`set_dr_conditional_risk_constraints!`](@ref). DR-CDaR and DR-CVaR are one ambiguity-ball
+programme over two different series.
 
 # Arguments
 
@@ -392,13 +431,19 @@ applied to the drawdown series.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The DR-CDaR risk expression added to the model.
 
 # Related
 
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`set_dr_conditional_risk_constraints!`](@ref)
+  - [`DrawdownRiskSeries`](@ref)
   - [`risk_series`](@ref)
   - [`set_risk_constraints!`](@ref)
 """

@@ -234,7 +234,7 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, fact
     state_set!(model, prefix, namec, i,
                JuMP.@constraint(model,
                                 [sc * tsecond_moment
-                                 0.5
+                                 sc * 0.5
                                  sc * second_moment] in JuMP.RotatedSecondOrderCone()))
     return state_set!(model, prefix, :second_moment_risk_, i,
                       JuMP.@expression(model, factor * tsecond_moment)), sqrt(factor)

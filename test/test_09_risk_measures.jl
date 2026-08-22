@@ -470,4 +470,106 @@
             @test collect(ow) == ow_before
         end
     end
+    @testset "A risk measure agrees between the model and the functor (#351)" begin
+        # `VarianceSkewKurtosis`'s functor used to delegate to its children, so it reported
+        # `Skewness`'s **standardised** third moment and, under the default `SOCRiskExpr`,
+        # `Kurtosis`'s **square root** of the fourth. Its own `JuMP` model reads the raw
+        # moments off the relaxation blocks, so the two disagreed in magnitude and in sign:
+        # the functor returned about -0.0721 where the model computed about +1.45e-5.
+        r = factory(VarianceSkewKurtosis(), pr)
+        w2 = kron(w, w)
+        mu2 = dot(w, pr.sigma, w)
+        mu3 = dot(w, pr.sk, w2)
+        mu4 = dot(w2, pr.kt, w2)
+        @test isapprox(r(w, rd.X), mu2 - mu3 + mu4)
+
+        # The scales are the model's per-child weights, applied the same way.
+        r2 = factory(VarianceSkewKurtosis(;
+                                          vr = Variance(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       scale = 2.0)),
+                                          kt = Kurtosis(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       scale = 3.0))),
+                     pr)
+        @test isapprox(r2(w, rd.X), 2 * mu2 - mu3 + 3 * mu4)
+
+        # A central moment does not move when `fees` shifts every observation by the same
+        # per-period constant, and the model carries no fee term either.
+        @test r(w, rd.X, Fees(; l = 0.001)) == r(w, rd.X)
+    end
+    @testset "The weighted even moment weights observations linearly (#351)" begin
+        # `moment_risk` computed `norm(val .* r.w, 2p)`, which raises each observation
+        # weight to the power `2p`. The `JuMP` model attains `(sum w_t d_t^(2p) / T_d)^(1/p)`,
+        # a linear weighting, so the two disagreed by a factor of `T^(2p-1)` at uniform
+        # weights. The suite missed it because every weighted case used uniform weights,
+        # where the error is one constant factor and never moves an argmin.
+        x = rd.X * w
+        ow = StatsBase.pweights(range(0.5, 1.5; length = length(x)))
+        for p in (2, 3), malg in (FullMoment(), SemiMoment())
+            unweighted = LowOrderMoment(; mu = 0, alg = EvenMoment(; p = p, alg = malg))
+            uniform = LowOrderMoment(; mu = 0, w = wt,
+                                     alg = EvenMoment(; p = p, alg = malg))
+            weighted = LowOrderMoment(; mu = 0, w = ow,
+                                      alg = EvenMoment(; p = p, alg = malg))
+
+            # Uniform observation weights must reproduce the unweighted value.
+            @test isapprox(uniform(x), unweighted(x))
+
+            # And a general weight vector must match the value the model attains. `ddof`
+            # defaults to 0, so the effective sample size is `sum(ow)`.
+            d = malg === FullMoment() ? x : min.(x, zero(eltype(x)))
+            @test isapprox(weighted(x), (sum(ow .* d .^ (2p)) / sum(ow))^inv(p))
+        end
+    end
+    @testset "The distribution Value-at-Risk agrees between the model and the functor (#351)" begin
+        # `ValueatRisk`'s functor computed the empirical order statistic whatever `alg`
+        # held, while the `JuMP` model under `DistributionValueatRisk` builds the
+        # parametric quantile. `alg` selects the estimand, so on a 200 x 6 normal sample
+        # the model reported 0.0059528 against the functor's 0.0063843, a gap of 7 %.
+        # The functor now reads the same two moments the model reads, and a `MinimumRisk`
+        # solve puts the two within 2e-9 of each other.
+        r = factory(ValueatRisk(; alpha = 0.05, alg = DistributionValueatRisk()), pr)
+        z = PortfolioOptimisers.compute_value_at_risk_z(r.alg.dist, r.alpha)
+        sd = sqrt(dot(w, pr.sigma, w))
+        @test isapprox(expected_risk(r, w, pr), -dot(pr.mu, w) + z * sd)
+
+        # The weights, not the net return series, reach the parametric branch.
+        @test PortfolioOptimisers.risk_input_kind(r) ==
+              PortfolioOptimisers.WeightsReturnsFeesInput()
+
+        # The empirical branch is untouched, and the two are different numbers.
+        emp = expected_risk(ValueatRisk(; alpha = 0.05), w, pr)
+        @test isapprox(emp, -partialsort(rd.X * w, ceil(Int, 0.05 * size(rd.X, 1))))
+        @test !isapprox(emp, expected_risk(r, w, pr))
+
+        # The range's two legs share one mean term, which cancels in their difference.
+        rr = factory(ValueatRiskRange(; alpha = 0.05, beta = 0.05,
+                                      alg = DistributionValueatRisk()), pr)
+        z_h = PortfolioOptimisers.compute_value_at_risk_cz(rr.alg.dist, rr.beta)
+        @test isapprox(expected_risk(rr, w, pr), (z - z_h) * sd)
+    end
+    @testset "MaxRiskMeasureSettings validates its lower bound (#402)" begin
+        # A vector bound is a sweep axis, one solve per entry, so an empty vector is a
+        # sweep of zero points. `MaxRiskMeasureSettings(; lb = Float64[])` constructed,
+        # and the optimisation that read it returned an empty result: no weights, no
+        # return code, no warning. The sibling `RiskMeasureSettings` refuses the same
+        # shape at construction.
+        @test_throws PortfolioOptimisers.IsEmptyError MaxRiskMeasureSettings(;
+                                                                             lb = Float64[])
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = Inf)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = -Inf)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = NaN)
+        @test_throws DomainError MaxRiskMeasureSettings(; lb = [Inf, NaN])
+
+        # The guard is `assert_nonempty_finite_val`, not the sibling's
+        # `assert_nonempty_nonneg_finite_val`, because a negative floor is meaningful for
+        # a quantity the optimisation maximises.
+        @test MaxRiskMeasureSettings(; lb = -1e-8).lb == -1e-8
+        @test MaxRiskMeasureSettings(; lb = [-1e-8, 1e-8]).lb == [-1e-8, 1e-8]
+
+        # `nothing` and a `Frontier` reach the `args...` fallback unchanged.
+        @test isnothing(MaxRiskMeasureSettings().lb)
+        @test isa(MaxRiskMeasureSettings(; lb = Frontier(; N = 3)).lb, Frontier)
+    end
 end

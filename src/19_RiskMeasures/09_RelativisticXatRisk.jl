@@ -5,6 +5,8 @@ Compute the Relativistic Risk Measure (RRM) for a vector of portfolio returns.
 
 Solves a convex optimisation problem to compute the RRM at confidence level `alpha` with relativistic parameter `kappa`, using the specified solver(s).
 
+The primal power-cone programme is tried first. If no solver in `slv` succeeds on it, the equivalent dual programme is tried, which is numerically better conditioned for some solvers. If neither succeeds, the result is `NaN`.
+
 # Arguments
 
   - `x`: Vector of portfolio returns.
@@ -16,7 +18,7 @@ Solves a convex optimisation problem to compute the RRM at confidence level `alp
 
 # Returns
 
-  - RRM value (scalar).
+  - RRM value (scalar), or `NaN` if neither the primal nor the dual programme is solved.
 
 # Related
 
@@ -116,7 +118,7 @@ Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\k
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
 \\end{align}
 ```
 
@@ -143,6 +145,8 @@ subject to the power-cone constraints:
 Where:
 
   - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
+
+For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the ``\\kappa``-logarithm argument ``\\frac{1}{\\alpha T}`` becomes ``\\frac{1}{\\alpha \\sum_{t=1}^{T} w_t}`` and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``\\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``.
 
 # Fields
 
@@ -199,6 +203,10 @@ RelativisticValueatRisk
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar])
 """
 @propagatable @concrete struct RelativisticValueatRisk <: RiskMeasure
     """
@@ -268,6 +276,8 @@ Where:
   - ``\\mathrm{RLVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x})``: Lower-tail RLVaR with parameters ``(\\alpha, \\kappa_a)``.
   - ``\\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RLVaR with parameters ``(\\beta, \\kappa_b)``.
 
+$(math_dict[:negated_upper_tail])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -326,6 +336,10 @@ RelativisticValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar])
 """
 @propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
     """
@@ -489,6 +503,11 @@ RelativisticDrawdownatRisk
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:rlvar])
 """
 @propagatable @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
     """
@@ -628,6 +647,11 @@ RelativeRelativisticDrawdownatRisk
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:rlvar])
 """
 @propagatable @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
     """

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents a simple mean return measure for use in non-optimisation contexts.
 
-`MeanReturn` computes the arithmetic (or geometric, when `flag = true`) mean of portfolio returns. It is used as the numerator in risk-adjusted performance ratios such as `MeanReturnRiskRatio`.
+`MeanReturn` computes the arithmetic mean of portfolio returns, or the mean log return when `flag = true`. It is used as the numerator in risk-adjusted performance ratios such as `MeanReturnRiskRatio`.
 
 # Mathematical definition
 
@@ -53,7 +53,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow])
 
 # Functor
 
@@ -109,7 +109,8 @@ function (r::MeanReturn)(x::VecNum)
     if r.flag
         x = log1p.(x)
     end
-    return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
+    w = get_observation_weights(r.w, x)
+    return isnothing(w) ? Statistics.mean(x) : Statistics.mean(x, w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -165,6 +166,29 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `rt`: Recursively updated via [`factory`](@ref).
   - `rk`: Recursively updated via [`factory`](@ref).
+
+# Examples
+
+```jldoctest
+julia> MeanReturnRiskRatio()
+MeanReturnRiskRatio
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
+        rt ┼ MeanReturn
+           │   settings ┼ HierarchicalRiskMeasureSettings
+           │            │   scale ┴ Float64: 1.0
+           │          w ┼ nothing
+           │       flag ┴ Bool: false
+        rk ┼ ConditionalValueatRisk
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Float64: 1.0
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: true
+           │      alpha ┼ Float64: 0.05
+           │          w ┴ nothing
+       sca ┼ SumScalariser()
+        rf ┴ Float64: 0.0
+```
 
 # Related
 
@@ -276,7 +300,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow])
 
 !!! warning
 

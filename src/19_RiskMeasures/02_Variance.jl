@@ -1,9 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of second moment risk measures.
+Abstract supertype for the `JuMP` encodings of a second moment.
 
-# Related Types
+A second-moment risk measure hands the formulation a deviation vector and a correction factor, and the formulation decides which quadratic object or cone carries the sum of squares. The four encodings differ in the cone they need and in the units they report: [`SOCRiskExpr`](@ref) reports the square root of the second moment, and the other three report the second moment itself. A bound in `settings.ub` is stated in the units that the chosen formulation reports. The cone encodings bound the sum of squares from above, so they are tight where the risk is minimised or bounded above, which is how a risk expression enters the model.
+
+All concrete types implementing a second-moment `JuMP` encoding should subtype `SecondMomentFormulation`.
+
+# Related
 
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
@@ -15,64 +19,82 @@ abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of variance-based risk measures.
+Abstract supertype for the second-moment encodings that state the risk as an explicit square.
 
-# Related Types
+[`Variance`](@ref) accepts these two and no others. Both report the variance itself, one as a quadratic form in the weights and the other as the square of a second-order cone variable.
 
+# Related
+
+  - [`SecondMomentFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
 """
 abstract type VarianceFormulation <: SecondMomentFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
+Encodes the second moment as an explicit quadratic form, without an auxiliary variable or a cone.
 
-# Summary statistics
+The encoding takes two shapes. A risk measure that holds a co-moment matrix uses the first, and a risk measure that builds a deviation vector uses the second.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
+R(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,,\\\\
+R(\\boldsymbol{w}) &= c \\, \\boldsymbol{d}^\\intercal \\boldsymbol{d}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - $(math_dict[:R_w])
+  - $(math_dict[:w_port])
   - ``\\mathbf{\\Sigma}``: `N × N` co-moment matrix.
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
 
-# Scenario-based
+# Related
 
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
-\\text{s.t.} \\quad & \\boldsymbol{d} \\in \\mathcal{S}_{w}.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` deviations vector.
-  - ``\\mathcal{S}_{w}``: Scenario set for portfolio `x`.
-
-# Related Types
-
+  - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
-  - [`Variance`](@ref)
-  - [`SOCRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
 """
 struct QuadRiskExpr <: VarianceFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Squared second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using the square of a variable constrained by a second order cone.
+Encodes the second moment as the square of a second-order cone variable.
+
+The cone bounds the norm of the deviation vector, and the risk expression squares that variable, so the reported units are those of the second moment.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= c \\, t^{2}\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
+  - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`Variance`](@ref)
 """
@@ -80,20 +102,59 @@ struct SquaredSOCRiskExpr <: VarianceFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
+Encodes the second moment as a variable that a rotated second-order cone bounds.
 
-# Related Types
+The cone carries the square, so the risk expression stays linear in the auxiliary variable. The library builds it as `[t; 1/2; d] in JuMP.RotatedSecondOrderCone()`. That cone reads ``2 t u \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``, and the second entry pins ``u = 1/2``, so it states ``t \\geq \\lVert \\boldsymbol{d} \\rVert_{2}^{2}``. The reported units are those of the second moment.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= c \\, t\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2}^{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, whose square is modelled as a [JuMP.RotatedSecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Rotated-Second-Order-Cone).
+
+# Related
 
   - [`SecondMomentFormulation`](@ref)
   - [`VarianceFormulation`](@ref)
-  - [`SOCRiskExpr`](@ref)
+  - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
 """
 struct RSOCRiskExpr <: SecondMomentFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using a variable constrained by a second order cone.
+Encodes the square root of the second moment as a second-order cone variable.
+
+This is the only one of the four encodings that reports a root. A risk measure that takes it reports a standard deviation where the other three report a variance, both in the model and in the functor, and a bound in `settings.ub` is read in the same units.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R(\\boldsymbol{w}) &= \\sqrt{c} \\, t\\,,\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\boldsymbol{d} \\right\\rVert_{2} \\leq t\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_secmom])
+  - $(math_dict[:c_secmom])
+  - $(math_dict[:t_secmom])
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Related
 
@@ -107,7 +168,7 @@ struct SOCRiskExpr <: SecondMomentFormulation end
 """
     const NSkeQuadFormulations
 
-Union type of quadratic OWA risk expression formulations for the Negative Skewness risk measure.
+Union of the second-moment formulations that state the risk of the Negative Skewness risk measure as an explicit square.
 
 Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
 
@@ -121,12 +182,13 @@ const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 """
     const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 
-Union of quadratic and RSOC formulations for second-moment (variance-based) risk expressions.
+Union of the second-moment formulations that report the second moment itself rather than its square root.
 
 # Related
 
   - [`NSkeQuadFormulations`](@ref)
   - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
   - [`Variance`](@ref)
 """
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
@@ -134,6 +196,19 @@ const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExp
 $(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio variance using a covariance matrix.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 # Fields
 
@@ -158,6 +233,15 @@ Keywords correspond to the struct's fields.
 !!! warning
 
     `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+
+## View parameters
+
+`Variance` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - The method refuses an `rc` that is a [`LinearConstraint`](@ref). A group constraint cannot be restricted to a part of its own group, and the restriction would break factor risk contribution.
+  - `settings`, `rc` and `alg` are carried through unchanged.
 
 # `JuMP` Formulations
 
@@ -242,17 +326,24 @@ julia> r(w)
 
 # Related
 
-  - [`set_risk_constraints!`](@ref)
-  - [`set_risk_constraints!`](@ref)
-  - [`scalarise_risk_expression!`](@ref)
+  - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`UncertaintySetVariance`](@ref)
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct Variance <: RiskMeasure
     """
@@ -357,6 +448,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -378,6 +482,14 @@ Keywords correspond to the struct's fields.
 !!! warning
 
     `sigma` and `chol` are a pair, and a stated `chol` factorises the `sigma` beside it. A caller who wants one consistent pair names `sigma` alone — a matrix leaves the factorisation to the kernel, a **Deferred Quantity** fits both from one prior. A caller who states both by hand must make sure that they agree. A stated matrix is also pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, while a **Deferred Quantity** crosses unresolved and refits on the subset.
+
+## View parameters
+
+`StandardDeviation` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - `sigma` is sliced to the selected assets. A stated matrix is sliced on **both** axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
+  - `chol` is sliced on its **columns** alone. Its rows index the factorisation, which the asset selection does not address.
+  - `settings` is carried through unchanged.
 
 ## `JuMP` Formulation
 
@@ -439,9 +551,17 @@ julia> r(w)
 
 # Related
 
+  - [`RiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
+  - [`Variance`](@ref)
+  - [`UncertaintySetVariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct StandardDeviation <: RiskMeasure
     """
@@ -640,18 +760,25 @@ Where:
 
     (r::UncertaintySetVariance)(w::VecNum)
 
-Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
+Computes the variance risk of a portfolio with weights `w`. The value depends on what `ucs` holds, because the measure is a worst case over a set and an unfitted estimator defines no set.
+
+  - `ucs` holds an [`AbstractUncertaintySetResult`](@ref): the worst-case variance over the fitted set, computed by [`ucs_variance`](@ref). This is the scalar twin of the risk expression the `JuMP` formulations above build.
+  - `ucs` holds an estimator or `nothing`: the nominal variance ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``.
 
 ```math
 \\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\begin{cases}
+  \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(fitted uncertainty set)} \\\\
+  \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w} & \\text{(estimator or nothing)}
+\\end{cases}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - $(math_dict[:w_port])
   - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
 
 ## Arguments
 
@@ -714,8 +841,15 @@ julia> r(w)
   - [`Variance`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`ucs_variance`](@ref)
   - [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:robustaa])
+  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:cajas2025]) Section 11.3.
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
     """

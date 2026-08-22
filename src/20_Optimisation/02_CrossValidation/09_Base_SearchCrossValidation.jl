@@ -68,9 +68,11 @@ julia> scorer(scores)
 2
 ```
 
-# Related Types
+# Related
 
   - [`CrossValSearchScorer`](@ref)
+  - [`HighestMeanScore`](@ref)
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
 """
 abstract type CrossValidationSearchScorer <: AbstractEstimator end
 """
@@ -137,6 +139,10 @@ GridSearchCrossValidation
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`CrossValSearchScorer`](@ref)
   - [`search_cross_validation`](@ref)
+
+# References
+
+  - $(ref_dict[:bergstra2012]) Section 2.
 """
 @concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
     """
@@ -254,7 +260,7 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
     ) -> RandomisedSearchCrossValidation
 
-Keyword arguments correspond to the struct's fields.
+Positional and keyword arguments correspond to the struct's fields.
 
 ## Validation
 
@@ -297,6 +303,10 @@ RandomisedSearchCrossValidation
   - [`GridSearchCrossValidation`](@ref)
   - [`SearchCrossValidationResult`](@ref)
   - [`CrossValSearchScorer`](@ref)
+
+# References
+
+  - $(ref_dict[:bergstra2012])
 """
 @concrete struct RandomisedSearchCrossValidation <: AbstractSearchCrossValidationEstimator
     """
@@ -500,37 +510,39 @@ end
 """
     fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                   scv::AbstractSearchCrossValidationEstimator,
+                  cv::CrossValidationResult,
                   rd::ReturnsResult,
-                  train_idx::VecInt,
-                  test_idx::VecInt)
+                  i::Integer)
 
-Fits a portfolio optimisation estimator on training data, scores it on test and train splits, and returns the scores for search-based cross-validation routines.
+Fit a portfolio optimisation estimator on the training half of split `i`, score it on that split, and return the scores for a search cross-validation routine.
+
+The split is read from an **already computed** [`CrossValidationResult`](@ref), so the search splits `rd` once and scores every parameter set against the same folds. The method that takes a [`MultipleRandomisedResult`](@ref) also reads that split's asset subset and passes it as `cols`.
 
 # Arguments
 
   - `opt`: Portfolio optimisation estimator to fit.
-  - `scv`: Search cross-validation estimator specifying risk measure and options.
+  - `scv`: Search cross-validation estimator. It carries the risk measure `r`, the `train_score` switch, and the `kwargs` forwarded to [`expected_risk`](@ref).
+  - `cv`: Cross-validation result holding the train and test indices of every split.
   - `rd`: Returns result containing asset returns data.
-  - `train_idx`: Indices for training split.
-  - `test_idx`: Indices for test split.
+  - `i`: Index of the split to fit and score.
 
 # Returns
 
-  - `test_score::Number`: Test score.
-  - `train_score::Option{<:Number}`: Train score.
+  - `test_score::Number`: Test score of split `i`.
+  - `train_score::Option{<:Number}`: Train score of split `i`, or `nothing` when `scv.train_score` is `false`.
 
 # Details
 
-  - Fits the estimator on training data.
-  - Predicts on test data using the fitted estimator.
-  - Computes risk scores for test and train splits.
-  - Applies sign convention based on risk measure direction.
-  - Returns scores for use in search cross-validation.
+  - Fits the estimator on the training indices of split `i` and predicts on its test indices.
+  - Computes the risk of the test prediction, and of the training fit when `scv.train_score` is `true`.
+  - Negates both when [`bigger_is_better`](@ref) is `false` for `scv.r`, so a higher score is always better whatever measure `r` is. A [`CrossValidationSearchScorer`](@ref) relies on that orientation.
 
 # Related
 
   - [`SearchCrossValidationResult`](@ref)
+  - [`CrossValidationSearchScorer`](@ref)
   - [`expected_risk`](@ref)
+  - [`bigger_is_better`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
 """

@@ -17,9 +17,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Hierarchical Risk Parity (HRP) portfolio optimiser.
+Allocates weights by recursively bisecting the dendrogram's leaf order and splitting each part's weight in inverse proportion to the risk of its two halves.
 
-`HierarchicalRiskParity` implements the Hierarchical Risk Parity algorithm of López de Prado (2016). It clusters assets using hierarchical clustering, then allocates weights by recursively bisecting the dendrogram and applying inverse-risk weighting within each cluster.
+This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then walks that order down to the individual assets. It solves no optimisation problem, so it accepts a risk measure that is not convex.
+
+# Mathematical definition
+
+Every asset starts at ``w_i = 1``. The algorithm splits the dendrogram's leaf order in half, then splits each half in half, until every part holds one asset. At each split it divides the part's weight between the two halves ``C_1`` and ``C_2``:
+
+```math
+\\begin{align}
+\\tilde{w}_i(C) &= \\frac{\\rho(\\{i\\})^{-1}}{\\sum_{j \\in C} \\rho(\\{j\\})^{-1}} \\quad \\forall\\, i \\in C\\,,\\\\
+\\tilde{\\rho}(C) &= \\rho\\left(\\tilde{\\boldsymbol{w}}(C)\\right)\\,,\\\\
+\\alpha &= \\frac{\\tilde{\\rho}(C_2)}{\\tilde{\\rho}(C_1) + \\tilde{\\rho}(C_2)}\\,,\\\\
+\\boldsymbol{w}_{C_1} &\\leftarrow \\alpha \\, \\boldsymbol{w}_{C_1}\\,,\\\\
+\\boldsymbol{w}_{C_2} &\\leftarrow (1 - \\alpha) \\, \\boldsymbol{w}_{C_2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho``: Risk measure `r`, resolved by [`factory`](@ref) against the prior.
+  - ``\\rho(\\{i\\})``: Risk of asset ``i`` held alone, from [`unitary_expected_risks`](@ref).
+  - ``\\tilde{\\boldsymbol{w}}(C)``: Naive risk parity weights inside part ``C``, zero outside it.
+  - ``\\tilde{\\rho}(C)``: Risk of that naive risk parity sub-portfolio.
+  - ``\\alpha``: Fraction of the part's weight that goes to ``C_1``.
+  - ``C_1``, ``C_2``: The two halves of the part being split, in leaf order.
+
+Two steps follow the recursion. The split factor ``\\alpha`` is first clamped so that neither half can leave the resolved weight bounds, see [`split_factor_weight_constraints`](@ref). The final vector is then normalised to sum to one and passed to the weight finaliser `wf`. When `r` is a vector, [`hrp_scalarised_risk`](@ref) combines the measures with `sca` before the split factor is formed.
 
 # Fields
 
@@ -48,6 +73,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+`HierarchicalRiskParity` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `r` recurses through [`port_opt_view`](@ref) with that matrix. `opt` recurses with the index alone, because a [`HierarchicalOptimiser`](@ref) holds no risk measure and therefore needs no returns.
+  - `sca` and `fb` are carried through unchanged.
 
 # Examples
 
@@ -131,24 +164,6 @@ HierarchicalRiskParity
    fb ┴ nothing
 ```
 
-# Mathematical definition
-
-At each bisection step, the algorithm splits cluster ``C`` into sub-clusters ``C_1`` and ``C_2`` and allocates weights proportional to inverse portfolio risk:
-
-```math
-\\begin{align}
-\\alpha &= \\frac{\\tilde{\\rho}(C_2)}{\\tilde{\\rho}(C_1) + \\tilde{\\rho}(C_2)}\\,, \\\\
-\\boldsymbol{w}_{C_1} \\leftarrow \\alpha \\, \\boldsymbol{w}_C, \\quad \\boldsymbol{w}_{C_2} \\leftarrow (1 - \\alpha) \\, \\boldsymbol{w}_C\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\alpha``: Bisection weight allocating fraction of cluster weight ``\\boldsymbol{w}_C`` to sub-cluster ``C_1``.
-  - ``\\tilde{\\rho}(C)``: Risk of the quasi-diagonal sub-portfolio restricted to cluster ``C``.
-  - ``C_1``, ``C_2``: Sub-clusters of the bisected cluster ``C``.
-  - ``\\boldsymbol{w}_C``: Weight vector assigned to cluster ``C`` before bisection.
-
 # Related
 
   - [`optimise`](@ref)
@@ -157,7 +172,15 @@ Where:
   - [`HierarchicalOptimiser`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`unitary_expected_risks`](@ref)
+  - [`split_factor_weight_constraints`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2016])
+  - $(ref_dict[:cajas2025]) Section 12.1.
 """
 @propagatable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     """
@@ -234,27 +257,37 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
 """
-    split_factor_weight_constraints(alpha, wb, w, ...)
+    split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
+                                    lc::VecNum, rc::VecNum) -> Number
 
-Split and scale factor weight constraints for hierarchical risk parity.
+Clamp a bisection split factor so that neither half of the split leaves its weight bounds.
 
-Distributes the weight constraints across clusters based on the hierarchical factor `alpha` and the current weight allocation `w`.
+The recursion scales the left half by `alpha` and the right half by `1 - alpha`. Both halves carry one common weight before the split, so the bounds on that half's total translate into bounds on the factor itself. This method clamps the factor for the left half, then clamps its complement for the right half, and returns what survives both.
 
 # Arguments
 
-  - `alpha`: Hierarchical scaling factor.
-  - `wb`: Weight bounds.
-  - `w`: Current portfolio weights.
-  - Additional parameters.
+  - `alpha`: The unclamped split factor, the left half's share of the part's weight.
+  - `wb`: Resolved weight bounds. `wb.lb` and `wb.ub` must be **vectors** over the whole universe, which is what [`weight_bounds_constraints`](@ref) returns.
+  - `w`: The current weight vector, before this split is applied.
+  - `lc`: Asset indices of the left half.
+  - `rc`: Asset indices of the right half.
 
 # Returns
 
-  - Tuple of updated weight bounds for each cluster.
+  - `alpha::Number`: The clamped split factor. It is a **scalar**, not a bounds object.
+
+# Details
+
+  - Each half's common weight is read from its first member, `w[lc[1]]` and `w[rc[1]]`, because the recursion has scaled every member of a half by the same factors.
+  - A zero common weight is replaced by `sqrt(eps(...))`, so the division that turns a weight bound into a factor bound cannot divide by zero.
+  - The bound on a half is the **sum** of its members' bounds, so a half whose bounds cannot hold the weight it is given leaves the factor at the nearest reachable value rather than failing.
 
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`WeightBounds`](@ref)
+  - [`weight_bounds_constraints`](@ref)
 """
 function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
                                          lc::VecNum, rc::VecNum)
@@ -334,31 +367,39 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                                         r = r, sca = hrp.sca, fb = nothing)
 end
 """
-    hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
+    hrp_scalarised_risk(sca::Scalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+                        lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
+                        fees::Option{<:Fees}) -> Tuple
 
-Compute the scalarised HRP left/right cluster risk for weight allocation.
+Combine several risk measures into the one left and one right risk that a bisection step needs.
 
-Aggregates risk measures across clusters using a scalariser (sum, max, min, or log-sum-exp), returning the left and right cluster risks used to allocate weights in HRP.
+Each measure builds its own naive risk parity sub-portfolio for the two halves, because the weights follow that measure's own unitary risks. The scalariser then combines the two risk vectors, pair by pair, into a single pair.
 
 # Arguments
 
-  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
-  - `wu`: Unitary weight matrix (pre-allocated buffer).
-  - `wk`: Cluster weight vector.
-  - `rku`: Unitary risk vector.
-  - `lc`: Left cluster asset indices.
-  - `rc`: Right cluster asset indices.
-  - `rs`: Vector of risk measures.
-  - `X`: Return matrix.
-  - `fees`: Optional fees.
+  - `sca`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wu`: Scratch weight matrix, of size `size(X, 2)` by two. It is refilled per measure.
+  - `wk`: Scratch weight vector for [`unitary_expected_risks!`](@ref), of length `size(X, 2)`.
+  - `rku`: Scratch unitary risk vector, of length `size(X, 2)`. It is overwritten per measure.
+  - `lc`: Asset indices of the left half.
+  - `rc`: Asset indices of the right half.
+  - `rs`: Vector of risk measures, already resolved by [`factory`](@ref).
+  - `X`: Asset return matrix, observations by assets.
+  - `fees`: Fees, or `nothing`.
 
 # Returns
 
-  - `(lrisk, rrisk)`: Left and right cluster risk scalars.
+  - `(lrisk, rrisk)::Tuple`: The combined left and right risk.
+
+# Details
+
+  - Each measure's contribution is multiplied by its own `settings.scale` before the scalariser sees it.
+  - The scalariser reduces over the pair with `by = sum`, so a [`MaxScalariser`](@ref) selects the measure with the largest **total** of the two risks, and returns that measure's own pair.
 
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
+  - [`unitary_expected_risks!`](@ref)
   - [`herc_scalarised_risk_i!`](@ref)
 """
 function hrp_scalarised_risk(sca::Scalariser, wu::MatNum, wk::VecNum, rku::VecNum,

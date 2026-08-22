@@ -5,9 +5,12 @@ Abstract supertype for all JuMP-based optimisation result types.
 
 All concrete and/or abstract types representing the result of a JuMP model optimisation should be subtypes of `AbstractJuMPResult`.
 
+A subtype records what happened during a solve attempt. It is not the portfolio: the weights live on the optimiser's own result type, which carries one of these alongside them.
+
 # Related
 
   - [`JuMPResult`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
 """
@@ -55,9 +58,9 @@ const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for configuring a JuMP solver and its settings.
+Configures one solver backend, its attributes, and the statuses its solutions must reach.
 
-The `Solver` struct encapsulates all information needed to set up and run a JuMP optimisation, including the solver backend, solver-specific settings, solution checks, and bridge options.
+Every optimiser takes one `Solver` or a vector of them. [`optimise_JuMP_model!`](@ref) tries them in order and stops at the first that returns a solution `check_sol` accepts, so a vector is a fallback chain.
 
 # Fields
 
@@ -187,11 +190,11 @@ const Slv_VecSlv = Union{<:Solver, <:VecSlv}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for JuMP model optimisation.
-
-The `JuMPResult` struct records the outcome of a JuMP optimisation, including trial errors and success status.
+Records which solvers failed, at which stage, and whether any of them succeeded.
 
 When `success` is `false` the constructor emits a warning built by [`failed_solve_msg`](@ref): one bounded line per failed solver stage (name, stage, first line of the error). The full per-solver exceptions and settings stay available on `trials` and are never dumped into the log.
+
+`trials` records **failures only**. A solver that succeeds leaves no entry, so an empty `trials` with `success = true` means the first solver answered, and it is not a record of the solve. Each entry is keyed by the solver's `name` and holds a dictionary from the failed stage — `:set_optimizer`, `:optimize!` or `:assert_is_solved_and_feasible` — to the exception. Two solvers that share a name share one entry, and the default name is `\"\"` for all of them, so a vector of unnamed solvers keeps only its last failure.
 
 # Fields
 
@@ -340,8 +343,12 @@ Tries each solver in order, applying settings and checking for solution feasibil
 # Details
 
   - For each solver, sets the optimizer and attributes, runs `JuMP.optimize!`, and checks solution feasibility.
-  - If a solver fails, records the error and tries the next.
-  - Stops at the first successful solution.
+  - If a solver fails at one of the three guarded stages, records the error under the solver's `name` and tries the next.
+  - Stops at the first successful solution, and leaves no `trials` entry for it.
+
+Three stages are guarded: `JuMP.set_optimizer`, `JuMP.optimize!` and `JuMP.assert_is_solved_and_feasible`. [`set_solver_attributes`](@ref) is **not**. A solver attribute the backend refuses throws straight out of this function, so no trial is recorded and no later solver is tried. This is deliberate: a misspelled attribute is a configuration error, not a solver failure, and swallowing it would silently drop a setting the caller asked for.
+
+Give each solver of a vector its own `name`. The name is the `trials` key, the default is `\"\"` for every solver, and a later failure overwrites an earlier one under the same key. Measured on two solvers that both fail at `set_optimizer`: `trials` holds **one** entry with the default names and **two** with distinct names.
 
 # Related
 

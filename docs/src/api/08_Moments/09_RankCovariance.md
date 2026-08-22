@@ -7,3 +7,10 @@ SpearmanCovariance
 cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 RankCovarianceEstimator
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for buy-in threshold portfolio constraints.
+Resolves a minimum-holding threshold written in asset or group names against a universe.
 
-`ThresholdEstimator` specifies a minimum allocation threshold for each asset in a portfolio. Only assets with weights above the threshold are allocated nonzero weight. The estimator supports asset-specific thresholds via dictionaries, pairs, or vectors of pairs, and validates input for non-emptiness.
+[`threshold_constraints`](@ref) turns it into a [`Threshold`](@ref): every name is mapped to its indices in the universe `key` selects, and an unnamed asset takes `dval`, which defaults to no threshold. A threshold may also be a scalar, a vector, or an algorithmic rule such as [`UniformValues`](@ref).
 
 # Fields
 
@@ -17,10 +17,11 @@ $(DocStringExtensions.FIELDS)
         dval::Option{<:Number} = nothing
     ) -> ThresholdEstimator
 
+Keywords correspond to the struct's fields.
+
 ## Validation
 
-  - If `val` is a `AbstractDict` or `AbstractVector`, `!isempty(val)`.
-  - If `dval` is not `nothing`, it is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `val` and `dval` are both validated with [`assert_nonempty_nonneg_finite_val`](@ref), so a threshold is non-empty, non-negative and finite.
   - If `key` is not `nothing`, it is a non-empty string.
 
 ## View parameters
@@ -28,6 +29,8 @@ $(DocStringExtensions.FIELDS)
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+Only a vector `val` is sliced. A `val` that is a scalar, a `Dict`, a `Pair` or an algorithmic rule is not indexed by asset, so a view passes it through untouched and it resolves against the viewed universe when the estimator runs.
 
 # Examples
 
@@ -69,7 +72,12 @@ ThresholdEstimator
   - [`EstValType`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
+  - [`UniverseSets`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.4.
 """
 @propagatable @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
     """
@@ -101,9 +109,35 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for buy-in threshold portfolio constraints.
+Forces every held position to reach a minimum size, and drives anything smaller to zero.
 
-`Threshold` stores the minimum allocation threshold(s) for assets in a portfolio. The threshold can be specified as a scalar (applied to all assets) or as a vector of per-asset values. Input validation ensures all thresholds are finite and non-negative.
+The threshold is a scalar shared by every asset or a vector of one value per asset. It exists to keep a mixed-integer model from answering with a long tail of positions too small to trade.
+
+# Mathematical definition
+
+The threshold is the lower half of a buy-in constraint, stated against the held binary:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}}\\quad & \\phi(\\boldsymbol{w})\\\\
+\\textrm{s.t.}\\quad & \\ell_i z_i \\leq w_i \\leq u_i z_i\\,,\\quad \\forall i = 1,\\ldots,N\\,,\\\\
+& \\boldsymbol{z} \\in \\{0, 1\\}^{N}\\,,\\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{z}``: Held binary, one entry per asset.
+  - ``\\ell_i``: Minimum-holding threshold for asset ``i``, the `val` field.
+  - ``u_i``: Upper weight bound for asset ``i``, from [`WeightBounds`](@ref).
+  - $(math_dict[:N])
+  - ``\\phi``: Objective function of the optimiser.
+  - ``\\mathcal{W}``: Rest of the feasible set.
+
+The binary carries both halves. Where ``z_i = 0`` the two bounds collapse to ``w_i = 0``; where ``z_i = 1`` the position must reach ``\\ell_i``. A long and a short threshold are separate objects, each bound to its own side's binary.
+
+The threshold binds the **held** weight, not the trade. The source writes the same constraint over positive and negative trades against a reference portfolio; this library writes it over the position, so no reference portfolio enters it. On a six-asset conditional-value-at-risk model at `Threshold(0.15)` every held weight came back at or above `0.15`, with the smallest exactly `0.15`.
 
 # Fields
 
@@ -111,9 +145,14 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
+    Threshold(
+        val::Num_VecNum
+    ) -> Threshold
     Threshold(;
         val::Num_VecNum
     ) -> Threshold
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -145,7 +184,12 @@ Threshold
   - [`ThresholdEstimator`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
+  - [`WeightBounds`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.4.
 """
 @propagatable @concrete struct Threshold <: AbstractConstraintResult
     """
@@ -277,7 +321,7 @@ Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and 
   - `t`: [`ThresholdEstimator`](@ref) specifying asset-specific threshold values.
   - `sets`: [`UniverseSets`](@ref) containing asset names or indices.
   - `datatype`: Output data type for thresholds.
-  - `strict`: If `true`, enforces strict matching between assets and thresholds (throws error on mismatch); if `false`, issues a warning.
+  - `strict`: If `true`, a name in `t.val` that `sets` does not resolve throws; if `false`, it issues a warning and is skipped.
 
 # Returns
 
@@ -285,8 +329,9 @@ Generate buy-in threshold portfolio constraints from a `ThresholdEstimator` and 
 
 # Details
 
-  - Thresholds are extracted and mapped to assets using `estimator_to_val`.
-  - If a threshold is missing for an asset, assigns zero (no threshold) unless `strict` is `true`.
+  - Thresholds are extracted and mapped to assets by [`estimator_to_val`](@ref), against the universe `t.key` selects.
+  - An asset that `t.val` does not name takes `t.dval`. The default `dval = nothing` gives it `zero(datatype)`, which is no threshold.
+  - `strict` governs unresolvable **names**, not unnamed assets. An unnamed asset always takes the default and never throws.
 
 # Examples
 

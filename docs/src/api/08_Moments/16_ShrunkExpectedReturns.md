@@ -16,3 +16,10 @@ AbstractShrunkExpectedReturnsAlgorithm
 AbstractShrunkExpectedReturnsTarget
 target_mean
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

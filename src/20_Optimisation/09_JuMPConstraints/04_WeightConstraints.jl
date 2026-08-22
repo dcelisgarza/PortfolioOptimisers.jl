@@ -80,8 +80,8 @@ Where:
 
   - $(arg_dict[:model])
   - $(arg_dict[:wb_arg])
-  - `bgt`: Optional total budget constraint (number or [`BudgetRange`](@ref)).
-  - `sbgt`: Optional short-side budget constraint.
+  - `bgt`: Optional total budget constraint. A number, a [`BudgetRange`](@ref), or a [`BudgetCostEstimator`](@ref), which is the whole of [`JuMPOptimiser`](@ref)'s own `bgt` bound.
+  - `sbgt`: Optional short-side budget constraint. A [`BudgetCostEstimator`](@ref) `bgt` forbids one, so the pair never meets here.
   - `gbgt`: Optional gross (leverage) budget constraint, applied only when the weight bounds admit shorts. See [`set_gross_budget_constraints!`](@ref).
   - `long::Bool = false`: When `true`, raises an error if any bound is negative.
 
@@ -114,7 +114,7 @@ function set_weight_constraints!(args...)
     return nothing
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                 bgt::Option{<:Num_BgtRg}, sbgt::Option{<:Num_BgtRg},
+                                 bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
                                  long::Bool = false; gbgt::Option{<:Num_BgtRg} = nothing)
     lb = wb.lb
     ub = wb.ub

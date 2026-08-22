@@ -21,6 +21,21 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `re`: Recursively updated via [`factory`](@ref).
+  - `ve`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `re`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+
 ## Composition: what this estimator forwards
 
 This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the rule of ADR 0046 still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
@@ -89,6 +104,13 @@ FactorPrior
   - [`StepwiseRegression`](@ref)
   - [`SimpleVariance`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.4 and 4.5.
+  - $(ref_dict[:fan2008])
 """
 @propagatable @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
     """
@@ -178,12 +200,22 @@ Which factor moments arrive is the caller's decision, and it is the only thing t
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\mathbf{M} \\boldsymbol{f} + \\boldsymbol{b}\\\\
-\\hat{\\mathbf{\\Sigma}} &= \\mathbf{M} \\mathbf{\\Sigma}_f \\mathbf{M}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,,
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,, \\\\
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
 \\end{align}
 ```
 
-where ``\\mathbf{\\Sigma}_\\varepsilon`` is the diagonal matrix of residual variances and is present only when `rsd` is `true`.
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` asset expected returns vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` asset covariance matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix, `rr.M`.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts, `rr.b`.
+  - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` factor expected returns vector, `f_mu`.
+  - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
+
+The returned `chol` is the ``N \\times (K + N)`` matrix ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]`` transposed, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It therefore satisfies ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` before matrix processing.
 
 # Arguments
 
@@ -242,14 +274,14 @@ There is no default. A silent `nothing` fallback cannot separate *this estimator
 
   - `pe`: Prior estimator.
 
+# Validation
+
+  - Throws an `ArgumentError` when the type of `pe` declares no method.
+
 # Returns
 
   - `nothing`: The estimator adds no residual block.
   - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
-
-# Validation
-
-  - Throws an `ArgumentError` when the type of `pe` declares no method.
 
 # Related
 
@@ -307,23 +339,20 @@ The factor model maps factor moments to asset space via the loadings matrix ``\\
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,.
-\\end{align}
-```
-
-```math
-\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,, \\\\
 \\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix, `rr.M`.
   - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` vector of factor expected returns.
-  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts, `rr.b`.
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances (when `rsd = true`).
+
+The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come from `pe.pe` fit on `F`, and the loadings from `pe.re` fit on `(X, F)`. The two equations are [`factor_lift`](@ref).
 
 # Arguments
 
@@ -334,13 +363,13 @@ Where:
   - $(arg_dict[:strict])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing posterior asset returns, mean vector, covariance matrix, Cholesky factor, regression result, and factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing posterior asset returns, mean vector, covariance matrix, Cholesky factor, regression result, and factor moments.
 
 # Related
 

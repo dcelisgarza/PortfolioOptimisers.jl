@@ -23,6 +23,20 @@ Keywords correspond to the struct's fields.
 
   - If `horizon` is not `nothing`, `horizon > 0`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -57,6 +71,13 @@ EmpiricalPrior
   - [`SimpleExpectedReturns`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.
+  - $(ref_dict[:meucci2005]) Chapter 3.
 """
 @propagatable @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -95,7 +116,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
 
 # Mathematical definition
 
-The empirical prior directly estimates first and second moments from the sample:
+`pe.me` computes the mean and `pe.ce` computes the covariance, so both moments are whatever those estimators return. Under the default pair — [`SimpleExpectedReturns`](@ref) and [`PortfolioOptimisersCovariance`](@ref) with no observation weights — they reduce to the sample moments:
 
 ```math
 \\begin{align}
@@ -106,10 +127,12 @@ The empirical prior directly estimates first and second moments from the sample:
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` covariance matrix.
   - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
   - $(math_dict[:T])
+
+Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a denoised covariance move both away from the display above rather than refining it.
 
 # Arguments
 
@@ -119,13 +142,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
 
 # Related
 
@@ -150,7 +173,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
 
 # Mathematical definition
 
-Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
+`pe.me` and `pe.ce` are applied to the **log-returns** ``\\log(1 + x_t)`` rather than to `X` itself. The two log-moments are scaled by the investment horizon ``h``, then converted back to arithmetic returns:
 
 ```math
 \\begin{align}
@@ -170,9 +193,11 @@ Where:
 
   - ``\\tilde{\\boldsymbol{\\mu}}``, ``\\tilde{\\mathbf{\\Sigma}}``: Horizon-scaled log-return mean and covariance.
   - ``h``: Investment horizon.
-  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Sample mean and covariance of log-returns ``\\log(1 + x_t)``.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Mean and covariance of the log-returns ``\\log(1 + x_t)``, computed by `pe.me` and `pe.ce`.
   - ``\\hat{\\mu}_i``: Arithmetic mean return for asset ``i``.
   - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
+
+`X` in the returned [`LowOrderPrior`](@ref) is the arithmetic returns matrix the caller supplied. Only the moments are computed in log space.
 
 # Arguments
 
@@ -182,13 +207,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
 
 # Related
 

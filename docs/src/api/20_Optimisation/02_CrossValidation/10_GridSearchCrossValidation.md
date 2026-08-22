@@ -10,3 +10,10 @@ search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  rd::ReturnsResult)
 lens_val_grid(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

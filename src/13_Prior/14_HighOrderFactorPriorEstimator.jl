@@ -1,22 +1,25 @@
 """
-    coskewness_residuals(X, me)
+    coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
 
-Compute the coskewness residuals from asset return data.
+Build the residual coskewness matrix a factor lift adds to its projected coskewness.
 
-Internal helper that demeans `X` using the expected returns from `me` and returns the residual return matrix used in coskewness estimation.
+`X` is the **residual** matrix `X - posterior_X`, not the asset returns. The residuals are independent across assets and have zero mean, so every cross term of their coskewness vanishes and only the `N` own-third-moment entries survive. The result is therefore an `N × N²` sparse matrix carrying `mean(me, X .^ 3)` on the positions `1:(N² + N + 1):(N² * N)` — entry `(i, (i - 1) * N + i)`, which is where ``\\mathbb{E}[\\varepsilon_i^3]`` sits in a coskewness matrix — and zero everywhere else.
+
+Nothing is demeaned here. The zero-mean assumption is the factor model's, and `me` supplies the averaging rule rather than a centre.
 
 # Arguments
 
-  - `X`: Asset return matrix (observations × assets).
-  - `me`: Expected returns estimator.
+  - `X`: Residual return matrix (observations × assets).
+  - `me`: Expected returns estimator, used to average the cubed residuals.
 
 # Returns
 
-  - Residual return matrix.
+  - `sk_err::SparseMatrixCSC`: `N × N²` residual coskewness matrix.
 
 # Related
 
   - [`cokurtosis_residuals`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
 """
 function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     N = size(X, 2)
@@ -28,25 +31,33 @@ function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     return sk_err
 end
 """
-    cokurtosis_residuals(sigma, X, me)
+    cokurtosis_residuals(sigma::MatNum, X::MatNum, me::AbstractExpectedReturnsEstimator,
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
 
-Compute the cokurtosis residuals from the covariance matrix and return data.
+Build the residual cokurtosis matrix a factor lift adds to its projected cokurtosis.
 
-Internal helper that standardises `X` using the covariance matrix `sigma` and expected returns from `me`, returning the standardised residual matrix used in cokurtosis estimation.
+`X` is the **residual** matrix `X - posterior_X`, not the asset returns, and `sigma` is the **systematic** covariance ``\\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal``, with any residual block already removed. The caller does that removal; see [`factor_residual_config`](@ref).
+
+Nothing is standardised here. Every entry is written in closed form from the second and fourth residual moments `e2 = mean(me, X .^ 2)` and `e4 = mean(me, X .^ 4)` together with `sigma`, under the factor model's assumption that the residuals have zero mean and are independent both of each other and of the factors. Under those assumptions each of the fourteen index patterns collapses to one of the branches in the loop, and every pattern with a lone index — one asset appearing exactly once — is zero.
+
+Entry `(i - 1) * N + k, (j - 1) * N + l` of the result is the residual contribution to ``\\mathbb{E}[r_i r_k r_j r_l]``. The matrix is symmetric, so only the upper triangle is computed and each value is written to both places.
 
 # Arguments
 
-  - `sigma`: Covariance matrix.
-  - `X`: Asset return matrix (observations × assets).
-  - `me`: Expected returns estimator.
+  - `sigma`: Systematic covariance matrix, `N × N`.
+  - `X`: Residual return matrix (observations × assets).
+  - `me`: Expected returns estimator, used to average the squared and the fourth-power residuals.
+  - `ex`: `FLoops` executor for the `N²` loop. Defaults to `FLoops.ThreadedEx()`.
 
 # Returns
 
-  - Standardised residual matrix.
+  - `kt_res::Matrix`: `N² × N²` residual cokurtosis matrix.
 
 # Related
 
   - [`coskewness_residuals`](@ref)
+  - [`factor_residual_config`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
 """
 function cokurtosis_residuals(sigma::MatNum, X::MatNum,
                               me::AbstractExpectedReturnsEstimator,
@@ -106,7 +117,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the High Order Factor Prior Estimator.
+Projects factor coskewness and cokurtosis onto the asset axis through the regression loadings.
 
 `HighOrderFactorPriorEstimator` extends a low-order factor prior with coskewness and cokurtosis moments estimated from a factor model. It supports error correction of higher-order moments using residuals from the factor regression.
 
@@ -125,6 +136,20 @@ $(DocStringExtensions.FIELDS)
     ) -> HighOrderFactorPriorEstimator
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `kte`: Recursively updated via [`factory`](@ref).
+  - `ske`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -209,6 +234,13 @@ HighOrderFactorPriorEstimator
   - [`CokurtosisEstimator`](@ref)
   - [`CoskewnessEstimator`](@ref)
   - [`HighOrderPrior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:boudt2015])
+  - $(ref_dict[:martelliniziemann2010])
 """
 @propagatable @concrete struct HighOrderFactorPriorEstimator <:
                                AbstractHighOrderPriorEstimator_F
@@ -266,30 +298,27 @@ Compute high order factor prior moments for asset returns using a factor model.
 
 # Mathematical definition
 
-Factor cokurtosis and coskewness are mapped to asset space via the loadings matrix ``\\mathbf{B}`` (with Kronecker product ``\\otimes``):
+Factor comoments are mapped to asset space through the loadings matrix ``\\mathbf{B}``:
 
 ```math
 \\begin{align}
-\\hat{\\mathbf{K}} &= (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{K}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{K}}_\\varepsilon\\,.
-\\end{align}
-```
-
-```math
-\\begin{align}
-\\hat{\\mathbf{S}} &= \\mathbf{B} \\hat{\\mathbf{S}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{S}}_\\varepsilon\\,.
+\\hat{\\mathbf{\\Sigma}}_4 &= (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{\\Sigma}}_{4,f} (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{\\Sigma}}_{4,\\varepsilon}\\,, \\\\
+\\hat{\\mathbf{M}}_3 &= \\mathbf{B} \\hat{\\mathbf{M}}_{3,f} (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{M}}_{3,\\varepsilon}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` asset cokurtosis matrix.
-  - ``\\hat{\\mathbf{S}}``: ``N \\times N^2`` asset coskewness matrix.
-  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
-  - ``\\hat{\\mathbf{K}}_f``: ``K^2 \\times K^2`` factor cokurtosis matrix.
-  - ``\\hat{\\mathbf{S}}_f``: ``K \\times K^2`` factor coskewness matrix.
-  - ``\\hat{\\mathbf{K}}_\\varepsilon``: Residual cokurtosis correction (when `rsd = true`).
-  - ``\\hat{\\mathbf{S}}_\\varepsilon``: Residual coskewness correction (when `rsd = true`).
+  - ``\\hat{\\mathbf{\\Sigma}}_4``: ``N^2 \\times N^2`` asset square cokurtosis matrix, `kt`.
+  - ``\\hat{\\mathbf{M}}_3``: ``N \\times N^2`` asset coskewness matrix, `sk`.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix, `pr.rr.M`.
+  - ``\\hat{\\mathbf{\\Sigma}}_{4,f}``: ``K^2 \\times K^2`` factor square cokurtosis matrix, `fpr.kt`.
+  - ``\\hat{\\mathbf{M}}_{3,f}``: ``K \\times K^2`` factor coskewness matrix, `fpr.sk`.
+  - ``\\hat{\\mathbf{\\Sigma}}_{4,\\varepsilon}``: Residual cokurtosis correction from [`cokurtosis_residuals`](@ref), present only when `rsd` is `true`.
+  - ``\\hat{\\mathbf{M}}_{3,\\varepsilon}``: Residual coskewness correction from [`coskewness_residuals`](@ref), present only when `rsd` is `true`.
   - ``\\otimes``: Kronecker product.
+
+The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-default `alg` on either replaces its display above. Either estimator set to `nothing` drops its moment from both the asset result and the nested factor block.
 
 # Arguments
 
@@ -299,14 +328,14 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
-# Returns
-
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
 
 # Details
 

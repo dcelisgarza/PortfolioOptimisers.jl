@@ -34,7 +34,7 @@ The map is exact, but **only for the bare problem** the closed forms assume: the
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct ActiveAssetsUncertaintyAlgorithm <: AbstractUncertaintyEpsAlgorithm
     """
@@ -117,7 +117,7 @@ This set bounds a *mean/characteristic* vector. It has no covariance analogue, s
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct L1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -233,7 +233,7 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct SignedL1UncertaintySet <: AbstractUncertaintySetResult
     """
@@ -343,7 +343,7 @@ Using the wrong one mis-calibrates the radius; it does not make the optimisation
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct L1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -407,7 +407,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct SignedL1UncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -490,7 +490,7 @@ This estimator is **mean-only**. [`ucs`](@ref) and [`sigma_ucs`](@ref) are defin
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 @concrete struct CharacteristicUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -528,7 +528,7 @@ Return the vector `g` whose `k`-th entry is the radius at which the `k`-th asset
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 function l1_activation_ladder(mu::VecNum, sd::Option{<:VecNum})
     N = length(mu)
@@ -546,7 +546,7 @@ Convert an `active` target — a count or a fraction of the universe — into an
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 function l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
     q = isa(active, Integer) ? Int(active) : round(Int, active * N)
@@ -568,7 +568,7 @@ Throws when the target interval is empty, which happens when the characteristic 
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 function l1_eps_from_ladder(method::Number, args...)
     return method
@@ -603,7 +603,7 @@ Resolve a radius from a [`Num_UcSEps`](@ref) against the characteristic vector.
 
 # References
 
-  - [quintile](@cite)
+  - $(ref_dict[:quintile])
 """
 function l1_resolve_eps(method::Number, args...)
     return method

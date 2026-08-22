@@ -204,23 +204,27 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Inverse Volatility portfolio optimiser.
+Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`.
 
-`InverseVolatility` allocates portfolio weights inversely proportional to each asset's volatility (standard deviation). Optionally, `sq = true` uses variance instead.
+The volatilities come from the diagonal of the covariance matrix the prior estimator `pe` returns, so every choice inside `pe` reaches the result. This is the naive risk parity allocation that [`HierarchicalRiskParity`](@ref) applies inside a cluster.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-w_i &= \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,\\,.
+w_i &= \\frac{\\sigma_i^{-1}}{\\sum_{j=1}^N \\sigma_j^{-1}} \\quad \\textrm{when } \\texttt{sq = false}\\,,\\\\
+w_i &= \\frac{\\sigma_i^{-2}}{\\sum_{j=1}^N \\sigma_j^{-2}} \\quad \\textrm{when } \\texttt{sq = true}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``w_i``: Portfolio weight of asset ``i``.
-  - ``\\sigma_i``: Standard deviation of asset ``i`` (variance when `sq = true`).
+  - ``w_i``: Portfolio weight of asset ``i`` before the weight bounds are applied.
+  - ``\\sigma_i^2``: Variance of asset ``i``, the ``i``-th diagonal entry of the prior covariance matrix.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
   - ``N``: Number of assets.
+
+The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, so the returned weights equal the expression above only when no bound binds.
 
 # Fields
 
@@ -240,6 +244,11 @@ $(DocStringExtensions.FIELDS)
     ) -> InverseVolatility
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static.
+
+## Validation
+
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -301,6 +310,10 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 12.1.3, footnote 5.
 """
 @propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
@@ -405,8 +418,10 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
-    wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, ifelse(isone(dims), 2, 1)),
-                                   strict = iv.strict, datatype = eltype(X))
+    # `pr.X` is always observations by assets, whatever `dims` the caller passed, so the
+    # asset count is `size(X, 2)` unconditionally.
+    wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, 2), strict = iv.strict,
+                                   datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, retcode = retcode, w = w,
                                    fb = nothing)
@@ -432,9 +447,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Equal-weighted portfolio optimiser.
+Allocates the same weight to every asset in the universe.
 
-`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio.
+The asset count comes from `rd.X`, so this optimiser reads no prior and no covariance matrix.
 
 # Mathematical definition
 
@@ -446,8 +461,10 @@ w_i &= \\frac{1}{N} \\quad \\forall i\\,.
 
 Where:
 
-  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``w_i``: Portfolio weight of asset ``i`` before the weight bounds are applied.
   - ``N``: Number of assets.
+
+The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, so the returned weights equal ``1/N`` only when no bound binds.
 
 # Fields
 
@@ -464,6 +481,11 @@ $(DocStringExtensions.FIELDS)
     ) -> EqualWeighted
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static.
+
+## Validation
+
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -593,22 +615,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Random-weighted portfolio optimiser.
+Draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`.
 
-`RandomWeighted` draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. This can be used for simulation, benchmarking, or stress-testing.
+Use it for simulation, benchmarking, or stress testing. A scalar `alpha` draws from the symmetric Dirichlet distribution over ``N`` assets; a vector `alpha` must be one entry per asset.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,\\,.
+\\boldsymbol{w} &\\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: Portfolio weight vector.
-  - ``\\boldsymbol{\\alpha}``: Scalar or vector concentration parameter. Larger values concentrate the distribution near equal weights.
+  - ``\\boldsymbol{w}``: Portfolio weight vector before the weight bounds are applied. A Dirichlet draw is non-negative and sums to one.
+  - ``\\boldsymbol{\\alpha}``: Concentration parameter, one entry per asset. A larger value concentrates the distribution near equal weights.
+
+The weight finaliser `wf` then imposes the resolved weight bounds on ``\\boldsymbol{w}``, which by default are absent for this optimiser.
 
 # Fields
 
@@ -631,7 +655,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 ## Validation
 
-  - If `alpha` is provided: all elements positive and finite.
+  - `alpha`: non-empty, and every element is positive and finite.
+  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
@@ -712,9 +737,7 @@ RandomWeighted
                             sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
                             fb::TDO_Option{<:OptE_Opt}, strict::Bool)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
-        if !isnothing(alpha)
-            assert_nonempty_gt0_finite_val(alpha, :alpha)
-        end
+        assert_nonempty_gt0_finite_val(alpha, :alpha)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))

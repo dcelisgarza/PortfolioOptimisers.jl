@@ -108,6 +108,11 @@ MyCoskewnessEstimator
 
   - [`Coskewness`](@ref)
   - [`AbstractEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.6.
+  - $(ref_dict[:pkurt])
 """
 abstract type CoskewnessEstimator <: AbstractEstimator end
 """
@@ -132,6 +137,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:oow])
+
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
@@ -145,9 +154,12 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
-# Validation
+## Observation weight parameters
 
-  - $(val_dict[:oow])
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -174,8 +186,16 @@ Coskewness
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Sections 3.1.4 and 7.2.5.1, Equations 3.6, 7.104 and 7.105.
+  - $(ref_dict[:pkurt])
+  - $(ref_dict[:nskew])
 """
 @propagatable @concrete struct Coskewness <: CoskewnessEstimator
     """
@@ -211,9 +231,29 @@ end
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
                  mp::AbstractMatrixProcessingEstimator)
 
-Internal helper for coskewness matrix processing.
+Internal helper that builds the negative spectral skewness matrix.
 
-`negative_spectral_coskewness` processes the coskewness tensor by applying the matrix processing estimator to each block, then projects the result using eigenvalue decomposition and clamps negative values. Used internally for robust coskewness estimation.
+`negative_spectral_coskewness` splits the coskewness tensor into its `N` symmetric blocks of size `N x N`, keeps the negative part of the spectrum of each block, and sums the negated parts into one `N x N` matrix. The matrix processing estimator runs once, on the summed result, and not on the individual blocks.
+
+# Mathematical definition
+
+Write the coskewness tensor as ``\\mathbf{S} = [\\mathbf{S}_{1} \\vert \\mathbf{S}_{2} \\vert \\ldots \\vert \\mathbf{S}_{N}]``. Each block ``\\mathbf{S}_{i}`` is symmetric, so its eigendecomposition is real. Keep the negative eigenvalues alone and negate the sum:
+
+```math
+\\begin{align}
+\\mathbf{S}_{i} &= \\mathbf{Q}_{i} \\mathbf{\\Lambda}_{i} \\mathbf{Q}_{i}^{\\intercal}\\,, \\\\
+\\mathbf{S}_{i}^{-} &= \\mathbf{Q}_{i} \\mathbf{\\Lambda}_{i}^{-} \\mathbf{Q}_{i}^{\\intercal}\\,, \\\\
+\\mathbf{V} &= -\\sum\\limits_{i=1}^{N} \\mathbf{S}_{i}^{-}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{S}_{i}``: ``i``-th ``N \\times N`` block of the coskewness tensor.
+  - ``\\mathbf{Q}_{i}``: Matrix of eigenvectors of ``\\mathbf{S}_{i}``.
+  - ``\\mathbf{\\Lambda}_{i}^{-}``: Diagonal matrix holding the negative eigenvalues of ``\\mathbf{S}_{i}``, with every non-negative one set to zero.
+  - ``\\mathbf{V}``: Negative spectral skewness matrix. It is positive semidefinite, because it is a sum of negated negative semidefinite matrices.
+  - $(math_dict[:N])
 
 # Arguments
 

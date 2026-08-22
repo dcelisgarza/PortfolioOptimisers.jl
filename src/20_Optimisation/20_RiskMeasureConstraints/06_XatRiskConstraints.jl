@@ -75,7 +75,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
                                               (; risk = :var_risk_, z = :z_var_,
                                                cardinality = :csvar_, exceedance = :cvar_);
-                                              loss = loss, prefix = prefix)
+                                              prefix = prefix)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -101,13 +101,17 @@ function writes the indicator block once.
 
 # Keyword arguments
 
-  - `loss::Bool`: `true` builds the loss tail, `false` the gain tail. The indicators are
-    negated with the series, so the two tails describe opposite sides.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
 
   - `risk`: The quantile risk variable added to the model.
+
+# Details
+
+The block knows nothing of which tail it builds. [`risk_series`](@ref) negates the series
+for the gain tail, and this same programme over that series is the gain tail's quantile, so
+the binaries and the cardinality constraint are written once.
 
 # Throws
 
@@ -122,7 +126,7 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                                             opt::RiskJuMPOptimisationEstimator,
                                             pr::AbstractPriorResult, series, T::Int,
                                             b::Number, s::Number, keys::NamedTuple;
-                                            loss::Bool = true, prefix::Symbol = Symbol(""))
+                                            prefix::Symbol = Symbol(""))
     @argcheck(b > s, DomainError("b ($b) must be greater than s ($s)"))
     sc = get_constraint_scale(model)
     risk, z = JuMP.@variables(model, begin
@@ -131,9 +135,6 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                               end)
     state_set!(model, prefix, keys.risk, i, risk)
     state_set!(model, prefix, keys.z, i, z)
-    if !loss
-        z = -z
-    end
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, pr.X)
@@ -190,72 +191,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :var_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Compute the lower-tail z-score for a parametric VaR at significance level `alpha`.
-
-Returns the complementary quantile for Normal and scaled Student-t distributions, and the
-closed-form expression for the Laplace distribution.
-
-# Arguments
-
-  - `dist`: Distribution instance (Normal, TDist, or Laplace).
-  - `alpha::Number`: Significance level.
-
-# Returns
-
-  - `z::Number`: Lower-tail z-score for the parametric VaR.
-
-# Related
-
-  - [`compute_value_at_risk_cz`](@ref)
-  - [`set_risk_constraints!`](@ref)
-"""
-function compute_value_at_risk_z(dist::Distributions.Normal, alpha::Number)
-    return Distributions.cquantile(dist, alpha)
-end
-function compute_value_at_risk_z(dist::Distributions.TDist, alpha::Number)
-    d = StatsAPI.dof(dist)
-    @argcheck(d > 2, DomainError(d, "degrees of freedom must be greater than 2"))
-    return Distributions.cquantile(dist, alpha) * sqrt((d - 2) / d)
-end
-function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
-    return -log(2 * alpha) / sqrt(2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Compute the upper-tail z-score for a parametric VaR at significance level `alpha`.
-
-Used for the high (upper) bound in VaR range constraints. Returns the lower quantile for
-Normal and scaled Student-t distributions, and the closed-form expression for Laplace.
-
-# Arguments
-
-  - `dist`: Distribution instance (Normal, TDist, or Laplace).
-  - `alpha::Number`: Significance level.
-
-# Returns
-
-  - `z::Number`: Upper-tail z-score for the parametric VaR.
-
-# Related
-
-  - [`compute_value_at_risk_z`](@ref)
-  - [`set_risk_constraints!`](@ref)
-"""
-function compute_value_at_risk_cz(dist::Distributions.Normal, alpha::Number)
-    return Statistics.quantile(dist, alpha)
-end
-function compute_value_at_risk_cz(dist::Distributions.TDist, alpha::Number)
-    d = StatsAPI.dof(dist)
-    @argcheck(d > 2, DomainError(d, "degrees of freedom must be greater than 2"))
-    return Statistics.quantile(dist, alpha) * sqrt((d - 2) / d)
-end
-function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
-    return -log(2 * (one(alpha) - alpha)) / sqrt(2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

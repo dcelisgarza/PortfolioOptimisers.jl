@@ -35,6 +35,8 @@ Where:
   - ``\\rho_{\\mathrm{gain}}``: Gain-side XatRisk risk measure.
   - $(math_dict[:xret])
 
+$(math_dict[:negated_upper_tail])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

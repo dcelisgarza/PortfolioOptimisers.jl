@@ -174,12 +174,18 @@ Abstract supertype for portfolio objective functions.
 
 Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
 
+The four concrete children are the source's four classic objective functions, one per subsection.
+
 # Related
 
   - [`MinimumRisk`](@ref)
   - [`MaximumReturn`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumUtility`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.2.
 """
 abstract type ObjectiveFunction <: AbstractEstimator end
 """
@@ -189,10 +195,16 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 
 `JuMPReturnsEstimator` types define how expected returns are incorporated into JuMP models.
 
+The two children are the source's two return definitions: the arithmetic return of Section 8.1.1 and the geometric return of Section 8.1.2.
+
 # Related
 
   - [`ArithmeticReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 8.1.
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
@@ -488,15 +500,18 @@ Alias for a single JuMP optimisation solution or a vector of them.
 """
 const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
 """
-    set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
+    set_model_scales!(model::JuMP.Model, sc::Number, so::Number)
 
-Register objective scale `so` and constraint scale `sc` as named expressions in the JuMP model.
+Register constraint scale `sc` and objective scale `so` as named expressions in the JuMP model.
+
+The positional order is `sc` first, matching every head, which passes `opt.sc, opt.so`
+straight out of its [`JuMPOptimiser`](@ref).
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `so::Number`: Objective scale factor.
-  - `sc::Number`: Constraint scale factor.
+  - `sc::Number`: Constraint scale factor, read back by [`get_constraint_scale`](@ref).
+  - `so::Number`: Objective scale factor, read back by [`get_objective_scale`](@ref).
 
 # Returns
 
@@ -505,8 +520,10 @@ Register objective scale `so` and constraint scale `sc` as named expressions in 
 # Related
 
   - [`JuMPOptimiser`](@ref)
+  - [`get_constraint_scale`](@ref)
+  - [`get_objective_scale`](@ref)
 """
-function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
+function set_model_scales!(model::JuMP.Model, sc::Number, so::Number)
     JuMP.@expressions(model, begin
                           so, so
                           sc, sc

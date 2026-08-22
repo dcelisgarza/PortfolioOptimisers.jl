@@ -53,9 +53,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for lower and upper portfolio weight bounds.
+Bounds every portfolio weight between a lower and an upper limit.
 
-`WeightBounds` stores the lower (`lb`) and upper (`ub`) bounds for portfolio weights, which can be scalars, vectors, or `nothing`. This type is used to represent weight constraints in portfolio optimisation problems, supporting both global and asset-specific bounds.
+A bound is a scalar shared by every asset, a vector of one limit per asset, or `nothing` for no limit in that direction. The bounds also serve the mixed-integer builders, which read them as the big-M that links a weight to its held indicator.
 
 # Fields
 
@@ -64,13 +64,20 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     WeightBounds(
+        lb::Option{<:Num_VecNum},
+        ub::Option{<:Num_VecNum}
+    ) -> WeightBounds
+    WeightBounds(;
         lb::Option{<:Num_VecNum} = 0.0,
         ub::Option{<:Num_VecNum} = 1.0
     ) -> WeightBounds
 
+Keywords correspond to the struct's fields. Only the keyword form carries the defaults.
+
 ## Validation
 
-  - `all(lb .<= ub)`.
+  - `lb` is not above `ub`, entry by entry where both are vectors, through [`validate_bounds`](@ref).
+  - A vector bound is non-empty.
 
 ## View parameters
 
@@ -129,9 +136,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for portfolio weight bounds constraints.
+Resolves weight bounds written in asset or group names against a universe.
 
-`WeightBoundsEstimator` constructs lower (`lb`) and upper (`ub`) bounds for portfolio weights, supporting scalars, vectors, dictionaries, pairs, or custom constraint types. This estimator enables flexible specification of global, asset-specific, or algorithmic bounds for use in portfolio optimisation workflows.
+[`weight_bounds_constraints`](@ref) turns it into a [`WeightBounds`](@ref): every name is mapped to its indices in the universe, and an unnamed asset takes `dlb` or `dub`. A bound may also be a scalar, a vector, or an algorithmic rule such as [`UniformValues`](@ref).
 
 # Fields
 
@@ -146,9 +153,14 @@ $(DocStringExtensions.FIELDS)
         dub::Option{<:Number} = nothing
     ) -> WeightBoundsEstimator
 
+Keywords correspond to the struct's fields.
+
 ## Validation
 
   - If `lb` or `ub` is a `AbstractDict` or `AbstractVector`, it must be non-empty.
+  - Two vector bounds must have the same length.
+  - Where both bounds are numbers or vectors of numbers, `lb` is not above `ub`, through [`validate_bounds`](@ref).
+  - If neither `dlb` nor `dub` is `nothing`, `dlb <= dub`.
 
 ## View parameters
 
@@ -156,6 +168,8 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
+Only a vector bound is sliced. A bound that is a scalar, a `Dict`, a `Pair` or an algorithmic rule is not indexed by asset, so a view passes it through untouched and it resolves against the viewed universe when the estimator runs.
 
 # Details
 
@@ -423,26 +437,28 @@ end
 """
     weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0, kwargs...)
 
-Propagate or expand portfolio weight bounds constraints from a `WeightBounds` object.
+Expand portfolio weight bounds constraints from a `WeightBounds` object to length `N`.
 
-`weight_bounds_constraints` returns the input [`WeightBounds`](@ref) object unchanged if `scalar` is `true` or `N` is zero. Otherwise, it expands scalar or `nothing` bounds to vectors or ranges of length `N` using [`weight_bounds_constraints_side`](@ref), ensuring per-asset constraints are properly propagated.
+`weight_bounds_constraints` expands a scalar, `nothing` or infinite bound to a vector or range of length `N` using [`weight_bounds_constraints_side`](@ref), so every bound reaches the model per asset. A vector bound is passed through unchanged.
+
+`N` is required in practice. The default `N = 0` builds two empty bound vectors, and [`WeightBounds`](@ref)'s own validation then throws `IsEmptyError: lb cannot be empty`.
 
 # Arguments
 
   - `wb`: [`WeightBounds`](@ref) object containing lower and upper bounds.
   - `args...`: Additional positional arguments (ignored).
-  - `scalar`: If `true`, treat bounds as scalar and return unchanged.
-  - `N`: Number of assets (length for expansion; if zero, treat as scalar).
+  - `N`: Number of assets, the length of the expansion.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `wb::WeightBounds`: Expanded or unchanged bounds object.
+  - `wb::WeightBounds`: Expanded bounds object.
 
 # Details
 
-  - If `scalar` is `true` or `N == 0`, returns `wb` unchanged.
-  - Otherwise, expands `lb` and `ub` using [`weight_bounds_constraints_side`](@ref) to vectors of length `N`.
+  - Expands `lb` and `ub` using [`weight_bounds_constraints_side`](@ref) to length `N`.
+  - A `nothing` or infinite bound expands to `-Inf` on the lower side and `Inf` on the upper side.
+  - A finite scalar bound expands to a constant `range`, not to an `Array`.
 
 # Examples
 
@@ -518,7 +534,7 @@ Generate unconstrained portfolio weight bounds when no bounds are specified.
 
   - `wb::Nothing`: Indicates no constraint for portfolio weights.
   - `args...`: Additional positional arguments (ignored).
-  - `N::Integer`: Number of assets (length for expansion; if zero, treat as scalar).
+  - `N::Integer`: Number of assets, the length of the two bound vectors.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
@@ -527,8 +543,8 @@ Generate unconstrained portfolio weight bounds when no bounds are specified.
 
 # Details
 
-  - If `scalar` is `true` or `N == 0`, returns `WeightBounds(-Inf, Inf)`.
-  - Otherwise, returns `WeightBounds(fill(-Inf, N), fill(Inf, N))`.
+  - Returns `WeightBounds(fill(-Inf, N), fill(Inf, N))`.
+  - `N` is required in practice. The default `N = 0` builds two empty vectors, and [`WeightBounds`](@ref)'s own validation then throws `IsEmptyError: lb cannot be empty`.
 
 # Examples
 

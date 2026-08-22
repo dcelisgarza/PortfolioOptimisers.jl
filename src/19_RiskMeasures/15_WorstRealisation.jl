@@ -58,6 +58,10 @@ WorstRealisation
   - [`RiskMeasureSettings`](@ref)
   - [`Range`](@ref)
   - [`ValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:minimax])
 """
 @concrete struct WorstRealisation <: RiskMeasure
     """

@@ -3,46 +3,56 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for relaxed risk budgeting algorithm variants.
 
-# Related Types
+# Related
 
   - [`BasicRelaxedRiskBudgeting`](@ref)
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
   - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:richardroncalli2019])
 """
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Basic Relaxed Risk Budgeting formulation.
+Bounds the risk variable by the portfolio standard deviation alone, which is the relaxation with no extra term.
 
-Uses the basic Second Order Cone (SOC) relaxation of the risk budgeting problem without additional regularisation.
-
-# Related Types
+# Related
 
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:gambetakwon2020])
+  - $(ref_dict[:richardroncalli2019])
 """
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regularised Relaxed Risk Budgeting formulation.
+Adds a second cone on an auxiliary scalar, which lifts the floor on the risk variable and improves numerical stability.
 
-Extends the basic SOC formulation with a regularisation term to improve numerical stability.
-
-# Related Types
+# Related
 
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
   - [`BasicRelaxedRiskBudgeting`](@ref)
   - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:richardroncalli2019])
 """
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regularised and penalised Relaxed Risk Budgeting formulation.
-
-Extends the regularised formulation with a penalty on deviations from target risk budgets, controlled by parameter `p`.
+Bounds the auxiliary scalar by the individual standard deviations rather than the portfolio one, weighted by `p`.
 
 # Fields
 
@@ -60,10 +70,15 @@ Keywords correspond to the struct's fields.
 
   - `isfinite(p)` and `p > 0`.
 
-# Related Types
+# Related
 
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+
+# References
+
+  - $(ref_dict[:richardroncalli2019])
 """
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
     """
@@ -135,17 +150,53 @@ The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity
 \\end{align}
 ```
 
-The risk cone constraint (basic variant): ``(\\psi,\\, \\mathbf{G}\\boldsymbol{w}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, i.e. ``\\psi \\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}``.
+The variant in `alg` decides the cone that bounds ``\\psi``. The three variants are versions A, B and C of the constrained risk budgeting model of Richard and Roncalli.
+
+[`BasicRelaxedRiskBudgeting`](@ref) bounds it by the portfolio standard deviation alone:
+
+```math
+\\begin{align}
+\\psi &\\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}\\,.
+\\end{align}
+```
+
+[`RegularisedRelaxedRiskBudgeting`](@ref) adds a scalar ``\\rho \\geq 0`` and a second cone:
+
+```math
+\\begin{align}
+\\psi &\\geq \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w} + \\rho^{2}}\\,, \\\\
+\\rho &\\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
+\\end{align}
+```
+
+[`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) keeps the first cone and replaces the second one, so that ``\\rho`` is bounded by the weighted individual standard deviations rather than by the portfolio one. `p` weights that term:
+
+```math
+\\begin{align}
+\\rho &\\geq \\sqrt{p} \\, \\lVert \\mathbf{\\Theta}\\boldsymbol{w} \\rVert_2\\,, \\quad \\mathbf{\\Theta} = \\mathrm{diag}\\left(\\sqrt{\\mathrm{diag}(\\mathbf{\\Sigma})}\\right)\\,.
+\\end{align}
+```
 
 Where:
 
   - ``\\boldsymbol{w}``: Portfolio weight vector.
-  - ``\\psi``, ``\\gamma``: Scalar auxiliary variables.
+  - ``\\psi``: Average risk of the portfolio.
+  - ``\\gamma``: Lower bound of the risk contribution of every asset.
   - ``\\boldsymbol{\\zeta}``: Auxiliary vector equal to ``\\mathbf{\\Sigma}\\boldsymbol{w}``.
   - ``b_i``: Risk budget for asset ``i``.
   - ``\\mathbf{G}``: Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``).
   - ``\\mathbf{\\Sigma}``: Covariance matrix.
+  - ``\\mathbf{\\Theta}``: Diagonal matrix of the individual standard deviations.
+  - ``\\rho``: Scalar auxiliary variable of the two regularised variants.
+  - ``p``: Penalty weight of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref).
   - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
+
+# Details
+
+  - The hyperbolic constraint is the substitution that makes the least squares risk parity
+    problem disciplined convex, and the same device carries it here.
+  - The hyperbolic constraint reads ``\\gamma \\leq \\sqrt{w_{i} \\zeta_{i} / b_{i}}`` for every ``i``, and ``w_{i} \\zeta_{i}`` is the risk contribution of asset ``i`` under the variance. So maximising ``\\gamma`` drives the contributions towards the stated proportions, while minimising ``\\psi`` drives the total risk down. The single objective ``\\psi - \\gamma`` does both.
+  - The relaxation reads the covariance alone. This head resolves no risk measure, which is why its result carries no `r`.
 
 # Notes
 
@@ -158,6 +209,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `opt`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`RelaxedRiskBudgeting` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` recurses through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
+  - `wi` is sliced to the selected assets.
+  - `alg` and `fb` are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
@@ -165,6 +225,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`JuMPOptimisationEstimator`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:gambetakwon2020])
+  - $(ref_dict[:richardroncalli2019])
+  - $(ref_dict[:mausserromanko2014])
+  - $(ref_dict[:cajas2025]) Section 10.1.2, Equations 10.5-10.6.
 """
 @propagatable @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     """

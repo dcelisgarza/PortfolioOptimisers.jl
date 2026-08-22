@@ -717,9 +717,12 @@
 
         alg = KMeansAlgorithm(; rng = StableRNG(42), seed = 42, kwargs = (; init = :kmcen))
         @test factory(alg) === alg
+        # Observation weights stop at `ce`. `Clustering.kmeans` weights its points, which
+        # here are the assets, so a weighted arity must return the algorithm unchanged
+        # rather than write an `ObsWeights` into `kwargs` (#393).
         wt2 = pweights(fill(inv(size(pr.X, 2)), size(pr.X, 2)))
-        alg2 = factory(alg, wt2)
-        @test alg2.kwargs[:weights] === wt2
+        @test factory(alg, wt2) === alg
+        @test !haskey(factory(alg, wt2).kwargs, :weights)
         clr = clusterise(ClustersEstimator(; ce = PortfolioOptimisersCovariance(),
                                            de = Distance(; alg = CanonicalDistance()),
                                            alg = alg,
@@ -2755,4 +2758,86 @@ end
     c3p, cqp = PortfolioOptimisers.PMFG_T2s(Sp, 4)[3:4]
     @test size(c3z) == size(c3p) == (N - 4, 3)
     @test size(cqz) == size(cqp) == (N - 3, 4)
+end
+@testset "An integer phylogeny carries no scale of its own" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    `IntegerPhylogeny` and `IntegerPhylogenyEstimator` each carried a `scale` field, a
+    big-M holdover from before the model owned the constraint scale. Nothing read it:
+    `set_iplg_constraints!` takes `sc = get_constraint_scale(model)` and emits
+    `sc * (A * ib ⊖ B) <= 0`, so the field reached no constraint. Measured before its
+    removal, `scale = 100_000.0`, `scale = 1.0` and `scale = -7.5` gave bit-identical
+    weights on a minimum-conditional-value-at-risk model, and the constructor validated
+    nothing there, so the negative value constructed. Issue #395 removed the field.
+
+    The field set is pinned here rather than a single `scale` absence, so that any field
+    added to either type is a deliberate edit to this test. The polarity that matters is
+    a second, *private* scale returning beside the model-wide one that every other
+    constraint family shares.
+    =#
+    @test fieldnames(IntegerPhylogenyEstimator) == (:pl, :B)
+    @test fieldnames(IntegerPhylogeny) == (:A, :B)
+    # The keyword is gone from both keyword constructors.
+    @test_throws MethodError IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1,
+                                                       scale = 100_000.0)
+    @test_throws MethodError IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2,
+                                              scale = 100_000.0)
+    # The positional constructors take the two fields and no third.
+    @test isa(IntegerPhylogenyEstimator(NetworkEstimator(), 1), IntegerPhylogenyEstimator)
+    @test isa(IntegerPhylogeny([0.0 1.0; 1.0 0.0], 2), IntegerPhylogeny)
+    # The refit from estimator to result carries only what the constraint reads.
+    X = randn(StableRNG(987654321), 200, 5)
+    ip = phylogeny_constraints(IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1),
+                               X)
+    @test isa(ip, IntegerPhylogeny)
+    @test propertynames(ip) == (:A, :B)
+    @test ip.B == 1
+end
+@testset "A two-asset cluster keeps the gap series finite" begin
+    using PortfolioOptimisers, Test, StableRNGs, StatsBase
+    # `Clustering` is not in `runtests.jl`'s `init_code`, and an in-block `using` does not
+    # bind the sandbox module, so reach `cutree` through the package.
+    cutree = PortfolioOptimisers.Clustering.cutree
+    # A cluster of exactly two assets carries one pairwise distance, and a single value has
+    # no corrected standard deviation. `StandardisedValue` divides by one in that case, so
+    # the cluster contributes its mean pairwise distance instead of a `NaN`.
+    rng = StableRNG(987654321)
+    X = randn(rng, 400, 20)
+    X[:, 2] = X[:, 1] + 0.02 * randn(rng, 400)
+    X[:, 4] = X[:, 3] + 0.02 * randn(rng, 400)
+    clr = clusterise(ClustersEstimator(), X)
+    res, D = clr.res, clr.D
+    # Every cut the statistic scores carries at least one two-asset cluster.
+    @test all(2 in counts(cutree(res; k = k)) for k in 2:6)
+    # Rebuild the two-difference gap series the estimator maximises.
+    function gap_series(alg, res, D)
+        c1 = min(floor(Int, sqrt(size(D, 1))) + 2, size(D, 1))
+        W = Vector{Float64}(undef, c1)
+        W[1] = typemin(Float64)
+        for i in 2:c1
+            lvl = cutree(res; k = i)
+            W[i] = sum(1:maximum(lvl)) do j
+                idx = lvl .== j
+                sub = D[idx, idx]
+                M = size(sub, 1)
+                return if M < 2
+                    0.0
+                else
+                    PortfolioOptimisers.vec_to_real_measure(alg,
+                                                            [sub[r, c] for c in 1:M
+                                                             for r in (c + 1):M])
+                end
+            end
+        end
+        return W[1:(end - 2)] + W[3:end] - 2 * W[2:(end - 1)]
+    end
+    gaps = gap_series(StandardisedValue(), res, D)
+    # The first entry is the deliberate `typemin` sentinel. The rest are finite.
+    @test all(isfinite, gaps[2:end])
+    # The selected count is a real maximiser of that series, not the fallback.
+    k = PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                          alg = SecondOrderDifference()),
+                                                    res, D)
+    @test k == argmax(gaps)
+    @test k == clr.k
 end

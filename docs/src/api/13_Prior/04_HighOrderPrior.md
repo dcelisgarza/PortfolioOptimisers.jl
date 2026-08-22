@@ -12,3 +12,10 @@ duplication_matrix
 dup_elim_sum_view(args...)
 dup_elim_sum_view(::MatNum, n)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

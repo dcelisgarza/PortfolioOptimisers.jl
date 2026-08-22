@@ -77,6 +77,10 @@ UlcerIndex
   - [`AverageDrawdown`](@ref)
   - [`MaximumDrawdown`](@ref)
   - [`RelativeUlcerIndex`](@ref)
+
+# References
+
+  - $(ref_dict[:ulcer])
 """
 @concrete struct UlcerIndex <: RiskMeasure
     """
@@ -170,6 +174,10 @@ RelativeUlcerIndex
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`UlcerIndex`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
+
+# References
+
+  - $(ref_dict[:ulcer])
 """
 @concrete struct RelativeUlcerIndex <: HierarchicalRiskMeasure
     """

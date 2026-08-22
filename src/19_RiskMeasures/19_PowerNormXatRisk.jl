@@ -17,12 +17,16 @@ Solves a convex optimisation problem to compute the PRM at confidence level `alp
 
 # Returns
 
-  - PRM value (scalar).
+  - PRM value (scalar), or `NaN` if no solver in `slv` succeeds.
 
 # Related
 
   - [`PowerNormValueatRisk`](@ref)
   - [`Slv_VecSlv`](@ref)
+
+# References
+
+  - $(ref_dict[:pnvar])
 """
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
@@ -87,6 +91,8 @@ Where:
   - ``\\eta``, ``t``, ``\\boldsymbol{w}``, ``\\boldsymbol{v}``: Conic optimisation variables.
   - ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
+The conic variable ``\\boldsymbol{w}`` is unrelated to the `w` field, which carries the observation weights. Write those weights ``\\boldsymbol{q}``. When they are present, the normalisation ``T^{1/p}`` becomes ``\\left(\\sum_{t=1}^{T} q_t\\right)^{1/p}`` and the budget constraint becomes ``\\sum_{i=1}^{T} q_i v_i \\leq t``.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -143,6 +149,10 @@ PowerNormValueatRisk
   - [`RelativisticValueatRisk`](@ref)
   - [`PowerNormValueatRiskRange`](@ref)
   - [`PowerNormDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:pnvar])
 """
 @propagatable @concrete struct PowerNormValueatRisk <: RiskMeasure
     """
@@ -211,6 +221,8 @@ Where:
   - ``\\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x})``: Lower-tail PNVaR with parameters ``(\\alpha, p_a)``.
   - ``\\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})``: Upper-tail PNVaR with parameters ``(\\beta, p_b)``.
 
+$(math_dict[:negated_upper_tail])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -269,6 +281,10 @@ PowerNormValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`PowerNormValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
+
+# References
+
+  - $(ref_dict[:pnvar])
 """
 @propagatable @concrete struct PowerNormValueatRiskRange <: RiskMeasure
     """
@@ -339,7 +355,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Power Norm Drawdown-at-Risk (PNDDaR) risk measure.
+Represents the Power Norm Drawdown-at-Risk (PNDaR) risk measure.
 
 `PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
@@ -364,13 +380,13 @@ The Power Norm Drawdown-at-Risk is the PNVaR of the drawdown series:
 
 ```math
 \\begin{align}
-\\mathrm{PNDDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\mathrm{PNDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{PNDDaR}_{\\alpha,p}(\\boldsymbol{x})``: Power Norm Drawdown-at-Risk.
+  - ``\\mathrm{PNDaR}_{\\alpha,p}(\\boldsymbol{x})``: Power Norm Drawdown-at-Risk.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - ``p \\geq 1``: Power parameter.
@@ -403,7 +419,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormDrawdownatRisk)(x::VecNum)
 
-Computes the PNDDaR of a portfolio returns vector `x`.
+Computes the PNDaR of a portfolio returns vector `x`.
 
 ## Arguments
 
@@ -432,6 +448,11 @@ PowerNormDrawdownatRisk
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativePowerNormDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:pnvar])
 """
 @propagatable @concrete struct PowerNormDrawdownatRisk <: RiskMeasure
     """
@@ -482,7 +503,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDDaR) risk measure for hierarchical optimisation.
+Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDaR) risk measure for hierarchical optimisation.
 
 `RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
@@ -507,13 +528,13 @@ The Relative Power Norm Drawdown-at-Risk is the PNVaR of the relative drawdown s
 
 ```math
 \\begin{align}
-\\mathrm{RPNDDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\mathrm{RPNDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RPNDDaR}_{\\alpha,p}(\\boldsymbol{x})``: Relative Power Norm Drawdown-at-Risk.
+  - ``\\mathrm{RPNDaR}_{\\alpha,p}(\\boldsymbol{x})``: Relative Power Norm Drawdown-at-Risk.
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - ``p \\geq 1``: Power parameter.
@@ -546,7 +567,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
 
-Computes the Relative PNDDaR of a portfolio returns vector `x`.
+Computes the Relative PNDaR of a portfolio returns vector `x`.
 
 ## Arguments
 
@@ -572,6 +593,11 @@ RelativePowerNormDrawdownatRisk
   - [`PowerNormDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
+  - $(ref_dict[:pnvar])
 """
 @propagatable @concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
     """

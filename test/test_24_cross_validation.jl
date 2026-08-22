@@ -500,6 +500,31 @@
             @test length(train_idx) == length(test_idx) == N
             @test N > 0
         end
+
+        # A `Period` train_size starts its first window at the first date whose training
+        # window fits, not at the first date of the range. The count of windows is therefore
+        # taken over a span of `last_allowed_start - first_start + 1` positions. Reading that
+        # span as a plain difference loses one window whenever the difference is an exact
+        # multiple of `test_size`, which every case below is.
+        for (train_size, test_size) in
+            ((Month(12), 5), (Day(23), 2), (Day(90), 2), (Day(90), 4)),
+            reduce_test in (false, true)
+
+            cv = DateWalkForward(train_size, test_size; period = Month(1), adjuster = ldm,
+                                 reduce_test = reduce_test)
+            (; train_idx, test_idx) = split(cv, rd)
+            N = n_splits(cv, rd)
+            @test length(train_idx) == length(test_idx) == N
+        end
+
+        # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
+        # is `div(a - 1, b)` and never a guarded division.
+        for a in 1:40, b in 1:7
+            @test PortfolioOptimisers.special_div(a, b) == div(a - 1, b)
+            @test PortfolioOptimisers.special_div(a, b) ==
+                  length(1:b:a) - 1 ==
+                  count(k -> 1 + k * b <= a, 0:a) - 1
+        end
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -592,11 +617,37 @@
 
         cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
                                 rng = StableRNG(666), seed = 42, n_subsets = 5,
-                                subset_size = 7, window_size = 340)
+                                subset_size = 7, window_size = 341)
         cv_res = split(cv, rd)
         (; train_idx, test_idx, asset_idx, path_ids) = cv_res
         @test_throws ArgumentError n_splits(cv, rd)
         @test n_splits(cv_res) == length(path_ids)
+
+        # `window_size` is a count of observations, so the window a path is drawn from spans
+        # exactly that many rows. An inner walk-forward that consumes the whole window makes the
+        # count observable: the first training index to the last test index is `window_size`.
+        for w in (109, 150)
+            cvw = MultipleRandomised(IndexWalkForward(w - 10, 10); rng = StableRNG(666),
+                                     seed = 42, n_subsets = 4, subset_size = 7,
+                                     window_size = w)
+            resw = split(cvw, rd)
+            for p in unique(resw.path_ids)
+                sel = resw.path_ids .== p
+                @test maximum(last.(resw.test_idx[sel])) -
+                      minimum(first.(resw.train_idx[sel])) + 1 == w
+            end
+            @test n_splits(cvw, rd) == n_splits(resw) == length(resw.path_ids)
+        end
+
+        # Every documented `window_size` and `n_subsets` form must reach `n_splits`, not only
+        # `split`: a float or a callable window cannot index, and a callable count cannot
+        # multiply.
+        for (ws, nss) in ((0.25, 4), (x -> 150, 4), (150, x -> 4), (nothing, x -> 4))
+            cvn = MultipleRandomised(IndexWalkForward(50, 20); rng = StableRNG(666),
+                                     seed = 42, n_subsets = nss, subset_size = 7,
+                                     window_size = ws)
+            @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
+        end
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
@@ -960,5 +1011,100 @@
         @test_throws Meta.ParseError pe.parse_lens(ex)
         # A legitimate key still parses under the default caps.
         @test pe.parse_lens("opt.pe.ce") isa Base.Callable
+    end
+    @testset "Documented shapes that had no method" begin
+        pe = PortfolioOptimisers
+        # `PopulationPredictionResult`'s documented empty default was unconstructible:
+        # `Vector{<:PredRes_MultiPredRes}(undef, 0)` names a UnionAll, so the
+        # no-argument constructor raised a MethodError instead of returning an empty
+        # population.
+        @test isempty(PopulationPredictionResult().pred)
+        # `MultiPeriodPredictionResult` defaulted `pred` to an empty vector, and its
+        # constructor stacks the folds' returns data starting at `pred[1]`, so that
+        # default raised a BoundsError. `pred` is required now, and an explicit empty
+        # vector fails with a typed error.
+        @test_throws UndefKeywordError MultiPeriodPredictionResult()
+        @test_throws IsEmptyError MultiPeriodPredictionResult(; pred = PredictionResult[])
+        # `n_splits` documents `(cv)` and `(cv, rd)` for a cross-validation result and
+        # for a combinatorial estimator. Five of those shapes had no method.
+        kf = KFold(; n = 5)
+        ccv = CombinatorialCrossValidation(; n_folds = 6, n_test_folds = 2)
+        kfr, ccvr = split(kf, rd), split(ccv, rd)
+        wfr = split(IndexWalkForward(200, 50), rd)
+        @test n_splits(ccv, rd) == n_splits(ccv) == 15
+        @test n_splits(kfr) == n_splits(kfr, rd) == n_splits(kf, rd) == kf.n
+        @test n_splits(ccvr) == n_splits(ccvr, rd) == n_splits(ccv)
+        @test n_splits(wfr) == n_splits(wfr, rd) == length(wfr.test_idx)
+        # `average_train_size` read `size(rd.X, 1)` and accepted a `ReturnsResult` only.
+        # It goes through `cv_nobs` now, so it takes price-level data too.
+        @test pe.average_train_size(ccv, rd) ==
+              pe.average_train_size(pe.cv_nobs(rd), ccv.n_folds, ccv.n_test_folds)
+        # `binomial` raises rather than saturating, so a `maxval` large enough to defeat
+        # the mirror pruning used to fail the whole search with an OverflowError.
+        @test optimal_number_folds(1000, 800, 10; maxval = 1e30) ==
+              optimal_number_folds(1000, 800, 10)
+    end
+    @testset "Combinatorial split counts and path recombination" begin
+        pe = PortfolioOptimisers
+        # Cajas (2025) equations 15.1 and 15.2, checked on the book's own example of
+        # Fig. 15.9: six splits in groups of two give 15 test sets and five paths.
+        @test n_splits(6, 2) == 15
+        @test pe.n_test_paths(6, 2) == 5
+        @test all(pe.n_test_paths(N, k) == binomial(N - 1, k - 1) for N in 3:12
+                  for k in 1:(N - 1))
+        T = size(rd.X, 1)
+        for (nf, ntf) in ((4, 2), (6, 2), (6, 3), (8, 3))
+            cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf)
+            res = split(cv, rd)
+            @test size(res.path_ids) == (ntf, n_splits(cv))
+            # `path_ids[m, j]` is the path of the `m`-th test block of split `j`, and
+            # `test_idx[j]` is sorted by first observation. Collecting one path's blocks
+            # over all splits must therefore reproduce the whole timeline, in order.
+            for p in 1:pe.n_test_paths(cv)
+                rows = reduce(vcat,
+                              [res.test_idx[j][m] for j in eachindex(res.test_idx)
+                               for m in axes(res.path_ids, 1) if res.path_ids[m, j] == p])
+                @test rows == 1:T
+            end
+        end
+    end
+    @testset "Purging and embargoing leave the documented gap" begin
+        T = size(rd.X, 1)
+        # A training row must never sit within `purged_size` rows before a test block,
+        # nor within `purged_size + embargo_size` rows after one.
+        for (nf, ntf, p, e) in ((6, 2, 3, 2), (8, 3, 5, 4))
+            cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf,
+                                              purged_size = p, embargo_size = e)
+            res = split(cv, rd)
+            for j in eachindex(res.train_idx)
+                tr = Set(res.train_idx[j])
+                te = sort(reduce(vcat, res.test_idx[j]))
+                tes = Set(te)
+                @test isempty(intersect(tr, tes))
+                for t in te
+                    if !(t - 1 in tes)
+                        @test all(k -> t - k < 1 || !(t - k in tr), 1:p)
+                    end
+                    if !(t + 1 in tes)
+                        @test all(k -> t + k > T || !(t + k in tr), 1:(p + e))
+                    end
+                end
+            end
+        end
+        # The same gap for `KFold`, whose folds are purged and embargoed one neighbour
+        # at a time rather than around every block.
+        for (n, p, e) in ((6, 3, 2), (5, 4, 3))
+            cv = KFold(; n = n, purged_size = p, embargo_size = e)
+            res = split(cv, rd)
+            for i in eachindex(res.train_idx)
+                tr = Set(res.train_idx[i])
+                te = collect(res.test_idx[i])
+                @test isempty(intersect(tr, Set(te)))
+                @test issorted(res.train_idx[i]) && allunique(res.train_idx[i])
+                @test all(k -> first(te) - k < 1 || !(first(te) - k in tr), 1:p)
+                @test all(k -> last(te) + k > T || !(last(te) + k in tr), 1:(p + e))
+            end
+            @test sum(length, res.test_idx) == T
+        end
     end
 end

@@ -399,6 +399,8 @@
                  "LinearConstraintEstimator" =>
                      (LinearConstraintEstimator(; val = "A1 <= 0.3"), nothing, :lcse),
                  "ThresholdEstimator" => (ThresholdEstimator(; val = 0.05), :st, :st),
+                 # The scalar resolves to `RiskBudget(1.0)`, which `test_01_structs.jl`
+                 # asserts. This row asserts the routing target only.
                  "RiskBudgetEstimator" => (RiskBudgetEstimator(; val = 0.2), nothing, :rkb),
                  "CentralityConstraint" => (CentralityConstraint(), nothing, :cte),
                  "IntegerPhylogenyEstimator" =>

@@ -143,13 +143,13 @@ Build the (lens, value) grid for tuning a [`Pipeline`](@ref) — the pipeline-aw
   - `pipe`: The pipeline being tuned.
   - `estval`: The parameter grid: `key => values` pairs, a dict, or a vector of either (independent grids concatenated).
 
-# Returns
-
-  - `(lenses, vals)`: Per-candidate lens vectors and value tuples.
-
 # Validation
 
   - The candidate count must not exceed `RESOURCE_LIMITS[].max_search_grid`, asserted by [`assert_search_grid_cap`](@ref) before the product is materialised.
+
+# Returns
+
+  - `(lenses, vals)`: Per-candidate lens vectors and value tuples.
 
 # Related
 

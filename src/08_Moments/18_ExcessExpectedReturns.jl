@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for excess expected returns estimators.
+Subtracts a risk-free rate from the expected returns that a nested estimator computes.
 
-`ExcessExpectedReturns` encapsulates a mean estimator and a risk-free rate for computing excess expected returns.
+The nested estimator does all the work. This type only shifts its result, so it composes with every other expected returns estimator.
 
 # Fields
 

@@ -37,3 +37,10 @@ sb_add_neg
 sb_add_neutral
 sb_pair_scores
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

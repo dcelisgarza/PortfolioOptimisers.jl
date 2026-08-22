@@ -1,7 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for box uncertainty sets using delta bounds on mean and covariance statistics in portfolio optimisation.
+Fits a box uncertainty set by widening the prior statistics by a fixed fraction of their own absolute value.
+
+It is the delta method of Equation 11.15 of the source, the one route in the family that draws no sample: `dmu` and `dsigma` are the two fractions. Its sampling counterparts are [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref).
 
 # Fields
 
@@ -56,6 +58,10 @@ DeltaUncertaintySet
   - [`BoxUncertaintySet`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`AbstractPriorEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Equation 11.15.
 """
 @concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -88,6 +94,11 @@ Box uncertainty set for expected returns from delta bounds: zero lower bound and
 `2 * dmu * abs.(pr.mu)` upper bound. Shared by the delta [`ucs`](@ref)/[`mu_ucs`](@ref)
 constructions. The set carries `pr.mu`, the characteristic vector its bounds are calibrated
 on.
+
+The consumer reads the two bounds only through their half-width, so this pair encodes
+``\\delta_{\\mu} = \\delta \\lvert \\hat{\\boldsymbol{\\mu}} \\rvert`` of Equation 11.15. The zero
+lower bound is what makes the half-width come out right; it is not a claim that the mean is
+non-negative.
 
 # Related
 

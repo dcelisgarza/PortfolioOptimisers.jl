@@ -76,6 +76,10 @@ MaximumDrawdown
   - [`AverageDrawdown`](@ref)
   - [`DrawdownatRisk`](@ref)
   - [`RelativeMaximumDrawdown`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @concrete struct MaximumDrawdown <: RiskMeasure
     """
@@ -169,6 +173,10 @@ RelativeMaximumDrawdown
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`MaximumDrawdown`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
+
+# References
+
+  - $(ref_dict[:cdar])
 """
 @concrete struct RelativeMaximumDrawdown <: HierarchicalRiskMeasure
     """

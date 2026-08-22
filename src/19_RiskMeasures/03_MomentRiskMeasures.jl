@@ -5,7 +5,7 @@ Abstract supertype for all moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using statistical moments (e.g., mean, variance, skewness, kurtosis) of the return distribution. All concrete moment risk measure algorithms should subtype `MomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
-# Related Types
+# Related
 
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
@@ -18,7 +18,7 @@ Abstract supertype for all low-order moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using low-order statistical moments (e.g., mean, variance, mean absolute deviation) of the return distribution. All concrete low-order moment risk measure algorithms should subtype `LowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
-# Related Types
+# Related
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
 """
@@ -30,7 +30,7 @@ Abstract supertype for low-order moment risk measure algorithms that are not sta
 
 Defines the interface for algorithms that compute portfolio risk using low-order statistical moments without normalising by the variance. All concrete unstandardised low-order moment risk measure algorithms should subtype `UnstandardisedLowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
-# Related Types
+# Related
 
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
@@ -64,6 +64,10 @@ Computes portfolio risk using the first lower moment, which is the negative mean
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:lpm])
 """
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
@@ -78,6 +82,10 @@ Computes portfolio risk as the mean of the absolute deviations of the returns se
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:mad])
 """
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
@@ -101,6 +109,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -120,6 +134,11 @@ SecondMoment
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
   - [`SecondMomentFormulation`](@ref)
+  - [`factory`](@ref)
+
+# References
+
+  - $(ref_dict[:markowitz1952])
 """
 @propagatable @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
     """
@@ -149,7 +168,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents an even-order moment risk measure algorithm.
 
-Computes portfolio risk using the square root of the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
+Computes portfolio risk using the ``p``-th root of the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
 
 # Fields
 
@@ -186,6 +205,10 @@ EvenMoment
   - [`LowOrderMoment`](@ref)
   - [`FullMoment`](@ref)
   - [`SemiMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:emom])
 """
 @concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
     """
@@ -217,7 +240,7 @@ Abstract supertype for all high-order moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (e.g., skewness, kurtosis) of the return distribution. All concrete high-order moment risk measure algorithms should subtype `HighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
-# Related Types
+# Related
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
@@ -230,7 +253,7 @@ Abstract supertype for high-order moment risk measure algorithms that are not st
 
 Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (such as skewness, kurtosis) without normalising by the variance. All concrete unstandardised high-order moment risk measure algorithms should subtype `UnstandardisedHighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
-# Related Types
+# Related
 
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
@@ -242,13 +265,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the unstandardised semi-skewness risk measure algorithm.
 
-Computes portfolio risk using the third lower moment (unstandardised semi-skewness), which quantifies downside asymmetry by considering only the cubed deviations below a target value. This algorithm is unstandardised and operates directly on the return distribution.
+Computes portfolio risk using the third lower moment (unstandardised semi-skewness), which quantifies downside asymmetry by considering only the cubed deviations below a target value. The measure negates the mean cubed lower deviation, so a larger value is more downside asymmetry. This algorithm is unstandardised and operates directly on the return distribution.
 
 # Related
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`HighOrderMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:lpm])
 """
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
@@ -282,6 +309,10 @@ FourthMoment
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
+
+# References
+
+  - $(ref_dict[:lpm])
 """
 @concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
     """
@@ -300,7 +331,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents a standardised high-order moment risk measure algorithm.
 
-Computes portfolio risk using a high-order moment algorithm (such as semi-skewness or semi-kurtosis), standardised by a variance estimator.
+Computes portfolio risk using a high-order moment algorithm (such as semi-skewness or semi-kurtosis), divided by `ve`'s variance raised to half the moment order. `ve` runs on the same deviations as `alg`, so a lower-moment `alg` is standardised by a semi-variance.
 
 # Fields
 
@@ -332,6 +363,7 @@ StandardisedHighOrderMoment
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`factory`](@ref)
 """
 @concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
     """
@@ -374,37 +406,9 @@ Represents a low-order moment risk measure.
 
 Computes portfolio risk using a low-order moment algorithm (such as first lower moment, mean absolute deviation, or second moment), optionally with custom weights and target values. This type is used for risk measures based on mean, variance, or related statistics.
 
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    LowOrderMoment(;
-        settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:MuSlot} = nothing,
-        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
-    ) -> LowOrderMoment
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - If `mu` is not `nothing`:
-
-      + `::Number`: `isfinite(mu)`.
-      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
-
-  - If `w` is not `nothing`, `!isempty(w)`.
-
-!!! warning
-
-    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
-
 # Mathematical definition
 
-Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
+Depending on the `alg` field, the risk measure computes one of the following quantities.
 
 ## `FirstLowerMoment`
 
@@ -422,23 +426,6 @@ Where:
   - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
   - ``\\circ``: Element-wise function application.
 
-As an optimisation problem, it can be formulated as:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
 ## `MeanAbsoluteDeviation`
 
 The mean absolute deviation is computed as:
@@ -454,30 +441,9 @@ Where:
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
 
-As an optimisation problem, it can be formulated as:
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
 ## `SecondMoment`
 
 Depending on the `alg1` field the risk measure can either compute the second central moment or second lower moment.
-
-!!! info
-
-    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
 
 Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments, they can be formulated in a variety of ways.
 
@@ -493,8 +459,8 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
-\\mathrm{SemiMoment-Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,, \\\\
+\\mathrm{SemiMoment\\text{-}Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
 \\end{align}
 ```
 
@@ -511,8 +477,8 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
-\\mathrm{SemiMoment-StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,, \\\\
+\\mathrm{SemiMoment\\text{-}StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
@@ -520,206 +486,6 @@ Where:
 
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
-
-#### `SquaredSOCRiskExpr`
-
-Represents the (semi-)variance using the square of a second order cone constrained variable.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-#### `RSOCRiskExpr`
-
-Represents the (semi-)variance using a sum of squares formulation via a rotated second order cone.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``t``: Variance of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{rsoc}``: Rotated second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``t``: Variance of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{rsoc}``: Rotated second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-#### `QuadRiskExpr`
-
-Represents the (semi-)variance using the deviations vector dotted with itself.
-
-The variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-variance is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mu``: Minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-#### `SOCRiskExpr`
-
-Represents the (semi-)standard deviation using a second order cone constrained variable.
-
-The standard deviation is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{soc}``: Second order cone.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The semi-standard deviation is formulated as.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: Standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T × N` return matrix.
-  - ``\\mu``: Minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
-  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: Element-wise (Hadamard) product.
-  - ``K_{soc}``: Second order cone.
 
 ## `EvenMoment`
 
@@ -748,6 +514,284 @@ Where:
   - ``T_d = T - \\mathrm{ddof}``: Effective sample size after degrees-of-freedom correction.
   - ``p \\geq 2``: Order parameter; the moment order is ``2p``.
   - ``\\circ``: Element-wise function application.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LowOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:MuSlot} = nothing,
+        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
+    ) -> LowOrderMoment
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Number`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+
+# `JuMP` Formulations
+
+Depending on the `alg` field, the risk measure is formulated in `JuMP` as follows. Every formulation measures the deviations against the target returned by [`calc_risk_constraint_target`](@ref), which is `mu` when the slot holds a value and the prior's expected returns otherwise.
+
+## `FirstLowerMoment`
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+
+## `MeanAbsoluteDeviation`
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+
+## `SecondMoment`
+
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
+
+### `SquaredSOCRiskExpr`
+
+Represents the (semi-)variance using the square of a second order cone constrained variable.
+
+The variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``K_{soc}``: Second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``K_{soc}``: Second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+### `RSOCRiskExpr`
+
+Represents the (semi-)variance using a sum of squares formulation via a rotated second order cone.
+
+The variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``t``: Variance of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``K_{rsoc}``: Rotated second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``t``: Variance of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``K_{rsoc}``: Rotated second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+### `QuadRiskExpr`
+
+Represents the (semi-)variance using the deviations vector dotted with itself.
+
+The variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\mu``: Minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+### `SOCRiskExpr`
+
+Represents the (semi-)standard deviation using a second order cone constrained variable.
+
+The standard deviation is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``K_{soc}``: Second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
+
+The semi-standard deviation is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\mu``: Minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Variance correction factor from `StatsBase.varcorrection`. It corrects for the sample size without observation weights, and for ``\\boldsymbol{\\lambda}`` with them. `ve.corrected` selects the divisor.
+  - ``\\odot``: Element-wise (Hadamard) product.
+  - ``K_{soc}``: Second order cone.
+
+## `EvenMoment`
 
 As an optimisation problem, the full even moment is formulated using a chain of power cone constraints:
 
@@ -793,7 +837,7 @@ Where:
     (r::LowOrderMoment)(w::VecNum, X::MatNum;
                         fees::Option{<:Fees} = nothing)
 
-Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+Computes the low-order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
 ## Details
 
@@ -826,6 +870,13 @@ LowOrderMoment
   - [`QuadRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`EvenMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:emom])
+  - $(ref_dict[:lpm])
+  - $(ref_dict[:mad])
+  - $(ref_dict[:markowitz1952])
 """
 @concrete struct LowOrderMoment <: RiskMeasure
     """
@@ -871,37 +922,9 @@ Represents a high-order moment risk measure.
 
 Computes portfolio risk using a high-order moment algorithm (such as semi-skewness, semi-kurtosis, or kurtosis), optionally with custom weights and target values. This type is used for risk measures based on third or fourth moments of the return distribution.
 
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    HighOrderMoment(;
-        settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:MuSlot} = nothing,
-        alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
-    ) -> HighOrderMoment
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - If `mu` is not `nothing`:
-
-      + `::Number`: `isfinite(mu)`.
-      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
-
-  - If `w` is not `nothing`, `!isempty(w)`.
-
-!!! warning
-
-    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
-
 # Mathematical definition
 
-Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower (semi) moment, or fourth central (full) moment. Each can be standardised or unstandardised.
+Depending on the `alg` field, the risk measure computes the third lower moment, fourth lower (semi) moment, or fourth central (full) moment. Each can be standardised or unstandardised.
 
 The unstandardised formulations are:
 
@@ -911,6 +934,8 @@ The unstandardised formulations are:
 The standardised formulations are:
 
   - [`StandardisedHighOrderMoment`](@ref), which uses a variance estimator and an unstandardised high-order moment algorithm.
+
+An odd moment order makes a lower moment negative, so the risk measure returns ``(-1)^n \\mu_n``. A larger value is therefore always more risk. The third lower moment is negated; the fourth moment is already non-negative and is returned unchanged.
 
 ## Unstandardised Moments
 
@@ -978,16 +1003,44 @@ Where:
   - ``\\circ``: Element-wise function application.
   - ``n``: Moment order.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HighOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:MuSlot} = nothing,
+        alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+    ) -> HighOrderMoment
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Number`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+!!! warning
+
+    A stated `mu` is pinned: it crosses a Cross-Validation fold or a subset view as the whole universe's answer, so it does not follow the refit the optimisation runs on. A caller who wants it to follow the fit names a **Deferred Quantity** in `mu`, or leaves the slot `nothing` and lets the prior supply it.
+
 # Functor
 
     (r::HighOrderMoment)(w::VecNum, X::MatNum;
                         fees::Option{<:Fees} = nothing)
 
-Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+Computes the high-order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
 ## Details
 
-  - `r.alg` defines what low-order moment to compute.
+  - `r.alg` defines what high-order moment to compute.
   - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
 
 # Examples
@@ -1011,6 +1064,10 @@ HighOrderMoment
   - [`ThirdLowerMoment`](@ref)
   - [`FourthMoment`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
+
+# References
+
+  - $(ref_dict[:lpm])
 """
 @concrete struct HighOrderMoment <: HierarchicalRiskMeasure
     """
@@ -1309,7 +1366,7 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
         LinearAlgebra.norm(val, 2 * r.alg.p)
     else
         T = T / length(val) * sum(r.w)
-        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+        LinearAlgebra.norm(val .* (r.w .^ inv(2 * r.alg.p)), 2 * r.alg.p)
     end
     return val^2 / T^inv(r.alg.p)
 end
@@ -1322,7 +1379,7 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
         LinearAlgebra.norm(val, 2 * r.alg.p)
     else
         T = T / length(val) * sum(r.w)
-        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+        LinearAlgebra.norm(val .* (r.w .^ inv(2 * r.alg.p)), 2 * r.alg.p)
     end
     return val^2 / T^inv(r.alg.p)
 end

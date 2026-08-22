@@ -191,3 +191,10 @@ factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 _Frontier
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

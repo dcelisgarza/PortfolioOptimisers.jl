@@ -9,14 +9,14 @@ status: accepted
 Six conic tail measures ship as a pair: a **returns** twin that reduces the net portfolio
 returns, and a **drawdown** twin that reduces the drawdown path.
 
-| family     | returns twin                                       | drawdown twin                                         |
-| ---------- | -------------------------------------------------- | ----------------------------------------------------- |
-| big-M      | `ValueatRisk` under `MIPValueatRisk`               | `DrawdownatRisk`                                      |
-| conditional| `ConditionalValueatRisk`                           | `ConditionalDrawdownatRisk`                           |
-| DR         | `DistributionallyRobustConditionalValueatRisk`     | `DistributionallyRobustConditionalDrawdownatRisk`     |
-| entropic   | `EntropicValueatRisk`                              | `EntropicDrawdownatRisk`                              |
-| relativistic | `RelativisticValueatRisk`                        | `RelativisticDrawdownatRisk`                          |
-| power-norm | `PowerNormValueatRisk`                             | `PowerNormDrawdownatRisk`                             |
+| family       | returns twin                                   | drawdown twin                                     |
+| ------------ | ---------------------------------------------- | ------------------------------------------------- |
+| big-M        | `ValueatRisk` under `MIPValueatRisk`           | `DrawdownatRisk`                                  |
+| conditional  | `ConditionalValueatRisk`                       | `ConditionalDrawdownatRisk`                       |
+| DR           | `DistributionallyRobustConditionalValueatRisk` | `DistributionallyRobustConditionalDrawdownatRisk` |
+| entropic     | `EntropicValueatRisk`                          | `EntropicDrawdownatRisk`                          |
+| relativistic | `RelativisticValueatRisk`                      | `RelativisticDrawdownatRisk`                      |
+| power-norm   | `PowerNormValueatRisk`                         | `PowerNormDrawdownatRisk`                         |
 
 Each pair is **one** conic programme. The only semantic difference is the series the
 programme reduces, under the substitution `net_X -> -dd[2:T+1]`.

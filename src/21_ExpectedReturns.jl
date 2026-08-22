@@ -371,6 +371,21 @@ Return-based risk measure.
 
 `ExpectedReturn` is a risk measure that uses the expected portfolio return as its risk metric. This is useful for algorithms or analyses where the risk is defined as the expected return, used in portfolio performance analysis.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ER}(\\boldsymbol{w}) &= \\sum_{j} s_j\\, R_j(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{ER}(\\boldsymbol{w})``: Expected portfolio return, used here as the risk metric.
+  - $(math_dict[:w_port])
+  - ``R_j``: Expected return of the ``j``-th term in `rt`, net of `fees`.
+  - ``s_j``: `settings.scale` of the ``j``-th term. A single `rt` has one term.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -486,6 +501,25 @@ $(DocStringExtensions.TYPEDEF)
 Ratio-based risk measure.
 
 `ExpectedReturnRiskRatio` is a risk measure that computes the risk-adjusted return ratio, such as the Sharpe ratio, for a portfolio. It combines a return estimator, a risk measure, and a risk-free rate to produce a ratio metric, used in portfolio performance analysis.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ERRR}(\\boldsymbol{w}) &= \\frac{\\sum_{j} s_j\\, R_j(\\boldsymbol{w}) - r_f}{\\mathrm{sca}\\left(\\left\\{c_i\\, \\rho_i(\\boldsymbol{w})\\right\\}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{ERRR}(\\boldsymbol{w})``: Expected return to risk ratio.
+  - $(math_dict[:w_port])
+  - ``R_j``: Expected return of the ``j``-th term in `rt`, net of `fees`.
+  - ``s_j``: `settings.scale` of the ``j``-th term of `rt`.
+  - ``r_f``: Risk-free rate, the `rf` field.
+  - ``\\rho_i``: The ``i``-th risk measure in `rk`.
+  - ``c_i``: `settings.scale` of the ``i``-th risk measure.
+  - ``\\mathrm{sca}``: Scalariser held in `sca`, which reduces the risk axis to one number.
 
 # Fields
 
@@ -777,7 +811,7 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
 # References
 
-  - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
+  - $(ref_dict[:brinson_attribution])
 """
 function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
                              asset_classes::DataFrames.DataFrame, col, date0 = nothing,
@@ -844,6 +878,19 @@ The headline performance statistics of a realised return series.
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PerformanceSummaryResult(
+        n_periods, periods_per_year, alpha, compound,
+        ann_return, ann_volatility, sharpe, sharpe_stderr,
+        sortino, calmar, max_drawdown, cvar
+    ) -> PerformanceSummaryResult
+
+Arguments correspond to the struct's fields, in the order they are declared. The type is a
+Result, so [`performance_summary`](@ref) builds it and a caller reads it; there is no keyword
+constructor, and the type validates nothing of its own. The four inputs it carries first are
+the arguments that produced the statistics after them.
 
 # Related
 
@@ -938,11 +985,13 @@ The standard error of the Sharpe ratio is the Bailey and Lopez de Prado [sharpe_
 
 ```math
 \\begin{align}
-\\mathrm{sharpe\\_stderr} &= \\sqrt{\\dfrac{p}{T - 1} \\left(1 - g_{1} \\dfrac{m}{s} + \\dfrac{g_{2}}{4} \\dfrac{m^{2}}{s^{2}}\\right)}\\,.
+\\mathrm{sharpe\\_stderr} &= \\sqrt{\\dfrac{p}{T - 1} \\left(1 - g_{1} \\dfrac{m}{s} + \\dfrac{g_{2} + 2}{4} \\dfrac{m^{2}}{s^{2}}\\right)}\\,.
 \\end{align}
 ```
 
-A non-normal return series makes a Sharpe ratio less precise than the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
+The kurtosis term is ``(g_{2} + 2)/4`` because the source states it as ``(\\gamma_{2} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{2}``, and `StatsBase.kurtosis` returns the **excess** moment ``g_{2} = \\gamma_{2} - 3``. The two forms agree, and only this one reduces to the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series: over 200,000 samples of 250 normal returns at a per-period Sharpe ratio of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**, against **0.06721661** from this expression evaluated at the population moments and **0.06337243** from the same expression without the ``+2``.
+
+A non-normal return series makes a Sharpe ratio less precise than the naive expression suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
 
 # Arguments
 
@@ -956,14 +1005,14 @@ A non-normal return series makes a Sharpe ratio less precise than the naive ``\\
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
 
-# Returns
-
-  - `summary::PerformanceSummaryResult`: The computed summary.
-
 # Validation
 
   - `0 < alpha < 1`.
   - `periods_per_year > 0`.
+
+# Returns
+
+  - `summary::PerformanceSummaryResult`: The computed summary.
 
 # Related
 
@@ -975,7 +1024,7 @@ A non-normal return series makes a Sharpe ratio less precise than the naive ``\\
 
 # References
 
-  - [sharpe_stderr](@cite) D. H. Bailey and M. Lopez de Prado. *The Sharpe ratio efficient frontier*. Journal of Risk 15, 3–44 (2012).
+  - $(ref_dict[:sharpe_stderr])
 """
 function performance_summary(ret::VecNum; periods_per_year::Number = 252,
                              alpha::Number = 0.05,
@@ -1001,8 +1050,11 @@ function performance_summary(ret::VecNum; periods_per_year::Number = 252,
     # The per-period Sharpe ratio, corrected by the third and fourth standardised
     # moments. `T - 1` matches the corrected `std` used for `sharpe` itself.
     sr_p = s > zero(s) ? m / s : NaN
+    # `StatsBase.kurtosis` is the EXCESS moment, and the source's coefficient is
+    # `(gamma_2 - 1) / 4` on the raw one, so the `+ 2` converts between them. Without it a
+    # normal series loses the whole `SR^2 / 2` term the naive expression carries.
     var_sr = (one(sr_p) - StatsBase.skewness(ret) * sr_p +
-              StatsBase.kurtosis(ret) / 4 * sr_p^2) / (T - 1)
+              (StatsBase.kurtosis(ret) + 2) / 4 * sr_p^2) / (T - 1)
     sharpe_se = var_sr > zero(var_sr) ? sqrt(var_sr * ann) : NaN
     return PerformanceSummaryResult(T, ann, alpha, compound, ann_ret, ann_vol, sharpe,
                                     sharpe_se, sortino, calmar, max_dd, cvar_val)

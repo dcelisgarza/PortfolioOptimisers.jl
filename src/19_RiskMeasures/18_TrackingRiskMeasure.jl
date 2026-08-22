@@ -2,9 +2,42 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Risk Tracking Error configuration for benchmark weight tracking.
+Constrains how far a portfolio's **risk** may stand from a benchmark portfolio's risk.
 
-`RiskTrackingError` specifies tracking error measurement against a benchmark as a risk quantity (rather than a norm). It wraps a `WeightsTracking` benchmark, a risk measure `r`, a scalar error tolerance `err`, and a tracking algorithm `alg`.
+This is the constraint twin of [`RiskTrackingRiskMeasure`](@ref): the same quantity in the same two modes, bounded here rather than minimised. Give it to a `JuMPOptimiser`'s `tr` slot, and the solution satisfies the bound; give the matching measure to `expected_risk` afterwards, and you read the value it bound. The distance is a **risk** distance rather than a norm of the return difference, which is what separates it from [`TrackingError`](@ref).
+
+# Mathematical definition
+
+`alg` chooses which of two quantities `err` bounds.
+
+**Independent** ([`IndependentVariableTracking`](@ref)) bounds the risk of the weight difference:
+
+```math
+\\begin{align}
+\\rho(\\boldsymbol{w} - \\boldsymbol{w}_b) &\\leq \\varepsilon\\,.
+\\end{align}
+```
+
+**Dependent** ([`DependentVariableTracking`](@ref)) bounds the difference of the two risks:
+
+```math
+\\begin{align}
+\\lvert \\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b) \\rvert &\\leq \\varepsilon\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``, the `w` of `tr`.
+  - ``\\rho``: The risk measure in `r`.
+  - ``\\varepsilon``: The tolerance in `err`.
+
+Both bind at `err`. On a 250x5 sample against an equal-weight benchmark, `err = 0.001` with a [`StandardDeviation`](@ref) realised `0.0009999999999770668` in independent mode and `0.0009999999992528616` in dependent mode, measured through the matching [`RiskTrackingRiskMeasure`](@ref); a [`Variance`](@ref) at `err = 1e-6` realised `1.000000041719058e-6`.
+
+!!! warning
+
+    The default `err = 0.0` admits only portfolios whose tracked risk is exactly the benchmark's. For a positive-definite measure in independent mode that pins ``\\boldsymbol{w}`` to ``\\boldsymbol{w}_b``. State an `err` unless that is what you want.
 
 # Fields
 
@@ -21,18 +54,47 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+The constructor rewrites `r` through [`no_bounds_no_risk_expr_risk_measure`](@ref), so the inner measure's own `settings.ub` and `settings.rke` are dropped. The measure is being used to *measure* the distance, not to bound the portfolio or to contribute to the objective, and both of those belong to the enclosing optimisation. `err` is this constraint's only bound.
+
 ## Validation
 
   - `err` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+
+# Examples
+
+```jldoctest
+julia> RiskTrackingError(; tr = WeightsTracking(; w = [0.5, 0.5]), err = 0.05)
+RiskTrackingError
+   tr ┼ WeightsTracking
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
+    r ┼ StandardDeviation
+      │   settings ┼ RiskMeasureSettings
+      │            │   scale ┼ Int64: 1
+      │            │      ub ┼ nothing
+      │            │     rke ┴ Bool: false
+      │      sigma ┼ nothing
+      │       chol ┴ nothing
+  err ┼ Float64: 0.05
+  alg ┴ IndependentVariableTracking()
+```
 
 # Related
 
   - [`set_tracking_error_constraints!`](@ref)
   - [`TrackingRiskMeasure`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
+  - [`TrackingError`](@ref)
   - [`WeightsTracking`](@ref)
   - [`IndependentVariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 @concrete struct RiskTrackingError <: AbstractTracking
     """
@@ -136,11 +198,11 @@ Represents the Tracking Error risk measure.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
+Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. With the default [`L2Norm`](@ref), the tracking error is:
 
 ```math
 \\begin{align}
-\\mathrm{TE}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\mathrm{TE}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2}{\\sqrt{N_T - \\nu}}\\,.
 \\end{align}
 ```
 
@@ -151,8 +213,9 @@ Where:
   - ``\\boldsymbol{x}``: Portfolio returns series ``N_T \\times 1``.
   - ``\\boldsymbol{b}``: Benchmark returns series ``N_T \\times 1``.
   - ``N_T``: Number of observations.
+  - ``\\nu``: Delta degrees of freedom, the `ddof` field of the norm. It is `1` by default, so the denominator is the sample one.
 
-Other norms can be selected via the `alg` field.
+The `alg` field selects the norm. It sets both the norm of the deviation vector and the divisor that scales it — see [`norm_error`](@ref) and [`norm_factor`](@ref).
 
 # Fields
 
@@ -167,6 +230,12 @@ $(DocStringExtensions.FIELDS)
     ) -> TrackingRiskMeasure
 
 Keywords correspond to the struct's fields.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Functor
 
@@ -213,6 +282,14 @@ TrackingRiskMeasure
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`NormError`](@ref)
+  - [`norm_error`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
@@ -394,6 +471,12 @@ RiskTrackingRiskMeasure
   - [`WeightsTracking`](@ref)
   - [`IndependentVariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`expected_risk`](@ref)
+
+# References
+
+  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
     """

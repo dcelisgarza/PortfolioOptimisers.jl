@@ -467,3 +467,59 @@ end
         @test maximum(abs, w) <= inv(v) + 1e-4
     end
 end
+@testset "Model scales reach the model under their own names" begin
+    # Regression: `set_model_scales!` declared its parameters `(so, sc)` while every head —
+    # and every test — calls it `(opt.sc, opt.so)`, so `model[:sc]` held `opt.so` and
+    # `model[:so]` held `opt.sc`. Both default to 1, which is why the swap stayed invisible.
+    res = optimise(MeanRisk(; r = Variance(),
+                            opt = JuMPOptimiser(; pe = pr, slv = slv, sc = 5, so = 7));
+                   save = true)
+    @test value(res.model[:sc]) == 5
+    @test value(res.model[:so]) == 7
+end
+@testset "The rotated second-order cone is constraint-scale invariant" begin
+    # Regression: `[sc * t; 0.5; sc * x] in RotatedSecondOrderCone()` reads
+    # `2 (sc t) (1/2) >= ‖sc x‖²`, i.e. `t >= sc ‖x‖²`, because the middle entry carried no
+    # `sc`. The penalty and the reported second-moment risk therefore scaled with a knob
+    # that is meant to change conditioning only. The middle entry now carries `sc`, which
+    # makes the cone homogeneous: `2 (sc t) (sc/2) >= ‖sc x‖²` is `t >= ‖x‖²`.
+    wv = [0.4, -0.3, 0.2, 0.7, -0.1]
+    function rsoc_penalty(sc)
+        model = JuMP.Model(Clarabel.Optimizer)
+        set_silent(model)
+        @variable(model, w[1:length(wv)])
+        @constraint(model, w .== wv)
+        PortfolioOptimisers.set_model_scales!(model, sc, 1.0)
+        PortfolioOptimisers.set_l2_regularisation!(model,
+                                                   L2Regularisation(; val = 1.0,
+                                                                    alg = RSOCRiskExpr()))
+        pen = model[:op]
+        @objective(model, Min, pen)
+        optimize!(model)
+        return value(pen)
+    end
+    for sc in (0.5, 1.0, 2.0, 10.0)
+        @test isapprox(rsoc_penalty(sc), norm(wv, 2)^2; rtol = 1e-6)
+    end
+    function rsoc_second_moment(sc)
+        model = JuMP.Model(Clarabel.Optimizer)
+        set_silent(model)
+        PortfolioOptimisers.set_model_scales!(model, sc, 1.0)
+        @variable(model, y[1:length(wv)])
+        @constraint(model, y .== wv)
+        expr, _ = PortfolioOptimisers.set_second_moment_risk!(model, RSOCRiskExpr(), 1, 1.0,
+                                                              y, :t_sm_, :c_sm_)
+        @objective(model, Min, expr)
+        optimize!(model)
+        return value(expr)
+    end
+    for sc in (0.5, 1.0, 2.0, 10.0)
+        @test isapprox(rsoc_second_moment(sc), norm(wv, 2)^2; rtol = 1e-6)
+    end
+    # The whole solve agrees too: an RSOC-encoded penalty must not move with `sc`.
+    w_of(sc) = optimise(MeanRisk(; obj = MaximumReturn(),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sc = sc,
+                                                     l2 = L2Regularisation(; val = 0.5,
+                                                                           alg = RSOCRiskExpr())))).w
+    @test isapprox(w_of(1), w_of(4); rtol = 5e-4)
+end

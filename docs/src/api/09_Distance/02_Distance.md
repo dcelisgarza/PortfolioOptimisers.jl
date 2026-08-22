@@ -14,3 +14,10 @@ RhoDistanceAlgorithm
 assert_dims
 dims_oriented
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

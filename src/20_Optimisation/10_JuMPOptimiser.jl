@@ -1,7 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for processed optimiser attributes. Every collection of processed optimiser attributes should subtype
+Abstract supertype for processed optimiser attributes.
+
+A subtype is the flat bundle of results one optimiser family produces once per `optimise`
+call and hands to its model-assembly pipeline. Every collection of processed optimiser
+attributes subtypes `ProcessedAttributes`.
 
 # Related
 
@@ -281,10 +285,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that `val` is finite and non-negative; throw an `ArgCheck` error otherwise.
+Assert that `val` is finite and positive; throw an `ArgCheck` error otherwise.
 
-Accepts a scalar `Number` or a `VecNum`; the vector overload requires at least one finite
-and non-negative element and no negative elements.
+Accepts a scalar `Number` or a `VecNum`. The scalar overload requires `isfinite(val)` and
+`val > 0`. The vector overload is weaker: it requires at least one finite element, at least
+one strictly positive element, and no negative element, so a vector carrying zeros passes
+where the scalar `0` does not.
 
 # Arguments
 
@@ -470,7 +476,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     lcse
     """
-    Centring constraint estimator(s) or constraint(s).
+    $(field_dict[:cte_jmp])
     """
     cte
     """
@@ -1021,7 +1027,7 @@ carried through unchanged.
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - `i`: Asset index or index set for the cluster.
-  - `X::MatNum`: FullMoment returns matrix used to slice tracking estimators.
+  - `X::MatNum`: Asset returns matrix (observations x assets) used to slice tracking estimators. A precomputed prior in `opt.pe` supplies its own `X` instead.
 
 # Returns
 
@@ -1213,13 +1219,19 @@ end
 
 Return a copy of `opt` with every return term replaced by its unbounded variant.
 
-Used internally in risk-frontier sub-problems where weight and risk bounds must be
-removed so the solver can range freely. A vector of terms is stripped term by term.
+Only the `ret` field changes. [`no_bounds_returns_estimator`](@ref) clears the term's own
+return lower bound `settings.lb`, and drops its uncertainty set when the forwarded flag is
+`false`; every other field of `opt`, weight bounds and risk bounds included, is carried
+through unchanged. A vector of terms is stripped term by term.
+
+[`NearOptimalCentering`](@ref) is the caller: its anchor sub-problems must range over the
+whole frontier, so the return bound that shapes the user's own problem is removed from them.
 
 # Arguments
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
-  - `args...`: Forwarded to [`no_bounds_returns_estimator`](@ref).
+  - `args...`: Forwarded to [`no_bounds_returns_estimator`](@ref). The one caller forwards
+    `noc.ucs_flag`, which keeps the uncertainty set when `true`.
 
 # Returns
 
@@ -1455,7 +1467,7 @@ and can be capped.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
   - $(arg_dict[:rd])
-  - `r::Option{<:RiskMeasure} = nothing`: Risk measure(s), or `nothing` to skip risk
+  - `r::Option{<:RM_VecRM} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
   - $(arg_dict[:b1_opt])
@@ -1466,24 +1478,6 @@ and can be capped.
 # Returns
 
   - `nothing`. Mutates `model` in place.
-
-# Examples
-
-```jldoctest
-julia> using PortfolioOptimisers
-
-julia> pr = prior(EmpiricalPrior(),
-                  ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
-
-julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
-                                        lcsr = nothing, ctr = nothing, gcardr = nothing,
-                                        sgcardr = nothing, smtx = nothing, sgmtx = nothing,
-                                        slt = nothing, sst = nothing, sglt = nothing,
-                                        sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn(),
-                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
-true
-```
 
 # Related
 

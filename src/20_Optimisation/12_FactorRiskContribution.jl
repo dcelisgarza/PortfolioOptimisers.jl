@@ -86,40 +86,61 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Factor Risk Contribution (FRC) portfolio optimiser.
+Solves a mean-risk problem whose decision variable is the vector of factor exposures rather than the vector of asset weights.
 
-`FactorRiskContribution` allocates portfolio weights so that each factor (and the idiosyncratic component) contributes a target proportion to the total portfolio risk. It combines factor regression with a JuMP-based risk budgeting optimisation.
+The asset weights are recovered from the exposures through the factor loadings, so a constraint written on the decision variable is a constraint on a factor. This is the change of basis alone: `FactorRiskContribution` sets **no** risk budget of its own. A target contribution per factor is stated through the risk measure's own `rc` constraints, exactly as it is for assets.
 
 # Mathematical definition
 
-Factor model:
+The factor model of the loadings, fitted by `re` or carried by the prior:
 
 ```math
 \\begin{align}
-\\boldsymbol{r}_i &= \\alpha_i + \\mathbf{F} \\boldsymbol{\\beta}_i + \\boldsymbol{\\varepsilon}_i\\,.
+\\mathbf{R} &= \\mathbf{F} \\mathbf{B}^\\intercal + \\mathbf{E}\\,.
 \\end{align}
 ```
 
-Factor risk contribution for factor ``k``:
+The portfolio's factor exposures are ``\\boldsymbol{y}_{f} = \\mathbf{B}^\\intercal \\boldsymbol{w}``, and the weights are recovered from them by the Moore-Penrose pseudoinverse:
 
 ```math
 \\begin{align}
-RC_k &= \\beta_{k,\\boldsymbol{w}} \\cdot \\frac{\\partial \\mathcal{R}(\\boldsymbol{w})}{\\partial \\beta_{k,\\boldsymbol{w}}}\\,, \\\\
-\\beta_{k,\\boldsymbol{w}} &= \\boldsymbol{w}^\\intercal \\boldsymbol{\\beta}_k\\,.
+\\boldsymbol{w} &= (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f}\\,, \\\\
+\\boldsymbol{w} &= (\\mathbf{B}^\\intercal)^{+} \\boldsymbol{y}_{f} + (\\tilde{\\mathbf{B}}^\\intercal)^{+} \\tilde{\\boldsymbol{y}}_{af}\\,, \\quad \\tilde{\\mathbf{B}} = \\ker(\\mathbf{B}^\\intercal)\\,.
+\\end{align}
+```
+
+The first form is the model built when `flag = false`, and the second when `flag = true`. The second adds the ``N - N_{f}`` directions the loadings do not span, so the weight vector is no longer confined to the factor subspace.
+
+The problem is then the mean-risk problem of [`MeanRisk`](@ref) over ``\\boldsymbol{y}_{f}``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{y}_{f}}{\\min} \\; f(\\boldsymbol{w}(\\boldsymbol{y}_{f})) \\quad \\text{s.t.} \\quad \\boldsymbol{w}(\\boldsymbol{y}_{f}) \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+The risk contribution of factor ``j``, which [`factor_risk_contribution`](@ref) reports, follows from the Euler decomposition in that basis:
+
+```math
+\\begin{align}
+RC_j(\\boldsymbol{y}_{f}) &= \\left[ \\frac{\\partial \\mathcal{R}(\\boldsymbol{w})}{\\partial \\boldsymbol{w}} (\\mathbf{B}^\\intercal)^{+} \\right]_{j} \\left[ \\mathbf{B}^\\intercal \\boldsymbol{w} \\right]_{j}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{r}_i``: Return vector of asset ``i``.
-  - ``\\alpha_i``: Intercept (idiosyncratic return) for asset ``i``.
+  - ``\\mathbf{R}``: Asset returns matrix.
   - ``\\mathbf{F}``: Factor returns matrix.
-  - ``\\boldsymbol{\\beta}_i``: Factor loading vector for asset ``i``.
-  - ``\\boldsymbol{\\varepsilon}_i``: Idiosyncratic residual for asset ``i``.
-  - ``RC_k``: Risk contribution of factor ``k``.
-  - ``\\beta_{k,\\boldsymbol{w}}``: Portfolio-level exposure to factor ``k``.
-  - ``\\mathcal{R}(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``\\mathbf{B}``: Loading matrix, of size ``N \\times N_{f}``.
+  - ``\\mathbf{E}``: Residual matrix.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\boldsymbol{y}_{f}``: Factor exposure vector, the decision variable.
+  - ``\\tilde{\\boldsymbol{y}}_{af}``: Exposures to the additional directions, which carry no economic interpretation.
+  - ``(\\cdot)^{+}``: Moore-Penrose pseudoinverse.
+  - ``f(\\boldsymbol{w})``: Objective function (depends on [`ObjectiveFunction`](@ref)).
+  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - ``\\mathcal{R}(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``RC_j``: Risk contribution of factor ``j``.
 
 # Fields
 
@@ -146,6 +167,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is a vector: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A risk expression that is identically zero is refused. The problem is stated in the
+    factor basis, so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
+    `settings.rke = false` on every measure are the two routes to it.
 
 ## Propagated parameters
 
@@ -155,6 +179,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `r`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+`FactorRiskContribution` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
+
+  - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
+  - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix. `re` recurses with the index alone, which slices its loadings to the selected assets and leaves the factor axis whole.
+  - `wi` is carried through unchanged, because it holds initial **factor** weights. The optimisation re-bases the weight variable onto the factor axis, so the asset selection does not index `wi`.
+  - `obj`, `frc_ple`, `sets`, `flag` and `fb` are carried through unchanged.
+
 # Related
 
   - [`optimise`](@ref)
@@ -163,7 +196,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`factor_risk_contribution`](@ref)
+  - [`set_factor_risk_contribution_constraints!`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 10.2.1.
+  - $(ref_dict[:roncalliweisang2012])
+  - $(ref_dict[:meucci2007])
 """
 @propagatable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     """

@@ -5,6 +5,10 @@ Abstract supertype for all portfolio optimisation estimators.
 
 All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
 
+# Interfaces
+
+`AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
+
 # Related
 
   - [`BaseOptimisationEstimator`](@ref)
@@ -31,6 +35,22 @@ Abstract supertype for base portfolio optimisation estimators.
 
 `BaseOptimisationEstimator` is the parent for all internal optimiser components that configure the optimisation problem but are not directly invokable as top-level optimisers.
 
+# Interfaces
+
+A subtype gains the time-dependent host methods from this supertype: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref) all scan its fields generically, through [`time_dependent_fields`](@ref). One method is worth implementing:
+
+## `time_dependent_field_defaults`
+
+  - `time_dependent_field_defaults(opt::MyConfiguration) -> NamedTuple`: The static default of each field that may hold a [`TimeDependent`](@ref), for those whose default is not `nothing`. A *required* field is listed with [`NoDefault`](@ref), which declares that a schedule there must carry its own `default`.
+
+### Arguments
+
+  - `opt`: The concrete subtype instance.
+
+### Returns
+
+  - `defaults::NamedTuple`: The fold-less value of each listed field. The fallback method returns an empty tuple, which gives every scheduled field the fold-less value `nothing`.
+
 # Related
 
   - [`AbstractOptimisationEstimator`](@ref)
@@ -43,6 +63,28 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
 
 Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
+
+# Interfaces
+
+In order to implement a new optimiser that works seamlessly with the library, subtype `OptimisationEstimator`, give it an `fb` field, and implement the following method:
+
+## `_optimise`
+
+  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem `opt` states over the data in `rd`, and returns the optimiser's own result type.
+
+### Arguments
+
+  - `opt`: The concrete subtype instance.
+  - `rd`: Returns data.
+  - `args...`, `kwargs...`: Forwarded from [`optimise`](@ref).
+
+### Returns
+
+  - `res::OptimisationResult`: The result, whose `retcode` decides whether [`optimise`](@ref) walks on to the fallback.
+
+## The `fb` field
+
+[`optimise`](@ref) reads `opt.fb` to walk the fallback chain, so every subtype carries one. It holds the next optimiser to try, or `nothing` to end the chain.
 
 # Related
 
@@ -57,6 +99,10 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
+
+# Interfaces
+
+`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous, which is what admits them to the cross-validation and meta-optimisation entry points (see [`OptE_Opt`](@ref)).
 
 # Related
 
@@ -286,6 +332,10 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation algorithms used by portfolio optimisers.
 
+# Interfaces
+
+A subtype is a tag that an optimiser dispatches on, so it declares no method of its own. To add a behaviour, subtype `OptimisationAlgorithm` and add the methods of the consuming optimiser that are specialised on it.
+
 # Related
 
   - [`AbstractAlgorithm`](@ref)
@@ -297,6 +347,14 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for portfolio optimisation result types.
 
 All concrete optimisation result types should subtype `OptimisationResult`.
+
+# Interfaces
+
+A subtype declares no method, but [`optimise`](@ref) and [`factory`](@ref) read three properties of it. A subtype exposes them either as its own fields or by forwarding from an embedded core, as the JuMP and hierarchical leaves do:
+
+  - `w`: The portfolio weights.
+  - `retcode`: An [`OptimisationReturnCode`](@ref). [`optimise`](@ref) walks the fallback chain until it reads an [`OptimisationSuccess`](@ref).
+  - `fb`: The record of the fallbacks that ran. It must be the **last field** of the struct, because [`factory`](@ref) rebuilds the result by replacing its trailing field.
 
 # Related
 
@@ -311,6 +369,10 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for continuous (non-integer allocation) optimisation results.
+
+# Interfaces
+
+The family adds no method to [`OptimisationResult`](@ref), but it is the bound of the generic [`factory`](@ref)`(res, fb)` that rebuilds a result with a new fallback record, which is why the trailing `fb` field is required here rather than one level up.
 
 # Related
 
@@ -328,6 +390,10 @@ Abstract supertype for non-JuMP continuous optimisation results.
 Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side. The JuMP side is itself two halves, [`RiskJuMPOptimisationResult`](@ref) for the results that carry a risk measure and [`NonRiskJuMPOptimisationResult`](@ref) for those that carry none.
 
 The hierarchical members are grouped one level further down, under [`HierarchicalOptimisationResult`](@ref).
+
+# Interfaces
+
+`NonJuMPOptimisationResult` adds no method to [`NonFiniteAllocationOptimisationResult`](@ref). It is a classification, and it is what lets a method state "carries no JuMP model" in a signature.
 
 # Related
 
@@ -347,6 +413,10 @@ Sits off the optimisation-result tree on purpose, exactly as [`BaseJuMPOptimisat
 
 Its one subtype is [`HierarchicalResult`](@ref), embedded as `hr` by each leaf.
 
+# Interfaces
+
+A subtype is a field block, not a result. It declares no method, and it must **not** be given one that is bounded on the optimisation-result family, because the core is never what [`optimise`](@ref) returns.
+
 # Related
 
   - [`HierarchicalResult`](@ref)
@@ -357,13 +427,19 @@ abstract type BaseHierarchicalOptimisationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the results of the estimators that embed a [`HierarchicalOptimiser`](@ref).
+Abstract supertype for the results of the estimators that embed a hierarchical optimiser.
+
+The optimiser they embed is a [`HierarchicalOptimiser`](@ref), held in their estimator's `opt` field.
 
 The membership rule is exact: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold an `opt::HierarchicalOptimiser`. [`NestedClustered`](@ref) does not, and its result is **not** in this family.
 
 The family is deliberately **not** called `ClusteringOptimisationResult`: [`ClusteringOptimisationEstimator`](@ref) has four subtypes and the fourth is [`NestedClustered`](@ref), so that name would claim a set this type does not hold.
 
 Two of the three members embed [`HierarchicalResult`](@ref) as `hr`; [`SchurComplementHierarchicalRiskParityResult`](@ref) keeps a flat field block, which is why the property forwarding lives on the leaves rather than here.
+
+# Interfaces
+
+The family adds no method to [`NonJuMPOptimisationResult`](@ref). Because the field block is not shared, a leaf that embeds [`HierarchicalResult`](@ref) declares its own property forwarding, so that the `w` and `retcode` properties [`OptimisationResult`](@ref) requires resolve through `hr`.
 
 # Related
 
@@ -392,6 +468,10 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for optimisation return codes.
 
 Concrete subtypes indicate whether an optimisation succeeded or failed.
+
+# Interfaces
+
+A subtype declares no method. It carries one field, `res`, which holds the diagnostic text of a failure or `nothing`. [`optimise`](@ref) tests the code by type alone: only an [`OptimisationSuccess`](@ref) ends the fallback chain, so any other subtype is read as a failure.
 
 # Related
 
@@ -424,6 +504,12 @@ const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for intermediate optimisation model results.
+
+Sits off the optimisation-result tree, like [`BaseHierarchicalOptimisationResult`](@ref) does: an intermediate record is not a thing [`optimise`](@ref) returns. Its one subtype is [`JuMPOptimisationSolution`](@ref), the record of what a solver returned.
+
+# Interfaces
+
+A subtype is a record of one solver attempt, and it declares no method. It is held by a result rather than returned by an optimiser.
 
 # Related
 
@@ -535,6 +621,27 @@ Being a struct also makes it the natural home for **recording what a callable sc
 
 The family classifies by what the functor returns, and a subtype declares that kind in its type. Subtype [`TimeDependentConstraintCallable`](@ref) when the per-fold value is a constraint value, and [`TimeDependentOptimiserCallable`](@ref) when it is an optimiser. Only the second is statically admissible in an optimiser-valued field (see [`TD_OptE_Opt`](@ref)), so the classification is what that admissibility is read off. Do not subtype this root directly.
 
+# Interfaces
+
+Subtype one of the two children, not this root, and implement the following:
+
+## The functor
+
+  - `(x::MySubtype)(ctx::TimeDependentContext)`: Returns the field value for the fold that `ctx` describes.
+
+### Arguments
+
+  - `x`: The concrete subtype instance.
+  - `ctx`: The fold's context, which carries the fold index, the fold loop's data and, when the loop runs sequentially, the previous fold's weights.
+
+### Returns
+
+  - The complete field value for that fold. Its kind is the one the subtype's supertype declares.
+
+## `needs_previous_weights`
+
+  - `needs_previous_weights(::MySubtype) -> Bool`: Declares whether the functor reads `ctx.w_prev`. The default is `false`. Define it as `true` to force sequential fold execution, which is what [`PreviousWeightsFunction`](@ref) does for a bare function.
+
 # Related
 
   - [`TimeDependentConstraintCallable`](@ref)
@@ -557,6 +664,10 @@ A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` retur
 
 This is the kind to subtype for a functor whose output is *not* an optimiser. A functor returning an optimiser declares [`TimeDependentOptimiserCallable`](@ref) instead, which is what makes an optimiser-position schedule statically admissible (see [`TD_OptE_Opt`](@ref)).
 
+# Interfaces
+
+The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states what the functor returns — a constraint value — and the host's own keyword constructor checks that value when the fold loop swaps it in.
+
 # Related
 
   - [`TimeDependentCallable`](@ref)
@@ -573,6 +684,10 @@ Abstract supertype for callable structs whose per-fold value is an *optimiser*.
 
 A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's optimiser (an [`OptE_Opt`](@ref)), so a [`TimeDependent`](@ref) holding it is admissible wherever an optimiser-valued field accepts a schedule (see [`TD_OptE_Opt`](@ref)). Declaring the functor's output kind in the type is what makes the schedule *statically* admissible: a bare `ctx -> optimiser` is admitted as a `Base.Callable` and checked only when the fold loop swaps its value in.
 
+# Interfaces
+
+The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns an [`OptE_Opt`](@ref), and [`assert_time_dependent_optimiser`](@ref) checks that promise when the fold loop swaps the value in.
+
 # Related
 
   - [`TimeDependentCallable`](@ref)
@@ -585,7 +700,7 @@ abstract type TimeDependentOptimiserCallable <: TimeDependentCallable end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights.
+Declares that a callable time-dependent entry requires the previous optimisation's weights.
 
 A bare callable inside a [`TimeDependent`](@ref) cannot be inspected for previous-weight requirements, so it contributes `false` to [`needs_previous_weights`](@ref) and its context's `w_prev` is only populated when something else makes the fold loop sequential. Wrapping the callable in `PreviousWeightsFunction` declares the requirement as data: it contributes `true` to [`needs_previous_weights`](@ref), forcing sequential fold execution and a populated `w_prev` in the [`TimeDependentContext`](@ref).
 
@@ -595,7 +710,17 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PreviousWeightsFunction(; f)
+    PreviousWeightsFunction(; f) -> PreviousWeightsFunction
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> PreviousWeightsFunction(; f = identity)
+PreviousWeightsFunction
+  f ┴ typeof(identity): identity
+```
 
 # Related
 
@@ -621,10 +746,21 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Marker for "no default here", used in the two places a fold-less value may be missing.
+States that no fold-less value exists. It stands in the two places such a value may be missing.
 
   - As a [`TimeDependent`](@ref)'s `default`: the schedule states no fold-less value of its own, so a fold-less solve falls back to the field's static default (see [`time_dependent_field_defaults`](@ref)).
   - As an entry of a host's [`time_dependent_field_defaults`](@ref): the field is *required* and has no static default (the optimiser-valued fields), so a schedule there must carry its own `default`. A fold-less solve of a host whose required field holds a defaultless schedule throws a [`TimeDependentDefaultError`](@ref).
+
+# Constructors
+
+    NoDefault() -> NoDefault
+
+# Examples
+
+```jldoctest
+julia> NoDefault()
+NoDefault()
+```
 
 # Related
 
@@ -665,7 +801,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Time-dependent constraint: an optimiser input whose value changes across the folds of a cross-validation scheme.
+Varies one optimiser input across the folds of a cross-validation scheme.
 
 A `TimeDependent` is stored *directly in the optimiser field it varies* — e.g. `JuMPOptimiser(; lt = TimeDependent([...]))` — so the field's position names the target and a field holds either a static value or a per-fold schedule, never both. It is recognised at top-level optimiser fields only, never nested inside another input (e.g. inside a [`Fees`](@ref) or a risk measure).
 
@@ -913,7 +1049,7 @@ const TD_VecOptE_Opt = Union{TimeDependent{<:AbstractVector{<:VecOptE_Opt_TD}},
 """
 $(DocStringExtensions.TYPEDEF)
 
-Per-fold context handed to time-dependent constraints when they are resolved.
+Describes one fold to the time-dependent constraints that resolve against it.
 
 Carries the fold's position in the consuming scheme's `split` enumeration and the data needed for a callable entry to compute its value. `i` indexes `train_idx`/`test_idx`, so `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's own windows; no ordering beyond the scheme's enumeration is implied. `rd` is the fold loop's (possibly asset-viewed) input data, so callables see the current universe and timestamps: the returns-level data at the optimiser fold loops, or the raw, pre-preprocessing price- or returns-level input at the [`Pipeline`](@ref) fold loop — a pipeline-level callable sees the fold's data *before* any pipeline step has transformed it. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
 
@@ -926,7 +1062,13 @@ $(DocStringExtensions.FIELDS)
     TimeDependentContext(;
         i::Integer, n::Integer, rd::Prices_RR, train_idx, test_idx,
         w_prev::Option{<:VecNum} = nothing, path_id::Option{<:Integer} = nothing
-    )
+    ) -> TimeDependentContext
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `1 <= i <= n`.
 
 # Related
 
@@ -1100,7 +1242,7 @@ end
 
 Field names of `opt` whose *type* admits a [`TimeDependent`](@ref) value — the candidate set [`time_dependent_fields`](@ref) narrows by value.
 
-Whether a field can hold a schedule is decidable from `fieldtype` alone: a host built through the widened constructor signatures (see [`TD_Option`](@ref)) records a schedule in the field's type parameter, so a field that holds no schedule cannot have a type intersecting [`TimeDependent`](@ref). The tuple is therefore computed once per host type by a generated function, and a fold-invariant scan over a wide static host (`JuMPOptimiser` has 41 fields) folds to an empty tuple at compile time rather than walking every field dynamically on every `split` and `_optimise`.
+Whether a field can hold a schedule is decidable from `fieldtype` alone: a host built through the widened constructor signatures (see [`TD_Option`](@ref)) records a schedule in the field's type parameter, so a field that holds no schedule cannot have a type intersecting [`TimeDependent`](@ref). The tuple is therefore computed once per host type by a generated function, and a fold-invariant scan over a wide static host such as `JuMPOptimiser`, whose fields number in the dozens, folds to an empty tuple at compile time rather than walking every field dynamically on every `split` and `_optimise`.
 
 This stays derived from the field types — no hand-maintained list — so the constructor signatures remain the single source of truth for which fields may vary over folds (ADR 0030).
 
@@ -1336,6 +1478,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Rebuild an estimator through its keyword constructor with the fields in `repl` replaced.
 
 All remaining fields are carried through unchanged. Because the rebuild goes through the validated keyword constructor, every construction invariant re-runs.
+
+# Related
+
+  - [`update_time_dependent_fields`](@ref)
+  - [`reset_time_dependent_fields`](@ref)
 """
 function rebuild_estimator(x, repl::NamedTuple)
     fns = fieldnames(typeof(x))
@@ -1748,7 +1895,10 @@ Assert special NCO requirements for each element of a vector of optimisation est
   - [`NestedClustered`](@ref)
 """
 function assert_special_nco_requirements(opt::VecOptE_Opt_TD)::Nothing
-    return assert_special_nco_requirements.(opt)
+    for opti in opt
+        assert_special_nco_requirements(opti)
+    end
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1814,6 +1964,24 @@ Abstract supertype for JuMP-based weight finaliser formulations.
 
 Defines the interface for norm types used when adjusting portfolio weights to satisfy bounds via a JuMP model.
 
+# Interfaces
+
+In order to implement a new formulation that works seamlessly with the library, subtype `JuMPWeightFinaliserFormulation` and implement the following method:
+
+## `set_clustering_weight_finaliser_alg!`
+
+  - `set_clustering_weight_finaliser_alg!(model::JuMP.Model, alg::MyFormulation, wi::VecNum) -> Nothing`: Adds the deviation objective to a model that already carries the decision vector `w`, the budget equality and the weight bounds.
+
+### Arguments
+
+  - `model`: The JuMP model, built by [`opt_weight_bounds`](@ref).
+  - `alg`: The concrete subtype instance.
+  - `wi`: The weights the optimisation produced, which the model repairs.
+
+### Returns
+
+  - `nothing`. The method works by adding variables, constraints and the objective to `model`.
+
 # Related
 
   - [`RelativeErrorWeightFinaliser`](@ref)
@@ -1827,6 +1995,23 @@ abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Minimises the L1 norm of relative weight deviations when enforcing weight bounds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} \\oslash \\boldsymbol{w}_{0} - \\boldsymbol{1} \\right\\rVert_{1}\\,, \\\\
+\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
+&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - $(math_dict[:lb_ub_finaliser])
+  - ``\\oslash``: Elementwise division. A zero entry of ``\\boldsymbol{w}_{0}`` is replaced by `eps` before the division, so the ratio stays finite.
 
 # Constructors
 
@@ -1851,7 +2036,26 @@ struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds.
+Minimises the L2 norm of relative weight deviations when enforcing weight bounds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} \\oslash \\boldsymbol{w}_{0} - \\boldsymbol{1} \\right\\rVert_{2}\\,, \\\\
+\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
+&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - $(math_dict[:lb_ub_finaliser])
+  - ``\\oslash``: Elementwise division. A zero entry of ``\\boldsymbol{w}_{0}`` is replaced by `eps` before the division, so the ratio stays finite.
+
+The second-order cone bounds the norm itself, so the objective value is the L2 norm and not its square. The name records the squared-error criterion, whose minimiser is the same because the square is monotonic on a non-negative norm. [`RelativeErrorWeightFinaliser`](@ref) differs in the norm, not in the power.
 
 # Constructors
 
@@ -1878,6 +2082,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Minimises the L1 norm of absolute weight deviations when enforcing weight bounds.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} - \\boldsymbol{w}_{0} \\right\\rVert_{1}\\,, \\\\
+\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
+&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - $(math_dict[:lb_ub_finaliser])
+
 # Constructors
 
     AbsoluteErrorWeightFinaliser() -> AbsoluteErrorWeightFinaliser
@@ -1901,7 +2121,25 @@ struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds.
+Minimises the L2 norm of absolute weight deviations when enforcing weight bounds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} &\\quad \\left\\lVert \\boldsymbol{w} - \\boldsymbol{w}_{0} \\right\\rVert_{2}\\,, \\\\
+\\textrm{s.t.} &\\quad \\boldsymbol{1}^\\intercal \\boldsymbol{w} = \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}\\,, \\\\
+&\\quad \\boldsymbol{l} \\leq \\boldsymbol{w} \\leq \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - $(math_dict[:lb_ub_finaliser])
+
+The second-order cone bounds the norm itself, so the objective value is the L2 norm and not its square. The name records the squared-error criterion, whose minimiser is the same because the square is monotonic on a non-negative norm. [`AbsoluteErrorWeightFinaliser`](@ref) differs in the norm, not in the power.
 
 # Constructors
 
@@ -1930,6 +2168,24 @@ Abstract supertype for weight finaliser strategies.
 
 A `WeightFinaliser` enforces weight bounds after the optimisation has produced unconstrained weights.
 
+# Interfaces
+
+In order to implement a new strategy that works seamlessly with the library, subtype `WeightFinaliser` and implement the following method:
+
+## `opt_weight_bounds`
+
+  - `opt_weight_bounds(wf::MyFinaliser, wb::WeightBounds, w::VecNum) -> VecNum`: Moves `w` into the bounds `wb`, keeping the budget it already carries.
+
+### Arguments
+
+  - `wf`: The concrete subtype instance.
+  - `wb`: The weight bounds. Either bound may be `nothing`.
+  - `w`: The weights the optimisation produced.
+
+### Returns
+
+  - `w::VecNum`: The repaired weight vector. [`finalise_weight_bounds`](@ref) then pairs it with a return code.
+
 # Related
 
   - [`IterativeWeightFinaliser`](@ref)
@@ -1941,7 +2197,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Iteratively projects weights into the feasible region defined by weight bounds.
 
-`IterativeWeightFinaliser` repeatedly clips and redistributes portfolio weights until they satisfy the given lower and upper bounds, or the maximum number of iterations `iter` is reached.
+Each pass clips the weights to the bounds, then redistributes the clipped mass over the entries that lie strictly inside the bounds, in proportion to their own weights. The pass ends by rescaling the vector to the budget it started with, so the sum is preserved. Passes run until the bounds hold or until `iter` passes are done. An absent bound is read as `typemin` or `typemax` of the weight element type.
+
+The bounds are not guaranteed on exit. A bound set that no rescaled vector can satisfy exhausts the passes and returns the last vector: four assets summing to `1` under `lb = 0.3` return `[0.25, 0.25, 0.25, 0.25]`. [`finalise_weight_bounds`](@ref) tests finiteness alone, so such a vector is reported as an [`OptimisationSuccess`](@ref).
 
 # Fields
 
@@ -1990,7 +2248,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Uses a JuMP optimisation model to enforce weight bounds.
 
-`JuMPWeightFinaliser` solves a small optimisation problem to find the closest feasible weights (in the sense of the chosen error formulation) that satisfy the given bounds. Falls back to [`IterativeWeightFinaliser`](@ref) if the JuMP model fails.
+The programme keeps the budget of the input weights and holds every weight between the bounds, and `alg` states which deviation it minimises over that set. An absent bound adds no constraint. A failed solve raises a warning and falls back to a default [`IterativeWeightFinaliser`](@ref).
 
 # Fields
 
@@ -2066,24 +2324,33 @@ function JuMPWeightFinaliser(; slv::Slv_VecSlv, sc::Number = 1.0, so::Number = 1
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end
 """
-    set_clustering_weight_finaliser_alg!(model, ...)
+    set_clustering_weight_finaliser_alg!(model::JuMP.Model,
+                                         alg::JuMPWeightFinaliserFormulation,
+                                         wi::VecNum)
 
-Set the clustering weight finalisation algorithm on the JuMP model.
+Add the deviation objective of `alg` to the weight finalisation model.
 
-Configures how cluster-level weights are finalised in the hierarchical optimisation model, applying the specified weight finaliser.
+[`opt_weight_bounds`](@ref) has already added the decision vector `w`, the budget equality and the weight bounds. This method adds the epigraph variable `t`, the cone that bounds the deviation of `w` from `wi`, and the objective `Min so * t`. The cone is a `NormOneCone` for the two L1 formulations and a `SecondOrderCone` for the two L2 formulations.
 
 # Arguments
 
-  - `model`: JuMP model.
-  - Additional clustering and finaliser parameters.
+  - `model`: JuMP model, which must already carry `w` and the two scale expressions.
+  - `alg`: The deviation formulation, one of the four [`JuMPWeightFinaliserFormulation`](@ref) subtypes.
+  - `wi`: The weights the optimisation produced, which the model repairs.
 
 # Returns
 
   - `nothing`.
 
+# Details
+
+  - The two relative formulations divide by `wi`, so they first replace each zero entry of `wi` **in place** with `eps(eltype(wi))`. The caller's vector carries that substitution afterwards.
+
 # Related
 
-  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+  - [`opt_weight_bounds`](@ref)
 """
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorWeightFinaliser, wi::VecNum)
@@ -2134,27 +2401,31 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 """
-    opt_weight_bounds(wf, wb, w)
+    opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum) -> VecNum
+    opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
 
-Compute optimised weight bounds from the finaliser, bounds, and current weights.
+Move a weight vector into the bounds `wb`, keeping the budget it already carries.
 
-Adjusts the weight bounds based on the weight finaliser algorithm and the current weight allocation, used in hierarchical weight allocation.
+The bounds themselves are not changed. Weights that already satisfy the bounds are returned unchanged, without a solve.
+
+The [`JuMPWeightFinaliser`](@ref) method builds the programme of its `alg` (see [`set_clustering_weight_finaliser_alg!`](@ref)) and solves it. A failed solve warns and falls back to a default [`IterativeWeightFinaliser`](@ref). The [`IterativeWeightFinaliser`](@ref) method clips and redistributes instead, and may exhaust its passes with the bounds still violated.
 
 # Arguments
 
   - `wf`: Weight finaliser algorithm.
   - `wb`: Weight bounds.
-  - `w`: Current portfolio weights.
+  - `wi`, `w`: The weights the optimisation produced.
 
 # Returns
 
-  - Updated weight bounds.
+  - `w::VecNum`: The repaired weight vector.
 
 # Related
 
   - [`WeightBounds`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
   - [`IterativeWeightFinaliser`](@ref)
+  - [`finalise_weight_bounds`](@ref)
 """
 function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
     lb = wb.lb
@@ -2219,6 +2490,8 @@ end
 Apply weight finalisation to enforce bounds and determine the optimisation return code.
 
 Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds, then returns a success or failure return code based on whether all weights are finite.
+
+Finiteness is the whole test. A vector that still violates the bounds — which an [`IterativeWeightFinaliser`](@ref) returns when it exhausts its passes — is reported as an [`OptimisationSuccess`](@ref).
 
 # Arguments
 
@@ -2498,7 +2771,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Obtains the fees to use for net return calculations from an optimisation result. If `fees` is provided; if not, it looks for a `fees` property in the result. Returns the fees or `nothing` if not found.
+Obtains the fees to use for net return calculations from an optimisation result.
+
+An explicitly provided `fees` wins. Otherwise the fees are read from the `fees` property of `res`, and a result exposing no such property gives `nothing`.
 
 # Arguments
 
@@ -2658,16 +2933,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Extracts the prior result for risk calculation from an optimisation result. Checks for an explicitly provided `pr`, then looks for `res.pr` and `res.pa.pr` before throwing an error if none are found.
+Extracts the prior result for risk calculation from an optimisation result.
+
+An explicitly provided `pr` wins. Otherwise the one test is `hasproperty(res, :pr)`, which property forwarding answers for a nested result: a JuMP leaf reaches its prior at `res.jr.pa.pr`, and `res.pr` resolves to it. A result that exposes no `pr` property throws.
 
 # Arguments
 
-  - `res`: Optimisation result, potentially containing a prior result in `res.pr` or `res.pa.pr`.
-  - `pr`: Optional prior result to use for risk calculation, which takes precedence over any found in `res`.
+  - `res`: Optimisation result, which carries a prior result as its `pr` property or reaches one by property forwarding.
+  - `pr`: Optional prior result to use for risk calculation, which takes precedence over the one found in `res`.
 
 # Returns
 
-  - `Option{<:Pr_RR}`: The prior result to use for risk calculation, or throws an error if none is found.
+  - `pr::Pr_RR`: The prior result to use for risk calculation. Throws an `ArgumentError` when none is found.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`extract_fees`](@ref)
+  - [`OptimisationResult`](@ref)
 """
 function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     return if !isnothing(pr)
@@ -2675,7 +2958,7 @@ function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     elseif hasproperty(res, :pr)
         res.pr
     else
-        throw(ArgumentError("`$(nameof(typeof(res)))` has no `.pr` or `.jr.pr`; provide `pr` explicitly"))
+        throw(ArgumentError("`$(nameof(typeof(res)))` exposes no `.pr` property, directly or through property forwarding; provide `pr` explicitly"))
     end
 end
 """
@@ -2686,7 +2969,7 @@ Compute the expected risk for an [`OptimisationResult`](@ref).
 
 Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref). `fees` takes precedence over `res.fees` if both are provided.
 
-When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or `res.pa.pr` before delegating.
+When `pr::Pr_RR` is `nothing`, [`extract_pr`](@ref) takes the prior result from the `pr` property of `res` before delegating.
 
 `r` is one measure or a vector of them; a vector is scalarised by `sca`, defaulting to [`SumScalariser`](@ref). The measure is **not** read from `res`, so a result that carries its own `r` and `sca` reports the figure it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 

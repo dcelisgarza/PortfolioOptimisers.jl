@@ -107,40 +107,26 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all tracking formulation algorithm types.
+Abstract supertype for all variable-based tracking formulation algorithms.
 
-All concrete and/or abstract types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should be subtypes of `TrackingFormulation`.
+A variable tracking algorithm states **which quantity** a risk-tracking measure compares against its benchmark: the weights that go into the risk measure, or the risk that comes out of it. It is orthogonal to the norm that measures the comparison, which a tracking measure holds in a separate field as a [`NormError`](@ref).
+
+All concrete and/or abstract types representing variable-based tracking algorithms should be subtypes of `VariableTracking`.
 
 # Related
 
   - [`AbstractAlgorithm`](@ref)
-  - [`NormError`](@ref)
-  - [`VariableTracking`](@ref)
-  - [`L2Norm`](@ref)
-  - [`SquaredL2Norm`](@ref)
-  - [`L1Norm`](@ref)
-"""
-abstract type TrackingFormulation <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all variable-based tracking formulation algorithms.
-
-All concrete and/or abstract types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should be subtypes of `VariableTracking`.
-
-# Related
-
-  - [`TrackingFormulation`](@ref)
   - [`IndependentVariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`NormError`](@ref)
 """
-abstract type VariableTracking <: TrackingFormulation end
+abstract type VariableTracking <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Independent variable-based tracking formulation.
+Applies the risk measure to the difference between the portfolio weights and the benchmark weights.
 
-`IndependentVariableTracking` tracks the independent variables of a measurement.
+The weights are the independent variable of a risk measure, so this formulation compares the two portfolios before the measure is evaluated: it reports ``R(\\boldsymbol{w} - \\boldsymbol{w}_{b})``.
 
 # Constructors
 
@@ -157,14 +143,18 @@ IndependentVariableTracking()
 
   - [`VariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Dependent variable-based tracking formulation.
+Applies the risk measure to each portfolio, then takes the absolute difference of the two risks.
 
-`DependentVariableTracking` tracks the measurement.
+The risk is the dependent variable of a risk measure, so this formulation compares the two portfolios after the measure is evaluated: it reports ``\\left\\lvert R(\\boldsymbol{w}) - R(\\boldsymbol{w}_{b}) \\right\\rvert``.
 
 # Constructors
 
@@ -186,9 +176,24 @@ struct DependentVariableTracking <: VariableTracking end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset weights-based tracking algorithm.
+Builds the benchmark return series by holding a fixed weight vector, net of its own fees.
 
-`WeightsTracking` represents a tracking algorithm that operates directly on portfolio weights, optionally incorporating transaction fees. This is used for tracking error measurement and constraint generation where the comparison is made between portfolio weights and benchmark weights, with optional adjustment for fees.
+The benchmark is stated as a portfolio rather than as a return series, so [`tracking_benchmark`](@ref) computes ``\\mathbf{X}\\boldsymbol{w}_{b}`` on whichever return matrix the caller supplies. Use it when the benchmark is a known allocation. Use [`ReturnsTracking`](@ref) when only its realised returns are known.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{b} &= \\mathbf{X}\\boldsymbol{w}_{b} - \\boldsymbol{F}(\\boldsymbol{w}_{b})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{b}``: `T × 1` benchmark return vector.
+  - ``\\mathbf{X}``: `T × N` asset return matrix.
+  - ``\\boldsymbol{w}_{b}``: `N × 1` benchmark weight vector, the `w` field.
+  - ``\\boldsymbol{F}(\\boldsymbol{w}_{b})``: Per-period fee charged on the benchmark, from the `fees` field. It is zero when `fees` is `nothing`. See [`calc_net_returns`](@ref).
 
 # Fields
 
@@ -201,6 +206,8 @@ $(DocStringExtensions.FIELDS)
         w::VecNum,
         fixed::Bool = false
     ) -> WeightsTracking
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -231,7 +238,12 @@ WeightsTracking
   - [`Fees`](@ref)
   - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
+  - [`calc_net_returns`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.18.
 """
 @propagatable @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
     """
@@ -391,9 +403,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Returns-based tracking algorithm.
+Carries the benchmark return series itself, for a benchmark whose weights are unknown.
 
-`ReturnsTracking` represents a tracking algorithm that operates directly on portfolio returns, rather than asset weights. This is used for tracking error measurement and constraint generation where the comparison is made between portfolio returns and benchmark returns.
+[`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case the book states first: an index whose published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
+
+The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on.
 
 # Fields
 
@@ -404,6 +418,8 @@ $(DocStringExtensions.FIELDS)
     ReturnsTracking(;
         w::VecNum
     ) -> ReturnsTracking
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -423,6 +439,10 @@ ReturnsTracking
   - [`TrackingError`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`tracking_benchmark`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
     """
@@ -477,9 +497,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tracking error result type.
+Bounds how far the portfolio return series may drift from a benchmark return series.
 
-`TrackingError` represents the result of a tracking error computation, including the tracking algorithm used, the computed error value, and the tracking formulation algorithm. This type is used to store and propagate tracking error results in portfolio analytics and optimisation workflows.
+`err` is an upper bound, not a computed value: [`set_tracking_error_constraints!`](@ref) writes one cone per `alg` and holds the scaled deviation below `err`. `tr` supplies the benchmark and `alg` names the norm that measures the deviation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}(\\boldsymbol{w}) &= \\lVert \\boldsymbol{r}(\\boldsymbol{w}) - \\boldsymbol{b} \\rVert \\cdot c^{-1} \\leq \\mathrm{err}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}(\\boldsymbol{w})``: Tracking error.
+  - ``\\boldsymbol{r}(\\boldsymbol{w})``: `T × 1` net portfolio return series.
+  - ``\\boldsymbol{b}``: `T × 1` benchmark return series, from [`tracking_benchmark`](@ref) on the `tr` field.
+  - ``\\lVert \\cdot \\rVert``, ``c``: The norm and the scaling factor that `alg` names. [`norm_error`](@ref) computes the pair and [`norm_factor`](@ref) gives ``c``.
+  - ``\\mathrm{err}``: The `err` field.
+
+!!! warning
+
+    `err` is stated in the units of `alg`, and [`SquaredL2Norm`](@ref) squares. The same number therefore means two different bounds: `TrackingError(; alg = SquaredL2Norm(), err = 5e-6)` admits an [`L2Norm`](@ref) error up to `sqrt(5e-6)`, about `0.00224`, where `TrackingError(; alg = L2Norm(), err = 5e-6)` admits `5e-6`. Convert with the square, not by reusing the tolerance. The model, [`norm_error`](@ref) and `set_risk_constraints!` all read `err` the same way.
 
 # Fields
 
@@ -492,6 +532,8 @@ $(DocStringExtensions.FIELDS)
         err::Number = 0.0,
         alg::NormError = L2Norm()
     ) -> TrackingError
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -533,9 +575,17 @@ TrackingError
   - [`ReturnsTracking`](@ref)
   - [`NormError`](@ref)
   - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
   - [`L1Norm`](@ref)
+  - [`norm_error`](@ref)
+  - [`norm_factor`](@ref)
+  - [`tracking_benchmark`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.19 to 9.21.
 """
 @propagatable @concrete struct TrackingError <: AbstractTracking
     """

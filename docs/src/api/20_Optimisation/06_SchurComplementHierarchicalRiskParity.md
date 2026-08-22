@@ -10,6 +10,7 @@ Sd_Var
 naive_portfolio_risk(::Variance, sigma::MatNum)
 symmetric_step_up_matrix(n1::Integer, n2::Integer)
 schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
+assert_schur_weights(w::Option{<:VecNum}, gamma::Number)
 schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number, lrisk::Number, tol::Number, iter::Option{<:Integer}, strict::Bool)
 schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:NonMonotonicSchurComplement, <:Any}, gamma::Option{<:Number} = nothing)
 schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:MonotonicSchurComplement, <:Any})
@@ -23,4 +24,11 @@ needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

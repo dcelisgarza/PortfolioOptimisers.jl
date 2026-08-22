@@ -7,3 +7,10 @@ RelativisticDrawdownatRisk
 RelativeRelativisticDrawdownatRisk
 RRM
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

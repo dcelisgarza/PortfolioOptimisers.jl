@@ -18,3 +18,10 @@ set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
 assert_gross_budget_admissible
 set_exact_budget_constraints!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

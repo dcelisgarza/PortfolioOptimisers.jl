@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for equilibrium expected returns estimators.
+Computes the expected excess returns that a set of equilibrium weights implies, by reverse optimisation.
 
-`EquilibriumExpectedReturns` encapsulates the covariance estimator, equilibrium weights, and risk aversion parameter for computing equilibrium expected returns (e.g., as in Black-Litterman).
+It holds a covariance estimator, the equilibrium weights and the risk aversion parameter. The Black-Litterman members use the same expression to build their prior mean.
 
 # Fields
 
@@ -66,8 +66,14 @@ EquilibriumExpectedReturns
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`equilibrium_mu`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 5.1.1, Equation 5.2.
+  - $(ref_dict[:black1992])
 """
 @propagatable @concrete struct EquilibriumExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
@@ -179,7 +185,12 @@ Where:
 
 # Returns
 
-  - `mu::ArrNum`: Equilibrium expected returns vector.
+  - `mu::VecNum`: Equilibrium expected returns, a vector of length `N`. Unlike the other expected returns estimators, this method returns a plain vector for both values of `dims`, because [`equilibrium_mu`](@ref) reduces the covariance block against the weights.
+
+# Details
+
+  - The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it.
+  - `dims` reaches the covariance estimator only. The covariance matrix is `N × N` either way, so it does not change the shape of the result.
 
 # Related
 

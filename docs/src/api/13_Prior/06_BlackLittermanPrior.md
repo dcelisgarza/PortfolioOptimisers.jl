@@ -12,3 +12,10 @@ apply_rf
 remove_rf
 remove_excl_views
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

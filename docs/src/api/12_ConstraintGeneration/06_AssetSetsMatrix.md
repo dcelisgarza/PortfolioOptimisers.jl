@@ -30,3 +30,10 @@ PortfolioOptimisers.feature_target!
 PortfolioOptimisers.feature_entry!
 port_opt_view(smtx::MatNum, i, args...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

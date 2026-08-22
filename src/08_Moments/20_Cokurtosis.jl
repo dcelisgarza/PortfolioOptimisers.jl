@@ -102,6 +102,11 @@ MyCokurtosisEstimator
 
   - [`Cokurtosis`](@ref)
   - [`AbstractEstimator`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
+  - $(ref_dict[:pkurt])
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
 """
@@ -126,9 +131,29 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Validation
+## Validation
 
   - $(val_dict[:oow])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -155,6 +180,14 @@ Cokurtosis
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
+  - $(ref_dict[:pkurt])
 """
 @propagatable @concrete struct Cokurtosis <: CokurtosisEstimator
     """
@@ -210,7 +243,7 @@ Where:
   - ``\\otimes``: Kronecker product.
   - ``\\odot``: Element-wise (Hadamard) product.
 
-The ``N^2 \\times N^2`` cokurtosis tensor is:
+The ``N^2 \\times N^2`` square cokurtosis matrix is:
 
 Unweighted:
 
@@ -230,7 +263,7 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis tensor.
+  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` square cokurtosis matrix. This is the source's ``\\Sigma_{4}``, not its ``\\mathbf{M}_{4}``. The latter is ``N \\times N^3`` and the library never builds it.
   - ``\\mathbf{Z}``: ``T \\times N^2`` auxiliary matrix of pairwise return products.
   - $(math_dict[:T])
   - ``\\boldsymbol{w}``: Observation weights vector ``T \\times 1``.

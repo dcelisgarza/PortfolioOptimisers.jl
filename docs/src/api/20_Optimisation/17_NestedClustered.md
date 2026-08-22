@@ -22,3 +22,10 @@ RiskBudgetingOptimiser
 assert_rc_variance
 _update_asset_sets
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

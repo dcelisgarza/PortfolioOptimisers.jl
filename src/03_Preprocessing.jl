@@ -128,15 +128,15 @@ The three methods dispatch on the shape rather than branching on `ndims`.
   - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
   - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `Z` is non-empty and every entry is finite.
   - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
   - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -195,16 +195,16 @@ The three methods dispatch on the shape rather than branching on `ndims`.
   - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
   - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `nz` and `Z` are both `nothing` or both given (see [`check_feature_names`](@ref)).
   - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
   - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
   - `size(Z, ndims(Z)) == length(nz)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -483,14 +483,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of the `PricesResult` for the observation window `i` of the asset price series `X`.
+Return a view of the `PricesResult` for the observation window `i` and the assets `j` of the asset price series `X`.
 
-The asset price series is the master clock: `i` selects rows of `X`, and the factor, benchmark, and implied volatility series are aligned to the selected timestamps (rows whose timestamps are absent from a series are dropped from that series).
+The asset price series is the master clock: `i` selects rows of `X`, and the factor, benchmark, and implied volatility series are aligned to the selected timestamps (rows whose timestamps are absent from a series are dropped from that series). `j` selects asset columns and defaults to `:`, so a call giving only `i` is an observation window over the whole universe.
 
 # Arguments
 
   - `pr`: A `PricesResult` object.
   - `i`: Observation window into the rows of `pr.X`. Either integer indices (`AbstractVector{<:Integer}`, `AbstractRange`, or `Colon`) or a vector of timestamps (`AbstractVector{<:Dates.AbstractTime}`).
+  - `j`: Asset window into the columns of `pr.X`. Integer indices, an `AbstractRange`, or `Colon` for the whole universe.
 
 # Returns
 
@@ -498,11 +499,12 @@ The asset price series is the master clock: `i` selects rows of `X`, and the fac
 
 # Details
 
-  - `Colon` returns `pr` unchanged.
+  - Two `Colon`s return `pr` unchanged.
   - Integer windows index the rows of `pr.X` directly; the selected timestamps are then used to align `F`, `B`, and `iv`.
   - Timestamp windows are applied to all series directly.
-  - `ivpa` is per-asset and passes through unchanged.
-  - A static feature matrix `Z` is per-asset and passes through unchanged; a time-varying one is sliced to the rows the selected timestamps occupy in the original clock (see [`feature_row_indices`](@ref)). When `Z`'s features *are* the assets, the asset subselection slices its feature axis too (see [`features_are_assets`](@ref)).
+  - The factor series `F` keeps every column: `j` is an asset index, and the factors are a separate axis.
+  - The asset index reaches `X`, `B` (when it has one column per asset), `iv` and `ivpa`. A `Colon` asset index leaves all four alone, which is why `ivpa` passes through untouched on the observation-only arity and is sliced by `j` on the other.
+  - The feature matrix `Z` is sliced on its asset axis by `j`, and a time-varying one is also sliced to the rows the selected timestamps occupy in the original clock (see [`feature_row_indices`](@ref)). A static `Z` has no observation axis, so a `Colon` asset index passes it through unchanged. When `Z`'s features *are* the assets, the asset subselection slices its feature axis and `nz` too (see [`features_are_assets`](@ref)).
 
 # Examples
 
@@ -533,13 +535,7 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                        ::Colon = :)
     X = pr.X[i]
     F = isnothing(pr.F) ? nothing : pr.F[i]
-    B = if isnothing(pr.B)
-        nothing
-    elseif length(TimeSeries.colnames(pr.B)) >= 1
-        pr.B[i]
-    else
-        pr.B[i]
-    end
+    B = isnothing(pr.B) ? nothing : pr.B[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     rows = feature_row_indices(pr.Z, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
     Z = feature_matrix_view(pr.Z, false, rows, :)
@@ -549,9 +545,13 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                        j::AbstractVector)
     X = pr.X[i][TimeSeries.colnames(pr.X)[j]]
     F = isnothing(pr.F) ? nothing : pr.F[i]
+    #! A benchmark is either one column per asset or a single shared column
+    #! (the PricesResult constructor admits no other width). Only the first is
+    #! indexed by the asset index; slicing the second by `j` reads past its one
+    #! column. The test is B's own width, never `length(j)`.
     B = if isnothing(pr.B)
         nothing
-    elseif length(j) >= 1
+    elseif length(TimeSeries.colnames(pr.B)) == size(values(pr.X), 2)
         pr.B[i][TimeSeries.colnames(pr.B)[j]]
     else
         pr.B[i]
@@ -611,8 +611,8 @@ Keywords correspond to the struct's fields.
   - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
   - If `ts` is not `nothing`, `!isempty(ts)`, `allunique(ts)`, and `length(ts) == size(X, 1)`. Uniqueness is required because `ts` *keys* the observation axis rather than merely labelling it: [`feature_row_indices`](@ref) recovers a subset's rows by matching its surviving timestamps back into this clock, and a repeated timestamp would resolve to the first occurrence and pair an asset with another period's features.
   - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
-  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
-  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected. An `ivpa` passed without an `iv` reaches no check, because it has no implied volatility to adjust.
   - `nz` and `Z` are both `nothing` or both given; see [`check_names_and_feature_matrix`](@ref) for the shape rules, which bind `Z`'s asset axis to `length(nx)` and, for a time-varying `Z`, its observation axis to `size(X, 1)`.
 
 # Examples
@@ -1020,7 +1020,7 @@ Training rows come from the head of the data and test rows from the tail, so the
 
   - **Neither given**: the split falls at `D` (75 % train, 25 % test).
   - **One given**: the other side is its complement, so the two windows partition the data.
-  - **Both given**: the head supplies `lo` training rows, the tail supplies `hi` test rows, and any rows between them are **embargoed** — they belong to neither window. This is how a gap between train and test is expressed.
+  - **Both given**: the head supplies `lo` training rows, the tail supplies `hi` test rows, and any rows between them are **embargoed** — they belong to neither window. This is how a gap between train and test is expressed. The gap is declared by the two sizes and nothing else; a rule that derives one from the label horizon belongs to the purged cross-validators ([`CombinatorialCrossValidation`](@ref)), not here.
 
 ## Validation
 
@@ -1032,6 +1032,7 @@ Training rows come from the head of the data and test rows from the tail, so the
   - [`train_test_split`](@ref)
   - [`TrainTestSplit`](@ref)
   - [`split_count`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
 """
 function safe_index(lo::Option{<:Number}, hi::Option{<:Number}, N::Integer, D = 0.75)
     N_l, N_h = if isnothing(lo) && isnothing(hi)
@@ -1123,7 +1124,8 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
   - If no adjustment is required or `B` is `nothing`, the original `ReturnsResult` is returned unchanged.
   - For vector benchmarks (`VecNum`) subtraction uses broadcasting (`X .- B`) to subtract the per-observation benchmark from each asset column (index tracking).
   - For matrix benchmarks (`MatNum`) subtraction uses matrix subtraction (`X - B`).
-  - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`) are preserved in the returned object.
+  - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`, `nz`, `Z`) are preserved in the returned object.
+  - `nb` and `B` are **not** carried over: the benchmark has been spent on the subtraction, so the returned object holds `nothing` for both. This is what makes the adjustment idempotent — a second call has no benchmark left to subtract and returns its argument unchanged.
 
 # Examples
 
@@ -1212,16 +1214,16 @@ else throws.
   - `X`: Price table (a `DataFrames.DataFrame` as built by [`prices_to_returns`](@ref)).
   - `impute_method`: `nothing` (no imputation), or an `Impute.Imputor` when `Impute` is loaded.
 
-# Returns
-
-  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
-
 # Validation
 
   - Throws an `ArgumentError` for any `impute_method` that is neither `nothing` nor an
     `Impute.Imputor`, distinguishing "`Impute` is not loaded" from "wrong type". Note that
     [`Imputer`](@ref) is a PortfolioOptimisers estimator unrelated to `Impute.jl` and is not
     accepted here.
+
+# Returns
+
+  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
 
 # Related
 
@@ -1277,7 +1279,7 @@ Where:
   - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
   - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
 
-If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}``.
+A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns in the `B` field of the [`ReturnsResult`](@ref); it is not subtracted here. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is done later, by [`returns_result_picker`](@ref), and only when the optimisation tracks the benchmark.
 
 # Arguments
 
@@ -1297,10 +1299,6 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
   - `nz`: Optional feature names.
   - `Z`: Optional feature matrix, static (assets × features) or time-varying (observations × assets × features), with its axes parallel to `X`'s columns and rows.
 
-# Returns
-
-  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
-
 # Validation
 
   - `!isempty(X)`.
@@ -1308,8 +1306,12 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
   - `0 < missing_row_percent <= 1`.
   - If `F` is not `nothing`, `!isempty(F)`.
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
-  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+  - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
+  - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
+
+# Returns
+
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
 # Details
 
@@ -1321,7 +1323,7 @@ If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t
 
   - Computes returns using the specified method.
 
-      + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
+      + If `B` is not `nothing`, it is converted to returns by the same rule and carried in the `B` field. It is **not** subtracted from the asset returns; [`returns_result_picker`](@ref) does that, for a returns-tracking optimisation.
 
   - Carries the feature matrix `Z` across, subselected to the assets that survive the conversion — an asset dropped for being entirely missing takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is also subselected to the surviving observations, matching them back into the original price timestamps ([`feature_row_indices`](@ref)); a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp — last-observation semantics, matching [`LastObservation`](@ref).
 

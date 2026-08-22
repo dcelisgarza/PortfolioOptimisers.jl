@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
+Computes the expected returns as the sample mean of the asset returns.
 
-`SimpleExpectedReturns` is the standard estimator for computing expected returns as the possibly weighted mean of asset returns.
+`w` carries optional observation weights. If `w` is `nothing`, the mean is unweighted. This is the default expected returns estimator throughout the library.
 
 # Fields
 
@@ -20,6 +20,18 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -39,6 +51,8 @@ SimpleExpectedReturns
   - [`Option`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`factory`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     """

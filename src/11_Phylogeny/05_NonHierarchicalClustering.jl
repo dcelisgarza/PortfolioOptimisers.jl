@@ -1,9 +1,17 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-K-means clustering algorithm configuration for non-hierarchical clustering.
+Partitions assets into `k` groups by Lloyd's algorithm, with no dendrogram.
 
-`KMeansAlgorithm` is a composable clustering algorithm type that specifies the use of the k-means algorithm (via [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)) for constructing non-hierarchical clusterings from a distance matrix.
+Runs [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans) over the **columns of the distance matrix**, so each asset is the point given by its distances to every asset, and two assets cluster together when they sit at similar distances from the rest of the universe. The result is a flat partition: there is no tree, so nothing downstream can cut it at a different `k`.
+
+`rng` and `seed` are here because the algorithm is randomised. [`resolve_rng`](@ref) combines them at the point of use, so a stated `seed` makes a run reproducible without the caller building a generator.
+
+# `kwargs` reaches `Clustering.kmeans` unchanged
+
+Whatever `kwargs` holds is splatted into the call. The constructor checks only that a `weights` entry is a non-empty `AbstractVector`; it does not check the length, and `Clustering.kmeans` wants **one weight per point**, which here means one per asset.
+
+[`factory`](@ref) never writes observation weights into `kwargs`. An observation weight has no meaning here, because every step after `ce` reads an `assets x assets` matrix.
 
 # Fields
 
@@ -21,7 +29,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `kwargs` contains `weights`, it must be a non-empty `AbstractVector`.
+  - If `kwargs` contains `weights`, it must be a non-empty `AbstractVector`. Its **length is not checked**; `Clustering.kmeans` raises the `DimensionMismatch` at the point of use.
 
 # Examples
 
@@ -38,7 +46,13 @@ KMeansAlgorithm
   - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
   - [`ClustersEstimator`](@ref)
   - [`clusterise`](@ref)
+  - [`get_k_clusters_from_alg`](@ref)
+  - [`resolve_rng`](@ref)
   - [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)
+
+# References
+
+  - $(ref_dict[:lloyd1982])
 """
 @concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
     """
@@ -57,7 +71,7 @@ KMeansAlgorithm
                              kwargs::NamedTuple)
         if haskey(kwargs, :weights)
             @argcheck(isa(kwargs.weights, AbstractVector),
-                      ArgumentError("kwargs.weights must be an AbstractVector of observation weights, one element per observation. Got\nkwargs.weights => $(typeof(kwargs.weights))"))
+                      ArgumentError("kwargs.weights must be an AbstractVector of point weights, one element per asset. Got\nkwargs.weights => $(typeof(kwargs.weights))"))
             @argcheck(!isempty(kwargs.weights), IsEmptyError)
         end
         return new{typeof(rng), typeof(seed), typeof(kwargs)}(rng, seed, kwargs)
@@ -69,39 +83,27 @@ function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
     return KMeansAlgorithm(rng, seed, kwargs)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`KMeansAlgorithm`](@ref) with observation weights `w` added to the `kwargs` field.
-
-# Related
-
-  - [`KMeansAlgorithm`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)::KMeansAlgorithm
-    return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
-                           kwargs = (; alg.kwargs..., weights = w))
-end
-"""
     get_k_clusters_from_alg(alg, D, k)
 
-Assign observations to `k` clusters using the specified clustering algorithm and distance matrix.
+Partition the assets into `k` clusters with the given non-hierarchical algorithm.
 
-Internal function used by non-hierarchical clustering estimators.
+The whole extension contract of [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): a new member is a struct and one method of this function.
 
 # Arguments
 
-  - `alg`: Clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
-  - `D`: Pairwise distance matrix.
-  - `k`: Number of clusters.
+  - `alg`: Non-hierarchical clustering algorithm.
+  - `D`: Distance matrix, `assets x assets`. Its **columns** are the points to cluster.
+  - `k`: Number of clusters to produce.
 
 # Returns
 
-  - Cluster assignments.
+  - `res::Clustering.ClusteringResult`: The partition, carrying at least the fields [`optimal_number_clusters`](@ref) reads — `assignments` and, under [`SecondOrderDifference`](@ref), `costs`.
 
 # Related
 
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
   - [`KMeansAlgorithm`](@ref)
+  - [`optimal_number_clusters`](@ref)
 """
 function get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     rng = resolve_rng(alg.rng, alg.seed)
@@ -115,17 +117,23 @@ end
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
                              alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
 
-Select the optimal number of clusters for a non-hierarchical clustering algorithm.
+Run a non-hierarchical algorithm at every candidate `k` and keep the best one.
 
-Dispatches on `onc.alg` to apply the configured selection strategy and returns both the best clustering result and the optimal `k`.
+Clusters the distance matrix once per candidate count, scores the results, and returns the winning clustering together with its `k`. Both come back because a flat partition cannot be re-cut: unlike the hierarchical branch, the clustering *is* the choice of `k`.
+
+# No validity test, and no tree to run one against
+
+[`valid_k_clusters`](@ref) has no counterpart here. It rejects a count the dendrogram cannot be cut at, and a flat partition has no dendrogram, so the argmax is taken as it stands.
+
+The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here.
 
 # Arguments
 
   - `onc`: Optimal number of clusters estimator.
 
       + `onc::OptimalNumberClusters{<:Any, <:Integer}`: Uses a fixed `k` directly, clamped to `max_k`.
-      + `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Selects `k` by maximising the second-order difference of per-cluster costs.
-      + `onc::OptimalNumberClusters{<:Any, <:SilhouetteScore}`: Selects `k` by maximising the mean silhouette score.
+      + `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Scores each count by the two-difference gap statistic of `onc.alg.alg` applied to that run's per-point costs, and takes the argmax.
+      + `onc::OptimalNumberClusters{<:Any, <:SilhouetteScore}`: Scores each count by `onc.alg.alg` applied to the vector of per-asset silhouettes, and takes the argmax.
 
   - `alg`: Non-hierarchical clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
 
@@ -197,9 +205,9 @@ end
                                       <:AbstractNonHierarchicalClusteringAlgorithm, <:Any},
                X::MatNum; dims::Int = 1, kwargs...)
 
-Run non-hierarchical clustering and return the result as a [`Clusters`](@ref) object.
+Cluster assets with a non-hierarchical algorithm and return a [`Clusters`](@ref) result.
 
-Computes the similarity and distance matrices from `X`, selects the optimal number of clusters, and returns a [`Clusters`](@ref) result.
+Estimates the similarity and distance matrices from `X`, then hands `D` to [`optimal_number_clusters`](@ref), which chooses `k` and returns the clustering for it. `P` is left as `nothing`, because the clustering ran on `D` itself.
 
 # Arguments
 

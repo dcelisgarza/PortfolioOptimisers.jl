@@ -17,7 +17,9 @@ denoise!
 denoise
 ```
 
+## References
+
 ```@bibliography
-Pages = ["05_Denoise.md"]
+Pages = [@__FILE__]
 Canonical = false
 ```

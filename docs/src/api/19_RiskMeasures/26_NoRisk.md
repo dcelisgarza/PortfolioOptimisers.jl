@@ -8,3 +8,10 @@ zero_risk_expression_cause
 assert_risk_measure_required
 assert_no_risk_objective_compatibility
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

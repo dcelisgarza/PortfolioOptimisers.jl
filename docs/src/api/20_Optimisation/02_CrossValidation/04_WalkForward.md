@@ -20,3 +20,10 @@ n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
 n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
 IntPeriodDateRange
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

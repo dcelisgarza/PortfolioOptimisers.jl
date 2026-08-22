@@ -45,3 +45,10 @@ factor_universe
 feature_universe
 _expr_depth_exceeds
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

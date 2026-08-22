@@ -23,3 +23,10 @@ Lc_CC_VecCC
 _validate_length_integer_phylogeny_constraint_B
 validate_length_integer_phylogeny_constraint_B
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

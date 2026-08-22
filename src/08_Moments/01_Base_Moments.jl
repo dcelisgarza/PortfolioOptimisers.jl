@@ -411,6 +411,8 @@ Given that these are meant to be used by expected returns estimators, there are 
 
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
+  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
@@ -455,7 +457,7 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`FullMoment` is used to indicate that all deviations are included in the moment estimation process.
+Keeps every deviation from the target, so the moment is two-sided.
 
 # Mathematical definition
 
@@ -490,7 +492,7 @@ struct FullMoment <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`SemiMoment` is used for semi-moment estimators, where only observations below a target are considered.
+Clips every deviation above the target to zero, so the moment reads the downside alone.
 
 # Mathematical definition
 
@@ -832,14 +834,14 @@ end
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
         args...;
-        dims = dims,
+        dims::Int = 1,
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
     moment_window_and_weights(
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
         window::VecInt;
-        dims = dims,
+        dims::Int = 1,
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
 
@@ -876,8 +878,8 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
   - [`get_window`](@ref)
   - [`get_observation_weights`](@ref)
 """
-function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; dims = dims,
-                                   kwargs...)
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...;
+                                   dims::Int = 1, kwargs...)
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
@@ -1309,12 +1311,12 @@ function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
                 :(DocStringExtensions.FIELDS),
                 "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
                 :(val_dict[:oow]),
-                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
+                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\nWhen [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:\n\n  - `$(field)`: Recursively indexed via [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
     for m in methods
         push!(parts, "  - ", m, "\n")
     end
     push!(parts,
-          "  - [`factory`](@ref)\n  - [`port_opt_view`](@ref)\n  - [`windowed_preamble`](@ref)\n")
+          "  - [`factory`](@ref)\n  - [`port_opt_view`](@ref)\n  - [`obs_weights_view`](@ref)\n  - [`windowed_preamble`](@ref)\n")
     return Expr(:string, parts...)
 end
 """
@@ -1450,9 +1452,7 @@ macro windowed_estimator(head, body)
                                      LineNumberNode(@__LINE__), field)),
                            Expr(:string, :(field_dict[:oow])),
                            Expr(:macrocall, Symbol("@wprop"), LineNumberNode(@__LINE__),
-                                :w),
-                           "Window specification: an integer (last `window` observations) or a vector of indices.",
-                           :window,
+                                :w), Expr(:string, :(field_dict[:window])), :window,
                            Expr(:function,
                                 Expr(:call, name, Expr(:(::), field, ftype),
                                      :(w::Option{<:ObsWeights}),

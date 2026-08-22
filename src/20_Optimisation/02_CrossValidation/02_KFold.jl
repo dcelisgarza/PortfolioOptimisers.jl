@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements non-sequential k-fold cross-validation with optional purging and embargoing of training samples.
 
+The observations are cut into `n` consecutive folds. Each fold is the test set of one split, and the remaining folds form that split's training set. `purged_size` drops the last `purged_size` rows of the training fold that precedes the test fold, which removes the rows whose labels overlap the test period. `embargo_size` widens the gap on the other side: the first `purged_size + embargo_size` rows of the training fold that follows the test fold are dropped, which removes the rows whose features are contaminated by the test period. Both default to `0`, which gives the plain k-fold scheme.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -21,6 +23,7 @@ Keyword arguments correspond to the struct's fields.
 
   - `n` must be non-empty, greater than zero, and finite.
   - `purged_size` and `embargo_size` must be non-empty and finite.
+  - [`Base.split`](@ref) additionally checks `purged_size + embargo_size < div(T, n)`, because a gap as wide as the smallest fold would empty a training fold.
 
 # Examples
 
@@ -39,6 +42,11 @@ KFold
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`KFoldResult`](@ref)
   - [`n_splits`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2018]) Chapter 7.
+  - $(ref_dict[:cajas2025]) Section 15.2.
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
     """
@@ -124,9 +132,19 @@ with optional purging and embargoing.
   - `kf::KFold`: K-fold cross-validation estimator.
   - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
 
+# Validation
+
+  - `purged_size + embargo_size < div(T, n)`, where `T` is the number of observations. A gap as wide as the smallest fold would empty a training fold.
+
 # Returns
 
   - `KFoldResult`: Result containing train and test indices for each fold.
+
+# Details
+
+  - The folds are consecutive and cover every observation exactly once. `mod(T, n)` extra rows are given one each to the first `mod(T, n)` folds, so the fold sizes differ by at most one row.
+  - For the split whose test set is fold `i`, the training folds are every fold other than `i`, concatenated in ascending order. Fold `i - 1` loses its last `purged_size` rows and fold `i + 1` loses its first `purged_size + embargo_size` rows.
+  - The training indices of every split increase strictly, which is what [`assert_unshuffled_folds`](@ref) needs.
 
 # Related
 

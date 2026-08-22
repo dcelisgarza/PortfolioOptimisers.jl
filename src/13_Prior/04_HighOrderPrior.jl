@@ -11,14 +11,14 @@ Block vectorisation operator.
   - `p`: Number of rows in each block.
   - `q`: Number of columns in each block.
 
-# Returns
-
-  - `A_vec::Matrix`: Block vectorised matrix of size `(m * n, p * q)`.
-
 # Validation
 
   - `size(A, 1)` must be an integer multiple of `p`.
   - `size(A, 2)` must be an integer multiple of `q`.
+
+# Returns
+
+  - `A_vec::Matrix`: Block vectorised matrix of size `(m * n, p * q)`.
 
 # Examples
 
@@ -36,6 +36,10 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 # Related
 
   - [`dup_elim_sum_matrices`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Appendix A.1, Equation A.14.
 """
 function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
@@ -255,19 +259,21 @@ Construct duplication, elimination, and summation matrices for symmetric matrix 
 
 `dup_elim_sum_matrices` returns the duplication matrix `D`, elimination matrix `L`, and summation matrix `S` for symmetric matrices of size `N × N`. These matrices are used in higher-order moment computations, tensor manipulations, and efficient vectorisation of symmetric matrices in portfolio analytics.
 
+For a symmetric `A` of size `n × n`, the three satisfy `D * vech(A) == vec(A)`, `L * vec(A) == vech(A)`, and `S == transpose(D) * D * L`, which makes `sum(S * vec(A)) == sum(vec(A))`: `S` reads the lower triangle and weights each off-diagonal entry by the two places it occupies in `vec(A)`.
+
 # Arguments
 
   - `n`: Size of the symmetric matrix (integer).
+
+# Validation
+
+  - `n` must be a positive integer.
 
 # Returns
 
   - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
   - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
   - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
-
-# Validation
-
-  - `n` must be a positive integer.
 
 # Examples
 
@@ -308,6 +314,13 @@ julia> S
 # Related
 
   - [`block_vec_pq`](@ref)
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Appendix A.2, Equations A.25 to A.27.
 """
 function dup_elim_sum_matrices(n::Int)
     m = div(n * (n + 1), 2)
@@ -345,17 +358,19 @@ end
 """
     dup_elim_sum_view(args...)
 
-Get a view of the duplication, elimination, and summation matrices for a given dimension.
+Answer with three `nothing`s when the first argument is not a matrix.
 
-Internal helper used in high-order moment estimation. Returns the precomputed matrices for the given size, or computes them on demand.
+The fallback of [`dup_elim_sum_view`](@ref). It builds nothing and reads none of its arguments; the matrix method is the one that calls [`dup_elim_sum_matrices`](@ref).
+
+Its two call sites are in [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref), which passes `pr.kt` as the first argument. No estimator in the library builds a carrier that reaches this method: `sk` and `V` travel together, and `kt`, `L2` and `S2` do too, so a carrier holding any of them holds `kt`. A hand-built carrier can — `D2` is the one moment field the constructor accepts on its own — and it is the case this method answers.
 
 # Arguments
 
-  - `args...`: Matrix and dimension arguments.
+  - `args...`: Any arguments. None is read.
 
 # Returns
 
-  - Tuple of (duplication, elimination, summation) matrices.
+  - `(nothing, nothing, nothing)::Tuple{Nothing, Nothing, Nothing}`.
 
 # Related
 
@@ -406,6 +421,22 @@ $(DocStringExtensions.FIELDS)
     ) -> HighOrderPriorEstimator
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+  - `kte`: Recursively updated via [`factory`](@ref).
+  - `ske`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `kte`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ske`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -471,6 +502,13 @@ HighOrderPriorEstimator
   - [`Cokurtosis`](@ref)
   - [`Coskewness`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equations 3.6 and 3.7.
+  - $(ref_dict[:pkurt])
 """
 @propagatable @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
     """
@@ -513,28 +551,30 @@ Compute high order prior moments for asset returns using a composite estimator.
 
 # Mathematical definition
 
-In addition to the first and second moments, the high order estimator computes:
+In addition to the first and second moments, the high order estimator computes the coskewness matrix ``\\mathbf{M}_3`` and the **square** cokurtosis matrix ``\\mathbf{\\Sigma}_4``:
 
 ```math
 \\begin{align}
-\\hat{M}_3 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
-\\end{align}
-```
-
-```math
-\\begin{align}
-\\hat{M}_4 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\mathbf{W} &= (\\mathbf{Z} \\otimes \\boldsymbol{1}_N^\\intercal) \\odot (\\boldsymbol{1}_N^\\intercal \\otimes \\mathbf{Z})\\,, \\\\
+\\mathbf{M}_3 &= \\frac{1}{T} \\mathbf{Z}^\\intercal \\mathbf{W}\\,, \\\\
+\\mathbf{\\Sigma}_4 &= \\frac{1}{T} \\mathbf{W}^\\intercal \\mathbf{W}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\hat{M}_3``: ``N \\times N^2`` coskewness matrix.
-  - ``\\hat{M}_4``: ``N^2 \\times N^2`` cokurtosis matrix.
-  - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
+  - ``\\mathbf{Z}``: ``T \\times N`` matrix of returns with each column's mean removed.
+  - ``\\mathbf{W}``: ``T \\times N^2`` matrix of pairwise products of the centred returns.
+  - ``\\mathbf{M}_3``: ``N \\times N^2`` coskewness matrix, `sk`.
+  - ``\\mathbf{\\Sigma}_4``: ``N^2 \\times N^2`` square cokurtosis matrix, `kt`.
+  - ``\\boldsymbol{1}_N``: ``N \\times 1`` vector of ones.
   - $(math_dict[:T])
   - ``\\otimes``: Kronecker product.
+  - ``\\odot``: Hadamard product.
+
+``\\mathbf{\\Sigma}_4`` is the square form and is ``N^2 \\times N^2``. It is not the ``N \\times N^3`` cokurtosis matrix ``\\mathbf{M}_4`` of the same source, which the library never builds.
+
+`pe.kte` computes `kt` and `pe.ske` computes `sk`, so a non-default `alg` — a semi-comoment, an exponentially weighted one — replaces the displays above rather than refining them. `V` is the negative spectral coskewness of `sk`, and either estimator set to `nothing` drops its moment from the result.
 
 # Arguments
 
@@ -544,13 +584,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
-# Returns
-
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
 
 # Related
 

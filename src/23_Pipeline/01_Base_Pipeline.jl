@@ -179,6 +179,8 @@ $(DocStringExtensions.FIELDS)
         res
     ) -> TargetedConstraint
 
+Keywords correspond to the struct's fields.
+
 ## Validation
 
   - `target in PIPELINE_ROUTING_TARGETS`.
@@ -592,7 +594,7 @@ julia> PortfolioOptimisers.pipe_reads(ps)
     """
     est
     """
-    Slot the step requires to be populated before it runs (subset of [`PIPELINE_SLOTS`](@ref)).
+    Slots the step requires to be populated before it runs (a subset of [`PIPELINE_SLOTS`](@ref), as a tuple).
     """
     reads
     """

@@ -18,3 +18,10 @@ subset_resampling_finaliser
 subset_resampling_retcode
 subset_resampling_td_defaults
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

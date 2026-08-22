@@ -54,6 +54,19 @@ Because both blocks are posterior, the returned carrier is **internally consiste
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pe`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -162,6 +175,13 @@ BayesianBlackLittermanPrior
   - [`UniverseSets`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:kolmritter2016])
+  - $(ref_dict[:cajas2025]) Section 5.3, Equations 5.23, 5.34 and 5.35.
 """
 @propagatable @concrete struct BayesianBlackLittermanPrior <:
                                AbstractLowOrderPriorEstimator_F
@@ -236,30 +256,51 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 
 # Mathematical definition
 
-The Bayesian Black-Litterman model updates the prior ``(\\boldsymbol{\\Pi}, \\mathbf{\\Sigma}/T)`` with views:
+This is **not** the classic Black-Litterman update run on the assets. The views land on the factor parameter ``\\boldsymbol{\\theta}``, and the assets are the posterior *predictive* distribution that the factor model implies. The model is:
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}}_{BBL} &= \\boldsymbol{\\Pi} + \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})\\,.
+\\boldsymbol{r} &\\sim \\mathcal{N}(\\mathbf{M}\\boldsymbol{\\theta} + \\boldsymbol{b},\\ \\mathbf{\\Sigma})\\,, \\\\
+\\boldsymbol{\\theta} &\\sim \\mathcal{N}(\\boldsymbol{\\Pi}_f,\\ \\mathbf{\\Sigma}_f)\\,, \\\\
+\\mathbf{P}\\boldsymbol{\\theta} &\\sim \\mathcal{N}(\\boldsymbol{q},\\ \\mathbf{\\Omega})\\,.
 \\end{align}
 ```
 
+The conditional posterior of ``\\boldsymbol{\\theta}`` given the views is Gaussian, with precision ``\\mathbf{H}``:
+
 ```math
 \\begin{align}
-\\hat{\\mathbf{\\Sigma}}_{BBL} &= \\mathbf{\\Sigma} + \\frac{\\mathbf{\\Sigma}}{T} - \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} \\mathbf{P} \\frac{\\mathbf{\\Sigma}}{T}\\,.
+\\mathbf{H} &= \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal \\mathbf{\\Omega}^{-1} \\mathbf{P}\\,, \\\\
+\\bar{\\mathbf{\\Sigma}}_f &= \\mathbf{H}^{-1}\\,, \\\\
+\\bar{\\boldsymbol{\\Pi}}_f &= \\mathbf{H}^{-1}\\left(\\mathbf{\\Sigma}_f^{-1}\\boldsymbol{\\Pi}_f + \\mathbf{P}^\\intercal \\mathbf{\\Omega}^{-1} \\boldsymbol{q}\\right)\\,.
+\\end{align}
+```
+
+Writing ``\\mathbf{V} = \\left(\\mathbf{H} + \\mathbf{M}^\\intercal \\mathbf{\\Sigma}^{-1} \\mathbf{M}\\right)^{-1}``, the posterior predictive asset moments are:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{BBL} &= \\left(\\mathbf{\\Sigma}^{-1} - \\mathbf{\\Sigma}^{-1}\\mathbf{M}\\,\\mathbf{V}\\,\\mathbf{M}^\\intercal \\mathbf{\\Sigma}^{-1}\\right)^{-1}\\,, \\\\
+\\hat{\\boldsymbol{\\mu}}_{BBL} &= \\hat{\\mathbf{\\Sigma}}_{BBL}\\,\\mathbf{\\Sigma}^{-1}\\mathbf{M}\\,\\mathbf{V}\\,\\mathbf{H}\\,\\bar{\\boldsymbol{\\Pi}}_f + \\boldsymbol{b} + r_{f}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}_{BBL}``: Bayesian Black-Litterman posterior mean.
-  - ``\\hat{\\mathbf{\\Sigma}}_{BBL}``: Bayesian Black-Litterman posterior covariance.
-  - ``\\boldsymbol{\\Pi}``: ``N \\times 1`` prior expected returns.
-  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
-  - $(math_dict[:T])
-  - ``\\mathbf{P}``: ``K \\times N`` views matrix.
-  - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
-  - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}_{BBL}``: ``N \\times 1`` Bayesian Black-Litterman posterior asset mean.
+  - ``\\hat{\\mathbf{\\Sigma}}_{BBL}``: ``N \\times N`` Bayesian Black-Litterman posterior asset covariance.
+  - ``\\boldsymbol{\\Pi}_f``, ``\\mathbf{\\Sigma}_f``: ``K \\times 1`` and ``K \\times K`` prior factor moments, from `pe.pe`.
+  - ``\\bar{\\boldsymbol{\\Pi}}_f``, ``\\bar{\\mathbf{\\Sigma}}_f``: Posterior factor moments, reported in `pr.fpr`.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior asset covariance matrix, from `pe.pe`.
+  - ``\\mathbf{M}``: ``N \\times K`` factor loadings matrix, `pr.rr.M`.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector, `pr.rr.b`.
+  - ``\\mathbf{P}``: ``K_v \\times K`` views matrix, over the **factor** axis.
+  - ``\\boldsymbol{q}``: ``K_v \\times 1`` views vector.
+  - ``\\mathbf{\\Omega}``: ``K_v \\times K_v`` view uncertainty matrix, ``\\mathrm{Diag}(\\mathbf{P}(\\tau\\mathbf{\\Sigma}_f)\\mathbf{P}^\\intercal)`` from [`calc_omega`](@ref) and [`bl_preroll`](@ref).
+  - ``\\tau``: Scaling parameter, `1/T` by default, where ``T`` is the number of factor observations.
+  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref).
+
+Two consequences are caller-facing. ``\\mathbf{P}`` is over the factor axis, so it has ``K`` columns and not ``N`` — the classic asset-axis master equation cannot be evaluated with this estimator's own quantities at all. And ``\\hat{\\boldsymbol{\\mu}}_{BBL}`` is ``\\mathbf{M}\\bar{\\boldsymbol{\\Pi}}_f + \\boldsymbol{b}`` by construction, which is the identity the *Composition* section above states.
 
 # Arguments
 
@@ -270,15 +311,15 @@ Where:
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, and factor prior details.
-
 # Validation
 
   - `dims in (1, 2)`.
   - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.fkey)` and `length(pe.sets.dict[pe.sets.fkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, and factor prior details.
 
 # Details
 
@@ -286,8 +327,9 @@ Where:
   - The factor prior is computed using the embedded prior estimator `pe.pe`.
   - Views are extracted using [`black_litterman_views`](@ref) **at `pe.sets.fkey`**, which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of factor observations.
-  - The view uncertainty matrix `f_omega` is computed using [`calc_omega`](@ref).
-  - Bayesian posterior mean and covariance are computed via the model's update equations.
+  - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref) and scaled by `tau` in [`bl_preroll`](@ref).
+  - `sigma_hat` is the posterior factor **precision** ``\\mathbf{H}``, not a covariance. `pr.fpr.sigma` is its inverse.
+  - The posterior predictive asset moments are computed from ``\\mathbf{H}``, the loadings and the prior asset covariance. This estimator never calls [`vanilla_posteriors`](@ref); its siblings that take asset views do.
   - Matrix processing is applied to the asset posterior covariance using `pe.mp`, and to the factor posterior covariance using `pe.f_mp`.
   - `pe.rf` is added to the asset posterior mean once, by [`apply_rf`](@ref). The factor block never carries it.
   - The result's factor block holds the **posterior** factor moments, so `pr.mu == pr.rr.M * pr.fpr.mu + pr.rr.b + pe.rf` holds exactly. At the default `rf = 0.0` that is the plain identity.

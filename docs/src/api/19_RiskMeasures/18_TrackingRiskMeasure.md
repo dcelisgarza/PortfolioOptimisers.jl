@@ -20,3 +20,10 @@ factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking})
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

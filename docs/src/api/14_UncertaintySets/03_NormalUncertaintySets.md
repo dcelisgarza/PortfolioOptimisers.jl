@@ -60,3 +60,10 @@ mu_normal_box_set
 sigma_normal_box_set
 normal_box_preamble
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

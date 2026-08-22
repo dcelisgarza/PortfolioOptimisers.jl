@@ -12,3 +12,10 @@ distance_to_similarity
 assert_similarity_domain
 default_similarity
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

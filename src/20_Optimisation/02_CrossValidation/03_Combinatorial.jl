@@ -3,6 +3,27 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements combinatorial non-sequential cross-validation with purging and embargoing, allowing for all possible combinations of test folds.
 
+The observations are cut into `n_folds` consecutive folds, and every combination of `n_test_folds` of them is one split's test set. The remaining folds form that split's training set, less the purged and embargoed rows on each side of every test block. Each fold is a test fold in the same number of splits, so the test blocks recombine into `n_test_paths` full backtest paths, each covering every observation exactly once.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+S(n,\\, k) &= \\binom{n}{k} = \\frac{n!}{k!\\,(n-k)!}\\,, \\\\
+\\varphi(n,\\, k) &= \\frac{k}{n} \\binom{n}{k} = \\frac{(n-1)!}{(k-1)!\\,(n-k)!}\\,, \\\\
+\\bar{T}(n,\\, k) &= \\frac{T}{n} (n - k)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``S(n,\\, k)``: Number of splits, one per combination of test folds.
+  - ``\\varphi(n,\\, k)``: Number of recombined test paths.
+  - ``\\bar{T}(n,\\, k)``: Average number of training observations per split, before purging and embargoing.
+  - ``n``: Number of folds, `n_folds`.
+  - ``k``: Number of test folds per split, `n_test_folds`.
+  - $(math_dict[:T])
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -26,7 +47,8 @@ The default holds out `2` of `10` folds for testing. This gives `binomial(10, 2)
   - `n_folds` must be non-empty, greater than zero, and finite.
   - `n_test_folds` must be non-empty, greater than zero, and finite.
   - `purged_size` and `embargo_size` must be non-empty and finite.
-  - Ensures the number of combinations does not exceed `max_comb`.
+  - `binomial(n_folds, n_test_folds) <= max_comb`. `max_comb` is a constructor argument, not a field, so it bounds the split count at construction and is not carried on the estimator.
+  - [`Base.split`](@ref) additionally checks `purged_size + embargo_size < div(T, n_folds)`, because a gap as wide as the smallest fold would empty a training fold.
 
 # Examples
 
@@ -47,6 +69,14 @@ CombinatorialCrossValidation
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
+  - [`n_test_paths`](@ref)
+  - [`average_train_size`](@ref)
+  - [`optimal_number_folds`](@ref)
+
+# References
+
+  - $(ref_dict[:lopezdeprado2018]) Chapter 12.
+  - $(ref_dict[:cajas2025]) Section 15.3, Equations 15.1 and 15.2.
 """
 @concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
     """
@@ -90,7 +120,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`CombinatorialCrossValidation`](@ref) after splitting data into combinatorial training and testing folds.
 
-Stores the train index vectors, nested test index vectors (one per path), and a matrix of path IDs mapping folds to paths.
+Stores the train index vectors, the nested test index vectors, and a matrix of path identifiers.
+
+Every field is indexed by split. `train_idx[j]` holds the training rows of split `j`, purged and embargoed. `test_idx[j]` holds that split's `n_test_folds` test blocks, sorted by first observation. Column `j` of `path_ids` names the path each of those blocks belongs to, in the same order, which is what recombines the blocks of all splits into full backtest paths.
 
 # Fields
 
@@ -118,6 +150,8 @@ Keywords correspond to the struct's fields.
   - [`CombinatorialCrossValidation`](@ref)
   - [`NonSequentialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
+  - [`get_path_ids`](@ref)
+  - [`sort_predictions!`](@ref)
 """
 @concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
     """
@@ -169,17 +203,24 @@ end
 function n_splits(ccv::CombinatorialCrossValidation)
     return n_splits(ccv.n_folds, ccv.n_test_folds)
 end
+function n_splits(ccv::CombinatorialCrossValidation, ::Prices_RR)
+    return n_splits(ccv)
+end
 """
     n_test_paths(n_folds, n_test_folds)
+    n_test_paths(ccv::CombinatorialCrossValidation)
 
 Compute the number of test paths in combinatorial cross-validation.
 
 Returns the number of unique recombined test paths from `n_folds` folds choosing `n_test_folds` test folds. Also accepts a `CombinatorialCrossValidation` object directly.
 
+The count is `div(binomial(n_folds, n_test_folds) * n_test_folds, n_folds)`, which is the ``\\varphi(n,\\, k)`` of [`CombinatorialCrossValidation`](@ref). Each fold is a test fold in the same number of splits, so the test blocks recombine into exactly this many paths, and each path covers every observation once.
+
 # Arguments
 
   - `n_folds`: Total number of folds.
   - `n_test_folds`: Number of test folds per combination.
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration, which supplies both counts.
 
 # Returns
 
@@ -189,6 +230,8 @@ Returns the number of unique recombined test paths from `n_folds` folds choosing
 
   - [`CombinatorialCrossValidation`](@ref)
   - [`recombined_paths`](@ref)
+  - [`average_train_size`](@ref)
+  - [`optimal_number_folds`](@ref)
 """
 function n_test_paths(n_folds::Integer, n_test_folds::Integer)
     return div(n_splits(n_folds, n_test_folds) * n_test_folds, n_folds)
@@ -198,28 +241,36 @@ function n_test_paths(ccv::CombinatorialCrossValidation)
 end
 """
     average_train_size(T, n_folds, n_test_folds)
+    average_train_size(ccv::CombinatorialCrossValidation, rd::Prices_RR)
 
 Compute the average training set size for combinatorial cross-validation.
+
+The count is `T / n_folds * (n_folds - n_test_folds)`, taken before purging and embargoing, so the training set of a split with a non-zero `purged_size` or `embargo_size` is smaller than this.
 
 # Arguments
 
   - `T`: Total number of observations.
   - `n_folds`: Total number of folds.
   - `n_test_folds`: Number of test folds per combination.
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration, which supplies `n_folds` and `n_test_folds`.
+  - `rd`: Returns-level or price-level data, which supplies `T` through [`cv_nobs`](@ref) ([`Prices_RR`](@ref)).
 
 # Returns
 
-  - Average number of training observations per fold.
+  - Average number of training observations per split.
 
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
+  - [`n_test_paths`](@ref)
+  - [`optimal_number_folds`](@ref)
+  - [`cv_nobs`](@ref)
 """
 function average_train_size(T::Integer, n_folds::Integer, n_test_folds::Integer)
     return T / n_folds * (n_folds - n_test_folds)
 end
-function average_train_size(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
-    T = size(rd.X, 1)
+function average_train_size(ccv::CombinatorialCrossValidation, rd::Prices_RR)
+    T = cv_nobs(rd)
     (; n_folds, n_test_folds) = ccv
     return average_train_size(T, n_folds, n_test_folds)
 end
@@ -228,7 +279,7 @@ end
 
 Generate all test set index combinations for combinatorial cross-validation.
 
-Returns a vector of test fold index combinations for `ccv`.
+Each element is one split's test set, given as the `n_test_folds` fold indices it holds. The elements are fold indices, not observation indices, and the splits come in the order `Combinatorics.combinations` enumerates them.
 
 # Arguments
 
@@ -236,7 +287,7 @@ Returns a vector of test fold index combinations for `ccv`.
 
 # Returns
 
-  - Vector of test index combinations.
+  - `Vector{Vector{Int}}` of length `n_splits`.
 
 # Related
 
@@ -249,9 +300,9 @@ end
 """
     binary_train_test_sets(ccv)
 
-Generate binary train/test set assignment matrices for combinatorial cross-validation.
+Generate the binary train/test fold assignment matrix for combinatorial cross-validation.
 
-Returns a matrix indicating which samples are in train (0) and test (1) sets for each combination.
+The rows are folds and the columns are splits. An entry is `true` when that fold is a test fold of that split, and `false` when it is a training fold. The assignment is over folds, not over observations.
 
 # Arguments
 
@@ -259,12 +310,13 @@ Returns a matrix indicating which samples are in train (0) and test (1) sets for
 
 # Returns
 
-  - Binary train/test assignment matrix.
+  - `BitMatrix` of size `(n_folds, n_splits)`.
 
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
   - [`test_set_index`](@ref)
+  - [`recombined_paths`](@ref)
 """
 function binary_train_test_sets(ccv::CombinatorialCrossValidation)
     n_folds = ccv.n_folds
@@ -281,7 +333,7 @@ end
 
 Generate the recombined test paths for combinatorial cross-validation.
 
-Returns a vector of vectors representing the recombined test paths — sequences of test fold indices that together cover the entire dataset.
+The rows are folds and the columns are paths. Entry `(f, p)` is the index of the split that supplies fold `f` to path `p`. Reading one column therefore names one split per fold, and those blocks together cover every observation exactly once.
 
 # Arguments
 
@@ -289,12 +341,14 @@ Returns a vector of vectors representing the recombined test paths — sequences
 
 # Returns
 
-  - Vector of recombined path index vectors.
+  - `Matrix{Int}` of size `(n_folds, n_test_paths)`.
 
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
   - [`n_test_paths`](@ref)
+  - [`binary_train_test_sets`](@ref)
+  - [`get_path_ids`](@ref)
 """
 function recombined_paths(ccv::CombinatorialCrossValidation)
     bidx = binary_train_test_sets(ccv)
@@ -308,9 +362,9 @@ end
 """
     get_path_ids(ccv)
 
-Get path identifiers for each test combination in combinatorial cross-validation.
+Get path identifiers for each test fold of each split in combinatorial cross-validation.
 
-Returns the path assignment for each test combination, mapping combinations to their recombined paths.
+This is the transpose of the view [`recombined_paths`](@ref) gives. The rows are the test folds of a split and the columns are splits. Entry `(m, j)` is the path that the `m`-th test block of split `j` belongs to, where the blocks of a split are counted in ascending observation order. This is the `path_ids` field of [`CombinatorialCrossValidationResult`](@ref), and it is what pairs each block of `test_idx[j]` with its path.
 
 # Arguments
 
@@ -318,12 +372,14 @@ Returns the path assignment for each test combination, mapping combinations to t
 
 # Returns
 
-  - Vector of path IDs.
+  - `Matrix{Int}` of size `(n_test_folds, n_splits)`.
 
 # Related
 
   - [`recombined_paths`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
+  - [`sort_predictions!`](@ref)
 """
 function get_path_ids(ccv::CombinatorialCrossValidation)
     rcp = recombined_paths(ccv)
@@ -338,30 +394,42 @@ function get_path_ids(ccv::CombinatorialCrossValidation)
     return ids
 end
 """
-    Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult) -> CombinatorialCrossValidationResult
+    Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR) -> CombinatorialCrossValidationResult
 
-Split the returns data `rd` into all possible combinations of training and test folds using
+Split the data `rd` into all possible combinations of training and test folds using
 combinatorial cross-validation with optional purging and embargoing.
 
 # Arguments
 
   - `ccv::CombinatorialCrossValidation`: Combinatorial cross-validation estimator.
-  - `rd::Prices_RR`: Returns or price data to split.
+  - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
+
+# Validation
+
+  - `purged_size + embargo_size < div(T, n_folds)`, where `T` is the number of observations. A gap as wide as the smallest fold would empty a training fold.
 
 # Returns
 
   - `CombinatorialCrossValidationResult`: Result containing train indices, nested test index
     vectors (one per path), and a matrix of path IDs mapping folds to paths.
 
+# Details
+
+  - The folds are consecutive and cover every observation exactly once. `mod(T, n_folds)` extra rows go to the last fold, so the fold sizes differ by at most `n_folds - 1` rows.
+  - Every training row within `purged_size` rows before a test block, or within `purged_size + embargo_size` rows after one, is dropped from that split's training set.
+  - Column `j` of `path_ids` names the path of each test block of split `j`, in the same order as `test_idx[j]`, which is sorted by first observation. Collecting the blocks of one path over all splits therefore reproduces the whole timeline in order.
+
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
+  - [`get_path_ids`](@ref)
+  - [`cv_nobs`](@ref)
 """
 function Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
-    T = size(rd.X, 1)
-    (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
+    T = cv_nobs(rd)
+    (; n_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)
     @argcheck(purged_size + embargo_size < min_fold_size,
               DomainError(purged_size + embargo_size,
@@ -403,13 +471,7 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
         test_idx_list[i] = sort!([fold_index[j[1]] for j in findall(x -> x == i, rcp)];
                                  by = x -> x[1])
     end
-    path_ids = zeros(Int, n_test_folds, num_splits)
-    for j in axes(path_ids, 2)
-        inds = findall(x -> x == j, rcp)
-        for i in axes(path_ids, 1)
-            path_ids[end - i + 1, j] = inds[i][2]
-        end
-    end
+    path_ids = get_path_ids(ccv)
     return CombinatorialCrossValidationResult(; train_idx = train_idx,
                                               test_idx = test_idx_list, path_ids = path_ids)
 end
@@ -447,11 +509,16 @@ Where:
   - `target_n_test_paths`: Desired number of recombined test paths.
   - `train_size_w`: Weight applied to the training-size component of the cost (default `1`).
   - `n_test_paths_w`: Weight applied to the test-paths component of the cost (default `1`).
-  - `maxval`: Early-exit threshold; a fold configuration whose cost exceeds `maxval` prunes subsequent higher `n_test_folds` values (default `1e5`).
+  - `maxval`: Pruning threshold (default `1e5`). Within one `n_folds`, let `m` be the first `n_test_folds` whose cost exceeds `maxval`. The search then skips every `n_test_folds` in `(m, n_folds - m)` and resumes at the mirror value `n_folds - m`, because `binomial(n, k) == binomial(n, n - k)` makes the two ends of the range the cheap ones and the middle the expensive one.
 
 # Returns
 
   - `Tuple{Int, Int}`: The optimal `(n_folds, n_test_folds)` pair minimising the weighted cost. Returns `(0, 0)` when no valid configuration is found.
+
+# Details
+
+  - The search walks `n_folds` from `3` to `T + 1` and `n_test_folds` from `2` to `n_folds`.
+  - A candidate whose split count overflows `Int` is treated as infinitely expensive rather than raising. Such a configuration is unusable: [`CombinatorialCrossValidation`](@ref) refuses it through `max_comb` long before the count reaches that size. Raising `maxval` widens the search into that region, so the guard is what keeps a large `maxval` from failing.
 
 # Related
 
@@ -463,8 +530,22 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
                               target_n_test_paths::Integer; train_size_w::Number = 1,
                               n_test_paths_w::Number = 1, maxval::Number = 1e5)
     function _cost(x::Integer, y::Integer)
-        return n_test_paths_w * abs(n_test_paths(x, y) - target_n_test_paths) /
-               target_n_test_paths +
+        # `binomial` raises rather than saturating, and a configuration whose split count
+        # cannot be represented is unusable anyway, so it costs infinity instead of
+        # failing the search. Only a `maxval` large enough to defeat the mirror pruning
+        # reaches this branch.
+        ntp = try
+            n_test_paths(x, y)
+        catch err
+            if !(isa(err, OverflowError))
+                rethrow()
+            end
+            nothing
+        end
+        if isnothing(ntp)
+            return Inf
+        end
+        return n_test_paths_w * abs(ntp - target_n_test_paths) / target_n_test_paths +
                train_size_w * abs(average_train_size(T, x, y) - target_train_size) /
                target_train_size
     end

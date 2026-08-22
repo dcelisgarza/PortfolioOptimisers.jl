@@ -128,20 +128,21 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                     opt = JuMPOptimiser(; slv = slv))), rd)
     @test resa.w == resb.w
 
-    res = optimise(NestedClustered(; cle = clr,
+    # A MIP range is two blocks of `T` binaries, so this case runs on the short window.
+    res = optimise(NestedClustered(; cle = clr_mip,
                                    opti = MeanRisk(; r = ValueatRiskRange(),
-                                                   opt = JuMPOptimiser(; pe = pr,
+                                                   opt = JuMPOptimiser(; pe = pr_mip,
                                                                        slv = mip_slv,
                                                                        sets = sets)),
                                    opto = MeanRisk(; r = ValueatRiskRange(),
                                                    opt = JuMPOptimiser(; slv = mip_slv))),
-                   rd)
+                   rd_mip)
     @test isapprox(res.w,
-                   [0.0002143701113304258, 0.0, 0.0, 5.5786513449552756e-5, 0.0,
-                    0.0004011239690056024, 0.0011731921141047454, 0.0,
-                    0.0027613837664847867, 0.19284923843692664, 0.16394453981228352, 0.0,
-                    0.0, 0.3005550653698399, 0.0, 0.0, 0.0, 0.0, 0.33517474548548876,
-                    0.0028705544210860263], rtol = 1e-6)
+                   [0.0, 0.0, 0.0, 0.003306398447882896, 0.020909276394013954, 0.0, 0.0,
+                    0.5126835695993831, 0.07670087618420798, 0.0011238748494735982,
+                    0.008282356039216072, 0.1721357232487124, 0.0, 0.017523225424448376,
+                    0.0, 0.010000303504920214, 0.0, 0.08659447685499204,
+                    0.05294777837182523, 0.037792141080924116], rtol = 1e-6)
 
     resa = optimise(NestedClustered(; cle = clr,
                                     opti = MeanRisk(;

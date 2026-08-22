@@ -17,3 +17,10 @@ factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...; kwargs...)
 supports_precomputed_returns(r::Skewness)
 supports_precomputed_returns(::VarianceSkewKurtosis)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

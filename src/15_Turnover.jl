@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator for turnover portfolio constraints.
+Names the per-asset turnover bounds, for [`turnover_constraints`](@ref) to align to a universe.
 
-`TurnoverEstimator` specifies turnover constraints for each asset in a portfolio, based on current portfolio weights `w`, asset-specific turnover values `val`, and a default value for assets not explicitly specified. Supports asset-specific turnover via dictionaries, pairs, or vectors of pairs.
+`val` accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name, and `dval` fills every asset the keys miss. [`turnover_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Turnover`](@ref), whose `val` is a plain per-asset vector.
 
-This estimator can be converted into a concrete [`Turnover`](@ref) constraint using the [`turnover_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`UniverseSets`](@ref) object.
+As on [`Turnover`](@ref), the `w` field holds the **reference** weights, not the candidate weights.
 
 # Fields
 
@@ -19,6 +19,8 @@ $(DocStringExtensions.FIELDS)
         dval::Option{<:Number} = nothing,
         fixed::Bool = false
     ) -> TurnoverEstimator
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -97,13 +99,13 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
   - `tn`: Existing `TurnoverEstimator` object. Supplies turnover values and default value.
   - `w`: New portfolio weights vector.
 
-# Returns
-
-  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
-
 # Validation
 
   - `w` is validated to be non-empty, finite, and numeric.
+
+# Returns
+
+  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
 
 # Examples
 
@@ -205,24 +207,32 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for turnover portfolio constraints.
+Bounds the per-asset weight change against a reference portfolio.
 
-`Turnover` stores the portfolio weights and turnover constraint values for each asset. The turnover constraint can be specified as a scalar (applied to all assets) or as a vector of per-asset values.
+!!! warning
+
+    The `w` field holds the **reference** weights, not the candidate weights. The candidate is the optimiser's own weight variable, which no field carries. `factory(tn, w)` replaces the reference, which is how the previous rebalance becomes the next reference.
+
+`val` is the bound. [`Fees`](@ref) reuses the same type with `val` read as a per-asset **fee rate** instead, so read the meaning of `val` off the type that holds the `Turnover`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-    \\boldsymbol{Tn}(\\boldsymbol{w}) &\\coloneqq \\lvert \\boldsymbol{w} - \\boldsymbol{w}_b \\rvert
+    \\boldsymbol{Tn}(\\boldsymbol{w}) &\\coloneqq \\lvert \\boldsymbol{w} - \\boldsymbol{w}_{0} \\rvert\\,, \\\\
+    \\boldsymbol{Tn}(\\boldsymbol{w}) &\\leq \\boldsymbol{\\delta}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\boldsymbol{Tn}(\\boldsymbol{w})``: `N × 1` turnover vector.
-  - ``\\boldsymbol{w}``: `N × 1` vector of current portfolio weights.
-  - ``\\boldsymbol{w}_b``: `N × 1` vector of benchmark portfolio weights.
+  - ``\\boldsymbol{w}``: `N × 1` vector of candidate portfolio weights.
+  - ``\\boldsymbol{w}_{0}``: `N × 1` vector of reference portfolio weights, the `w` field.
+  - ``\\boldsymbol{\\delta}``: `N × 1` vector of maximum turnover, the `val` field. A scalar `val` broadcasts to every asset.
   - ``\\lvert \\cdot \\rvert``: Element-wise absolute value.
+
+[`set_turnover_constraints!`](@ref) writes the second line as the two linear constraints the source gives, one per side of the absolute value.
 
 # Fields
 
@@ -281,7 +291,12 @@ Turnover
   - [`Num_VecNum`](@ref)
   - [`turnover_constraints`](@ref)
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
+  - [`Fees`](@ref)
   - [`port_opt_view`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.10 and 9.11.
 """
 @propagatable @concrete struct Turnover <: AbstractResult
     """

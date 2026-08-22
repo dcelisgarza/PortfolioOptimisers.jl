@@ -16,3 +16,10 @@ variation_info
 mutual_info
 mutual_variation_info
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

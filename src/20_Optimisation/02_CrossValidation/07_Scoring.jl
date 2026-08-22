@@ -80,15 +80,19 @@ A mixed-polarity vector is admitted here, because [`quantile_by_measure`](@ref) 
 
 # Functor
 
-    (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
+    (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult, sign::Integer = 1)
 
-Evaluates the scorer on a population prediction result and returns the selected
-prediction.
+Evaluate the scorer on a population prediction result and return the selected prediction.
+
+`sign` is the orientation of the risk scale, forwarded to [`quantile_by_measure`](@ref). Use `1`
+when a larger risk is worse, `-1` when it is better. It negates every risk value before the
+quantile is taken, so `sign = -1` selects the same path that `sign = 1` selects at `1 - q`.
 
 # Related
 
   - [`PredictionScorer`](@ref)
   - [`PopulationPredictionResult`](@ref)
+  - [`quantile_by_measure`](@ref)
   - [`ConditionalValueatRisk`](@ref)
 """
 @concrete struct NearestQuantilePrediction <: PredictionScorer
