@@ -47,10 +47,10 @@
 "src/01_Base.jl" = { map = 1, units = 136, swept = false }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = true }
-"src/04_PosdefMatrix.jl" = { map = 2, units = 4, swept = false }
-"src/05_Denoise.jl" = { map = 2, units = 10, swept = false }
-"src/06_Detone.jl" = { map = 2, units = 4, swept = false }
-"src/07_MatrixProcessing.jl" = { map = 2, units = 8, swept = false }
+"src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
+"src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
+"src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
+"src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
 "src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, swept = false }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, swept = false }
 "src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, swept = false }

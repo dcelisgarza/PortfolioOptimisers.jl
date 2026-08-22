@@ -153,6 +153,14 @@ Where:
   - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues (``\\lambda_i > \\lambda_+``).
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
+# Algorithm
+
+The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
+
+ 1. Set the `num_factors` smallest entries of `vals` to zero. `vals` is sorted ascending, so those are the noise eigenvalues.
+ 2. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the signal-only reconstruction ``\\mathbf{C}_{\\mathrm{signal}}``.
+ 3. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
+
 # Details
 
   - The rescaling is not cosmetic. Discarding the noise eigenvalues shrinks the diagonal of ``\\mathbf{C}_{\\mathrm{signal}}`` below one, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``(C_{\\mathrm{signal}})_{11} = 0.7180`` and ``(C_{\\mathrm{signal}})_{12} = 0.7817``, against ``\\tilde{X}_{11} = \\tilde{X}_{12} = 1``.
@@ -178,6 +186,7 @@ SpectralDenoise()
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.2, Equations 3.54 and 3.55.
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -207,6 +216,14 @@ Where:
   - ``\\tilde{\\mathbf{X}}``: Denoised matrix.
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
+# Algorithm
+
+The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
+
+ 1. Replace the `num_factors` smallest entries of `vals` by their own mean. `vals` is sorted ascending, so those are the noise eigenvalues.
+ 2. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the reconstruction ``\\mathbf{C}`` from the flattened spectrum.
+ 3. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
+
 # Details
 
   - Flattening the noise eigenvalues preserves the trace but not the diagonal, so the rescaling changes every entry. On a 40x10 one-factor sample with nine noise eigenvalues, ``C_{11} = 0.9715`` and ``C_{12} = 0.7524``, against ``\\tilde{X}_{11} = 1`` and ``\\tilde{X}_{12} = 0.7280``.
@@ -232,6 +249,7 @@ FixedDenoise()
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.1, Equations 3.52 and 3.53.
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -262,6 +280,16 @@ Where:
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
 The two ``\\alpha`` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic. The diagonal is pinned to one afterwards to shed the eigendecomposition round-off.
+
+# Algorithm
+
+The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
+
+ 1. Split `vals` and `vecs` at `num_factors`. The first `num_factors` entries are the noise block `vals_l` and `vecs_l`, and the rest are the signal block `vals_r` and `vecs_r`.
+ 2. Build `corr0` from the signal block, which is ``\\mathbf{C}_{\\mathrm{signal}}``.
+ 3. Build `corr1` from the noise block, which is ``\\mathbf{C}_{\\mathrm{noise}}``.
+ 4. Write `corr0 + alpha * corr1 + (1 - alpha) * Diagonal(corr1)` into `X`.
+ 5. Set the diagonal of `X` to one. This branch reconstructs directly rather than through `StatsBase.cov2cor`, so it is the only branch that must pin its own diagonal.
 
 # Details
 
@@ -301,6 +329,7 @@ ShrunkDenoise
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.3, Equation 3.56.
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
     """
@@ -389,6 +418,7 @@ Denoise
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
     """
@@ -448,6 +478,16 @@ In-place denoising of a correlation matrix using a specific denoising algorithm.
 
 These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) when a [`Denoise`](@ref) estimator is used, and should not typically be called directly.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. `vals` is sorted ascending, so the first `num_factors` entries are the noise eigenvalues and the rest are the signal eigenvalues.
+
+ 1. `alg` is a [`SpectralDenoise`](@ref): zero the noise eigenvalues, rebuild from the signal components alone, and rescale to unit diagonal with `StatsBase.cov2cor`.
+ 2. `alg` is a [`FixedDenoise`](@ref): replace the noise eigenvalues by their own mean, rebuild from the flattened spectrum, and rescale to unit diagonal with `StatsBase.cov2cor`.
+ 3. `alg` is a [`ShrunkDenoise`](@ref): rebuild the two blocks separately, combine them under `alg.alpha`, and pin the diagonal to one. This branch does not route through `StatsBase.cov2cor`, so it is the only branch that pins its own diagonal.
+
+Every branch writes into `X` and returns it.
+
 # Arguments
 
   - `alg`: Denoising algorithm.
@@ -480,6 +520,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -541,6 +582,50 @@ Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of
 
 This function fits the MP distribution to the observed spectrum by minimizing the sum of squared errors between the empirical and theoretical densities, and returns the estimated maximum eigenvalue for noise.
 
+# Mathematical definition
+
+For an effective sample ratio ``q = T/N`` and a noise variance ``\\sigma^2``, the Marčenko-Pastur density and its support are
+
+```math
+\\begin{align}
+f(\\lambda) &= \\begin{cases} \\dfrac{q \\sqrt{(\\lambda_+ - \\lambda)(\\lambda - \\lambda_-)}}{2 \\pi \\lambda \\sigma^2} & \\lambda \\in [\\lambda_-, \\lambda_+] \\\\ 0 & \\text{otherwise} \\end{cases}\\,, \\\\
+\\lambda_{\\pm} &= \\sigma^2 \\left(1 \\pm \\sqrt{\\frac{1}{q}}\\right)^2\\,.
+\\end{align}
+```
+
+The noise variance is the minimiser of the sum of squared errors between that density and an average shifted histogram estimate of the density of the observed eigenvalues,
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2 &= \\underset{\\sigma^2 \\in [0, 1]}{\\arg\\min} \\sum_{i=1}^{n} \\left(\\hat{f}(\\lambda_i) - f(\\lambda_i)\\right)^2\\,, \\\\
+\\hat{\\lambda}_{+} &= \\hat{\\sigma}^2 \\left(1 + \\sqrt{\\frac{1}{q}}\\right)^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``f``: Theoretical Marčenko-Pastur density.
+  - ``\\hat{f}``: Average shifted histogram estimate of the density of the observed eigenvalues.
+  - ``\\lambda_{\\pm}``: Upper and lower edges of the support of ``f``.
+  - ``\\hat{\\lambda}_{+}``: Fitted upper edge, which is the value returned.
+  - ``\\sigma^2``: Variance attributed to noise. A correlation matrix has ``\\sigma^2 = 1``.
+  - ``q = T/N``: Effective sample ratio.
+  - ``n``: Number of grid points, which is the argument `n`.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Compute the two edge factors of a unit variance, `op_sqrt_iq_sq` for ``\\lambda_+`` and `om_sqrt_iq_sq` for ``\\lambda_-``.
+ 2. Define the objective on a trial variance `x`. Steps 3 to 6 are its body.
+ 3. Scale the two edge factors by `x`, giving `e_min` and `e_max`, and place `n` equally spaced points over `[e_min, e_max]`, giving `rg`.
+ 4. Evaluate the theoretical density on `rg`, giving column 1 of `pdf`. The product under the square root is clamped at zero, so a round-off outside the support gives zero rather than a domain error.
+ 5. Estimate the density of `vals` over the same range with `AverageShiftedHistograms.ash`, under `kernel` and `m`, and evaluate it, giving column 2 of `pdf`. Replace a non-finite entry by zero.
+ 6. Return the sum of the squared differences of the two columns.
+ 7. Minimise the objective over `x` in `[0, 1]` with `Optim.optimize`, under `args` and `kwargs`.
+ 8. Take `x` as the minimiser when the search converged. When it did not, warn and substitute `x = 1`, the variance of a correlation matrix.
+ 9. Return `x * op_sqrt_iq_sq`, the fitted upper edge.
+
 # Arguments
 
   - `vals`: Observed eigenvalues (typically sorted in ascending order).
@@ -560,6 +645,9 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - Minimises the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
   - Uses the minimiser and effective sample ratio to compute the maximum feasible noise eigenvalue.
   - Returns the maximum feasible noise eigenvalue.
+  - **The fitted variance is bounded above by one.** `Optim.optimize` searches `[0, 1]`, so a spectrum whose noise variance exceeds one fits at the boundary and the returned edge is the unit-variance edge. A correlation matrix has unit variance by construction, which is the case this bound is written for.
+  - **A search that does not converge substitutes a unit variance.** The returned edge is then ``(1 + \\sqrt{1/q})^2`` exactly. The substitution emits a warning, so the caller can tell a fitted edge from a fallback edge. Only `args` and `kwargs` can make the search fail; the defaults converge.
+  - **The empirical density is evaluated at the wrong points.** Step 5 evaluates `AverageShiftedHistograms.pdf` at the *values* of column 1 rather than at the grid `rg`, so the two columns of `pdf` are not compared over a common abscissa. See [#475](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/475), which carries the reproduction and the one-line fix.
 
 # Related
 
@@ -570,6 +658,8 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 # References
 
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:cajas2025]) Section 3.5.1, Equation 3.51.
 """
 function find_max_eval(vals::VecNum, q::Number,
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -594,7 +684,12 @@ function find_max_eval(vals::VecNum, q::Number,
     end
     res = Optim.optimize(x -> f(x), zero(eltype(vals)), one(eltype(vals)), args...;
                          kwargs...)
-    x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
+    x = if Optim.converged(res)
+        Optim.minimizer(res)
+    else
+        @warn("Marčenko-Pastur fit did not converge, using a unit noise variance.")
+        1.0
+    end
     return x * op_sqrt_iq_sq
 end
 """
@@ -619,6 +714,17 @@ Where:
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
   - ``\\sigma^2``: Variance explained by noise (fitted from the Marčenko-Pastur distribution).
   - ``q = T/N``: Effective sample ratio (observations to assets).
+
+# Algorithm
+
+ 1. Check that `X` is square.
+ 2. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 3. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 4. Fit the Marčenko-Pastur density to `vals` with [`find_max_eval`](@ref), giving `max_val`, the upper edge of the noise band.
+ 5. Count the eigenvalues that do not exceed `max_val`, giving `num_factors`, the number of noise eigenvalues.
+ 6. Rebuild `X` from the split spectrum with [`_denoise!`](@ref), through the branch that `dn.alg` selects.
+ 7. Repair the rebuilt matrix with [`posdef!`](@ref), under `dn.pdm`.
+ 8. When step 2 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 2, so the original diagonal returns exactly.
 
 # Arguments
 
@@ -688,6 +794,7 @@ julia> denoise!(Denoise(), X, 10 / 5)
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.
 """
 function denoise!(::Nothing, X::MatNum, args...)::MatNum
     return X
@@ -714,6 +821,11 @@ end
     denoise(dn::Option{<:AbstractDenoiseEstimator}, X::MatNum, q::Number) -> MatNum
 
 Out-of-place version of [`denoise!`](@ref).
+
+# Algorithm
+
+ 1. Copy `X`.
+ 2. Apply [`denoise!`](@ref) to the copy, and return it. The input is never modified.
 
 # Arguments
 
@@ -759,6 +871,7 @@ julia> size(Xd)
 
   - $(ref_dict[:mlp1]) Chapter 2.
   - $(ref_dict[:mpdist])
+  - $(ref_dict[:cajas2025]) Section 3.5.2.
 """
 function denoise(::Nothing, X::MatNum, args...)::MatNum
     return X

@@ -12,8 +12,8 @@ commit = "a6d87c6"
 "src/01_Base.jl" = { lines = 402, misses = 68 }
 "src/02_Tools.jl" = { lines = 398, misses = 0 }
 "src/03_Preprocessing.jl" = { lines = 403, misses = 0 }
-"src/04_PosdefMatrix.jl" = { lines = 26, misses = 1 }
-"src/05_Denoise.jl" = { lines = 71, misses = 0 }
+"src/04_PosdefMatrix.jl" = { lines = 26, misses = 0 }
+"src/05_Denoise.jl" = { lines = 74, misses = 0 }
 "src/06_Detone.jl" = { lines = 30, misses = 0 }
 "src/07_MatrixProcessing.jl" = { lines = 33, misses = 0 }
 "src/08_Moments/01_Base_Moments.jl" = { lines = 245, misses = 14 }

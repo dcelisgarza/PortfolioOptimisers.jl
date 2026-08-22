@@ -1,4 +1,4 @@
-using PortfolioOptimisers, Test
+using PortfolioOptimisers, Test, NearestCorrelationMatrix, LinearAlgebra
 
 # Card 7 of the 2026-08-17 maintainability review: the out-of-place verbs are documented
 # as an optional part of the extension interface, so an estimator that declares only the
@@ -19,9 +19,33 @@ function PortfolioOptimisers.detone!(::Card7Detone, X::AbstractMatrix)
     return X
 end
 
+# Ticket 447: `posdef!` warns rather than throwing when the projection leaves the matrix
+# indefinite, and returns the unrepaired matrix either way. Every algorithm
+# NearestCorrelationMatrix ships repairs its input, and `nearest_cor!` passes
+# `ensure_pd = true` on top of it, so the arm is reachable only through a `pdm.alg` that
+# declines to repair and a `pdm.kwargs` that lifts that guard. Both are documented fields.
+struct Ticket447Stub <: NearestCorrelationMatrix.NCMAlgorithm end
+NearestCorrelationMatrix.modifies_in_place(::Ticket447Stub) = true
+NearestCorrelationMatrix.supports_symmetric(::Ticket447Stub) = true
+function NearestCorrelationMatrix.solve!(solver::NearestCorrelationMatrix.NCMSolver,
+                                         alg::Ticket447Stub; kwargs...)
+    return NearestCorrelationMatrix.build_ncm_solution(alg, solver.A, nothing, solver;
+                                                       iters = 0)
+end
+
+# Ticket 447: an algorithm whose effect does not commute with detoning, so the order of
+# `mp.order` is observable rather than merely stored.
+struct Ticket447Bump <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end
+function PortfolioOptimisers.matrix_processing_algorithm!(::Ticket447Bump,
+                                                          sigma::AbstractMatrix, args...;
+                                                          kwargs...)
+    sigma[LinearAlgebra.diagind(sigma)] .*= 4
+    return sigma
+end
+
 @testset "Linear Algebra" begin
     using PortfolioOptimisers, Test, CSV, LinearAlgebra, DataFrames, TimeSeries, StableRNGs,
-          Random
+          Random, AverageShiftedHistograms
     @testset "Operators" begin
         rng = StableRNG(987654321)
         X1 = rand(rng, 10)
@@ -115,6 +139,151 @@ end
         sigma5 = matrix_processing(nothing, sigma1, pr.X)
         sigma4 == matrix_processing!(MatrixProcessing(), sigma2, pr.X)
         sigma5 == matrix_processing!(nothing, sigma3, pr.X)
+    end
+    @testset "Ticket 447: the covariance-to-correlation wrapper" begin
+        # `posdef!`, `denoise!` and `detone!` all decide with `any(!isone, s)`, so it is the
+        # value of the diagonal that names a covariance, never the type of the matrix. The
+        # two routes must therefore agree up to the rescaling.
+        rng = StableRNG(11223344)
+        f = randn(rng, 200)
+        Y = hcat([0.8 .* f .+ 0.6 .* randn(rng, 200) for _ in 1:10]...)
+        C = cor(Y)
+        qr = 200 / 10
+        sd = collect(range(0.5, 2.0; length = 10))
+        S = StatsBase.cor2cov(copy(C), sd)
+        for alg in (SpectralDenoise(), FixedDenoise(), ShrunkDenoise(; alpha = 0.3))
+            Xc = denoise(Denoise(; alg = alg), C, qr)
+            Sc = denoise(Denoise(; alg = alg), S, qr)
+            @test all(isone, LinearAlgebra.diag(Xc))
+            @test isapprox(LinearAlgebra.diag(Sc), LinearAlgebra.diag(S))
+            @test isapprox(StatsBase.cov2cor(copy(Sc), sqrt.(LinearAlgebra.diag(Sc))), Xc)
+        end
+        Xt = detone(Detone(), C)
+        St = detone(Detone(), S)
+        @test all(isone, LinearAlgebra.diag(Xt))
+        @test isapprox(LinearAlgebra.diag(St), LinearAlgebra.diag(S))
+        @test isapprox(StatsBase.cov2cor(copy(St), sqrt.(LinearAlgebra.diag(St))), Xt)
+    end
+    @testset "Ticket 447: ShrunkDenoise's alpha is the weight kept" begin
+        # `alpha` scales the off-diagonal part of the noise block, so `alpha = 0` is total
+        # shrinkage and `alpha = 1` is a no-op. A reading of `alpha` as a shrinkage
+        # intensity has the polarity backwards.
+        rng = StableRNG(987654321)
+        C = cor(randn(rng, 24, 8))
+        offd(M) = sum(abs, M - LinearAlgebra.Diagonal(M))
+        c0 = denoise(Denoise(; alg = ShrunkDenoise(; alpha = 0.0)), C, 24 / 8)
+        c5 = denoise(Denoise(; alg = ShrunkDenoise(; alpha = 0.5)), C, 24 / 8)
+        c1 = denoise(Denoise(; alg = ShrunkDenoise(; alpha = 1.0)), C, 24 / 8)
+        # Every eigenvalue of this sample is noise, so the whole off-diagonal is shrunk.
+        @test isapprox(offd(C), 9.42045698910268)
+        @test iszero(offd(c0))
+        @test isapprox(offd(c5), offd(C) / 2)
+        @test isapprox(c1, C; atol = 1e-14)
+        # Each branch pins the diagonal, the last one by hand.
+        @test all(isone, LinearAlgebra.diag(c0))
+        @test all(isone, LinearAlgebra.diag(c5))
+        @test all(isone, LinearAlgebra.diag(c1))
+    end
+    @testset "Ticket 447: detone! removes the top n modes" begin
+        # `detone!` decrements `n` and slices `(end - n):end`, so `dt.n` is the count of
+        # modes removed and `dt.n = 1` removes the market mode alone.
+        rng = StableRNG(11223344)
+        f = randn(rng, 200)
+        Y = hcat([0.8 .* f .+ 0.6 .* randn(rng, 200) for _ in 1:10]...)
+        C = cor(Y)
+        sd = collect(range(0.5, 2.0; length = 10))
+        S = StatsBase.cor2cov(copy(C), sd)
+        function detone_byhand(X, n)
+            s = LinearAlgebra.diag(X)
+            iscov = any(!isone, s)
+            Xw = copy(X)
+            if iscov
+                s = sqrt.(s)
+                StatsBase.cov2cor!(Xw, s)
+            end
+            v, V = LinearAlgebra.eigen(Xw)
+            for k in (size(Xw, 1) - n + 1):size(Xw, 1)
+                Xw .-= v[k] * V[:, k] * transpose(V[:, k])
+            end
+            Xw .= StatsBase.cov2cor(Xw)
+            PortfolioOptimisers.posdef!(Posdef(), Xw)
+            iscov && StatsBase.cor2cov!(Xw, s)
+            return Xw
+        end
+        for n in 1:3
+            @test isapprox(detone(Detone(; n = n), C), detone_byhand(C, n))
+        end
+        for n in 1:2
+            @test isapprox(detone(Detone(; n = n), S), detone_byhand(S, n))
+        end
+        @test_throws DomainError detone(Detone(; n = 11), C)
+    end
+    @testset "Ticket 447: find_max_eval and its fallback" begin
+        # On data drawn from an identity covariance the fitted edge sits at the theoretical
+        # Marcenko-Pastur edge, because the noise variance of a correlation matrix is one.
+        rng = StableRNG(555)
+        for (T, N) in ((2000, 100), (1000, 50))
+            Z = cor(randn(rng, T, N))
+            vals = LinearAlgebra.eigen(Z).values
+            edge = (1 + sqrt(N / T))^2
+            fitted = PortfolioOptimisers.find_max_eval(vals, T / N,
+                                                       AverageShiftedHistograms.Kernels.gaussian,
+                                                       10, 1000, (), (;))
+            @test isapprox(fitted, edge; rtol = 1e-3)
+        end
+        # A search that does not converge substitutes a unit variance, and says so. Only
+        # `dn.kwargs` can make the search fail; the defaults converge.
+        vals = LinearAlgebra.eigen(cor(randn(rng, 500, 50))).values
+        q0 = 10.0
+        @test isapprox(PortfolioOptimisers.find_max_eval(copy(vals), q0,
+                                                         AverageShiftedHistograms.Kernels.gaussian,
+                                                         10, 1000, (), (; iterations = 0)),
+                       (1 + sqrt(inv(q0)))^2)
+        @test_logs (:warn,
+                    "Marčenko-Pastur fit did not converge, using a unit noise variance.") PortfolioOptimisers.find_max_eval(copy(vals),
+                                                                                                                            q0,
+                                                                                                                            AverageShiftedHistograms.Kernels.gaussian,
+                                                                                                                            10,
+                                                                                                                            1000,
+                                                                                                                            (),
+                                                                                                                            (;
+                                                                                                                             iterations = 0))
+    end
+    @testset "Ticket 447: posdef! warns and returns the unrepaired matrix" begin
+        X = [1.0 2.0; 2.0 1.0]
+        est = Posdef(; alg = Ticket447Stub(), kwargs = (; ensure_pd = false))
+        r = @test_logs (:warn, "Matrix could not be made positive definite.") posdef!(est,
+                                                                                      copy(X))
+        @test r == X
+        @test !LinearAlgebra.isposdef(r)
+    end
+    @testset "Ticket 447: matrix_processing! applies mp.order" begin
+        rng = StableRNG(90210)
+        Xd = randn(rng, 120, 6)
+        S0 = cov(Xd)
+        mp = MatrixProcessing(; pdm = Posdef(), dn = Denoise(; alg = FixedDenoise()),
+                              dt = Detone(; n = 1), alg = nothing)
+        T, N = size(Xd)
+        byhand = copy(S0)
+        posdef!(mp.pdm, byhand)
+        denoise!(mp.dn, byhand, T / N)
+        detone!(mp.dt, byhand)
+        PortfolioOptimisers.matrix_processing_algorithm!(mp.alg, byhand, Xd)
+        @test matrix_processing(mp, S0, Xd) == byhand
+        # A `nothing` estimator skips its step rather than leaving the order.
+        skipped = MatrixProcessing(; pdm = nothing, dn = nothing, dt = nothing,
+                                   alg = nothing)
+        @test matrix_processing(skipped, S0, Xd) == S0
+        # The order is applied, not merely stored.
+        b1 = matrix_processing(MatrixProcessing(; dt = Detone(; n = 1),
+                                                alg = Ticket447Bump(), order = (:alg, :dt)),
+                               S0, Xd)
+        b2 = matrix_processing(MatrixProcessing(; dt = Detone(; n = 1),
+                                                alg = Ticket447Bump(), order = (:dt, :alg)),
+                               S0, Xd)
+        @test !isapprox(b1, b2)
+        @test isapprox(maximum(abs, b1 - b2), 1.2495649955451098)
+        @test_throws ArgumentError MatrixProcessing(; order = (:pdm, :nope))
     end
     @testset "Inherited out-of-place fallback" begin
         X = [1.0 2.0; 0.0 1.0]
