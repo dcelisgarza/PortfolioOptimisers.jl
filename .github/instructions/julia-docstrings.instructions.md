@@ -12,6 +12,7 @@ applyTo: 'src/**/*.jl, ext/**/*.jl, docs/**/*.md'
 - Include code examples where applicable.
 - **All public types, functions, and macros must have docstrings.**
 - **Scope**: `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. A package extension in `ext/` is documented on the same terms as `src/`.
+- **An extension documents the names it declares itself, and nothing else.** An extension implements a seam that `src/` declares, and the declaration carries the docstring, the `# References` section and the API-page entry. So a method of a function declared in `src/` gets no docstring of its own in `ext/`, and the extension's own module, constants, types and macros each get one. Write a citation in the `src/` declaration, where the API page that renders it carries the bibliography block; an extension needs neither an API page nor a bibliography block of its own. `test/test_26_docs.jl` gates this per file, through the `swept` flag in [`sweep/manifest.toml`](../../sweep/manifest.toml).
 
 ## The summary sentence (load-bearing — read this before writing a type docstring)
 

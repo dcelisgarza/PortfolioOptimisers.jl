@@ -228,6 +228,7 @@ nothing raises `@error "File exists but no references were collected"` in
     using PortfolioOptimisers, Test
     PO = PortfolioOptimisers
     SRC = joinpath(@__DIR__, "..", "src")
+    EXT = joinpath(@__DIR__, "..", "ext")
     BIB = joinpath(@__DIR__, "..", "docs", "src", "References.bib")
     API = joinpath(@__DIR__, "..", "docs", "src", "api")
 
@@ -239,7 +240,16 @@ nothing raises `@error "File exists but no references were collected"` in
         return sort!(acc)
     end
 
-    src_files = files_under(SRC, ".jl")
+    #=
+    Issue #404 widened the sweep's scope from `src/` to `src/` and `ext/`. The three checks
+    below scan source text, and each of them is a CONFORMANCE check: if a file cites, the key
+    must resolve, and if a file writes a `# References` bullet, that bullet must interpolate
+    `ref_dict`. Such a check is vacuous on a file that does neither, so widening it cannot
+    red a file that no child map has swept. It takes effect on the day the first `ext/`
+    docstring cites. `Extension docs completeness` at the foot of this file holds the other
+    kind of check, which cannot widen this way.
+    =#
+    source_files = vcat(files_under(SRC, ".jl"), files_under(EXT, ".jl"))
     # `ref_dict` itself names every key it defines, so it is not evidence that anything
     # cites the work. Exclude the file that holds the table when looking for users.
     dict_file = joinpath(SRC, "01_Base.jl")
@@ -257,7 +267,7 @@ nothing raises `@error "File exists but no references were collected"` in
     end
 
     @testset "every citation resolves in References.bib" begin
-        for f in src_files
+        for f in source_files
             for key in cited_keys(read(f, String))
                 @test key in bib_keys
             end
@@ -269,7 +279,7 @@ nothing raises `@error "File exists but no references were collected"` in
             @test string(key) in bib_keys
         end
         users = Set{Symbol}()
-        for f in src_files
+        for f in source_files
             f == dict_file && continue
             for m in eachmatch(r"ref_dict\[:([A-Za-z0-9_]+)\]", read(f, String))
                 push!(users, Symbol(m.captures[1]))
@@ -285,7 +295,7 @@ nothing raises `@error "File exists but no references were collected"` in
     # reference prose, which is what this table exists to stop.
     @testset "no # References bullet carries inline reference prose" begin
         bullet = r"^\s*- \$\(ref_dict\[:[A-Za-z0-9_]+\]\)"
-        for f in src_files
+        for f in source_files
             lines = split(read(f, String), '\n')
             i = 1
             while i <= length(lines)
@@ -446,5 +456,156 @@ is blind to the ordering and this check is what holds it across the tree.
             append!(offenders, misordered_docstrings(joinpath(root, f)))
         end
         @test offenders == String[]
+    end
+end
+
+#=
+`ext/` and the sweep manifest (issue #409, under the map of maps #404).
+
+#404 widened the sweep's scope from `src/` to `src/` and `ext/`, for all three of its
+concerns. The checks in this file stopped at `src/`. Widening them is not one act, because
+they are of two kinds and only one kind can red a file that no child map has swept.
+
+  A CONFORMANCE check says "if the file states X, X must be well formed". It is vacuous on a
+  file that states no X, so it widens unconditionally and takes effect on the day the first
+  `ext/` docstring states one. The three text checks under `References` are of this kind,
+  and so is `# Validation precedes # Returns`, which #406 already widened.
+
+  A PRESENCE check says "the file must state X". It reds a file the moment its scope reaches
+  it. `ext/` carries ZERO docstrings over 2145 lines, so a presence check widened
+  unconditionally would red the build across both files on the day it landed. It reads the
+  sweep manifest instead: a file marked `swept = true` must satisfy it, and an unswept file
+  is exempt. Both `ext/` rows are `swept = false` today, so the testset below asserts the
+  exemption and nothing else. Child map 13 sweeps the two files and flips the flags.
+
+--------------------------------------------------- what an extension file has to document
+
+An extension is a module of its own, so `Base.undocumented_names` -- the instrument the
+first testset in this file already uses -- answers for it directly. It also answers the
+right question rather than a widened one, and what the two files hold is why:
+
+  - `ext/PortfolioOptimisersPlotsExt.jl` defines 171 methods of 34 functions, and every one
+    of the 34 is declared as a bare `function ... end` stub in `src/24_Plotting.jl`, which
+    carries its docstring. Beyond those methods it declares four module-local `const`s
+    holding error-message text, and nothing else.
+  - `ext/PortfolioOptimisersImputeExt.jl` defines one method of
+    `PortfolioOptimisers.apply_impute_method`, a seam declared in `src/03_Preprocessing.jl`.
+
+A method binds in the module that declares the FUNCTION, so none of those 172 methods
+reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
+is the right demand: 172 docstrings restating 35 would be 137 copies free to drift, which is
+what `ref_dict` and `field_dict` exist to stop. What the census does ask for is the four
+`const`s and the extension module's own docstring -- the names the extension declares
+itself. The main module carries a docstring under exactly that rule, so this is one rule and
+not two.
+
+#409's three questions are answered by that one rule.
+
+ 1. A NAME THE EXTENSION FILE DECLARES ITSELF must be documented, and a method of a function
+    declared in `src/` is documented by that declaration. The tree holds no `@recipe` block
+    today, and the rule settles one if it ever appears: `@recipe` declares no binding a
+    caller can reach, so it never enters `names`, and the reachable name is the `plot_*`
+    function it serves, which `src/24_Plotting.jl` declares.
+ 2. `ext/` NAMES DO NOT ENTER THE CAPABILITY CATALOGUE on their own account. The 34 `plot_*`
+    functions are exported by `src/24_Plotting.jl` and are catalogued there already, which
+    is why `every exported function is accounted for` is green today. ADR 0040 owns the
+    catalogue and needs no amendment. An extension that declared a user-facing name of its
+    own would be the smell, not the case to cater for: the declaration belongs in `src/` as
+    a stub, which is the pattern both extensions already follow.
+ 3. AN `ext/` DOCSTRING MAY CITE, by the same rule as a `src/` one, and the API page that
+    renders that docstring carries the bibliography block. Under rule 1 the page is always
+    the page of the `src/` declaration -- `docs/src/api/24_Plotting.md` for the plotting
+    family -- so an extension needs neither a page nor a block of its own. This matters:
+    `an API page carries a bibliography block iff it cites` resolves each `@docs` entry
+    against `PortfolioOptimisers`, so a name declared inside an extension resolves to
+    nothing there, the page reads as citing nothing, and a block that page needs is reported
+    as stray. Rule 1 keeps that case out of the tree.
+=#
+@testset "Extension docs completeness" begin
+    using PortfolioOptimisers, Test, TOML
+    ROOT = normpath(joinpath(@__DIR__, ".."))
+
+    extensions = get(TOML.parsefile(joinpath(ROOT, "Project.toml")), "extensions",
+                     Dict{String, Any}())
+    rows = TOML.parsefile(joinpath(ROOT, "sweep", "manifest.toml"))["file"]
+    ext_rows = sort([f for f in keys(rows) if startswith(f, "ext/")])
+
+    # Julia loads an extension from `ext/<Name>.jl`, or from `ext/<Name>/` when it needs
+    # more than one file. The manifest is per file and `[extensions]` is per module, so the
+    # join is derived here rather than written down: a second file added to an extension
+    # then needs no edit in this file.
+    belongs_to(name, f) = f == string("ext/", name, ".jl") ||
+                          startswith(f, string("ext/", name, "/"))
+
+    @testset "every ext/ row belongs to a declared extension" begin
+        # A `.jl` file under `ext/` that no `[extensions]` entry claims is loaded by
+        # nothing, so no `using` reaches it and no gate here can see it.
+        orphans = filter(f -> !any(n -> belongs_to(n, f), keys(extensions)), ext_rows)
+        if !isempty(orphans)
+            @warn """$(length(orphans)) file(s) under `ext/` that no `[extensions]` entry in
+                     `Project.toml` claims:\n  $(join(orphans, "\n  "))"""
+        end
+        @test isempty(orphans)
+    end
+
+    @testset "a swept extension declares no undocumented name" begin
+        # Loading is deferred to a swept extension, and to that extension's own triggers.
+        # `StatsPlots` costs about a minute to load, and this file must not pay that to
+        # assert an exemption.
+        #
+        # A trigger is required to be a declared dependency of `test/Project.toml`, and not
+        # merely loadable. `Base.require` searches the whole `LOAD_PATH`, so in a hand-run
+        # REPL it reaches the user's own environment and returns a version that no
+        # `[compat]` bound here sanctions. `Pkg.test` puts the test environment and the
+        # stdlib on `LOAD_PATH` and nothing else, so the same call answers differently in
+        # CI. Reading the declaration makes this file answer the same in both.
+        test_deps = keys(get(TOML.parsefile(joinpath(@__DIR__, "Project.toml")), "deps",
+                             Dict{String, Any}()))
+        function load_extension(name, triggers)
+            all(t -> t in test_deps, triggers) || return nothing
+            for t in triggers
+                try
+                    Base.require(Main, Symbol(t))
+                catch
+                    return nothing
+                end
+            end
+            return Base.get_extension(PortfolioOptimisers, Symbol(name))
+        end
+
+        undocumented, unloadable = String[], String[]
+        for (name, triggers) in extensions
+            files = filter(f -> belongs_to(name, f), ext_rows)
+            any(f -> rows[f]["swept"], files) || continue
+            trigger_list = isa(triggers, AbstractString) ? [triggers] : triggers
+            mod = load_extension(name, trigger_list)
+            if isnothing(mod)
+                # Refuse to be vacuously green. `Impute` is a weak dependency (ADR 0042)
+                # and is absent from `test/Project.toml`, so on the day child map 13 sweeps
+                # that extension this environment must gain it, or the gate is blind to the
+                # file it is meant to hold.
+                push!(unloadable, string(name, "  triggers: ", join(trigger_list, ", ")))
+            else
+                for n in Base.undocumented_names(mod; private = true)
+                    push!(undocumented, string(name, ".", n))
+                end
+            end
+        end
+
+        if !isempty(unloadable)
+            @warn """$(length(unloadable)) extension(s) marked `swept = true` in
+                     `sweep/manifest.toml` cannot be loaded in this environment, so nothing
+                     here can see them. Add each trigger package to `test/Project.toml`:
+                     \n  $(join(sort(unloadable), "\n  "))"""
+        end
+        @test isempty(unloadable)
+
+        if !isempty(undocumented)
+            @warn """$(length(undocumented)) name(s) declared by a swept extension carry no
+                     docstring. A method of a function declared in `src/` is documented by
+                     that declaration and never appears here, so each name below is one the
+                     extension declares itself:\n  $(join(sort(undocumented), "\n  "))"""
+        end
+        @test isempty(undocumented)
     end
 end
