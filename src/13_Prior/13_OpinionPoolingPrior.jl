@@ -444,13 +444,13 @@ Compute opinion pooling prior moments for asset returns.
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, consensus weights, entropy, Kullback-Leibler divergence, opinion probabilities, and optional factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, consensus weights, entropy, Kullback-Leibler divergence, opinion probabilities, and optional factor moments.
 
 # Details
 

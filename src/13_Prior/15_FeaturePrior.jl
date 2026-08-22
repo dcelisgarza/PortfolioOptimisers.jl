@@ -740,15 +740,15 @@ Every moment is the wrapped estimator's, untouched. The only addition is `Z`, pr
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the wrapped estimator and the producer.
 
-# Returns
-
-  - `pr::LowOrderPrior`: The wrapped result, with `Z` set.
-
 # Validation
 
   - `dims in (1, 2)`.
   - If `pe.sets` is not `nothing`, `length(pe.sets.dict[pe.sets.xkey]) == size(X, 2)`.
   - `Z` is validated against `X` by [`LowOrderPrior`](@ref).
+
+# Returns
+
+  - `pr::LowOrderPrior`: The wrapped result, with `Z` set.
 
 # Related
 

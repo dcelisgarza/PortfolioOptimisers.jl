@@ -747,6 +747,8 @@ const err_name_dict = unique_key_dict(:err_name_dict, :kt => "cokurtosis",
     const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
+
+`:relax` is the exception: it is the fixed opening sentence of a `## Relaxation` subsection under `# JuMP formulation`, held here so that the wording cannot drift between docstrings.
 """
 const val_dict = unique_key_dict(:val_dict,
                                  :oow => "If `w` is not `nothing`, `!isempty(w)`.",
@@ -799,7 +801,8 @@ const val_dict = unique_key_dict(:val_dict,
                                  :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
                                  :ra_x => "`x` is valid",#
                                  :ra_y => "`y` is valid",#
-                                 :ra_norm_x => "`x` is valid")
+                                 :ra_norm_x => "`x` is valid",#
+                                 :relax => "The encoding is not exact: the rows below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
@@ -859,6 +862,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                       :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
                        # Second-moment formulations.
@@ -3695,13 +3699,13 @@ Assert that the input matrix is square.
   - `X`: Input matrix to validate.
   - `X_sym`: Symbolic name used in error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `size(X, 1) == size(X, 2)`.
+
+# Returns
+
+  - `nothing`.
 
 # Details
 
@@ -3753,14 +3757,14 @@ Validate `dims` and return the matrices with the observations along the rows.
   - `dims`: Dimension along which the observations lie.
   - `A`, `B`, `Cs...`: Matrices to orient. A `nothing` passes through unchanged, so an optional matrix needs no branch of its own.
 
+# Validation
+
+  - `dims in (1, 2)`, by [`assert_dims`](@ref).
+
 # Returns
 
   - `A`: The oriented matrix, when one matrix is given.
   - `(A, B, Cs...)`: A tuple of the oriented matrices, when more than one is given.
-
-# Validation
-
-  - `dims in (1, 2)`, by [`assert_dims`](@ref).
 
 # Details
 

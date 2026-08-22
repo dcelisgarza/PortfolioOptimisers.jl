@@ -288,10 +288,6 @@ The unit-interval bound is load-bearing rather than cosmetic. [`calc_omega`](@re
   - `views_conf`: Scalar or vector of confidence values.
   - `views`: Black-Litterman views, which may be equations.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `views_conf`:
@@ -306,6 +302,10 @@ The unit-interval bound is load-bearing rather than cosmetic. [`calc_omega`](@re
       + `::VecStr_Expr`, `length(views_conf) == length(views)`.
       + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
       + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`, then the unit-interval bound.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

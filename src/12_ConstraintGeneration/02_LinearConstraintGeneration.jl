@@ -225,14 +225,14 @@ That equivalence is what this function exists to preserve. A caller that compute
 
   - `lcs`: The constraints to merge.
 
-# Returns
-
-  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
-
 # Validation
 
   - `lcs` is non-empty.
   - Every merged half is written over the same number of variables.
+
+# Returns
+
+  - `lc::LinearConstraint`: One constraint carrying every row, in input order.
 
 # Examples
 
@@ -822,13 +822,13 @@ This method checks that the input vector `val` matches the length of the asset u
   - `key`: (Optional) Key in the [`UniverseSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`UniverseSets`](@ref).
   - `kwargs...`: Additional keyword arguments (ignored).
 
-# Returns
-
-  - `val::VecNum`: The input vector, unchanged.
-
 # Validation
 
   - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
 
 # Related
 
@@ -859,13 +859,13 @@ This method checks that size of `dims` of the input matrix `val` matches the len
   - `dims`: Dimension along which to validate the matrix size.
   - `kwargs...`: Additional keyword arguments (ignored).
 
-# Returns
-
-  - `val::VecNum`: The input vector, unchanged.
-
 # Validation
 
   - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.xkey, key)]`.
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
 
 # Related
 

@@ -433,14 +433,14 @@ Nothing that works today. Every pairing this refuses already throws, at [`PMFG_T
   - `de`: Distance estimator that produced `D`. Read only to name it in the error.
   - `D`: Distance matrix.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Under [`ComplementSimilarity`](@ref): `all(x -> x <= 1, D)`.
   - Under [`MaximumDistanceSimilarity`](@ref): `all(isfinite, D)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

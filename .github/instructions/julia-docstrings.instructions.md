@@ -1,5 +1,5 @@
 ---
-applyTo: 'src/**/*.jl, docs/**/*.md'
+applyTo: 'src/**/*.jl, ext/**/*.jl, docs/**/*.md'
 ---
 
 # Docstring and Documentation Guidelines for PortfolioOptimisers.jl
@@ -11,6 +11,7 @@ applyTo: 'src/**/*.jl, docs/**/*.md'
 - Use consistent terminology and style.
 - Include code examples where applicable.
 - **All public types, functions, and macros must have docstrings.**
+- **Scope**: `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. A package extension in `ext/` is documented on the same terms as `src/`.
 
 ## The summary sentence (load-bearing — read this before writing a type docstring)
 
@@ -85,6 +86,27 @@ Fields in `@concrete` structs are documented inline using `field_dict`:
     "$(field_dict[:malg])"
     alg
     ...
+end
+```
+
+### When a field description may be prose
+
+The dictionary exists to stop two copies of one sentence drifting apart. One copy cannot drift, so the rule is keyed on the number of users:
+
+- A description used by **more than one field must interpolate** `field_dict`.
+- A description used by **exactly one field may be written as prose** in the struct body.
+- When a prose description gains a second user, move it into `arg_dict` and replace both copies with the interpolation.
+
+`field_dict` is derived from `arg_dict` by stripping everything up to and including the first `:`, so a new field description is added to `arg_dict`. Editing a value already in `arg_dict` moves every docstring that interpolates the key, so **add a new key rather than rewriting one that is in use**.
+
+```julia
+@concrete struct MyType <: AbstractMyType
+    # `me` is described by many types, so it interpolates.
+    "$(field_dict[:me])"
+    me
+    # `tag` is described here and nowhere else, so prose is permitted.
+    "Selector that names the branch this type takes."
+    tag
 end
 ```
 
@@ -518,6 +540,92 @@ Key rules:
 - Every symbol that appears in any block must be defined.
 - Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
 - If a key is missing from `math_dict`, add it to `src/01_Base.jl` first.
+
+---
+
+## The `# Algorithm` Section
+
+A **procedure** is documented in `# Algorithm`. A **closed form** stays in `# Mathematical definition`. A docstring may carry both sections, and a marker type carries neither.
+
+`# Algorithm` sits immediately after `# Mathematical definition`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
+
+Rules:
+
+- Write **numbered steps, one step per operation**. Each step names the quantity that the operation produces.
+- Name each quantity by the name that the body gives it, so a reader can follow the steps in the code.
+- Do not restate a closed form as a step. The formula belongs in `# Mathematical definition`, and the step that applies it names it.
+- A **selector tag** — a type whose only job is to name the branch that a caller takes — carries **neither** section. Its summary sentence states which branch it selects. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type.
+
+The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/05_Denoise.jl`:
+
+````julia
+"""
+# Algorithm
+
+ 1. Check that `X` is square.
+ 2. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`.
+ 3. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 4. Fit the Marčenko-Pastur density to `vals`, giving `max_val`, the upper edge of the noise band.
+ 5. Count the eigenvalues that do not exceed `max_val`, giving `num_factors`, the number of noise eigenvalues.
+ 6. Rebuild `X` from the split spectrum, through the branch that `alg` selects.
+ 7. Repair the rebuilt matrix with `posdef!`.
+ 8. When step 2 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`.
+"""
+````
+
+---
+
+## The `# JuMP formulation` Section
+
+Any code that **adds rows to a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: the rows carry names, a caller reads them back by those names, and the encoding is not always exact.
+
+`# JuMP formulation` sits after `# Mathematical definition` and after `# Algorithm`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
+
+It has three subsections, in this order. The first two are always present. The third is present only when the encoding is not exact.
+
+### `## Variables`
+
+One bullet per model variable that the code reads or creates. Name each variable by its model key, and say whether the code reads it or creates it.
+
+### `## Constraints`
+
+**One bullet per row that the code registers**, in the order in which the body registers them. Each bullet carries **the row's JuMP name** and the mathematics of the row. The name is the one written in the `JuMP.@constraint` call, because that is the key with which a caller reads the row back out of the model.
+
+Close the subsection with a `Where:` list that defines every symbol, under the rules of the `Where:` section above. Interpolate `$(math_dict[:key])` for a standardised symbol.
+
+### `## Relaxation`
+
+Present **only when the encoding is not exact**. An exact encoding carries no `## Relaxation` subsection at all.
+
+Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift from one docstring to the next. Then state three things:
+
+ 1. The **direction** of the bound: whether the model quantity lies above or below the exact quantity.
+ 2. The **quantity** that is bounded, named by its model key.
+ 3. The **condition** under which the bound is tight.
+
+The following is the formulation of `set_gross_budget_constraints!` in `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl`:
+
+````julia
+"""
+# JuMP formulation
+
+## Variables
+
+  - `lw`, `sw`: long and short weight vectors, read from the model.
+  - `k`: homogenisation scalar.
+
+## Constraints
+
+  - `gbgt_lb`: ``s_c \\left(\\sum lw + \\sum sw - k b_l\\right) \\geq 0``
+  - `gbgt_ub`: ``s_c \\left(\\sum lw + \\sum sw - k b_u\\right) \\leq 0``
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:k_budget])
+  - ``b_l``, ``b_u``: lower and upper gross budget bounds.
+"""
+````
 
 ---
 

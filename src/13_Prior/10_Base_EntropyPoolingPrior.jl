@@ -2539,13 +2539,13 @@ Solve an entropy pooling problem that carries tail view constraints.
       + `::JuMPEntropyPooling`: Builds every tail view into the model.
       + `::OptimEntropyPooling`: Solves the dual, which has no room for an auxiliary variable, so it accepts an empty `tvs` alone.
 
-# Returns
-
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
-
 # Validation
 
   - `isa(opt, OptimEntropyPooling)` requires `isempty(tvs)`.
+
+# Returns
+
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
 
 # Related
 

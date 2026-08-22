@@ -99,13 +99,13 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
   - `tn`: Existing `TurnoverEstimator` object. Supplies turnover values and default value.
   - `w`: New portfolio weights vector.
 
-# Returns
-
-  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
-
 # Validation
 
   - `w` is validated to be non-empty, finite, and numeric.
+
+# Returns
+
+  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
 
 # Examples
 

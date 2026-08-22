@@ -147,6 +147,11 @@ Construct a binary asset-group membership matrix from asset set groupings.
   - `smtx`: The key or group name to extract from the asset sets.
   - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
 
+# Validation
+
+  - `haskey(sets.dict, smtx)`, via [`taxonomy_column`](@ref).
+  - Throws an `AssertionError` if the length of `sets.dict[smtx]` does not match the asset universe.
+
 # Returns
 
   - `A`: The `transpose` of a `BitMatrix`, of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` belongs to group `i`.
@@ -156,11 +161,6 @@ Construct a binary asset-group membership matrix from asset set groupings.
   - The function checks that `smtx` exists in `sets.dict` and that its length matches the asset universe.
   - Each unique value in `sets.dict[smtx]` defines a group.
   - The output matrix is transposed so that rows correspond to groups and columns to assets.
-
-# Validation
-
-  - `haskey(sets.dict, smtx)`, via [`taxonomy_column`](@ref).
-  - Throws an `AssertionError` if the length of `sets.dict[smtx]` does not match the asset universe.
 
 # Examples
 
@@ -372,14 +372,14 @@ Duplicate keys are refused rather than deduplicated: repeating a key doubles its
 
   - `vals`: Group name keys to stack into the feature axis.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `length(vals) >= 2`.
   - `allunique(vals)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -407,6 +407,11 @@ This is the **exogenous** feature source: a sector, industry or country classifi
   - `vals`: Group name keys in `sets.dict`, at least two (see [`assert_feature_keys`](@ref)).
   - `sets`: A [`UniverseSets`](@ref) object specifying the asset universe and groupings.
   - `strict`: Accepted for a uniform interface with the graded method and **ignored**. `strict` governs name resolution, and on this path every name is a `sets.dict` key whose absence is an unconditional `KeyError` from [`taxonomy_column`](@ref) — there is no soft failure for it to govern.
+
+# Validation
+
+  - `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)).
+  - Each key exists in `sets.dict` and has the length of the asset universe (enforced by [`asset_sets_matrix`](@ref)).
 
 # Returns
 
@@ -436,11 +441,6 @@ The result is dense `Float64` rather than the `BitMatrix` [`asset_sets_matrix`](
 # Views
 
 An asset view of a `UniverseSets` slices the groups prefixed by `sets.xkey` and leaves the rest alone, so a key named for a view to reach must carry that prefix — `\"nx_sector\"`, not `\"sector\"`. An unprefixed key does not fail silently: [`asset_sets_matrix`](@ref)'s length check throws on the next call, because the sliced universe no longer matches the unsliced group.
-
-# Validation
-
-  - `length(vals) >= 2` and `allunique(vals)` (see [`assert_feature_keys`](@ref)).
-  - Each key exists in `sets.dict` and has the length of the asset universe (enforced by [`asset_sets_matrix`](@ref)).
 
 # Examples
 
@@ -906,14 +906,14 @@ Only non-emptiness is unconditional. A **malformed entry** — one that matches 
   - `sets`: A [`UniverseSets`](@ref) whose `dict` declares the feature axis under `sets.zkey`.
   - `strict`: Whether an unresolvable name throws instead of warning.
 
-# Returns
-
-  - `Z::Matrix{Float64}`: An `assets × length(sets.dict[sets.zkey])` matrix, zero-initialised.
-
 # Validation
 
   - `!isempty(vals)`.
   - `haskey(sets.dict, sets.zkey)` (see [`feature_universe`](@ref)).
+
+# Returns
+
+  - `Z::Matrix{Float64}`: An `assets × length(sets.dict[sets.zkey])` matrix, zero-initialised.
 
 # Examples
 

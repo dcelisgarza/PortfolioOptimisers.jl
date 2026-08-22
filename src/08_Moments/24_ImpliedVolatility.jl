@@ -383,13 +383,13 @@ Where:
   - `X`: Asset returns matrix (observations × assets) used to compute realised volatility.
   - `::Any`: Ignored (placeholder for `ivpa`).
 
-# Returns
-
-  - `rv_p::Vector{<:Number}`: Predicted next-period realised volatilities (one per asset).
-
 # Validation
 
   - `chunk > 2` (i.e., there must be more than 2 windows of data to fit the regression).
+
+# Returns
+
+  - `rv_p::Vector{<:Number}`: Predicted next-period realised volatilities (one per asset).
 
 # Related
 

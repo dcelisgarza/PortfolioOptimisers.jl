@@ -1,12 +1,12 @@
 """
     CodeHealth
 
-Shared machinery for the three code-health entry scripts, `complexity.jl`, `expansion.jl` and
-`jet.jl`. It reads and writes the generated TOML files, compares provenance, applies the ratchet,
-pairs renames, and renders a failure for a terminal and for GitHub Actions.
+Shared machinery for the four code-health entry scripts, `complexity.jl`, `expansion.jl`, `jet.jl`
+and `coverage.jl`. It reads and writes the generated TOML files, compares provenance, applies the
+ratchet, pairs renames, and renders a failure for a terminal and for GitHub Actions.
 
-The decisions this module implements are recorded in ADRs 0071 to 0077 under `docs/adr/`. The
-maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
+The decisions this module implements are recorded in ADRs 0071 to 0077 and ADR 0082 under
+`docs/adr/`. The maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
 """
 module CodeHealth
 
@@ -268,14 +268,16 @@ end
 """
     check_rationale_citations(rulings)
 
-Every Dismissal and every Exemption must cite a Rationale that the file defines. ADR 0071 makes a
-new Rationale the maintainer's act, so an unknown citation is a broken record, not a new claim.
+Every Dismissal, every Exemption and every Coverage Exemption must cite a Rationale that the file
+defines. ADR 0071 makes a new Rationale the maintainer's act, so an unknown citation is a broken
+record, not a new claim.
 """
 function check_rationale_citations(rulings)
     known = Set(keys(get(rulings, "rationale", Dict{String, Any}())))
     bad = String[]
     for (kind, entries) in (("dismissal", get(rulings, "dismissal", [])),
-                            ("exemption", get(rulings, "exemption", [])))
+                            ("exemption", get(rulings, "exemption", [])),
+                            ("coverage_exemption", get(rulings, "coverage_exemption", [])))
         for e in entries
             r = get(e, "rationale", nothing)
             if r === nothing || !(r in known)

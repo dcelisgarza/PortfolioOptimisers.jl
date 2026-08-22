@@ -803,13 +803,13 @@ The whole extension contract of [`AbstractSeparationDecayAlgorithm`](@ref): a ne
   - `d`: Separation between two assets, `d >= 0`. Real rather than integral, so a weighted path length is as admissible as a hop count.
   - `dmax`: Separation budget in scope. **Inert for members that do not need it** — only [`LinearDecay`](@ref) reads it. Inert arguments have precedent here: [`phylogeny_features`](@ref) ignores its `alg` entirely for a partition source.
 
-# Returns
-
-  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
-
 # Validation
 
 The contract is not checked here — this runs inside an `assets × assets` loop. Callers probe once up front with [`assert_separation_decay`](@ref) instead.
+
+# Returns
+
+  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
 
 # Examples
 
@@ -869,10 +869,6 @@ Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax
   - `ds`: Separations to probe. Need not be sorted. Precondition: `ds ⊆ [0, dmax]` — `ds` is what the guarded loop will ask about, and the loop never asks outside the budget.
   - `dmax`: Separation budget in scope, forwarded to [`separation_decay`](@ref) and probed as an endpoint in its own right.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Every probed value is finite.
@@ -880,6 +876,10 @@ Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax
   - `f(0) >= f(d)` for every probed `d`.
   - The probed values are monotone non-increasing in `d`.
   - `f(d) >= 0` for every probed `d`, and at `d = dmax` whether or not it was probed.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

@@ -43,7 +43,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | If you are changing… | Authority | Gate |
 | --- | --- | --- |
 | Any file in `src/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `pre-commit run -a`, `test/` |
-| A docstring | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) | `test/test_26_docs.jl`, the doctest job |
+| A docstring in `src/` or `ext/` | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) | `test/test_26_docs.jl`, the doctest job |
 | A return type annotation | [`.github/instructions/julia-return-types.instructions.md`](.github/instructions/julia-return-types.instructions.md) | none — unenforced |
 | A test file | [`.github/instructions/julia-test-writing.instructions.md`](.github/instructions/julia-test-writing.instructions.md) | `test/runtests.jl` auto-discovery |
 | Adding an estimator | [`.github/prompts/add-estimator.prompt.md`](.github/prompts/add-estimator.prompt.md) | `test/test_26_docs.jl` |
@@ -57,6 +57,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
+| Adding a file, a type or a function under `src/` or `ext/` | [`sweep/manifest.toml`](sweep/manifest.toml) — its header states the rule, and issue #404 owns it | `test/test_45_sweep_census.jl` |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
@@ -65,6 +66,8 @@ picking a side — a contradiction between standards files is itself a defect.
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
 | Running Julia or the test suite | [`CLAUDE.md`](CLAUDE.md) § Running Julia | none — unenforced |
 | Running doctests | the `run-doctests` skill | `.github/workflows/Docs.yml` (`doctest` job) |
+| The line coverage of a file in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) | `.github/workflows/ReusableTest.yml` (`coverage` job) |
+| A Coverage Exemption | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md), `code_health/rulings.toml` | `.github/workflows/ReusableTest.yml` (`coverage` job) |
 
 ## The standards files
 
@@ -76,7 +79,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |
 | `.github/instructions/julia-source-code.instructions.md` | type roles, constructors, aliases, validation, dispatch, exports | `src/**/*.jl` |
-| `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, `jldoctest` | `src/**/*.jl`, `docs/**/*.md` |
+| `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, `jldoctest` | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
 | `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl` |
 | `.github/instructions/julia-test-writing.instructions.md` | test file layout, `@safetestset`, validation tests | `test/` |
 | `.github/prompts/*.prompt.md` | step-by-step workflows for adding a type or shipping a change | task-scoped |
@@ -99,12 +102,14 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
 | `test/test_44_range_tails_census.jl` | a range risk measure declares its tails, or is on the fused list | run the file |
+| `test/test_45_sweep_census.jl` | every file under `src/` and `ext/` has a sweep-manifest row naming its child map of #404, and the file's documented-unit count still matches that row | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |
 | `.github/workflows/Paper.yml` | the paper's listing still runs against this checkout, and `docs/paper/main-jlyfish.json` is current | the workflow |
+| `.github/workflows/ReusableTest.yml` (`coverage`) | a file's miss count has not risen above `code_health/coverage_baseline.toml`, an added file enters with every line covered or exempted, and every Coverage Exemption states the exact count it stands for | `julia --project=code_health code_health/coverage.jl check`, with `COVERAGE_LCOV` pointing at an `lcov.info` |
 | `.github/workflows/Aqua.yml` | package-quality checks over the dependency graph | the workflow |
 | `.github/workflows/LinkChecker.yml` | links in the built documentation resolve | the workflow |
 

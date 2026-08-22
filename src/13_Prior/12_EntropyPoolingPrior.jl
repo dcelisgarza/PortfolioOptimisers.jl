@@ -486,13 +486,13 @@ A single formulation applies to every view, a vector supplies one per view, and 
   - `N`: Number of views.
   - `key`: Field name, used in the error message.
 
-# Returns
-
-  - `algs::AbstractVector`: One entry per view.
-
 # Validation
 
   - If `alg` is a vector, `length(alg) == N`.
+
+# Returns
+
+  - `algs::AbstractVector`: One entry per view.
 
 # Related
 
@@ -573,14 +573,14 @@ A tail risk measure of a reweighted sample lies between the smallest and the lar
   - `eqn`: Equation of the view, used in the error message.
   - `name`: Name of the view family, used in the error message.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - If `op` is `:geq` or `:eq`, `rhs < maximum(x)`.
   - If `op` is `:leq` or `:eq`, `rhs > minimum(x)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -693,13 +693,13 @@ Lower one conditional value-at-risk view into the tail view constraint its formu
   - `pv`: Prior value of the view's left hand side.
   - `eqn`: Equation of the view, used in the error messages.
 
-# Returns
-
-  - `nothing`: The function mutates `tvs` in-place.
-
 # Validation
 
   - [`LinearConditionalValueatRiskView`](@ref) needs one asset, an operator other than `<=`, and, for an equality, a target at or above the prior CVaR.
+
+# Returns
+
+  - `nothing`: The function mutates `tvs` in-place.
 
 # Related
 
@@ -759,13 +759,13 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
   - `pv`: Prior EVaR of the asset.
   - `eqn`: Equation of the view, used in the error messages.
 
-# Returns
-
-  - `nothing`: The function mutates `epc` and `tvs` in-place.
-
 # Validation
 
   - [`ConicEntropicValueatRiskView`](@ref) needs an operator other than `<=`, and, for an equality, a target at or above the prior EVaR.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
 
 # Related
 
@@ -1384,13 +1384,13 @@ Compute the entropy pooling prior of asset returns with tail views.
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
   - `kwargs...`: Additional keyword arguments forwarded to the wrapped prior estimator.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Prior result carrying the posterior probability weights.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Prior result carrying the posterior probability weights.
 
 # Related
 

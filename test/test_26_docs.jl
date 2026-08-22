@@ -400,3 +400,51 @@ nothing raises `@error "File exists but no references were collected"` in
         @test stray_block == String[]
     end
 end
+
+#=
+The function template in `.github/instructions/julia-docstrings.instructions.md` puts
+`# Validation` before `# Returns`: a call states what it refuses before it states what it
+produces. Documenter renders the sections in whatever order it is given, so the docs build
+is blind to the ordering and this check is what holds it across the tree.
+=#
+@testset "Docstring section order" begin
+    using Test
+    ROOT = joinpath(@__DIR__, "..")
+
+    # A section heading is a markdown `# Name` at column 0 inside a triple-quoted block.
+    # Every triple-quoted literal toggles the same way, so a plain string literal is
+    # scanned too and contributes no headings.
+    function misordered_docstrings(file)
+        acc, names, start, indoc = String[], String[], 0, false
+        for (i, ln) in enumerate(readlines(file))
+            q = length(findall("\"\"\"", ln))
+            if !indoc
+                if q == 1
+                    indoc, start = true, i
+                    empty!(names)
+                end
+            elseif q >= 1
+                indoc = false
+                v = findfirst(==("Validation"), names)
+                r = findfirst(==("Returns"), names)
+                if !isnothing(v) && !isnothing(r) && v > r
+                    push!(acc, "$(relpath(file, ROOT)):$(start)")
+                end
+            elseif startswith(ln, "# ")
+                push!(names, strip(ln[3:end]))
+            end
+        end
+        return acc
+    end
+
+    @testset "# Validation precedes # Returns" begin
+        offenders = String[]
+        for dir in ("src", "ext"), (root, _, files) in walkdir(joinpath(ROOT, dir)),
+            f in files
+
+            endswith(f, ".jl") || continue
+            append!(offenders, misordered_docstrings(joinpath(root, f)))
+        end
+        @test offenders == String[]
+    end
+end

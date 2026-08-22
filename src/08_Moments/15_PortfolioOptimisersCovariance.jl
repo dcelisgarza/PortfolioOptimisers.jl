@@ -91,13 +91,13 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# Returns
-
-  - `sigma::Matrix{<:Number}`: The processed covariance matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `sigma::Matrix{<:Number}`: The processed covariance matrix.
 
 # Related
 
@@ -128,13 +128,13 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: The processed correlation matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: The processed correlation matrix.
 
 # Related
 

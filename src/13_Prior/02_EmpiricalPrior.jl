@@ -142,13 +142,13 @@ Every choice inside `pe.me` and `pe.ce` reaches the result. A shrunk mean and a 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
 
 # Related
 
@@ -207,13 +207,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
 
 # Related
 

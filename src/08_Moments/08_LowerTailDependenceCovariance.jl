@@ -186,13 +186,13 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence correlation coefficients.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence correlation coefficients.
 
 # Examples
 

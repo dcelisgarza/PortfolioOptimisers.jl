@@ -1876,13 +1876,13 @@ The check runs for a [`VariationInfoDistance`](@ref) estimator alone, which is t
   - `sigma`: Covariance matrix (`N × N`).
   - `X`: Data matrix (`T × N` or `N × T`).
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `size(sigma, 1) == size(X, 2)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

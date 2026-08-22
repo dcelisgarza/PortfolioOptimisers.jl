@@ -58,8 +58,11 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   runtime check; precomputed structure belongs on the Result type.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
-- Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`. Add an entry
-  there rather than inlining prose, and delete entries that lose their last user.
+- Docstring field text is centralised in `field_dict` / `arg_dict` in `src/01_Base.jl`, and an entry
+  that loses its last user is deleted. When a description must interpolate a key and when prose is
+  permitted is stated by
+  [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
+  which owns that rule.
 - **Never export an abstract type unless explicitly told to.** All but a handful of the abstract
   types in `src/` are unexported, so unexported is the convention. An open family, a sibling family
   that exports its supertype, and an existing API-page entry are none of them a reason to add one in

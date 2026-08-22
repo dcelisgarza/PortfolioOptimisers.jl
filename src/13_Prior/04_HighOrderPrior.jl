@@ -11,14 +11,14 @@ Block vectorisation operator.
   - `p`: Number of rows in each block.
   - `q`: Number of columns in each block.
 
-# Returns
-
-  - `A_vec::Matrix`: Block vectorised matrix of size `(m * n, p * q)`.
-
 # Validation
 
   - `size(A, 1)` must be an integer multiple of `p`.
   - `size(A, 2)` must be an integer multiple of `q`.
+
+# Returns
+
+  - `A_vec::Matrix`: Block vectorised matrix of size `(m * n, p * q)`.
 
 # Examples
 
@@ -265,15 +265,15 @@ For a symmetric `A` of size `n × n`, the three satisfy `D * vech(A) == vec(A)`,
 
   - `n`: Size of the symmetric matrix (integer).
 
+# Validation
+
+  - `n` must be a positive integer.
+
 # Returns
 
   - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
   - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
   - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
-
-# Validation
-
-  - `n` must be a positive integer.
 
 # Examples
 
@@ -584,13 +584,13 @@ Where:
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
-# Returns
-
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
 
 # Related
 

@@ -989,13 +989,13 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: The Smyth-Broby correlation matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: The Smyth-Broby correlation matrix.
 
 # Related
 
@@ -1030,13 +1030,13 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# Returns
-
-  - `sigma::Matrix{<:Number}`: The Smyth-Broby covariance matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `sigma::Matrix{<:Number}`: The Smyth-Broby covariance matrix.
 
 # Related
 

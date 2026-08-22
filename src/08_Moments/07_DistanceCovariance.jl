@@ -187,6 +187,11 @@ Where:
   - `v2`: Second data vector.
   - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
+# Validation
+
+  - `length(v1) == length(v2)`.
+  - `length(v1) > 1`.
+
 # Returns
 
   - `rho::Float64`: The computed distance correlation between `v1` and `v2`.
@@ -196,11 +201,6 @@ Where:
  1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
  2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
  3. Computes the squared distance covariance and normalizes to obtain the distance correlation.
-
-# Validation
-
-  - `length(v1) == length(v2)`.
-  - `length(v1) > 1`.
 
 # Related
 
@@ -276,13 +276,13 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
 
 # Examples
 
@@ -347,6 +347,11 @@ The square root takes no absolute value. It needs none: the doubly-centred V-sta
   - `v2`: Second data vector.
   - `w`: Observation weights, or `nothing` for the unweighted statistic.
 
+# Validation
+
+  - `length(v1) == length(v2)`.
+  - `length(v1) > 1`.
+
 # Returns
 
   - `rho::Number`: The computed distance covariance between `v1` and `v2`.
@@ -356,11 +361,6 @@ The square root takes no absolute value. It needs none: the doubly-centred V-sta
  1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
  2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
  3. Computes the squared distance covariance and returns its square root.
-
-# Validation
-
-  - `length(v1) == length(v2)`.
-  - `length(v1) > 1`.
 
 # Related
 
@@ -434,13 +434,13 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# Returns
-
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
 
 # Examples
 

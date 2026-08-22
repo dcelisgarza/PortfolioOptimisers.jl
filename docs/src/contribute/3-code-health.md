@@ -77,10 +77,23 @@ Run the check that the issue's metric belongs to, from the repository root.
 julia --project=code_health code_health/complexity.jl check
 julia --project=code_health code_health/expansion.jl check
 julia --project=code_health code_health/jet.jl check
+COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl check
 ```
 
 The complexity check takes about 5 seconds and the Expansion Bound about 80 seconds, so you can run
 either as often as you like. **The JET check takes 5 minutes 46 seconds and peaks at 2.4 GiB.**
+
+The coverage check takes about 20 seconds, and it needs an `lcov.info` that it cannot make itself.
+In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job
+wrote. Locally, run the suite with coverage on and process it, or download the `lcov` artifact from
+any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+
+`coverage.jl` takes one more verb than the other three. `terminal` answers #404's closing question
+for a child map's own files, and names the definitions that still hold an uncovered line.
+
+```bash
+COVERAGE_LCOV=path/to/lcov.info julia --project=code_health code_health/coverage.jl terminal src/08_Moments/
+```
 
 !!! warning "There is no fast inner loop for JET"
 

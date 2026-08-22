@@ -128,15 +128,15 @@ The three methods dispatch on the shape rather than branching on `ndims`.
   - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
   - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `Z` is non-empty and every entry is finite.
   - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
   - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -195,16 +195,16 @@ The three methods dispatch on the shape rather than branching on `ndims`.
   - `nobs`: Number of observations a time-varying feature matrix must bind to, or `nothing` when the carrier has no observation axis.
   - `na_sym`: Symbolic name of the asset anchor displayed in error messages.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - `nz` and `Z` are both `nothing` or both given (see [`check_feature_names`](@ref)).
   - `size(Z, 1) == na` (static) or `size(Z, 2) == na` (time-varying); `na` must not be `nothing`.
   - `size(Z, 1) == nobs` for a time-varying `Z`; `nobs` must not be `nothing`.
   - `size(Z, ndims(Z)) == length(nz)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -1214,16 +1214,16 @@ else throws.
   - `X`: Price table (a `DataFrames.DataFrame` as built by [`prices_to_returns`](@ref)).
   - `impute_method`: `nothing` (no imputation), or an `Impute.Imputor` when `Impute` is loaded.
 
-# Returns
-
-  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
-
 # Validation
 
   - Throws an `ArgumentError` for any `impute_method` that is neither `nothing` nor an
     `Impute.Imputor`, distinguishing "`Impute` is not loaded" from "wrong type". Note that
     [`Imputer`](@ref) is a PortfolioOptimisers estimator unrelated to `Impute.jl` and is not
     accepted here.
+
+# Returns
+
+  - `X`: Unchanged when `impute_method` is `nothing`, otherwise the imputed table.
 
 # Related
 
@@ -1299,10 +1299,6 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
   - `nz`: Optional feature names.
   - `Z`: Optional feature matrix, static (assets × features) or time-varying (observations × assets × features), with its axes parallel to `X`'s columns and rows.
 
-# Returns
-
-  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
-
 # Validation
 
   - `!isempty(X)`.
@@ -1312,6 +1308,10 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
   - If `iv` is not `nothing`, the timestamps of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `all(x -> isfinite(x), iv)`, and `size(iv) == size(X)`.
   - `ivpa` is validated in that same branch, so it is checked only when `iv` is given: `all(x -> x > 0, ivpa)`, `all(x -> isfinite(x), ivpa)`, and, if a vector, `length(ivpa) == size(iv, 2)`. The bound is strict — a zero adjustment is rejected.
+
+# Returns
+
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
 # Details
 

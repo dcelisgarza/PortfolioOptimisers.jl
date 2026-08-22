@@ -119,13 +119,13 @@ This method computes the pairwise mutual information correlation matrix for the 
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# Returns
-
-  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Related
 

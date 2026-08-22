@@ -1005,14 +1005,14 @@ A non-normal return series makes a Sharpe ratio less precise than the naive expr
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
 
-# Returns
-
-  - `summary::PerformanceSummaryResult`: The computed summary.
-
 # Validation
 
   - `0 < alpha < 1`.
   - `periods_per_year > 0`.
+
+# Returns
+
+  - `summary::PerformanceSummaryResult`: The computed summary.
 
 # Related
 

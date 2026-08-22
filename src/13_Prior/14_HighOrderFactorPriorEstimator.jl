@@ -328,14 +328,14 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-defaul
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
-# Returns
-
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
   - The prior produced by `pe.pe` must carry a regression result, via [`assert_prior_regression`](@ref).
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
 
 # Details
 

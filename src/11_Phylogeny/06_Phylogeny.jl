@@ -233,13 +233,13 @@ The index of the offending entry is reported with its type, because `args` is sp
   - `shape`: Name of that shape, used in the error message.
   - `channel`: Sentence naming the declared channel the caller must use instead.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `S`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -274,13 +274,13 @@ Non-matrix entries are untouched: a vertex list or a sample count is a genuine p
   - `T`: Centrality algorithm type, named in the error message.
   - `args`: Positional arguments destined for the `Graphs.jl` centrality function.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `AbstractMatrix`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -314,14 +314,14 @@ Non-matrix, non-vector entries are untouched, and so is every other keyword. Tho
   - `args`: Positional arguments destined for the `Graphs.jl` spanning-tree function.
   - `kwargs`: Keyword arguments destined for the same function.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Throws a [`ConflictingArgumentError`](@ref) if any entry of `args` is an `AbstractMatrix` or an `AbstractVector`.
   - Throws a [`ConflictingArgumentError`](@ref) if `kwargs` contains `minimize`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -1768,13 +1768,13 @@ Negative and `NaN` entries have no such nearest representable value and are reje
 
   - `D`: Symmetric distance matrix.
 
-# Returns
-
-  - `W::MatNum`: `D` itself, or a repaired copy of it.
-
 # Validation
 
   - Throws a `DomainError` if any off-diagonal entry is negative or `NaN`.
+
+# Returns
+
+  - `W::MatNum`: `D` itself, or a repaired copy of it.
 
 # Related
 
@@ -2434,14 +2434,14 @@ Resolution goes back through the ordinary constructor, so the rule's answer meet
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments, forwarded to the rule.
 
-# Returns
-
-  - `sep::AbstractSeparationAlgorithm`: The same member with a resolved budget. `sep` itself when the budget was already a value.
-
 # Validation
 
   - A [`HopCountAlgorithm`](@ref) or `Function` in `HopCount`'s `n` must return an `Integer`.
   - A [`PathLengthAlgorithm`](@ref) or `Function` in `PathLength`'s `dmax` must return a `Number`. `nothing` is a stated budget, not a computed one.
+
+# Returns
+
+  - `sep::AbstractSeparationAlgorithm`: The same member with a resolved budget. `sep` itself when the budget was already a value.
 
 # Related
 

@@ -337,13 +337,13 @@ This function is used internally to ensure that the number of groups or allocati
 
   - `B`: Vector of integers representing group sizes or allocations.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Throws `DomainError` if `length(B) > alg`.
+
+# Returns
+
+  - `nothing`.
 
 # Details
 
@@ -375,14 +375,14 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - `B`: Vector of integers representing group sizes or allocations.
   - `args...`: No validation is performed.
 
-# Returns
-
-  - `nothing`.
-
 # Validation
 
   - Throws `DomainError` if `length(B) > cle.onc.max_k` (when `max_k` is set).
   - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
+
+# Returns
+
+  - `nothing`.
 
 # Details
 

@@ -332,10 +332,6 @@ The estimators that *lift* a factor-axis prior into an asset-axis result ([`Fact
   - `pr`: Prior result produced by the wrapped estimator.
   - `overrides...`: Field overrides; a value to replace, or `nothing` to drop.
 
-# Returns
-
-  - `pr::AbstractPriorResult`: The wrapped result with `overrides` applied, or `pr` itself when there are none.
-
 # Validation
 
   - Naming `sigma` requires naming `chol`, unless `pr.chol` is already `nothing`.
@@ -343,6 +339,10 @@ The estimators that *lift* a factor-axis prior into an asset-axis result ([`Fact
   - Naming `rr` requires naming `o_X`, unless `pr.o_X` is already `nothing`.
   - Every name in `overrides` is a field of `typeof(pr)`.
   - Every `@argcheck` of the constructor of `typeof(pr)`.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The wrapped result with `overrides` applied, or `pr` itself when there are none.
 
 # Examples
 

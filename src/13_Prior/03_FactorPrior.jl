@@ -274,14 +274,14 @@ There is no default. A silent `nothing` fallback cannot separate *this estimator
 
   - `pe`: Prior estimator.
 
+# Validation
+
+  - Throws an `ArgumentError` when the type of `pe` declares no method.
+
 # Returns
 
   - `nothing`: The estimator adds no residual block.
   - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
-
-# Validation
-
-  - Throws an `ArgumentError` when the type of `pe` declares no method.
 
 # Related
 
@@ -363,13 +363,13 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - $(arg_dict[:strict])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing posterior asset returns, mean vector, covariance matrix, Cholesky factor, regression result, and factor moments.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing posterior asset returns, mean vector, covariance matrix, Cholesky factor, regression result, and factor moments.
 
 # Related
 

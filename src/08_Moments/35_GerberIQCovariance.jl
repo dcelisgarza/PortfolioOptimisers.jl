@@ -1809,13 +1809,13 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# Returns
-
-  - `rho::MatNum`: The Gerber IQ correlation matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `rho::MatNum`: The Gerber IQ correlation matrix.
 
 # Related
 
@@ -1860,13 +1860,13 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# Returns
-
-  - `sigma::MatNum`: The Gerber IQ covariance matrix.
-
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Returns
+
+  - `sigma::MatNum`: The Gerber IQ covariance matrix.
 
 # Related
 

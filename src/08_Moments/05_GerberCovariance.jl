@@ -564,13 +564,13 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
-
-  - $(arg_dict[:rho])
-
 # Validation
 
   - $(val_dict[:dims])
+
+# Returns
+
+  - $(arg_dict[:rho])
 
 # Details
 
@@ -615,13 +615,13 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
-
-  - $(arg_dict[:rho])
-
 # Validation
 
   - $(val_dict[:dims])
+
+# Returns
+
+  - $(arg_dict[:rho])
 
 # Details
 

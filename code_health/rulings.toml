@@ -11,10 +11,11 @@
 #   [[unmeasured_path]] a path the gate never measures. It has no row and nothing to ratchet.
 #   [[exemption]]       a real number that may stand. It binds issue candidacy alone.
 #   [[dismissal]]       a JET report class that is not a defect. It binds the reviewed count.
+#   [[coverage_exemption]]  a line that no test can reach. It binds the terminal condition.
 #
-# An Exemption and a Dismissal both cite a Rationale by name. Citing an approved Rationale is
-# bookkeeping and any contributor may do it. Adding a `[rationale.…]` block is a claim that some
-# code is correct, and it needs the maintainer.
+# An Exemption, a Dismissal and a Coverage Exemption all cite a Rationale by name. Citing an
+# approved Rationale is bookkeeping and any contributor may do it. Adding a `[rationale.…]` block
+# is a claim that some code is correct, and it needs the maintainer.
 
 # --- thresholds ------------------------------------------------------------
 #
@@ -209,3 +210,33 @@ path = "src/20_Optimisation/19_SubsetResampling.jl"
 definition = "SubsetResampling"
 metric = "arg"
 rationale = "keyword-constructor-arity"
+
+# --- coverage exemptions ---------------------------------------------------
+#
+# ADR 0082. One row per definition that holds an uncovered line no test can reach, keyed
+# (path, definition) and carrying the exact count of lines it stands for.
+#
+#   [[coverage_exemption]]
+#   path       = "src/…/…jl"
+#   definition = "show"          # or "<toplevel>" for a line inside no named definition
+#   misses     = 3
+#   rationale  = "a-named-rationale-block-above"
+#
+# The key holds no line number. A line number churns on every insertion above it and on every
+# reformat, and this repository formats the whole tree in place, so a line-keyed row would be wrong
+# more often than it was right. A definition name survives both. ADR 0071 keys a Dismissal on
+# (file, kind, message) for the same reason.
+#
+# The count is part of the claim, and `coverage.jl check` holds it to equality in both directions.
+# A claim above the truth is a stale row whose lines were covered. A claim below it is the leak the
+# file total cannot see: a line covered elsewhere in the file pays for a new uncovered line inside
+# the exempted definition, and the ratchet reads a flat number.
+#
+# A row here never moves a baseline number. Like the Exemptions above it, it binds one thing only:
+# whether the file is **terminal**, which is #404's condition for closing a child map on coverage.
+# The ratchet still sees every miss.
+#
+# The list is empty. #408 built the machinery; the thirteen child maps of #404 write the rows as
+# they sweep. A row is written when a line cannot be reached, never when reaching it is merely
+# awkward, and issue #411 settles whether a line reached only by its own `jldoctest` counts as
+# covered at all.
