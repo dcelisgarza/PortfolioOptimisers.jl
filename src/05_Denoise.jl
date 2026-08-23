@@ -617,14 +617,15 @@ Where:
 # Algorithm
 
  1. Compute the two edge factors of a unit variance, `op_sqrt_iq_sq` for ``\\lambda_+`` and `om_sqrt_iq_sq` for ``\\lambda_-``.
- 2. Define the objective on a trial variance `x`. Steps 3 to 6 are its body.
- 3. Scale the two edge factors by `x`, giving `e_min` and `e_max`, and place `n` equally spaced points over `[e_min, e_max]`, giving `rg`.
- 4. Evaluate the theoretical density on `rg`, giving column 1 of `pdf`. The product under the square root is clamped at zero, so a round-off outside the support gives zero rather than a domain error.
- 5. Estimate the density of `vals` over the same range with `AverageShiftedHistograms.ash`, under `kernel` and `m`, and evaluate it, giving column 2 of `pdf`. Replace a non-finite entry by zero.
- 6. Return the sum of the squared differences of the two columns.
- 7. Minimise the objective over `x` in `[0, 1]` with `Optim.optimize`, under `args` and `kwargs`.
- 8. Take `x` as the minimiser when the search converged. When it did not, warn and substitute `x = 1`, the variance of a correlation matrix.
- 9. Return `x * op_sqrt_iq_sq`, the fitted upper edge.
+ 2. Estimate the density of `vals` with `AverageShiftedHistograms.ash`, under `kernel` and `m`, over the range of `vals` itself. The estimate is built once, so it does not depend on the trial variance.
+ 3. Define the objective on a trial variance `x`. Steps 4 to 7 are its body.
+ 4. Scale the two edge factors by `x`, giving `e_min` and `e_max`, and place `n` equally spaced points over `[e_min, e_max]`, giving `rg`.
+ 5. Evaluate the theoretical density on `rg`, giving column 1 of `pdf`. The product under the square root is clamped at zero, so a round-off outside the support gives zero rather than a domain error.
+ 6. Read the estimate of step 2 on `rg`, the same abscissa as column 1, giving column 2 of `pdf`. Replace a non-finite entry by zero.
+ 7. Return the sum of the squared differences of the two columns.
+ 8. Minimise the objective over `x` in `[0, 1]` with `Optim.optimize`, under `args` and `kwargs`.
+ 9. Take `x` as the minimiser when the search converged. When it did not, warn and substitute `x = 1`, the variance of a correlation matrix.
+10. Return `x * op_sqrt_iq_sq`, the fitted upper edge.
 
 # Arguments
 
@@ -646,8 +647,9 @@ Where:
   - Uses the minimiser and effective sample ratio to compute the maximum feasible noise eigenvalue.
   - Returns the maximum feasible noise eigenvalue.
   - **The fitted variance is bounded above by one.** `Optim.optimize` searches `[0, 1]`, so a spectrum whose noise variance exceeds one fits at the boundary and the returned edge is the unit-variance edge. A correlation matrix has unit variance by construction, which is the case this bound is written for.
+  - **The two densities share one abscissa, and the empirical estimate has a fixed support.** Both columns of `pdf` are read on `rg`, and the average shifted histogram spans the range of `vals` for every trial variance. An estimate whose support followed `x` would renormalise over a shrinking window, which gives the objective a spurious local minimum well below the true variance.
+  - **A spectrum whose eigenvalues are all equal carries no fit.** The range of `vals` is a single point, so the estimate spans `[v, v + 1]` instead and the search returns a value that carries no information. A matrix with such a spectrum is a multiple of the identity, so it holds no signal to separate.
   - **A search that does not converge substitutes a unit variance.** The returned edge is then ``(1 + \\sqrt{1/q})^2`` exactly. The substitution emits a warning, so the caller can tell a fitted edge from a fallback edge. Only `args` and `kwargs` can make the search fail; the defaults converge.
-  - **The empirical density is evaluated at the wrong points.** Step 5 evaluates `AverageShiftedHistograms.pdf` at the *values* of column 1 rather than at the grid `rg`, so the two columns of `pdf` are not compared over a common abscissa. See [#475](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/475), which carries the reproduction and the one-line fix.
 
 # Related
 
@@ -668,16 +670,28 @@ function find_max_eval(vals::VecNum, q::Number,
     pdf = Matrix{eltype(vals)}(undef, n, 2)
     op_sqrt_iq_sq = (one(q) + sqrt(inv(q)))^2
     om_sqrt_iq_sq = (one(q) - sqrt(inv(q)))^2
+    #=
+    The empirical density is estimated once, over the observed spectrum, and it does not
+    depend on the trial variance. Only the abscissa at which it is read moves with `x`.
+
+    An estimate whose support moves with `x` is not comparable across `x`: it renormalises
+    over a shrinking window, so the objective gains a spurious local minimum well below the
+    true variance and the search converges to it. See #475.
+    =#
+    v_min, v_max = extrema(vals)
+    # A spectrum whose eigenvalues are all equal has a range of zero, and `ash` needs a
+    # range it can bin. Such a matrix is a multiple of the identity and carries no signal.
+    v_hi = v_max > v_min ? v_max : v_min + one(eltype(vals))
+    ash_res = AverageShiftedHistograms.ash(vals; rng = range(v_min, v_hi; length = n),
+                                           kernel = kernel, m = m)
     # Marčenko-Pastur distribution
     function f(x::Number)
         e_min, e_max = x * om_sqrt_iq_sq, x * op_sqrt_iq_sq
         rg = range(e_min, e_max; length = n)
         pdf[:, 1] .= q ⊘ (2 * pi * x * rg) ⊙
                      sqrt.(clamp.((e_max .- rg) ⊙ (rg .- e_min), zero(x), typemax(x)))
-        res = AverageShiftedHistograms.ash(vals; rng = range(e_min, e_max; length = n),
-                                           kernel = kernel, m = m)
-        for (i, j) in enumerate(view(pdf, :, 1))
-            pdf[i, 2] = AverageShiftedHistograms.pdf(res, j)
+        for (i, j) in enumerate(rg)
+            pdf[i, 2] = AverageShiftedHistograms.pdf(ash_res, j)
         end
         pdf[.!isfinite.(view(pdf, :, 2)), 2] .= zero(eltype(x))
         return sum((view(pdf, :, 2) - view(pdf, :, 1)) .^ 2)

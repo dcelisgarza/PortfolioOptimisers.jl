@@ -219,21 +219,44 @@ end
         @test_throws DomainError detone(Detone(; n = 11), C)
     end
     @testset "Ticket 447: find_max_eval and its fallback" begin
-        # On data drawn from an identity covariance the fitted edge sits at the theoretical
-        # Marcenko-Pastur edge, because the noise variance of a correlation matrix is one.
-        rng = StableRNG(555)
+        #=
+        On data drawn from an identity covariance the fitted edge sits at the theoretical
+        Marcenko-Pastur edge, because the noise variance of a correlation matrix is one.
+
+        The tolerance is the accuracy of the average shifted histogram, not of the search.
+        The estimate is built from `N` eigenvalues, so it sharpens as `N` rises: over five
+        seeds the worst fitted variance is 0.9849 at `N = 50` and 0.9914 at `N = 100`.
+
+        Ticket 475: the draws below also pin the *support* of that estimate. An estimate
+        refitted over `[e_min, e_max]` at every trial variance renormalises over a shrinking
+        window, which gives the objective a spurious local minimum. On the `N = 50` draw the
+        search converged to it, at 0.415 of the true variance, so the second assertion of
+        each pair reds when the support follows the search.
+        =#
         for (T, N) in ((2000, 100), (1000, 50))
-            Z = cor(randn(rng, T, N))
+            Z = cor(randn(StableRNG(555), T, N))
             vals = LinearAlgebra.eigen(Z).values
             edge = (1 + sqrt(N / T))^2
             fitted = PortfolioOptimisers.find_max_eval(vals, T / N,
                                                        AverageShiftedHistograms.Kernels.gaussian,
                                                        10, 1000, (), (;))
-            @test isapprox(fitted, edge; rtol = 1e-3)
+            @test isapprox(fitted, edge; rtol = 5e-2)
+            @test fitted > 0.9 * edge
         end
+        #=
+        Ticket 475: a spectrum whose eigenvalues are all equal has a range of zero, and the
+        average shifted histogram needs a range it can bin. The fit carries no information
+        there, but it must not raise: a matrix with such a spectrum is a multiple of the
+        identity, and `denoise!` is asked for one by any caller who hands it one.
+        =#
+        @test isfinite(PortfolioOptimisers.find_max_eval(ones(10), 5.0,
+                                                         AverageShiftedHistograms.Kernels.gaussian,
+                                                         10, 1000, (), (;)))
+        @test denoise(Denoise(), Matrix(1.0 * LinearAlgebra.I, 10, 10), 5.0) ==
+              Matrix(1.0 * LinearAlgebra.I, 10, 10)
         # A search that does not converge substitutes a unit variance, and says so. Only
         # `dn.kwargs` can make the search fail; the defaults converge.
-        vals = LinearAlgebra.eigen(cor(randn(rng, 500, 50))).values
+        vals = LinearAlgebra.eigen(cor(randn(StableRNG(555), 500, 50))).values
         q0 = 10.0
         @test isapprox(PortfolioOptimisers.find_max_eval(copy(vals), q0,
                                                          AverageShiftedHistograms.Kernels.gaussian,
