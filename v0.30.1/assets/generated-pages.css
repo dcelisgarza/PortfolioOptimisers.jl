@@ -1,0 +1,87 @@
+/* ==========================================================================
+ * Styles for the two GENERATED pages
+ * ==========================================================================
+ *
+ *   docs/src/capability_catalogue.md   <- docs/generate_capability_catalogue.jl
+ *   docs/src/api/NN_TypeHierarchy.md   <- docs/generate_type_hierarchy.jl
+ *
+ * Wired in through `assets = [...]` in docs/make.jl.
+ *
+ * Both pages carry markup the stock Documenter themes do not style. Every
+ * selector below is more specific than the theme rule it overrides, so the
+ * load order does not matter.
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * TYPE HIERARCHY
+ *
+ * Each tree is ONE markdown paragraph wrapped in `<div class="type-tree">`, with
+ * a `<br>` between entries. A paragraph is used because a `@ref` link cannot
+ * live inside a code fence, so the tree cannot be `<pre>`.
+ *
+ * Nothing here controls the row spacing. That is the point: one paragraph PER
+ * ENTRY picks up the theme's `margin-bottom` and renders the tree with a blank
+ * line between its rows, and a margin reset here is the only thing holding the
+ * rows together. `<br>` cannot take a margin, so the generator emits that
+ * instead. See `docs/generate_type_hierarchy.jl`.
+ *
+ * The `p` rule below only stops the tree's single paragraph from adding a
+ * second bottom margin under the one on `.type-tree` itself. The theme rule is
+ * `.content p:not(:last-child)`, so the `:not()` selector is repeated to
+ * outrank it.
+ * -------------------------------------------------------------------------- */
+.content .type-tree {
+    font-family: "JuliaMono", "SFMono-Regular", "Menlo", "Consolas",
+        "Liberation Mono", "DejaVu Sans Mono", monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    /* The trees are wide and the box-drawing prefixes only line up unwrapped. */
+    white-space: nowrap;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+
+.content .type-tree p,
+.content .type-tree p:not(:last-child) {
+    margin: 0;
+}
+
+.content .type-tree a {
+    font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+ * CAPABILITY CATALOGUE
+ *
+ * Each collapsible group is `<details class="cap-group">` with an inline
+ * `margin-left` that restores the list level it broke out of. The `<summary>`
+ * holds one markdown paragraph, so that paragraph has to go inline or the head
+ * drops below the disclosure marker.
+ *
+ * The disclosure marker is the browser's own triangle, which already turns when
+ * the group opens. Do NOT restate the theme's chevron here. Every theme rule for
+ * `summary` is scoped to `details.docstring > summary`, the Font Awesome glyph
+ * included, so a `::before` on this class inherits no font and the private-use
+ * codepoint renders as a tofu box.
+ * -------------------------------------------------------------------------- */
+.content details.cap-group {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+}
+
+.content details.cap-group > summary {
+    cursor: pointer;
+}
+
+.content details.cap-group > summary > p,
+.content details.cap-group > summary > p:not(:last-child) {
+    display: inline;
+    margin: 0;
+}
+
+/* The body list sits tighter than a free-standing one: these nest five deep. */
+.content details.cap-group > ul,
+.content details.cap-group > ul:not(:last-child) {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+}
