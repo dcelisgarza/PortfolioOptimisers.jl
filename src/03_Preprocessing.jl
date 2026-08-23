@@ -44,17 +44,19 @@ Validate that asset or factor names and their corresponding returns matrix are p
   - `names_sym`: Symbolic name for the names argument displayed in error messages.
   - `mat_sym`: Symbolic name for the matrix argument displayed in error messages.
 
-# Returns
+# Validation
 
-  - `nothing`.
-
-# Details
+  - `allunique(names)`, whenever `names` is not `nothing`.
 
   - If either `names` or `mat` is not `nothing`:
 
       + `!isnothing(names)` and `!isnothing(mat)`.
       + `!isempty(names)` and `!isempty(mat)`.
       + `length(names) == size(mat, 2)`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -90,6 +92,12 @@ The **names layer** of [`check_names_and_feature_matrix`](@ref): both-or-neither
   - `nz`: Feature names.
   - `Z`: Feature matrix.
 
+# Validation
+
+  - `!isnothing(nz)`.
+  - `!isempty(nz)`.
+  - `allunique(nz)`.
+
 # Returns
 
   - `nothing`.
@@ -120,6 +128,16 @@ The **shape layer**. It holds every check that depends only on the matrix: non-e
 Two carriers use it. [`ReturnsResult`](@ref) and [`PricesResult`](@ref) reach it through [`check_names_and_feature_matrix`](@ref), which adds the names layer on top. [`LowOrderPrior`](@ref) calls it directly: a prior-side feature matrix is **nameless** by design — a producer runs inside `prior(pe, X, F; …)` with raw matrices and no names — so it has a shape to check and nothing to check it against by name.
 
 The three methods dispatch on the shape rather than branching on `ndims`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method.
+
+ 1. `Z` is `nothing`: return. The carrier holds no feature matrix, so there is no shape to check.
+ 2. `Z` is a `MatNum`, which is `assets × features`: check that `Z` is non-empty and that every entry is finite. Check that `na` is not `nothing`. Check that `size(Z, 1) == na`, which binds axis 1 to the assets. The observation count `nobs` is not read, because a static feature matrix has no observation axis.
+ 3. `Z` is an `Arr3Num`, which is `observations × assets × features`: check that `Z` is non-empty and that every entry is finite. Check that neither `na` nor `nobs` is `nothing`. Check that `size(Z, 1) == nobs`, which binds axis 1 to the observations, and that `size(Z, 2) == na`, which binds axis 2 to the assets.
+
+No method reads the trailing feature axis. That axis binds to `length(nz)`, and the names are the one thing this layer does not hold, so [`check_names_and_feature_matrix`](@ref) makes that check.
 
 # Arguments
 
@@ -187,6 +205,14 @@ This is the **names layer**: it composes [`check_feature_names`](@ref) and [`che
 
 The three methods dispatch on the shape rather than branching on `ndims`.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method.
+
+ 1. `Z` is `nothing`: check that `nz` is `nothing` too, and return. A name vector without a matrix names an axis the carrier does not hold.
+ 2. `Z` is a `MatNum`, which is `assets × features`: apply the names layer with [`check_feature_names`](@ref), then the shape layer with [`check_feature_matrix`](@ref), then check that `size(Z, 2) == length(nz)`, which binds axis 2 to the features. The shape layer is given `nothing` for the observation count, because a static feature matrix has no observation axis.
+ 3. `Z` is an `Arr3Num`, which is `observations × assets × features`: apply the same two layers, then check that `size(Z, 3) == length(nz)`, which binds axis 3 to the features. The observation count reaches the shape layer, which binds axis 1 to the observations and axis 2 to the assets.
+
 # Arguments
 
   - `nz`: Feature names.
@@ -249,6 +275,11 @@ True when the feature names equal the asset names, which is what a square phylog
 
 Compares the names rather than the axis lengths: a rectangular-by-accident coincidence of counts is not a claim that the axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices.
 
+# Algorithm
+
+ 1. If either `nz` or `nx` is `nothing`, return `false`. A carrier that names only one of the two axes makes no claim that the two are the same axis.
+ 2. Return `nz == nx`, the elementwise equality of the two name vectors.
+
 # Arguments
 
   - `nz`: Feature names.
@@ -269,13 +300,25 @@ end
 """
     feature_matrix_view(Z::Nothing, sq::Bool, i, j)
     feature_matrix_view(Z::MatNum, sq::Bool, i, j)
+    feature_matrix_view(Z::MatNum, sq::Bool, i, j::Colon)
     feature_matrix_view(Z::Arr3Num, sq::Bool, i, j)
+    feature_matrix_view(Z::Arr3Num, sq::Bool, i, j::Colon)
 
 Subselect a carried feature matrix by observations `i` and assets `j`.
 
 `Z` is assets-major, so the asset index `j` addresses axis 1 of a static feature matrix and axis 2 of a time-varying one. The static shape has no observation axis and therefore ignores `i` — the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
 
 When `sq` is `true` the feature axis is the asset axis ([`features_are_assets`](@ref)) and is sliced by `j` as well. A `Colon` asset index touches neither axis, so a static feature matrix passes through unchanged rather than being wrapped in a no-op view — the same passthrough `ivpa` gets when only observations are selected.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method, and no method copies `Z`.
+
+ 1. `Z` is `nothing`: return `nothing`.
+ 2. `Z` is a `MatNum` and `j` is a `Colon`: return `Z` itself. The asset index reaches neither axis, so no view is built.
+ 3. `Z` is a `MatNum`, which is `assets × features`: return `view(Z, j, j)` when `sq` is `true`, and `view(Z, j, :)` otherwise. Axis 1 is the assets, and axis 2 is the features. The observation index `i` is not read, because a static feature matrix has no observation axis.
+ 4. `Z` is an `Arr3Num` and `j` is a `Colon`: return `view(Z, i, :, :)`. Only the leading observation axis is selected.
+ 5. `Z` is an `Arr3Num`, which is `observations × assets × features`: return `view(Z, i, j, j)` when `sq` is `true`, and `view(Z, i, j, :)` otherwise. Axis 1 is the observations, axis 2 is the assets, and axis 3 is the features.
 
 # Arguments
 
@@ -311,6 +354,7 @@ end
 """
     feature_row_indices(Z::Nothing, ts_new, ts_old) -> Colon
     feature_row_indices(Z::MatNum, ts_new, ts_old) -> Colon
+    feature_row_indices(Z::Arr3Num, ts_new::Nothing, ts_old)
     feature_row_indices(Z::Arr3Num, ts_new, ts_old) -> VecInt
 
 Recover the positional row indices of a time-varying feature matrix from a timestamp window.
@@ -321,11 +365,24 @@ Two sites use it. At **price level** the clock is `TimeSeries.timestamp(X)` and 
 
 The static and absent shapes have no observation axis, so they return `Colon` and cost nothing.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method.
+
+ 1. `Z` is `nothing` or a `MatNum`: return `Colon()`. Neither shape has an observation axis, so there is no row to recover and the timestamps are not read.
+ 2. `Z` is an `Arr3Num` and `ts_new` is `nothing`: throw. The selection kept no timestamp, so the rows to keep cannot be named.
+ 3. `Z` is an `Arr3Num`: match `ts_new` into `ts_old` with `indexin`, giving `rows`, the position each surviving timestamp holds in the original clock. Check that no entry of `rows` is `nothing`. Return `rows` as a `Vector{Int}`.
+
 # Arguments
 
   - `Z`: Feature matrix.
   - `ts_new`: Timestamps surviving the selection.
   - `ts_old`: Timestamps of the clock `Z`'s observation axis is parallel to.
+
+# Validation
+
+  - `ts_new` is not `nothing` when `Z` is time-varying.
+  - Every entry of `ts_new` appears in `ts_old`.
 
 # Returns
 
@@ -433,11 +490,11 @@ julia> size(values(pr.X))
     """
     iv
     """
-    Implied volatility risk premium adjustment, if a vector (assets × 1).
+    $(field_dict[:ivpa_iv])
     """
     ivpa
     """
-    Names or identifiers of feature columns (features × 1).
+    $(field_dict[:nz_feat])
     """
     nz
     """
@@ -487,6 +544,26 @@ Return a view of the `PricesResult` for the observation window `i` and the asset
 
 The asset price series is the master clock: `i` selects rows of `X`, and the factor, benchmark, and implied volatility series are aligned to the selected timestamps (rows whose timestamps are absent from a series are dropped from that series). `j` selects asset columns and defaults to `:`, so a call giving only `i` is an observation window over the whole universe.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. The timestamp methods do the work, and the integer method routes into them.
+
+ 1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
+
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying `Z` from the surviving timestamps with [`feature_row_indices`](@ref), and view `Z` on that observation axis with [`feature_matrix_view`](@ref). Carry `ivpa` and `nz` through untouched, because the asset index reaches neither. Rebuild the [`PricesResult`](@ref).
+
+ 3. `i` is a vector of timestamps and `j` is a vector of asset indices:
+
+     1. Index `X` by the timestamps `i`, then keep the asset columns `j`.
+     2. Index `F` by the timestamps `i` alone. `j` is an asset index, and the factors are a separate axis, so every factor column is kept.
+     3. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test is `B`'s own width, because a shared benchmark has one column to give whatever `j` asks for.
+     4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
+     5. Read `sq` from [`features_are_assets`](@ref) on `nz` and the asset names of `X`. When `sq` is `true`, view `nz` at `j` as well.
+     6. Recover the rows of a time-varying `Z` with [`feature_row_indices`](@ref), and view `Z` at those rows and the assets `j` with [`feature_matrix_view`](@ref). A static `Z` has no observation axis and is viewed on the assets alone.
+     7. Rebuild the [`PricesResult`](@ref).
+
+ 4. `i` and `j` are integer indices, ranges or `Colon`s: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. This is the method a caller reaches with `port_opt_view(pr, 2:3)`.
+
 # Arguments
 
   - `pr`: A `PricesResult` object.
@@ -499,12 +576,9 @@ The asset price series is the master clock: `i` selects rows of `X`, and the fac
 
 # Details
 
-  - Two `Colon`s return `pr` unchanged.
-  - Integer windows index the rows of `pr.X` directly; the selected timestamps are then used to align `F`, `B`, and `iv`.
-  - Timestamp windows are applied to all series directly.
-  - The factor series `F` keeps every column: `j` is an asset index, and the factors are a separate axis.
-  - The asset index reaches `X`, `B` (when it has one column per asset), `iv` and `ivpa`. A `Colon` asset index leaves all four alone, which is why `ivpa` passes through untouched on the observation-only arity and is sliced by `j` on the other.
-  - The feature matrix `Z` is sliced on its asset axis by `j`, and a time-varying one is also sliced to the rows the selected timestamps occupy in the original clock (see [`feature_row_indices`](@ref)). A static `Z` has no observation axis, so a `Colon` asset index passes it through unchanged. When `Z`'s features *are* the assets, the asset subselection slices its feature axis and `nz` too (see [`features_are_assets`](@ref)).
+  - A `Colon` asset index leaves `X`, `B`, `iv` and `ivpa` alone, which is why `ivpa` passes through untouched on the observation-only arity and is viewed at `j` on the other.
+  - A static `Z` has no observation axis, so a `Colon` asset index passes it through unchanged rather than wrapping it in a no-op view.
+  - When `Z`'s features *are* the assets, the asset subselection slices its feature axis and `nz` too (see [`features_are_assets`](@ref)).
 
 # Examples
 
@@ -677,11 +751,11 @@ ReturnsResult
     """
     iv
     """
-    Implied volatility risk premium adjustment, if a vector (assets × 1).
+    $(field_dict[:ivpa_iv])
     """
     ivpa
     """
-    Names or identifiers of feature columns (features × 1).
+    $(field_dict[:nz_feat])
     """
     nz
     """
@@ -775,6 +849,18 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
 
     This two-argument method indexes **assets**, matching the rest of the `port_opt_view` family. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. The two arities therefore give `i` different meanings; see [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
 
+# Algorithm
+
+ 1. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
+ 2. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
+ 3. When `B` is a matrix, it holds one column per asset: view `nb` at `i`, and view `B` as `view(rd.B, :, i)`. Otherwise — a single shared benchmark, or none at all — `nb` and `B` both pass through untouched.
+ 4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
+ 5. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `i` as well, because the feature axis is the asset axis.
+ 6. View the feature matrix with [`feature_matrix_view`](@ref) at `i` on the asset axis. The observation index is a `Colon`, so a time-varying `Z` keeps every observation.
+ 7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
+
+Each field that is `nothing` stays `nothing`. No step copies data.
+
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
@@ -786,10 +872,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
 
 # Details
 
-  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `i`.
-  - Preserves factor, timestamp, and other fields from the original object.
-  - Returns `nothing` for fields that are not present.
-  - Subselects the feature matrix `Z` on its asset axis — axis 1 when static, axis 2 when time-varying, since `Z` is carried assets-major. Its observation axis is untouched by this arity. When `Z`'s features *are* the assets, its feature axis and `nz` are subselected too (see [`features_are_assets`](@ref)).
+  - `Z` is carried assets-major, so the asset axis is axis 1 when `Z` is static and axis 2 when `Z` is time-varying.
 
 # Examples
 
@@ -847,6 +930,19 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
     Unlike every other [`port_opt_view`](@ref) method — including [`port_opt_view(rd::ReturnsResult, i)`](@ref) — the first index of this method selects **observations**, not assets. Assets are the *second* index. Cross-validation splits observations and assets together, which is why this arity exists at all.
 
+# Algorithm
+
+ 1. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
+ 2. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
+ 3. View the factor names `nf` at `k`, unless `k` is a `Colon`, in which case `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
+ 4. When `B` is a matrix, it holds one column per asset: view `nb` at `j`, and view `B` as `view(rd.B, i, j)`. When `B` is a vector, it is a single shared benchmark: view it as `view(rd.B, i)`, and carry `nb` through.
+ 5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
+ 6. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `j` as well.
+ 7. View the feature matrix with [`feature_matrix_view`](@ref) at the observations `i` and the assets `j`. A static `Z` has no observation axis and ignores `i`.
+ 8. Rebuild the [`ReturnsResult`](@ref).
+
+Each field that is `nothing` stays `nothing`. No step copies data.
+
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
@@ -860,12 +956,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
 # Details
 
-  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `j` and observation(s) `i`.
-  - Extracts the factor names and returns for indices `k` and observations `i`.
-  - Preserves factor names and returns for the selected observations.
-  - Preserves timestamps for the selected observations.
-  - Returns `nothing` for fields that are not present in the original object.
-  - Subselects the feature matrix `Z` by assets `j` and, when time-varying, by observations `i` as well. A static `Z` has no observation axis and ignores `i` — the same asymmetry `ivpa` has. When `Z`'s features *are* the assets, its feature axis and `nz` are subselected by `j` too (see [`features_are_assets`](@ref)).
+  - A static `Z` ignores the observation index `i`, which is the same asymmetry `ivpa` has.
 
 # Related
 
@@ -919,6 +1010,10 @@ Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would han
 
 Subtypes carrying a feature matrix owe it the same treatment as `X`: subselect its asset axis on every arity, its observation axis on the arities that take one, and — when its features *are* the assets ([`features_are_assets`](@ref)) — its feature axis as well. A feature matrix that survives a fold unsliced is the same silent-wrongness as an unsliced returns matrix, one level down: the distance it produces is finite, plausible, and computed over the wrong universe. [`feature_matrix_view`](@ref) implements the rule; the [`ReturnsResult`](@ref) methods are the reference.
 
+# Algorithm
+
+ 1. Throw an `ArgumentError` naming the concrete type and the number of index arguments the call gave. The method reads neither the indices nor the fields of `rd`.
+
 # Related
 
   - [`port_opt_view`](@ref)
@@ -931,6 +1026,11 @@ Subtypes carrying a feature matrix owe it the same treatment as `X`: subselect i
 Erroring tripwire for [`ReturnsResult`](@ref) calls whose *call shape* no supported arity matches.
 
 `ReturnsResult` does implement [`port_opt_view`](@ref), so the [`AbstractReturnsResult`](@ref) tripwire above would misreport a mistyped call as an unimplemented subtype. This method takes the call instead and names the call shape: the supported arities take one, two, or three positional index arguments and no keyword arguments — in particular `factors` is the third *positional* index, not a keyword.
+
+# Algorithm
+
+ 1. Count the positional arguments `args`, and read the names of the keyword arguments `kwargs`.
+ 2. Throw an `ArgumentError` reporting both counts, and naming the three supported call shapes.
 
 # Related
 
@@ -995,6 +1095,28 @@ Resolve one side of a train/test split into a row count.
 
 A size is either an `Integer` count of observations, or an `AbstractFloat` fraction of them in `(0, 1)`. Counts saturate at `N` (asking for more rows than exist takes all of them); the [`safe_index`](@ref) window guards then reject a split that leaves either side empty.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method, and the two mean different things: a count and a fraction.
+
+ 1. `s` is an `Integer`, so it is a count of rows: check that `s > 0`, and return `min(Int(s), N)`. A count larger than the data takes every row.
+ 2. `s` is an `AbstractFloat`, so it is a fraction of the rows: check that `0 < s < 1`, and return `clamp(floor(Int, s * N), 1, N)`. The fraction rounds **down** to whole rows, and the clamp keeps a small fraction of a short window from resolving to zero rows.
+
+# Arguments
+
+  - `s`: One side of the split, as a row count (`Integer`) or a fraction of the observations (`AbstractFloat` in `(0, 1)`).
+  - `N`: Number of observations available.
+  - `name`: Symbolic name of the side, displayed in error messages.
+
+# Validation
+
+  - `s > 0` when `s` is an `Integer`.
+  - `0 < s < 1` when `s` is an `AbstractFloat`.
+
+# Returns
+
+  - `n::Int`: The number of rows the side takes, in `1:N`.
+
 # Related
 
   - [`safe_index`](@ref)
@@ -1022,10 +1144,34 @@ Training rows come from the head of the data and test rows from the tail, so the
   - **One given**: the other side is its complement, so the two windows partition the data.
   - **Both given**: the head supplies `lo` training rows, the tail supplies `hi` test rows, and any rows between them are **embargoed** — they belong to neither window. This is how a gap between train and test is expressed. The gap is declared by the two sizes and nothing else; a rule that derives one from the label horizon belongs to the purged cross-validators ([`CombinatorialCrossValidation`](@ref)), not here.
 
-## Validation
+# Algorithm
+
+ 1. Resolve the two window lengths `N_l` and `N_h`, through the branch that `lo` and `hi` select:
+
+     1. Neither is given: take `n = clamp(floor(Int, D * N), 1, N)`, then `N_l = n` and `N_h = N - n`.
+     2. Only `lo` is given: resolve it with [`split_count`](@ref), then `N_l = n` and `N_h = N - n`.
+     3. Only `hi` is given: resolve it with [`split_count`](@ref), then `N_l = N - n` and `N_h = n`.
+     4. Both are given: resolve each with [`split_count`](@ref) on its own. Neither is the complement of the other, so the rows between the two windows are embargoed.
+
+ 2. Check that both windows are non-empty, and that the two do not overlap.
+
+ 3. Return the two ranges `1:N_l` and `(N - N_h + 1):N`. The training window is the head of the data, and the test window is the tail, so the embargoed rows sit between them.
+
+# Arguments
+
+  - `lo`: Training rows, as a count (`Integer`) or a fraction (`AbstractFloat` in `(0, 1)`); `nothing` takes the complement of `hi`.
+  - `hi`: Test rows, likewise; `nothing` takes the complement of `lo`.
+  - `N`: Number of observations available.
+  - `D = 0.75`: Training fraction taken when neither size is given.
+
+# Validation
 
   - Both windows are non-empty. A split whose sizes saturate the data on one side (`train_size = N`) leaves nothing to test on and throws.
   - The windows do not overlap: `lo + hi <= N`.
+
+# Returns
+
+  - `(train, test)`: The training and test row ranges, as two `UnitRange{Int}`s.
 
 # Related
 
@@ -1060,6 +1206,12 @@ end
 Cut price- or returns-level data into a training window (the head) and a held-out test window (the tail).
 
 The free-function form of [`TrainTestSplit`](@ref); the windows are [`port_opt_view`](@ref)s, so no data is copied. See [`safe_index`](@ref) for the sizing rules — complement when one side is given, embargo when both are.
+
+# Algorithm
+
+ 1. Read the observation count `N` from the asset data: `size(rd.X, 1)` at returns level, and `size(TimeSeries.values(pr.X), 1)` at price level.
+ 2. Resolve the two row ranges with [`safe_index`](@ref).
+ 3. Return a [`port_opt_view`](@ref) of each range. The returns-level method passes a `Colon` asset index after the row range, because that arity indexes observations first and assets second.
 
 # Arguments
 
@@ -1106,6 +1258,15 @@ Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
 
 This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean flag `brt` (benchmark-tracking). If `brt` is `true` and a benchmark `B` is present it returns a new `ReturnsResult` in which asset returns `X` have the benchmark removed (i.e. `X - B` or broadcast `X .- B` for vector benchmarks). If `brt` is `false` or no benchmark is present, the original `ReturnsResult` is returned unchanged.
 
+# Algorithm
+
+The first step is a method selected on the field type of `B`, so a carrier with no benchmark runs no branch at all.
+
+ 1. `rd` carries no benchmark, because its `B` field is `Nothing`: return `rd` itself.
+ 2. `brt` is `false`: return `rd` itself.
+ 3. `brt` is `true`: subtract the benchmark from the asset returns, giving `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes one benchmark value per observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
+ 4. Rebuild the [`ReturnsResult`](@ref) from `X`, and leave `nb` and `B` unset. The benchmark is spent on the subtraction, which is what makes a second call return its argument unchanged.
+
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset, factor and/or benchmark returns.
@@ -1120,10 +1281,7 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 
 # Details
 
-  - When an adjustment is required and `B` is present, a new `ReturnsResult` is returned leaving the original `rd` unmodified.
-  - If no adjustment is required or `B` is `nothing`, the original `ReturnsResult` is returned unchanged.
-  - For vector benchmarks (`VecNum`) subtraction uses broadcasting (`X .- B`) to subtract the per-observation benchmark from each asset column (index tracking).
-  - For matrix benchmarks (`MatNum`) subtraction uses matrix subtraction (`X - B`).
+  - The original `rd` is never modified. An adjustment builds a new [`ReturnsResult`](@ref).
   - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`, `nz`, `Z`) are preserved in the returned object.
   - `nb` and `B` are **not** carried over: the benchmark has been spent on the subtraction, so the returned object holds `nothing` for both. This is what makes the adjustment idempotent — a second call has no benchmark left to subtract and returns its argument unchanged.
 
@@ -1209,6 +1367,14 @@ Apply the `impute_method` given to [`prices_to_returns`](@ref) to the price tabl
 by `PortfolioOptimisersImputeExt` and only exists once the caller has run `using Impute`. Anything
 else throws.
 
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method, and the second lives in an extension.
+
+ 1. `impute_method` is `nothing`: return `X` unchanged. This is the default path, and it loads nothing.
+ 2. `impute_method` is an `Impute.Imputor`: apply it to `X`. `PortfolioOptimisersImputeExt` supplies this method, so it exists only after the caller runs `using Impute`.
+ 3. Any other `impute_method`: read whether the extension is loaded with `Base.get_extension`, and throw an `ArgumentError` that names which of the two mistakes happened. `Impute` not being loaded and a wrong type are different mistakes, and the caller cannot tell them apart from the type alone.
+
 # Arguments
 
   - `X`: Price table (a `DataFrames.DataFrame` as built by [`prices_to_returns`](@ref)).
@@ -1279,7 +1445,31 @@ Where:
   - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
   - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
 
+`TimeSeries.percentchange` computes both branches through logarithms: the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is ``\\mathrm{expm1}`` of it. The two agree with the forms above to floating point rather than to the last bit, and both need a **positive** price. A negative price throws a `DomainError` from inside the logarithm, on the simple branch as well, and a zero price gives ``\\pm\\infty``.
+
 A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns in the `B` field of the [`ReturnsResult`](@ref); it is not subtracted here. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is done later, by [`returns_result_picker`](@ref), and only when the optimisation tracks the benchmark.
+
+# Algorithm
+
+ 1. Check `X`, `missing_col_percent` and `missing_row_percent`. Read the asset names and the asset timestamps from `X`, and check `nz` and `Z` against them with [`check_names_and_feature_matrix`](@ref).
+ 2. Merge the factor prices `F` into `X` under `join_method`, and record the factor names.
+ 3. Merge the benchmark prices `B` into `X` under `join_method`, and record the benchmark names. A benchmark is one shared column, or one column per asset.
+ 4. Apply `map_func` to every entry, when one is given.
+ 5. Collapse the time series with `collapse_args`, when they are given. This is the step that changes the frequency.
+ 6. Convert the table to a `DataFrames.DataFrame`, and replace every `NaN` with `missing`. The two conventions for an absent price become one.
+ 7. Impute the missing entries with [`apply_impute_method`](@ref), which does nothing unless the caller gives an `Impute.Imputor`.
+ 8. Count the missing entries of the table, giving one count per row and one count per column.
+ 9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
+10. Drop each column whose count of missing rows exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
+11. Drop every column that is still typed as missing, then every row that still holds a missing entry.
+12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
+13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
+14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
+15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`.
+16. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
+17. Return the [`ReturnsResult`](@ref).
+
+Step 9 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one.
 
 # Arguments
 
@@ -1290,8 +1480,8 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
-  - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing values per column (asset + factor).
-  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing values per row (timestamp).
+  - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing **columns** in an observation row. A row above it is dropped. The name reads as the axis that is counted, not the axis that is dropped.
+  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing **rows** in a column. A column above it is dropped. `nothing` keeps the columns whose missing count equals the mode of the counts instead, which is the shape of a panel whose assets share one history.
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
@@ -1315,15 +1505,9 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 
 # Details
 
-  - Joins asset, factor, and benchmark data as specified.
+  - Step 10 counts the missing entries of a column over **every** row the table had at step 8, and compares that count against the row total that **survived** step 9. A column can therefore be dropped for missing entries that sit only in rows already gone.
 
-  - Optionally applies a mapping function and/or collapses the time series.
-
-  - Handles missing values by filtering, imputation, and dropping as configured.
-
-  - Computes returns using the specified method.
-
-      + If `B` is not `nothing`, it is converted to returns by the same rule and carried in the `B` field. It is **not** subtracted from the asset returns; [`returns_result_picker`](@ref) does that, for a returns-tracking optimisation.
+  - The benchmark is converted to returns by the same rule and carried in the `B` field. It is **not** subtracted from the asset returns; [`returns_result_picker`](@ref) does that, for a returns-tracking optimisation.
 
   - Carries the feature matrix `Z` across, subselected to the assets that survive the conversion — an asset dropped for being entirely missing takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is also subselected to the surviving observations, matching them back into the original price timestamps ([`feature_row_indices`](@ref)); a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp — last-observation semantics, matching [`LastObservation`](@ref).
 
@@ -1497,6 +1681,13 @@ This function scans the specified dimension of the input matrix and returns the 
 
 Internal machinery — the caller-facing form is [`CompleteAssetSelector`](@ref), which wraps the `dims = 1` (complete-column) mode as a fit/apply estimator. The `dims = 2` (complete-row) mode has no estimator form: dropping observations is a price-level concern ([`MissingDataFilter`](@ref)).
 
+# Algorithm
+
+ 1. Orient `X` with `dims_oriented`, so that the axis to test is axis 2 in both modes. `dims = 2` transposes the matrix, and `dims = 1` leaves it alone.
+ 2. Read the column count `N` of the oriented matrix.
+ 3. For each column of the oriented matrix, test whether it holds a `missing` entry or a `NaN` entry. Collect the positions of the columns that do, giving `to_remove`. One entry is enough to remove the whole column.
+ 4. Return `setdiff(1:N, to_remove)`, the positions of the complete columns, in ascending order.
+
 # Arguments
 
   - $(arg_dict[:X])
@@ -1509,12 +1700,6 @@ Internal machinery — the caller-facing form is [`CompleteAssetSelector`](@ref)
 # Returns
 
   - `res::VecInt`: Indices of columns (or rows) in `X` that are complete.
-
-# Details
-
-  - If `dims == 2`, the matrix is transposed and columns are checked.
-  - Any column (or row) containing at least one `missing` or `NaN` value is excluded.
-  - The result is a vector of indices of complete columns (or rows).
 
 # Examples
 
@@ -1640,6 +1825,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` when `x` counts as a missing observation in price-level data.
 
 Price-level data stores absent observations either as `missing` or as `NaN` (the two conventions [`prices_to_returns`](@ref) already unifies).
+
+# Algorithm
+
+ 1. Return `true` when `x` is `missing`.
+ 2. Return `true` when `x` is a `Number` and `isnan(x)` holds. The type test guards the call, because `isnan` is not defined for every value a price table can carry.
+ 3. Return `false` otherwise.
 
 # Arguments
 
@@ -1812,6 +2003,12 @@ Fit a [`TrainTestSplit`](@ref) by cutting the data into its two windows.
 
 Unlike the other preprocessing estimators, the fitted result is *not* replayed on unseen data: a holdout's rows are a fact about the fitting window alone, so [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) passes the window through unchanged.
 
+# Algorithm
+
+ 1. [`fit_preprocessing`](@ref) calls [`train_test_split`](@ref) on the data, and returns the [`TrainTestSplitResult`](@ref) that holds both windows.
+ 2. [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) returns its data argument unchanged.
+ 3. [`apply_preprocessing`](@ref) on a [`TrainTestSplit`](@ref) returns its data argument unchanged, so an unfitted step is a pass-through as well.
+
 # Related
 
   - [`TrainTestSplit`](@ref)
@@ -1832,6 +2029,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Split `data` under a [`TrainTestSplit`](@ref), returning both windows as a [`TrainTestSplitResult`](@ref).
 
 The estimator-form counterpart of the keyword form: `train_test_split(rd; test_size = 0.2)` hands back a bare `(train, test)` tuple, while this hands back the same fitted result a pipeline's split step produces, so a holdout configured once can be reused verbatim inside and outside a [`Pipeline`](@ref).
+
+# Algorithm
+
+ 1. Call the keyword form of [`train_test_split`](@ref) with `tts.train_size` and `tts.test_size`, giving the two windows.
+ 2. Wrap the pair in a [`TrainTestSplitResult`](@ref), in the order `(train, test)`.
 
 # Related
 
@@ -1916,10 +2118,26 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fit any [`AbstractAssetSelector`](@ref) by recording the asset universe [`select_assets`](@ref) keeps.
 
-## Validation
+# Algorithm
+
+ 1. Call [`select_assets`](@ref) on the training window, giving the keep-mask `keep`.
+ 2. Check that `keep` holds one entry per asset column of `rd`.
+ 3. Check that `keep` keeps at least one asset.
+ 4. Return an [`AssetSelectorResult`](@ref) holding the names of the kept assets, in their original column order.
+
+# Arguments
+
+  - `sel`: The asset selector.
+  - `rd`: The training-window returns data.
+
+# Validation
 
   - `select_assets` must return a mask whose length matches the number of asset columns.
   - The selection must keep at least one asset; a selector that empties the universe throws rather than passing a zero-asset problem downstream (the [`MissingDataFilter`](@ref) precedent).
+
+# Returns
+
+  - `res::AssetSelectorResult`: The fitted asset universe.
 
 # Related
 
@@ -1943,9 +2161,24 @@ Replay a fitted asset universe on a data window.
 
 The surviving columns are emitted in *fitted* order, not in the window's own column order, because the terminal weights are indexed by the training universe and `assert_universe_aligned` compares the two name vectors elementwise.
 
-## Validation
+# Algorithm
+
+ 1. For each fitted asset name, in fitted order, find the column of the window that carries it, and record that position in `idx`.
+ 2. Check that the name is present. A name the window does not carry throws.
+ 3. Return a [`port_opt_view`](@ref) of the window at `idx`. The positions are in fitted order, so the view reorders the window's columns when the two orders differ.
+
+# Arguments
+
+  - `res`: The fitted asset universe.
+  - `rd`: The data window to transform.
+
+# Validation
 
   - Every fitted asset name must be present in the window; a missing one throws rather than silently shrinking the universe.
+
+# Returns
+
+  - `rd′::AbstractReturnsResult`: The window restricted to the fitted universe, in fitted order.
 
 # Related
 
@@ -1974,6 +2207,15 @@ Missing-data filtering is deliberately *not* part of this estimator (the corresp
 !!! warning
 
     Because this step is stateless, it does not define an asset universe. [`prices_to_returns`](@ref) drops assets that are entirely missing in the window being converted, so a training window in which an asset has no history produces a different universe from a clean test window. Precede this estimator with a [`MissingDataFilter`](@ref) (which fits the universe on the training window) and an [`Imputer`](@ref) (which fills the remaining gaps with training statistics) whenever a fitted transformation must be replayed on unseen windows; a `Pipeline` enforces this via `assert_universe_aligned`.
+
+# Algorithm
+
+The estimator is stateless, so both verbs are thin.
+
+ 1. [`fit_preprocessing`](@ref) returns the estimator itself. There is no state to fit.
+ 2. [`apply_preprocessing`](@ref) calls [`prices_to_returns`](@ref) with the five fields as keywords, and with `X`, `F`, `B`, `iv`, `ivpa`, `nz` and `Z` read off the [`PricesResult`](@ref). It returns the [`ReturnsResult`](@ref).
+
+The missing-data keywords of [`prices_to_returns`](@ref) are not fields of this estimator, so they hold their permissive defaults and every row and column reaches the conversion.
 
 # Fields
 
@@ -2077,6 +2319,26 @@ Preprocessing estimator dropping assets and observations with excessive missing 
 The *asset universe is fitted state*: the training window decides which assets survive (per-column missing fraction at most `col_thr`), and applying the fitted result to an unseen window subsets it to that same universe — so train weights and test returns always refer to the same assets. Observation (row) filtering is window-local: rows whose missing fraction across the surviving assets exceeds `row_thr` are dropped from whichever window is being transformed.
 
 This estimator supersedes the `missing_col_percent`/`missing_row_percent` keywords of [`prices_to_returns`](@ref), making the thresholds fitted state and independently tunable. Only the asset series `X` (and the matching implied volatility columns, and the feature matrix, whose axes are parallel to `X`) participate; factor and benchmark series pass through unchanged.
+
+# Algorithm
+
+## Fit
+
+ 1. Count the missing observations of each asset column with [`is_missing_value`](@ref), and divide each count by the observation total, giving `frac`.
+ 2. Keep the assets whose fraction does not exceed `col_thr`, and check that one asset at least survives.
+ 3. Return a [`MissingDataFilterResult`](@ref) holding the surviving asset names and `row_thr`.
+
+## Apply
+
+ 1. Find the columns of the window whose names are in the fitted universe, and check that one at least is present.
+ 2. Count the missing assets of each row over those columns alone, and keep the rows whose count does not exceed `row_thr` of the column total.
+ 3. Rebuild `X` from the kept rows and the kept columns.
+ 4. Subselect the implied volatilities on the kept columns, and `ivpa` with them when it is a vector. The implied volatility series keeps every row, because its own clock is not the one that was filtered.
+ 5. Read `sq` from [`features_are_assets`](@ref), and view `nz` at the kept columns when `sq` is `true`.
+ 6. View the feature matrix with [`feature_matrix_view`](@ref) at the kept rows and the kept columns.
+ 7. Rebuild the [`PricesResult`](@ref). The factor series `F` and the benchmark series `B` pass through untouched.
+
+The two thresholds count opposite axes: `col_thr` counts the missing rows of a column and drops columns, and `row_thr` counts the missing columns of a row and drops rows.
 
 # Fields
 
@@ -2202,6 +2464,22 @@ Preprocessing estimator imputing missing price observations from per-asset stati
 The *imputation parameters are fitted state*: each asset's fill value is computed from the training window's observed (non-missing) prices with the configured [`Num_VecToScaM`](@ref), and applying the fitted result to an unseen window fills that window's missing observations with the *training* values — never with statistics of the window being transformed, which is exactly the leakage a fit/apply contract exists to prevent.
 
 Assets with no observed values in the training window get no fill value and are left untouched at apply time; combine with [`MissingDataFilter`](@ref) to drop them instead.
+
+# Algorithm
+
+## Fit
+
+ 1. For each asset column, collect the observed prices. An entry [`is_missing_value`](@ref) accepts is left out.
+ 2. Skip an asset whose column holds no observed price. It gets no fill value, and no entry in the result.
+ 3. Reduce the observed prices of the column to one value with `stat`, giving that asset's fill value.
+ 4. Return an [`ImputerResult`](@ref) holding the fitted asset names and their fill values, aligned.
+
+## Apply
+
+ 1. Copy the price values of the window, so the input is not mutated.
+ 2. For each fitted asset name, find its column in the window. Skip a name the window does not carry.
+ 3. Replace every missing entry of that column with that asset's fitted fill value.
+ 4. Rebuild `X` from the filled values, keeping the timestamps and the column names, then rebuild the [`PricesResult`](@ref). Every other field passes through untouched.
 
 # Fields
 

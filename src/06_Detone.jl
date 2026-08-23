@@ -108,6 +108,7 @@ Detone
 # References
 
   - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
     """
@@ -155,6 +156,19 @@ Where:
   - $(math_dict[:N])
 
 The rescaling is not cosmetic. Subtracting the market modes takes the diagonal of ``\\mathbf{C}`` well below one, so the rescaling changes every entry. On a 24x8 standard normal sample with `n = 1`, ``C_{11} = 0.8615`` and ``C_{12} = -0.2479``, against ``\\tilde{X}_{11} = 1`` and ``\\tilde{X}_{12} = -0.2671``; the largest entrywise gap is `0.5664`.
+
+# Algorithm
+
+ 1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
+ 2. Decrement `n` by one. `n` counts the modes to remove, and steps 5 and 6 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 5. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
+ 6. Take the matching trailing columns of `vecs`.
+ 7. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
+ 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`. The subtraction takes the diagonal below one, so this step changes every entry.
+ 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
+10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
 
 # Arguments
 
@@ -222,6 +236,7 @@ julia> detone!(Detone(), X)
 # References
 
   - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
 """
 function detone!(::Nothing, X::MatNum)::MatNum
     return X
@@ -252,6 +267,11 @@ end
     detone(dt::Option{<:AbstractDetoneEstimator}, X::MatNum) -> MatNum
 
 Out-of-place version of [`detone!`](@ref).
+
+# Algorithm
+
+ 1. Copy `X`.
+ 2. Apply [`detone!`](@ref) to the copy, and return it. The input is never modified.
 
 # Arguments
 
@@ -291,6 +311,7 @@ julia> size(Xd)
 # References
 
   - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
 """
 function detone(::Nothing, X::MatNum)::MatNum
     return X

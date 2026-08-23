@@ -133,18 +133,6 @@ function read_existing(path::AbstractString)
     return out
 end
 
-"""
-    names_path(title, path) -> Bool
-
-ADR 0078 searches `label:code-health state:all` plus **the exact path in the title**. The job holds
-every `code-health` issue already, so the search happens here, and the test is a token match rather
-than a substring: the path must stand as a whole word. A substring test would let a title naming
-`src/A.jl.orig` skip `src/A.jl` for ever.
-"""
-function names_path(title::AbstractString, path::AbstractString)
-    return any(==(path), split(title, r"[\s`,;()\[\]]+"; keepempty = false))
-end
-
 # --- git, for the refile clause --------------------------------------------
 
 """
@@ -315,7 +303,7 @@ issue closed. The most recent closed issue is the one consulted, because it is t
 person signed the file off.
 """
 function verdict(c::Candidate, existing::Vector{Existing})
-    matches = filter(e -> names_path(e.title, c.path), existing)
+    matches = filter(e -> CodeHealth.names_path(e.title, c.path), existing)
     if isempty(matches)
         return :file, "never filed"
     end

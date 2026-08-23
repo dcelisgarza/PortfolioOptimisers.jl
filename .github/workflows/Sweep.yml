@@ -1,0 +1,148 @@
+name: Sweep
+
+# The scheduled job of ADR 0084. It reconciles `sweep/manifest.toml` against the tracker, reopens
+# the child map of #404 that a late addition joined, and opens one sub-issue per such file under
+# the `sweep` label.
+#
+# It is a BACKSTOP, not the rule. `CLAUDE.md`, section "Functionality you add", states the four
+# steps a person takes, and `test/test_45_sweep_census.jl` reds the build the day the addition
+# lands. This job catches the one case the census cannot see: the person added the row and forgot
+# to reopen the closed child map. A Julia test cannot read the state of an issue.
+#
+# Its trigger is one condition: a row that reads `swept = false` under a CLOSED child map. That
+# trigger is also the deduplication, because run 1 reopens the map that made it true.
+#
+# Every decision the job makes lives in `code_health/sweep_triage.jl`, which a person can run and
+# read. This file does two things around it: it asks the tracker what exists, and it opens and
+# reopens what the plan names.
+
+on:
+  schedule:
+    # Monday, 06:00 UTC, the same cadence as `CodeHealth.yml`. The trigger fires only when a child
+    # map closes, which is rare, so a week of latency costs nothing. ADR 0084.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would be opened, and open nothing.'
+        type: boolean
+        default: true
+
+# `issues: write` is the whole point of the job. It needs no `contents: write`: it never writes a
+# manifest row, which is what keeps it inside the same permission set as `CodeHealth.yml`. The row
+# arrives by hand, because the census keeps a pull request red until it does.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    # A fork never files into anybody's tracker. A scheduled workflow does run on a fork once it is
+    # enabled there, and `GITHUB_TOKEN` on a fork carries `issues: write` for the FORK, so without
+    # this guard a fork would quietly open this repository's backlog in its own tracker. The guard
+    # is on the job rather than on the create step, so a fork spends no runner minutes at all.
+    if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    steps:
+      # The job reads `dev`, because `dev` is where an addition lands and where `sweep/manifest.toml`
+      # is current. The workflow file itself must reach `main` for the schedule to fire at all,
+      # which is GitHub's rule and not a choice here.
+      #
+      # `fetch-depth: 0` is NOT needed. `CodeHealth.yml` fetches the full history because its refile
+      # clause reads a baseline row at a past commit. This job's trigger is a flag in the checked-out
+      # tree, so the default shallow clone answers everything it asks.
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+      - name: Read the Julia pin from the Manifest
+        id: pin
+        run: |
+          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The sweep job is pinned to Julia $v."
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      # There is NO instantiate step, and that is the reason this job runs in seconds where
+      # `CodeHealth.yml` runs for sixteen minutes. `sweep_triage.jl` includes `CodeHealth.jl`, which
+      # loads only `TOML`, and `TOML` is stdlib.
+      #
+      # The two dumps are tab-separated, one issue per line, so the Julia side needs no JSON parser.
+      # The maps dump carries every `wayfinder:map` issue in the tracker; the script picks the
+      # thirteen children out of it by title and reads the umbrella by number.
+      - name: Dump the wayfinder maps and the sweep issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p code_health/_sweep
+          gh issue list --label wayfinder:map --state all --limit 200 \
+             --json number,state,title \
+             --template '{{range .}}{{.number}}{{"\t"}}{{.state}}{{"\t"}}{{.title}}{{"\n"}}{{end}}' \
+             > code_health/_sweep/maps.tsv
+          gh issue list --label sweep --state all --limit 500 \
+             --json number,state,title \
+             --template '{{range .}}{{.number}}{{"\t"}}{{.state}}{{"\t"}}{{.title}}{{"\n"}}{{end}}' \
+             > code_health/_sweep/existing.tsv
+          echo "The tracker holds $(wc -l < code_health/_sweep/maps.tsv) map(s)."
+          echo "It holds $(wc -l < code_health/_sweep/existing.tsv) sweep issue(s)."
+      # The script throws when the manifest and the tracker disagree, and it then writes no plan.
+      # That is deliberate: a wrong parent or a wrong title is work a person must undo by hand.
+      - name: Plan the sub-issues
+        run: |
+          julia --project=code_health code_health/sweep_triage.jl \
+            --maps code_health/_sweep/maps.tsv \
+            --existing code_health/_sweep/existing.tsv
+      # The plan is the same whether or not it is posted, so a dry run exercises the real code path
+      # and leaves it unposted. There is no second rendering to drift.
+      #
+      # The map is reopened BEFORE its sub-issues are opened, which is the order #404's rule states.
+      # `reopen.tsv` lists only issues the dump reported CLOSED, because `gh issue reopen` fails on
+      # an issue that is already open.
+      - name: Reopen the maps and open the sub-issues
+        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          while read -r n; do
+            [ -n "$n" ] || continue
+            gh issue reopen "$n" </dev/null
+            echo "Reopened #$n."
+          done < code_health/_sweep/reopen.tsv
+          count=0
+          while IFS=$'\t' read -r stem path parent; do
+            [ -n "$stem" ] || continue
+            url=$(gh issue create --label sweep \
+                    --title "$(cat "code_health/_sweep/$stem.title")" \
+                    --body-file "code_health/_sweep/$stem.body" </dev/null)
+            echo "Opened $url for $path."
+            # The sub-issues endpoint takes the child's DATABASE id, which is not the number in the
+            # URL. `gh issue create` prints the URL alone, so the id is read back by number.
+            child=$(gh api "repos/$GITHUB_REPOSITORY/issues/${url##*/}" --jq .id </dev/null)
+            gh api "repos/$GITHUB_REPOSITORY/issues/$parent/sub_issues" \
+               -F sub_issue_id="$child" --silent </dev/null
+            echo "Attached it to child map #$parent."
+            count=$((count + 1))
+          done < code_health/_sweep/plan.tsv
+          echo "Opened $count sub-issue(s)."
+      - name: Report the dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Dry run. Nothing was opened and nothing was reopened."
+          echo "--- the sub-issues that would be opened ---"
+          cat code_health/_sweep/plan.tsv || true
+          echo "--- the issues that would be reopened ---"
+          cat code_health/_sweep/reopen.tsv || true
+      # The plan is kept so a dry run can be read in full. It carries no secret: every line of it
+      # came from a committed file or from the public tracker.
+      - name: Publish the plan
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-plan
+          path: code_health/_sweep/
+          if-no-files-found: ignore

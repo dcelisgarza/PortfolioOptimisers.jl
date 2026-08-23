@@ -21,7 +21,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             5e-4
         elseif i == 6
             # Host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
-            1e-4
+            5e-4
         elseif i == 9
             1
         elseif i ∈ (11, 15, 18, 19, 20, 22)

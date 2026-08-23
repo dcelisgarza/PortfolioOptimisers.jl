@@ -535,6 +535,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :r_kwargs => "`r_kwargs`: Keyword arguments passed to the risk measure.",#
                                  :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
                                  :p_cv => "`p`: Hyperparameter search grid.",#
+                                 # Data carrier fields.
+                                 :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).",#
+                                 :nz_feat => "`nz`: Names or identifiers of feature columns (features × 1).",#
                                  # Prediction result fields.
                                  :pred_nx => "`nx`: Asset name vector.",#
                                  :pred_nf => "`nf`: Factor name vector.",#
@@ -811,6 +814,7 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
                                  :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
                                  :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
+                                 :Ddist => "`D::MatNum`: Distance matrix `assets x assets`, in the units the distance algorithm defines.",#
                                  :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
                                  :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
                                  :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#

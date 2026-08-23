@@ -44,6 +44,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | --- | --- | --- |
 | Any file in `src/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `pre-commit run -a`, `test/` |
 | A docstring in `src/` or `ext/` | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) | `test/test_26_docs.jl`, the doctest job |
+| The `# Algorithm` and `# JuMP formulation` sections of a SWEPT file | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md), and [`sweep/manifest.toml`](sweep/manifest.toml) for the `swept` flag that arms the demand | `test/test_26_docs.jl` |
 | A return type annotation | [`.github/instructions/julia-return-types.instructions.md`](.github/instructions/julia-return-types.instructions.md) | none — unenforced |
 | A test file | [`.github/instructions/julia-test-writing.instructions.md`](.github/instructions/julia-test-writing.instructions.md) | `test/runtests.jl` auto-discovery |
 | Adding an estimator | [`.github/prompts/add-estimator.prompt.md`](.github/prompts/add-estimator.prompt.md) | `test/test_26_docs.jl` |
@@ -57,7 +58,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
-| Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl` |
+| Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
@@ -97,7 +98,7 @@ Every Gate below is a real check that fails on a real breach.
 | JuliaFormatter | 92-column margin, `yas` style, from `.JuliaFormatter.toml` | inside `pre-commit`, and `.github/workflows/FormatCheck.yml` |
 | ExplicitImports | no implicit imports or non-public qualified accesses | inside `pre-commit` |
 | markdownlint | markdown structure, from `.markdownlint.json`, over the files `.markdownlintignore` leaves in scope | inside `pre-commit` |
-| `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions; every citation in `src/` and `ext/` resolves, every `ref_dict` entry has a user, no reference prose is pasted inline, and an API page carries a bibliography block exactly when it cites; a name an extension declares itself carries a docstring once that extension's file is marked `swept` in [`sweep/manifest.toml`](sweep/manifest.toml) | run the file |
+| `test/test_26_docs.jl` | every public and private name is documented; the Capability Catalogue is complete in both directions; every citation in `src/` and `ext/` resolves, every `ref_dict` entry has a user, no reference prose is pasted inline, and an API page carries a bibliography block exactly when it cites; a name an extension declares itself carries a docstring once that extension's file is marked `swept` in [`sweep/manifest.toml`](sweep/manifest.toml); a swept file's docstring that documents a function registering a `JuMP` row carries `# JuMP formulation`, and a swept file's count of `# Algorithm` sections does not fall below its manifest row | run the file |
 | `test/test_41_constructor_docstring_drift.jl` | a `# Constructors` block matches the signature it copies | run the file |
 | `test/test_43_exported_abstract_type_census.jl` | the exported abstract types are exactly the names on the allow-list in that file | run the file |
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
@@ -110,6 +111,7 @@ Every Gate below is a real check that fails on a real breach.
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |
 | `.github/workflows/Paper.yml` | the paper's listing still runs against this checkout, and `docs/paper/main-jlyfish.json` is current | the workflow |
 | `.github/workflows/ReusableTest.yml` (`coverage`) | a file's miss count has not risen above `code_health/coverage_baseline.toml`, an added file enters with every line covered or exempted, and every Coverage Exemption states the exact count it stands for | `julia --project=code_health code_health/coverage.jl check`, with `COVERAGE_LCOV` pointing at an `lcov.info` |
+| `.github/workflows/Sweep.yml` | a file whose sweep-manifest row reads `swept = false` under a CLOSED child map of #404 reopens that map, reopens #404, and gets one `sweep` sub-issue | `julia --project=code_health code_health/sweep_triage.jl --maps <tsv>` for the plan; the workflow opens it |
 | `.github/workflows/Aqua.yml` | package-quality checks over the dependency graph | the workflow |
 | `.github/workflows/LinkChecker.yml` | links in the built documentation resolve | the workflow |
 

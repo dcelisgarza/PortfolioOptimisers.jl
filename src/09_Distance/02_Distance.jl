@@ -40,11 +40,19 @@ Where:
   - ``d_{i,\\,j}``: Base distance computed using the specified distance algorithm.
   - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
   - ``p``: Integer power.
-  - ``s``: Scaling factor of [`SimpleDistance`](@ref) alone (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``). The halving is dropped for even ``p`` because ``\\rho_{i,\\,j}^{p}`` is then non-negative, so ``1 - \\rho_{i,\\,j}^{p}`` already lies in ``[0,\\,1]``.
+  - ``s``: Scaling factor of [`SimpleDistance`](@ref) alone (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``).
+
+The two cases of ``s`` are not a convention. ``s`` is the normalisation that keeps the radicand inside ``[0,\\,1]`` over the reachable range of ``\\rho_{i,\\,j}^{p}``, so it is ``1 / (1 - m)``, where ``m`` is the smallest value ``\\rho_{i,\\,j}^{p}`` can take. An odd ``p`` keeps the sign, so ``m = -1`` and ``s = 1/2``. An even ``p`` cannot be negative, so ``m = 0`` and ``s = 1``.
 
 The clamp is inert for the first two algorithms at every ``p``: ``s(1 - \\rho_{i,\\,j}^{p})`` and ``1 - \\lvert\\rho_{i,\\,j}\\rvert^{p}`` never leave ``[0,\\,1]``. It **binds** for [`CorrelationDistance`](@ref) at every odd ``p``, where ``\\rho_{i,\\,j}^{p}`` keeps its sign and the radicand runs over ``[0,\\,2]``; that algorithm's own docstring measures the truncation.
 
 [`CanonicalDistance`](@ref) is a redirect and owns no formula. It forwards `power` to the algorithm it selects.
+
+!!! warning "`power` raises two different quantities"
+
+    The field is one field, and the reader must not assume one meaning. For a correlation-based algorithm it raises the **correlation**, inside the transform. For [`VariationInfoDistance`](@ref) there is no correlation to raise, so it raises the **distance** the algorithm returns. So ``_{g}d^{\\mathrm{S}}`` at ``p = 2`` is *not* ``\\left(d^{\\mathrm{S}}\\right)^{2}``, while ``_{g}d^{\\mathrm{VI}}`` at ``p = 2`` *is* ``\\left(d^{\\mathrm{VI}}\\right)^{2}``.
+
+The source carries the four base formulas alone. Section 6.2 of the reference below ends at the tail dissimilarity, so the ``p`` generalisation and the scaling ``s`` are this library's own extension of it.
 
 # Fields
 
@@ -128,17 +136,77 @@ Union of the correlation-based distance algorithms: those whose distance matrix 
 const RhoDistanceAlgorithm = Union{SimpleDistance, SimpleAbsoluteDistance, LogDistance,
                                    CorrelationDistance}
 """
-    _absguard(rho::MatNum)
+    _absguard(rho::MatNum) -> MatNum
 
-Return `rho` unchanged if every entry is non-negative, otherwise `abs.(rho)`. Shared by [`SimpleAbsoluteDistance`](@ref) and [`LogDistance`](@ref), which are defined on the magnitude of the correlation.
+Supply the magnitude of `rho` to the two algorithms that are defined on it, without allocating when the magnitude is already `rho`.
+
+This is an **allocation guard, not a branch in the mathematics**. `abs.(rho)` equals `rho` entry for entry whenever no entry of `rho` is negative, so both arms return the same numbers for every input, `-0.0` included; the guard only decides whether a second matrix is built. Shared by [`SimpleAbsoluteDistance`](@ref) and [`LogDistance`](@ref).
+
+# Algorithm
+
+ 1. Test every entry of `rho` against zero.
+ 2. When no entry is negative, return `rho` itself, the same object the caller passed.
+ 3. Otherwise return `abs.(rho)`, a new matrix.
+
+# Arguments
+
+  - $(arg_dict[:rho])
+
+# Returns
+
+  - `rho::MatNum`: The magnitude of the argument. It is the argument itself when the argument holds no negative entry.
+
+# Details
+
+  - The test reads the **whole** matrix, so one negative entry allocates the copy for all of them. That is the intended reading of the two algorithms, which take the magnitude of every entry.
+  - `NaN` compares false against zero, so a matrix holding one takes the allocating arm. `abs(NaN)` is `NaN`, so that entry is `NaN` on either arm.
+
+# Related
+
+  - [`SimpleAbsoluteDistance`](@ref)
+  - [`LogDistance`](@ref)
+  - [`_dist_from_cor`](@ref)
 """
 function _absguard(rho::MatNum)
     return all(x -> zero(x) <= x, rho) ? rho : abs.(rho)
 end
 """
-    _as_correlation(rho::MatNum, sym::Symbol = :rho)
+    _as_correlation(rho::MatNum, sym::Symbol = :rho) -> MatNum
 
-Validate that `rho` is square and coerce it to a correlation matrix: if the diagonal is not all ones it is treated as a covariance matrix and converted via `StatsBase.cov2cor`. The square-matrix check runs here, once, for every correlation-based algorithm's matrix entry point.
+Coerce a square matrix to a correlation matrix, converting it from a covariance matrix when its diagonal says it is one.
+
+The **value of the diagonal decides, never the type**. A matrix whose diagonal is all ones is already a correlation matrix and is returned as the same object; any other diagonal is read as the variances of a covariance matrix. This is the same test the matrix processing pipeline applies, so the two layers agree on what a correlation matrix is. The square-matrix check runs here, once, for every correlation-based algorithm's matrix entry point.
+
+# Algorithm
+
+ 1. Check that `rho` is square, reporting the failure under the name `sym`.
+ 2. Read the diagonal of `rho` into `s`. `LinearAlgebra.diag` allocates, so `rho` is never written to.
+ 3. When every entry of `s` is one, return `rho` itself. Steps 4 and 5 do not run.
+ 4. Otherwise replace `s` with its square roots, giving the standard deviations.
+ 5. Divide `rho` by the outer product of `s` with `StatsBase.cov2cor`, giving a new correlation matrix.
+
+# Arguments
+
+  - `rho`: Correlation matrix `assets × assets`, or the covariance matrix to convert.
+  - `sym`: Name to report the square-matrix failure under.
+
+# Validation
+
+  - `rho` is square.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Details
+
+  - The argument is never mutated on either route. Step 2 copies the diagonal, and step 5 builds a new matrix.
+  - The conversion round-trips: the correlation of a covariance matrix built from a correlation matrix and a vector of standard deviations is that correlation matrix again.
+
+# Related
+
+  - [`distance`](@ref)
+  - [`_dist_from_cor`](@ref)
 """
 function _as_correlation(rho::MatNum, sym::Symbol = :rho)
     assert_matrix_issquare(rho, sym)
@@ -150,16 +218,56 @@ function _as_correlation(rho::MatNum, sym::Symbol = :rho)
     return rho
 end
 """
-    _dist_from_cor(alg::RhoDistanceAlgorithm, power, rho::MatNum)
+    _dist_from_cor(alg::RhoDistanceAlgorithm, power::Option{<:Integer}, rho::MatNum) -> MatNum
 
-Turn a correlation matrix `rho` into a distance matrix for a correlation-based algorithm (see [`RhoDistanceAlgorithm`](@ref)). This is the shared kernel behind the [`distance`](@ref) and [`cor_and_dist`](@ref) entry points: they differ only in how they obtain `rho`. `power` is `nothing` for the base distance or an `Integer` for the generalised power distance; dispatch keeps the two apart so the base case never raises `rho` to a power.
+Turn a correlation matrix into a distance matrix, for one of the four correlation-based algorithms.
+
+This is the shared kernel behind the [`distance`](@ref) and [`cor_and_dist`](@ref) entry points: they differ only in how they obtain `rho`, never in the transform they apply to it. Eight methods cover the four algorithms of [`RhoDistanceAlgorithm`](@ref) at each of the two `power` cases.
+
+# Mathematical definition
+
+[`Distance`](@ref) states the eight closed forms and the scaling ``s``. Each algorithm's own docstring states the base case and the range it is defined on.
+
+# Algorithm
+
+`power` selects the method, so the base case never raises `rho` to a power.
+
+ 1. [`SimpleAbsoluteDistance`](@ref) and [`LogDistance`](@ref) replace `rho` with its magnitude through [`_absguard`](@ref). [`SimpleDistance`](@ref) and [`CorrelationDistance`](@ref) do not, and read the signed correlation.
+ 2. When `power` is an `Integer`, raise `rho` to it entry by entry. When `power` is `nothing`, leave `rho` as it is.
+ 3. [`SimpleDistance`](@ref) scales ``1 - \\rho`` by `1//2` for an odd `power` and by `1//1` for an even one, and by `1//2` in the base case. The other three apply no scaling.
+ 4. The three square-root algorithms clamp the radicand into ``[0,\\,1]`` with `clamp!` and take its square root. [`LogDistance`](@ref) instead takes ``-\\log`` and floors the result at zero with `max`.
+
+# Arguments
+
+  - $(arg_dict[:dalg])
+  - $(arg_dict[:dopower])
+  - $(arg_dict[:rho])
+
+# Returns
+
+  - $(ret_dict[:Ddist])
+
+# Details
+
+  - Every method allocates its own result, and `clamp!` writes only into that allocation. `rho` is never mutated.
+  - The scale of step 3 is a `Rational`, so the element type of `rho` is carried through: a `Float32` correlation matrix gives a `Float32` distance matrix, as it does under the other three algorithms.
+  - [`CanonicalDistance`](@ref) and [`VariationInfoDistance`](@ref) never reach this kernel. The first is a redirect that resolves to one of the four before the call, and the second reads the data matrix and holds no correlation.
+
+# Related
+
+  - [`RhoDistanceAlgorithm`](@ref)
+  - [`_absguard`](@ref)
+  - [`_as_correlation`](@ref)
+  - [`Distance`](@ref)
+  - [`distance`](@ref)
+  - [`cor_and_dist`](@ref)
 """
 function _dist_from_cor(::SimpleDistance, ::Nothing, rho::MatNum)
-    return sqrt.(clamp!((one(eltype(rho)) .- rho) * 0.5, zero(eltype(rho)),
+    return sqrt.(clamp!((one(eltype(rho)) .- rho) * (1//2), zero(eltype(rho)),
                         one(eltype(rho))))
 end
 function _dist_from_cor(::SimpleDistance, power::Integer, rho::MatNum)
-    scale = isodd(power) ? 0.5 : 1.0
+    scale = isodd(power) ? 1//2 : 1//1
     return sqrt.(clamp!((one(eltype(rho)) .- rho .^ power) * scale, zero(eltype(rho)),
                         one(eltype(rho))))
 end
@@ -191,7 +299,16 @@ end
                                   <:CorrelationDistance, <:CanonicalDistance}},
              ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-This method computes the correlation matrix using the provided covariance estimator `ce` and data matrix `X`, which is used to compute the distance matrix based on the specified distance algorithm in `de`.
+Compute the correlation matrix with `ce` and `X`, and transform it into a distance matrix with the algorithm `de` names.
+
+This is the data entry point of the correlation-based family. [`cor_and_dist`](@ref) is the same computation with the correlation returned alongside the distance, so a caller that needs both pays for the correlation once.
+
+# Algorithm
+
+ 1. Compute the correlation matrix from `ce` and `X` with `Statistics.cor`, along `dims`. `kwargs` are forwarded to it, and it is what refuses a `dims` outside ``(1,\\, 2)``.
+ 2. Transform that correlation matrix with [`_dist_from_cor`](@ref), under `de.alg` and `de.power`.
+
+A [`CanonicalDistance`](@ref) `de` takes one step first: it rebuilds `de` with [`SimpleDistance`](@ref), carrying `de.power` over, because a `ce` that is a plain `StatsBase.CovarianceEstimator` carries no preference. The four estimators that do carry one have their own methods; see the redirect table on [`CanonicalDistance`](@ref).
 
 # Arguments
 
@@ -211,9 +328,17 @@ This method computes the correlation matrix using the provided covariance estima
 
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
+# Validation
+
+  - $(val_dict[:dims])
+
 # Returns
 
-  - `D::Matrix{<:Number}`: Matrix of pairwise distances.
+  - $(ret_dict[:Ddist])
+
+# Details
+
+  - `dims` is enforced by `Statistics.cor`, not by this method. A `dims` outside ``(1,\\, 2)`` raises a `DomainError` from there.
 
 # Related
 
@@ -223,6 +348,7 @@ This method computes the correlation matrix using the provided covariance estima
   - [`LogDistance`](@ref)
   - [`CorrelationDistance`](@ref)
   - [`CanonicalDistance`](@ref)
+  - [`_dist_from_cor`](@ref)
   - [`cor_and_dist`](@ref)
 """
 function distance(de::Distance{<:Any, <:RhoDistanceAlgorithm},
@@ -250,36 +376,54 @@ Matches [`LowerTailDependenceCovariance`](@ref) or any [`PortfolioOptimisersCova
 const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
                                        <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance}}
 """
-    distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::MatNum;
+    distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
+             dims::Int = 1, kwargs...)
+    distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any, X::MatNum;
              dims::Int = 1, kwargs...)
 
-Compute the variation of information (VI) distance matrix from a data matrix.
+Compute the variation of information distance matrix from the data matrix alone.
+
+This is the one algorithm of the family that reads `X` rather than a correlation matrix, so the covariance estimator is a placeholder that the method ignores. It captures a non-linear relationship that no correlation coefficient sees.
+
+!!! warning "`power` raises the distance here, not the correlation"
+
+    The two methods above are the two `power` cases, and they are the reason the trap exists. For a correlation-based algorithm `power` raises the **correlation** inside the transform. There is no correlation here, so `power` raises the **distance** the algorithm returns: the result is `variation_info(...) .^ de.power`. One field, two quantities.
+
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Read `de.alg.bins` and `de.alg.normalise` off the algorithm, and pass both to [`variation_info`](@ref), which builds the joint histograms and forms the distance. [`VariationInfoDistance`](@ref) states those steps.
+ 3. When `de.power` is an `Integer`, raise the distance matrix of step 2 to it entry by entry. When `de.power` is `nothing`, return that matrix as it stands.
 
 # Arguments
 
-  - `de::Distance{<:Any, <:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
-  - `::Any`: Covariance estimator placeholder for API compatibility (ignored).
-  - `X`: Data matrix (observations × assets).
+  - `de`: Distance estimator carrying the [`VariationInfoDistance`](@ref) algorithm.
+  - `::Any`: Covariance estimator placeholder for API compatibility. It is ignored.
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `kwargs...`: Additional keyword arguments. They are ignored.
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Returns
 
-  - `D::Matrix{<:Number}`: Matrix of pairwise variation of information distances.
+  - $(ret_dict[:Ddist])
 
 # Details
 
-  - The number of bins and normalisation are taken from the [`VariationInfoDistance`](@ref) algorithm fields.
-  - If `dims == 2`, the data matrix is transposed before computation.
+  - `dims` is enforced by [`dims_oriented`](@ref). A `dims` outside ``(1,\\, 2)`` raises a `DomainError` from there.
+  - `bins` and `normalise` come from the algorithm, never from a keyword. [`CanonicalDistance`](@ref) is what copies them off a [`MutualInfoCovariance`](@ref).
 
 # Related
 
   - [`Distance`](@ref)
   - [`VariationInfoDistance`](@ref)
+  - [`variation_info`](@ref)
+  - [`MutualInfoCovariance`](@ref)
+  - [`CanonicalDistance`](@ref)
+  - [`cor_and_dist`](@ref)
 """
 function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
@@ -297,9 +441,16 @@ end
                                 <:CorrelationDistance, <:CanonicalDistance}},
              rho::MatNum, args...; kwargs...)
 
-Compute the distance matrix from a correlation or covariance matrix.
+Compute the distance matrix from a correlation matrix, or from a covariance matrix.
 
-If the input `rho` is a covariance matrix, it is converted to a correlation matrix which is used to compute the distance matrix using the specified distance algorithm in `de`.
+This is the matrix entry point of the correlation-based family, for a caller that already holds the matrix and needs no covariance estimator. The value of the diagonal decides which of the two it was given; see [`_as_correlation`](@ref).
+
+# Algorithm
+
+ 1. Coerce `rho` to a correlation matrix with [`_as_correlation`](@ref), which also checks that it is square.
+ 2. Transform that correlation matrix with [`_dist_from_cor`](@ref), under `de.alg` and `de.power`.
+
+A [`CanonicalDistance`](@ref) `de` takes one step first: it rebuilds `de` with [`SimpleDistance`](@ref), carrying `de.power` over. There is no covariance estimator here to select from, so the redirect table cannot apply and the fallback of the table is taken.
 
 # Arguments
 
@@ -315,15 +466,21 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
 
   - `args...`: Additional arguments (ignored).
 
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments. They are ignored.
+
+# Validation
+
+  - `rho` is square.
 
 # Returns
 
-  - `D::Matrix{<:Number}`: Matrix of pairwise Euclidean distances.
+  - $(ret_dict[:Ddist])
 
 # Details
 
-  - If `rho` is a covariance matrix, it is converted to a correlation matrix using `StatsBase.cov2cor`.
+  - The distance is the one the algorithm defines, and it is not Euclidean under any of the four. [`SimpleDistance`](@ref) and [`SimpleAbsoluteDistance`](@ref) return an angular distance, and [`LogDistance`](@ref) an unbounded dissimilarity.
+  - A covariance matrix is converted with `StatsBase.cov2cor`, and the conversion allocates rather than writing into the argument.
+  - `args` and `kwargs` exist so that this method and the `ce`-and-`X` method above take the same call. Neither is read.
 
 # Related
 
@@ -333,6 +490,8 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
   - [`LogDistance`](@ref)
   - [`CorrelationDistance`](@ref)
   - [`CanonicalDistance`](@ref)
+  - [`_as_correlation`](@ref)
+  - [`_dist_from_cor`](@ref)
   - [`cor_and_dist`](@ref)
 """
 function distance(de::Distance{<:Any, <:RhoDistanceAlgorithm}, rho::MatNum, args...;
@@ -344,34 +503,51 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, rho::MatNum, args...
 end
 """
     cor_and_dist(de::Distance{<:Any,
-                              <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                                      <:LogDistance, <:VariationInfoDistance,
-                                      <:CorrelationDistance}},
+                              <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance,
+                                      <:LogDistance, <:CorrelationDistance,
+                                      <:VariationInfoDistance, <:CanonicalDistance}},
                  ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute and return the correlation and distance matrices. The distance matrix depends on the combination of distance and covariance estimators (see [`distance`](@ref)).
+Compute the correlation matrix and the distance matrix together, from one pass over the data.
+
+It returns the same `D` that [`distance`](@ref) returns for the same arguments; that agreement is the claim of having two entry points. Take this one when both matrices are wanted, because the correlation-based family then computes the correlation once instead of twice.
+
+# Algorithm
+
+Which of the three routes runs is decided by `de.alg`.
+
+ 1. A correlation-based algorithm computes the correlation matrix with `Statistics.cor`, then transforms that same matrix with [`_dist_from_cor`](@ref). This is the route that saves the second correlation.
+ 2. [`VariationInfoDistance`](@ref) checks `dims` with [`assert_dims`](@ref), computes the correlation matrix for the caller, and calls [`distance`](@ref) for the distance. The distance reads `X`, not the correlation, so nothing is shared between the two.
+ 3. [`CanonicalDistance`](@ref) rebuilds `de` with the algorithm its redirect table names for `ce`, then re-enters at route 1 or route 2. See [`distance`](@ref) for the table and for the fields the rebuild copies.
 
 # Arguments
 
   - `de`: Distance estimator.
-  - `ce`: Covariance estimator.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Validation
 
-  - `dims in (1, 2)`.
+  - $(val_dict[:dims])
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Correlation matrix.
-  - `D::Matrix{<:Number}`: Distance matrix.
+  - $(ret_dict[:rho])
+  - $(ret_dict[:Ddist])
+
+# Details
+
+  - Route 2 checks `dims` itself with [`assert_dims`](@ref). Route 1 leaves the check to `Statistics.cor`, which raises the same `DomainError`.
+  - The correlation returned is the one `ce` computes, untransformed. It is not the magnitude that [`SimpleAbsoluteDistance`](@ref) and [`LogDistance`](@ref) take, nor the power of it that a `de.power` raises.
 
 # Related
 
   - [`Distance`](@ref)
   - [`distance`](@ref)
+  - [`CanonicalDistance`](@ref)
+  - [`_dist_from_cor`](@ref)
 """
 function cor_and_dist(de::Distance{<:Any, <:RhoDistanceAlgorithm},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
@@ -452,19 +628,42 @@ end
                        <:DistCov_AllInternalDistCov},
              X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
+Rebuild `de` with the distance algorithm that the covariance estimator's own range calls for, and call [`distance`](@ref) again.
+
+The redirect owns no formula. It exists so that a codependence measure reaches the transform its range needs: a signed correlation must be halved, a mutual information has no correlation to transform at all, and a tail dependence coefficient wants an unbounded distance. `de.power` is carried over unchanged onto the algorithm that is selected.
+
+| Covariance estimator                                    | Algorithm selected              | Read from `ce`                  |
+|:------------------------------------------------------- |:------------------------------- |:------------------------------- |
+| [`MutualInfoCovariance`](@ref)                          | [`VariationInfoDistance`](@ref) | `ce.bins`, `ce.normalise`       |
+| [`PortfolioOptimisersCovariance`](@ref) wrapping it     | [`VariationInfoDistance`](@ref) | `ce.ce.bins`, `ce.ce.normalise` |
+| [`LowerTailDependenceCovariance`](@ref), wrapped or not | [`LogDistance`](@ref)           | nothing                         |
+| [`DistanceCovariance`](@ref), wrapped or not            | [`CorrelationDistance`](@ref)   | nothing                         |
+| any other `StatsBase.CovarianceEstimator`               | [`SimpleDistance`](@ref)        | nothing                         |
+
+# Algorithm
+
+ 1. Select the row of the table above by the type of `ce`. Dispatch does the selection, so a wrapper reaches the same row as the estimator it wraps.
+ 2. Build a fresh [`Distance`](@ref) carrying `de.power` and the algorithm of that row.
+ 3. On the two mutual-information rows, **copy `bins` and `normalise` off `ce` onto the new [`VariationInfoDistance`](@ref)**, one field level deeper for the wrapper. Without the copy the algorithm would take its own defaults, and the distance would be a different number.
+ 4. Call [`distance`](@ref) with the rebuilt estimator, the same `ce`, and the same `X`, `dims` and `kwargs`.
 
 # Arguments
 
-  - `de::Distance{<:Any, <:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
-  - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
-  - `X`: Data matrix (observations × assets).
+  - `de`: Distance estimator carrying the [`CanonicalDistance`](@ref) algorithm.
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments passed to the selected algorithm.
 
 # Returns
 
-  - `D::Matrix{<:Number}`: Matrix of pairwise canonical distances.
+  - $(ret_dict[:Ddist])
+
+# Details
+
+  - Step 3 is invisible to a reader of the signature, and it is load-bearing. A [`MutualInfoCovariance`](@ref) built with a non-default `bins` gives a different distance matrix from one built with the default, and the redirect is what carries that setting across.
+  - The last row is the fallback, and it is also what a bare [`Distance`](@ref) with [`SimpleDistance`](@ref) gives. The two agree on every estimator outside the table.
+  - [`cor_and_dist`](@ref) carries the same table, over the same five rows.
 
 # Related
 
@@ -473,6 +672,8 @@ Compute the canonical distance matrix using the covariance estimator and data ma
   - [`MutualInfoCovariance`](@ref)
   - [`LowerTailDependenceCovariance`](@ref)
   - [`DistanceCovariance`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`cor_and_dist`](@ref)
 """
 function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
                   X::MatNum; dims::Int = 1, kwargs...)

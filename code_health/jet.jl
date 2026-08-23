@@ -115,12 +115,29 @@ report_kind(report) = String(nameof(typeof(report)))
 """
     report_message(report) -> String
 
-`JETInterface.print_report_message` alone. `print_signature` is a separate JET interface function,
-and every fragile piece of text — the gensym `#23`, a local variable name — lives there, so the
-fingerprint cuts it rather than masking it. Because the text is cut, no normalisation rule exists
-to write, test or maintain. ADR 0071.
+`JETInterface.print_report_message`, and for a `BuiltinErrorReport` the builtin as well.
+`print_signature` is a separate JET interface function, and every fragile piece of text — the
+gensym `#23`, a local variable name — lives there, so the fingerprint cuts it rather than masking
+it. Because the text is cut, no normalisation rule exists to write, test or maintain.
+
+A `BuiltinErrorReport` prints `r.msg` alone, and that message is often the bare constant
+`invalid builtin function call`: 175 of this package's 200 reports of the kind carry it, and five
+builtins sit behind it. One Dismissal would cover all five. `r.f` is the builtin itself, and it
+carries no gensym, no local name and no type render, so it narrows the class without re-admitting
+the fragile text. It is appended unconditionally, because a rule that fires only on JET's constant
+would name a JET internal string in this script.
+
+The kind is matched by its name rather than by its type. A type in a method signature resolves at
+load time, and JET's stubs define no such type on an unsupported Julia, so a signature would turn
+`assert_environment`'s clean message into an `UndefVarError`. ADR 0071, amended by issue #357.
 """
-report_message(report) = sprint(io -> JET.JETInterface.print_report_message(io, report))
+function report_message(report)
+    msg = sprint(io -> JET.JETInterface.print_report_message(io, report))
+    if report_kind(report) == "BuiltinErrorReport"
+        return msg * ": " * string(report.f)
+    end
+    return msg
+end
 
 fingerprint(report) = (attribute(report), report_kind(report), report_message(report))
 

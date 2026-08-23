@@ -236,8 +236,15 @@
             =#
             ce = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
             de = Distance(; alg = LogDistance())
-            # `pr.X` is too correlated to denoise to an exact zero, so this needs noise.
-            Xn = randn(StableRNG(987654321), 500, 20)
+            #=
+            `pr.X` is too correlated to denoise to an exact zero, so this needs noise. The
+            zero needs *every* eigenvalue under the fitted edge: `ShrunkDenoise` at the
+            default `alpha = 0` keeps the signal block, so an exact zero off the diagonal
+            asks that no signal block survives. Ticket 475 sharpened the fit, and the draw
+            this test used keeps four components under it; `StableRNG(1)` is a draw whose
+            whole spectrum still falls under the edge, by a margin of 5.8 %.
+            =#
+            Xn = randn(StableRNG(1), 500, 20)
             @test any(isinf, PortfolioOptimisers.distance(de, ce, Xn))
             nte = NetworkEstimator(; ce = ce, de = de, alg = MaximumDistanceSimilarity())
             @test_throws DomainError PortfolioOptimisers.calc_adjacency(nte, Xn)

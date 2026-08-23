@@ -147,6 +147,15 @@ Where:
 
 For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``, project, then rescale back.
 
+# Algorithm
+
+ 1. Return `X` unchanged when it is already positive definite. The projection has nothing to do, and the check runs before every other step.
+ 2. Check that `X` is square.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Project `X` onto the nearest correlation matrix with `NearestCorrelationMatrix.nearest_cor!`, under the algorithm `pdm.alg` and the keyword arguments `pdm.kwargs`.
+ 5. Warn when the projected `X` is still not positive definite. `X` is returned either way, so the caller must check the result when it cannot tolerate an unrepaired matrix.
+ 6. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
+
 # Arguments
 
   - $(arg_dict[:opdm])
@@ -226,6 +235,11 @@ end
     posdef(pdm::Option{<:AbstractPosdefEstimator}, X::MatNum) -> MatNum
 
 Out-of-place version of [`posdef!`](@ref).
+
+# Algorithm
+
+ 1. Copy `X`.
+ 2. Apply [`posdef!`](@ref) to the copy, and return it. The input is never modified.
 
 # Arguments
 

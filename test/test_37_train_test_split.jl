@@ -51,6 +51,28 @@
         @test_throws DomainError safe_index(nothing, -5, 100)
     end
 
+    @testset "split_count boundaries" begin
+        split_count = PortfolioOptimisers.split_count
+
+        # A count saturates at the observation total.
+        @test split_count(3, 10, :train_size) == 3
+        @test split_count(10, 10, :train_size) == 10
+        @test split_count(15, 10, :train_size) == 10
+
+        # A fraction that lands exactly on an integer takes that integer, and one that
+        # floors below one row is clamped up to one, so rounding alone never empties a
+        # window.
+        @test split_count(0.5, 10, :train_size) == 5
+        @test split_count(0.01, 10, :train_size) == 1
+        @test split_count(0.9999, 10, :train_size) == 9
+
+        # A count must be positive, and a fraction must lie strictly inside (0, 1).
+        @test_throws DomainError split_count(0, 10, :train_size)
+        @test_throws DomainError split_count(-1, 10, :train_size)
+        @test_throws DomainError split_count(0.0, 10, :train_size)
+        @test_throws DomainError split_count(1.0, 10, :train_size)
+    end
+
     @testset "train_test_split free function" begin
         pr = make_prices()
         rd = make_returns()
@@ -103,6 +125,11 @@
         @test size(res.train.X, 1) == 80
         @test size(res.test.X, 1) == 20
         @test PortfolioOptimisers.apply_preprocessing(res, rd) === rd
+
+        # an unfitted split is a pass-through too, so a step that never saw
+        # `fit_preprocessing` hands the window on whole rather than cutting it silently
+        @test PortfolioOptimisers.apply_preprocessing(tts, rd) === rd
+        @test PortfolioOptimisers.apply_preprocessing(tts, pr) === pr
 
         # it splits whichever data level it is handed
         resp = PortfolioOptimisers.fit_preprocessing(tts, pr)

@@ -320,6 +320,14 @@ In-place matrix processing pipeline.
 
 This method applies a sequence of matrix processing steps to the input covariance or correlation matrix `sigma`, modifying it in-place. The steps and their order are given by `mp.order`---a tuple or vector of symbols (`:pdm`, `:dn`, `:dt`, `:alg`)---and each step is dispatched through [`matrix_processing_step!`](@ref).
 
+# Algorithm
+
+ 1. Take the next symbol of `mp.order`. The default order is `(:pdm, :dn, :dt, :alg)`.
+ 2. Wrap the symbol in a `Val` and apply [`matrix_processing_step!`](@ref) to `sigma`. Each step reads the estimator that the symbol names, and a step whose estimator is `nothing` is a no-op, so a `nothing` field skips its step rather than removing it from the order.
+ 3. Repeat from step 1 until `mp.order` is exhausted, then return `sigma`.
+
+`mp.order` is validated at construction, so no step of this loop can name a field that `MatrixProcessing` does not carry. A repeated symbol applies its step twice, which is the order's own business and not an error.
+
 # Arguments
 
   - $(arg_dict[:omp])
@@ -416,6 +424,17 @@ Apply a single named matrix processing step to `sigma` in-place, dispatching on 
 
 This is the per-step worker that [`matrix_processing!`](@ref) calls while iterating over `mp.order`. Each recognised symbol maps to one of the estimator fields of `mp`; the override-or-skip behaviour is inherited from the underlying primitives (a `nothing` estimator is a no-op).
 
+# Algorithm
+
+The method that Julia selects is the algorithm. Each step is one method, and each one delegates to the primitive that its field names.
+
+ 1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` is not read.
+ 2. `Val{:dn}`: read `T, N = size(X)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `X`, and it reads only its shape.
+ 3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` is not read.
+ 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the seam a caller extends.
+
+No method is defined for any other symbol, so an unrecognised step raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) rejects such a symbol first, so the `MethodError` is reachable only through a hand-built `Val`.
+
 # Arguments
 
   - `::Val{step}`: The processing step to apply, named by a symbol:
@@ -470,6 +489,11 @@ end
     ) -> MatNum
 
 Out-of-place version of [`matrix_processing!`](@ref).
+
+# Algorithm
+
+ 1. Copy `sigma`.
+ 2. Apply [`matrix_processing!`](@ref) to the copy, and return it. The input is never modified, and `X` is never modified by either form.
 
 # Arguments
 
