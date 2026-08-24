@@ -88,13 +88,13 @@ Public functions use a **manually written signature** in the docstring header (n
 
 ## Documentation Dictionaries
 
-Four dictionaries in `src/01_Base.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
+Five dictionaries in `src/01_Base.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
 
 - `arg_dict` — argument descriptions. Use as `$(arg_dict[:key])` in `# Arguments` sections.
 - `field_dict` — field descriptions (derived from `arg_dict`). Use as `"$(field_dict[:key])"` in inline field docstrings inside structs.
 - `val_dict` — validation rule descriptions. Use as `$(val_dict[:key])` in `## Validation` sections.
 - `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
-- `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in `# Details` sections.
+- `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
 If a needed key is missing, add it to the appropriate dictionary in `01_Base.jl` before writing the docstring.
 
@@ -138,6 +138,45 @@ The dictionary exists to stop two copies of one sentence drifting apart. One cop
     tag
 end
 ```
+
+---
+
+## What each section holds
+
+A docstring has one home for each kind of fact. Put a sentence where its **subject** belongs. A true sentence in the wrong section is still a defect, because the reader who needs it looks somewhere else.
+
+| Section | Holds | Does not hold |
+| --- | --- | --- |
+| summary paragraph | what the unit is, in the first sentence; a trap that applies to the unit as a whole, in a later sentence | a formula, a step, or a fact about one field |
+| `# Mathematical definition` | the closed form that defines the unit, and a consequence of that form | an identifier from the body, an order of operations, or a choice the implementation made |
+| `# Algorithm` | the numbered steps the body runs, each naming the quantity it produces | a closed form restated as a step |
+| `# JuMP formulation` | the variables the code reads or creates, one bullet per row it registers, and the relaxation when the encoding is not exact | a row the body does not register |
+| `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method | a method the family does not dispatch on |
+| `# Fields` | one description per field, written where the field is declared | a fact about the type as a whole |
+| `# Constructors` | the signature, `## Validation`, and the propagation subsections | a rule the constructor does not enforce |
+| `# Arguments` | the contract of each argument | the shape of the result |
+| `# Validation` | every precondition and every raise | a precondition the code does not check |
+| `# Returns` | the shape and the meaning of each returned value | how the value was computed |
+| `# Examples` | a `jldoctest` block | prose that a section above owns |
+| `# Related` | one bullet per related unit, annotated when the relation is not obvious | a copy of the related unit's own text |
+| `# References` | one `ref_dict` interpolation per published work | reference prose written out |
+
+### `# Details` is abolished
+
+**There is no `# Details` section.** It held facts that the sections above already own, and it held them because nothing said where they belonged. Write no new one, and move an existing one by the **subject** of each fact it carries.
+
+| The fact is about… | It goes to |
+| --- | --- |
+| one field | that field's description |
+| a raise or a precondition | `# Validation` |
+| the unit as a whole | the summary paragraph, in the second sentence or later |
+| another unit | `# Related`, as an annotated entry |
+
+A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, the shape of a result to `# Returns`, and a model row to `# JuMP formulation`.
+
+The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
+
+`test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
 
 ---
 
@@ -276,7 +315,7 @@ A field may carry any combination (`@fprop @vprop field`, in either order) — t
 
 > `MyType` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-and follow that with a bullet list of high-level details, written in the shape of the `# Details` section of a function docstring. Cover these points, in this order, and only where the method has something to say:
+and follow that with a bullet list of high-level details. Cover these points, in this order, and only where the method has something to say:
 
 - Which arguments beyond `i` the method reads, and what it does with them.
 - Which fields recurse through [`port_opt_view`](@ref), and with which arguments.
@@ -413,10 +452,6 @@ Longer explanation if needed.
 
   - $(ret_dict[:key])
 
-# Details
-
-  - Additional implementation notes.
-
 # Examples
 
 ```jldoctest
@@ -511,6 +546,21 @@ When adding a new symbol, also add it to the corresponding API markdown file.
 ## Mathematical Notation
 
 When a type or function has a mathematical formulation, include a `# Mathematical definition` section immediately before `# Fields` (for structs) or before `# Arguments` (for functions).
+
+### What the section may not state
+
+The section states the mathematics and nothing else. It **names no identifier from the body, states no order of operations, and states no property that the implementation chose rather than the mathematics.** A consequence of the definition stays, because a consequence is mathematics.
+
+`# Algorithm` carries the reverse rule — *do not restate a closed form as a step*. The two rules bound one border from opposite sides, so a fact that fails this rule usually already stands as a step, and the fix is to delete it here rather than to move it.
+
+**Example.** Read against `ShrunkDenoise` in [`src/05_Denoise.jl`](../../src/05_Denoise.jl):
+
+- CUT — *the eigenvalues sorted ascending*. The sort is the body's choice, and it is already an `# Algorithm` step.
+- CUT — *the diagonal is pinned to one afterwards to shed the eigendecomposition round-off*. That is an `# Algorithm` step too.
+- CUT — `vals`, `vecs`, `corr0`. Each names a local of the body.
+- KEEP — *the two `alpha` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic*. That is a consequence of the definition, and it holds whatever the body does.
+
+An implementation fact is not a token, so no parser finds one. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
 
 ### LaTeX conventions
 

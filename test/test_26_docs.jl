@@ -716,10 +716,10 @@ rather than settled here by a gate that demands more than its Authority states.
         return Meta.isexpr(lhs, :call)
     end
 
-    # The name a definition binds. A definition reaches here through four declaration forms:
-    # bare, `@concrete struct`, a short form, and a macro-prefixed one. A `macro` declaration
-    # binds its name through its `:call` node, exactly as a `function` does, and it is named
-    # here without its `@`.
+    # The name a definition binds. A definition reaches here through five declaration forms:
+    # bare, `@concrete struct`, a short form, a macro-prefixed one, and a qualified one. A
+    # `macro` declaration binds its name through its `:call` node, exactly as a `function`
+    # does, and it is named here without its `@`.
     function bound_name(x)
         x isa Symbol && return x
         x isa Expr || return nothing
@@ -730,6 +730,14 @@ rather than settled here by a gate that demands more than its Authority states.
             end
             return nothing
         end
+        # A method of a function another module owns is declared `Statistics.mean(...)`, so
+        # the callee of its `:call` is an `Expr(:., :Statistics, QuoteNode(:mean))` and not a
+        # Symbol. Reading only the Symbol forms dropped every such docstring, and the shape is
+        # not rare: four files under `src/` carried a `# Details` section that no count below
+        # could see, and four more carried one the count read short. The `# Algorithm` floor
+        # and the `# JuMP formulation` rule read the same units, so both were blind to the
+        # same docstrings. The name is taken bare, exactly as a `macro` is.
+        Meta.isexpr(x, :.) && x.args[end] isa QuoteNode && return x.args[end].value
         x.head === :struct && return bound_name(x.args[2])
         x.head in
         (:function, :macro, :(=), :call, :where, :(::), :const, :abstract, :curly, :(<:)) &&
@@ -749,7 +757,11 @@ rather than settled here by a gate that demands more than its Authority states.
     end
 
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
-    has_section(text, name) = any(==(string("# ", name)), rstrip.(split(text, '\n')))
+    # The count, not the flag, is the primitive: one docstring can carry a section twice.
+    # `port_opt_view` in `src/03_Preprocessing.jl` documents four methods under one string
+    # block, separated by horizontal rules, and two of the four carry `# Details`.
+    count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
+    has_section(text, name) = count_section(text, name) > 0
 
     constraint_macros = (Symbol("@constraint"), Symbol("@constraints"))
     function registers_row(node)
@@ -853,6 +865,106 @@ rather than settled here by a gate that demands more than its Authority states.
                 println("    \"", f, "\" = { map = ", row["map"], ", units = ",
                         row["units"], ", algorithm = ", now, ", swept = ", row["swept"],
                         " }")
+            end
+        end
+    end
+
+    #=
+    `# Details` is abolished (issue #480, under the standards-hardening map #478).
+
+    ADR 0085 records the decision. The section held facts that five other sections already
+    own, and it held them because nothing said where they belonged: the Authority mentioned
+    it four times, every mention sat inside a template, and the only text that described it
+    was the placeholder `Additional implementation notes.` 299 sections over 84 files carried
+    it on the day the rule was written.
+
+    The two checks below INVERT the `# Algorithm` floor above. That floor may not FALL,
+    because a swept file's steps must stay written. These counts may not RISE, because the
+    section they count must reach zero.
+
+      1. A file whose manifest row reads `swept = true` carries ZERO `# Details` sections.
+         `MIGRATING` is the one exception, and it is a DEBT rather than a rule. It names the
+         seven swept files that still carry the section together with the count each carries,
+         so a named file may not rise above its own number and an unnamed swept file may not
+         carry the section at all. #485 migrates those 29 sections and empties `MIGRATING`,
+         and the check then reads exactly as the Authority states it.
+      2. The library-wide count may not rise above `DETAILS_TOTAL`. Each #404 sweep ticket
+         lowers it as its file migrates, and the check retires when it reaches zero.
+
+    Both numbers count SECTION HEADINGS and not docstrings that carry one. `port_opt_view` in
+    `src/03_Preprocessing.jl` documents four methods under one string block and carries the
+    heading twice, so a docstring count would read 298 and would not fall when the first of
+    those two headings moved.
+
+    The manifest gains NO key for either number. A swept row states that a file passed three
+    conditions, and this decision changes one of them without re-opening the row, which #478
+    settles explicitly. So the debt is written here, in the census idiom of
+    `test_43_exported_abstract_type_census.jl`, where deleting the last entry is a visible
+    edit and not a silent one.
+    =#
+    @testset "# Details is abolished" begin
+        # What each swept file still carries. #485 empties this list, one entry per file.
+        MIGRATING = Dict("src/02_Tools.jl" => 7, "src/03_Preprocessing.jl" => 5,
+                         "src/04_PosdefMatrix.jl" => 1, "src/05_Denoise.jl" => 6,
+                         "src/06_Detone.jl" => 1, "src/07_MatrixProcessing.jl" => 1,
+                         "src/09_Distance/02_Distance.jl" => 8)
+        DETAILS_TOTAL = 299
+
+        @testset "a swept file carries no # Details section" begin
+            offenders = Tuple{String, Int, Int}[]
+            for f in swept
+                _, texts, _ = scan(joinpath(ROOT, f))
+                measured = sum(t -> count_section(t, "Details"), texts; init = 0)
+                allowed = get(MIGRATING, f, 0)
+                measured > allowed && push!(offenders, (f, allowed, measured))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) file(s) marked `swept = true` in
+                         `sweep/manifest.toml` carry more `# Details` sections than they are
+                         allowed. The section is abolished: move each fact by its subject,
+                         under `## What each section holds` in
+                         `.github/instructions/julia-docstrings.instructions.md`. The columns
+                         are the file, its allowance, and what it
+                         carries:\n  $(join(string.(offenders), "\n  "))"""
+            end
+            @test isempty(offenders)
+
+            # An entry that reaches zero is deleted rather than left at zero, and an entry
+            # for a file that is no longer swept is dead. Either one hides a paid debt.
+            stale = sort([f for (f, n) in MIGRATING if n == 0 || f ∉ swept])
+            if !isempty(stale)
+                @warn """$(length(stale)) entr(y/ies) of `MIGRATING` are spent. Delete the
+                         entry rather than leaving it at zero, and delete `MIGRATING` itself
+                         when the last one goes:\n  $(join(stale, "\n  "))"""
+            end
+            @test isempty(stale)
+        end
+
+        @testset "the library-wide # Details count does not rise" begin
+            # `sweep/manifest.toml` carries one row per file under `src/` and `ext/`, and
+            # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the
+            # scope of this count, already gated, and no second file walk is needed.
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(rows)))
+                _, texts, _ = scan(joinpath(ROOT, f))
+                n = sum(t -> count_section(t, "Details"), texts; init = 0)
+                n > 0 && push!(per, (f, n))
+            end
+            measured = sum(last, per; init = 0)
+
+            if measured > DETAILS_TOTAL
+                @warn """The library carries $measured `# Details` sections over
+                         $(length(per)) file(s), above the $DETAILS_TOTAL this check records.
+                         The section is abolished, so the count may only fall. Move the new
+                         fact by its subject rather than raising the number."""
+            end
+            @test measured <= DETAILS_TOTAL
+
+            if measured < DETAILS_TOTAL
+                println("The count of `# Details` sections has fallen to ", measured,
+                        " over ", length(per), " file(s). Lower the number in the same ",
+                        "commit that removed them, and retire this testset at zero:")
+                println("        DETAILS_TOTAL = ", measured)
             end
         end
     end
