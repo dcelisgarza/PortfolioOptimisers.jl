@@ -85,7 +85,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, `jldoctest`, and the pointers to the reference docstrings | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
 | `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl` |
 | `.github/instructions/julia-test-writing.instructions.md` | test file layout, `@safetestset`, validation tests | `test/` |
-| `.github/prompts/*.prompt.md` | step-by-step workflows for adding a type or shipping a change | task-scoped |
+| `.github/prompts/*.prompt.md` | the order of the work for adding a type or shipping a change; every step links to the Authority that owns its rule, and a prompt states no rule of its own | task-scoped |
 | `docs/src/contribute/` | contributor and developer guides, release checklist | the repository |
 
 `CONTEXT.md` is a glossary and nothing else. Reasoning and forensics belong in `docs/adr/`.
