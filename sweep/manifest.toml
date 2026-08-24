@@ -51,7 +51,7 @@
 "src/05_Denoise.jl" = { map = 2, units = 10, algorithm = 7, swept = true }
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
-"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, swept = false }
+"src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, algorithm = 16, swept = true }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, swept = false }
 "src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, swept = false }
 "src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, swept = false }
@@ -78,11 +78,11 @@
 "src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, swept = false }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, swept = false }
-"src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/30_WindowedVariance.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/31_WindowedCoskewness.jl" = { map = 3, units = 0, swept = false }
-"src/08_Moments/32_WindowedCokurtosis.jl" = { map = 3, units = 0, swept = false }
+"src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/30_WindowedVariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/31_WindowedCoskewness.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
+"src/08_Moments/32_WindowedCokurtosis.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/33_MedianExpectedReturns.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { map = 3, units = 7, swept = false }
 "src/08_Moments/35_GerberIQCovariance.jl" = { map = 3, units = 34, swept = false }
