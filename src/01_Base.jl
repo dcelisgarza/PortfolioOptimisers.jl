@@ -5,8 +5,26 @@ Build a documentation dictionary from `pairs`, and throw if a key appears more t
 
 A `Dict` literal is last-wins, so a repeated key drops the earlier entry with no warning and
 makes its prose unreachable. This constructor is the guard against that: it fails at load
-time and names both descriptions, so the duplicate is visible instead of silent. `name` is
-the dictionary under construction, and is used in the error message.
+time and names both descriptions, so the duplicate is visible instead of silent.
+
+# Algorithm
+
+ 1. Start `dict` empty.
+ 2. For each pair, in the order the caller wrote it, raise an `ArgumentError` when `dict` already holds the key. The message names `name`, the key, and both descriptions.
+ 3. Otherwise store the pair in `dict`.
+
+# Arguments
+
+  - `name::Symbol`: Name of the dictionary under construction, used in the error message.
+  - `pairs`: The key-description pairs, in the order they are written.
+
+# Validation
+
+  - Each key appears exactly once. A repeat raises an `ArgumentError` naming `name`, the key, and both descriptions.
+
+# Returns
+
+  - `dict::Dict{Symbol, String}`: The built table.
 
 # Related
 
@@ -729,6 +747,13 @@ const arg_dict = unique_key_dict(:arg_dict,
 Derived dictionary mapping argument keys to field description strings, used for `\$(FIELDS)`-style docstring interpolation.
 
 Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter name prefix (everything up to and including the first `:`).
+
+# Related
+
+  - [`arg_dict`](@ref)
+  - [`val_dict`](@ref)
+  - [`ret_dict`](@ref)
+  - [`math_dict`](@ref)
 """
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
@@ -739,6 +764,12 @@ Maps high-order-moment argument keys to the domain noun used in error messages, 
 message names what the caller supplied (e.g. `cokurtosis`) rather than the bare field
 symbol. The symbol itself is appended at the call site, giving messages like
 ``cokurtosis (`kt`) cannot be empty``.
+
+# Related
+
+  - [`unique_key_dict`](@ref)
+  - [`arg_dict`](@ref)
+  - [`val_dict`](@ref)
 """
 const err_name_dict = unique_key_dict(:err_name_dict, :kt => "cokurtosis",
                                       :sk => "coskewness",
@@ -752,6 +783,13 @@ const err_name_dict = unique_key_dict(:err_name_dict, :kt => "cokurtosis",
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 
 `:relax` is the exception: it is the fixed opening sentence of a `## Relaxation` subsection under `# JuMP formulation`, held here so that the wording cannot drift between docstrings.
+
+# Related
+
+  - [`unique_key_dict`](@ref)
+  - [`arg_dict`](@ref)
+  - [`field_dict`](@ref)
+  - [`ret_dict`](@ref)
 """
 const val_dict = unique_key_dict(:val_dict,
                                  :oow => "If `w` is not `nothing`, `!isempty(w)`.",
@@ -808,7 +846,16 @@ const val_dict = unique_key_dict(:val_dict,
                                  :relax => "The encoding is not exact: the entries below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
 
 """
+    ret_dict
+
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+
+# Related
+
+  - [`unique_key_dict`](@ref)
+  - [`arg_dict`](@ref)
+  - [`field_dict`](@ref)
+  - [`val_dict`](@ref)
 """
 const ret_dict = unique_key_dict(:ret_dict,
                                  :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#
@@ -842,6 +889,15 @@ const ret_dict = unique_key_dict(:ret_dict,
 Dictionary of mathematical notation descriptions used for docstring interpolation throughout `PortfolioOptimisers.jl`.
 
 Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
+
+A key owns a definition, not a glyph: one glyph carries different quantities in different families, so a second quantity on the same glyph takes its own key under its own symbol.
+
+# Related
+
+  - [`arg_dict`](@ref)
+  - [`val_dict`](@ref)
+  - [`ret_dict`](@ref)
+  - [`ref_dict`](@ref)
 """
 const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
                        :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
@@ -898,6 +954,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :X_denoised => "``\\tilde{\\mathbf{X}}``: Denoised matrix.",#
                        :q_mp => "``q = T/N``: Effective sample ratio, observations to assets.",#
                        :sigma2_noise => "``\\sigma^2``: Variance attributed to noise. A correlation matrix has ``\\sigma^2 = 1``.",#
+                       # Norm-based error family.
+                       :a_norm_err => "``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.",#
+                       :b_norm_err => "``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.",#
+                       :d_ddof => "``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.",#
+                       :p_norm_order => "``p``: Norm order.",#
+                       :te_l2 => "``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.",#
+                       :te_l2sq => "``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.",#
+                       :te_l1 => "``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.",#
+                       :te_lp => "``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.",#
+                       :te_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.")
 """
@@ -1236,29 +1302,50 @@ Stacktrace:
 """
 abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
-    define_pretty_show(T, flag::Bool = true)
+    @define_pretty_show(T, flag::Bool = true)
 
-Macro to define a custom pretty-printing `Base.show` method for types.
+Defines a `Base.show` method for `T` that prints the type name and one aligned line per field.
 
-This macro generates a `show` method that displays the type name and all fields in a readable, aligned format. For fields that are themselves custom types or collections, the macro recursively applies pretty-printing for nested structures. Handles compact and multiline IO contexts gracefully.
+A field that is itself pretty-printable is rendered under its parent and indented, and an oversized one is collapsed to `Name ⋯`. The height at which a nested field collapses is the budget that [`compact_show_budget`](@ref) reads; see [`set_compact_show!`](@ref).
+
+# Algorithm
+
+The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` method it emits.
+
+ 1. When `flag` is `true`, define `has_pretty_show_method(::T) = true`.
+
+ 2. Define `Base.show(io::IO, obj::T)`.
+
+ 3. Read `fields`, the field names of `obj`. When `fields` is empty, print `T()` and return.
+
+ 4. When the `IO` context sets `:compact` or `:multiline`, print the type name alone and return.
+
+ 5. Print the wrapper name of the type, then compute `padding`, the length of the longest field name plus two.
+
+ 6. For each field in declaration order, read `val`. A field the object does not have is skipped, and no line is printed for it.
+
+ 7. Choose the connector `sym1`, giving `┴` for the last printed line and `┼` otherwise.
+
+ 8. Print the field name, right-aligned to `padding`.
+
+ 9. Print `val` through the first branch that matches it, giving the rest of the line:
+
+      + `nothing` prints as `nothing`.
+      + A value that has a pretty-show method is rendered into a buffer, giving `alglines`. When the number of non-empty lines exceeds `compact_show_budget(io)`, print the wrapper name of the value followed by `⋯`. Otherwise print the first line beside the connector, and indent the rest under `│`.
+      + A non-empty vector whose every element has a pretty-show method prints the summary from [`pretty_show_vector_summary`](@ref), then the lines from [`pretty_show_vector_body`](@ref), each indented under `│`.
+      + A matrix prints its size and its type.
+      + A vector of more than six entries, or a vector of arrays, prints its length and its type.
+      + A `DataType` prints its type and its wrapper name.
+      + Any other value prints its type and `repr(val)`.
 
 # Arguments
 
   - `T`: The type for which to define the pretty-printing method.
+  - `flag::Bool = true`: When `true`, the macro also defines `has_pretty_show_method(::T) = true`, which is how a parent finds that `T` renders through this method. Pass `false` for a type whose parent must print it by `repr` instead.
 
 # Returns
 
   - Defines a `Base.show(io::IO, obj::T)` method for the given type.
-
-# Details
-
-  - Prints the type name and all fields with aligned labels.
-  - Recursively pretty-prints nested custom types and collections.
-  - Handles compact and multiline IO contexts.
-  - Displays matrix fields with their size and type.
-  - Lists a vector of pretty-printable structs as a `"N-element Vector{Name}"` summary followed by one collapsed line per element (each a wrapper-type name, with a trailing `" ⋯"` when the element has fields). Long listings are truncated head-and-tail with a `"⋮"` line, bounded by [`compact_show_budget`](@ref).
-  - Collapses an oversized nested struct field to `Name ⋯` when its rendered height exceeds [`compact_show_budget`](@ref); see [`set_compact_show!`](@ref).
-  - Skips fields that are not present or are `nothing`.
 
 # Related
 
@@ -1266,6 +1353,10 @@ This macro generates a `show` method that displays the type name and all fields 
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`has_pretty_show_method`](@ref)
+  - [`compact_show_budget`](@ref)
+  - [`pretty_show_vector_summary`](@ref)
+  - [`pretty_show_vector_body`](@ref)
   - [`Base.show`](https://docs.julialang.org/en/v1/base/io/#Base.show)
 """
 macro define_pretty_show(T, flag::Bool = true)
@@ -1380,12 +1471,41 @@ ScopedConfig(x::T) where {T} = ScopedConfig{T}(x)
     getindex(cfg::ScopedConfig)
 
 Read the active value of a [`ScopedConfig`](@ref): the innermost task-scoped override when inside a `with_*` block, otherwise the global default (read atomically).
+
+# Algorithm
+
+ 1. Read `cfg.scoped[]`, the innermost task-scoped override, giving `nothing` outside every `with_*` block.
+ 2. When step 1 gives `nothing`, read `cfg.default` atomically instead.
+
+# Returns
+
+  - `x::T`: The active value of the configuration.
+
+# Related
+
+  - [`ScopedConfig`](@ref)
+  - [`set_default!`](@ref)
+  - [`with_config`](@ref)
 """
 Base.getindex(cfg::ScopedConfig) = @something(cfg.scoped[], @atomic(cfg.default))
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Atomically replace the global default of a [`ScopedConfig`](@ref) with `x` and return it. Does not affect any active scoped override.
+
+# Algorithm
+
+ 1. Convert `x` to `T`, the element type of `cfg`, so that a failed conversion raises before anything is stored.
+ 2. Store the converted `x` into `cfg.default` in one atomic write, so that a concurrent reader sees either the old value or the new one and never a partial write.
+
+# Arguments
+
+  - `cfg`: Configuration holder whose global default is replaced.
+  - `x`: New value, converted to the element type `T` of `cfg`.
+
+# Returns
+
+  - `x::T`: The stored value.
 
 # Related
 
@@ -1401,6 +1521,21 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run `f()` with the [`ScopedConfig`](@ref) `cfg` overridden to `x` for the dynamic extent of the call, restoring the previous value on exit. Thread-safe: the override is task-scoped (inherited by tasks spawned inside `f`, invisible to concurrent tasks outside it).
+
+# Algorithm
+
+ 1. Convert `x` to `T`, the element type of `cfg`.
+ 2. Bind `cfg.scoped` to the converted `x` and run `f()` inside that binding, so that the binding is restored when `f` returns and when `f` raises.
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `cfg`: Configuration holder to override.
+  - `x`: Override value, converted to the element type `T` of `cfg`.
+
+# Returns
+
+  - The value that `f()` returns.
 
 # Related
 
@@ -1436,9 +1571,24 @@ Collapsing only ever applies to height-limited output (`get(io, :limit, false)`)
 
 Sets the global default (atomically; see [`ScopedConfig`](@ref)). For a temporary, task-scoped override use [`with_compact_show`](@ref).
 
+# Algorithm
+
+ 1. Widen an `Integer` argument to `Int`, so that the two methods store one of the two members of the stored union and never a third integer type. A `Bool` is stored unchanged.
+ 2. Store the value as the global default of [`COMPACT_SHOW`](@ref) through [`set_default!`](@ref).
+
+# Arguments
+
+  - `x::Bool`: `false` disables collapsing, `true` enables it with the automatic budget.
+  - `n::Integer`: Fixed line budget, stored as an `Int`.
+
+# Returns
+
+  - `x::Union{Bool, Int}`: The stored setting.
+
 # Related
 
   - [`@define_pretty_show`](@ref)
+  - [`COMPACT_SHOW`](@ref)
   - [`compact_show_budget`](@ref)
   - [`with_compact_show`](@ref)
 """
@@ -1450,8 +1600,24 @@ set_compact_show!(n::Integer) = set_default!(COMPACT_SHOW, Int(n))
 
 Run `f()` with the [`COMPACT_SHOW`](@ref) collapsing setting overridden to `x`/`n` for the dynamic extent of the call, restoring the previous setting on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched.
 
+# Algorithm
+
+ 1. Widen an `Integer` argument to `Int`, as [`set_compact_show!`](@ref) does. A `Bool` is passed unchanged.
+ 2. Run `f()` with [`COMPACT_SHOW`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `x::Bool`: `false` disables collapsing, `true` enables it with the automatic budget.
+  - `n::Integer`: Fixed line budget, stored as an `Int`.
+
+# Returns
+
+  - The value that `f()` returns.
+
 # Related
 
+  - [`COMPACT_SHOW`](@ref)
   - [`set_compact_show!`](@ref)
   - [`compact_show_budget`](@ref)
 """
@@ -1463,6 +1629,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Resolve the line budget that triggers collapsing a nested struct rendered by [`@define_pretty_show`](@ref).
 
 The per-call `:po_compact` IO property takes precedence over the global [`COMPACT_SHOW`](@ref) setting; both accept `false` (disabled), `true` (automatic budget), or an `Int` (fixed budget). The automatic budget is `max(8, displaysize(io)[1] - 4)`, so only subtrees that nearly fill or exceed the terminal collapse.
+
+# Algorithm
+
+ 1. Read the `:po_compact` property of `io`, giving `v`.
+ 2. When `io` sets no such property, collapsing applies only to height-limited output: return `nothing` when `:limit` is `false`, and otherwise read the global [`COMPACT_SHOW`](@ref) setting into `v`.
+ 3. Return `nothing` when `v` is `false`, because that value disables collapsing.
+ 4. Return `Int(v)` when `v` is an integer that is not a `Bool`, because that value is the fixed budget.
+ 5. Otherwise `v` is `true`, so return the automatic budget `max(8, displaysize(io)[1] - 4)`.
+
+# Arguments
+
+  - `io`: Stream whose `:po_compact`, `:limit` and `:displaysize` properties the resolution reads.
 
 # Returns
 
@@ -1497,12 +1675,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Global configuration for the fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
 
+Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
+
 # Fields
 
-  - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
-  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion. Must be positive (enforced by the constructor). `StringDistances.findnearest` never suggests a candidate scoring exactly `0`, but any threshold at or below `0` admits every candidate with *some* nonzero similarity — so `0` and a negative value behave identically and both defeat the info-leak-safe boundary by naming a real asset for a near-miss probe.
+$(DocStringExtensions.FIELDS)
 
-Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
+# Constructors
+
+    StringDistanceConfig(dist::StringDistances.StringDistance,
+                         min_score::Real) -> StringDistanceConfig
+
+## Validation
+
+  - `min_score > 0`. `StringDistances.findnearest` never suggests a candidate scoring exactly `0`, but any threshold at or below `0` admits every candidate with *some* nonzero similarity, so `0` and a negative value behave identically. Both defeat the info-leak-safe boundary by naming a real asset for a near-miss probe.
 
 # Related
 
@@ -1512,7 +1698,13 @@ Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the
   - [`did_you_mean`](@ref)
 """
 struct StringDistanceConfig
+    """
+    Distance used to score a candidate name against the offending one. The default is `StringDistances.Levenshtein()`.
+    """
     dist::StringDistances.StringDistance
+    """
+    Minimum normalised similarity a candidate must reach before it is suggested. The default is `0.7`. A value toward `1` keeps only a near-exact match, and a value above `1` disables suggestions entirely, which is what a meta-optimiser inner loop wants: an asset name legitimately absent from a cluster or a subset is not a typo and must draw no suggestion.
+    """
     min_score::Float64
     function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
         @argcheck(min_score > 0,
@@ -1539,10 +1731,24 @@ const STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levens
 
 Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](@ref). The store is atomic (see [`ScopedConfig`](@ref)); unspecified keywords keep their current default. For a temporary, task-scoped override use [`with_string_distance`](@ref).
 
-  - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
-  - `min_score`: minimum normalised similarity in `(0, 1]` to emit a suggestion; set above `1` to disable suggestions. Must be positive: a non-positive threshold admits every candidate with any nonzero similarity.
+# Algorithm
 
-Returns the new default [`StringDistanceConfig`](@ref).
+ 1. Default each keyword the caller omits to the field of the current global default, read atomically. A scoped override is not read, so the call configures the global default alone.
+ 2. Build a [`StringDistanceConfig`](@ref) from the two keywords, which is where the validation below runs.
+ 3. Store it as the global default of [`STRING_DISTANCE`](@ref) through [`set_default!`](@ref).
+
+# Arguments
+
+  - `dist::StringDistances.StringDistance`: Distance used to rank candidate names, for example `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()` or `StringDistances.JaroWinkler()`.
+  - `min_score::Real`: Minimum normalised similarity in `(0, 1]` that emits a suggestion. A value above `1` disables suggestions.
+
+# Validation
+
+  - `min_score > 0`, enforced by [`StringDistanceConfig`](@ref). A non-positive threshold admits every candidate with any nonzero similarity.
+
+# Returns
+
+  - `cfg::StringDistanceConfig`: The new global default.
 
 # Related
 
@@ -1564,10 +1770,32 @@ Run `f()` with the fuzzy-suggestion settings read by [`did_you_mean`](@ref) over
 
 Useful around a meta-optimiser run to silence suggestions (`min_score` above `1`) in its inner loops without affecting other concurrent work.
 
+# Algorithm
+
+ 1. Default each keyword the caller omits to the field of the currently active value, so that a nested override inherits from the enclosing one instead of from the global default.
+ 2. Build a [`StringDistanceConfig`](@ref) from the two keywords, which is where the validation below runs.
+ 3. Run `f()` with [`STRING_DISTANCE`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `dist::StringDistances.StringDistance`: Distance used to rank candidate names.
+  - `min_score::Real`: Minimum normalised similarity in `(0, 1]` that emits a suggestion. A value above `1` disables suggestions.
+
+# Validation
+
+  - `min_score > 0`, enforced by [`StringDistanceConfig`](@ref).
+
+# Returns
+
+  - The value that `f()` returns.
+
 # Related
 
   - [`set_string_distance!`](@ref)
   - [`STRING_DISTANCE`](@ref)
+  - [`StringDistanceConfig`](@ref)
+  - [`with_config`](@ref)
   - [`did_you_mean`](@ref)
 """
 function with_string_distance(f;
@@ -1576,19 +1804,43 @@ function with_string_distance(f;
     return with_config(f, STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
 Global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
 
 Constraint, Black-Litterman view and entropy-pooling view strings are untrusted input (config files, spreadsheets, UI). They funnel through [`parse_equation`](@ref), which calls `Meta.parse` and then walks the resulting expression tree recursively ([`eval_numeric_functions`](@ref), `collect_terms!`, `has_invalid_plus`). Without a bound, a deeply nested string (e.g. tens of thousands of parentheses) produces an AST deep enough to exhaust the stack and take down the host process. These caps fail closed with a typed `Meta.ParseError` well before that point.
 
+The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref). See `docs/adr/0027-cap-equation-parser-recursion.md`.
+
 # Fields
 
-  - `max_length`: maximum number of characters in an equation string handed to `Meta.parse` (default `4096`). A legitimate linear constraint is short; the bound sits far above any real constraint and far below the nesting depth that threatens the stack. Because achieving nesting depth `d` from a string needs at least `d` characters, the length cap also bounds the AST depth of the *string* form.
-  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref) (default `256`), which receives a pre-built AST that no length cap covers.
+$(DocStringExtensions.FIELDS)
 
-The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref). Both fields must be positive (enforced by the constructor). See `docs/adr/0027-cap-equation-parser-recursion.md`.
+# Constructors
+
+    EquationLimits(max_length::Integer, max_depth::Integer) -> EquationLimits
+
+## Validation
+
+  - `max_length > 0 && max_depth > 0`.
+
+# Related
+
+  - [`EQUATION_LIMITS`](@ref)
+  - [`set_equation_limits!`](@ref)
+  - [`with_equation_limits`](@ref)
+  - [`ResourceLimits`](@ref)
+  - [`ScopedConfig`](@ref)
+  - [`parse_equation`](@ref)
 """
 struct EquationLimits
+    """
+    Maximum number of characters in an equation string handed to `Meta.parse`. The default is `4096`. A legitimate linear constraint is short, so the bound sits far above any real constraint and far below the nesting depth that threatens the stack. A nesting depth `d` needs at least `d` characters, so the length cap also bounds the AST depth of the *string* form.
+    """
     max_length::Int
+    """
+    Maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref). The default is `256`. That form receives a pre-built AST, which no length cap covers.
+    """
     max_depth::Int
     function EquationLimits(max_length::Integer, max_depth::Integer)
         @argcheck(max_length > 0 && max_depth > 0,
@@ -1614,12 +1866,26 @@ const EQUATION_LIMITS = ScopedConfig(EquationLimits(4096, 256))
 
 Configure the global default equation-parser resource caps read at the string→AST trust boundary (see [`EQUATION_LIMITS`](@ref)).
 
-  - `max_length`: maximum equation-string length passed to `Meta.parse`.
-  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
+Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_equation_limits`](@ref).
 
-Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Both must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_equation_limits`](@ref).
+# Algorithm
 
-Returns the new default [`EquationLimits`](@ref).
+ 1. Default each keyword the caller omits to the field of the current global default, read atomically. A scoped override is not read, so the call configures the global default alone.
+ 2. Build an [`EquationLimits`](@ref) from the two keywords, which is where the validation below runs.
+ 3. Store it as the global default of [`EQUATION_LIMITS`](@ref) through [`set_default!`](@ref).
+
+# Arguments
+
+  - `max_length::Integer`: Maximum equation-string length passed to `Meta.parse`.
+  - `max_depth::Integer`: Maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
+
+# Validation
+
+  - `max_length > 0 && max_depth > 0`, enforced by [`EquationLimits`](@ref).
+
+# Returns
+
+  - `lims::EquationLimits`: The new global default.
 
 # Related
 
@@ -1641,10 +1907,32 @@ Run `f()` with the equation-parser resource caps (see [`EQUATION_LIMITS`](@ref))
 
 Useful to tighten the boundary around one batch of untrusted constraint strings, or to raise it for a single machine-generated constraint set, without affecting other concurrent work.
 
+# Algorithm
+
+ 1. Default each keyword the caller omits to the field of the currently active value, so that a nested override inherits from the enclosing one instead of from the global default.
+ 2. Build an [`EquationLimits`](@ref) from the two keywords, which is where the validation below runs.
+ 3. Run `f()` with [`EQUATION_LIMITS`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `max_length::Integer`: Maximum equation-string length passed to `Meta.parse`.
+  - `max_depth::Integer`: Maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
+
+# Validation
+
+  - `max_length > 0 && max_depth > 0`, enforced by [`EquationLimits`](@ref).
+
+# Returns
+
+  - The value that `f()` returns.
+
 # Related
 
   - [`set_equation_limits!`](@ref)
   - [`EQUATION_LIMITS`](@ref)
+  - [`EquationLimits`](@ref)
+  - [`with_config`](@ref)
   - [`parse_equation`](@ref)
 """
 function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
@@ -1652,22 +1940,40 @@ function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_len
     return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
 Global resource caps for the sampling- and sweep-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion.
 
 Draw counts, subset counts, frontier-sweep lengths and histogram bin counts are untrusted configuration integers (config files, tuning grids, UI): each directly multiplies an allocation, and in the subset and frontier cases a whole optimisation. Their own constructors only bound them from *below* (`n_sim > 0`, `n_subsets >= 2`, `N > 0`, `bins > 0`), so an absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by the OOM killer rather than told what went wrong. These caps fail closed with a typed `DomainError` at the point the value is resolved.
 
 There is **one cap per sink**, each named to mirror the field it guards. Reuse across sinks is deliberately avoided: a *linear* cap cannot bound a *quadratic* sink, which is why the `bins × bins` histogram gets its own [`max_bins`](@ref ResourceLimits) rather than sharing the linear draw cap.
 
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). Prefer the keyword constructor `ResourceLimits(; …)` — the six caps are same-typed and four share the value `100_000`, so positional construction is error-prone.
+
 # Fields
 
-  - `max_n_sim`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`. *Memory*-bound.
-  - `max_n_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
-  - `max_frontier`: maximum efficient-frontier sweep points accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref) (default `100_000`). Like `max_n_subsets` this is *compute*-bound — every point runs a full inner `optimise_JuMP_model!` solve — so it mirrors that ceiling; the shipped `Frontier` default is `N = 20`. Enforced **twice**: [`Frontier`](@ref)'s constructor caps the `N` of one bound, and [`assert_frontier_sweep_cap`](@ref) caps the **product** across every swept return term and every swept risk measure at Model Assembly, since the sweep is an `Iterators.product` and `k` bounds of `N` points cost `N^k` solves.
-  - `max_bins`: maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref) (default `10_000`). The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is ≈ 800 MB per histogram — below OOM yet far above the ~50-bin range legitimate binning produces.
-  - `max_hop_count`: maximum hop count (`n`) accepted by [`HopCount`](@ref) (default `100_000`). Three readers sum `A^i` over `i in 0:n`, so the sink is *linear* in `n` at `N³` flops a power and a large `n` wedges the session on compute rather than memory. Like `max_n_subsets` it is compute-bound and mirrors that ceiling; the shipped default is `n = 1`. The cap is read in `HopCount`'s constructor, which is also where [`resolve_separation`](@ref) sends a rule's answer, so one check covers the stated value and the computed one alike.
-  - `max_search_grid`: maximum search-grid candidates accepted by [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref) (default `100_000`). Every candidate runs a full cross-validated fit, so this is *compute*-bound like `max_n_subsets`. The grid is an `Iterators.product` materialised by `collect`, so `k` parameters of `N` values cost `N^k` candidates: the cap is asserted on the **product** by [`assert_search_grid_cap`](@ref) where the grid is formed, since a per-parameter check can never see it.
+$(DocStringExtensions.FIELDS)
 
-The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). All fields must be positive (enforced by the constructor). Prefer the keyword constructor `ResourceLimits(; …)` — the six caps are same-typed and four share the value `100_000`, so positional construction is error-prone.
+# Constructors
+
+    ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer, max_frontier::Integer,
+                   max_bins::Integer, max_hop_count::Integer,
+                   max_search_grid::Integer) -> ResourceLimits
+
+    ResourceLimits(;
+        max_n_sim::Integer = 1_000_000,
+        max_n_subsets::Integer = 100_000,
+        max_frontier::Integer = 100_000,
+        max_bins::Integer = 10_000,
+        max_hop_count::Integer = 100_000,
+        max_search_grid::Integer = 100_000
+    ) -> ResourceLimits
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `max_n_sim > 0 && max_n_subsets > 0 && max_frontier > 0 && max_bins > 0 && max_hop_count > 0 && max_search_grid > 0`.
 
 # Related
 
@@ -1678,11 +1984,29 @@ The values are conservative static defaults, deliberately far above legitimate u
   - [`EquationLimits`](@ref)
 """
 struct ResourceLimits
+    """
+    Maximum Monte-Carlo or bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref). The default is `1_000_000`. Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`. *Memory*-bound.
+    """
     max_n_sim::Int
+    """
+    Maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref). The default is `100_000`. This cap bounds *compute* far more than memory, because every subset runs a full inner optimisation, so it sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
+    """
     max_n_subsets::Int
+    """
+    Maximum efficient-frontier sweep points accepted by the [`Frontier`](@ref) algorithm of [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref). The default is `100_000`. Like `max_n_subsets` it is *compute*-bound, because every point runs a full inner `optimise_JuMP_model!` solve, so it mirrors that ceiling; the shipped [`Frontier`](@ref) default is `N = 20`. It is enforced **twice**: [`Frontier`](@ref)'s constructor caps the `N` of one bound, and [`assert_frontier_sweep_cap`](@ref) caps the **product** across every swept return term and every swept risk measure at Model Assembly, because the sweep is an `Iterators.product` and `k` bounds of `N` points cost `N^k` solves.
+    """
     max_frontier::Int
+    """
+    Maximum histogram bins accepted by [`MutualInfoCovariance`](@ref) and [`VariationInfoDistance`](@ref). The default is `10_000`. The joint histogram is a `bins × bins` weights matrix built per asset pair, so this bounds a *quadratic* memory allocation: `10_000²` cells is about 800 MB per histogram, below OOM yet far above the roughly 50-bin range that legitimate binning produces.
+    """
     max_bins::Int
+    """
+    Maximum hop count (`n`) accepted by [`HopCount`](@ref). The default is `100_000`. Three readers sum `A^i` over `i in 0:n`, so the sink is *linear* in `n` at `N³` flops a power, and a large `n` wedges the session on compute rather than on memory. Like `max_n_subsets` it is compute-bound and mirrors that ceiling; the shipped default is `n = 1`. The cap is read in [`HopCount`](@ref)'s constructor, which is also where [`resolve_separation`](@ref) sends a rule's answer, so one check covers the stated value and the computed one alike.
+    """
     max_hop_count::Int
+    """
+    Maximum search-grid candidates accepted by [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref). The default is `100_000`. Every candidate runs a full cross-validated fit, so this is *compute*-bound like `max_n_subsets`. The grid is an `Iterators.product` materialised by `collect`, so `k` parameters of `N` values cost `N^k` candidates: the cap is asserted on the **product** by [`assert_search_grid_cap`](@ref) where the grid is formed, because a per-parameter check can never see it.
+    """
     max_search_grid::Int
     function ResourceLimits(max_n_sim::Integer, max_n_subsets::Integer,
                             max_frontier::Integer, max_bins::Integer,
@@ -1725,16 +2049,30 @@ const RESOURCE_LIMITS = ScopedConfig(ResourceLimits())
 
 Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
 
-  - `max_n_sim`: maximum `n_sim` accepted by the uncertainty-set estimators.
-  - `max_n_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
-  - `max_frontier`: maximum `N` accepted by one [`Frontier`](@ref), and maximum total sweep points across every swept bound.
-  - `max_bins`: maximum `bins` accepted by the mutual-information estimators.
-  - `max_hop_count`: maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
-  - `max_search_grid`: maximum total candidates in a search cross-validation grid.
+Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. Unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
 
-Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. All must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
+# Algorithm
 
-Returns the new default [`ResourceLimits`](@ref).
+ 1. Default each keyword the caller omits to the field of the current global default, read atomically. A scoped override is not read, so the call configures the global default alone.
+ 2. Build a [`ResourceLimits`](@ref) from the six keywords, which is where the validation below runs.
+ 3. Store it as the global default of [`RESOURCE_LIMITS`](@ref) through [`set_default!`](@ref).
+
+# Arguments
+
+  - `max_n_sim::Integer`: Maximum `n_sim` accepted by the uncertainty-set estimators.
+  - `max_n_subsets::Integer`: Maximum `n_subsets` accepted by the subset-resampling estimators.
+  - `max_frontier::Integer`: Maximum `N` accepted by one [`Frontier`](@ref), and maximum total sweep points across every swept bound.
+  - `max_bins::Integer`: Maximum `bins` accepted by the mutual-information estimators.
+  - `max_hop_count::Integer`: Maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
+  - `max_search_grid::Integer`: Maximum total candidates in a search cross-validation grid.
+
+# Validation
+
+  - Every cap is positive, enforced by [`ResourceLimits`](@ref).
+
+# Returns
+
+  - `lims::ResourceLimits`: The new global default.
 
 # Related
 
@@ -1765,10 +2103,36 @@ Run `f()` with the resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for 
 
 Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim`, `N` and `bins` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former cases and the `optimise` call in the latter.
 
+# Algorithm
+
+ 1. Default each keyword the caller omits to the field of the currently active value, so that a nested override inherits from the enclosing one instead of from the global default.
+ 2. Build a [`ResourceLimits`](@ref) from the six keywords, which is where the validation below runs.
+ 3. Run `f()` with [`RESOURCE_LIMITS`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `max_n_sim::Integer`: Maximum `n_sim` accepted by the uncertainty-set estimators.
+  - `max_n_subsets::Integer`: Maximum `n_subsets` accepted by the subset-resampling estimators.
+  - `max_frontier::Integer`: Maximum `N` accepted by one [`Frontier`](@ref), and maximum total sweep points across every swept bound.
+  - `max_bins::Integer`: Maximum `bins` accepted by the mutual-information estimators.
+  - `max_hop_count::Integer`: Maximum `n` accepted by [`HopCount`](@ref), stated or resolved from a rule.
+  - `max_search_grid::Integer`: Maximum total candidates in a search cross-validation grid.
+
+# Validation
+
+  - Every cap is positive, enforced by [`ResourceLimits`](@ref).
+
+# Returns
+
+  - The value that `f()` returns.
+
 # Related
 
   - [`set_resource_limits!`](@ref)
   - [`RESOURCE_LIMITS`](@ref)
+  - [`ResourceLimits`](@ref)
+  - [`with_config`](@ref)
 """
 function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_sim,
                               max_n_subsets::Integer = RESOURCE_LIMITS[].max_n_subsets,
@@ -1788,6 +2152,22 @@ Return a "did you mean" suffix naming the closest match to `name` among `candida
 Do not wrap the suffix in a code span that also carries escaped backticks. `JuliaFormatter` mis-pairs the backticks and deletes the spaces around the neighbouring code spans, which breaks the rendering.
 
 Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the active [`STRING_DISTANCE`](@ref) config — global default via [`set_string_distance!`](@ref), task-scoped override via [`with_string_distance`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
+
+# Algorithm
+
+ 1. Return an empty string when `candidates` is empty, because there is nothing to search.
+ 2. Read the active [`STRING_DISTANCE`](@ref) configuration into `sd`.
+ 3. Search `candidates` for the entry nearest to `name` under `sd.dist`, keeping only a match whose normalised similarity reaches `sd.min_score`, giving `match`.
+ 4. Return an empty string when step 3 finds no match. Otherwise return the suffix that names `match`.
+
+# Arguments
+
+  - `name::AbstractString`: The offending name the caller wrote.
+  - `candidates`: Collection of valid names to search.
+
+# Returns
+
+  - `msg::String`: The suffix `" (did you mean X?)"`, or an empty string when no candidate reaches the threshold.
 
 # Related
 
@@ -1810,6 +2190,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Suggest the nearest `candidates` entry to a mistyped **declaration key**: a macro block key, a dictionary key, a struct field name, or a keyword of a generated constructor.
 
 Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default: Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The strict global default exists to keep near-miss probes from echoing real *asset names* back to the caller (ADR 0026); that boundary does not apply here, because the candidates are compile-time constants — block keys, dictionary keys and field names — with nothing to leak. At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5 against `noun`, so the suggestion would be dead code.
+
+# Arguments
+
+  - `key`: The mistyped declaration key, converted to a `String`.
+  - `candidates`: Collection of valid keys, each converted to a `String`.
+
+# Returns
+
+  - `msg::String`: The suffix that [`did_you_mean`](@ref) returns under the looser configuration.
 
 # Related
 
@@ -1835,6 +2224,18 @@ Build the warning/error text for a constraint or view variable `v` that is absen
 
 Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`name_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
 
+# Arguments
+
+  - `v`: The variable name that is absent from the universe.
+  - `nx`: The universe the lookup failed against. Only its length reaches the message.
+  - `key`: The key the universe is stored under.
+  - `candidates = nx`: Pool searched for the typo suggestion.
+  - `axis::AbstractString = "asset"`: Name of the universe the variable was looked up in.
+
+# Returns
+
+  - `msg::String`: The diagnostic text, with a [`did_you_mean`](@ref) suffix when a close match exists.
+
 # Related
 
   - [`did_you_mean`](@ref)
@@ -1853,6 +2254,18 @@ Build the warning/error text for a parsed equation `eqn` whose every term missed
 
 Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
 
+# Arguments
+
+  - `eqn`: The parsed equation whose every term missed the universe.
+  - `nx`: The universe the terms missed. Only its length reaches the message.
+  - `key`: The key the universe is stored under.
+  - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, `"view"` for a Black-Litterman view.
+  - `axis::AbstractString = "asset"`: Name of the universe, as in [`unknown_variable_msg`](@ref).
+
+# Returns
+
+  - `msg::String`: The diagnostic text.
+
 # Related
 
   - [`unknown_variable_msg`](@ref)
@@ -1869,6 +2282,18 @@ Build the warning/error text for a re-based equation `eqn` whose terms *did* res
 
 This diagnosis exists only under a re-basis, and it is a different failure from [`empty_row_msg`](@ref): there the names missed the universe, here they hit it and the basis annihilated them. Reporting the first for the second would send a user hunting for a typo that is not there — the real cause is a factor no asset loads on.
 
+# Arguments
+
+  - `eqn`: The re-based equation whose projection is an all-zero row.
+  - `nf`: The factor universe the terms resolved against. Only its length reaches the message.
+  - `key`: The key the factor universe is stored under.
+  - `n`: Number of assets the row was projected over.
+  - `noun::AbstractString = "constraint"`: `"constraint"` for a linear constraint, `"view"` for a view.
+
+# Returns
+
+  - `msg::String`: The diagnostic text.
+
 # Related
 
   - [`empty_row_msg`](@ref)
@@ -1883,6 +2308,21 @@ end
 Build the error text for a gross budget (`gbgt`) whose weight bounds `lb` and `ub` admit no short position. With no negative bound the gross exposure equals the net exposure, so the net budget (`bgt`) already owns the constraint and `gbgt` has nothing left to express.
 
 Names the *size* of the bounds and the failed predicate only — never the bound values — the same info-leak-safe discipline as [`unknown_variable_msg`](@ref) and its siblings. Scalar or absent bounds have no size, so the message names the bounds without a count.
+
+# Algorithm
+
+ 1. Take `n`, the greater of the two bound lengths, counting a bound that is not a vector as zero.
+ 2. Build `scope`, which names the bounds alone when `n` is zero and names them with the asset count otherwise.
+ 3. Build the message from the fixed explanation and `scope`.
+
+# Arguments
+
+  - `lb`: Lower weight bound. Only its length reaches the message.
+  - `ub`: Upper weight bound. Only its length reaches the message.
+
+# Returns
+
+  - `msg::String`: The error text.
 
 # Related
 
@@ -1903,10 +2343,19 @@ Report an unresolvable **name**: throw an `ArgumentError` under `strict`, warn o
 
 `strict` governs names only. Nothing structural is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every name diagnostic in the library routes through here, so the strictness policy is one edit.
 
+# Algorithm
+
+ 1. Throw an `ArgumentError` carrying `msg` when `strict` is `true`, which ends the call.
+ 2. Otherwise emit `msg` as a warning and return.
+
 # Arguments
 
   - `msg`: The diagnostic text, built by [`unknown_variable_msg`](@ref) or one of its siblings.
   - `strict`: If `true`, throws an `ArgumentError`; if `false`, issues a warning.
+
+# Validation
+
+  - The call raises an `ArgumentError` carrying `msg` when `strict` is `true`.
 
 # Returns
 
@@ -1937,6 +2386,17 @@ suggestion for the first missing member.
 Shared by [`name_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
 alongside [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref).
 
+# Arguments
+
+  - `group`: The group name that resolved in the asset sets.
+  - `missing_assets`: The member names absent from the asset universe.
+  - `nx`: The asset universe. Only its length reaches the message.
+  - `key`: The key the asset universe is stored under.
+
+# Returns
+
+  - `msg::String`: The diagnostic text, with a [`did_you_mean`](@ref) suffix for the first missing member.
+
 # Related
 
   - [`unknown_variable_msg`](@ref)
@@ -1957,6 +2417,25 @@ Position is the only link between a name and a column, so a disagreement is not 
 
 Two disagreements are reported differently because they have different causes. Different lengths mean the two describe different universes — usually a stale `sets` against freshly sliced data. Equal lengths mean they describe the same universe in a different order, and the first differing position is the whole diagnosis. Names the sizes and the *first* differing pair only — never either universe in full, the same info-leak-safe discipline as [`unknown_variable_msg`](@ref).
 
+# Algorithm
+
+ 1. Build `detail` through the branch that the two lengths select.
+ 2. When the lengths differ, `detail` names both counts and nothing else, because the two describe different universes.
+ 3. When the lengths agree, find `i`, the first position at which the two disagree, and let `detail` name the shared count, `i`, and the pair at `i`.
+ 4. Build the message from `detail`, the axis, the key, and the repair to make.
+
+# Arguments
+
+  - `declared`: The universe declared under `key`.
+  - `names`: The axis of the data the universe is used against.
+  - `axis`: Name of the axis, for example `"asset"`.
+  - `key`: The key the declared universe is stored under.
+  - `sym`: Field of the returns data that carries the correct axis, named in the repair.
+
+# Returns
+
+  - `msg::String`: The error text.
+
 # Related
 
   - [`unknown_variable_msg`](@ref)
@@ -1976,6 +2455,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Render the first line of an error for a log message, truncated to `max_line_length` characters (a trailing `…` marks the cut). Exceptions render via `showerror`, so the line carries the exception type and message; anything else renders via `repr`.
 
+# Algorithm
+
+ 1. Render `err` into `s`, through `showerror` when `err` is an `Exception` and through `repr` otherwise.
+ 2. Take `line`, the text of `s` up to its first newline.
+ 3. Return `line` unchanged when it fits `max_line_length`, and otherwise return its first `max_line_length` characters followed by `…`.
+
+# Arguments
+
+  - `err`: The error to render.
+  - `max_line_length::Integer`: Maximum number of characters the returned line may hold before the cut.
+
+# Returns
+
+  - `line::String`: The rendered first line, truncated when needed.
+
 # Related
 
   - [`failed_solve_msg`](@ref)
@@ -1991,6 +2485,23 @@ end
 Build the warning text for a JuMP model that no configured solver could solve satisfactorily (see `JuMPResult`). One line per failed stage of each solver trial: the solver name, the stage that failed (`set_optimizer`, `optimize!`, or `assert_is_solved_and_feasible`), and the first line of the error truncated to `max_line_length` characters — so a JuMP termination status stays visible.
 
 Never interpolates the whole trials dictionary, the solver settings, or full exception payloads into the log; the raw data remains available on the returned `JuMPResult.trials`. This is the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref) and its siblings. Solver names and stages are sorted so the message is deterministic.
+
+# Algorithm
+
+ 1. Open `msg` with the trial count, so the reader sees how many solvers were tried before the detail.
+ 2. For each solver name, in sorted order, read its entry into `trial`.
+ 3. Read the stages of `trial`, giving `stages`. An entry that is not a dictionary is wrapped as the single stage `:trial`, so a solver that failed before any stage was recorded still reports.
+ 4. For each stage, in sorted order, skip `:settings`, because the solver settings are caller input and never reach a log.
+ 5. Append one line per remaining stage: the solver name, the stage, and the first line of its error from [`first_error_line`](@ref).
+
+# Arguments
+
+  - `trials::AbstractDict`: One entry per solver trial, keyed by solver name.
+  - `max_line_length::Integer = 200`: Maximum number of characters of each error line.
+
+# Returns
+
+  - `msg::String`: The warning text, one line per failed stage.
 
 # Related
 
@@ -2066,6 +2577,14 @@ Build the warning text for the load-time preferences that widened a guard (see [
 
 A preference file is data. It ships with a cloned project or a template, it is often untracked, and [`__init__`](@ref PortfolioOptimisers.__init__) applies it at `using PortfolioOptimisers`, before any user code runs. A value that *tightens* a guard needs no announcement, so the warning names the widened guards alone: the [`RESOURCE_LIMITS`](@ref) and [`EQUATION_LIMITS`](@ref) caps a file raised, and a [`STRING_DISTANCE`](@ref) suggestion threshold it lowered (a lower threshold admits more candidates, which is the info-leak direction of `docs/adr/0026-lenient-constraint-names-with-suggestions.md`).
 
+Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
+
+# Algorithm
+
+ 1. Open `msg` with the number of widened guards and the sentence that says when a preference applies.
+ 2. Append one line per triple, naming the key, the default it replaced, and the value the project asked for.
+ 3. Close `msg` with the two repairs: delete the key, or widen the guard for one scope with a `with_*` helper.
+
 # Arguments
 
   - `relaxations`: One `(key, default, value)` triple per widened guard, in [`PREFERENCE_KEYS`](@ref) order.
@@ -2073,8 +2592,6 @@ A preference file is data. It ships with a cloned project or a template, it is o
 # Returns
 
   - `msg::String`: Multi-line warning text, one line per triple.
-
-Never interpolates the whole preference dictionary, so a key the message does not name stays out of the log — the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref).
 
 # Related
 
@@ -2115,6 +2632,32 @@ suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
 ```
+
+# Algorithm
+
+ 1. Start `relaxations` empty. It collects one `(key, default, value)` triple per guard the preferences widen.
+ 2. Read the two equation keys. When either is set, check that every set value is a positive integer, read the current [`EQUATION_LIMITS`](@ref) default, record a triple for each value above its default, and apply both through [`set_equation_limits!`](@ref). A key the project left unset keeps the value it already has.
+ 3. Read the six resource keys and repeat step 2 against [`RESOURCE_LIMITS`](@ref) and [`set_resource_limits!`](@ref).
+ 4. Read `"suggestion_min_score"`. When it is set, check that it is a real number, record a triple when it is below the current threshold, and apply it through [`set_string_distance!`](@ref). A lower threshold widens the guard, which is the opposite direction from a cap.
+ 5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
+ 6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
+ 7. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
+
+# Arguments
+
+  - `prefs`: One entry per key of [`PREFERENCE_KEYS`](@ref). A `nothing` value means the project set no preference for that key, and the shipped default stands.
+
+# Validation
+
+  - Each of the eight cap keys is a positive integer that is not a `Bool`.
+  - `"suggestion_min_score"` is a real number that is not a `Bool`.
+  - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
+  - `"compact_show"` is a `Bool` or an `Integer`.
+  - A breach of any rule above raises an `ArgumentError` that names the key and the value, so the package refuses to load.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -2213,6 +2756,15 @@ Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active
 
 This is the one channel that reaches the guards without running code: a `LocalPreferences.toml` is data, it travels with a cloned project or a template, and it is read here, before any user code. A valid value is therefore applied but not silent — a value that widens a guard is announced with a warning (see [`relaxed_preferences_msg`](@ref)).
 
+# Algorithm
+
+ 1. Read every key of [`PREFERENCE_KEYS`](@ref) with `Preferences.load_preference`, giving `nothing` for a key the active project did not set.
+ 2. Pass the resulting dictionary to [`apply_preferences!`](@ref), which validates each value and applies it.
+
+# Returns
+
+  - `nothing`.
+
 # Related
 
   - [`apply_preferences!`](@ref)
@@ -2232,6 +2784,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Build the single-line summary for a vector field rendered by [`@define_pretty_show`](@ref).
 
 Returns a string of the form `"N-element Vector{Name}"`. A vector is treated as homogeneous when every element shares the same wrapper-type name (so elements that differ only in type parameters are still homogeneous): a homogeneous vector uses that common wrapper name, otherwise the wrapper of the element type, falling back to the raw `eltype` for `Union`s.
+
+# Algorithm
+
+ 1. Collect `names`, the wrapper-type name of every element. Two elements that differ only in their type parameters share one name.
+ 2. Read `et`, the element type of the vector.
+ 3. Take `tname` from the branch that `names` selects: the common name when every entry of `names` is equal, the string of `et` when `et` is a `Union`, and the wrapper name of `et` otherwise.
+ 4. Build the summary from the length of the vector and `tname`.
 
 # Arguments
 
@@ -2264,6 +2823,19 @@ Render a single vector element as a collapsed line for [`@define_pretty_show`](@
 
 Every element of a listed vector is shown as just its wrapper-type name. When the element is a struct with fields, a trailing `" ⋯"` marks it as a collapsed struct (consistent with how an over-budget struct field collapses to `Name ⋯`); fieldless elements are left bare.
 
+# Algorithm
+
+ 1. Take `s`, the wrapper-type name of `v`.
+ 2. Return `s` unchanged when `v` has no field, and otherwise return `s` followed by `" ⋯"`.
+
+# Arguments
+
+  - `v`: The vector element to render.
+
+# Returns
+
+  - `line::String`: The collapsed one-line rendering of `v`.
+
 # Related
 
   - [`@define_pretty_show`](@ref)
@@ -2280,6 +2852,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Apply the shared collapse budget to the per-element lines of a vector rendered by [`@define_pretty_show`](@ref).
 
 The budget comes from [`compact_show_budget`](@ref), so vector truncation honours the same `:limit` gate, global [`set_compact_show!`](@ref) setting, and per-call `:po_compact` override as struct collapsing. When the budget is `nothing` (disabled, unlimited output, or override-off) every line is returned. Otherwise, when the listing exceeds the budget it is split head-and-tail, mirroring how `Base` truncates long arrays, with a single `"⋮"` line marking the elision.
+
+# Algorithm
+
+ 1. Read `budget` from [`compact_show_budget`](@ref), and `n`, the number of lines.
+ 2. Return `lines` unchanged when `budget` is `nothing`, or when `n` does not exceed it.
+ 3. Split the budget into `nhead`, its half rounded up, and `ntail`, the rest.
+ 4. Return the first `nhead` lines, a single `"⋮"` line, and the last `ntail` lines.
 
 # Arguments
 
@@ -2343,6 +2922,8 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
   - [`ConflictingArgumentError`](@ref)
+  - [`PropertyPathError`](@ref)
+  - [`ObservationWeightsError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -2356,7 +2937,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    IsNothingError(msg)
+    IsNothingError(msg) -> IsNothingError
 
 Arguments correspond to the fields above.
 
@@ -2394,7 +2975,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    IsEmptyError(msg)
+    IsEmptyError(msg) -> IsEmptyError
 
 Arguments correspond to the fields above.
 
@@ -2432,7 +3013,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    IsNonFiniteError(msg)
+    IsNonFiniteError(msg) -> IsNonFiniteError
 
 Arguments correspond to the fields above.
 
@@ -2470,7 +3051,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ConflictingArgumentError(msg)
+    ConflictingArgumentError(msg) -> ConflictingArgumentError
 
 Arguments correspond to the fields above.
 
@@ -2508,7 +3089,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    PropertyPathError(msg)
+    PropertyPathError(msg) -> PropertyPathError
 
 Arguments correspond to the fields above.
 
@@ -2546,7 +3127,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ObservationWeightsError(msg)
+    ObservationWeightsError(msg) -> ObservationWeightsError
 
 Arguments correspond to the fields above.
 
@@ -2576,6 +3157,26 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
+
+# Algorithm
+
+ 1. Take `name`, the string of the concrete type of `err`.
+ 2. Cut `name` at the first `{` or `(`, so a parametric subtype prints under its wrapper name alone.
+ 3. Print `name`, a colon, and the `msg` field of `err`.
+
+# Arguments
+
+  - `io`: Stream the message is printed to.
+  - `err`: The error to render.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`first_error_line`](@ref)
 """
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
@@ -2586,6 +3187,29 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Make estimators, algorithms, and results behave as length-1 iterables, returning the object itself on the first iteration and `nothing` thereafter.
+
+This is what lets a caller write one loop over a value that may be a single estimator or a vector of them, without a branch on which it received.
+
+# Algorithm
+
+ 1. Return `nothing` when `state` is above `1`, which ends the iteration.
+ 2. Otherwise return the pair of `obj` and the next state.
+
+# Arguments
+
+  - `obj`: The estimator, algorithm or result to iterate.
+  - `state = 1`: Iteration state. Only `1` yields a value.
+
+# Returns
+
+  - `nothing` after the first iteration.
+  - `(obj, state + 1)` on the first iteration.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+  - [`AbstractResult`](@ref)
 """
 function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
@@ -2596,13 +3220,37 @@ Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Index into estimators, algorithms, and results as length-1 containers. Only index `1` is valid; any other index throws `BoundsError`.
+
+# Algorithm
+
+ 1. Return `obj` when `i` is `1`.
+ 2. Otherwise throw a `BoundsError` naming `obj` and `i`.
+
+# Arguments
+
+  - `obj`: The estimator, algorithm or result to index.
+  - `i::Int`: The index. Only `1` is valid.
+
+# Validation
+
+  - `i == 1`. Any other index raises a `BoundsError`.
+
+# Returns
+
+  - `obj`: The object itself.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+  - [`AbstractResult`](@ref)
 """
 function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecNum = AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract vector of numeric types or JuMP scalar types.
 
@@ -2614,7 +3262,7 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
 """
 const VecNum = AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecInt = AbstractVector{<:Integer}
 
 Alias for an abstract vector of integer types.
 
@@ -2626,7 +3274,7 @@ Alias for an abstract vector of integer types.
 """
 const VecInt = AbstractVector{<:Integer}
 """
-$(DocStringExtensions.TYPEDEF)
+    const MatNum = AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract matrix of numeric types or JuMP scalar types.
 
@@ -2638,7 +3286,7 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
 """
 const MatNum = AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
-$(DocStringExtensions.TYPEDEF)
+    const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract array of numeric types or JuMP scalar types.
 
@@ -2649,7 +3297,7 @@ Alias for an abstract array of numeric types or JuMP scalar types.
 """
 const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
-$(DocStringExtensions.TYPEDEF)
+    const Arr3Num = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}, 3}
 
 Alias for an abstract 3-dimensional array of numeric types or JuMP scalar types.
 
@@ -2735,7 +3383,15 @@ abstract type AbstractCustomValue <: AbstractAlgorithm end
 """
     const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
 
-Alias for the union of `AbstractCustomValue` and `Func_Num_VecNum`. This is used to define the type of the `val` field in [`CustomValueExpectedReturns`](@ref).
+Alias for the two ways a caller supplies a custom value: an [`AbstractCustomValue`](@ref) algorithm, or the plain forms that [`Func_Num_VecNum`](@ref) already groups.
+
+The group exists because the `val` field of [`CustomValueExpectedReturns`](@ref) accepts both, and one bound on that field is what keeps the two routes from drifting apart.
+
+# Related
+
+  - [`AbstractCustomValue`](@ref)
+  - [`Func_Num_VecNum`](@ref)
+  - [`CustomValueExpectedReturns`](@ref)
 """
 const CVal_Func_Num_VecNum = Union{<:AbstractCustomValue, <:Func_Num_VecNum}
 """
@@ -2750,7 +3406,7 @@ Alias for a union of a numeric type or an abstract array of numeric types.
 """
 const Num_ArrNum = Union{<:Number, <:ArrNum}
 """
-$(DocStringExtensions.TYPEDEF)
+    const PairStrNum = Pair{<:AbstractString, <:Number}
 
 Alias for a pair consisting of an abstract string and a numeric type.
 
@@ -2761,7 +3417,8 @@ Alias for a pair consisting of an abstract string and a numeric type.
 """
 const PairStrNum = Pair{<:AbstractString, <:Number}
 """
-$(DocStringExtensions.TYPEDEF)
+    const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
+                          <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
 
 Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, an accessor lens, or an integer (a step position when tuning a `Pipeline`).
 
@@ -2774,7 +3431,7 @@ Alias for a key type used in grid search cross-validation, which can be an abstr
 const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
                       <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
 """
-$(DocStringExtensions.TYPEDEF)
+    const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
 
 Alias for a value type used in randomised search cross-validation, which can be an abstract vector or a distribution.
 
@@ -2786,7 +3443,7 @@ Alias for a value type used in randomised search cross-validation, which can be 
 """
 const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
 """
-$(DocStringExtensions.TYPEDEF)
+    const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 
 Alias for a pair consisting of an abstract string and an abstract vector.
 
@@ -2797,7 +3454,7 @@ Alias for a pair consisting of an abstract string and an abstract vector.
 """
 const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 """
-$(DocStringExtensions.TYPEDEF)
+    const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 
 Alias for an abstract dictionary with string keys and numeric values.
 
@@ -2808,7 +3465,7 @@ Alias for an abstract dictionary with string keys and numeric values.
 """
 const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 """
-$(DocStringExtensions.TYPEDEF)
+    const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 
 Alias for an abstract dictionary with string keys and abstract vector values.
 
@@ -2844,7 +3501,7 @@ Alias for a union of an abstract dictionary with string keys and abstract vector
 """
 const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
 
 Alias for an abstract vector of `MultiGSCVValType` elements.
 
@@ -2895,7 +3552,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
 
-# Returns
+## Returns
 
   - `val::Num_VecNum`: The numeric or vector of numeric value.
 
@@ -2963,7 +3620,7 @@ Alias for a union of abstract string or Julia expression.
 """
 const Str_Expr = Union{<:AbstractString, Expr}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecStr_Expr = AbstractVector{<:Str_Expr}
 
 Alias for an abstract vector of strings or Julia expressions.
 
@@ -2987,7 +3644,7 @@ Alias for a union of string, Julia expression, or vector of strings/expressions.
 const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr,
                       <:AbstractEstimatorValueAlgorithm}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecVecNum = AbstractVector{<:VecNum}
 
 Alias for an abstract vector of numeric vectors.
 
@@ -2998,7 +3655,7 @@ Alias for an abstract vector of numeric vectors.
 """
 const VecVecNum = AbstractVector{<:VecNum}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecVecInt = AbstractVector{<:VecInt}
 
 Alias for an abstract vector of integer vectors.
 
@@ -3019,7 +3676,7 @@ Alias for a union of an abstract vector of integers or an abstract vector of int
 """
 const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecVecVecInt = AbstractVector{<:VecVecInt}
 
 Alias for an abstract vector of abstract vector of integer vectors.
 
@@ -3029,7 +3686,7 @@ Alias for an abstract vector of abstract vector of integer vectors.
 """
 const VecVecVecInt = AbstractVector{<:VecVecInt}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecMatNum = AbstractVector{<:MatNum}
 
 Alias for an abstract vector of numeric matrices.
 
@@ -3040,7 +3697,7 @@ Alias for an abstract vector of numeric matrices.
 """
 const VecMatNum = AbstractVector{<:MatNum}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecStr = AbstractVector{<:AbstractString}
 
 Alias for an abstract vector of strings.
 
@@ -3051,7 +3708,7 @@ Alias for an abstract vector of strings.
 """
 const VecStr = AbstractVector{<:AbstractString}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecPair = AbstractVector{<:Pair}
 
 Alias for an abstract vector of pairs.
 
@@ -3061,7 +3718,7 @@ Alias for an abstract vector of pairs.
 """
 const VecPair = AbstractVector{<:Pair}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract vector of JuMP scalar types.
 
@@ -3113,7 +3770,7 @@ Alias for a union of a numeric vector or a vector of numeric vectors.
 """
 const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
 """
-$(DocStringExtensions.TYPEDEF)
+    const VecDate = AbstractVector{<:Dates.AbstractTime}
 
 Alias for an abstract vector of date or time types.
 
@@ -3181,7 +3838,7 @@ Get the observation weights for statistical estimation.
 
 This is why call sites need no strictness check of their own. A `DynamicAbstractWeights` is resolved *before* dispatch (see [`average_drawdown`](@ref) for the pattern), so the estimator downstream only ever sees a concrete weight vector or a deliberate `nothing`.
 
-## The returned vector is borrowed, not owned
+# The returned vector is borrowed, not owned
 
 For a `StatsBase.AbstractWeights` this returns **the stored object itself**, not a copy — an estimator's `w` field is handed straight back. So the caller may **read** it but must never **mutate** it: writing through it permutes the estimator's own configuration, and every later evaluation of that estimator is then wrong.
 
@@ -3189,19 +3846,28 @@ This is the same obligation the rest of `src/` already meets: a `reverse!` or a 
 
 A defensive copy here was considered and rejected: it would cost an allocation on every evaluation of every weighted estimator, and the obligation is cheap to keep.
 
+# Algorithm
+
+The method Julia selects on the type of `w` is the algorithm. Three methods share the name, and a fourth is written by the caller.
+
+ 1. `w === nothing` selects the method that returns `nothing`, which is the deliberate request for an unweighted result.
+ 2. A `StatsBase.AbstractWeights`, which is a `VecNum`, selects the method that returns the stored object itself. It allocates nothing, which is why the returned vector is borrowed.
+ 3. A [`DynamicAbstractWeights`](@ref) for which the caller wrote no method selects the fallback, which raises. The fallback builds `shape` from the first positional argument, naming its dimension count and its size when that argument is an array and naming it as "the given input" otherwise, then raises [`ObservationWeightsError`](@ref) carrying `shape` and the two method signatures to write.
+ 4. A [`DynamicAbstractWeights`](@ref) for which the caller wrote a method selects that method instead, because it is more specific than the fallback of step 3.
+
 # Arguments
 
   - $(arg_dict[:oow])
   - $(arg_dict[:ignargs])
   - $(arg_dict[:ignkwargs])
 
+# Validation
+
+  - `w` is `nothing`, a `StatsBase.AbstractWeights`, or a [`DynamicAbstractWeights`](@ref) that has a method for the shape of the given input. A [`DynamicAbstractWeights`](@ref) with no such method raises [`ObservationWeightsError`](@ref), which names the two signatures to write. It never resolves to `nothing`, because that would silently give an unweighted answer that looks plausible.
+
 # Returns
 
   - `w::Option{<:VecNum}`: The observation weights, or `nothing` when `w` is `nothing`.
-
-# Throws
-
-  - [`ObservationWeightsError`](@ref): if `w` is a [`DynamicAbstractWeights`](@ref) with no `get_observation_weights` method for the shape of the given input.
 
 # Related
 
@@ -3237,6 +3903,10 @@ No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
   - `val`: Container to check; one of `AbstractDict`, `VecPair`, or `ArrNum`.
   - `sym`: Symbolic name used in the error message.
 
+# Validation
+
+  - `!isempty(val)`, which raises an [`IsEmptyError`](@ref) naming `sym`.
+
 # Returns
 
   - `nothing`.
@@ -3263,6 +3933,11 @@ No-op overload of [`assert_nonempty`](@ref) for scalar inputs.
 
 Emptiness does not apply to `Pair` or `Number` values.
 
+# Arguments
+
+  - `::Union{<:Pair, <:Number}`: Scalar value, not read.
+  - `::Sym_Str = :val`: Symbolic name, not read.
+
 # Returns
 
   - `nothing`.
@@ -3279,18 +3954,24 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that `val` contains at least one finite element.
 
-Dispatches on the input type:
+# Algorithm
 
-  - `AbstractDict`: `any(isfinite, values(val))`.
-  - `VecPair`: `any(isfinite, getindex.(val, 2))`.
-  - `ArrNum`: `any(isfinite, val)`.
-  - `Pair`: `isfinite(val[2])`.
-  - `Number`: `isfinite(val)`.
+The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+
+ 1. An `AbstractDict` checks `any(isfinite, values(val))`, so the keys are not read.
+ 2. A `VecPair` checks `any(isfinite, getindex.(val, 2))`, so the second element of each pair is the value.
+ 3. An `ArrNum` checks `any(isfinite, val)`.
+ 4. A `Pair` checks `isfinite(val[2])`.
+ 5. A `Number` checks `isfinite(val)`.
 
 # Arguments
 
   - `val`: Value to check.
   - `sym`: Symbolic name used in the error message.
+
+# Validation
+
+  - At least one element of `val` is finite, under the predicate that its type selects. A breach raises a `DomainError`.
 
 # Returns
 
@@ -3342,6 +4023,10 @@ Unlike [`assert_finite`](@ref), which only requires *one* finite element, this d
   - `val`: Array to check.
   - `sym`: Symbolic name used in the error message.
 
+# Validation
+
+  - `all(isfinite, val)`, which raises an [`IsNonFiniteError`](@ref). The message carries the count of offending entries and the first offending index, and never a data value.
+
 # Returns
 
   - `nothing`.
@@ -3369,6 +4054,10 @@ Assert that an untrusted sizing integer `val` does not exceed the active [`RESOU
   - `cap`: The active ceiling.
   - `sym`: Symbolic name of the offending field.
   - `knob`: Symbolic name of the [`ResourceLimits`](@ref) field that raises the ceiling.
+
+# Validation
+
+  - `val <= cap`, which raises a `DomainError` naming `val`, `sym`, `cap` and `knob`.
 
 # Returns
 
@@ -3410,9 +4099,18 @@ identical to the old in-place seeding; only the side effect on the caller's stre
   - `rng`: Fallback random number generator, used verbatim when `seed` is `nothing`.
   - `seed`: Optional seed. If set, a private `Random.seed!(copy(rng), seed)` is returned instead of touching `rng`.
 
+# Algorithm
+
+ 1. Return `rng` unchanged when `seed` is `nothing`, so the caller's generator is used as it stands.
+ 2. Otherwise copy `rng`, reseed the copy with `seed`, and return the copy. The caller's own generator is never mutated.
+
 # Returns
 
   - `Random.AbstractRNG`: the generator to draw from.
+
+# Related
+
+  - [`assert_resource_cap`](@ref)
 """
 function resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
     return isnothing(seed) ? rng : Random.seed!(copy(rng), seed)
@@ -3422,18 +4120,24 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that all elements of `val` are non-negative (`>= 0`).
 
-Dispatches on the input type:
+# Algorithm
 
-  - `AbstractDict`: `all(x -> 0 <= x, values(val))`.
-  - `VecPair`: `all(x -> 0 <= x[2], val)`.
-  - `ArrNum`: `all(x -> 0 <= x, val)`.
-  - `Pair`: `0 <= val[2]`.
-  - `Number`: `0 <= val`.
+The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+
+ 1. An `AbstractDict` checks `all(x -> 0 <= x, values(val))`, so the keys are not read.
+ 2. A `VecPair` checks `all(x -> 0 <= x[2], val)`, so the second element of each pair is the value.
+ 3. An `ArrNum` checks `all(x -> 0 <= x, val)`.
+ 4. A `Pair` checks `0 <= val[2]`.
+ 5. A `Number` checks `0 <= val`.
 
 # Arguments
 
   - `val`: Value to check.
   - `sym`: Symbolic name used in the error message.
+
+# Validation
+
+  - Every element of `val` is non-negative, under the predicate that its type selects. A breach raises a `DomainError`.
 
 # Returns
 
@@ -3475,18 +4179,24 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that all elements of `val` are strictly positive (`> 0`).
 
-Dispatches on the input type:
+# Algorithm
 
-  - `AbstractDict`: `all(x -> 0 < x, values(val))`.
-  - `VecPair`: `all(x -> 0 < x[2], val)`.
-  - `ArrNum`: `all(x -> 0 < x, val)`.
-  - `Pair`: `0 < val[2]`.
-  - `Number`: `0 < val`.
+The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+
+ 1. An `AbstractDict` checks `all(x -> 0 < x, values(val))`, so the keys are not read.
+ 2. A `VecPair` checks `all(x -> 0 < x[2], val)`, so the second element of each pair is the value.
+ 3. An `ArrNum` checks `all(x -> 0 < x, val)`.
+ 4. A `Pair` checks `0 < val[2]`.
+ 5. A `Number` checks `0 < val`.
 
 # Arguments
 
   - `val`: Value to check.
   - `sym`: Symbolic name used in the error message.
+
+# Validation
+
+  - Every element of `val` is strictly positive, under the predicate that its type selects. A breach raises a `DomainError`.
 
 # Returns
 
@@ -3533,6 +4243,10 @@ Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
   - `val`: Value to check.
   - `sym`: Symbolic name used in the error message.
 
+# Validation
+
+  - `0 < val < 1`, which raises a `DomainError` naming `sym` and `val`.
+
 # Returns
 
   - `nothing`.
@@ -3559,6 +4273,10 @@ Source selectors pick which of the two carriers a matrix is read from: `:prior` 
   - `src`: Selector to check.
   - `sym`: Symbolic name used in the error message.
 
+# Validation
+
+  - `src in (:prior, :data)`, which raises an `ArgumentError` naming `sym` and `src`.
+
 # Returns
 
   - `nothing`.
@@ -3583,25 +4301,30 @@ end
 
 Validate that the input value is non-empty, non-negative and finite.
 
+# Algorithm
+
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_nonneg`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
+ 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+
 # Arguments
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
 
+# Validation
+
+Each rule is the one that `val`'s own type selects in the three functions of step 1.
+
+  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+  - `::Number`: `isfinite(val)` and `val >= 0`.
+  - Any other type: no rule, so the call always passes.
+
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-      + `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
-      + `::Number`: `isfinite(val)` and `val >= 0`.
-      + `args...`: Always passes.
 
 # Related
 
@@ -3631,25 +4354,30 @@ end
 
 Validate that the input value is non-empty, greater than zero, and finite.
 
+# Algorithm
+
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_gt0`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
+ 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+
 # Arguments
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
 
+# Validation
+
+Each rule is the one that `val`'s own type selects in the three functions of step 1.
+
+  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+  - `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
+  - `::Number`: `isfinite(val)` and `val > 0`.
+  - Any other type: no rule, so the call always passes.
+
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
-      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
-      + `::Number`: `isfinite(val)` and `val > 0`.
-      + `args...`: Always passes.
 
 # Related
 
@@ -3679,25 +4407,30 @@ end
 
 Validate that the input value is non-empty and finite.
 
+# Algorithm
+
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
+ 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+
 # Arguments
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
 
+# Validation
+
+Each rule is the one that `val`'s own type selects in the two functions of step 1.
+
+  - `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
+  - `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
+  - `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
+  - `::Pair`: `isfinite(val[2])`.
+  - `::Number`: `isfinite(val)`.
+  - Any other type: no rule, so the call always passes.
+
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
-      + `::Pair`: `isfinite(val[2])`.
-      + `::Number`: `isfinite(val)`.
-      + `args...`: Always passes.
 
 # Related
 
@@ -3727,19 +4460,16 @@ Assert that the input matrix is square.
 
 # Validation
 
-  - `size(X, 1) == size(X, 2)`.
+  - `size(X, 1) == size(X, 2)`, which raises a `DimensionMismatch` naming `X_sym` and both sizes.
 
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - Throws `DimensionMismatch` if the check fails.
-
 # Related
 
   - [`MatNum`](@ref)
+  - [`assert_dims`](@ref)
 """
 function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     @argcheck(size(X, 1) == size(X, 2),
@@ -3756,17 +4486,18 @@ Assert that `dims` selects a valid matrix dimension (`dims in (1, 2)`).
   - `dims`: Dimension selector to check.
   - `sym`: Symbolic name used in the error message.
 
+# Validation
+
+  - `dims in (1, 2)`, which raises a `DomainError` naming `sym` and `dims`.
+
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - Throws `DomainError` if `dims ∉ (1, 2)`.
-
 # Related
 
   - [`assert_matrix_issquare`](@ref)
+  - [`dims_oriented`](@ref)
 """
 function assert_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
     @argcheck(dims in (1, 2),
@@ -3777,6 +4508,14 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate `dims` and return the matrices with the observations along the rows.
+
+The guard and the orientation are one call, so a caller cannot orient a matrix without validating `dims`. This is the single decision point: a leaf that spelled the guard and the `transpose` by hand could omit the guard and answer a `dims` of `3` with the raw input.
+
+# Algorithm
+
+ 1. Validate `dims` with [`assert_dims`](@ref).
+ 2. Return each matrix untouched when `dims` is `1`, because the observations already lie along the rows.
+ 3. Return the `transpose` of each matrix when `dims` is `2`. A `nothing` passes through unchanged.
 
 # Arguments
 
@@ -3791,11 +4530,6 @@ Validate `dims` and return the matrices with the observations along the rows.
 
   - `A`: The oriented matrix, when one matrix is given.
   - `(A, B, Cs...)`: A tuple of the oriented matrices, when more than one is given.
-
-# Details
-
-  - `dims == 1` returns the input untouched. `dims == 2` returns its `transpose`.
-  - The guard and the orientation are one call, so a caller cannot orient a matrix without validating `dims`. This is the single decision point: a leaf that spelled the guard and the `transpose` by hand could omit the guard and answer a `dims` of `3` with the raw input.
 
 # Related
 
@@ -3935,11 +4669,11 @@ Second-order cone (SOC) norm-based error formulation.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_l2])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - $(math_dict[:d_ddof])
 
 The source states the denominator as ``\\sqrt{T}``. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the source.
 
@@ -4000,6 +4734,8 @@ Second-order cone (SOC) squared norm-based error formulation.
 
 `SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
 
+The value is the square of the [`L2Norm`](@ref) error, so a `settings.ub` on a [`TrackingRiskMeasure`](@ref) carries squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
+
 # Mathematical definition
 
 ```math
@@ -4010,11 +4746,11 @@ Second-order cone (SOC) squared norm-based error formulation.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_l2sq])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - $(math_dict[:d_ddof])
 
 # Fields
 
@@ -4031,10 +4767,6 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 <= ddof`.
-
-# Details
-
-  - The value is the square of the [`L2Norm`](@ref) error. A `settings.ub` on a [`TrackingRiskMeasure`](@ref) therefore carries squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
 
 # Examples
 
@@ -4087,9 +4819,9 @@ Norm-one (NOC) error formulation.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_l1])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
 
 # Constructors
@@ -4134,12 +4866,12 @@ L-p norm error estimator.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_lp])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
-  - ``p``: Norm order.
+  - $(math_dict[:d_ddof])
+  - $(math_dict[:p_norm_order])
 
 # Fields
 
@@ -4153,12 +4885,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 <= ddof`.
-
-# Details
-
-  - The constructor does not bound `p`. The JuMP model does: both `set_risk_constraints!` and `set_tracking_error_constraints!` need `1 < p` for the power cone, and throw a `DomainError` otherwise. The functor accepts any `p` that `LinearAlgebra.norm` accepts.
-  - `norm_factor` computes the divisor with `cbrt` when `p == 3`, the default.
+  - `0 <= ddof`. The constructor does not bound `p`. The JuMP model does: both `set_risk_constraints!` and `set_tracking_error_constraints!` need `1 < p` for the power cone, and raise a `DomainError` otherwise. The functor accepts any `p` that `LinearAlgebra.norm` accepts.
 
 # Examples
 
@@ -4213,11 +4940,11 @@ L-infinity norm (maximum absolute deviation) error estimator.
 
 Where:
 
-  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_linf])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - $(math_dict[:d_ddof])
 
 # Fields
 
@@ -4290,11 +5017,23 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 Where:
 
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:te_l2])
+  - $(math_dict[:te_l2sq])
+  - $(math_dict[:te_l1])
+  - $(math_dict[:te_lp])
+  - $(math_dict[:te_linf])
+  - $(math_dict[:a_norm_err])
+  - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`.
-  - ``p``: Norm order.
+  - $(math_dict[:d_ddof])
+  - $(math_dict[:p_norm_order])
+
+# Algorithm
+
+The method Julia selects on the type of `f` is the algorithm, and every method runs the same two steps.
+
+ 1. Take the norm that `f` names, of `a - b` in the three-argument form and of `a` alone in the two-argument form.
+ 2. Divide the norm of step 1 by [`norm_factor`](@ref) of the same `f` and `T`, which is `1` when `T` is `nothing`.
 
 # Arguments
 
@@ -4306,10 +5045,6 @@ Where:
 # Returns
 
   - `err::Number`: Norm-based tracking error.
-
-# Details
-
-  - The norm is divided by [`norm_factor`](@ref), which is `1` when `T` is `nothing`.
 
 # Examples
 
@@ -4340,6 +5075,17 @@ Compute the denominator that scales a norm in [`norm_error`](@ref).
 
 The factor is the single place where the optional observation count `T` is turned into a divisor. Each [`NormError`](@ref) declares its own factor, and the `T === nothing` case is a method, not a branch inside one. A branch is what let `ifelse` evaluate `T - f.ddof` on the `nothing` path.
 
+# Algorithm
+
+The method Julia selects on the types of `f` and `T` is the algorithm. A `T` of `nothing` selects the method that returns `1`, so the `nothing` case is a method and never a branch inside one.
+
+ 1. `f === nothing` gives `sqrt(T)`, the unweighted L2 factor.
+ 2. [`L2Norm`](@ref) gives `sqrt(T - f.ddof)`.
+ 3. [`SquaredL2Norm`](@ref) gives `T - f.ddof`.
+ 4. [`L1Norm`](@ref) gives `T`, because that norm carries no degrees of freedom.
+ 5. [`LpNorm`](@ref) gives `(T - f.ddof)^(1/f.p)`, taken with `cbrt` when `f.p` is `3`, the default.
+ 6. [`LInfNorm`](@ref) gives `T - f.ddof`.
+
 # Arguments
 
   - `f`: Norm-based error algorithm, a [`NormError`](@ref) subtype. `nothing` means an unweighted L2 norm.
@@ -4348,15 +5094,6 @@ The factor is the single place where the optional observation count `T` is turne
 # Returns
 
   - `factor::Number`: Divisor for the norm. It is `1` when `T` is `nothing`.
-
-# Details
-
-  - `nothing`: `sqrt(T)`.
-  - [`L2Norm`](@ref): `sqrt(T - f.ddof)`.
-  - [`SquaredL2Norm`](@ref): `T - f.ddof`.
-  - [`L1Norm`](@ref): `T`.
-  - [`LpNorm`](@ref): `(T - f.ddof)^(1/f.p)`, computed with `cbrt` when `f.p == 3`.
-  - [`LInfNorm`](@ref): `T - f.ddof`.
 
 # Examples
 

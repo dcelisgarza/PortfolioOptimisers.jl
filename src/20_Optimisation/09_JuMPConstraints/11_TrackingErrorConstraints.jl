@@ -31,7 +31,7 @@ Where:
   - $(math_dict[:w_port])
   - ``\\boldsymbol{b}``: Benchmark return vector.
   - $(math_dict[:k_budget])
-  - ``p``: Norm order.
+  - $(math_dict[:p_norm_order])
   - ``c_p``: Norm-specific scaling factor (``T``, ``\\sqrt{T - d}``, etc.).
   - ``\\mathrm{err}``: Tracking error tolerance.
 
