@@ -27,9 +27,10 @@ Sessions run in parallel, so the checkout is not yours alone. Two rules keep the
 
 **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
 Commit there, then rebase onto `dev`, so the merge is a fast-forward that carries only your work.
-Merge into the local `dev`, and push `dev` to `origin`. Do not push the worktree branch, and delete
-it after the merge. Never commit a change you did not make: check `git status` before you stage,
-and stage the files you edited by name rather than with `git add -A`.
+Merge into the local `dev`, and push `dev` to `origin`, never the worktree branch. After the merge,
+leave the worktree with `ExitWorktree`, then delete the branch. Never commit a change you did not
+make: check `git status` before you stage, and stage the files you edited by name rather than with
+`git add -A`.
 
 **Do not edit a file at the same time as another session.** Two sessions can change the same file
 during one ticket, one after the other. Only a simultaneous edit loses work. The session that
