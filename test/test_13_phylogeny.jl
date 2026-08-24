@@ -47,6 +47,98 @@
               PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
         @test AngularSimilarity() isa PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
     end
+    @testset "The similarity sweep of #449" begin
+        #=
+        Each of the five closed forms of `src/09_Distance/04_Similarity.jl` computed by
+        hand and compared, rather than read. The testset above already pins the two the
+        library shipped first; this one covers all five, the element type every branch
+        carries through, the sign that excludes `AngularSimilarity` from the non-negative
+        family, and the `default_similarity` method declared in `05_FeatureDistance.jl`.
+        =#
+        Ds = [0.0 0.25 0.5; 0.25 0.0 1.0; 0.5 1.0 0.0]
+        gse = GeneralExponentialSimilarity(; coef = 2, power = 3)
+        for (sim, hand) in ((MaximumDistanceSimilarity(), ceil(maximum(Ds)^2) .- Ds .^ 2),
+                            (ExponentialSimilarity(), exp.(-Ds)),
+                            (GeneralExponentialSimilarity(), exp.(-Ds)), (gse, exp.(-2 .* Ds .^ 3)),
+                            (ComplementSimilarity(), 1 .- Ds), (AngularSimilarity(), cos.(pi .* Ds)))
+            @test PortfolioOptimisers.distance_to_similarity(sim; D = Ds) == hand
+        end
+        # The ceiling is the maximum squared and then rounded up, taken once as a scalar.
+        @test ceil(maximum(Ds)^2) == 1.0
+        #=
+        Every branch carries the element type of `D` through. `ComplementSimilarity`
+        writes its unit as `one(eltype(D))` and `AngularSimilarity` scales by the
+        `Irrational` `pi` for exactly that reason, so a widening here is a defect in the
+        branch and not in the test.
+        =#
+        D32 = Float32[0.0 0.25; 0.25 0.0]
+        for sim in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                    GeneralExponentialSimilarity(), gse, ComplementSimilarity(),
+                    AngularSimilarity())
+            @test eltype(PortfolioOptimisers.distance_to_similarity(sim; D = D32)) ===
+                  Float32
+        end
+        #=
+        The sign of `AngularSimilarity` is why it is excluded from
+        `AbstractNonNegativeSimilarityMatrixAlgorithm` permanently rather than pending a
+        domain precondition: it crosses zero at `D = 0.5` and is negative above it.
+        =#
+        Dg = [0.0 0.25 0.75; 0.25 0.0 0.5; 0.75 0.5 0.0]
+        Sg = PortfolioOptimisers.distance_to_similarity(AngularSimilarity(); D = Dg)
+        @test Sg[1, 2] > 0
+        @test isapprox(Sg[2, 3], 0; atol = 1e-15)
+        @test Sg[1, 3] < 0
+        @test !(AngularSimilarity() isa
+                PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm)
+        for sim in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                    GeneralExponentialSimilarity(), ComplementSimilarity())
+            @test sim isa PortfolioOptimisers.AbstractNonNegativeSimilarityMatrixAlgorithm
+        end
+        #=
+        `MaximumDistanceSimilarity` is `NaN` at a non-finite entry and `Inf` everywhere
+        else, which is the whole reason `assert_similarity_domain` refuses it there.
+        =#
+        Sinf = PortfolioOptimisers.distance_to_similarity(MaximumDistanceSimilarity();
+                                                          D = [0.0 Inf; Inf 0.0])
+        @test all(isnan, [Sinf[1, 2], Sinf[2, 1]])
+        @test all(isinf, [Sinf[1, 1], Sinf[2, 2]])
+        # `ExponentialSimilarity` takes an infinite distance, where `exp(-Inf)` is 0.
+        @test PortfolioOptimisers.distance_to_similarity(ExponentialSimilarity();
+                                                         D = [0.0 Inf; Inf 0.0]) ==
+              [1.0 0.0; 0.0 1.0]
+        # The fallback of `assert_similarity_domain` is a no-op on that same matrix.
+        @test isnothing(PortfolioOptimisers.assert_similarity_domain(ExponentialSimilarity(),
+                                                                     Distance(),
+                                                                     [0.0 Inf; Inf 0.0]))
+        #=
+        `default_similarity` speaks for both of its methods. The `AngularDist` method is
+        declared in `src/09_Distance/05_FeatureDistance.jl`, beside the metric; the
+        docstring lives in `04_Similarity.jl` and states the branch.
+        =#
+        @test PortfolioOptimisers.default_similarity(AngularDist()) === AngularSimilarity()
+        #=
+        The pairing trap both warnings name, to the numbers they quote. `SimpleDistance`
+        shares the `[0, 1]` range of an angular distance, so nothing can detect the
+        mispairing: `0.706` is a perfectly legal bounded distance.
+        =#
+        dtrap = sqrt((1 - 0.003) / 2)
+        @test isapprox(dtrap, 0.706; atol = 5e-4)
+        @test isapprox(1 - dtrap, 0.29; atol = 5e-3)
+        @test isapprox(cos(pi * dtrap), -0.603; atol = 5e-4)
+        #=
+        `AngularSimilarity` against `AngularDist` is the one pairing that is exact: it is
+        the algebraic inverse, so the recovered cosine matches the one computed from the
+        features themselves.
+        =#
+        rngs = StableRNG(123)
+        Xf = randn(rngs, 200, 8)
+        cosf = [dot(Xf[:, i], Xf[:, j]) / (norm(Xf[:, i]) * norm(Xf[:, j]))
+                for i in 1:8, j in 1:8]
+        Daf = PortfolioOptimisers.Distances.pairwise(AngularDist(), Xf; dims = 2)
+        @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                  D = Daf), cosf;
+                       atol = 1e-14)
+    end
     @testset "Non-negative similarity interface (#239)" begin
         nonneg = (MaximumDistanceSimilarity(), ExponentialSimilarity(),
                   GeneralExponentialSimilarity(), ComplementSimilarity())

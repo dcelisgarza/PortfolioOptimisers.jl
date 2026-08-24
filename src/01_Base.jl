@@ -888,6 +888,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Pairwise distance and correlation.
                        :d_ij_dist => "``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.",#
                        :rho_ij => "``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.",#
+                       :D_mat_dist => "``\\mathbf{D}``: Distance matrix.",#
                        # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                        :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
                        :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#

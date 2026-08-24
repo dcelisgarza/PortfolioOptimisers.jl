@@ -1095,6 +1095,80 @@
         @test_throws DomainError Distance(; power = 0)
         @test_throws DomainError Distance(; power = -2)
     end
+    @testset "The distance-of-distances sweep of #449" begin
+        #=
+        Every claim `src/09_Distance/03_DistanceDistance.jl` makes, pinned by running it:
+        both entry points against the two steps computed by hand, the agreement of
+        `cor_and_dist` with `distance`, the `CanonicalDistance` redirect inside step 1, the
+        `power = 1` identity, and the `args`/`kwargs` fields that no test had reached.
+        =#
+        Dist = PortfolioOptimisers.Distances
+        rngdd = StableRNG(987)
+        Xd = randn(rngdd, 300, 6)
+        ced = PortfolioOptimisersCovariance()
+        Cd = cor(ced, Xd)
+        # --- step 1 then step 2, by hand, on both entry points ---
+        for (power, alg) in
+            ((nothing, SimpleDistance()), (2, SimpleAbsoluteDistance()), (3, LogDistance()),
+             (nothing, CorrelationDistance()))
+            dd = DistanceDistance(; power = power, alg = alg)
+            base = Distance(; power = power, alg = alg)
+            @test distance(dd, ced, Xd) ==
+                  Dist.pairwise(Dist.Euclidean(), distance(base, ced, Xd))
+            @test distance(dd, Cd) == Dist.pairwise(Dist.Euclidean(), distance(base, Cd))
+            # `cor_and_dist` returns the base estimator's own correlation beside the
+            # matrix `distance` returns for the same arguments.
+            rhod, Dd = cor_and_dist(dd, ced, Xd)
+            @test Dd == distance(dd, ced, Xd)
+            @test rhod == cor(ced, Xd)
+        end
+        # --- the `metric` field reaches `pairwise`, and changes the answer ---
+        Db = distance(Distance(), Cd)
+        ddm = DistanceDistance(; metric = Dist.Minkowski(3.0))
+        @test distance(ddm, Cd) == Dist.pairwise(Dist.Minkowski(3.0), Db)
+        @test distance(ddm, Cd) != distance(DistanceDistance(), Cd)
+        #=
+        `args` and `kwargs` are fields of the estimator and they reach `pairwise` itself.
+        The positional `args...` and `kwargs...` of the method go the other way, to the
+        base distance of step 1, which ignores the positional ones.
+        =#
+        for dims in (1, 2)
+            ddk = DistanceDistance(; kwargs = (; dims = dims))
+            @test distance(ddk, Cd) == Dist.pairwise(Dist.Euclidean(), Db; dims = dims)
+        end
+        # A base distance matrix is symmetric, so which axis `pairwise` reads as the
+        # observation does not change the answer.
+        @test issymmetric(Db)
+        @test Dist.pairwise(Dist.Euclidean(), Db; dims = 1) ==
+              Dist.pairwise(Dist.Euclidean(), Db; dims = 2)
+        # `args` supplies the second matrix `pairwise` takes, where the axis does matter.
+        Bd = Db[:, 1:3]
+        dda = DistanceDistance(; args = (Bd,), kwargs = (; dims = 2))
+        @test distance(dda, Cd) == Dist.pairwise(Dist.Euclidean(), Db, Bd; dims = 2)
+        @test size(distance(dda, Cd)) == (6, 3)
+        # --- the `CanonicalDistance` redirect happens inside step 1 ---
+        cemi = MutualInfoCovariance()
+        ddc = DistanceDistance(; alg = CanonicalDistance())
+        @test distance(ddc, cemi, Xd) == Dist.pairwise(Dist.Euclidean(),
+                                                       distance(Distance(; alg = CanonicalDistance()), cemi, Xd))
+        # There is no covariance estimator on the matrix route, so the redirect table
+        # cannot select a row and its `SimpleDistance` fallback is taken.
+        @test distance(ddc, Cd) == distance(DistanceDistance(; alg = SimpleDistance()), Cd)
+        # --- `power = 1` reproduces the base distance, so it equals `power = nothing` ---
+        @test distance(DistanceDistance(; power = 1), Cd) ==
+              distance(DistanceDistance(; power = nothing), Cd)
+        @test distance(DistanceDistance(; power = 2), Cd) !=
+              distance(DistanceDistance(; power = nothing), Cd)
+        # --- the constructor refuses a power below one ---
+        @test_throws DomainError DistanceDistance(; power = 0)
+        @test_throws DomainError DistanceDistance(; power = -2)
+        #=
+        The Euclidean norm of two columns of a bounded distance matrix is not itself
+        bounded by one, which is why `ComplementSimilarity` is out of domain against this
+        estimator's own default.
+        =#
+        @test maximum(distance(DistanceDistance(), Cd)) > 1
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`
