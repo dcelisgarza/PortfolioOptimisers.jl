@@ -93,7 +93,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - Keep commits atomic and rebase on `main` before PR.
 - **Releases:**
 
-  - Use a `release-x.y.z` branch, update `Project.toml` and `CHANGELOG.md`, and follow the release checklist in `2-developer.md`.
+  - Use a `release-x.y.z` branch, update `Project.toml`, and follow the release checklist in `2-developer.md`.
 
 ## Integration & Dependencies
 

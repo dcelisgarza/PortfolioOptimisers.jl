@@ -228,18 +228,6 @@
                                "rendered by CI from " *
                                "`examples/**/*.jl`; never committed")
 
-    #=
-    A path that a standards file cites and that does not exist. `CHANGELOG.md` is the only
-    one: the release checklist in `docs/src/contribute/2-developer.md` carries a four-step
-    procedure for a file this repository has never held, and
-    `.github/copilot-instructions.md` repeats the instruction. Whether to start a changelog
-    or to drop the step is the maintainer's call, so #486 asks it rather than deciding here.
-    Remove this entry when #486 closes: under either answer nothing is left to allow.
-    =#
-    known_dead_paths = Dict("CHANGELOG.md" =>
-                                "no changelog exists; #486 asks whether to " *
-                                "start one or to drop the step")
-
     # ----------------------------------------------------------------- the span reader
 
     #=
@@ -322,7 +310,6 @@
     for (s, sites) in citations
         is_path_citation(s) || continue
         has_placeholder(s) && continue
-        haskey(known_dead_paths, s) && continue
         haskey(generated_paths, s) && continue
         path_resolves(s) || push!(dead_paths, "$s  cited by  " * join(sites, ", "))
     end

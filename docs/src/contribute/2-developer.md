@@ -226,12 +226,6 @@ To create a new release, you can follow these simple steps:
 - Create a branch `release-x.y.z`
 
 - Update `version` in `Project.toml`
-- Update the `CHANGELOG.md`:
-
-  - Rename the section "Unreleased" to "[x.y.z] - yyyy-mm-dd" (i.e., version under brackets, dash, and date in ISO format)
-  - Add a new section on top of it named "Unreleased"
-  - Add a new link in the bottom for version "x.y.z"
-  - Change the "[unreleased]" link to use the latest version - end of line, `vx.y.z ... HEAD`.
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.
 - Go back to main screen and click on the latest commit (link: [https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main](https://github.com/dcelisgarza/PortfolioOptimisers.jl/commit/main))
 - At the bottom, write `@JuliaRegistrator register`
