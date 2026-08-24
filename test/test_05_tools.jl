@@ -305,11 +305,12 @@ end
     @test PO.vec_to_real_measure(StdValue(; w = aweights(wv), corrected = true), t) ==
           sqrt(10 / 7)
     #=
-    Issue #444. A plain `Weights` with the default `corrected = true` raises at the reduction,
-    not at the constructor, and `factory` reaches the same state with no `StdValue` in the
-    caller's hand: it replaces the `w` of the default `sv = StdValue()` and leaves `corrected`
-    at `true`. Pinned as the behaviour that ships, so the day #444 settles this test names the
-    site that changes.
+    Issue #444, settled by ADR 0087. A plain `Weights` with the default `corrected = true`
+    raises at the reduction, not at the constructor, and `factory` reaches the same state with
+    no `StdValue` in the caller's hand: it replaces the `w` of the default `sv = StdValue()`
+    and leaves `corrected` at `true`. This is the behaviour that ships. The library writes one
+    bias-correction default rather than deferring to the callee's, because upstream carries no
+    single default to defer to.
     =#
     @test_throws ArgumentError PO.vec_to_real_measure(StdValue(; w = weights(wv)), v)
     @test_throws ArgumentError PO.vec_to_real_measure(VarValue(; w = weights(wv)), v)
@@ -318,6 +319,39 @@ end
     # The same call with a weights type that does support the correction answers a number.
     @test PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
           wm / sqrt(10 / 7)
+    #=
+    ADR 0087, the consistency the written default buys. The variance path and the covariance
+    path answer the same number over the same data, on both branches, and they refuse a plain
+    `Weights` together. `GeneralCovariance` reaches that agreement only because it writes
+    `StatsBase.SimpleCovariance(; corrected = true)`: that estimator's own default is `false`,
+    and under it the unweighted covariance would leave the unweighted variance.
+    =#
+    Xm = hcat(v, reverse(v))
+    aw = aweights(wv)
+    @test isapprox(var(SimpleVariance(), Xm)[1], cov(GeneralCovariance(), Xm)[1, 1])
+    @test isapprox(var(factory(SimpleVariance(), aw), Xm)[1],
+                   cov(factory(GeneralCovariance(), aw), Xm)[1, 1])
+    @test_throws ArgumentError cov(factory(GeneralCovariance(), weights(wv)), Xm)
+    @test_throws ArgumentError var(factory(SimpleVariance(), weights(wv)), Xm)
+    #=
+    The comparison holds only when the mean carries the same weights. `factory` propagates the
+    incoming weights into `me` as well as into `w`, and the covariance always centres on the
+    weighted mean. A `SimpleVariance` built by hand keeps whatever `me` the caller gave it, so
+    `SimpleVariance(; w = aw)` weights the deviations about the UNWEIGHTED mean and leaves the
+    covariance path. That is the `me` field doing its job, not a bias-correction difference.
+    =#
+    @test isapprox(var(SimpleVariance(; me = SimpleExpectedReturns(; w = aw), w = aw), Xm)[1],
+                   cov(GeneralCovariance(; w = aw), Xm)[1, 1])
+    @test !isapprox(var(SimpleVariance(; w = aw), Xm)[1],
+                    cov(GeneralCovariance(; w = aw), Xm)[1, 1])
+    #=
+    The estimator's own default is the one the library declines to inherit. Under it the
+    unweighted covariance leaves the unweighted variance, which is why the written `true` in
+    `GeneralCovariance` is load-bearing rather than redundant.
+    =#
+    @test StatsBase.SimpleCovariance().corrected == false
+    @test !isapprox(cov(GeneralCovariance(; ce = StatsBase.SimpleCovariance()), Xm)[1, 1],
+                    var(SimpleVariance(), Xm)[1])
     # --- The `Function` branch reduces with the function it is given. ---
     @test PO.vec_to_real_measure(sum, v) == 10.0
     @test PO.vec_to_real_measure(sum, t) == 10.0
