@@ -30,12 +30,12 @@ Commit there, then merge into `dev`. Rebase onto `dev` first, so the merge is a 
 your commit carries only your work. Never commit a change you did not make: check `git status`
 before you stage, and stage the files you edited by name rather than with `git add -A`.
 
-**Queue on a file another session holds.** One session edits a file at a time. Before you start,
-read the open tickets that are assigned to someone and take the files each one names. If a file you
-need is on that list, wait for that session to commit and merge, then rebase and start. Do not open
-the file in the meantime.
+**Do not edit a file at the same time as another session.** Two sessions can change the same file
+during one ticket, one after the other. Only a simultaneous edit loses work. The session that
+finishes last commits the common file. That session rebases onto the commit of the session that
+finished first, then adds its own change to the current text.
 
-Three files are shared by every sweep ticket, so the queue rule bites hardest there:
+Three files are shared by every sweep ticket, so this rule bites hardest there:
 
 - `sweep/manifest.toml` — one row per source file.
 - `src/01_Base.jl` — `arg_dict`, `math_dict` and their siblings.
