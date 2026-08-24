@@ -539,6 +539,109 @@
             end
         end
     end
+    @testset "Gerber statistic (#454)" begin
+        # ---- the counting rule, hand-counted -----------------------------------------
+        # Two assets, eight observations, each column already centred exactly, so
+        # `demean_returns` is a no-op and the crossings are the ones written here.
+        #
+        #   row | asset 1 | asset 2 | the pair is
+        #   ----+---------+---------+-------------------
+        #     1 |   up    |   up    | concordant
+        #     2 |   up    |  down   | discordant
+        #     3 |  down   |  down   | concordant
+        #     4 |   up    | neutral | exactly one crossed
+        #     5 | neutral |   up    | exactly one crossed
+        #     6 | neutral | neutral | neither crossed
+        #     7 |  down   |   up    | discordant
+        #     8 |  down   |  down   | concordant
+        #
+        # So nconc = 3, ndisc = 2, nneut = 2 and both are neutral once. Asset 1 crosses on
+        # rows 1, 2, 3, 4, 7, 8 and asset 2 on rows 1, 2, 3, 5, 7, 8, so each diagonal
+        # concordant count is 6.
+        Xh = [2.0 2.0; 2.0 -2.0; -2.0 -2.0; 2.0 0.0; 0.0 2.0; 0.0 0.0; -2.0 2.0; -2.0 -2.0]
+        @test all(iszero, sum(Xh; dims = 1))
+        ceh = GerberCovariance(; t = 0.5, pdm = nothing)
+        sdh = std(ceh.ve, Xh; dims = 1)
+        Uh, Dh = PortfolioOptimisers.gerber_updown(ceh, Xh, sdh)
+        @test Uh == Bool[1 1; 1 0; 0 0; 1 0; 0 1; 0 0; 0 1; 0 0]
+        @test Dh == Bool[0 0; 0 1; 1 1; 0 0; 0 0; 0 0; 1 0; 1 1]
+        # A positive threshold makes the two bands disjoint.
+        @test !any(Uh .& Dh)
+        UmDh = Uh - Dh
+        UpDh = Uh + Dh
+        nconch, ndisch = PortfolioOptimisers.concordance_counts(transpose(UmDh) * UmDh,
+                                                                transpose(UpDh) * UpDh)
+        @test nconch == [6.0 3.0; 3.0 6.0]
+        @test ndisch == [0.0 2.0; 2.0 0.0]
+        # The split is exact: it returns the difference and the sum it was given.
+        @test nconch .- ndisch == transpose(UmDh) * UmDh
+        @test nconch .+ ndisch == transpose(UpDh) * UpDh
+
+        # ---- the three tags give three different matrices ------------------------------
+        rh = Dict(a => cor(GerberCovariance(; t = 0.5, pdm = nothing, alg = a), Xh)
+                  for a in (Gerber0(), Gerber1(), Gerber2()))
+        # Gerber0 divides by nconc + ndisc = 5, Gerber1 by nconc + ndisc + nneut = 7, and
+        # Gerber2 by sqrt(6 * 6) = 6.
+        @test isapprox(rh[Gerber0()][1, 2], 1 / 5)
+        @test isapprox(rh[Gerber1()][1, 2], 1 / 7)
+        @test isapprox(rh[Gerber2()][1, 2], 1 / 6)
+        # Every diagonal is unit: an asset is concordant with itself at every crossing.
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            @test isapprox(diag(rh[a]), ones(2))
+        end
+
+        Xg = randn(StableRNG(454454454), 40, 12)
+        mg = [cor(GerberCovariance(; alg = a, pdm = nothing), Xg)
+              for a in (Gerber0(), Gerber1(), Gerber2())]
+        @test !isapprox(mg[1], mg[2])
+        @test !isapprox(mg[1], mg[3])
+        @test !isapprox(mg[2], mg[3])
+        # Gerber1's denominator carries nneut on top of Gerber0's, so it is never smaller
+        # and the statistic is never larger in magnitude.
+        @test all(abs.(mg[2]) .<= abs.(mg[1]) .+ sqrt(eps()))
+
+        # ---- the threshold's effect at both degenerate ends ----------------------------
+        # A threshold above every observation: nothing crosses, every denominator
+        # vanishes, and the guard in `comovement_ratio` / `standardise_comovement!` returns
+        # the zero matrix rather than a NaN. `posdef!` cannot take that zero diagonal, so
+        # this drives the reduction with `pdm = nothing`.
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            rbig = cor(GerberCovariance(; t = 1e3, pdm = nothing, alg = a), Xg)
+            @test all(isfinite, rbig)
+            @test all(iszero, rbig)
+        end
+        # A zero threshold: every observation whose centred return is not exactly zero
+        # crosses, so no observation is neutral and Gerber0 and Gerber1 coincide.
+        r0lo = cor(GerberCovariance(; t = 0.0, pdm = nothing, alg = Gerber0()), Xg)
+        r1lo = cor(GerberCovariance(; t = 0.0, pdm = nothing, alg = Gerber1()), Xg)
+        @test isapprox(r0lo, r1lo)
+        @test isapprox(diag(r0lo), ones(12))
+        # `t = 0` is the one threshold at which the two bands overlap: `>= 0` and `<= 0`
+        # both hold at an exactly zero return, which double-counts it. `Xh` carries such
+        # returns, and its diagonal is then not unit. See #491.
+        @test !isapprox(diag(cor(GerberCovariance(; t = 0.0, pdm = nothing,
+                                                  alg = Gerber0()), Xh)), ones(2))
+
+        # ---- the cor and cov pair -------------------------------------------------------
+        sdg = vec(std(GerberCovariance().ve, Xg; dims = 1))
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            ceg = GerberCovariance(; alg = a, pdm = nothing)
+            rho = cor(ceg, Xg)
+            sigma = cov(ceg, Xg)
+            @test isapprox(sigma, rho .* (sdg * transpose(sdg)))
+            @test isapprox(diag(sigma), sdg .^ 2)
+            @test isapprox(StatsBase.cov2cor(sigma), rho)
+        end
+
+        # ---- positive definiteness -------------------------------------------------------
+        # A Gerber matrix is a matrix of pairwise votes, so it is not positive definite in
+        # general. `Gerber0` is indefinite on this sample, and `pdm` repairs it.
+        rho_raw = cor(GerberCovariance(; alg = Gerber0(), pdm = nothing), Xg)
+        @test minimum(eigvals(Symmetric(rho_raw))) < 0
+        rho_pdm = cor(GerberCovariance(; alg = Gerber0(), pdm = Posdef()), Xg)
+        @test minimum(eigvals(Symmetric(rho_pdm))) >= 0
+        @test !isapprox(rho_raw, rho_pdm)
+    end
     @testset "GerberIQ region templates" begin
         # gerber_iq_weight maps a co-movement (r_i, r_j) to its region's squeezing weight.
         # Sentinel weights n_k = k/100 (and distinct thresholds) make every region identifiable,

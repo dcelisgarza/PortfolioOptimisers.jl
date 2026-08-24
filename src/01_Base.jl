@@ -980,7 +980,22 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :te_lp => "``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.",#
                        :te_linf => "``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error, the largest absolute deviation.",#
                        # The Range convention (ADR 0057).
-                       :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.")
+                       :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.",#
+                       # The Gerber family. `05_GerberCovariance.jl` states the statistic,
+                       # and `06_SmythBrobyCovariance.jl` and `35_GerberIQCovariance.jl`
+                       # build on the same symbols.
+                       :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
+                       :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero.",#
+                       :sigma_i_asset => "``\\sigma_i``: Standard deviation of asset ``i``.",#
+                       :oslash => "``\\oslash``: Element-wise division.",#
+                       :U_gerber => "``\\mathbf{U} \\in \\{0,1\\}^{T \\times N}``: Up indicator matrix, ``U_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i]``.",#
+                       :D_gerber => "``\\mathbf{D} \\in \\{0,1\\}^{T \\times N}``: Down indicator matrix, ``D_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i]``.",#
+                       :Nneut_gerber => "``\\mathbf{N} \\in \\{0,1\\}^{T \\times N}``: Neutral indicator matrix, ``N_{t,\\,i} = \\mathbf{1}[-t \\, \\sigma_i < x_{t,\\,i} < t \\, \\sigma_i]``. It is the complement of ``\\mathbf{U} + \\mathbf{D}``.",#
+                       :H_gerber => "``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``: Signed crossing matrix. Its entry is ``1`` when the asset crossed upwards, ``-1`` when it crossed downwards, and ``0`` when it did not cross.",#
+                       :Vcross_gerber => "``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``: Crossing matrix. Its entry is ``1`` when the asset crossed its threshold in either direction, and ``0`` when it did not.",#
+                       :nc_gerber => "``n_{c}``: Concordant count of a pair, the observations on which both assets crossed their thresholds in the same direction.",#
+                       :nd_gerber => "``n_{d}``: Discordant count of a pair, the observations on which both assets crossed their thresholds in opposite directions.",#
+                       :nn_gerber => "``n_{n}``: Neutral count of a pair, the observations on which exactly one of the two assets crossed its threshold.")
 """
     ref_dict
 
