@@ -98,7 +98,7 @@ jobs:
           print(f"{len(built)} cells ran, none failed, and the committed cache is current.")
           PY
       - name: Upload the paper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: paper
           path: docs/paper/main.pdf
