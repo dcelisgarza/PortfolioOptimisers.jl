@@ -110,6 +110,11 @@ Where:
 
 Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is equation 6.3 of the source. **The two differ when ties are present**: on `[1.0 1.0; 2.0 1.0; 2.0 3.0; 4.0 4.0; 5.0 2.0]` (one tied pair in each series), ``\\tau_a`` is `0.4` and this method returns `0.4444444444444444`.
 
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Return `StatsBase.corkendall(X)`, the tie-corrected ``\\tau_b`` of every pair of columns. The diagonal is exactly `1`, and no scaling or clamping is applied to the result.
+
 # Arguments
 
   - `ce`: Kendall's tau-based covariance estimator.
@@ -240,6 +245,11 @@ Where:
   - ``\\sigma_{\\mathrm{rk}(\\cdot)}``: Standard deviation of the rank variable.
 
 Without ties this equals the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 1))``, with ``d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})``. **The two differ when ties are present**: on `[1.0 1.0; 2.0 1.0; 2.0 3.0; 4.0 4.0; 5.0 2.0]` (one tied pair in each series), the closed form gives `0.575` and this method returns `0.5526315789473685`.
+
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Return `StatsBase.corspearman(X)`, the Pearson correlation of the mid-ranked columns. The diagonal is exactly `1`, and no scaling or clamping is applied to the result.
 
 # Arguments
 

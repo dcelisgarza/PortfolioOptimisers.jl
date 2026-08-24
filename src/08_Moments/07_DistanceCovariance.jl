@@ -103,7 +103,13 @@ end
 
 Compute pairwise distance matrices between two vectors using the configured metric.
 
-Internal helper used in distance correlation computation. Without weights it applies the metric to `v1` and `v2` directly. With weights it applies the metric to the element-wise products `v1 .* w` and `v2 .* w`, so an observation's weight scales its coordinate before the distance is taken.
+Internal helper used in distance correlation and distance covariance computation.
+
+# Algorithm
+
+ 1. Without weights, apply the estimator's `metric` to `v1` and to `v2` as the caller gave them, and pass `ce.args` and `ce.kwargs` to `Distances.pairwise`.
+ 2. With weights, apply the same metric to the element-wise products `v1 ⊙ w` and `v2 ⊙ w`, so an observation's weight scales its coordinate before the distance is taken.
+ 3. Return the two matrices in the order `(D1, D2)`. Each is ``T \\times T`` for a pair of series of ``T`` observations, and `D1[k, l]` is the distance between observations ``k`` and ``l`` of the same series.
 
 # Arguments
 
@@ -180,6 +186,13 @@ Where:
 
   - ``\\hat{R}_{\\mathrm{dist}}(X, Y)``: Distance correlation between ``X`` and ``Y``.
 
+# Algorithm
+
+ 1. Build the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref), which carries the estimator's metric, its `args`, its `kwargs` and the weights.
+ 2. Doubly centre each matrix: subtract its row means and its column means, then add its grand mean, giving ``\\mathbf{A}`` and ``\\mathbf{B}``.
+ 3. Take the three Frobenius inner products ``\\mathbf{A}:\\mathbf{A}``, ``\\mathbf{A}:\\mathbf{B}`` and ``\\mathbf{B}:\\mathbf{B}``, and divide each by ``n^2``, giving the three squared distance covariances.
+ 4. Return ``\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}`` divided by the square root of the product of the two remaining square roots.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
@@ -194,13 +207,7 @@ Where:
 
 # Returns
 
-  - `rho::Float64`: The computed distance correlation between `v1` and `v2`.
-
-# Details
-
- 1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
- 2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
- 3. Computes the squared distance covariance and normalizes to obtain the distance correlation.
+  - `rho::Float64`: The computed distance correlation between `v1` and `v2`. A series against itself gives exactly `1.0`.
 
 # Related
 
@@ -232,6 +239,12 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 This function computes the distance correlation between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance correlation between two assets.
 
+# Algorithm
+
+ 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The result is indexed by asset and never by observation, so a non-square `X` cannot hide a transposed index.
+ 2. For each column `j`, and for each column `i` at or below `j`, call [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns and write the value into both `rho[i, j]` and `rho[j, i]`. The estimator's `ex` field runs the outer loop.
+ 3. Return the symmetric matrix. Its diagonal is exactly `1.0`, because the pair `(j, j)` is one of the pairs step 2 computes.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
@@ -241,11 +254,6 @@ This function computes the distance correlation between each pair of columns in 
 # Returns
 
   - `rho::Matrix{<:Number}`: Distance correlation matrix.
-
-# Details
-
-  - Iterates over all pairs of columns in `X`, computing the distance correlation for each pair using [`cor_distance(ce, v1, v2)`](@ref).
-  - Parallelizes computation using the estimator's `ex` field.
 
 # Related
 
@@ -269,6 +277,12 @@ end
 
 Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Resolve the estimator's `w` field against the oriented matrix with [`get_observation_weights`](@ref), giving `nothing` for an unweighted estimator.
+ 3. Return [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
@@ -282,7 +296,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations, with a diagonal of exactly `1.0`.
 
 # Examples
 
@@ -340,6 +354,13 @@ Where:
 
 The square root takes no absolute value. It needs none: the doubly-centred V-statistic is non-negative for a metric of strong negative type, which the Euclidean default is.
 
+# Algorithm
+
+ 1. Build the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref), which carries the estimator's metric, its `args`, its `kwargs` and the weights.
+ 2. Doubly centre each matrix: subtract its row means and its column means, then add its grand mean, giving ``\\mathbf{A}`` and ``\\mathbf{B}``.
+ 3. Take the Frobenius inner product ``\\mathbf{A}:\\mathbf{B}`` and divide it by ``n^2``, giving the squared distance covariance.
+ 4. Return the square root of that value. Steps 1 and 2 are those of [`cor_distance`](@ref); this method computes one of the three inner products and takes no ratio.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
@@ -354,13 +375,7 @@ The square root takes no absolute value. It needs none: the doubly-centred V-sta
 
 # Returns
 
-  - `rho::Number`: The computed distance covariance between `v1` and `v2`.
-
-# Details
-
- 1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
- 2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
- 3. Computes the squared distance covariance and returns its square root.
+  - `rho::Number`: The computed distance covariance between `v1` and `v2`. A series against itself gives the distance standard deviation ``\\widehat{\\mathrm{dVar}}^{1/2}(X)``, which is not the sample standard deviation.
 
 # Related
 
@@ -390,6 +405,12 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 This function computes the distance covariance between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance covariance between two assets.
 
+# Algorithm
+
+ 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The result is indexed by asset and never by observation, so a non-square `X` cannot hide a transposed index.
+ 2. For each column `j`, and for each column `i` at or below `j`, call [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns and write the value into both `sigma[i, j]` and `sigma[j, i]`. The estimator's `ex` field runs the outer loop.
+ 3. Return the symmetric matrix. Its diagonal is the distance standard deviation of each asset, because the pair `(j, j)` is one of the pairs step 2 computes.
+
 # Arguments
 
   - `ce`: Distance covariance estimator.
@@ -399,11 +420,6 @@ This function computes the distance covariance between each pair of columns in `
 # Returns
 
   - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
-
-# Details
-
-  - Iterates over all pairs of columns in `X`, computing the distance covariance for each pair using [`cov_distance(ce, v1, v2)`](@ref).
-  - Parallelizes computation using the estimator's `ex` field.
 
 # Related
 
@@ -426,6 +442,14 @@ end
     Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
+
+This method overrides the generic covariance fallback, which [`DistanceCovariance`](@ref) cannot use because it carries no variance estimator field. So the diagonal is the **distance** standard deviation of each asset and not the sample standard deviation, and the matrix that [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns is exactly this matrix rescaled by the square roots of that diagonal.
+
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Resolve the estimator's `w` field against the oriented matrix with [`get_observation_weights`](@ref), giving `nothing` for an unweighted estimator.
+ 3. Return [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
 
 # Arguments
 

@@ -118,6 +118,14 @@ Where:
   - ``x_{ti}``: Return of asset ``i`` at time ``t``.
   - ``\\hat{q}_i``: Empirical ``\\alpha``-quantile of asset ``i``.
 
+# Algorithm
+
+ 1. Set ``k = \\lceil T \\alpha \\rceil``, the number of observations the lower tail holds, and allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so a `k` of zero reaches the caller as zeros and never as uninitialised memory.
+ 2. When `k` is zero, return that zero matrix. `# Validation` states the two cases that reach this branch.
+ 3. Copy `X`, and partially sort each column of the copy about position `k`. Position `k` of the sorted column is the ``k``-th order statistic, which is the empirical ``\\alpha``-quantile of that asset.
+ 4. Build the whole boolean mask, one column at a time: entry `(t, j)` is true when ``x_{tj}`` is at or below the quantile of step 3. The mask is complete before any pair is counted, because the pair loop of step 5 reads a column of lower index than the one it writes.
+ 5. For each pair ``(i, j)`` with ``i \\leq j``, count the observations whose two mask entries are both true, divide that count by `k`, and clamp the ratio to ``[\\sqrt{\\varepsilon},\\, 1]``. Write the clamped value into both `rho[i, j]` and `rho[j, i]`. The executor `ex` runs this loop.
+
 # Arguments
 
   - `X`: Data matrix of asset returns (observations × assets).
@@ -126,17 +134,11 @@ Where:
 
 # Validation
 
-  - `ceil(Int, T * alpha) > 0`. A smaller `alpha` selects no observation, and the function then returns a zero matrix rather than an estimate. [`LowerTailDependenceCovariance`](@ref) rules this out at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`.
+  - `ceil(Int, T * alpha) > 0`. The count is zero in exactly two cases, and the function then returns a zero matrix rather than an estimate: `alpha` is exactly `0`, or `X` carries no observation. **No small positive `alpha` reaches this branch.** `ceil` of any positive real is at least `1`, so `alpha = nextfloat(0.0)` on a matrix of one or more observations still selects one observation. [`LowerTailDependenceCovariance`](@ref) rules the first case out at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
-
-# Details
-
-For each pair of assets `(i, j)`, the LTD is estimated as the proportion of observations where both asset `i` and asset `j` have returns less than or equal to their respective empirical `alpha`-quantiles, divided by the number of observations in the lower tail (`ceil(Int, T * alpha)`, where `T` is the number of observations).
-
-The resulting matrix is symmetric and all values are clamped to `[sqrt(eps(eltype(X))), 1]`. The lower bound is deliberate: it keeps an entry usable as a divisor.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`. The diagonal is exactly `1`, and every entry lies in ``[\\sqrt{\\varepsilon},\\, 1]``.
 
 # Related
 
@@ -177,7 +179,12 @@ end
 
 Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
-This method computes the lower tail dependence (LTD) correlation matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD correlation quantifies the probability that pairs of assets experience joint drawdowns or adverse events, as measured by their co-movement in the lower tail.
+This method computes the lower tail dependence (LTD) correlation matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD correlation quantifies the probability that pairs of assets experience joint drawdowns or adverse events, as measured by their co-movement in the lower tail. The estimator's `ve` field is read by the generic covariance fallback and not by this method.
+
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
+ 2. Return [`lower_tail_dependence`](@ref) of the oriented matrix, called with the estimator's `alpha` and its executor `ex`.
 
 # Arguments
 
