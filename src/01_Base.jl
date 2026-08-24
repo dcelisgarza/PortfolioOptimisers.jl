@@ -945,6 +945,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :d_ij_dist => "``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.",#
                        :rho_ij => "``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.",#
                        :D_mat_dist => "``\\mathbf{D}``: Distance matrix.",#
+                       # Feature matrices and the collapse of a feature window.
+                       :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
+                       :z_tik_feature => "``z_{t,\\,i,\\,k}``: Feature window entry: feature ``k`` of asset ``i`` at observation ``t``.",#
+                       :zbar_ik_feature => "``\\bar{z}_{i,\\,k}``: Collapsed feature ``k`` of asset ``i``, the aggregate of ``z_{t,\\,i,\\,k}`` over the observation axis.",#
+                       :w_t_obsweight => "``w_{t}``: Observation weight of observation ``t``. An unweighted collapse sets every ``w_{t}`` to ``1``.",#
                        # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                        :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
                        :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#

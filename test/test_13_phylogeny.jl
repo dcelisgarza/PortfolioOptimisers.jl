@@ -574,6 +574,178 @@
             # The 3-D entry point validates the same way.
             @test_throws DomainError distance(de, abs.(randn(rng, 2, 3, 2)); dims = 3)
         end
+        @testset "AngularDist against acos(rho)/pi, computed by hand" begin
+            # The elementwise method's own contract, checked against the closed form rather
+            # than against the other path.
+            Zh = [1.0 0.0; 0.0 1.0; 1.0 1.0; -1.0 1.0]
+            for i in 1:4, j in 1:4
+                a = Zh[i, :]
+                b = Zh[j, :]
+                rho = dot(a, b) / (norm(a) * norm(b))
+                @test isapprox(AngularDist()(a, b), acos(clamp(rho, -1, 1)) / pi;
+                               atol = 1e-14)
+            end
+            #=
+            The two paths part on the diagonal, and the gemm path is the correct one there.
+            `acos` has an infinite derivative at 1, so the cosine of a vector with itself
+            rounding to 0.9999999999999999 becomes a 1e-8 error in the distance. The gemm
+            path writes an exact zero instead. This is the measurement the `AngularDist`
+            docstring's `# Algorithm` section states.
+            =#
+            Zd = randn(rng, 8, 5)
+            Dg = DS.pairwise(AngularDist(), Zd; dims = 1)
+            @test all(iszero, diag(Dg))
+            self = [AngularDist()(Zd[i, :], Zd[i, :]) for i in 1:8]
+            @test maximum(self) <= 6.707879276254074e-9
+            @test any(!iszero, self)
+            offg = [Dg[i, j] for i in 1:8, j in 1:8 if i != j]
+            offe = [AngularDist()(Zd[i, :], Zd[j, :]) for i in 1:8, j in 1:8 if i != j]
+            @test maximum(abs.(offg .- offe)) <= 1e-14
+        end
+        @testset "The four collapse algorithms against a hand-built answer" begin
+            #=
+            Three axes of different lengths: 4 observations, 5 assets, 3 features. A cubic
+            array hides a permuted axis. `Euclidean` is non-linear in the features, so
+            `AggregateFeatures` and `AggregateDistances` cannot agree by accident.
+            =#
+            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            metric = DS.Euclidean()
+            de(alg) = FeatureDistance(; metric = metric, alg = alg)
+            # `LastObservation` takes the last slice of the observation axis.
+            @test isapprox(distance(de(LastObservation()), Zc),
+                           DS.pairwise(metric, Zc[4, :, :]; dims = 1))
+            # `AggregateFeatures` collapses the features, then measures once.
+            Zm = [mean(Zc[:, j, k]) for j in 1:5, k in 1:3]
+            @test isapprox(distance(de(AggregateFeatures()), Zc),
+                           DS.pairwise(metric, Zm; dims = 1))
+            Zmed = [median(Zc[:, j, k]) for j in 1:5, k in 1:3]
+            @test isapprox(distance(de(AggregateFeatures(; alg = MedianCollapse())), Zc),
+                           DS.pairwise(metric, Zmed; dims = 1))
+            # `AggregateDistances` measures every observation, then collapses the matrices.
+            Dad = mean([DS.pairwise(metric, Zc[t, :, :]; dims = 1) for t in 1:4])
+            @test isapprox(distance(de(AggregateDistances()), Zc), Dad)
+            # `StackObservations` concatenates the window into one vector per asset.
+            Zst = PortfolioOptimisers.stack_observations(Zc, 1)
+            @test size(Zst) == (5, 12)
+            Zst_hand = Matrix{Float64}(undef, 5, 12)
+            for j in 1:5
+                Zst_hand[j, :] = vec(permutedims(Zc, (2, 1, 3))[j, :, :])
+            end
+            @test Zst == Zst_hand
+            @test isapprox(distance(de(StackObservations()), Zc),
+                           DS.pairwise(metric, Zst_hand; dims = 1))
+            # The two aggregations differ in *what* they aggregate, so on a non-linear
+            # metric they must give different answers.
+            @test !isapprox(distance(de(AggregateFeatures()), Zc), Dad)
+            # `dims = 2` swaps the two trailing axes, for every rule and both kernels.
+            Zp = permutedims(Zc, (1, 3, 2))
+            @test size(PortfolioOptimisers.stack_observations(Zp, 2)) == (5, 12)
+            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                        StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+                @test isapprox(distance(de(alg), Zp; dims = 2), distance(de(alg), Zc))
+            end
+        end
+        @testset "The weighted collapses, and the weighted median interpolates" begin
+            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            metric = DS.Euclidean()
+            wc = pweights([1.0, 2.0, 3.0, 4.0])
+            # The weighted mean is the convex combination the docstring states.
+            Zm = [sum(wc .* Zc[:, j, k]) / sum(wc) for j in 1:5, k in 1:3]
+            @test isapprox(distance(FeatureDistance(; metric = metric,
+                                                    alg = AggregateFeatures(; w = wc)), Zc),
+                           DS.pairwise(metric, Zm; dims = 1))
+            # `AggregateDistances` weights the matrices and divides by the weight total.
+            Dad = sum(wc[t] .* DS.pairwise(metric, Zc[t, :, :]; dims = 1) for t in 1:4) ./
+                  sum(wc)
+            @test isapprox(distance(FeatureDistance(; metric = metric,
+                                                    alg = AggregateDistances(; w = wc)),
+                                    Zc), Dad)
+            #=
+            `Statistics.median(v, w)` is the StatsBase 0.5-quantile, not an order statistic,
+            so a weighted median need not be an element of the window. Check the collapse
+            against that function rather than against a value of `v`.
+            =#
+            Zmed = [median(Zc[:, j, k], wc) for j in 1:5, k in 1:3]
+            @test isapprox(distance(FeatureDistance(; metric = metric,
+                                                    alg = AggregateFeatures(; w = wc,
+                                                                            alg = MedianCollapse())),
+                                    Zc), DS.pairwise(metric, Zmed; dims = 1))
+            #=
+            A fixed window, so the claim does not rest on a draw. Under `[1, 2, 3, 4]` the
+            weighted median of `[0, 1, 2, 3]` is `11/6`, which lies strictly between the
+            second and the third value and is no element of the window. Under `[4, 3, 2, 1]`
+            it lands on `v[2]`, so interpolation is what the quantile *may* do, not what it
+            always does.
+            =#
+            v = [0.0, 1.0, 2.0, 3.0]
+            @test median(v, pweights([1.0, 2, 3, 4])) ≈ 11 / 6
+            @test median(v, pweights([1.0, 2, 3, 4])) ∉ v
+            @test v[2] < median(v, pweights([1.0, 2, 3, 4])) < v[3]
+            @test median(v, pweights([4.0, 3, 2, 1])) == v[2]
+            # The unweighted median of an even window averages the two central values.
+            @test median(v) ≈ 1.5
+            @test median(v) ∉ v
+        end
+        @testset "The estimator is not mutated by a call" begin
+            # An in-place broadcast on a weight field has written into an estimator in this
+            # library before, so the whole configuration is compared before and after.
+            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            wc = pweights([1.0, 2.0, 3.0, 4.0])
+            for alg in (AggregateFeatures(; w = wc), AggregateDistances(; w = wc),
+                        AggregateFeatures(; w = wc, alg = MedianCollapse()))
+                fde = FeatureDistance(; alg = alg)
+                before = deepcopy(fde)
+                distance(fde, Zc)
+                cor_and_dist(fde, Zc)
+                @test collect(fde.alg.w) == collect(before.alg.w)
+                @test fde.metric === before.metric
+                @test fde.sim === before.sim
+                @test fde.alg.alg === before.alg.alg
+            end
+            # The window itself is read, never written.
+            Zk = copy(Zc)
+            distance(FeatureDistance(; alg = AggregateDistances()), Zc)
+            @test Zc == Zk
+        end
+        @testset "cor_and_dist carries the distance this call produced" begin
+            Zc = abs.(randn(rng, 4, 5, 3)) .+ 0.1
+            for Zin in (Zc[4, :, :], Zc)
+                for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                            StackObservations())
+                    fde = FeatureDistance(; alg = alg)
+                    S, D = cor_and_dist(fde, Zin)
+                    @test D == distance(fde, Zin)
+                    # `AngularSimilarity` is the exact inverse of `AngularDist`.
+                    @test isapprox(S, cos.(pi .* D))
+                end
+            end
+        end
+        @testset "A median collapse of an integer window" begin
+            #=
+            The median of an even window is the mean of two order statistics, so a window
+            of integers has a fractional median. Preallocating the result at the window's
+            element type threw `InexactError` there; the collapse now takes its element
+            type from the values it computes.
+            =#
+            Zi = rand(rng, 1:9, 4, 5, 3)
+            wc = pweights([1.0, 2.0, 3.0, 4.0])
+            for alg in (AggregateFeatures(; alg = MedianCollapse()),
+                        AggregateFeatures(; w = wc, alg = MedianCollapse()))
+                D = distance(FeatureDistance(; alg = alg), Zi)
+                @test eltype(D) === Float64
+                @test issymmetric(D)
+                @test !any(isnan, D)
+            end
+            @test eltype(PortfolioOptimisers.collapse_features(MedianCollapse(), Zi,
+                                                               nothing)) === Float64
+            # A window whose median stays inside its own type keeps that type.
+            @test eltype(PortfolioOptimisers.collapse_features(MedianCollapse(),
+                                                               Float32.(Zi), nothing)) ===
+                  Float32
+            @test eltype(PortfolioOptimisers.collapse_features(MedianCollapse(),
+                                                               Rational{Int}.(Zi), nothing)) ===
+                  Rational{Int}
+        end
         @testset "FeatureDistance is a distance estimator" begin
             # It is a peer of `Distance`/`DistanceDistance`, not one of their algorithms:
             # every consumer types its `de` field as `AbstractDistanceEstimator`.

@@ -92,7 +92,7 @@
 "src/09_Distance/02_Distance.jl" = { map = 2, units = 13, algorithm = 8, swept = true }
 "src/09_Distance/03_DistanceDistance.jl" = { map = 2, units = 4, algorithm = 3, swept = true }
 "src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, algorithm = 8, swept = true }
-"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, swept = false }
+"src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, algorithm = 20, swept = true }
 "src/10_JuMPModelOptimisation.jl" = { map = 10, units = 12, swept = false }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, swept = false }
 "src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, swept = false }
