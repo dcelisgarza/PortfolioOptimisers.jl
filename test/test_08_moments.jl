@@ -262,6 +262,23 @@
         @test !isapprox(var(vew, rd.X; dims = 1),
                         var(SimpleVariance(; me = nothing, corrected = false), rd.X;
                             dims = 1))
+        #=
+        ADR 0088, #490. `w` weights the whole estimate, so the centre carries the same
+        weights as the deviations. The divisor block below pins the numbers on three
+        observations. These four pin the routes: the standard deviation as well as the
+        variance, the estimator that `factory` builds, the `SimpleVariance{Nothing}` method
+        that builds its own centring estimator, and the unweighted path that did not move.
+        =#
+        let v490 = rd.X[:, 1], X490 = reshape(rd.X[:, 1], :, 1), aw490 = aweights(ew)
+            ve490 = SimpleVariance(; w = aw490)
+            @test isapprox(std(ve490, X490; dims = 1)[1], std(ve490, v490))
+            @test isapprox(var(factory(SimpleVariance(), aw490), X490; dims = 1)[1],
+                           var(ve490, v490))
+            @test isapprox(var(SimpleVariance(; me = nothing, w = aw490), X490; dims = 1)[1],
+                           var(ve490, v490))
+            @test isapprox(var(SimpleVariance(), X490; dims = 1)[1],
+                           var(SimpleVariance(), v490))
+        end
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
@@ -1201,13 +1218,19 @@
         #=
         The vector methods leave the centring to `Statistics`, so a weighted vector is
         centred on its weighted mean. The matrix methods take the centre from `ve.me`
-        instead, which is unweighted unless the caller weights it too. See #490.
+        under the same `ve.w`, so the two paths answer the same number. Spelling the
+        weights into `me` changes nothing. See #490 and ADR 0088.
         =#
         let Xc = reshape(vs, Tv, 1), aw = aweights(wv), c = sum(wv .^ 2) / sum(wv)
             @test var(SimpleVariance(; w = aw), Xc; dims = 1)[1] ≈
-                  sum(wv .* (vs .- muv) .^ 2) / (sum(wv) - c)
+                  sum(wv .* (vs .- muw) .^ 2) / (sum(wv) - c)
+            @test var(SimpleVariance(; w = aw), Xc; dims = 1)[1] ≈
+                  var(SimpleVariance(; w = aw), vs)
             @test var(SimpleVariance(; me = SimpleExpectedReturns(; w = aw), w = aw), Xc;
                       dims = 1)[1] ≈ var(SimpleVariance(; w = aw), vs)
+            # The `mean` keyword still reaches the unweighted centre.
+            @test var(SimpleVariance(; w = aw), Xc; dims = 1, mean = [muv])[1] ≈
+                  sum(wv .* (vs .- muv) .^ 2) / (sum(wv) - c)
         end
         # --- the semi-moment target is the mean, and the divisor stays `T - 1` ---
         Xsm = [0.01 0.02; 0.03 0.04; 0.02 0.03]

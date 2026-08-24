@@ -334,15 +334,22 @@ end
     @test_throws ArgumentError cov(factory(GeneralCovariance(), weights(wv)), Xm)
     @test_throws ArgumentError var(factory(SimpleVariance(), weights(wv)), Xm)
     #=
-    The comparison holds only when the mean carries the same weights. `factory` propagates the
-    incoming weights into `me` as well as into `w`, and the covariance always centres on the
-    weighted mean. A `SimpleVariance` built by hand keeps whatever `me` the caller gave it, so
-    `SimpleVariance(; w = aw)` weights the deviations about the UNWEIGHTED mean and leaves the
-    covariance path. That is the `me` field doing its job, not a bias-correction difference.
+    ADR 0088. The comparison holds by hand as well as through `factory`. A `SimpleVariance`
+    centres on the mean that its own `w` weights, and `GeneralCovariance` always centres on the
+    weighted mean, so the two paths agree whether or not the caller spells the weights into
+    `me`. Writing them into `me` changes nothing, because `ve.w` reaches the centre either way.
     =#
     @test isapprox(var(SimpleVariance(; me = SimpleExpectedReturns(; w = aw), w = aw), Xm)[1],
                    cov(GeneralCovariance(; w = aw), Xm)[1, 1])
-    @test !isapprox(var(SimpleVariance(; w = aw), Xm)[1],
+    @test isapprox(var(SimpleVariance(; w = aw), Xm)[1],
+                   cov(GeneralCovariance(; w = aw), Xm)[1, 1])
+    #=
+    The `mean` keyword is the escape hatch ADR 0088 leaves for a centre that the estimator's
+    own weights do not describe. It reaches the unweighted centre, which is the number the
+    matrix path answered before the ADR, and it leaves the covariance path again.
+    =#
+    @test !isapprox(var(SimpleVariance(; w = aw), Xm;
+                        mean = Statistics.mean(SimpleExpectedReturns(), Xm; dims = 1))[1],
                     cov(GeneralCovariance(; w = aw), Xm)[1, 1])
     #=
     The estimator's own default is the one the library declines to inherit. Under it the

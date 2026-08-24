@@ -3,7 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the marginal variance and standard deviation, optionally weighted and optionally bias-corrected.
 
-`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction. `me` reaches the matrix methods only: the vector methods leave the centring to `Statistics`, which centres a weighted vector on its weighted mean. Give `me` the same weights as `w` to make the two paths agree.
+`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction. `me` reaches the matrix methods only: the vector methods leave the centring to `Statistics`.
+
+`w` weights the whole estimate, so it reaches the centre as well as the deviations. The matrix methods send `me` through [`factory`](@ref), which replaces the weights of `me` with `w`, and `Statistics` centres a weighted vector on its weighted mean. Both paths therefore answer the same number over the same data, and `w` wins over the weights that `me` carries. Pass `mean` for a centre that `w` does not describe. ADR 0088 records the decision.
 
 # Fields
 
@@ -111,7 +113,7 @@ Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.
 The matrix method:
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `me`; otherwise take `mu` from `mean`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `me`; otherwise take `mu` from `mean`. When `ve.w` is not `nothing`, send `me` through [`factory`](@ref) first, so that `mu` carries the same weights as the deviations.
  3. Resolve the observation weights from `ve.w` against `X` with [`get_observation_weights`](@ref), giving `w`.
  4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
  5. Otherwise call `f(X, w, dims; corrected = ve.corrected, mean = mu)`.
@@ -122,7 +124,9 @@ The vector method:
  2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
  3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
 
-The two methods centre differently, and the difference is visible in the result. The matrix method always resolves a centre before it calls `f`, and it takes that centre from `me`, whose own weights are separate from `ve.w`. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with two numbers whenever `ve.w` is set and `me` carries no matching weights. Give `me` the same weights to make the two agree.
+The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and it takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path. ADR 0088 records the decision, and `mean` takes any other centre.
+
+Step 2 calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a performance guard and not a second contract: `ve.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
 
 # Arguments
 
@@ -151,7 +155,13 @@ function simple_variance_kernel(f::F, ve::SimpleVariance,
                                 me::AbstractExpectedReturnsEstimator, X::MatNum;
                                 dims::Int = 1, mean = nothing, kwargs...) where {F}
     assert_dims(dims)
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
+    mu = if !isnothing(mean)
+        mean
+    elseif isnothing(ve.w)
+        Statistics.mean(me, X; dims = dims, kwargs...)
+    else
+        Statistics.mean(factory(me, ve.w), X; dims = dims, kwargs...)
+    end
     w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         f(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -199,12 +209,12 @@ Where:
 # Algorithm
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`; otherwise take `mu` from `mean`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it; otherwise take `mu` from `mean`.
  3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
  4. When `w` is `nothing`, take the unweighted standard deviation of `X` along `dims`, centred on `mu`.
  5. Otherwise take the standard deviation of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.me` carries its own weights. A `SimpleVariance` whose `w` is set and whose `me` is unweighted therefore weights the squared deviations but not the centre. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre. ADR 0088 records the decision.
 
 # Arguments
 
@@ -284,7 +294,7 @@ This method computes the standard deviation of the input vector `X` using the co
  2. When `w` is `nothing`, take the unweighted standard deviation of `X`, centred on `mean`.
  3. Otherwise take the standard deviation of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` instead, so the two answers differ for the same data. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data. ADR 0088 records the decision.
 
 # Arguments
 
@@ -388,12 +398,12 @@ Where:
 # Algorithm
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`; otherwise take `mu` from `mean`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it; otherwise take `mu` from `mean`.
  3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
  4. When `w` is `nothing`, take the unweighted variance of `X` along `dims`, centred on `mu`.
  5. Otherwise take the variance of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.me` carries its own weights. A `SimpleVariance` whose `w` is set and whose `me` is unweighted therefore weights the squared deviations but not the centre. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre. ADR 0088 records the decision.
 
 # Arguments
 
@@ -473,7 +483,7 @@ This method computes the variance of the input vector `X` using the configuratio
  2. When `w` is `nothing`, take the unweighted variance of `X`, centred on `mean`.
  3. Otherwise take the variance of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` instead, so the two answers differ for the same data. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data. ADR 0088 records the decision.
 
 # Arguments
 
