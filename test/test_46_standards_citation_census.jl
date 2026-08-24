@@ -211,6 +211,12 @@
     =#
     external_names = Dict("grep_code" => "a kaimon MCP tool, cited by `CLAUDE.md`",
                           "search_code" => "a kaimon MCP tool, cited by `CLAUDE.md`",
+                          "start_session" =>
+                              "a kaimon MCP tool, cited by `CLAUDE.md` " *
+                              "§ Running Julia",
+                          "EnterWorktree" =>
+                              "a Claude Code tool, cited by `CLAUDE.md` " *
+                              "§ Parallel sessions",
                           "servedocs" =>
                               "LiveServer.jl, a declared dependency of " *
                               "`docs/Project.toml`",

@@ -21,10 +21,37 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   want, and `grep_code` when you already hold an exact token. `/graphify` builds a queryable graph
   for larger architectural questions.
 
+## Parallel sessions
+
+Sessions run in parallel, so the checkout is not yours alone. Two rules keep them apart.
+
+**Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
+Commit there, then merge into `dev`. Rebase onto `dev` first, so the merge is a fast-forward and
+your commit carries only your work. Never commit a change you did not make: check `git status`
+before you stage, and stage the files you edited by name rather than with `git add -A`.
+
+**Queue on a file another session holds.** One session edits a file at a time. Before you start,
+read the open tickets that are assigned to someone and take the files each one names. If a file you
+need is on that list, wait for that session to commit and merge, then rebase and start. Do not open
+the file in the meantime.
+
+Three files are shared by every sweep ticket, so the queue rule bites hardest there:
+
+- `sweep/manifest.toml` — one row per source file.
+- `src/01_Base.jl` — `arg_dict`, `math_dict` and their siblings.
+- `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
+  `MATH_COPY_TOTAL`.
+
+A ratchet is one number for the whole library. Two sessions that each lower it write two different
+numbers, and a merge keeps one of them. Lower a ratchet in the commit that pays it, and rebase
+before you merge so you lower the number that is current.
+
 ## Running Julia
 
 - **Go through the kaimon MCP tools**, not `julia` on Bash. `ex(e="…")` evaluates in a REPL the
-  user shares live.
+  user shares live. Start a REPL for your own worktree with `start_session(project_path=…)`, and
+  pass its session key to every `ex` call. A REPL that another session opened is not yours to
+  restart.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
 - Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
