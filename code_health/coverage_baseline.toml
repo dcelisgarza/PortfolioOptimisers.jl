@@ -201,5 +201,5 @@ commit = "a6d87c6"
 "src/23_Pipeline/04_PredictionCV.jl" = { lines = 96, misses = 19 }
 "src/23_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 23 }
 "src/24_Plotting.jl" = { lines = 11, misses = 3 }
-"src/25_Aliases.jl" = { lines = 43, misses = 38 }
+"src/25_Aliases.jl" = { lines = 43, misses = 0 }
 "src/PortfolioOptimisers.jl" = { lines = 0, misses = 0 }

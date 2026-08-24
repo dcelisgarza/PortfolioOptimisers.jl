@@ -44,7 +44,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | Any file in `src/` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `pre-commit run -a`, `test/` |
 | A docstring in `src/` or `ext/` | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) | `test/test_26_docs.jl`, the doctest job |
 | The `# Algorithm` and `# JuMP formulation` sections of a SWEPT file | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md), and [`sweep/manifest.toml`](sweep/manifest.toml) for the `swept` flag that arms the demand | `test/test_26_docs.jl` |
-| An alias docstring — acronym, factory, or dispatch | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *Section Structure for Aliases* | `test/test_26_docs.jl` — the sections a kind allows, `# Related` in a SWEPT file, and a library-wide ratchet |
+| An alias docstring — acronym, factory, or dispatch | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *Section Structure for Aliases* | `test/test_26_docs.jl` — the sections a kind allows, `# Related` in a SWEPT file, and a library-wide ratchet; `test/test_47_alias_and_module_census.jl` — an acronym alias IS its target and its sentence names it, and a factory alias's sentence names every type it composes |
 | A `# Details` section | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *`# Details` is abolished* | `test/test_26_docs.jl` — zero in a SWEPT file, and a library-wide count that may not rise |
 | The `# Mathematical definition` section | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *What the section may not state* | none — unenforced |
 | A mathematical symbol that two or more docstrings share | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *Notation is fixed by symbol and by family*, `math_dict` in [`src/01_Base.jl`](src/01_Base.jl) | `test/test_26_docs.jl` — a swept file copies no `math_dict` value, and a library-wide count that may not rise |
@@ -62,7 +62,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
-| Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed |
+| Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed; `test/test_47_alias_and_module_census.jl` for a new file, which `src/PortfolioOptimisers.jl` must `include` |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
 | A standards file, or a name or a path one cites | [`STANDARDS.md`](STANDARDS.md) § *Changing a standard* | `test/test_46_standards_citation_census.jl` |
@@ -109,6 +109,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
 | `test/test_44_range_tails_census.jl` | a range risk measure declares its tails, or is on the fused list | run the file |
 | `test/test_45_sweep_census.jl` | every file under `src/` and `ext/` has a sweep-manifest row naming its child map of #404, and the file's documented-unit count still matches that row | run the file |
+| `test/test_47_alias_and_module_census.jl` | an acronym alias of `src/25_Aliases.jl` IS the binding its docstring names, a factory alias of that file EQUALS the long form its sentence names, and `src/PortfolioOptimisers.jl` `include`s every other file under `src/` exactly once | run the file |
 | `test/test_46_standards_citation_census.jl` | every name and every path a standards file cites resolves against the repository, and no standards file states a count of the repository | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
