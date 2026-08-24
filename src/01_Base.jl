@@ -1317,7 +1317,7 @@ A field that is itself pretty-printable is rendered under its parent and indente
 
 The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` method it emits.
 
- 1. When `flag` is `true`, define `has_pretty_show_method(::T) = true`.
+ 1. When `flag` is `true`, define `has_pretty_show_method(::T)::Bool = true`. The return type is annotated, as it is on the four methods that [`has_pretty_show_method`](@ref) declares by hand.
 
  2. Define `Base.show(io::IO, obj::T)`.
 
@@ -1327,7 +1327,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 
  5. Print the wrapper name of the type, then compute `padding`, the length of the longest field name plus two.
 
- 6. For each field in declaration order, read `val`. A field the object does not have is skipped, and no line is printed for it.
+ 6. For each field in declaration order, read `val` with `getproperty`, so that a property a rule of [`@forward_properties`](@ref) swaps prints the swapped value.
 
  7. Choose the connector `sym1`, giving `┴` for the last printed line and `┼` otherwise.
 
@@ -1340,7 +1340,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
       + A non-empty vector whose every element has a pretty-show method prints the summary from [`pretty_show_vector_summary`](@ref), then the lines from [`pretty_show_vector_body`](@ref), each indented under `│`.
       + A matrix prints its size and its type.
       + A vector of more than six entries, or a vector of arrays, prints its length and its type.
-      + A `DataType` prints its type and its wrapper name.
+      + A `DataType` prints `DataType`, which is its type, then the wrapper name of the value, so a parametrised type reports the wrapper it instantiates and `Vector{Float64}` prints as `DataType: Array`.
       + Any other value prints its type and `repr(val)`.
 
 # Arguments
@@ -1367,7 +1367,7 @@ The macro emits two definitions. Steps 3 to 9 are the body of the `Base.show` me
 macro define_pretty_show(T, flag::Bool = true)
     esc(quote
             if $flag
-                has_pretty_show_method(::$T) = true
+                has_pretty_show_method(::$T)::Bool = true
             end
             function Base.show(io::IO, obj::$T)
                 fields = fieldnames(typeof(obj))
@@ -1382,11 +1382,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
                 for (i, field) in enumerate(fields)
-                    if hasfield(typeof(obj), field)
-                        val = getproperty(obj, field)
-                    else
-                        continue
-                    end
+                    val = getproperty(obj, field)
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
                                       (!flag || (flag && isempty(fieldnames(typeof(val))))),
@@ -1436,7 +1432,7 @@ macro define_pretty_show(T, flag::Bool = true)
                         print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
                     elseif isa(val, DataType)
                         tval = typeof(val)
-                        valstr = Base.typename(tval).wrapper
+                        valstr = Base.typename(val).wrapper
                         print(io, "$(sym1) $(tval): ", valstr, '\n')
                     else
                         print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
@@ -3220,7 +3216,7 @@ function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
     return state > 1 ? nothing : (obj, state + 1)
 end
-Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
+Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})::Int = 1
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

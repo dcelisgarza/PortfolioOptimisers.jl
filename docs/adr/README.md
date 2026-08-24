@@ -33,7 +33,7 @@ decision that moved many times, so read the amendments as well as the body.
 | 0010 | [Unify the `*_view` family; split the propagation tags](0010-unify-view-family-and-split-propagation-tags.md) | 3 · 2026-08-21 | One `port_opt_view` verb. `@prop` splits into `@fprop` (factory) and `@vprop` (view). |
 | 0011 | [One deep optimisation Result](0011-deep-optimisation-result.md) | 1 · 2026-08-16 | The result side mirrors the JuMP estimator structure. The change is additive. |
 | 0012 | [Deepen the prior→measure moment binding with `@pprop`/`@cprop`](0012-prior-measure-binding-tags.md) | | A tag names either a mechanism or a source. The family grows from two axes to five. |
-| 0013 | [Generate property forwarding with `@forward_properties`](0013-property-forwarding-macro.md) | | A standalone macro beside the struct emits `getproperty` and `propertynames` from explicit rules. |
+| 0013 | [Generate property forwarding with `@forward_properties`](0013-property-forwarding-macro.md) | 1 · 2026-08-24 | A standalone macro beside the struct emits `getproperty` and `propertynames` from explicit rules. |
 | 0014 | [Group the user guide and the examples by pipeline stage](0014-group-docs-by-pipeline-stage.md) | | Both narrative halves follow the `CONTEXT.md` pipeline spine, one subdirectory per group. |
 | 0015 | [A role suffix is for disambiguation](0015-disambiguation-suffix-naming.md) | | A type takes the bare concept word when that word is unambiguous. A suffix is added only to earn the bare name back. |
 | 0016 | [Uncertainty sets own their posdef and moment configuration](0016-uncertainty-sets-own-their-posdef-and-moment-config.md) | | An uncertainty-set estimator carries its own configuration. It never reaches into the prior instance. |
