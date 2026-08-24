@@ -960,7 +960,7 @@ in the sense of `STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 250
+        DETAILS_TOTAL = 245
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1218,7 +1218,7 @@ in the sense of `STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 15
+        MATH_COPY_TOTAL = 13
 
         #=
         `math_dict` is read from source with the same instrument the rest of this testset

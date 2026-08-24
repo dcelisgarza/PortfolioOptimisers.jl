@@ -71,10 +71,17 @@ Compute the correlation matrix using the underlying estimator.
 
 This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`, returning the correlation matrix as the "covariance". This is useful when a correlation matrix is required in a context that accepts a covariance estimator.
 
+# Algorithm
+
+ 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+
+The returned matrix carries a unit diagonal, so a caller that reads the diagonal for a variance
+reads ones, not variances.
+
 # Arguments
 
   - `ce`: Correlation covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
@@ -98,10 +105,16 @@ Compute the correlation matrix using the underlying estimator.
 
 This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`.
 
+# Algorithm
+
+ 1. Call `Statistics.cor(ce.ce, X; dims = dims, kwargs...)` and return its result.
+
+`cov` and `cor` on a [`CorrelationCovariance`](@ref) return the same matrix.
+
 # Arguments
 
   - `ce`: Correlation covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 

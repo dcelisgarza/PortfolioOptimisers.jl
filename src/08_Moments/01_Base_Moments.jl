@@ -541,7 +541,7 @@ This fallback lets a correlation-style covariance estimator define only its [`St
 
 Where:
 
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - ``\\hat{\\rho}_{ij}``: Correlation between assets ``i`` and ``j``.
   - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``.
 

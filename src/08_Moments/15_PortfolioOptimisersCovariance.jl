@@ -84,16 +84,28 @@ Compute the covariance matrix with post-processing using a [`PortfolioOptimisers
 
 This method computes the covariance matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
 
+# Algorithm
+
+ 1. Check `dims` and orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 2. Compute `sigma` with `Statistics.cov(ce.ce, X; kwargs...)`.
+ 3. When `sigma` is immutable, copy it into a `Matrix`, because step 4 writes in place.
+ 4. Apply [`matrix_processing!`](@ref) with `ce.mp` to `sigma`, in place.
+ 5. Return `sigma`.
+
+`ce.ce` runs before `ce.mp`, and `ce.mp.order` fixes the order of the steps inside the
+post-processing. Step 1 orients `X` once, so the estimator and the post-processing both read the
+same orientation and neither takes a `dims` of its own.
+
 # Arguments
 
   - `ce`: Composite covariance estimator with post-processing.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Returns
 
@@ -121,16 +133,28 @@ Compute the correlation matrix with post-processing using a [`PortfolioOptimiser
 
 This method computes the correlation matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
 
+# Algorithm
+
+ 1. Check `dims` and orient `X` to `observations × assets`, transposing it when `dims == 2`.
+ 2. Compute `rho` with `Statistics.cor(ce.ce, X; kwargs...)`.
+ 3. When `rho` is immutable, copy it into a `Matrix`, because step 4 writes in place.
+ 4. Apply [`matrix_processing!`](@ref) with `ce.mp` to `rho`, in place.
+ 5. Return `rho`.
+
+`ce.ce` runs before `ce.mp`, and `ce.mp.order` fixes the order of the steps inside the
+post-processing. Step 1 orients `X` once, so the estimator and the post-processing both read the
+same orientation and neither takes a `dims` of its own.
+
 # Arguments
 
   - `ce`: Composite covariance estimator with post-processing.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Returns
 
@@ -166,25 +190,34 @@ By default the drop score is each asset's summary correlation to every other ass
 
 Internal machinery — the caller-facing form is [`RedundancySelector`](@ref) with a [`PairwiseCorrelation`](@ref) algorithm.
 
+# Algorithm
+
+ 1. Compute the correlation matrix `rho` with `ce`, and take its absolute value when `absolute` is `true`.
+ 2. When `scores` is `nothing`, collapse each column of `rho` with `measure` into `summary_rho`, the default drop score. Otherwise take `summary_rho` from `scores`.
+ 3. Read the strict lower triangle of `rho` into `tril_idx`, giving each pair once.
+ 4. Keep the pairs whose correlation is at least `t`, and sort them from the most to the least correlated.
+ 5. Walk that list. For a pair whose two assets are both still present, remove the one with the higher drop score. **When the two scores are equal, remove both** — the library's "if we cannot tell them apart, trust neither" tie policy, which is why two identical columns leave no survivor.
+ 6. Return the indices that step 5 did not remove, in ascending order.
+
+Step 5 skips a pair whose assets are already removed, so the result depends on the order step 4
+fixes.
+
 # Arguments
 
-  - `X`: Data matrix of asset returns (observations × assets).
-  - `ce`: Covariance estimator used to compute the correlation matrix.
+  - $(arg_dict[:X])
+  - $(arg_dict[:ce])
   - `t`: Correlation threshold above which two assets are considered too correlated.
   - `absolute`: If `true`, the absolute value of the correlation is used for comparison.
   - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to produce the default drop score. Ignored when `scores` is given.
   - `scores`: Per-asset drop scores; the asset with the *higher* score is removed from a correlated pair.
 
+# Validation
+
+  - If `scores` is not `nothing`, `length(scores) == size(X, 2)`, else a `DimensionMismatch` is raised.
+
 # Returns
 
   - `idx::Vector{Int}`: Indices of assets that form a maximally uncorrelated subset.
-
-# Details
-
-  - Computes the (absolute) correlation matrix for all assets.
-  - Identifies pairs of assets with correlation at or above `t`, sorted from most to least correlated.
-  - For each correlated pair (not yet removed), removes the asset with the higher drop score. **If both assets score equally, both are removed** — the library's "if we cannot tell them apart, trust neither" tie policy, which is why two identical columns leave no survivor.
-  - Returns the indices of assets not in the removed set.
 
 # Related
 

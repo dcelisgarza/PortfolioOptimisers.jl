@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the marginal variance and standard deviation, optionally weighted and optionally bias-corrected.
 
-`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction.
+`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction. `me` reaches the matrix methods only: the vector methods leave the centring to `Statistics`, which centres a weighted vector on its weighted mean. Give `me` the same weights as `w` to make the two paths agree.
 
 # Fields
 
@@ -22,7 +22,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
-  - `corrected = true` needs a weight type that supports bias correction. See the note on the weighted formula in [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
+  - `corrected = true` needs a weight type that carries a bias correction. See the bias-correction bullet of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
 
 ## Propagated parameters
 
@@ -106,6 +106,24 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var`.
 
+# Algorithm
+
+The matrix method:
+
+ 1. Check that `dims` is `1` or `2`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `me`; otherwise take `mu` from `mean`.
+ 3. Resolve the observation weights from `ve.w` against `X` with [`get_observation_weights`](@ref), giving `w`.
+ 4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
+ 5. Otherwise call `f(X, w, dims; corrected = ve.corrected, mean = mu)`.
+
+The vector method:
+
+ 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
+ 3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
+
+The two methods centre differently, and the difference is visible in the result. The matrix method always resolves a centre before it calls `f`, and it takes that centre from `me`, whose own weights are separate from `ve.w`. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with two numbers whenever `ve.w` is set and `me` carries no matching weights. Give `me` the same weights to make the two agree.
+
 # Arguments
 
   - `f`: Dispersion function to apply, either `Statistics.std` or `Statistics.var`.
@@ -123,12 +141,6 @@ Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.
 # Returns
 
   - `sigma::Union{<:Number, <:ArrNum}`: Dispersion of `X` computed by `f`.
-
-# Details
-
-  - For a matrix, resolves the mean from `mean` when given, else from `me`. A vector defers the mean to `f`.
-  - Resolves the observation weights from `ve.w` with [`get_observation_weights`](@ref).
-  - Applies `f` to the weighted branch when the resolved weights are not `nothing`, else to the unweighted branch.
 
 # Related
 
@@ -171,8 +183,6 @@ This method computes the standard deviation of the input matrix `X` using the co
 
 # Mathematical definition
 
-Unweighted:
-
 ```math
 \\begin{align}
 \\hat{\\sigma}_j &= \\sqrt{\\hat{\\sigma}^2_j}\\,.
@@ -181,43 +191,20 @@ Unweighted:
 
 Where:
 
-  - ``\\hat{\\sigma}_j``: Standard deviation of asset ``j``.
-  - ``\\hat{\\sigma}^2_j``: Variance of asset ``j``.
+  - ``\\hat{\\sigma}_j``: Estimated standard deviation of asset ``j``.
+  - $(math_dict[:sigma2_hat_j])
 
-For `corrected = true`:
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines ``\\hat{\\sigma}^2_j`` in each of the four cases that `ve.w` and `ve.corrected` select.
 
-```math
-\\begin{align}
-\\hat{\\sigma}^2_j &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
-\\end{align}
-```
+# Algorithm
 
-For `corrected = false`:
+ 1. Check that `dims` is `1` or `2`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`; otherwise take `mu` from `mean`.
+ 3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 4. When `w` is `nothing`, take the unweighted standard deviation of `X` along `dims`, centred on `mu`.
+ 5. Otherwise take the standard deviation of `X` weighted by `w` along `dims`, centred on `mu`.
 
-```math
-\\begin{align}
-\\hat{\\sigma}^2_j &= \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
-\\end{align}
-```
-
-Weighted:
-
-```math
-\\begin{align}
-\\hat{\\sigma}^2_j &= \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
-  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
-  - ``T``: Number of observations.
-  - ``w_t``: Observation weight at time ``t``.
-  - ``c``: Bias correction factor, fixed by the **type** of `w`, not by the estimator.
-
-`corrected = false` sets ``c = 0`` for every weight type. `corrected = true` reads ``c`` from the weight type: `StatsBase.FrequencyWeights` gives ``c = 1``, `StatsBase.AnalyticWeights` gives ``c = \\sum_t w_t^2 / \\sum_t w_t``, and `StatsBase.ProbabilityWeights` gives ``c = \\sum_t w_t / T``. **A plain `StatsBase.Weights` supports no correction and throws an `ArgumentError`**, so `SimpleVariance(; w = StatsBase.Weights(...))` must also pass `corrected = false`.
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.me` carries its own weights. A `SimpleVariance` whose `w` is set and whose `me` is unweighted therefore weights the squared deviations but not the centre. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
 
 # Arguments
 
@@ -226,6 +213,11 @@ Where:
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
 
 # Returns
 
@@ -282,11 +274,27 @@ Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a 
 
 This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`.
 
+# Mathematical definition
+
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select, and this method returns its square root.
+
+# Algorithm
+
+ 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 2. When `w` is `nothing`, take the unweighted standard deviation of `X`, centred on `mean`.
+ 3. Otherwise take the standard deviation of `X` weighted by `w`, centred on `mean`.
+
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` instead, so the two answers differ for the same data. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+
 # Arguments
 
   - $(arg_dict[:ve])
   - $(arg_dict[:Xv])
   - $(arg_dict[:omean])
+
+# Validation
+
+  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
 
 # Returns
 
@@ -370,14 +378,22 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
-  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
-  - ``T``: Number of observations.
-  - ``w_t``: Observation weight at time ``t``.
-  - ``c``: Bias correction factor, fixed by the **type** of `w`, not by the estimator.
+  - $(math_dict[:sigma2_hat_j])
+  - $(math_dict[:r_tj])
+  - $(math_dict[:mu_hat_j])
+  - $(math_dict[:T])
+  - $(math_dict[:w_t_moment])
+  - $(math_dict[:c_weight_bias])
 
-`corrected = false` sets ``c = 0`` for every weight type. `corrected = true` reads ``c`` from the weight type: `StatsBase.FrequencyWeights` gives ``c = 1``, `StatsBase.AnalyticWeights` gives ``c = \\sum_t w_t^2 / \\sum_t w_t``, and `StatsBase.ProbabilityWeights` gives ``c = \\sum_t w_t / T``. **A plain `StatsBase.Weights` supports no correction and throws an `ArgumentError`**, so `SimpleVariance(; w = StatsBase.Weights(...))` must also pass `corrected = false`.
+# Algorithm
+
+ 1. Check that `dims` is `1` or `2`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`; otherwise take `mu` from `mean`.
+ 3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 4. When `w` is `nothing`, take the unweighted variance of `X` along `dims`, centred on `mu`.
+ 5. Otherwise take the variance of `X` weighted by `w` along `dims`, centred on `mu`.
+
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.me` carries its own weights. A `SimpleVariance` whose `w` is set and whose `me` is unweighted therefore weights the squared deviations but not the centre. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
 
 # Arguments
 
@@ -386,6 +402,11 @@ Where:
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Validation
+
+  - $(val_dict[:dims])
+  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
 
 # Returns
 
@@ -442,11 +463,27 @@ Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
 This method computes the variance of the input vector `X` using the configuration specified in `ve`.
 
+# Mathematical definition
+
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select, and this method returns it for a single series.
+
+# Algorithm
+
+ 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 2. When `w` is `nothing`, take the unweighted variance of `X`, centred on `mean`.
+ 3. Otherwise take the variance of `X` weighted by `w`, centred on `mean`.
+
+The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` instead, so the two answers differ for the same data. See the note on the two centring paths in [`simple_variance_kernel`](@ref).
+
 # Arguments
 
   - $(arg_dict[:ve])
   - $(arg_dict[:Xv])
   - $(arg_dict[:omean])
+
+# Validation
+
+  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
 
 # Returns
 

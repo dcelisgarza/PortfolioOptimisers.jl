@@ -395,7 +395,7 @@ Where:
   - ``\\hat{\\Sigma}^{(m)}_{ij}``: ``(i,j)``-element of the ``m``-th simulated Wishart covariance draw.
   - ``\\boldsymbol{\\mu}_{lb}``, ``\\mu_{ub,i}``: Lower and upper bounds for expected returns.
   - ``z_{q/2} = \\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - ``q``: Significance level.
 
@@ -455,7 +455,7 @@ Where:
 
   - ``\\boldsymbol{\\mu}_{lb}``, ``\\mu_{ub,i}``: Lower and upper bounds for expected returns.
   - ``\\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - ``q``: Significance level.
 
@@ -590,7 +590,7 @@ Where:
 
   - ``\\mathbf{\\Sigma}_{\\mu}``: Asymptotic covariance of the mean estimator.
   - ``\\mathbf{\\Sigma}_{\\Sigma}``: Asymptotic covariance of the covariance estimator (vectorised).
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - ``\\mathbf{I}``: Identity matrix.
   - ``\\mathbf{K}``: Commutation matrix.
@@ -690,7 +690,7 @@ Where:
 
   - ``\\mathbf{\\Sigma}_{\\mu}``: Asymptotic covariance of the mean estimator.
   - ``\\mathbf{\\Sigma}_{\\Sigma}``: Asymptotic covariance of the covariance estimator (vectorised).
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
   - ``\\mathbf{I}``: Identity matrix.
   - ``\\mathbf{K}``: Commutation matrix.

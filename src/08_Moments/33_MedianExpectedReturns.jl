@@ -91,7 +91,7 @@ Unweighted:
 Where:
 
   - ``\\hat{\\mu}_j``: Median expected return of asset ``j``.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - $(math_dict[:r_tj])
   - $(math_dict[:T])
 
 Weighted. The weighted median is the `StatsBase` weighted quantile at probability ``1/2``, which **interpolates between two order statistics**. Order the returns of asset ``j`` so that ``r_{(1)j} \\leq \\ldots \\leq r_{(T)j}``, and let ``w_{(t)}`` be the weight that travels with each one:

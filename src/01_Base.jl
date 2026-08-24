@@ -879,8 +879,8 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
                                  :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
                                  :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                                 :stdnum => "`vr::Number`: Standard deviation of `X`",
-                                 :varnum => "`vr::Number`: Variance of `X`",
+                                 :stdnum => "`sd::Number`: Standard deviation of `X`.",
+                                 :varnum => "`vr::Number`: Variance of `X`.",
                                  :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
                                  :alg => "`alg`: The original algorithm instance.")
 """
@@ -911,6 +911,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :T => "``T``: Number of observations.",#
                        :x_t_obs => "``\\boldsymbol{x}_t``: Asset returns for observation ``t``, the ``t``-th row of the returns matrix.",#
                        :N => "``N``: Number of assets.",#
+                       # Sample moments of the returns matrix.
+                       :r_tj => "``r_{tj}``: Return of asset ``j`` at time ``t``.",#
+                       :mu_hat_j => "``\\hat{\\mu}_j``: Estimated mean of asset ``j``.",#
+                       :sigma2_hat_j => "``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.",#
+                       :sigma_hat_i => "``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.",#
+                       :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
+                       :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
+                       :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
+                       :w_t_moment => "``w_t``: Observation weight of observation ``t``.",#
+                       :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                        # Risk measure parameters.
                        :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                        :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#

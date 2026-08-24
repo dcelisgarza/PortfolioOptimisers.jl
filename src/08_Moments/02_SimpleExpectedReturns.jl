@@ -77,7 +77,7 @@ end
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
-This method computes the expected returns as the sample mean of the input data `X` according to `ce`.
+This method computes the expected returns as the sample mean of the input data `X` according to `me`.
 
 # Mathematical definition
 
@@ -89,12 +89,6 @@ Unweighted:
 \\end{align}
 ```
 
-Where:
-
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
-  - $(math_dict[:T])
-
 Weighted:
 
 ```math
@@ -105,10 +99,18 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns, whose ``j``-th entry is ``\\hat{\\mu}_j``.
+  - $(math_dict[:mu_hat_j])
+  - $(math_dict[:r_tj])
   - $(math_dict[:T])
-  - ``w_t``: Observation weight at time ``t``.
+  - $(math_dict[:w_t_moment])
+
+# Algorithm
+
+ 1. Check that `dims` is `1` or `2`.
+ 2. Resolve the observation weights from `me.w` against `X`, giving `w`.
+ 3. When `w` is `nothing`, take the unweighted mean of `X` along `dims`.
+ 4. Otherwise take the mean of `X` weighted by `w` along `dims`.
 
 # Arguments
 

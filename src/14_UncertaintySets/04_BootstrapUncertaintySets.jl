@@ -848,7 +848,7 @@ Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampl
 Where:
 
   - ``\\mathbf{\\Sigma}_{\\Sigma}``: Empirical covariance of bootstrap covariance deviations (vectorised).
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
   - ``k_{\\Sigma}``: Empirically fitted scaling parameter.
 

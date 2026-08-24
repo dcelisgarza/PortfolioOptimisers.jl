@@ -52,9 +52,9 @@
 "src/06_Detone.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
 "src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
 "src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, algorithm = 16, swept = true }
-"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, swept = false }
-"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, swept = false }
+"src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, algorithm = 1, swept = true }
+"src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, algorithm = 6, swept = true }
+"src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, algorithm = 5, swept = true }
 "src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, swept = false }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 33, swept = false }
 "src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, swept = false }
@@ -62,10 +62,10 @@
 "src/08_Moments/09_RankCovariance.jl" = { map = 3, units = 5, swept = false }
 "src/08_Moments/10_Histogram.jl" = { map = 3, units = 16, swept = false }
 "src/08_Moments/11_MutualInfoCovariance.jl" = { map = 3, units = 2, swept = false }
-"src/08_Moments/12_DenoiseCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/13_DetoneCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/14_ProcessedCovariance.jl" = { map = 3, units = 1, swept = false }
-"src/08_Moments/15_PortfolioOptimisersCovariance.jl" = { map = 3, units = 4, swept = false }
+"src/08_Moments/12_DenoiseCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/13_DetoneCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/14_ProcessedCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
+"src/08_Moments/15_PortfolioOptimisersCovariance.jl" = { map = 3, units = 4, algorithm = 3, swept = true }
 "src/08_Moments/16_ShrunkExpectedReturns.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/17_EquilibriumExpectedReturns.jl" = { map = 3, units = 3, swept = false }
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, swept = false }
@@ -75,8 +75,8 @@
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, swept = false }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, swept = false }
-"src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, swept = false }
-"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
+"src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, algorithm = 2, swept = true }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { map = 3, units = 4, swept = false }
 "src/08_Moments/28_WindowedExpectedReturns.jl" = { map = 3, units = 0, algorithm = 0, swept = true }
 "src/08_Moments/29_WindowedCovariance.jl" = { map = 3, units = 0, algorithm = 0, swept = true }

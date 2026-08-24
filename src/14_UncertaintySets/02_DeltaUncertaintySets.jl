@@ -157,7 +157,7 @@ Where:
   - ``\\boldsymbol{\\mu}_{lb}``, ``\\boldsymbol{\\mu}_{ub}``: Lower and upper bounds for expected returns.
   - ``\\mathbf{\\Sigma}_{lb}``, ``\\mathbf{\\Sigma}_{ub}``: Lower and upper bounds for covariance matrix.
   - ``\\hat{\\boldsymbol{\\mu}}``: Estimated mean vector.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - ``\\delta_{\\mu}``: Delta bound for expected returns.
   - ``\\delta_{\\sigma}``: Delta bound for covariance.
   - ``|\\cdot|``: Element-wise absolute value.
@@ -264,7 +264,7 @@ Constructs a box uncertainty set for covariance using delta bounds from a prior 
 Where:
 
   - ``\\mathbf{\\Sigma}_{lb}``, ``\\mathbf{\\Sigma}_{ub}``: Lower and upper bounds for covariance matrix.
-  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:Sigma_hat])
   - ``\\delta_{\\sigma}``: Delta bound for covariance.
   - ``|\\cdot|``: Element-wise absolute value.
 

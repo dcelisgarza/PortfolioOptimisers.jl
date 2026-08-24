@@ -1169,6 +1169,103 @@
         =#
         @test maximum(distance(DistanceDistance(), Cd)) > 1
     end
+    @testset "The covariance base sweep of #453" begin
+        #=
+        Every claim the covariance base and its four wrappers make, pinned by running it.
+        The variance divisor under each weight type, the semi-moment target and its
+        divisor, the composition order of the wrappers, the correlation the
+        `CorrelationCovariance` answers with, and the tie policy of
+        `find_uncorrelated_indices`.
+        =#
+        # --- the variance divisor: `corrected` and the weight type fix `c`, not `ve` ---
+        vs = [1.0, 2.0, 4.0]
+        Tv = length(vs)
+        muv = sum(vs) / Tv
+        d2 = sum((vs .- muv) .^ 2)
+        wv = [0.2, 0.3, 0.5]
+        muw = sum(wv .* vs) / sum(wv)
+        d2w = sum(wv .* (vs .- muw) .^ 2)
+        @test var(SimpleVariance(), vs) ≈ d2 / (Tv - 1)
+        @test var(SimpleVariance(; corrected = false), vs) ≈ d2 / Tv
+        @test var(SimpleVariance(; w = Weights(wv), corrected = false), vs) ≈ d2w / sum(wv)
+        @test var(SimpleVariance(; w = aweights(wv)), vs) ≈
+              d2w / (sum(wv) - sum(wv .^ 2) / sum(wv))
+        @test var(SimpleVariance(; w = pweights(wv)), vs) ≈ d2w / (sum(wv) - sum(wv) / Tv)
+        let fwv = fweights([1.0, 2.0, 3.0])
+            m = sum(fwv .* vs) / sum(fwv)
+            @test var(SimpleVariance(; w = fwv), vs) ≈
+                  sum(fwv .* (vs .- m) .^ 2) / (sum(fwv) - 1)
+        end
+        # A plain `Weights` carries no correction, so `corrected = true` is refused.
+        @test_throws ArgumentError var(SimpleVariance(; w = Weights(wv)), vs)
+        #=
+        The vector methods leave the centring to `Statistics`, so a weighted vector is
+        centred on its weighted mean. The matrix methods take the centre from `ve.me`
+        instead, which is unweighted unless the caller weights it too. See #490.
+        =#
+        let Xc = reshape(vs, Tv, 1), aw = aweights(wv), c = sum(wv .^ 2) / sum(wv)
+            @test var(SimpleVariance(; w = aw), Xc; dims = 1)[1] ≈
+                  sum(wv .* (vs .- muv) .^ 2) / (sum(wv) - c)
+            @test var(SimpleVariance(; me = SimpleExpectedReturns(; w = aw), w = aw), Xc;
+                      dims = 1)[1] ≈ var(SimpleVariance(; w = aw), vs)
+        end
+        # --- the semi-moment target is the mean, and the divisor stays `T - 1` ---
+        Xsm = [0.01 0.02; 0.03 0.04; 0.02 0.03]
+        let mu = mean(Xsm; dims = 1), Y = min.(Xsm .- mu, 0.0)
+            @test cov(Covariance(; alg = SemiMoment()), Xsm) == Y'Y / (size(Xsm, 1) - 1)
+        end
+        # --- the fallback variance and standard deviation read the covariance diagonal ---
+        @test vec(var(Covariance(), Xsm)) == diag(cov(Covariance(), Xsm))
+        @test vec(std(Covariance(), Xsm)) == sqrt.(diag(cov(Covariance(), Xsm)))
+        @test size(var(Covariance(), Xsm; dims = 1)) == (1, 2)
+        @test size(var(Covariance(), permutedims(Xsm); dims = 2)) == (2, 1)
+        # --- the wrappers compose `ce` and then `mp`, in the order their row declares ---
+        rng453 = StableRNG(11223344)
+        X453 = randn(rng453, 6, 10)
+        mp_dn = MatrixProcessing(; pdm = Posdef(), dn = Denoise(), order = (:pdm, :dn))
+        mp_dt = MatrixProcessing(; pdm = Posdef(), dt = Detone(), order = (:pdm, :dt))
+        mp_al = MatrixProcessing(; pdm = Posdef(), alg = nothing, order = (:pdm, :alg))
+        function processed(mp, X)
+            s = Matrix(cov(Covariance(), X))
+            matrix_processing!(mp, s, X)
+            return s
+        end
+        @test cov(PortfolioOptimisersCovariance(; ce = Covariance(), mp = mp_dn), X453) ==
+              processed(mp_dn, X453)
+        @test cov(DenoiseCovariance(), X453) == processed(mp_dn, X453)
+        @test cov(DetoneCovariance(), X453) == processed(mp_dt, X453)
+        @test cov(ProcessedCovariance(), X453) == processed(mp_al, X453)
+        #=
+        The post-processing really runs: the raw covariance of a random matrix is dense, and
+        the denoised one is not. Whether the two `order` permutations differ numerically is a
+        property of the data, not of the wrapper, so it is not asserted here.
+        =#
+        @test processed(mp_dn, X453) != Matrix(cov(Covariance(), X453))
+        # --- `CorrelationCovariance` answers both verbs with the correlation ---
+        ccv = CorrelationCovariance(; ce = Covariance())
+        @test cov(ccv, X453) == cor(Covariance(), X453)
+        @test cor(ccv, X453) == cov(ccv, X453)
+        @test all(isone, diag(cov(ccv, X453)))
+        # --- `find_uncorrelated_indices`: the drop score, the tie policy, the guard ---
+        rng454 = StableRNG(11)
+        B453 = randn(rng454, 60, 3)
+        W453 = hcat(B453[:, 1], B453[:, 1] .+ 1e-9 .* randn(rng454, 60), B453[:, 2],
+                    B453[:, 3])
+        @test PortfolioOptimisers.find_uncorrelated_indices(W453; t = 0.95) == [2, 3, 4]
+        @test PortfolioOptimisers.find_uncorrelated_indices(W453; t = 0.95,
+                                                            scores = [0.0, 9.0, 0.0, 0.0]) ==
+              [1, 3, 4]
+        @test PortfolioOptimisers.find_uncorrelated_indices(W453; t = 0.95,
+                                                            scores = [9.0, 0.0, 0.0, 0.0]) ==
+              [2, 3, 4]
+        # Two columns that score equally leave no survivor.
+        @test PortfolioOptimisers.find_uncorrelated_indices(hcat(B453[:, 1], B453[:, 1],
+                                                                 B453[:, 2]); t = 0.95) ==
+              [3]
+        @test_throws DimensionMismatch PortfolioOptimisers.find_uncorrelated_indices(W453;
+                                                                                     scores = [1.0,
+                                                                                               2.0])
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`

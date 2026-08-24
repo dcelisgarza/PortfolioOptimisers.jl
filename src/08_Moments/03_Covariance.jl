@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Adapts any `StatsBase.CovarianceEstimator` to the library's calling convention, carrying its observation weights alongside it.
 
-The estimator and the weights travel together in one object, so a caller passes one value where the `StatsBase` API takes a separate estimator and weight vector at every call site.
+The estimator and the weights travel together in one object, so a caller passes one value where the `StatsBase` API takes a separate estimator and weight vector at every call site. `ce` accepts any subtype of `StatsBase.CovarianceEstimator`, so an estimator from a package such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl) reaches the library unchanged.
 
 # Fields
 
@@ -42,10 +42,6 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 
   - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-
-# Details
-
-  - `ce` can be used to specify any subtype of `StatsBase.CovarianceEstimator`. This allows users to leverage packages such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl), which implement custom covariance estimators.
 
 # Examples
 
@@ -105,6 +101,12 @@ Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
 This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.w`, which computes the covariance matrix using `ce.ce`.
 
+# Algorithm
+
+ 1. Resolve the observation weights from `ce.w` against `X`, giving `w`.
+ 2. When `w` is `nothing`, call [`robust_cov`](@ref) with `ce.ce` and `X` alone.
+ 3. Otherwise call [`robust_cov`](@ref) with `ce.ce`, `X` and `w`.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -117,17 +119,6 @@ This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.
 
   - $(ret_dict[:sigma])
 
-# Details
-
-  - Calls [`robust_cov`](@ref) with the appropriate covariance estimator.
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`robust_cov`](@ref)
-  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -138,6 +129,13 @@ julia> cov(GeneralCovariance(), X)
  0.0001  0.0001
  0.0001  0.0001
 ```
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`robust_cov`](@ref)
+  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -161,6 +159,12 @@ Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
 This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.w`, which computes the correlation matrix using `ce.ce`.
 
+# Algorithm
+
+ 1. Resolve the observation weights from `ce.w` against `X`, giving `w`.
+ 2. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` alone.
+ 3. Otherwise call [`robust_cor`](@ref) with `ce.ce`, `X` and `w`.
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -173,17 +177,6 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
 
   - $(ret_dict[:rho])
 
-# Details
-
-  - Calls [`robust_cor`](@ref) with the appropriate covariance estimator.
-
-# Related
-
-  - [`MatNum`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`robust_cor`](@ref)
-  - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -194,6 +187,13 @@ julia> cor(GeneralCovariance(), X)
  1.0  1.0
  1.0  1.0
 ```
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`robust_cor`](@ref)
+  - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -306,38 +306,32 @@ FullMoment covariance:
 \\end{align}
 ```
 
-Where:
-
-  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
-  - ``r_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
-  - $(math_dict[:T])
-
-SemiMoment (downside) covariance — clip de-meaned returns to zero before computing:
+SemiMoment (downside) covariance, from the de-meaned returns clipped at zero:
 
 ```math
 \\begin{align}
-\\tilde{r}_{tj} &= \\min(r_{tj} - \\hat{\\mu}_j,\\, 0)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\tilde{r}_{tj}``: Clipped de-meaned return of asset ``j`` at time ``t``.
-  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
-  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
-
-```math
-\\begin{align}
+\\tilde{r}_{tj} &= \\min(r_{tj} - \\hat{\\mu}_j,\\, 0)\\,,\\\\
 \\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij} &= \\frac{1}{T-1} \\sum_{t=1}^{T} \\tilde{r}_{ti} \\, \\tilde{r}_{tj}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - $(math_dict[:Sigma_hat_ij])
   - ``\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij}``: Estimated semi-covariance between assets ``i`` and ``j``.
-  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: Clipped de-meaned returns of assets ``i`` and ``j``.
+  - $(math_dict[:r_tj])
+  - ``r_{ti}``: Return of asset ``i`` at time ``t``.
+  - $(math_dict[:mu_hat_j])
+  - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
+  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: De-meaned returns of assets ``i`` and ``j``, clipped at zero.
   - $(math_dict[:T])
+
+The semi-covariance keeps the ``T-1`` divisor of the full moment, so it is not the covariance of the clipped returns about their own mean.
+
+# Algorithm
+
+ 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 2. Delegate to `Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
@@ -353,15 +347,6 @@ Where:
 
   - $(ret_dict[:sigma])
 
-# Related
-
-  - [`Covariance`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`FullMoment`](@ref)
-  - [`SemiMoment`](@ref)
-  - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -371,7 +356,21 @@ julia> cov(Covariance(), X)
 2×2 Matrix{Float64}:
  0.0001  0.0001
  0.0001  0.0001
+
+julia> cov(Covariance(; alg = SemiMoment()), X)
+2×2 Matrix{Float64}:
+ 5.0e-5  5.0e-5
+ 5.0e-5  5.0e-5
 ```
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
+  - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
@@ -382,6 +381,12 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`SemiMoment`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
+
+# Algorithm
+
+ 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
+ 3. Delegate to `Statistics.cov(ce.ce, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
@@ -411,8 +416,16 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 Where:
 
   - ``\\hat{\\mathbf{P}}_{ij}``: Estimated correlation between assets ``i`` and ``j``.
-  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
-  - ``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.
+  - $(math_dict[:Sigma_hat_ij])
+  - $(math_dict[:sigma_hat_i])
+  - ``\\hat{\\sigma}_j``: Estimated standard deviation of asset ``j``.
+
+The `alg` field of `ce` reaches ``\\hat{\\mathbf{\\Sigma}}``: [`SemiMoment`](@ref) standardises the semi-covariance, so the diagonal is one and an off-diagonal entry is a downside correlation.
+
+# Algorithm
+
+ 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 2. Delegate to `Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
@@ -433,15 +446,6 @@ Where:
 
   - $(ret_dict[:rho])
 
-# Related
-
-  - [`Covariance`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`FullMoment`](@ref)
-  - [`SemiMoment`](@ref)
-  - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -452,6 +456,15 @@ julia> cor(Covariance(), X)
  1.0  1.0
  1.0  1.0
 ```
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
+  - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
@@ -462,6 +475,12 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`SemiMoment`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
+
+# Algorithm
+
+ 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
+ 3. Delegate to `Statistics.cor(ce.ce, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
