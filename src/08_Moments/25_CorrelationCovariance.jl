@@ -40,7 +40,8 @@ CorrelationCovariance
      │    ce ┼ GeneralCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
-     │   alg ┴ FullMoment()
+     │   alg ┼ FullMoment()
+     │     w ┴ nothing
 ```
 
 # Related

@@ -279,6 +279,54 @@
             @test isapprox(var(SimpleVariance(), X490; dims = 1)[1],
                            var(SimpleVariance(), v490))
         end
+        #=
+        ADR 0088, #492. The rule of #490 covers the whole moment layer. `Covariance` gained
+        a `@wprop w` of its own, and `Coskewness` and `Cokurtosis` now read the `w` they
+        already held. For each of the four a hand-built weighted estimator therefore answers
+        what `factory` builds, under both moment algorithms.
+
+        Option 2 of #492 is what these pin. `w` weights the centre through `me` and the
+        deviations through `ce`, so one field weights the whole estimate. Weights that live
+        inside `ce` alone still centre on the unweighted mean, because no verb reads the
+        weights of an arbitrary `StatsBase.CovarianceEstimator`; the `mean` keyword reaches
+        that combination, and the last comparison of the block pins the pair.
+        =#
+        let aw492 = aweights(ew),
+            aw492b = aweights(reverse(collect(ew))),
+            mu492 = mean(SimpleExpectedReturns(), rd.X; dims = 1)
+
+            for malg in (FullMoment(), SemiMoment())
+                @test isapprox(cov(Covariance(; alg = malg, w = aw492), rd.X),
+                               cov(factory(Covariance(; alg = malg), aw492), rd.X))
+                @test isapprox(cor(Covariance(; alg = malg, w = aw492), rd.X),
+                               cor(factory(Covariance(; alg = malg), aw492), rd.X))
+                @test isapprox(coskewness(Coskewness(; alg = malg, w = aw492), rd.X)[1],
+                               coskewness(factory(Coskewness(; alg = malg), aw492), rd.X)[1])
+                @test isapprox(cokurtosis(Cokurtosis(; alg = malg, w = aw492), rd.X),
+                               cokurtosis(factory(Cokurtosis(; alg = malg), aw492), rd.X))
+            end
+            # The weighted centre is not the unweighted one, so each fix is measurable.
+            @test !isapprox(cov(Covariance(; w = aw492), rd.X),
+                            cov(Covariance(; w = aw492), rd.X; mean = mu492))
+            @test !isapprox(coskewness(Coskewness(; w = aw492), rd.X)[1],
+                            coskewness(Coskewness(; w = aw492), rd.X; mean = mu492)[1])
+            @test !isapprox(cokurtosis(Cokurtosis(; w = aw492), rd.X),
+                            cokurtosis(Cokurtosis(; w = aw492), rd.X; mean = mu492))
+            # `w` wins over the weights that `me` and `ce` carry, which is what `factory`
+            # does on every other path.
+            @test isapprox(cov(Covariance(; me = SimpleExpectedReturns(; w = aw492b),
+                                          ce = GeneralCovariance(; w = aw492b), w = aw492),
+                               rd.X), cov(Covariance(; w = aw492), rd.X))
+            @test isapprox(coskewness(Coskewness(; me = SimpleExpectedReturns(; w = aw492b),
+                                                 w = aw492), rd.X)[1],
+                           coskewness(Coskewness(; w = aw492), rd.X)[1])
+            # The unweighted path did not move.
+            @test isapprox(cov(Covariance(), rd.X), Statistics.cov(rd.X))
+            # The `mean` keyword still reaches an unweighted centre with weighted
+            # deviations, which is what weights inside `ce` alone give.
+            @test isapprox(cov(Covariance(; w = aw492), rd.X; mean = mu492),
+                           cov(Covariance(; ce = GeneralCovariance(; w = aw492)), rd.X))
+        end
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),

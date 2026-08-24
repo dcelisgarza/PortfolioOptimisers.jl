@@ -309,6 +309,8 @@ Compute the cokurtosis tensor for a dataset.
 
 This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. Observation weights in `kte.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
 
+`kte.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `kte.w` is not, the method sends `kte.me` through [`factory`](@ref) with `kte.w`, so `kte.w` wins over the weights that `kte.me` carries. Pass `mean` for a centre that `kte.w` does not describe. ADR 0088 records the decision.
+
 # Arguments
 
   - `kte`: Cokurtosis estimator.
@@ -359,7 +361,13 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
+    mu = if !isnothing(mean)
+        mean
+    elseif isnothing(kte.w)
+        Statistics.mean(kte.me, X; kwargs...)
+    else
+        Statistics.mean(factory(kte.me, kte.w), X; kwargs...)
+    end
     X = X .- mu
     return _cokurtosis(X, kte.mp, w)
 end
@@ -367,7 +375,13 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
+    mu = if !isnothing(mean)
+        mean
+    elseif isnothing(kte.w)
+        Statistics.mean(kte.me, X; kwargs...)
+    else
+        Statistics.mean(factory(kte.me, kte.w), X; kwargs...)
+    end
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurtosis(X, kte.mp, w)
 end

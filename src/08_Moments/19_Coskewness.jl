@@ -372,6 +372,8 @@ end
 
 Compute the full coskewness tensor and processed matrix for a dataset. Observation weights in `ske.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
+`ske.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `ske.w` is not, the method sends `ske.me` through [`factory`](@ref) with `ske.w`, so `ske.w` wins over the weights that `ske.me` carries. Pass `mean` for a centre that `ske.w` does not describe. ADR 0088 records the decision.
+
 # Arguments
 
   - `ske`: Coskewness estimator.
@@ -431,7 +433,13 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
+    mu = if !isnothing(mean)
+        mean
+    elseif isnothing(ske.w)
+        Statistics.mean(ske.me, X; kwargs...)
+    else
+        Statistics.mean(factory(ske.me, ske.w), X; kwargs...)
+    end
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
@@ -439,7 +447,13 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims
                     mean = nothing, kwargs...)
     X = dims_oriented(dims, X)
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
+    mu = if !isnothing(mean)
+        mean
+    elseif isnothing(ske.w)
+        Statistics.mean(ske.me, X; kwargs...)
+    else
+        Statistics.mean(factory(ske.me, ske.w), X; kwargs...)
+    end
     Y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(Y, X, ske.mp, w)
 end

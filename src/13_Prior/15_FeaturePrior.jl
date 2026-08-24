@@ -382,7 +382,8 @@ PhylogenyFeatures
       │       │      │    ce ┼ GeneralCovariance
       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │       │      │       │    w ┴ nothing
-      │       │      │   alg ┴ FullMoment()
+      │       │      │   alg ┼ FullMoment()
+      │       │      │     w ┴ nothing
       │       │   mp ┼ MatrixProcessing
       │       │      │     pdm ┼ Posdef
       │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -648,7 +649,8 @@ EmpiricalPrior
           │      │    ce ┼ GeneralCovariance
           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
           │      │       │    w ┴ nothing
-          │      │   alg ┴ FullMoment()
+          │      │   alg ┼ FullMoment()
+          │      │     w ┴ nothing
           │   mp ┼ MatrixProcessing
           │      │     pdm ┼ Posdef
           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

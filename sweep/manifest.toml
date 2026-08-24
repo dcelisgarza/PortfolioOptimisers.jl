@@ -53,7 +53,7 @@
 "src/07_MatrixProcessing.jl" = { map = 2, units = 8, algorithm = 3, swept = true }
 "src/08_Moments/01_Base_Moments.jl" = { map = 3, units = 33, algorithm = 16, swept = true }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { map = 3, units = 2, algorithm = 1, swept = true }
-"src/08_Moments/03_Covariance.jl" = { map = 3, units = 8, algorithm = 6, swept = true }
+"src/08_Moments/03_Covariance.jl" = { map = 3, units = 9, algorithm = 7, swept = true }
 "src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, algorithm = 5, swept = true }
 "src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, algorithm = 9, swept = true }
 "src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 33, swept = false }

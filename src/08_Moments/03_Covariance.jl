@@ -211,6 +211,10 @@ Estimates the covariance matrix of asset returns from a centring estimator, a co
 
 `Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
 
+`w` weights the whole estimate, so it reaches the centre as well as the deviations. The four methods send `me` and `ce` through [`factory`](@ref), which replaces the weights of each with `w`, so `w` wins over the weights that `me` and `ce` carry. Pass `mean` for a centre that `w` does not describe. ADR 0088 records the decision.
+
+`ce` admits any `StatsBase.CovarianceEstimator`, and no verb of this library reads the weights of one that the library does not own. A `ce` from a package such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl) therefore keeps its own configuration, and `w` is the field that weights a `Covariance`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -220,10 +224,15 @@ $(DocStringExtensions.FIELDS)
     Covariance(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-        alg::AbstractMomentAlgorithm = FullMoment()
+        alg::AbstractMomentAlgorithm = FullMoment(),
+        w::Option{<:ObsWeights} = nothing
     ) -> Covariance
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:oow])
 
 ## Propagated parameters
 
@@ -231,6 +240,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## View parameters
 
@@ -238,6 +248,14 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -249,7 +267,18 @@ Covariance
    ce ┼ GeneralCovariance
       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │    w ┴ nothing
-  alg ┴ FullMoment()
+  alg ┼ FullMoment()
+    w ┴ nothing
+
+julia> Covariance(; w = StatsBase.AnalyticWeights([0.2, 0.3, 0.5]))
+Covariance
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+   ce ┼ GeneralCovariance
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ nothing
+  alg ┼ FullMoment()
+    w ┴ StatsBase.AnalyticWeights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
 ```
 
 # Related
@@ -259,8 +288,12 @@ Covariance
   - [`SimpleExpectedReturns`](@ref)
   - [`FullMoment`](@ref)
   - [`SemiMoment`](@ref)
+  - [`Option`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`covariance_centre_and_estimator`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 """
 @propagatable @concrete struct Covariance <: AbstractCovarianceEstimator
     """
@@ -275,15 +308,66 @@ Covariance
     $(field_dict[:malg])
     """
     alg
+    """
+    $(field_dict[:oow])
+    """
+    @wprop w
     function Covariance(me::AbstractExpectedReturnsEstimator,
-                        ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)
-        return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
+                        ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm,
+                        w::Option{<:ObsWeights})
+        assert_nonempty_nonneg_finite_val(w, :w)
+        return new{typeof(me), typeof(ce), typeof(alg), typeof(w)}(me, ce, alg, w)
     end
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-                    alg::AbstractMomentAlgorithm = FullMoment())::Covariance
-    return Covariance(me, ce, alg)
+                    alg::AbstractMomentAlgorithm = FullMoment(),
+                    w::Option{<:ObsWeights} = nothing)::Covariance
+    return Covariance(me, ce, alg, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the centring vector and the inner covariance estimator that a [`Covariance`](@ref) method computes with.
+
+The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covariance`](@ref) reach one centre and one inner estimator by this verb, so `ce.w` reaches the centre and the deviations by one rule. ADR 0088 records the decision.
+
+# Algorithm
+
+ 1. `ce.w` is `nothing`: take `mu` from `mean`, or compute it with `ce.me` when `mean` is `nothing`. Return `mu` and `ce.ce` unchanged.
+ 2. `ce.w` is not `nothing`: send `ce.me` through [`factory`](@ref) with `ce.w`, so that the centre carries the weights of the deviations. Take `mu` from `mean`, or compute it with the rebuilt estimator when `mean` is `nothing`.
+ 3. Send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights; a `StatsBase.CovarianceEstimator` that is not one of them passes through unchanged, because no verb of this library reads its weights.
+
+Step 1 is a performance guard and not a second contract. `ce.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `ce` once per window. A `ce.ce` that holds weights of its own therefore keeps them when `ce.w` is `nothing`, and loses them to `ce.w` when it is not. That is what [`factory`](@ref) does on every other path.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Returns
+
+  - `mu::Union{<:Number, <:ArrNum}`: Centring vector.
+  - `cel::StatsBase.CovarianceEstimator`: Inner covariance estimator, weighted by `ce.w` when it is not `nothing`.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`factory`](@ref)
+  - [`factory_child`](@ref)
+"""
+function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 1,
+                                         mean = nothing, kwargs...)
+    if isnothing(ce.w)
+        mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
+        return mu, ce.ce
+    end
+    me = factory(ce.me, ce.w)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
+    return mu, factory_child(ce.ce, ce.w)
 end
 """
     Statistics.cov(
@@ -330,8 +414,8 @@ The semi-covariance keeps the ``T-1`` divisor of the full moment, so it is not t
 
 # Algorithm
 
- 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
- 2. Delegate to `Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)`.
+ 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`; otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` reaches `ce.me` and `ce.ce` through [`factory`](@ref) first.
+ 2. Delegate to `Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
@@ -374,8 +458,8 @@ julia> cov(Covariance(; alg = SemiMoment()), X)
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
+    return Statistics.cov(cel, X; dims = dims, mean = mu, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -384,15 +468,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 # Algorithm
 
- 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
  2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Delegate to `Statistics.cov(ce.ce, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
+ 3. Delegate to `Statistics.cov(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
+    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return Statistics.cov(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 """
     Statistics.cor(
@@ -424,8 +508,8 @@ The `alg` field of `ce` reaches ``\\hat{\\mathbf{\\Sigma}}``: [`SemiMoment`](@re
 
 # Algorithm
 
- 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
- 2. Delegate to `Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)`.
+ 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref). When `mean` is `nothing`, `mu` comes from `ce.me`; otherwise it comes from `mean`. When `ce.w` is not `nothing`, `ce.w` reaches `ce.me` and `ce.ce` through [`factory`](@ref) first.
+ 2. Delegate to `Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)`.
 
 # Arguments
 
@@ -468,8 +552,8 @@ julia> cor(Covariance(), X)
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
+    return Statistics.cor(cel, X; dims = dims, mean = mu, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -478,15 +562,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 # Algorithm
 
- 1. When `mean` is `nothing`, compute the centring vector `mu` with `ce.me`; otherwise take `mu` from `mean`.
+ 1. Resolve the centring vector `mu` and the inner estimator `cel` with [`covariance_centre_and_estimator`](@ref).
  2. Replace `X` with `min.(X .- mu, 0)`, the de-meaned returns clipped at zero.
- 3. Delegate to `Statistics.cor(ce.ce, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
+ 3. Delegate to `Statistics.cor(cel, X; dims = dims, mean = 0, kwargs...)`. The zero mean is what stops the clipped returns being centred a second time.
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
+    mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return Statistics.cor(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 
 export GeneralCovariance, Covariance, cov, cor
