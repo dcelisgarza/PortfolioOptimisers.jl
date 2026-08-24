@@ -629,12 +629,12 @@ No file is swept today, so this testset asserts the exemption and nothing else, 
 
 The sections are not gated the same way, and the reason is the trigger, not the section.
 
-  `# JuMP formulation` HAS A MECHANICAL TRIGGER IN THE CODE. A body that calls
-  `JuMP.@constraint` or `JuMP.@constraints` registers a row, and the parser sees the call.
-  The trigger needs no judgement and no exemption list, so this section gets the strongest
-  check available: a PER-UNIT PRESENCE RULE. Measured over the tree, 82 functions register a
-  row and every one of the 82 is documented in its own file, so the rule demands the section
-  of 82 docstrings and of nothing else.
+  `# JuMP formulation` HAS A MECHANICAL TRIGGER IN THE CODE. A body that calls a JuMP
+  model-building macro builds part of the model, and the parser sees the call. The trigger
+  needs no judgement and no exemption list, so this section gets the strongest check
+  available: a PER-UNIT PRESENCE RULE, on the section AND on each subsection the body's
+  macros demand. #443 widened the trigger from `@constraint` alone; the block above the
+  trigger table records what it measured.
 
   `# Algorithm` HAS NO SUCH TRIGGER. The standard says a procedure carries it, a closed form
   stays in `# Mathematical definition`, and a SELECTOR TAG carries neither. `AbstractAlgorithm`
@@ -651,7 +651,7 @@ selector tag that a parser can apply, and it would carry an exemption row per ma
 It was set aside for that cost. It stays available: the ratchet is a floor, and a later
 ticket can raise it to a presence rule without moving the manifest key.
 
-------------------------------------------------- what a row-registering docstring is
+------------------------------------------------ what a model-building docstring is
 
 A docstring does not always sit on the method that registers the row. Two shapes exist in
 the tree and the attribution must read both.
@@ -676,14 +676,11 @@ case exists in the tree today. It is the accepted blind spot, in the manner of t
 
 --------------------------------------------------------------- what is NOT gated here
 
-The standard's trigger sentence is "any code that ADDS ROWS to a `JuMP.Model`", and this
-check gates exactly that. 40 further documented functions touch the model without
-registering a row: they create a variable, register an expression, or set the objective.
-`set_model_scales!` is one of them, and it is the function whose `sc` and `so` were swapped
-for nine callers -- the defect #404's charter names when it says the JuMP layer is
-undocumented as a model. Whether the trigger should widen to cover them is a change to the
-STANDARD, which is #405's charter and not this gate's, so it is raised as its own ticket
-rather than settled here by a gate that demands more than its Authority states.
+The CONTENT of a subsection. Nothing compares the model keys a docstring names with the keys
+the body registers, and nothing reads a `## Relaxation` at all -- an inexact encoding is a
+fact about the mathematics, not a token. ADR 0081 records the key census as the largest build
+of this area and leaves it in the map's *Not yet specified*. `## Relaxation` holds by review,
+in the sense of `STANDARDS.md`.
 =#
 @testset "Swept file section completeness" begin
     using Test, TOML
@@ -704,9 +701,9 @@ rather than settled here by a gate that demands more than its Authority states.
     # row to a name no docstring can ever carry.
     function isdefinition(x)
         Meta.isexpr(x, :function) && return true
-        # A `macro` is a definition and it binds a name, so its body reaches `registers_row`
-        # like any other. `test_45_sweep_census.jl` counts a documented macro as a unit, and
-        # these two checks read the same units it does.
+        # A `macro` is a definition and it binds a name, so its body reaches
+        # `demanded_subsections` like any other. `test_45_sweep_census.jl` counts a
+        # documented macro as a unit, and these two checks read the same units it does.
         Meta.isexpr(x, :macro) && return true
         Meta.isexpr(x, :(=)) || return false
         lhs = x.args[1]
@@ -762,10 +759,52 @@ rather than settled here by a gate that demands more than its Authority states.
     # holds the section. `port_opt_view` in `src/03_Preprocessing.jl` is such a block.
     count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
     has_section(text, name) = count_section(text, name) > 0
+    has_subsection(text, name) = count(==(string("## ", name)),
+                                       rstrip.(split(text, '\n'))) > 0
 
-    constraint_macros = (Symbol("@constraint"), Symbol("@constraints"))
-    function registers_row(node)
-        node isa Expr || return false
+    #=
+    THE TRIGGER IS THE MACRO FAMILY, AND EACH FAMILY OWNS ONE SUBSECTION.
+
+    #437 built this check on `JuMP.@constraint` alone, because the standard's trigger
+    sentence read "any code that ADDS ROWS to a `JuMP.Model`". #443 widened both, and the
+    reason is the standard's OWN justification for the section: an entry carries a name, and
+    a caller reads the entry back by that name. THAT IS NOT A PROPERTY OF A ROW.
+    `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each a variable or an
+    expression, `src/` reads a model key back by name in 51 places over 16 distinct keys, and
+    `08_Base_JuMPOptimisation.jl` wraps nine of those keys in an accessor that raises a named
+    `ArgumentError` when its builder has not run. A row name is public, and so is every one
+    of those.
+
+    Measured over `src/` and `ext/` at the tip that widened it: 137 documented units call one
+    of the macros below, 96 register a row, and 41 touch the model without one. 31 of the 41
+    register only an expression, 3 only a variable, 4 both, 2 only the objective and 1 an
+    expression and the objective. `set_model_scales!` is one of the 41, and its swapped
+    `sc`/`so` is the defect #404's charter names when it says the JuMP layer is undocumented
+    as a model. Two of the four `## Relaxation` cases ADR 0081 cites -- the
+    `BrownianDistanceVariance` bound and the scalarisers -- sat on the exempt side of the
+    trigger that same decision wrote.
+
+    `@objective` is IN. A formulation is variables, constraints and an objective, and the
+    third was missing. `owa_l_moment_crm_sumsq_obj` in `src/19_RiskMeasures/` is two methods
+    that differ in `Min so * t` against `Min so * t^2` AND IN NOTHING ELSE, so the objective
+    line is the only text that can tell them apart.
+
+    The widening costs no judgement and no exemption list, which is the property that made
+    the narrow rule worth building: the parser sees a macro call, and each family maps to the
+    subsection that documents what that macro registers. It is measured to red nothing today
+    -- no file marked `swept = true` calls a JuMP macro.
+    =#
+    subsection_of = Dict(Symbol("@variable") => "Variables",
+                         Symbol("@variables") => "Variables",
+                         Symbol("@expression") => "Expressions",
+                         Symbol("@expressions") => "Expressions",
+                         Symbol("@constraint") => "Constraints",
+                         Symbol("@constraints") => "Constraints",
+                         Symbol("@objective") => "Objective")
+
+    # Every subsection the macros under `node` demand of the docstring that speaks for it.
+    function demanded_subsections(node, acc = Set{String}())
+        node isa Expr || return acc
         if Meta.isexpr(node, :macrocall) && !isempty(node.args)
             m = node.args[1]
             s = if m isa GlobalRef
@@ -777,19 +816,26 @@ rather than settled here by a gate that demands more than its Authority states.
             else
                 nothing
             end
-            s in constraint_macros && return true
+            if !isnothing(s) && haskey(subsection_of, s)
+                push!(acc, subsection_of[s])
+            end
         end
-        return any(registers_row, node.args)
+        for a in node.args
+            demanded_subsections(a, acc)
+        end
+        return acc
     end
 
     #=
     Returns the file's documented units in source order -- the name each one documents and
-    its text -- and the indices of those that own a row-registering definition. A docstring
-    takes charge of its own name when it is read, and holds it until the next docstring of
-    that name, which is the attribution the two shapes above need.
+    its text -- and, for each unit that owns a model-building definition, the subsections
+    that definition demands. A docstring takes charge of its own name when it is read, and
+    holds it until the next docstring of that name, which is the attribution the two shapes
+    above need. A unit whose definitions call no such macro carries no entry.
     =#
     function scan(path)
-        names, texts, registering = Symbol[], String[], Int[]
+        names, texts = Symbol[], String[]
+        demanded = Dict{Int, Set{String}}()
         in_force = Dict{Symbol, Int}()
         function walk(node)
             node isa Expr || return nothing
@@ -803,32 +849,45 @@ rather than settled here by a gate that demands more than its Authority states.
                 end
             elseif isdefinition(node)
                 nm = bound_name(node)
-                if !isnothing(nm) && haskey(in_force, nm) && registers_row(node)
-                    push!(registering, in_force[nm])
+                if !isnothing(nm) && haskey(in_force, nm)
+                    subs = demanded_subsections(node)
+                    isempty(subs) ||
+                        union!(get!(demanded, in_force[nm], Set{String}()), subs)
                 end
             end
             foreach(walk, node.args)
             return nothing
         end
         walk(Meta.parseall(read(path, String)))
-        return names, texts, unique!(sort!(registering))
+        return names, texts, demanded
     end
 
-    @testset "a swept file's row-registering docstring carries # JuMP formulation" begin
+    @testset "a swept file's model-building docstring carries # JuMP formulation" begin
         offenders = String[]
         for f in swept
-            names, texts, registering = scan(joinpath(ROOT, f))
-            for u in registering
-                has_section(texts[u], "JuMP formulation") ||
-                    push!(offenders, string(f, "  ", names[u]))
+            names, texts, demanded = scan(joinpath(ROOT, f))
+            for u in sort(collect(keys(demanded)))
+                text = texts[u]
+                if !has_section(text, "JuMP formulation")
+                    push!(offenders, string(f, "  ", names[u], "  # JuMP formulation"))
+                    continue
+                end
+                # The section is there, so each family the body calls owes its subsection.
+                for sub in sort(collect(demanded[u]))
+                    has_subsection(text, sub) ||
+                        push!(offenders, string(f, "  ", names[u], "  ## ", sub))
+                end
             end
         end
         if !isempty(offenders)
             @warn """$(length(offenders)) docstring(s) in a file marked `swept = true` in
-                     `sweep/manifest.toml` document a function that registers a row through
-                     `JuMP.@constraint` or `JuMP.@constraints` and carry no
-                     `# JuMP formulation` section. The section names one bullet per row, by
-                     the row's JuMP name:\n  $(join(offenders, "\n  "))"""
+                     `sweep/manifest.toml` document a function that builds part of a
+                     `JuMP.Model` and carry neither the `# JuMP formulation` section nor a
+                     subsection the body's macros demand. `@variable` owes `## Variables`,
+                     `@expression` owes `## Expressions`, `@constraint` owes
+                     `## Constraints` and `@objective` owes `## Objective`, each naming its
+                     entry by the model key a caller reads it back
+                     by:\n  $(join(offenders, "\n  "))"""
         end
         @test isempty(offenders)
     end

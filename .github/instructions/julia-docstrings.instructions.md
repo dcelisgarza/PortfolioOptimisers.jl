@@ -150,7 +150,7 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 | summary paragraph | what the unit is, in the first sentence; a trap that applies to the unit as a whole, in a later sentence | a formula, a step, or a fact about one field |
 | `# Mathematical definition` | the closed form that defines the unit, and a consequence of that form | an identifier from the body, an order of operations, or a choice the implementation made |
 | `# Algorithm` | the numbered steps the body runs, each naming the quantity it produces | a closed form restated as a step |
-| `# JuMP formulation` | the variables the code reads or creates, one bullet per row it registers, and the relaxation when the encoding is not exact | a row the body does not register |
+| `# JuMP formulation` | the model the code builds: the variables, expressions and rows it registers, the objective it sets, and the relaxation when the encoding is not exact | an entry the body does not register |
 | `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method | a method the family does not dispatch on |
 | `# Fields` | one description per field, written where the field is declared | a fact about the type as a whole |
 | `# Constructors` | the signature, `## Validation`, and the propagation subsections | a rule the constructor does not enforce |
@@ -172,7 +172,7 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 | the unit as a whole | the summary paragraph, in the second sentence or later |
 | another unit | `# Related`, as an annotated entry |
 
-A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, the shape of a result to `# Returns`, and a model row to `# JuMP formulation`.
+A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, the shape of a result to `# Returns`, and a model entry to `# JuMP formulation`.
 
 The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
 
@@ -498,7 +498,7 @@ A **dispatch alias** is a `const` bound to a type expression rather than to a ba
 - **No `# Fields`, no `# Constructors`, no `# Arguments`, no `# Returns`, no `# Examples`, on any kind.** The canonical unit owns each of them, and the summary sentence puts it one click away. A copy on the alias is a second text to maintain and the one a reader reaches first when it goes stale.
 - **No `# Related` on an acronym alias or on a factory alias.** Its summary sentence already `@ref`s every canonical name, and `## What each section holds` states that `# Related` does not hold a copy of the related unit's own text. One link, once.
 - **`# Related` on a dispatch alias**, one bullet per grouped member. A group of members is a list, and a summary sentence must not be one. A function that dispatches on the alias may take a bullet of its own.
-- **`# Algorithm`, `# Mathematical definition` and `# JuMP formulation` reach no alias.** An alias runs no steps and registers no row. A factory alias composes types and takes no branch worth numbering.
+- **`# Algorithm`, `# Mathematical definition` and `# JuMP formulation` reach no alias.** An alias runs no steps and registers no model entry. A factory alias composes types and takes no branch worth numbering.
 
 The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:alias`, under [`.github/instructions/julia-source-code.instructions.md`](julia-source-code.instructions.md), so it never reads an alias summary sentence.
 
@@ -731,21 +731,41 @@ Rules:
 
 ## The `# JuMP formulation` Section
 
-Any code that **adds rows to a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: the rows carry names, a caller reads them back by those names, and the encoding is not always exact.
+Any code that **builds part of a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: a model entry carries a name, a caller reads the entry back by that name, and the encoding is not always exact.
+
+The trigger is mechanical. The body calls `JuMP.@variable`, `JuMP.@variables`, `JuMP.@expression`, `JuMP.@expressions`, `JuMP.@constraint`, `JuMP.@constraints` or `JuMP.@objective`. **A row is not the only public entry.** `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are registered as a variable or as an expression, and each is read back by name across the library. `set_model_scales!` registers `sc` and `so` for every builder that scales a row or an objective.
 
 `# JuMP formulation` sits after `# Mathematical definition` and after `# Algorithm`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
 
-It has three subsections, in this order. The first two are always present. The third is present only when the encoding is not exact.
+It has five subsections, in this order. Each of the first four is present whenever the body calls the macro that owns it. The fifth is present only when the encoding is not exact.
+
+| Subsection | Present when the body calls | Holds |
+| --- | --- | --- |
+| `## Variables` | `JuMP.@variable`, `JuMP.@variables` | the model variables the code creates, and the ones it reads |
+| `## Expressions` | `JuMP.@expression`, `JuMP.@expressions` | the expressions the code registers |
+| `## Constraints` | `JuMP.@constraint`, `JuMP.@constraints` | the rows the code registers |
+| `## Objective` | `JuMP.@objective` | the sense and the expression the code sets |
+| `## Relaxation` | — | the bound, when the encoding is not exact |
+
+`## Variables` is also permitted when the body only **reads** a variable. A formulation that reads `w` and never names it is unreadable.
+
+The **last** of the first four subsections that is present closes with a `Where:` list. It defines every symbol the section uses, under the rules of the `Where:` section above. Interpolate `$(math_dict[:key])` for a standardised symbol. One list serves the whole section.
 
 ### `## Variables`
 
-One bullet per model variable that the code reads or creates. Name each variable by its model key, and say whether the code reads it or creates it.
+One bullet per model variable that the code creates, and one per model variable that it reads. Name each variable by its model key, and say whether the code reads it or creates it. A variable that the macro creates under no key is named by the symbol the body binds it to.
+
+### `## Expressions`
+
+One bullet per expression that the code registers, in the order in which the body registers them. Each bullet carries **the expression's model key** and the mathematics of the expression. An expression that the macro does not name carries the key it is stored under. An expression that the function only returns is named by the returned value.
 
 ### `## Constraints`
 
 **One bullet per row that the code registers**, in the order in which the body registers them. Each bullet carries **the row's JuMP name** and the mathematics of the row. The name is the one written in the `JuMP.@constraint` call, because that is the key with which a caller reads the row back out of the model.
 
-Close the subsection with a `Where:` list that defines every symbol, under the rules of the `Where:` section above. Interpolate `$(math_dict[:key])` for a standardised symbol.
+### `## Objective`
+
+One bullet: the sense that the code sets, `Min` or `Max`, and the expression that it minimises or maximises, named by its model key. Two methods of one function can differ in nothing but the objective, and then this bullet is the only text that tells them apart.
 
 ### `## Relaxation`
 
@@ -756,6 +776,8 @@ Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift
  1. The **direction** of the bound: whether the model quantity lies above or below the exact quantity.
  2. The **quantity** that is bounded, named by its model key.
  3. The **condition** under which the bound is tight.
+
+**A bound does not have to sit in a row.** `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp scalarisers put an upper bound in `model[:risk]` that is tight only while a minimising objective pulls on it.
 
 **Example.** The following is the formulation of `set_gross_budget_constraints!` in `src/20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl`:
 
@@ -770,14 +792,32 @@ Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift
 
 ## Constraints
 
-  - `gbgt_lb`: ``s_c \\left(\\sum lw + \\sum sw - k b_l\\right) \\geq 0``
-  - `gbgt_ub`: ``s_c \\left(\\sum lw + \\sum sw - k b_u\\right) \\leq 0``
+  - `gbgt_lb`: ``s_c \left(\sum lw + \sum sw - k b_l\right) \geq 0``
+  - `gbgt_ub`: ``s_c \left(\sum lw + \sum sw - k b_u\right) \leq 0``
 
 Where:
 
   - $(math_dict[:sc_scale])
   - $(math_dict[:k_budget])
   - ``b_l``, ``b_u``: lower and upper gross budget bounds.
+"""
+````
+
+**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/20_Optimisation/08_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
+
+````julia
+"""
+# JuMP formulation
+
+## Expressions
+
+  - `sc`: ``s_c``, multiplied into both sides of every scaled row.
+  - `so`: ``s_o``, multiplied into the objective.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
 """
 ````
 
@@ -796,4 +836,4 @@ Read a real docstring, not a copy of one. Each row names a Unit whose file is ma
 | Private function | `_denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
 | Dispatch alias | `RhoDistanceAlgorithm` | [`src/09_Distance/02_Distance.jl`](../../src/09_Distance/02_Distance.jl) |
 
-`# JuMP formulation` carries no row. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.
+The table above carries no row for `# JuMP formulation`. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.

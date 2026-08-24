@@ -805,7 +805,7 @@ const val_dict = unique_key_dict(:val_dict,
                                  :ra_x => "`x` is valid",#
                                  :ra_y => "`y` is valid",#
                                  :ra_norm_x => "`x` is valid",#
-                                 :relax => "The encoding is not exact: the rows below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
+                                 :relax => "The encoding is not exact: the entries below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
@@ -867,6 +867,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # JuMP optimisation variables.
                        :k_budget => "``k``: Budget scaling / homogenisation variable.",#
                        :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
+                       :so_scale => "``s_o``: Objective scale. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
                        :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.",#
                        # Second-moment formulations.

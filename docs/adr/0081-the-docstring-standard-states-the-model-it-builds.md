@@ -191,3 +191,69 @@ corrected rather than deleted.
 Its 380-line `## Complete Example` is deleted, because it is fictional, it can never be gated, and
 it breaks this repository's summary-sentence rule twice in its own text. ADR 0085 records what
 replaces it.
+
+## Amendment (2026-08-24): the `# JuMP formulation` trigger covers the whole formulation
+
+The 2026-08-22 amendment above raised a question and left it open. This amendment answers it.
+
+**The trigger widens from a row to any model entry.** Rule 1 above reads *any code that adds
+rows to a `JuMP.Model`*. It now reads: **any code that builds part of a `JuMP.Model`**, and the
+mechanical form of that is a body that calls `JuMP.@variable`, `JuMP.@variables`,
+`JuMP.@expression`, `JuMP.@expressions`, `JuMP.@constraint`, `JuMP.@constraints` or
+`JuMP.@objective`.
+
+The reason is this decision's own justification for the section. It says that the section exists
+because *the rows carry names, a caller reads them back by those names*. **That is not a property
+of a row.** `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are each registered as a
+variable or as an expression, `src/` reads a model key back by name in 51 places over 16 distinct
+keys, and `src/20_Optimisation/08_Base_JuMPOptimisation.jl` wraps nine of those keys in an
+accessor that raises a named `ArgumentError` when its builder has not run. A row name is public,
+and so is every one of those.
+
+Measured over `src/` and `ext/` at the tip that widened it: 137 documented units call one of the
+seven macros, 96 register a row, and 41 touch the model without one. Of the 41, 31 register only
+an expression, 3 only a variable, 4 both, 2 only the objective, and 1 an expression and the
+objective. They sit in 16 files, and **no file marked `swept = true` is one of them**, so the
+widening reds nothing on the day it lands.
+
+**The section gains `## Expressions` and `## Objective`, and no subsection is unconditional.**
+Rule 1 said `## Variables` and `## Constraints` are *always present*, which would put an empty
+`## Constraints` under a function that registers no row. Each of the four register subsections is
+now present exactly when the body calls the macro that owns it: `@variable` owes `## Variables`,
+`@expression` owes `## Expressions`, `@constraint` owes `## Constraints`, and `@objective` owes
+`## Objective`. `## Variables` is also permitted when the body only *reads* a variable, because a
+formulation that reads `w` and never names it is unreadable. One `Where:` list closes the last
+subsection present and serves the whole section.
+
+An expression had no home before this. `set_model_scales!` registers `sc` and `so` and is the
+function whose two scales were swapped for nine callers — the defect #404's charter names when it
+says that the JuMP layer is undocumented as a model — and under the old rule its docstring had
+nowhere to say so.
+
+**`@objective` is in.** A mathematical program is variables, constraints and an objective, and the
+third was missing from a section named *formulation*. The case that settles it is
+`owa_l_moment_crm_sumsq_obj` in `src/19_RiskMeasures/10_OWARiskMeasures.jl`: two methods that
+differ in `Min so * t` against `Min so * t^2` and in nothing else. Only an objective bullet tells
+them apart.
+
+**`## Relaxation` is unchanged in shape and widened in reach.** The bound does not have to sit in
+a row. `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp
+scalarisers put an upper bound in `model[:risk]`. Those are two of the four cases this decision
+cites, and both sat on the exempt side of the trigger it wrote. `val_dict[:relax]` therefore reads
+*the entries below bound the quantity* rather than *the rows below*. No docstring interpolated it
+yet, so the wording moved at no cost.
+
+**The gate widens with the standard, and gains a subsection check.** The `Swept file section
+completeness` testset of `test/test_26_docs.jl` reads a macro-to-subsection table rather than a
+constraint-macro tuple. It demands the section of a unit whose definitions call any of the seven,
+and then demands each subsection that unit's own macros name. The widening keeps the property that
+made the narrow rule worth building: a parser sees a macro call, so the trigger needs no judgement
+and no exemption list.
+
+**What is still ungated.** The *content* of a subsection. Nothing compares the model keys a
+docstring names with the keys the body registers, and nothing reads `## Relaxation` at all — an
+inexact encoding is a fact about the mathematics and not a token. The key census stands in the
+map's *Not yet specified*, as the Consequences above already record. `## Relaxation` holds by
+review, in the sense of `STANDARDS.md`. This is a known unenforced state and not a hidden one.
+
+`math_dict` gains `:so_scale`, the objective scale, beside the `:sc_scale` this decision added.
