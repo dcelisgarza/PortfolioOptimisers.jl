@@ -1482,21 +1482,19 @@
         @test size(hxy) == (nb, nb)
         # The marginals are normalised before the entropy; the joint histogram is not.
         wmx = fit(Histogram, xh,
-                  range(minimum(xh) - eps(Float64), maximum(xh) + eps(Float64);
-                        length = nb + 1)).weights
+                  range(minimum(xh), nextfloat(maximum(xh)); length = nb + 1)).weights
         @test exh ≈ entropy(wmx ./ sum(wmx))
-        @test sum(hxy) <= length(xh)
+        @test sum(hxy) == length(xh)
         #=
-        The edges are widened by `eps(eltype(x))`, the machine epsilon, not the spacing at
-        the widened value. For a maximum of magnitude two or more the widened upper edge
-        rounds back to the maximum, and the exclusive upper edge then bins the largest
-        observation out of the histogram. Pinned so the loss is visible, not silent. The
-        fix moves every mutual information number the library reports, so it is filed as
-        #493 rather than made here.
+        ADR 0089, #493. The edges are widened by the spacing at the value, not by the
+        machine epsilon of the type. `eps(Float64)` is half of one unit in the last place at
+        a magnitude of two or more, so the old upper edge rounded back onto the maximum and
+        the exclusive edge binned the largest observation out. `nextfloat` is a whole unit
+        at every magnitude, so nothing is lost. The testset below carries the rest.
         =#
         xbig = xh .+ 10
         @test maximum(xbig) + eps(Float64) == maximum(xbig)
-        @test sum(PO.calc_hist_data(xbig, xbig, nb)[3]) == length(xbig) - 1
+        @test sum(PO.calc_hist_data(xbig, xbig, nb)[3]) == length(xbig)
         # --- `intrinsic_mutual_info` is the unnormalised, unclamped estimate ---
         Zh = hcat(xh, yh)
         @test PO.intrinsic_mutual_info(hxy) ≈ PO.mutual_info(Zh, nb, false)[1, 2]
@@ -1591,6 +1589,79 @@
         @test cor(MutualInfoCovariance(; bins = 8), Xc) ≈
               cor(MutualInfoCovariance(; bins = 8), Xc'; dims = 2)
         @test_throws DomainError cor(MutualInfoCovariance(; bins = 8), Xc; dims = 3)
+    end
+    @testset "A histogram edge is widened by the spacing at the value (#493)" begin
+        #=
+        ADR 0089. `calc_hist_data` widened both edges by `eps(eltype(x))`, the epsilon of
+        the type rather than the spacing at the value. At a magnitude of two or more that is
+        half a unit in the last place, so `maximum(x) + eps(Float64)` rounded back onto the
+        maximum. A `StatsBase.Histogram` bin is closed on the left, so its upper edge is
+        exclusive, and the largest observation was binned out.
+        =#
+        Z493 = randn(StableRNG(555), 600, 6)
+        Tobs493 = size(Z493, 1)
+        #=
+        The rounding that caused the defect is a property of the value, not of the fix, so
+        it is still there. `eps(Float64)` is exactly half a unit in the last place at a
+        magnitude between two and four, and a half rounds to even, so the sum returns the
+        value it started from. `nextfloat` is a whole unit and always moves.
+        =#
+        @test 3.5 + eps(Float64) == 3.5
+        @test nextfloat(3.5) > 3.5
+        # Three of these six columns carry a maximum that the old widening rounded away.
+        @test count(k -> maximum(view(Z493, :, k)) + eps(Float64) ==
+                         maximum(view(Z493, :, k)), axes(Z493, 2)) >= 1
+        # Every observation of every pair is binned, under every bin rule.
+        for bins in (HacineGharbiRavier(), Knuth(), Scott(), FreedmanDiaconis(), 8)
+            for j in axes(Z493, 2), i in 1:j
+                xj = view(Z493, :, j)
+                xi = view(Z493, :, i)
+                nb = PortfolioOptimisers.calc_num_bins(bins, xj, xi, j, i, Tobs493)
+                ex, ey, hxy = PortfolioOptimisers.calc_hist_data(xj, xi, nb)
+                @test sum(hxy) == Tobs493
+                @test isfinite(ex)
+                @test isfinite(ey)
+            end
+        end
+        #=
+        The pair this data loses most on. It binned 598 of 600, and its mutual information
+        was 0.03695594625897657, which is 7.4 % below the value below. #493's own table is
+        a different matrix -- the same seed with two columns made correlated -- so its
+        numbers are not these. These are the plain sample, which is what this pins.
+        =#
+        ex493, ey493, hxy493 = PortfolioOptimisers.calc_hist_data(view(Z493, :, 2),
+                                                                  view(Z493, :, 5), 8)
+        @test sum(hxy493) == 600
+        @test isapprox(ex493, 1.683319735731528)
+        @test isapprox(ey493, 1.5597176994273774)
+        @test isapprox(PortfolioOptimisers.intrinsic_mutual_info(hxy493),
+                       0.03969760755165243)
+        #=
+        A constant column at a magnitude where the old widening rounded away closed both
+        edges onto one value. The histogram was all zero, `hx / sum(hx)` was a vector of
+        `NaN`, and the entropy was `NaN`. The entropy of a constant variable is zero.
+        =#
+        c493 = fill(3.5, 20)
+        exc, eyc, hxyc = PortfolioOptimisers.calc_hist_data(c493, c493, 8)
+        @test iszero(exc)
+        @test iszero(eyc)
+        @test sum(hxyc) == 20
+        #=
+        The library's own pinned numbers do not move, and this is the reason. Every return
+        of the test data is small enough that `eps(Float64)` is many units in the last place
+        there, so the widening that ADR 0089 replaced already did what it was written to do.
+        =#
+        @test !any(k -> maximum(view(rd.X, :, k)) + eps(Float64) ==
+                        maximum(view(rd.X, :, k)), axes(rd.X, 2))
+        for bins in (HacineGharbiRavier(), Knuth(), Scott(), FreedmanDiaconis(), 5, 7)
+            for j in axes(rd.X, 2), i in 1:j
+                xj = view(rd.X, :, j)
+                xi = view(rd.X, :, i)
+                nb = PortfolioOptimisers.calc_num_bins(bins, xj, xi, j, i, size(rd.X, 1))
+                @test sum(PortfolioOptimisers.calc_hist_data(xj, xi, nb)[3]) ==
+                      size(rd.X, 1)
+            end
+        end
     end
 end
 """

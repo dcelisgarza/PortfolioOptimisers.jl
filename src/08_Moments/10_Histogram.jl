@@ -544,12 +544,12 @@ Compute histogram-based marginal and joint distributions for two variables.
 
 This function computes the normalised histograms (probability mass functions) for two variables `xj` and `xi` using the specified number of bins, as well as their joint histogram. It returns the marginal entropies and the joint histogram, which are used in mutual information and variation of information calculations.
 
-The bin edges are widened by `eps(eltype(x))`, which is the machine epsilon of the element type and not the spacing at the widened value. `eps(Float64)` is half of one unit in the last place at any value of magnitude two or more, so for such a value the widened edge rounds back to the value it came from. The upper edge is exclusive, so the largest observation is then binned out of both the marginal and the joint histogram. The marginal histograms are renormalised afterwards, so the loss shifts the estimates rather than raising anything.
+A bin is closed on the left, so the lower edge is the minimum itself and needs no widening. The upper edge is exclusive, so it is `nextfloat` of the maximum, one unit in the last place above it at every magnitude. The largest observation therefore falls strictly inside the last bin whatever the magnitude of the data, and a constant column gives an entropy of zero rather than `NaN`.
 
 # Algorithm
 
  1. Add one to `bins`, giving `bp1`, the number of bin edges.
- 2. Build the edge range of `xj` from `minimum(xj) - eps(eltype(xj))` to `maximum(xj) + eps(eltype(xj))`, with `bp1` points. Repeat for `xi`.
+ 2. Build the edge range of `xj` from `minimum(xj)` to `nextfloat(maximum(xj))`, with `bp1` points. Repeat for `xi`.
  3. Bin `xj` over its own edges, giving the counts `hx`, and divide `hx` by its own sum to make it a probability mass function.
  4. Repeat step 3 for `xi`, giving `hy`.
  5. Take the Shannon entropy of `hx` into `ex`, and of `hy` into `ey`.
@@ -578,11 +578,11 @@ The bin edges are widened by `eps(eltype(x))`, which is the machine epsilon of t
 function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     bp1 = bins + one(bins)
 
-    xjl = minimum(xj) - eps(eltype(xj))
-    xjh = maximum(xj) + eps(eltype(xj))
+    xjl = minimum(xj)
+    xjh = nextfloat(maximum(xj))
 
-    xil = minimum(xi) - eps(eltype(xi))
-    xih = maximum(xi) + eps(eltype(xi))
+    xil = minimum(xi)
+    xih = nextfloat(maximum(xi))
 
     hx = StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
     hx /= sum(hx)
