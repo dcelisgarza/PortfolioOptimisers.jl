@@ -13,7 +13,7 @@ d_{i,\\,j} &= \\dfrac{1}{\\pi}\\arccos\\left(\\dfrac{\\boldsymbol{z}_{i} \\cdot 
 
 Where:
 
-  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
+  - $(math_dict[:d_ij_dist])
   - ``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``.
 
 Unlike `Distances.CosineDist` (``1 - \\cos``), the angular distance satisfies the triangle inequality, so it is a true metric and the hierarchies built from it are well defined. It maps ``[-1,\\,1] \\to [1,\\,0]``, so it is bounded, scale-invariant per asset, and admits signed features. Its exact similarity counterpart is [`AngularSimilarity`](@ref), which recovers the cosine from the distance alone.

@@ -550,7 +550,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying `Z` from the surviving timestamps with [`feature_row_indices`](@ref), and view `Z` on that observation axis with [`feature_matrix_view`](@ref). Carry `ivpa` and `nz` through untouched, because the asset index reaches neither. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying `Z` from the surviving timestamps with [`feature_row_indices`](@ref), and view `Z` on that observation axis with [`feature_matrix_view`](@ref). A static `Z` has no observation axis, so it passes through unchanged rather than being wrapped in a no-op view. Carry `ivpa` and `nz` through untouched, because the asset index reaches neither. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset indices:
 
@@ -568,17 +568,11 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
   - `pr`: A `PricesResult` object.
   - `i`: Observation window into the rows of `pr.X`. Either integer indices (`AbstractVector{<:Integer}`, `AbstractRange`, or `Colon`) or a vector of timestamps (`AbstractVector{<:Dates.AbstractTime}`).
-  - `j`: Asset window into the columns of `pr.X`. Integer indices, an `AbstractRange`, or `Colon` for the whole universe.
+  - `j`: Asset window into the columns of `pr.X`. Integer indices, an `AbstractRange`, or `Colon` for the whole universe. A `Colon` leaves `X`, `B`, `iv` and `ivpa` alone, which is why `ivpa` passes through untouched on the observation-only arity and is viewed at `j` on the other.
 
 # Returns
 
   - `new_pr::PricesResult`: A new `PricesResult` containing only the data for the selected window.
-
-# Details
-
-  - A `Colon` asset index leaves `X`, `B`, `iv` and `ivpa` alone, which is why `ivpa` passes through untouched on the observation-only arity and is viewed at `j` on the other.
-  - A static `Z` has no observation axis, so a `Colon` asset index passes it through unchanged rather than wrapping it in a no-op view.
-  - When `Z`'s features *are* the assets, the asset subselection slices its feature axis and `nz` too (see [`features_are_assets`](@ref)).
 
 # Examples
 
@@ -856,7 +850,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the V
  3. When `B` is a matrix, it holds one column per asset: view `nb` at `i`, and view `B` as `view(rd.B, :, i)`. Otherwise — a single shared benchmark, or none at all — `nb` and `B` both pass through untouched.
  4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
  5. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `i` as well, because the feature axis is the asset axis.
- 6. View the feature matrix with [`feature_matrix_view`](@ref) at `i` on the asset axis. The observation index is a `Colon`, so a time-varying `Z` keeps every observation.
+ 6. View the feature matrix with [`feature_matrix_view`](@ref) at `i` on the asset axis. `Z` is carried assets-major, so that axis is axis 1 when `Z` is static and axis 2 when `Z` is time-varying. The observation index is a `Colon`, so a time-varying `Z` keeps every observation.
  7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through untouched, because none of the three has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -869,10 +863,6 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Returns
 
   - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
-
-# Details
-
-  - `Z` is carried assets-major, so the asset axis is axis 1 when `Z` is static and axis 2 when `Z` is time-varying.
 
 # Examples
 
@@ -938,7 +928,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  4. When `B` is a matrix, it holds one column per asset: view `nb` at `j`, and view `B` as `view(rd.B, i, j)`. When `B` is a vector, it is a single shared benchmark: view it as `view(rd.B, i)`, and carry `nb` through.
  5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
  6. Read `sq` from [`features_are_assets`](@ref) on `nz` and `nx`. When `sq` is `true`, view `nz` at `j` as well.
- 7. View the feature matrix with [`feature_matrix_view`](@ref) at the observations `i` and the assets `j`. A static `Z` has no observation axis and ignores `i`.
+ 7. View the feature matrix with [`feature_matrix_view`](@ref) at the observations `i` and the assets `j`. A static `Z` has no observation axis and ignores `i`, which is the same asymmetry `ivpa` has on the asset axis.
  8. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -953,10 +943,6 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Returns
 
   - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified indices.
-
-# Details
-
-  - A static `Z` ignores the observation index `i`, which is the same asymmetry `ivpa` has.
 
 # Related
 
@@ -1273,7 +1259,7 @@ The first step is a method selected on the field type of `B`, so a carrier with 
  1. `rd` carries no benchmark, because its `B` field is `Nothing`: return `rd` itself.
  2. `brt` is `false`: return `rd` itself.
  3. `brt` is `true`: subtract the benchmark from the asset returns, giving `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes one benchmark value per observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
- 4. Rebuild the [`ReturnsResult`](@ref) from `X`, and leave `nb` and `B` unset. The benchmark is spent on the subtraction, which is what makes a second call return its argument unchanged.
+ 4. Rebuild the [`ReturnsResult`](@ref) from `X`, and leave `nb` and `B` unset. The benchmark is spent on the subtraction, which is what makes a second call return its argument unchanged. Every other field — `nx`, `nf`, `F`, `ts`, `iv`, `ivpa`, `nz` and `Z` — is carried over. The argument itself is never modified.
 
 # Arguments
 
@@ -1285,13 +1271,7 @@ The first step is a method selected on the field type of `B`, so a carrier with 
   - `rd::ReturnsResult`:
 
       + If `brt` is `true` and a benchmark `B` is present: A new `ReturnsResult` with adjusted asset returns
-      + Otherwise: The `rd` is returned unchanged.
-
-# Details
-
-  - The original `rd` is never modified. An adjustment builds a new [`ReturnsResult`](@ref).
-  - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`, `nz`, `Z`) are preserved in the returned object.
-  - `nb` and `B` are **not** carried over: the benchmark has been spent on the subtraction, so the returned object holds `nothing` for both. This is what makes the adjustment idempotent — a second call has no benchmark left to subtract and returns its argument unchanged.
+      + Otherwise: The `rd` is returned unchanged. `nb` and `B` hold `nothing` on an adjusted result, which is what makes the adjustment idempotent.
 
 # Examples
 
@@ -1453,9 +1433,9 @@ Where:
   - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
   - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
 
-`TimeSeries.percentchange` computes both branches through logarithms: the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is ``\\mathrm{expm1}`` of it. The two agree with the forms above to floating point rather than to the last bit, and both need a **positive** price. A negative price throws a `DomainError` from inside the logarithm, on the simple branch as well, and a zero price gives ``\\pm\\infty``.
+Both branches need a **positive** price, and a zero price gives ``\\pm\\infty``.
 
-A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns in the `B` field of the [`ReturnsResult`](@ref); it is not subtracted here. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is done later, by [`returns_result_picker`](@ref), and only when the optimisation tracks the benchmark.
+A benchmark ``B`` is converted by the same rule and **carried alongside** the asset returns, never subtracted from them. The subtraction that forms the excess return ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}`` is a separate operation, and it is applied only when the optimisation tracks the benchmark.
 
 # Algorithm
 
@@ -1470,10 +1450,10 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
 10. Count the missing entries of each column over the rows that step 9 kept. Drop each column whose count exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
 11. Drop every column that is still typed as missing, then every row that still holds a missing entry.
-12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
+12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. It computes both branches through logarithms — the log return is ``\\ln P_{t,i} - \\ln P_{t-1,i}``, and the simple return is `expm1` of it — so the two agree with the closed forms above to floating point rather than to the last bit. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
 13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
 14. Index the implied volatilities `iv` by `ts`, then check `iv` and `ivpa` against the surviving asset count.
-15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`.
+15. Subselect the feature matrix. Read the surviving assets' positions `acols` in the original asset names, read `sq` from [`features_are_assets`](@ref), recover the surviving rows with [`feature_row_indices`](@ref), and view `Z` with [`feature_matrix_view`](@ref). Materialise the view with `Array`, and view `nz` at `acols` when `sq` is `true`. An asset dropped by steps 9 to 11 takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is subselected to the surviving observations as well, matched back into the original price timestamps; a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp, which is last-observation semantics and matches [`LastObservation`](@ref).
 16. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
 17. Return the [`ReturnsResult`](@ref).
 
@@ -1499,6 +1479,7 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
 
 # Validation
 
+  - Every price reaching step 12 is positive. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price raises a `DomainError` from inside it, on the simple branch as well.
   - `!isempty(X)`.
   - `0 < missing_col_percent <= 1`
   - `0 < missing_row_percent <= 1`.
@@ -1509,17 +1490,7 @@ Step 8 counts the missing columns of a row, and step 10 counts the missing rows 
 
 # Returns
 
-  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
-
-# Details
-
-  - Step 10 counts the missing entries of a column over **every** row the table had at step 8, and compares that count against the row total that **survived** step 9. A column can therefore be dropped for missing entries that sit only in rows already gone.
-
-  - The benchmark is converted to returns by the same rule and carried in the `B` field. It is **not** subtracted from the asset returns; [`returns_result_picker`](@ref) does that, for a returns-tracking optimisation.
-
-  - Carries the feature matrix `Z` across, subselected to the assets that survive the conversion — an asset dropped for being entirely missing takes its features with it, or the two matrices would desynchronise silently. A time-varying `Z` is also subselected to the surviving observations, matching them back into the original price timestamps ([`feature_row_indices`](@ref)); a surviving timestamp absent from that clock throws. Under `collapse_args` this gives the aggregated period the features of the row at its representative timestamp — last-observation semantics, matching [`LastObservation`](@ref).
-
-  - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data. A converted benchmark is carried in its `B` field.
 
 # Examples
 
@@ -1561,6 +1532,7 @@ ReturnsResult
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
   - [`apply_impute_method`](@ref)
   - [`Impute`](https://github.com/invenia/Impute.jl)
+  - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
 function prices_to_returns(X::TimeSeries.TimeArray,
                            F::Option{<:TimeSeries.TimeArray} = nothing;

@@ -189,8 +189,8 @@ MeanRisk
       │     linfc ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
-      │      linf ┼ nothing
       │        lp ┼ nothing
+      │      linf ┼ nothing
       │       brt ┼ Bool: false
       │     x_src ┼ Symbol: :prior
       │     z_src ┼ Symbol: :data

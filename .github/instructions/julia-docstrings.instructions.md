@@ -708,7 +708,7 @@ Rules:
 - Write **numbered steps, one step per operation**. Each step names the quantity that the operation produces.
 - Name each quantity by the name that the body gives it, so a reader can follow the steps in the code.
 - Do not restate a closed form as a step. The formula belongs in `# Mathematical definition`, and the step that applies it names it.
-- A **selector tag** — a type whose only job is to name the branch that a caller takes — carries **neither** section. Its summary sentence states which branch it selects. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type.
+- A **selector tag** — a type whose only job is to name the branch that a caller takes — is never *forced* to carry either section. Its summary sentence states which branch it selects, and a tag that names nothing further stops there. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type. A tag whose branch *is* a closed form does state it: the form under `# Mathematical definition`, and the steps of that branch under `# Algorithm`. `SpectralDenoise` is the reference for that shape, and the row below points at it.
 
 **Example.** The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/05_Denoise.jl`:
 

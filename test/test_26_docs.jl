@@ -757,9 +757,9 @@ rather than settled here by a gate that demands more than its Authority states.
     end
 
     # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
-    # The count, not the flag, is the primitive: one docstring can carry a section twice.
-    # `port_opt_view` in `src/03_Preprocessing.jl` documents four methods under one string
-    # block, separated by horizontal rules, and two of the four carry `# Details`.
+    # The count, not the flag, is the primitive: one string block can document several
+    # methods, separated by horizontal rules, and then carries one heading per method that
+    # holds the section. `port_opt_view` in `src/03_Preprocessing.jl` is such a block.
     count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
     has_section(text, name) = count_section(text, name) > 0
 
@@ -883,11 +883,9 @@ rather than settled here by a gate that demands more than its Authority states.
     section they count must reach zero.
 
       1. A file whose manifest row reads `swept = true` carries ZERO `# Details` sections.
-         `MIGRATING` is the one exception, and it is a DEBT rather than a rule. It names the
-         seven swept files that still carry the section together with the count each carries,
-         so a named file may not rise above its own number and an unnamed swept file may not
-         carry the section at all. #485 migrates those 29 sections and empties `MIGRATING`,
-         and the check then reads exactly as the Authority states it.
+         #485 migrated the 29 sections the seven swept files carried when the rule was
+         written, so the debt list that held them is spent and gone, and the check now reads
+         exactly as the Authority states it.
       2. The library-wide count may not rise above `DETAILS_TOTAL`. Each #404 sweep ticket
          lowers it as its file migrates, and the check retires when it reaches zero.
 
@@ -903,41 +901,25 @@ rather than settled here by a gate that demands more than its Authority states.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        # What each swept file still carries. #485 empties this list, one entry per file.
-        MIGRATING = Dict("src/02_Tools.jl" => 7, "src/03_Preprocessing.jl" => 5,
-                         "src/04_PosdefMatrix.jl" => 1, "src/05_Denoise.jl" => 6,
-                         "src/06_Detone.jl" => 1, "src/07_MatrixProcessing.jl" => 1,
-                         "src/09_Distance/02_Distance.jl" => 8)
-        DETAILS_TOTAL = 299
+        DETAILS_TOTAL = 270
 
         @testset "a swept file carries no # Details section" begin
-            offenders = Tuple{String, Int, Int}[]
+            offenders = Tuple{String, Int}[]
             for f in swept
                 _, texts, _ = scan(joinpath(ROOT, f))
                 measured = sum(t -> count_section(t, "Details"), texts; init = 0)
-                allowed = get(MIGRATING, f, 0)
-                measured > allowed && push!(offenders, (f, allowed, measured))
+                measured > 0 && push!(offenders, (f, measured))
             end
             if !isempty(offenders)
                 @warn """$(length(offenders)) file(s) marked `swept = true` in
-                         `sweep/manifest.toml` carry more `# Details` sections than they are
-                         allowed. The section is abolished: move each fact by its subject,
-                         under `## What each section holds` in
+                         `sweep/manifest.toml` carry a `# Details` section. The section is
+                         abolished: move each fact by its subject, under
+                         `## What each section holds` in
                          `.github/instructions/julia-docstrings.instructions.md`. The columns
-                         are the file, its allowance, and what it
+                         are the file and what it
                          carries:\n  $(join(string.(offenders), "\n  "))"""
             end
             @test isempty(offenders)
-
-            # An entry that reaches zero is deleted rather than left at zero, and an entry
-            # for a file that is no longer swept is dead. Either one hides a paid debt.
-            stale = sort([f for (f, n) in MIGRATING if n == 0 || f ∉ swept])
-            if !isempty(stale)
-                @warn """$(length(stale)) entr(y/ies) of `MIGRATING` are spent. Delete the
-                         entry rather than leaving it at zero, and delete `MIGRATING` itself
-                         when the last one goes:\n  $(join(stale, "\n  "))"""
-            end
-            @test isempty(stale)
         end
 
         @testset "the library-wide # Details count does not rise" begin

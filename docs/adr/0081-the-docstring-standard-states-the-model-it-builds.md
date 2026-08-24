@@ -173,6 +173,19 @@ and the widened Scope are unchanged.
 [#443](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/443) still holds the open
 question that the 2026-08-22 amendment raised, and #478 re-parents it without answering it.
 
+**A selector tag is never forced to carry a section, and it is not forbidden one.** Rule 2 above
+reads *a selector tag carries neither section*. The Context that produced it says only that a rule
+must never **force** numbered steps onto a marker type. The two are not the same sentence, and the
+stronger reading contradicts the tree it governs: `SpectralDenoise`, `FixedDenoise`, `MaxValue` and
+the four members of `AbstractDistanceAlgorithm` are all fieldless tags, and every one of them
+states the closed form of the branch it selects.
+[#485](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/485) sharpens the Authority to
+the permission the Context intended. A tag that names nothing beyond its branch stops at its
+summary sentence. A tag whose branch **is** a closed form states that form under
+`# Mathematical definition`, with the steps of the branch under `# Algorithm`. `SpectralDenoise` is
+the Authority's reference for that shape, and #478's own motivation asks for its mathematics to be
+corrected rather than deleted.
+
 **The Authority keeps its name and loses its worked example.**
 `.github/instructions/julia-docstrings.instructions.md` remains the Authority for every rule above.
 Its 380-line `## Complete Example` is deleted, because it is fictional, it can never be gated, and

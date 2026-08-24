@@ -876,6 +876,26 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Weight finalisation.
                        :w_0_finaliser => "``\\boldsymbol{w}_{0}``: Portfolio weights vector ``N \\times 1`` that the optimisation produced, which the finaliser repairs.",#
                        :lb_ub_finaliser => "``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds. An absent bound is dropped from the programme rather than set to an infinity.",#
+                       # Vector reductions and elementwise operands.
+                       :v_reduce => "``\\boldsymbol{v}``: The vector to reduce, of length ``n``.",#
+                       :v_i_entry => "``v_{i}``: Its ``i``-th entry, ``i = 1,\\ldots,n``.",#
+                       :i_linear => "``i``: Linear index, ``i = 1,\\ldots,n``.",#
+                       :ab_operands => "``\\boldsymbol{a}``, ``\\boldsymbol{b}``: Array operands, read in linear index order.",#
+                       :alpha_beta_scalars => "``\\alpha``, ``\\beta``: Scalar operands.",#
+                       :lambda_tilde_i => "``\\tilde{\\lambda}_i``: Denoised ``i``-th eigenvalue.",#
+                       :V_eigvec => "``\\mathbf{V}``: Eigenvector matrix of the input.",#
+                       # Pairwise distance and correlation.
+                       :d_ij_dist => "``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.",#
+                       :rho_ij => "``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.",#
+                       # Spectral denoising: the Marcenko-Pastur split of a spectrum.
+                       :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
+                       :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#
+                       :V_signal => "``\\mathbf{V}_{\\mathrm{signal}}``: Eigenvector block of the signal eigenpairs.",#
+                       :lambda_vec_signal => "``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues.",#
+                       :C_signal => "``\\mathbf{C}_{\\mathrm{signal}}``: Reconstruction from the signal eigenpairs alone.",#
+                       :X_denoised => "``\\tilde{\\mathbf{X}}``: Denoised matrix.",#
+                       :q_mp => "``q = T/N``: Effective sample ratio, observations to assets.",#
+                       :sigma2_noise => "``\\sigma^2``: Variance attributed to noise. A correlation matrix has ``\\sigma^2 = 1``.",#
                        # The Range convention (ADR 0057).
                        :negated_upper_tail => "The upper tail is the base measure applied to the negated returns ``-\\boldsymbol{x}``, so both tails are reported on the same sign convention and the range is their sum, not their difference.")
 """
