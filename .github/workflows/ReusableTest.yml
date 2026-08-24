@@ -60,7 +60,7 @@ jobs:
       # pins intact: this job stays a build-and-test job, and the gate stays on ADR 0077's version.
       - name: Publish lcov.info for the ratchet
         if: ${{ inputs.run_codecov }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: lcov.info
@@ -104,7 +104,7 @@ jobs:
       # ADR 0075.
       - name: Publish the Refresh Artifact
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-refresh
           path: code_health/_refresh/*.toml
