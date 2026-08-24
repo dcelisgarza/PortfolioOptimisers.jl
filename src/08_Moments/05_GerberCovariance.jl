@@ -333,8 +333,8 @@ Build the up and down indicator matrices shared by every Gerber correlation vari
 
 ```math
 \\begin{align}
-U_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i]\\,, \\\\
-D_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i]\\,.
+U_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i \\land x_{t,\\,i} > 0]\\,, \\\\
+D_{t,\\,i} &= \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i \\land x_{t,\\,i} < 0]\\,.
 \\end{align}
 ```
 
@@ -348,13 +348,15 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The two bands do not overlap for a positive threshold, so no observation is marked in both matrices and their sum is the crossing indicator.
+The two bands never overlap, so no observation is marked in both matrices and their sum is the crossing indicator. The sign test is what keeps them apart at a zero band edge. `ce.t = 0` produces one, and so does a zero entry of `sd`, which the `Statistics.cor` method rules out by raising `sd` to at least `eps`. Without the sign test the two closed comparisons both hold on an exactly zero return, and the sum is two rather than one. ADR 0090 records the decision.
+
+For a positive band edge the sign test is redundant, because ``x_{t,\\,i} \\geq t \\, \\sigma_i > 0`` already implies ``x_{t,\\,i} > 0``. A zero band edge therefore makes the pair of matrices the sign of the return, and the Gerber statistic the sign concordance.
 
 # Algorithm
 
  1. Scale the standard deviation vector by the threshold, giving the per-asset band edge `ts = sd * ce.t`.
- 2. Mark `U[t, i]` when `X[t, i] >= ts[i]`.
- 3. Mark `D[t, i]` when `X[t, i] <= -ts[i]`.
+ 2. Mark `U[t, i]` when `X[t, i] >= ts[i]` and `X[t, i]` is positive.
+ 3. Mark `D[t, i]` when `X[t, i] <= -ts[i]` and `X[t, i]` is negative.
 
 # Arguments
 
@@ -376,8 +378,12 @@ function gerber_updown(ce::GerberCovariance, X::MatNum, sd::ArrNum)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     ts = sd * ce.t
-    U .= X .>= ts
-    D .= X .<= -ts
+    # The sign test is redundant for a positive band edge, because `X >= ts > 0` already
+    # implies `X > 0`. It binds only when the edge is zero, where the two closed
+    # comparisons would otherwise both hold on an exactly zero return. ADR 0090.
+    zx = zero(eltype(X))
+    U .= (X .>= ts) .& (X .> zx)
+    D .= (X .<= -ts) .& (X .< zx)
     return U, D
 end
 """

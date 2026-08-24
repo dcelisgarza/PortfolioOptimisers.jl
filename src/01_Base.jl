@@ -992,12 +992,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # and `06_SmythBrobyCovariance.jl` and `35_GerberIQCovariance.jl`
                        # build on the same symbols.
                        :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
-                       :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero.",#
+                       :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero, and a return of exactly zero never crosses.",#
                        :sigma_i_asset => "``\\sigma_i``: Standard deviation of asset ``i``.",#
                        :oslash => "``\\oslash``: Element-wise division.",#
-                       :U_gerber => "``\\mathbf{U} \\in \\{0,1\\}^{T \\times N}``: Up indicator matrix, ``U_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i]``.",#
-                       :D_gerber => "``\\mathbf{D} \\in \\{0,1\\}^{T \\times N}``: Down indicator matrix, ``D_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i]``.",#
-                       :Nneut_gerber => "``\\mathbf{N} \\in \\{0,1\\}^{T \\times N}``: Neutral indicator matrix, ``N_{t,\\,i} = \\mathbf{1}[-t \\, \\sigma_i < x_{t,\\,i} < t \\, \\sigma_i]``. It is the complement of ``\\mathbf{U} + \\mathbf{D}``.",#
+                       :U_gerber => "``\\mathbf{U} \\in \\{0,1\\}^{T \\times N}``: Up indicator matrix, ``U_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i \\land x_{t,\\,i} > 0]``.",#
+                       :D_gerber => "``\\mathbf{D} \\in \\{0,1\\}^{T \\times N}``: Down indicator matrix, ``D_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i \\land x_{t,\\,i} < 0]``.",#
+                       :Nneut_gerber => "``\\mathbf{N} \\in \\{0,1\\}^{T \\times N}``: Neutral indicator matrix, ``N_{t,\\,i} = \\mathbf{1}[\\lvert x_{t,\\,i} \\rvert < t \\, \\sigma_i \\lor x_{t,\\,i} = 0]``. It is the complement of ``\\mathbf{U} + \\mathbf{D}``.",#
                        :H_gerber => "``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``: Signed crossing matrix. Its entry is ``1`` when the asset crossed upwards, ``-1`` when it crossed downwards, and ``0`` when it did not cross.",#
                        :Vcross_gerber => "``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``: Crossing matrix. Its entry is ``1`` when the asset crossed its threshold in either direction, and ``0`` when it did not.",#
                        :nc_gerber => "``n_{c}``: Concordant count of a pair, the observations on which both assets crossed their thresholds in the same direction.",#

@@ -613,7 +613,7 @@
         Uh, Dh = PortfolioOptimisers.gerber_updown(ceh, Xh, sdh)
         @test Uh == Bool[1 1; 1 0; 0 0; 1 0; 0 1; 0 0; 0 1; 0 0]
         @test Dh == Bool[0 0; 0 1; 1 1; 0 0; 0 0; 0 0; 1 0; 1 1]
-        # A positive threshold makes the two bands disjoint.
+        # Every threshold makes the two bands disjoint.
         @test !any(Uh .& Dh)
         UmDh = Uh - Dh
         UpDh = Uh + Dh
@@ -664,11 +664,25 @@
         r1lo = cor(GerberCovariance(; t = 0.0, pdm = nothing, alg = Gerber1()), Xg)
         @test isapprox(r0lo, r1lo)
         @test isapprox(diag(r0lo), ones(12))
-        # `t = 0` is the one threshold at which the two bands overlap: `>= 0` and `<= 0`
-        # both hold at an exactly zero return, which double-counts it. `Xh` carries such
-        # returns, and its diagonal is then not unit. See #491.
-        @test !isapprox(diag(cor(GerberCovariance(; t = 0.0, pdm = nothing,
-                                                  alg = Gerber0()), Xh)), ones(2))
+        # `t = 0` puts the band edge at zero, where `>= 0` and `<= 0` both hold at an
+        # exactly zero return. The sign test in `gerber_updown` makes such a return
+        # neutral instead of both up and down, so the two bands stay disjoint. `Xh`
+        # carries three such returns. Its bands at `t = 0` are the bands at `t = 0.5`,
+        # because every crossing of `Xh` clears both edges, so the three matrices and the
+        # unit diagonal carry over unchanged. #491, ADR 0090.
+        ceh0 = GerberCovariance(; t = 0.0, pdm = nothing)
+        Uh0, Dh0 = PortfolioOptimisers.gerber_updown(ceh0, Xh, sdh)
+        @test Uh0 == Uh
+        @test Dh0 == Dh
+        @test !any(Uh0 .& Dh0)
+        # Rows 4, 5 and 6 carry the exactly zero returns, and each one is neutral.
+        @test !any(Uh0[4:6, :] .& Dh0[4:6, :])
+        @test Uh0[6, :] == Dh0[6, :] == Bool[0, 0]
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            rh0 = cor(GerberCovariance(; t = 0.0, pdm = nothing, alg = a), Xh)
+            @test isapprox(rh0, rh[a])
+            @test isapprox(diag(rh0), ones(2))
+        end
 
         # ---- the cor and cov pair -------------------------------------------------------
         sdg = vec(std(GerberCovariance().ve, Xg; dims = 1))
