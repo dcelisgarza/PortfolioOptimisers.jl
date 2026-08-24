@@ -157,3 +157,21 @@ wrote no plan. A run under an empty `JULIA_DEPOT_PATH` succeeded, which is the n
 `test/test_45_sweep_census.jl` passes with 10 assertions. On a scratch tree holding two files with
 no row it printed the one map for `src/11_Phylogeny/07_NewThing.jl` and the five candidates 1, 2, 8,
 10 and 13 for `src/26_Scratch.jl`.
+
+## Amendment (2026-08-24)
+
+The body carries a fixed `## Routing` block above its Destination. It names `STANDARDS.md`, the two
+Authorities a sweeper reads, and `CONTEXT.md`, each one directly.
+
+The original body routed through #404 alone: *"Every rule for this effort lives on #404. Read it
+first."* #404 does name those files, inside five thousand words. Measured over the six open sweep
+tickets on 2026-08-24, three named an Authority and none named `STANDARDS.md`. A standard that the
+sweeper is never routed to does not hold, however well it is written.
+
+The block is constant text, so the sentence *"Every field of its body is generated, so the job
+needs no judgement"* still holds: a constant needs no judgement either. Nothing here is
+machine-read, which is unchanged. #404 keeps the rules of this effort alone, and the Notes keep
+their pointer to it.
+
+The same block was back-filled by hand into the 30 open tickets of child maps 1 to 4. #478 is the
+map that asked for this, ADR 0085 records the decision, and #484 is the ticket that carried it out.

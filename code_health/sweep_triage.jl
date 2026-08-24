@@ -234,6 +234,33 @@ end
 
 # --- the issue -------------------------------------------------------------
 
+"""
+The `## Routing` block every sweep sub-issue carries, and the block back-filled by hand into the
+tickets that were filed before it existed.
+
+It names the map, the Authority of each rule the sweeper touches, and the glossary **directly**.
+Before it existed the only route was one long hop: this body pointed at #404, and #404 named the
+four files inside five thousand words. Three of the six open sweep tickets measured on 2026-08-24
+named an Authority, and none named `STANDARDS.md`.
+
+The block is constant text, so it costs the job no judgement, and it is never machine-read. #404
+keeps the rules of this effort alone; every rule of the tree itself lives at one of these four
+files.
+"""
+const ROUTING = """
+## Routing
+
+Read before you start:
+
+- `STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
+- `.github/instructions/julia-docstrings.instructions.md` — the Authority for a docstring rule.
+- `.github/instructions/julia-source-code.instructions.md` — the Authority for a rule about code
+  under `src/` and `ext/`.
+- `CONTEXT.md` — the domain vocabulary. Use its words, and add a word you introduce.
+
+`STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
+"""
+
 function title_of(c::Candidate)
     return string("Sweep `", c.path, "` into child map ", c.map.number, ": ", c.map.name)
 end
@@ -243,18 +270,21 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
 """
     body_of(candidate, commit) -> String
 
-The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: a Destination
-naming the file and its measured row, the three conditions of #404 restated compactly, the sentence
-that the committed files are the authority, and Notes that point at #404 without copying a rule.
+The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
+`ROUTING` block, a Destination naming the file and its measured row, the three conditions of #404
+restated compactly, the sentence that the committed files are the authority, and Notes that point
+at #404 without copying a rule.
 
 **Every field is generated**, so the job needs no judgement: the path, `map` and `units` from
-`sweep/manifest.toml`, and `lines` and `misses` from `code_health/coverage_baseline.toml`.
+`sweep/manifest.toml`, and `lines` and `misses` from `code_health/coverage_baseline.toml`. The
+`ROUTING` block is constant, so it needs none either.
 
 **Nothing here is ever machine-read.** The safeguard reads the title, and every other fact a later
 run needs comes from a committed file or from the tracker's own metadata.
 """
 function body_of(c::Candidate, commit::AbstractString)
     io = IOBuffer()
+    println(io, ROUTING)
     println(io, "## Destination\n")
     println(io, "This file is swept. It joined child map ", c.map.number,
             " after that map closed, so the map and #", UMBRELLA, " were reopened.\n")
