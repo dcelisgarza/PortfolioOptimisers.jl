@@ -124,7 +124,7 @@ const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimat
                                                   <:AbstractLowOrderPriorEstimator_AF}
 ```
 
-This avoids duplicating method definitions. Always document the alias with a docstring explaining which types it groups and why.
+This avoids duplicating method definitions. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. Which sections that docstring carries is stated by [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases*, which is the Authority for it.
 
 ## Docstring Documentation Dictionaries
 

@@ -1081,11 +1081,19 @@ function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
     return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype; without it a meta-optimiser or cross-validation fold would silently train on the unsubselected universe. See port_opt_view(rd::ReturnsResult, ...) for the reference implementation."))
 end
 """
-    Prices_RR
+    const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 
 Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
 
 Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
+
+# Related
+
+  - [`AbstractReturnsResult`](@ref)
+  - [`AbstractPricesResult`](@ref)
+  - [`cv_nobs`](@ref)
+  - [`cv_timestamps`](@ref)
+  - [`n_splits`](@ref)
 """
 const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 """

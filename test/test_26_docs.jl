@@ -968,4 +968,310 @@ rather than settled here by a gate that demands more than its Authority states.
             end
         end
     end
+    #=
+    ---------------------------------------------------------------- alias docstrings
+
+    An alias is a second name for something another docstring already documents. The
+    Authority gave a section structure for a type and one for a function, and none for an
+    alias (issue #436, under the standards-hardening map #478). Read literally, a factory
+    alias needed `# Arguments`, `# Returns` and `# Related`, and an acronym alias needed
+    `# Related`. Nothing in the tree did either, so the standard and the code disagreed at
+    381 units.
+
+    ADR 0086 settles it: an alias LINKS its canonical unit and RESTATES nothing. Three
+    kinds, and three section sets.
+
+      - An ACRONYM alias, `const HRP = HierarchicalRiskParity`, carries NO section. It and
+        its target are the same object.
+      - A FACTORY alias, `MAD(; kwargs...)::LowOrderMoment`, carries `# Validation` alone,
+        and only when its own body raises.
+      - A DISPATCH alias, a `const` bound to a type EXPRESSION, carries `# Related` and
+        `# References`. A union, a container such as `AbstractVector{<:LinearConstraint}`
+        and a parametrised form such as `const RMCVaR{T} = Union{...}` are ONE kind,
+        because a caller meets all three as the type a signature dispatches on. Reading
+        only the unions would have missed 66 of the 249.
+
+    The kind is read from the parse, not from a name. An acronym and a factory are scoped to
+    `src/25_Aliases.jl`, which is where both live and is itself part of the rule. Without
+    that scope `const PROP_TAG_MACRO_NAMES = ...` in `src/02_Tools.jl` reads as an acronym
+    alias, and it is a computed constant.
+
+    Three checks, and the split between them is the one ADR 0081 drew and ADR 0085 reused. A
+    check that DEMANDS a section reads the `swept` flag, because it may not red a file that
+    no child map of #404 has swept. A check that FORBIDS one does not, because a file passes
+    it by changing nothing.
+    =#
+    @testset "an alias docstring carries only the sections its kind allows" begin
+        ALLOWED = Dict(:acronym => String[], :factory => ["# Validation"],
+                       :dispatch => ["# Related", "# References"])
+        # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
+        # ticket pays its share. Lower the number in the commit that pays it, and retire the
+        # ratchet at zero.
+        NO_RELATED_TOTAL = 22
+
+        # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
+        # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,
+        # which is what keeps `const allowed_functions = Dict{Symbol, Function}(...)` out.
+        function alias_kind(d, path)
+            in_aliases = endswith(path, "25_Aliases.jl")
+            if Meta.isexpr(d, :function) ||
+               (Meta.isexpr(d, :(=)) && Meta.isexpr(d.args[1], :call))
+                return in_aliases ? :factory : nothing
+            end
+            e = Meta.isexpr(d, :const) ? d.args[1] : d
+            Meta.isexpr(e, :(=)) || return nothing
+            lhs, rhs = e.args[1], e.args[2]
+            lhs isa Symbol ||
+                (Meta.isexpr(lhs, :curly) && lhs.args[1] isa Symbol) ||
+                return nothing
+            (rhs isa Symbol || Meta.isexpr(rhs, :.)) &&
+                return in_aliases ? :acronym : nothing
+            Meta.isexpr(rhs, :curly) && return :dispatch
+            return nothing
+        end
+
+        # Every alias of a file: its name, its kind, and the sections its docstring carries.
+        function scan_aliases(path)
+            found = Tuple{Symbol, Symbol, Vector{String}}[]
+            function walk(node)
+                node isa Expr || return nothing
+                if isdocstring(node) && length(node.args) >= 4
+                    d = node.args[4]
+                    k = alias_kind(d, path)
+                    if !isnothing(k)
+                        nm = bound_name(d)
+                        secs = [String(rstrip(l))
+                                for l in split(docstring_text(node), '\n')
+                                if startswith(l, "# ")]
+                        isnothing(nm) || push!(found, (nm, k, secs))
+                    end
+                end
+                foreach(walk, node.args)
+                return nothing
+            end
+            walk(Meta.parseall(read(path, String)))
+            return found
+        end
+
+        # `sweep/manifest.toml` holds one row per file under `src/` and `ext/`, and
+        # `test_45_sweep_census.jl` reds when a file has no row. So its keys are the scope,
+        # already gated, and one walk serves all three checks.
+        measured = Dict(f => scan_aliases(joinpath(ROOT, f))
+                        for f in sort(collect(keys(rows))))
+
+        @testset "no alias carries a section outside its kind" begin
+            offenders = String[]
+            for f in sort(collect(keys(measured))), (nm, k, secs) in measured[f]
+                extra = setdiff(secs, ALLOWED[k])
+                isempty(extra) || push!(offenders,
+                                        string(f, "  ", nm, "  (", k, ")  ", join(extra, ", ")))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) alias docstring(s) carry a section their kind
+                         does not allow. An alias links its canonical unit and restates
+                         nothing: see `## Section Structure for Aliases` in
+                         `.github/instructions/julia-docstrings.instructions.md`, and
+                         ADR 0086. An acronym alias carries no section, a factory alias
+                         carries `# Validation` alone and only when its body raises, and a
+                         dispatch alias carries `# Related` and
+                         `# References`:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "a dispatch alias in a swept file carries # Related" begin
+            offenders = String[]
+            for f in swept, (nm, k, secs) in measured[f]
+                k === :dispatch &&
+                    "# Related" ∉ secs &&
+                    push!(offenders, string(f, "  ", nm))
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) dispatch alias(es) in a file marked
+                         `swept = true` in `sweep/manifest.toml` carry no `# Related`
+                         section. The section lists what the alias groups, one bullet per
+                         member, and the summary paragraph states why the group
+                         exists:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "the count of dispatch aliases with no # Related does not rise" begin
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(measured)))
+                n = count(t -> t[2] === :dispatch && "# Related" ∉ t[3], measured[f])
+                n > 0 && push!(per, (f, n))
+            end
+            total = sum(last, per; init = 0)
+
+            if total > NO_RELATED_TOTAL
+                @warn """$total dispatch alias(es) over $(length(per)) file(s) carry no
+                         `# Related` section, above the $NO_RELATED_TOTAL this check records.
+                         A new dispatch alias carries the section, so the count may only
+                         fall:\n  $(join(string.(per), "\n  "))"""
+            end
+            @test total <= NO_RELATED_TOTAL
+
+            if total < NO_RELATED_TOTAL
+                println("The count of dispatch aliases carrying no `# Related` has fallen ",
+                        "to ", total, " over ", length(per),
+                        " file(s). Lower the number in ",
+                        "the same commit that paid it, and retire this testset at zero:")
+                println("        NO_RELATED_TOTAL = ", total)
+            end
+        end
+    end
+
+    #=
+    The notation contract (issue #481, under the standards-hardening map #478).
+
+    ADR 0085 records the decision and
+    `.github/instructions/julia-docstrings.instructions.md` is the Authority, in its section
+    "Notation is fixed by symbol and by family". A symbol that appears in the docstrings of
+    two or more units gets a `math_dict` key in `src/01_Base.jl`, and every site
+    interpolates it. A new description takes a NEW key, because editing a value already in
+    the table moves every docstring that interpolates it.
+
+    #478 opened on the drift that follows when a symbol stays inline. Three subtypes of
+    `AbstractDenoiseAlgorithm` state one noise condition three ways -- in a parenthesis, in
+    set notation, and in the `Where:` list -- and the symbol every sibling of that family
+    needs is written by hand at each of its sites and has no key at all.
+
+    ------------------------------------------------------------ what this check matches
+
+    A WHOLE BULLET AGAINST A WHOLE VALUE, never a symbol against a symbol.
+
+    A glyph is not owned by a key. `\boldsymbol{w}` is `math_dict[:w_port]`, the portfolio
+    weights vector, inside a risk measure; it is the observation weights in
+    `src/02_Tools.jl` and the OWA weight vector in
+    `src/19_RiskMeasures/10_OWARiskMeasures.jl`. Matching on the symbol alone reported 149
+    sites, and the great majority of them define a different quantity that the key would
+    state wrongly -- `src/02_Tools.jl` among them, the one such site inside a swept file.
+    Matching the whole bullet against the whole value reports only a COPY of the dictionary
+    text. That copy is the drift the rule exists to stop, and the match cannot fire on a
+    glyph that two families share.
+
+    An interpolation leaves no text behind, which is what makes the match cheap.
+    `docstring_text` above joins the literal pieces of an interpolating docstring, so
+    `math_dict[:T]` contributes nothing to the text it returns. A bullet that still reads as
+    the value is therefore a hand-written copy of it.
+
+    The cost of the trade is stated plainly: a copy that drifts by one word stops matching
+    and stops being reported. That is the trade the exact-name resolution of
+    `test_46_standards_citation_census.jl` already makes, and a drifted copy is what the
+    per-file sweep ticket reads by hand.
+
+    The FAMILY half of the rule -- siblings of one leaf abstract supertype state a shared
+    quantity in the same form -- is not gated here or anywhere. An equation's form is not a
+    token. It holds by review, in the sense of `STANDARDS.md`.
+
+    ---------------------------------------------------------------------- the two checks
+
+      1. A file whose manifest row reads `swept = true` carries ZERO copies. No swept file
+         carries one today, so this check needs no debt list of its own.
+      2. The library-wide count may not rise above `MATH_COPY_TOTAL`. Each #404 sweep ticket
+         lowers it as its file migrates, and the check retires when it reaches zero.
+
+    Both mirror the `# Details` pair above, for the same reason: ADR 0085 settles that the
+    migration is per file, inside each file's own sweep ticket, and never in one
+    library-wide pass.
+    =#
+    @testset "a math_dict value is interpolated, never copied" begin
+        MATH_COPY_TOTAL = 15
+
+        #=
+        `math_dict` is read from source with the same instrument the rest of this testset
+        uses, so this check loads no package either. The table is built by a bare `Dict`
+        call, so each of its entries parses to `Expr(:call, :(=>), QuoteNode(key), value)`.
+        =#
+        function math_dict_values(path)
+            acc = Dict{String, Symbol}()
+            function walk(node)
+                node isa Expr || return nothing
+                if Meta.isexpr(node, :(=)) &&
+                   node.args[1] === :math_dict &&
+                   node.args[2] isa Expr
+                    for p in node.args[2].args
+                        if Meta.isexpr(p, :call) &&
+                           length(p.args) == 3 &&
+                           p.args[1] === :(=>) &&
+                           p.args[2] isa QuoteNode &&
+                           p.args[3] isa AbstractString
+                            acc[strip(p.args[3])] = p.args[2].value
+                        end
+                    end
+                    return nothing
+                end
+                foreach(walk, node.args)
+                return nothing
+            end
+            walk(Meta.parseall(read(path, String)))
+            return acc
+        end
+
+        mvals = math_dict_values(joinpath(ROOT, "src", "01_Base.jl"))
+        @test !isempty(mvals)
+
+        # Every bullet of the docstring, stripped of its marker. A `math_dict` value is one
+        # line, so a bullet that wraps onto a second line cannot be a copy of one.
+        function copied_keys(text, mvals)
+            acc = Symbol[]
+            for line in split(text, '\n')
+                m = match(r"^\s*[-*]\s+(.*?)\s*$", line)
+                isnothing(m) && continue
+                k = get(mvals, m.captures[1], nothing)
+                isnothing(k) || push!(acc, k)
+            end
+            return acc
+        end
+
+        @testset "a swept file copies no math_dict value" begin
+            offenders = String[]
+            for f in swept
+                names, texts, _ = scan(joinpath(ROOT, f))
+                for (nm, t) in zip(names, texts), k in copied_keys(t, mvals)
+                    push!(offenders, string(f, "  ", nm, "  math_dict[:", k, "]"))
+                end
+            end
+            if !isempty(offenders)
+                @warn """$(length(offenders)) `Where:` bullet(s) in a file marked
+                         `swept = true` in `sweep/manifest.toml` write out a `math_dict`
+                         value instead of interpolating it. Replace the bullet with
+                         `\$(math_dict[:key])`, under `Notation is fixed by symbol and by
+                         family` in
+                         `.github/instructions/julia-docstrings.instructions.md`. The
+                         columns are the file, the documented name, and the key it
+                         copies:\n  $(join(offenders, "\n  "))"""
+            end
+            @test isempty(offenders)
+        end
+
+        @testset "the library-wide count of copied values does not rise" begin
+            # The manifest keys are the scope, exactly as they are for `# Details` above:
+            # `test_45_sweep_census.jl` reds when a file under `src/` or `ext/` has no row,
+            # so no second file walk is needed.
+            per = Tuple{String, Int}[]
+            for f in sort(collect(keys(rows)))
+                _, texts, _ = scan(joinpath(ROOT, f))
+                n = sum(t -> length(copied_keys(t, mvals)), texts; init = 0)
+                n > 0 && push!(per, (f, n))
+            end
+            measured = sum(last, per; init = 0)
+
+            if measured > MATH_COPY_TOTAL
+                @warn """$measured `Where:` bullet(s) over $(length(per)) file(s) copy a
+                         `math_dict` value, above the $MATH_COPY_TOTAL this check records. A
+                         shared symbol is interpolated, so the count may only
+                         fall:\n  $(join(string.(per), "\n  "))"""
+            end
+            @test measured <= MATH_COPY_TOTAL
+
+            if measured < MATH_COPY_TOTAL
+                println("The count of copied `math_dict` values has fallen to ", measured,
+                        " over ", length(per), " file(s). Lower the number in the same ",
+                        "commit that paid it, and retire this testset at zero:")
+                println("        MATH_COPY_TOTAL = ", measured)
+            end
+        end
+    end
 end

@@ -23,7 +23,7 @@ To read a complete docstring, open a Unit that [Reference docstrings](#reference
 Five words are used precisely in this file.
 
 - **Unit** — one documented name: a module, a type, a function, a macro or a constant. [`sweep/manifest.toml`](../../sweep/manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when a file's count leaves its row.
-- **Family** — a leaf abstract supertype, together with the concrete types that subtype it. Most families sit inside one file.
+- **Family** — a leaf abstract supertype, together with the concrete types that subtype it. Leaf-most means that no abstract type subtypes it, so a generic root such as `RiskMeasure` or `AbstractResult` is not a Family: its members span many files and share no notation. Most families sit inside one file, so a rule about a Family is local to one sweep ticket. [Notation is fixed by symbol and by family](#notation-is-fixed-by-symbol-and-by-family) is such a rule.
 - **Reference docstring** — a docstring that the [Reference docstrings](#reference-docstrings) table names. Its file is marked `swept = true` in the sweep manifest, so a Gate holds it. Read one in place of a worked example.
 - **Capability Catalogue** — the user-facing inventory of everything the package offers, built by [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl) under ADR 0040. It extracts the first sentence of a type's summary paragraph verbatim.
 - **Coverage Exemption** — a named ruling in [`code_health/rulings.toml`](../../code_health/rulings.toml) that excuses a stated number of uncovered lines in one file. [ADR 0082](../../docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) owns it.
@@ -473,6 +473,47 @@ Internal/private functions may use `$(DocStringExtensions.TYPEDSIGNATURES)` as t
 
 ---
 
+## Section Structure for Aliases
+
+An **alias** is a second name for something another docstring already documents. Its docstring routes the reader to that documentation. It restates none of it, because a second copy drifts away from the first — the argument that put the field descriptions into `field_dict`.
+
+Three kinds of alias exist, and the sections differ by kind.
+
+| Kind | Declaration | Lives in | Header line | Sections it carries |
+| --- | --- | --- | --- | --- |
+| **Acronym alias** | `const HRP = HierarchicalRiskParity` | `src/25_Aliases.jl` only | the alias name alone | none |
+| **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/25_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
+| **Dispatch alias** | `const RhoDistanceAlgorithm = Union{...}` | any file under `src/` | the declaration, `const NAME = <type expression>` | `# Related`, and `# References` when the grouping itself is published |
+
+A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind, because a caller meets all three the same way: as the type a method signature dispatches on.
+
+### The summary paragraph
+
+- An **acronym alias** carries exactly one sentence, `Alias for [`Canonical`](@ref).` and nothing more. The alias and its target are the same object, so a second sentence describes the target and belongs on the target.
+- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/25_Aliases.jl`](../../src/25_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
+- A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the load-bearing half: a reader who sees only the member list learns nothing the declaration did not already show.
+
+### Why an alias carries so little
+
+- **No `# Fields`, no `# Constructors`, no `# Arguments`, no `# Returns`, no `# Examples`, on any kind.** The canonical unit owns each of them, and the summary sentence puts it one click away. A copy on the alias is a second text to maintain and the one a reader reaches first when it goes stale.
+- **No `# Related` on an acronym alias or on a factory alias.** Its summary sentence already `@ref`s every canonical name, and `## What each section holds` states that `# Related` does not hold a copy of the related unit's own text. One link, once.
+- **`# Related` on a dispatch alias**, one bullet per grouped member. A group of members is a list, and a summary sentence must not be one. A function that dispatches on the alias may take a bullet of its own.
+- **`# Algorithm`, `# Mathematical definition` and `# JuMP formulation` reach no alias.** An alias runs no steps and registers no row. A factory alias composes types and takes no branch worth numbering.
+
+The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:alias`, under [`.github/instructions/julia-source-code.instructions.md`](julia-source-code.instructions.md), so it never reads an alias summary sentence.
+
+### The Gate
+
+`test/test_26_docs.jl` gates the rule with three checks, in the shape [ADR 0086](../../docs/adr/0086-an-alias-docstring-links-its-canonical-unit-and-restates-nothing.md) records.
+
+ 1. **Library-wide, absolute.** No alias carries a section outside its kind's row of the table above. A new breach is the only way this check can red.
+ 2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries `# Related`.
+ 3. **Library-wide, a ratchet.** The count of dispatch aliases carrying no `# Related` may not rise. The check retires when that count reaches zero.
+
+Check 2 reads the `swept` flag because it demands a section, and a presence demand may not red a file that no child map of issue #404 has swept. Check 1 forbids a section instead, so it needs no flag.
+
+---
+
 ## The `# Validation` Section
 
 - Include a `## Validation` sub-section in struct docstrings and a `# Validation` section in function docstrings whenever the function or constructor enforces preconditions.
@@ -636,6 +677,26 @@ Key rules:
 
 ---
 
+### Notation is fixed by symbol and by family
+
+The rules above fix the glyphs. The two below fix the content, so that two docstrings that state one quantity state it once and state it alike.
+
+**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base.jl`](../../src/01_Base.jl), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
+
+A new description is a **new** key. Editing a value already in `math_dict` moves every docstring that interpolates it, which is the reason [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives for `arg_dict`.
+
+**A key owns a definition, not a glyph.** One glyph carries different quantities in different families: ``\boldsymbol{w}`` is the portfolio weights vector in a risk measure and the observation weights in a moment estimator. A key is therefore claimed by the whole definition — the symbol together with the sentence that defines it — and a second quantity on the same glyph takes its own key under its own symbol. It never takes a second meaning on the first.
+
+**Gate.** `test/test_26_docs.jl` reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`sweep/manifest.toml`](../../sweep/manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+
+**Siblings of one Family state a shared quantity in the same form.** Not the same symbol alone — the same shape of equation. A condition that one sibling writes in a parenthesis, the second in set notation and the third in its `Where:` list is one fact written three ways, and the three do not read as one Family. Take the shape from the sibling that states it most completely, and write the others to match it.
+
+The Family is the leaf-most abstract supertype, never a generic root. `RiskMeasure` and `AbstractResult` span many files and their members share no notation, so neither is a Family in this sense.
+
+An equation's form is not a token, so no parser finds a breach. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
+
+---
+
 ## The `# Algorithm` Section
 
 A **procedure** is documented in `# Algorithm`. A **closed form** stays in `# Mathematical definition`. A docstring may carry both sections, and a marker type carries neither.
@@ -733,5 +794,6 @@ Read a real docstring, not a copy of one. Each row names a Unit whose file is ma
 | Struct with fields | `ShrunkDenoise` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
 | Public function | `denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
 | Private function | `_denoise!` | [`src/05_Denoise.jl`](../../src/05_Denoise.jl) |
+| Dispatch alias | `RhoDistanceAlgorithm` | [`src/09_Distance/02_Distance.jl`](../../src/09_Distance/02_Distance.jl) |
 
 `# JuMP formulation` carries no row. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.
