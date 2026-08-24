@@ -1392,6 +1392,206 @@
                                                                                      scores = [1.0,
                                                                                                2.0])
     end
+    @testset "The information-theoretic sweep of #459" begin
+        #=
+        Every claim the histogram and mutual information files make, pinned by running it.
+        The four bin rules against their own closed forms, the two direct routes to a bin
+        count, the two extremes of `mutual_info`, the metric axioms of `variation_info`,
+        the identity that relates `intrinsic_mutual_info` to `mutual_info`, and the shape
+        of `MutualInfoCovariance`.
+        =#
+        PO = PortfolioOptimisers
+        SF = PortfolioOptimisers.SpecialFunctions
+        rngh = StableRNG(987654321)
+        xh = randn(rngh, 200)
+        yh = randn(rngh, 200)
+        Th = length(xh)
+        # --- Scott's rule against its closed form ---
+        # dx = sigma * (24 sqrt(pi) / n)^(1/3), with the UNCORRECTED standard deviation.
+        sc = PO.bin_width(Scott(), xh)
+        @test isapprox(sc, std(xh; corrected = false) * (24 * sqrt(pi) / Th)^(1 / 3))
+        # The corrected standard deviation is a different number, so the flag is not free.
+        @test !isapprox(sc, std(xh; corrected = true) * (24 * sqrt(pi) / Th)^(1 / 3))
+        # --- Freedman-Diaconis against its closed form ---
+        # dx = 2 IQR(x) / n^(1/3).
+        q25, q75 = quantile(xh, [0.25, 0.75])
+        fd = PO.bin_width(FreedmanDiaconis(), xh)
+        @test isapprox(fd, 2 * (q75 - q25) / Th^(1 / 3))
+        #=
+        The two rules differ in their constant AND in their dispersion measure, so a check
+        that does not separate them checks neither. On this sample Scott is the wider.
+        =#
+        @test !isapprox(sc, fd; rtol = 0.1)
+        @test sc > fd
+        # --- Knuth's rule maximises its own posterior ---
+        # `bin_width` returns `range / M`, so recover M and score its neighbours.
+        function knuth_f(x, M)
+            n = length(x)
+            xl, xu = extrema(x)
+            rx = xu - xl
+            nk = zeros(Int, M)
+            for xi in x
+                nk[min(floor(Int, (xi - xl) / rx * M) + 1, M)] += 1
+            end
+            return n * log(M) + SF.loggamma(M / 2) - M * SF.loggamma(0.5) -
+                   SF.loggamma(n + M / 2) + sum(SF.loggamma, nk .+ 0.5)
+        end
+        kdx = PO.bin_width(Knuth(), xh)
+        Mk = round(Int, (maximum(xh) - minimum(xh)) / kdx)
+        @test Mk >= 1
+        @test knuth_f(xh, Mk) >= knuth_f(xh, Mk - 1)
+        @test knuth_f(xh, Mk) >= knuth_f(xh, Mk + 1)
+        # The three width rules are genuinely different selections on one sample.
+        @test length(unique([sc, fd, kdx])) == 3
+        # --- Hacine-Gharbi-Ravier, both closed forms ---
+        ch = cor(xh, yh)
+        @test !isone(abs(ch))
+        @test PO.calc_num_bins(HacineGharbiRavier(), xh, yh, 1, 2, Th) ==
+              round(Int, sqrt(1 + sqrt(1 + 24 * Th / (1 - ch^2))) / sqrt(2))
+        zk = cbrt(8 + 324 * Th + 12 * sqrt(36 * Th + 729 * Th^2))
+        @test PO.calc_num_bins(HacineGharbiRavier(), xh, xh, 1, 1, Th) ==
+              round(Int, zk / 6 + 2 / (3 * zk) + 1 / 3)
+        #=
+        The bi-histogram form divides by `1 - rho^2`, so it is singular at BOTH ends of the
+        correlation range. A perfectly anti-correlated pair used to reach that branch and
+        raise `InexactError: Int64(Inf)`; it now takes the univariate form, as `rho = 1`
+        does. Fixed under #459.
+        =#
+        @test cor(xh, -xh) == -1
+        @test PO.calc_num_bins(HacineGharbiRavier(), xh, -xh, 1, 2, Th) ==
+              PO.calc_num_bins(HacineGharbiRavier(), xh, xh, 1, 1, Th)
+        @test !isnan(PO.mutual_info(hcat(xh, -xh))[1, 2])
+        @test size(PO.variation_info(hcat(xh, -xh))) == (2, 2)
+        # --- the two direct routes to a bin count ---
+        # An `Integer` is returned unchanged and reads no other argument.
+        @test PO.calc_num_bins(11, xh, yh, 1, 2, Th) == 11
+        @test PO.calc_num_bins(11) == 11
+        @test 11 isa PO.Int_Bin
+        @test HacineGharbiRavier() isa PO.Int_Bin
+        #=
+        A `BinWidthBins` divides the range by the width. The self pair takes one variable's
+        count; an off-diagonal pair takes the LARGER of the two.
+        =#
+        k1 = (maximum(xh) - minimum(xh)) / sc
+        k2 = (maximum(yh) - minimum(yh)) / PO.bin_width(Scott(), yh)
+        @test PO.calc_num_bins(Scott(), xh, yh, 1, 1, Th) == round(Int, k1)
+        @test PO.calc_num_bins(Scott(), xh, yh, 1, 2, Th) == round(Int, max(k1, k2))
+        # --- `calc_hist_data` shape and units ---
+        nb = 8
+        exh, eyh, hxy = PO.calc_hist_data(xh, yh, nb)
+        @test size(hxy) == (nb, nb)
+        # The marginals are normalised before the entropy; the joint histogram is not.
+        wmx = fit(Histogram, xh,
+                  range(minimum(xh) - eps(Float64), maximum(xh) + eps(Float64);
+                        length = nb + 1)).weights
+        @test exh ≈ entropy(wmx ./ sum(wmx))
+        @test sum(hxy) <= length(xh)
+        #=
+        The edges are widened by `eps(eltype(x))`, the machine epsilon, not the spacing at
+        the widened value. For a maximum of magnitude two or more the widened upper edge
+        rounds back to the maximum, and the exclusive upper edge then bins the largest
+        observation out of the histogram. Pinned so the loss is visible, not silent. The
+        fix moves every mutual information number the library reports, so it is filed as
+        #493 rather than made here.
+        =#
+        xbig = xh .+ 10
+        @test maximum(xbig) + eps(Float64) == maximum(xbig)
+        @test sum(PO.calc_hist_data(xbig, xbig, nb)[3]) == length(xbig) - 1
+        # --- `intrinsic_mutual_info` is the unnormalised, unclamped estimate ---
+        Zh = hcat(xh, yh)
+        @test PO.intrinsic_mutual_info(hxy) ≈ PO.mutual_info(Zh, nb, false)[1, 2]
+        @test PO.mutual_info(Zh, nb, true)[1, 2] ≈
+              PO.intrinsic_mutual_info(hxy) / min(exh, eyh)
+        # A single bin on either axis carries no information.
+        @test iszero(PO.intrinsic_mutual_info(PO.calc_hist_data(xh, yh, 1)[3]))
+        @test iszero(PO.intrinsic_mutual_info(ones(1, 4)))
+        @test iszero(PO.intrinsic_mutual_info(ones(4, 1)))
+        # --- `mutual_info` at its two extremes ---
+        rngm = StableRNG(123456789)
+        Xm = randn(rngm, 500, 3)
+        Mun = PO.mutual_info(Xm, HacineGharbiRavier(), false)
+        # A variable against itself gives its own entropy.
+        for j in 1:3
+            nbj = PO.calc_num_bins(HacineGharbiRavier(), view(Xm, :, j), view(Xm, :, j), j,
+                                   j, size(Xm, 1))
+            @test Mun[j, j] ≈ PO.calc_hist_data(view(Xm, :, j), view(Xm, :, j), nbj)[1]
+        end
+        # Independent variables give about zero -- a small positive finite-sample bias.
+        for j in 1:3, i in 1:(j - 1)
+            @test 0 <= Mun[j, i] < 0.1
+        end
+        # Normalised, the diagonal is one and every entry is bounded by [0, 1].
+        Mno = PO.mutual_info(Xm, HacineGharbiRavier(), true)
+        @test all(x -> isapprox(x, 1), diag(Mno))
+        @test all(x -> 0 <= x <= 1 + eps(), Mno)
+        @test issymmetric(Mno)
+        # --- `variation_info` is a metric ---
+        rngv = StableRNG(555)
+        Zv = randn(rngv, 600, 6)
+        Zv[:, 2] .= 0.8 .* Zv[:, 1] .+ 0.6 .* Zv[:, 2]
+        Zv[:, 3] .= 0.5 .* Zv[:, 2] .+ 0.9 .* Zv[:, 3]
+        for nrm in (true, false)
+            Vv = PO.variation_info(Zv, 8, nrm)
+            # Identity of indiscernibles, pinned rather than estimated.
+            @test all(iszero, diag(Vv))
+            # Non-negativity and symmetry.
+            @test all(>=(0), Vv)
+            @test issymmetric(Vv)
+            # The triangle inequality, over every ordered triple.
+            for a in axes(Vv, 1), b in axes(Vv, 1), c in axes(Vv, 1)
+                @test Vv[a, c] <= Vv[a, b] + Vv[b, c] + 1e-12
+            end
+        end
+        # The normalised form divides by the joint entropy, which bounds it to [0, 1].
+        Vn = PO.variation_info(Zv, 8, true)
+        @test all(x -> 0 <= x <= 1, Vn)
+        # `mutual_info` is NOT a metric: its diagonal is the entropy, not zero.
+        @test all(!iszero, diag(PO.mutual_info(Zv, 8, false)))
+        # The unnormalised form is the closed form, term by term.
+        Vu = PO.variation_info(Zv, 8, false)
+        for j in axes(Zv, 2), i in 1:(j - 1)
+            ex2, ey2, h2 = PO.calc_hist_data(view(Zv, :, j), view(Zv, :, i), 8)
+            mi2 = PO.intrinsic_mutual_info(h2)
+            @test Vu[j, i] ≈ ex2 + ey2 - 2 * mi2
+            @test Vn[j, i] ≈ (ex2 + ey2 - 2 * mi2) / (ex2 + ey2 - mi2)
+        end
+        # --- `mutual_variation_info` returns exactly the two matrices ---
+        mmv, vmv = PO.mutual_variation_info(Zv, 8, true)
+        @test mmv ≈ PO.mutual_info(Zv, 8, true)
+        @test vmv ≈ Vn
+        @test all(iszero, diag(vmv))
+        @test all(x -> isapprox(x, 1), diag(mmv))
+        # --- `MutualInfoCovariance` ---
+        Xc = randn(StableRNG(4242), 400, 4)
+        vc = vec(var(SimpleVariance(), Xc))
+        sc4 = sqrt.(vc)
+        for nrm in (true, false)
+            cec = MutualInfoCovariance(; bins = 8, normalise = nrm)
+            Rc = cor(cec, Xc)
+            Cc = cov(cec, Xc)
+            @test issymmetric(Rc)
+            @test issymmetric(Cc)
+            @test Rc ≈ PO.mutual_info(Xc, 8, nrm)
+            #=
+            `cor2cov!` writes the variance onto the diagonal whatever the correlation
+            carries there, so the covariance diagonal is the variance under BOTH flags.
+            =#
+            @test isapprox(diag(Cc), vc)
+            # Off the diagonal the covariance is the correlation scaled by the two sigmas.
+            for j in 1:4, i in 1:(j - 1)
+                @test Cc[j, i] ≈ Rc[j, i] * sc4[j] * sc4[i]
+            end
+            # Mutual information is non-negative, so no pair is ever reported as opposed.
+            @test all(>=(0), Cc)
+        end
+        # Normalised, the correlation diagonal is one; unnormalised, it is the entropy.
+        @test all(x -> isapprox(x, 1), diag(cor(MutualInfoCovariance(; bins = 8), Xc)))
+        @test all(>(1), diag(cor(MutualInfoCovariance(; bins = 8, normalise = false), Xc)))
+        # `dims = 2` transposes before the estimate rather than after.
+        @test cor(MutualInfoCovariance(; bins = 8), Xc) ≈
+              cor(MutualInfoCovariance(; bins = 8), Xc'; dims = 2)
+        @test_throws DomainError cor(MutualInfoCovariance(; bins = 8), Xc; dims = 3)
+    end
 end
 """
 Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`

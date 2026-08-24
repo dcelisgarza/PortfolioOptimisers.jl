@@ -60,8 +60,8 @@
 "src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, algorithm = 7, swept = true }
 "src/08_Moments/08_LowerTailDependenceCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
 "src/08_Moments/09_RankCovariance.jl" = { map = 3, units = 5, algorithm = 2, swept = true }
-"src/08_Moments/10_Histogram.jl" = { map = 3, units = 16, swept = false }
-"src/08_Moments/11_MutualInfoCovariance.jl" = { map = 3, units = 2, swept = false }
+"src/08_Moments/10_Histogram.jl" = { map = 3, units = 16, algorithm = 7, swept = true }
+"src/08_Moments/11_MutualInfoCovariance.jl" = { map = 3, units = 2, algorithm = 1, swept = true }
 "src/08_Moments/12_DenoiseCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
 "src/08_Moments/13_DetoneCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }
 "src/08_Moments/14_ProcessedCovariance.jl" = { map = 3, units = 1, algorithm = 1, swept = true }

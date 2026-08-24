@@ -127,6 +127,11 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  ## Mutual and var info
                                  :bins => "`bins`: Binning algorithm or fixed number of bins.",#
                                  :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
+                                 :xj => "`xj`: Data vector for variable `j`.",#
+                                 :xi => "`xi`: Data vector for variable `i`.",#
+                                 :jidx => "`j`: Index of variable `j`.",#
+                                 :iidx => "`i`: Index of variable `i`.",#
+                                 :Tobs => "`T`: Number of observations.",#
                                  ## Distance
                                  :dopower => "`power`: Optional matrix exponent. `nothing` and `1` both give the base distance, so only `power >= 2` changes the result.",#
                                  :dalg => "`alg`: Distance algorithm.",#
@@ -862,6 +867,8 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :sigma => "`sigma::MatNum`: Covariance matrix `assets x assets`.",#
                                  :rho => "`rho::MatNum`: Correlation matrix `assets x assets`.",#
                                  :Ddist => "`D::MatNum`: Distance matrix `assets x assets`, in the units the distance algorithm defines.",#
+                                 :nbins => "`nbins::Integer`: Number of histogram bins for the variable pair.",#
+                                 :dx => "`dx::Number`: Optimal histogram bin width.",#
                                  :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
                                  :sk => "`sk::MatNum`: Coskewness matrix `assets x assets`.",#
                                  :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
