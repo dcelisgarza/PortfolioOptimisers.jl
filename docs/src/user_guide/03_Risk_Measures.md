@@ -1,5 +1,4 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
-
 ```@meta
 EditURL = "../../../user_guide/03_Risk_Measures.jl"
 ```
@@ -349,16 +348,16 @@ pretty_table(DataFrame("Alias" => [a[1] * "()" for a in alias_ctors],
 
 The catalogue is long, but the choice collapses to what you believe about the return distribution:
 
-- **Roughly symmetric, care about spread** — [`Variance`](@ref) (the default) or
+  - **Roughly symmetric, care about spread** — [`Variance`](@ref) (the default) or
     [`StandardDeviation`](@ref).
-- **Left tail matters more than spread** — [`ConditionalValueatRisk`](@ref) first; reach for
+  - **Left tail matters more than spread** — [`ConditionalValueatRisk`](@ref) first; reach for
     [`EntropicValueatRisk`](@ref) / [`RelativisticValueatRisk`](@ref) when you want to control the
     tail more tightly than CVaR does.
-- **Path matters, not just the distribution** — the drawdown family, headed by
+  - **Path matters, not just the distribution** — the drawdown family, headed by
     [`MaximumDrawdown`](@ref) and [`ConditionalDrawdownatRisk`](@ref).
-- **You distrust the covariance estimate** — [`UncertaintySetVariance`](@ref).
-- **You want to shape the whole ordered loss curve** — [`OrderedWeightsArray`](@ref).
-- **Trading costs bite** — add [`TurnoverRiskMeasure`](@ref) or
+  - **You distrust the covariance estimate** — [`UncertaintySetVariance`](@ref).
+  - **You want to shape the whole ordered loss curve** — [`OrderedWeightsArray`](@ref).
+  - **Trading costs bite** — add [`TurnoverRiskMeasure`](@ref) or
     [`TrackingRiskMeasure`](@ref) alongside your main measure.
 
 Several measures can be combined in one objective — see

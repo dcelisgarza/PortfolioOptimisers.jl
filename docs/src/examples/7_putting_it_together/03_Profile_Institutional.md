@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/7_putting_it_together/03_Profile_Institutional.jl"
 ```
@@ -14,12 +13,12 @@ The size makes exact execution worthwhile.
 
 The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
-- **The mandate is the boss** — per-name caps, sector limits, and a benchmark tracking-error
+  - **The mandate is the boss** — per-name caps, sector limits, and a benchmark tracking-error
     ceiling are hard requirements, exactly what the [`JuMPOptimiser`](@ref) constraint keywords
     express.
-- **Benchmarked** — this is enhanced indexing: minimise risk but stay within a tracking-error
+  - **Benchmarked** — this is enhanced indexing: minimise risk but stay within a tracking-error
     budget of the benchmark (see [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md)).
-- **Large and precise** — a big book justifies an exact [`DiscreteAllocation`](@ref).
+  - **Large and precise** — a big book justifies an exact [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"
     This is the template for a constrained, benchmarked institutional book: stack the mandate's

@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/6_post_processing/01_Finite_Allocation.jl"
 ```
@@ -13,9 +12,9 @@ realised portfolio away from the target, and the smaller the account the more it
 and an exact mixed-integer one — both called through the same
 `optimise(allocator, FiniteAllocationInput(; w, prices, cash))` interface.
 
-- [`GreedyAllocation`](@ref) — a two-pass heuristic: round to whole (or lot-sized) shares, then
+  - [`GreedyAllocation`](@ref) — a two-pass heuristic: round to whole (or lot-sized) shares, then
     spend the leftover cash on the largest underweights. No solver needed.
-- [`DiscreteAllocation`](@ref) — solves a mixed-integer program for the *optimal* whole-share
+  - [`DiscreteAllocation`](@ref) — solves a mixed-integer program for the *optimal* whole-share
     book. Needs a MIP solver.
 
 !!! tip "When to reach for this"

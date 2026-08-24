@@ -1458,9 +1458,9 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
  5. Collapse the time series with `collapse_args`, when they are given. This is the step that changes the frequency.
  6. Convert the table to a `DataFrames.DataFrame`, and replace every `NaN` with `missing`. The two conventions for an absent price become one.
  7. Impute the missing entries with [`apply_impute_method`](@ref), which does nothing unless the caller gives an `Impute.Imputor`.
- 8. Count the missing entries of the table, giving one count per row and one count per column.
+ 8. Count the missing entries of each row of the table.
  9. Drop each row whose count of missing columns exceeds `missing_col_percent` of the column total.
-10. Drop each column whose count of missing rows exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
+10. Count the missing entries of each column over the rows that step 9 kept. Drop each column whose count exceeds `missing_row_percent` of the surviving row total. When `missing_row_percent` is `nothing`, keep instead the columns whose count equals the mode of the counts.
 11. Drop every column that is still typed as missing, then every row that still holds a missing entry.
 12. Convert the surviving prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This is the step that applies the formula above. When `padding` is `true` the first observation is kept and its return is `NaN`, so the returns keep the length of the price clock.
 13. Split the surviving column names into the asset names `nx`, the factor names `nf`, the benchmark names `nb`, and the timestamp column, which gives `ts`.
@@ -1469,7 +1469,7 @@ A benchmark ``B`` is converted by the same rule and **carried alongside** the as
 16. Build the asset, factor and benchmark matrices from the surviving columns. A group whose columns all went is `nothing`.
 17. Return the [`ReturnsResult`](@ref).
 
-Step 9 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one.
+Step 8 counts the missing columns of a row, and step 10 counts the missing rows of a column. The name of each keyword reads as the axis it counts, and the axis it drops is the other one. Both filters read the same table, because step 10 counts only over the rows that step 9 kept.
 
 # Arguments
 
@@ -1481,7 +1481,7 @@ Step 9 counts the missing columns of a row, and step 10 counts the missing rows 
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
   - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing **columns** in an observation row. A row above it is dropped. The name reads as the axis that is counted, not the axis that is dropped.
-  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing **rows** in a column. A column above it is dropped. `nothing` keeps the columns whose missing count equals the mode of the counts instead, which is the shape of a panel whose assets share one history.
+  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing **rows** in a column, counted over the rows that `missing_col_percent` kept. A column above it is dropped. `nothing` keeps the columns whose missing count equals the mode of the counts instead, which is the shape of a panel whose assets share one history.
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
@@ -1610,7 +1610,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     missings_cols = vec(count(missing_mtx; dims = 2))
     keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
     X = X[keep_rows, :]
-    missings_rows = vec(count(missing_mtx; dims = 1))
+    # Both filters read the same table: count the missing entries of a column over the rows
+    # that survived the row filter, never over the rows that filter already dropped.
+    missings_rows = vec(count(view(missing_mtx, keep_rows, :); dims = 1))
     keep_cols = if !isnothing(missing_row_percent)
         missings_rows .<= DataFrames.DataAPI.nrow(X) * missing_row_percent
     else

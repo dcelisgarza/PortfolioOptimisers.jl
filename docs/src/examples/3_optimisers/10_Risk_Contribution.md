@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/10_Risk_Contribution.jl"
 ```
@@ -9,9 +8,9 @@ EditURL = "../../../../examples/3_optimisers/10_Risk_Contribution.jl"
 This example focuses on *where* risk lands rather than only on how much risk a portfolio
 takes. It walks through two related workflows:
 
-- asset risk contribution under the variance measure, using the `rc` field to constrain
+  - asset risk contribution under the variance measure, using the `rc` field to constrain
     per-asset contributions while comparing multiple objective functions;
-- factor risk contribution optimisation, where we constrain the contribution of specific
+  - factor risk contribution optimisation, where we constrain the contribution of specific
     factors and solve across multiple objectives.
 
 !!! tip "When to reach for this"
@@ -152,11 +151,11 @@ end
 
 Risk contribution workflows answer a different question from plain mean-risk optimisation:
 
-- [`Variance`](@ref) with `rc` constraints directly limits realised risk contribution,
+  - [`Variance`](@ref) with `rc` constraints directly limits realised risk contribution,
     either by asset or by factor.
-- [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) can be run with the same
+  - [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) can be run with the same
     constraints and different objective functions to compare allocations and concentration.
-- [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) verify whether the
+  - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) verify whether the
     solved portfolio's realised profile matches your intended contribution policy.
 
 ---

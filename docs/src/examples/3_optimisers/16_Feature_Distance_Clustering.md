@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/16_Feature_Distance_Clustering.jl"
 ```
@@ -342,11 +341,11 @@ pretty_table(producers; title = "The four routes a feature matrix takes")
 
 [`PhylogenyFeatures`](@ref) is driven by two settings that live on **two different objects**:
 
-- `sep` on the [`NetworkEstimator`](@ref) decides **which pairs are related** — how far apart
+  - `sep` on the [`NetworkEstimator`](@ref) decides **which pairs are related** — how far apart
     two assets may sit and still score above zero. [`HopCount`](@ref) counts edges with a budget
     of `n` of them; [`PathLength`](@ref) sums distances along the shortest path with a budget
     `dmax` in those units.
-- `decay` on [`Proximity`](@ref) decides **how strongly** a related pair scores as separation
+  - `decay` on [`Proximity`](@ref) decides **how strongly** a related pair scores as separation
     grows.
 
 Setting one does not imply the other, and getting that wrong produces no error at all. The
@@ -387,16 +386,16 @@ pretty_table(sweep;
 
 Read the table down the columns rather than across the rows:
 
-- **`Related pairs` moves with the separation and never with the decay.** Which pairs are
+  - **`Related pairs` moves with the separation and never with the decay.** Which pairs are
     related is `sep`'s question alone.
-- **`Self score` is `1.0` for every decay except [`LinearDecay`](@ref)**, where it is the
+  - **`Self score` is `1.0` for every decay except [`LinearDecay`](@ref)**, where it is the
     budget plus one — `3` under `HopCount(; n = 2)`, `2` under `PathLength(; dmax = 1.0)`. The
     other three pin `f(0) = 1` and set the fall-off from their own parameter, independently of
     how far the budget looks. That is the whole of the coincidence: under the default pairing
     the budget doubles as the scale, and under every other it does not.
-- **`ARI vs correlation` moves with both.** The decay is not cosmetic — it changes the
+  - **`ARI vs correlation` moves with both.** The decay is not cosmetic — it changes the
     distance and the clusters that come out of it.
-- **[`NoDecay`](@ref) is not "no truncation".** The budget still cuts, so it gives `1` inside
+  - **[`NoDecay`](@ref) is not "no truncation".** The budget still cuts, so it gives `1` inside
     and `0` outside: a neighbourhood indicator, not a matrix of ones. It is also the row where
     the two separations agree exactly, because an indicator can only see the support.
 
@@ -523,12 +522,12 @@ pretty_table(collapse_rows; title = "Four collapse rules on one $(T)×$(N)×2 fe
 
 The four rules give four different answers, and they are different *in kind*:
 
-- [`LastObservation`](@ref) (the default) takes the most recent slice and ignores the rest.
-- [`AggregateFeatures`](@ref) averages the features first, then measures once.
-- [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. It
+  - [`LastObservation`](@ref) (the default) takes the most recent slice and ignores the rest.
+  - [`AggregateFeatures`](@ref) averages the features first, then measures once.
+  - [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. It
     refuses [`MedianCollapse`](@ref) at construction, because a convex combination of metrics is
     a metric while a median of distance matrices is not.
-- [`StackObservations`](@ref) concatenates every period into one long coordinate vector. It is
+  - [`StackObservations`](@ref) concatenates every period into one long coordinate vector. It is
     the most scale-exposed of the four, since a period with large magnitudes dominates.
 
 The last column is the degeneracy that shows they are the same idea: at one observation all four
@@ -583,10 +582,10 @@ plot([distance(FeatureDistance(; alg = alg), Ztv; dims = 1)[1, :] for (_, alg) i
 A feature matrix reaches [`distance`](@ref) from one of two places, and `z_src` on the optimiser
 picks which:
 
-- `z_src = :data` reads [`ReturnsResult`](@ref)'s `Z` — the matrix **you supplied**. This is
+  - `z_src = :data` reads [`ReturnsResult`](@ref)'s `Z` — the matrix **you supplied**. This is
     the default, because an explicitly supplied matrix outranks a derived one. It is the
     opposite default to `x_src`, deliberately.
-- `z_src = :prior` reads the prior result's `Z` — the matrix a **producer derived**.
+  - `z_src = :prior` reads the prior result's `Z` — the matrix a **producer derived**.
 
 Provenance is strict: a producer only ever populates the prior carrier, and `prior(pe, rd)`
 always drops `rd.Z`. The two carriers therefore never hold two copies of one matrix, and `z_src`
@@ -619,9 +618,9 @@ println("Largest weight difference between the two carriers: ",
 The equality above is a property of the whole universe, not of the two selectors. Under a
 meta-optimiser or a cross-validation fold:
 
-- **`:data` slices.** The carried matrix is *subselected* to the subproblem's assets. Its
+  - **`:data` slices.** The carried matrix is *subselected* to the subproblem's assets. Its
     columns still describe the classification of the full universe.
-- **`:prior` refits.** The producer runs again inside the subproblem's own `prior` call and
+  - **`:prior` refits.** The producer runs again inside the subproblem's own `prior` call and
     recomputes `Z` from the subproblem's returns and its sliced [`UniverseSets`](@ref).
 
 For an exogenous taxonomy the two coincide, because slicing a partition and re-deriving it give
@@ -851,8 +850,8 @@ reshapes the distance fold by fold.
 
 Two ways out, and both are one keyword:
 
-- State a numeric `dmax`, which pins the budget and the scale across every fold.
-- Use a decay that pins `f(0) = 1` — [`ExponentialDecay`](@ref), [`ReciprocalDecay`](@ref) or
+  - State a numeric `dmax`, which pins the budget and the scale across every fold.
+  - Use a decay that pins `f(0) = 1` — [`ExponentialDecay`](@ref), [`ReciprocalDecay`](@ref) or
     [`NoDecay`](@ref) — which never had the exposure in the first place.
 
 ## 9. A walk-forward backtest
@@ -923,18 +922,18 @@ plot_portfolio_cumulative_returns(bt_fea)
 
 ## 10. Summary
 
-- A feature matrix is `assets × features` data carried beside the returns, not configuration
+  - A feature matrix is `assets × features` data carried beside the returns, not configuration
     held on an estimator. Static and time-varying shapes are told apart by `ndims`.
-- [`FeatureDistance`](@ref) turns it into a distance, so every clustering, network and
+  - [`FeatureDistance`](@ref) turns it into a distance, so every clustering, network and
     constraint consumer takes it unchanged.
-- Four producers supply it. Only [`AssetSetsFeatures`](@ref) is exogenous, which is the
+  - Four producers supply it. Only [`AssetSetsFeatures`](@ref) is exogenous, which is the
     property the whole exercise exists for.
-- [`PhylogenyFeatures`](@ref) has two independent knobs on two different objects: `sep`
+  - [`PhylogenyFeatures`](@ref) has two independent knobs on two different objects: `sep`
     chooses which pairs are related, `decay` how strongly. Neither implies the other, and the
     default pairing hides the difference.
-- `z_src` picks the carrier: `:data` slices under a fold, `:prior` refits. They agree on the
+  - `z_src` picks the carrier: `:data` slices under a fold, `:prior` refits. They agree on the
     whole universe and diverge on a subproblem.
-- Cross-validation surfaces two things nothing else does — a time-varying literal cannot
+  - Cross-validation surfaces two things nothing else does — a time-varying literal cannot
     survive an observation fold, and a bare `PathLength()` makes the scale of `Z` follow the
     sample.
 

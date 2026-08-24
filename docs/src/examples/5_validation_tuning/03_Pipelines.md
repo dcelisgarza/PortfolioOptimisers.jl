@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/03_Pipelines.jl"
 ```
@@ -199,9 +198,9 @@ constraints → weight bounds → [`MeanRisk`](@ref).
 
 Two things make this work without any plumbing:
 
-- **Slot routing.** Each step writes the context slot its family owns. A prior estimator
+  - **Slot routing.** Each step writes the context slot its family owns. A prior estimator
     writes `:prior`; a phylogeny-constraint estimator writes `:constraints`.
-- **Injection.** Immediately before the optimisation step runs, the computed slots
+  - **Injection.** Immediately before the optimisation step runs, the computed slots
     override the optimiser's *internal* configuration. The pipeline's prior replaces the
     optimiser's default `pe`; each constraint result is routed into the optimiser field its
     family names — `wb`, `lcse`, `cte`, `ple`, `rkb`, and the threshold fields. Where a
@@ -255,9 +254,9 @@ during preprocessing.
 
 Lens keys address steps three ways:
 
-- by **name** with a trailing property path — `"filter.col_thr"`;
-- by **name** alone (or by integer position), which swaps the whole step — `"impute"`;
-- by **raw property path**, exactly as for plain optimisers — `"steps[1].col_thr"`.
+  - by **name** with a trailing property path — `"filter.col_thr"`;
+  - by **name** alone (or by integer position), which swaps the whole step — `"impute"`;
+  - by **raw property path**, exactly as for plain optimisers — `"steps[1].col_thr"`.
 
 ````@example 03_Pipelines
 pipe = Pipeline(;
@@ -380,15 +379,15 @@ pretty_table(DataFrame(; path = [p.id for p in pm.pred],
 A few things a pipeline deliberately will not do, each with an explanatory error rather than
 a silent wrong answer:
 
-- **Combinatorial and multiple-randomised cross-validation are price-level-restricted.** A
+  - **Combinatorial and multiple-randomised cross-validation are price-level-restricted.** A
     price-starting pipeline rejects them by the rolling-window rule of §5; run them on a
     returns-level pipeline, as above.
-- **A pipeline cannot be wrapped in a meta-optimiser** (`NestedClustered`, `Stacking`,
+  - **A pipeline cannot be wrapped in a meta-optimiser** (`NestedClustered`, `Stacking`,
     `SubsetResampling`). Those build asset sub-portfolios via an asset view of their inner
     estimator, and a pipeline's universe is fitted state, so the view is not well defined
     before fitting. The reverse *is* supported: a meta-optimiser makes a perfectly good
     optimisation step of a pipeline.
-- **Predicting without weights** — a pipeline with no terminal optimisation step is legal
+  - **Predicting without weights** — a pipeline with no terminal optimisation step is legal
     (a prior-only pipeline is useful), but it has nothing to predict with.
 
 ````@example 03_Pipelines
@@ -410,14 +409,14 @@ end
 A [`Pipeline`](@ref) turns an implicit, hand-tuned data-preparation prologue into an explicit,
 fitted, tunable part of the model.
 
-- Steps are ordinary estimators, routed to context slots by their family.
-- Preprocessing steps have a fit/apply contract: the training window learns the universe
+  - Steps are ordinary estimators, routed to context slots by their family.
+  - Preprocessing steps have a fit/apply contract: the training window learns the universe
     and the imputation parameters, and unseen windows replay them.
-- Computed slots are injected into the optimiser's configuration, so a prior is computed
+  - Computed slots are injected into the optimiser's configuration, so a prior is computed
     once and shared, and each constraint lands in the optimiser field its family declares.
-- Cross-validation splits the *input* rows, so the cleaning steps are refitted inside every
+  - Cross-validation splits the *input* rows, so the cleaning steps are refitted inside every
     fold — which is precisely the leakage the pipeline exists to remove.
-- Hyperparameters of the preprocessing and of the optimiser are searched in one grid, and
+  - Hyperparameters of the preprocessing and of the optimiser are searched in one grid, and
     whole estimators can be swapped as grid values.
 
 See `docs/adr/0028-pipeline-workflow-estimator.md` for the design rationale and the list of

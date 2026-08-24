@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/07_Regularisation.jl"
 ```
@@ -85,10 +84,10 @@ The optimal regularisation penalty value depends on the data, the investor prefe
 
 We will use the same small penalty for all regularisations to illustrate how they differ.
 
-- L1 regularisation (also known as Lasso regularisation) adds a penalty proportional to the sum of the absolute values of the portfolio weights. This encourages sparsity in the portfolio, leading to fewer assets being selected.
-- L2 regularisation (also known as Ridge regularisation) adds a penalty proportional to the sum of the squares of the portfolio weights. This discourages large weights and promotes diversification.
-- Lp regularisation via [`LpRegularisation`](@ref) adds a penalty proportional to the p-norm of the portfolio weights, where `p > 1` is a positive real number.
-- L-Inf regularisation adds a penalty proportional to the maximum absolute value of the portfolio weights. This limits the influence of any single asset in the portfolio.
+  - L1 regularisation (also known as Lasso regularisation) adds a penalty proportional to the sum of the absolute values of the portfolio weights. This encourages sparsity in the portfolio, leading to fewer assets being selected.
+  - L2 regularisation (also known as Ridge regularisation) adds a penalty proportional to the sum of the squares of the portfolio weights. This discourages large weights and promotes diversification.
+  - Lp regularisation via [`LpRegularisation`](@ref) adds a penalty proportional to the p-norm of the portfolio weights, where `p > 1` is a positive real number.
+  - L-Inf regularisation adds a penalty proportional to the maximum absolute value of the portfolio weights. This limits the influence of any single asset in the portfolio.
 
 ### 2.1 Efficient frontier
 

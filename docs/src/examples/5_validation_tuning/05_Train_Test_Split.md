@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/5_validation_tuning/05_Train_Test_Split.jl"
 ```
@@ -319,15 +318,15 @@ it stops being held out, and you are back to reporting an in-sample number with 
 
 ## Summary
 
-- [`train_test_split`](@ref) cuts data into a head (train) and a tail (test); one size given
+  - [`train_test_split`](@ref) cuts data into a head (train) and a tail (test); one size given
     makes the other its complement, both given **embargoes** the rows between them.
-- [`TrainTestSplit`](@ref) makes that the **first step** of a [`Pipeline`](@ref), so every
+  - [`TrainTestSplit`](@ref) makes that the **first step** of a [`Pipeline`](@ref), so every
     fitted step downstream — universe selection, imputation, prior, optimiser — sees the
     training window alone. The position rule is enforced at construction.
-- [`fit_predict`](@ref) on a split-bearing pipeline scores on the held-out window; the split's
+  - [`fit_predict`](@ref) on a split-bearing pipeline scores on the held-out window; the split's
     fitted result carries both windows (`res["split"].train`, `res["split"].test`).
-- Replaying a fitted split is a pass-through, so predicting on genuinely new data still works.
-- A pipeline carrying a holdout cannot also be cross-validated: one evaluation protocol per
+  - Replaying a fitted split is a pass-through, so predicting on genuinely new data still works.
+  - A pipeline carrying a holdout cannot also be cross-validated: one evaluation protocol per
     call.
 
 ---

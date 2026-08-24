@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/06_Advanced_Black_Litterman.jl"
 ```
@@ -12,14 +11,14 @@ are often more naturally expressed about **factors** — "momentum will earn a p
 "quality minus low-volatility will be negative" — and sometimes you hold asset *and* factor
 views at once. `PortfolioOptimisers` ships three variants of the model for exactly these cases:
 
-- [`BayesianBlackLittermanPrior`](@ref) — the Bayesian formulation that sits on top of a
+  - [`BayesianBlackLittermanPrior`](@ref) — the Bayesian formulation that sits on top of a
     [`FactorPrior`](@ref). Views are expressed on the factors, and the factor structure
     propagates the posterior back to the assets.
-- [`FactorBlackLittermanPrior`](@ref) — expresses views directly on **factor premia** and
+  - [`FactorBlackLittermanPrior`](@ref) — expresses views directly on **factor premia** and
     pushes them to the assets through a factor regression. The `rsd` flag controls whether
     idiosyncratic residual variance is retained, and `l` is the risk-aversion of the implied
     factor equilibrium.
-- [`AugmentedBlackLittermanPrior`](@ref) — carries **both** asset views (`a_views`) and
+  - [`AugmentedBlackLittermanPrior`](@ref) — carries **both** asset views (`a_views`) and
     factor views (`f_views`) simultaneously, each with its own asset set and confidence.
 
 All three return an asset-space posterior `(mu, sigma)` you can feed to any optimiser, exactly
@@ -116,10 +115,10 @@ through the factor regression rather than a factor prior. Its views resolve agai
 were written in, and the asset axis is what a view over a subset of assets slices. Two knobs
 matter:
 
-- `rsd` — keep the idiosyncratic **residual** variance (`true`) or drop it (`false`), i.e.
+  - `rsd` — keep the idiosyncratic **residual** variance (`true`) or drop it (`false`), i.e.
     whether the posterior covariance is the full asset covariance or only its factor-explained
     part.
-- `l` — the risk-aversion of the implied factor equilibrium.
+  - `l` — the risk-aversion of the implied factor equilibrium.
 
 We build both `rsd` settings and a higher-risk-aversion variant to show each knob moves the
 posterior.
@@ -211,10 +210,10 @@ plot_stacked_bar_composition(res, rd; xticks = (1:length(priors), first.(priors)
 
 The Black–Litterman family extends well past asset-space views:
 
-- [`BayesianBlackLittermanPrior`](@ref) places factor views on a [`FactorPrior`](@ref).
-- [`FactorBlackLittermanPrior`](@ref) propagates factor-premia views through a regression,
+  - [`BayesianBlackLittermanPrior`](@ref) places factor views on a [`FactorPrior`](@ref).
+  - [`FactorBlackLittermanPrior`](@ref) propagates factor-premia views through a regression,
     with `rsd` controlling residual variance and `l` the implied equilibrium risk-aversion.
-- [`AugmentedBlackLittermanPrior`](@ref) blends asset views and factor views in one
+  - [`AugmentedBlackLittermanPrior`](@ref) blends asset views and factor views in one
     posterior.
 
 All three return a standard asset-space posterior, so they drop into any optimiser exactly

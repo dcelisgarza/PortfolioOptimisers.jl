@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/12_Clustering_Mixed_Risks_And_Constraints.jl"
 ```
@@ -9,8 +8,8 @@ EditURL = "../../../../examples/3_optimisers/12_Clustering_Mixed_Risks_And_Const
 This example turns the clustering optimiser chapter into a deeper playground for two things
 that are easy to miss in the overview:
 
-- clustering optimisers can mix risk measures and scalarisers across the hierarchy;
-- the hierarchical optimiser can still carry constraints and fees while the cluster logic
+  - clustering optimisers can mix risk measures and scalarisers across the hierarchy;
+  - the hierarchical optimiser can still carry constraints and fees while the cluster logic
     does the diversification work.
 
 We use the same S&P 500 slice as the rest of the examples, then compare a plain HRP solve,
@@ -148,10 +147,10 @@ plot_risk_contribution(rv, herc_constrained, rd)
 
 Clustering optimisers give you a hierarchical lever on diversification.
 
-- [`HierarchicalRiskParity`](@ref) responds to the scalariser when you mix risk measures.
-- [`HierarchicalEqualRiskContribution`](@ref) lets inner and outer levels use different
+  - [`HierarchicalRiskParity`](@ref) responds to the scalariser when you mix risk measures.
+  - [`HierarchicalEqualRiskContribution`](@ref) lets inner and outer levels use different
     risk terms and different scalarisers.
-- [`HierarchicalOptimiser`](@ref) can still carry practical constraints like weight bounds
+  - [`HierarchicalOptimiser`](@ref) can still carry practical constraints like weight bounds
     and fees while the hierarchy does the allocation.
 
 ---

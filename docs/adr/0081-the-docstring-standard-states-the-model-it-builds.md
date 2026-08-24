@@ -144,3 +144,37 @@ the trigger should widen is a change to this decision, so it is raised as
 [#443](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/443) rather than settled by a
 gate that demands more than its Authority states. This is a known unenforced state, in the sense of
 `STANDARDS.md`, and not a hidden one.
+
+## Amendment (2026-08-24)
+
+This decision wrote four rules.
+[#478](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/478) changes one of them, and
+it removes a section that this decision assumed.
+
+**The `# Mathematical definition` boundary now points both ways.** Rule 2 above states one
+direction only: a closed form stays in `# Mathematical definition`, and no step restates it.
+Nothing stated the reverse, so nothing kept an implementation fact out of the mathematics.
+`src/05_Denoise.jl` shows the cost. `SpectralDenoise` writes the sort order of the eigenvalues
+into its mathematical prose, and the sort is the body's choice. `ShrunkDenoise` repeats its own
+`# Algorithm` step 5 there. Neither breaks a rule that this decision wrote. #478 adds the reverse
+rule. The section names no identifier from the body, states no order of operations, and states no
+property that the implementation chose rather than the mathematics. A mathematical consequence of
+the definition stays, so `ShrunkDenoise`'s sentence about the two `alpha` weights survives.
+
+**`# Details` is no longer a section.** This decision's Scope covered the sections that it wrote,
+and it left `# Details` as it found it. `# Details` carried no rule at all, in this ADR or at its
+Authority, and the only text that described it was the placeholder `Additional implementation
+notes.` in a template. 299 docstrings over 84 files carry it. #478 abolishes it and names four
+destinations. [ADR 0085](0085-the-docstring-standard-is-rules-and-pointers.md) owns that decision
+and its two gates.
+
+**Rules 1, 3 and 4 stand.** The `# JuMP formulation` trigger, the one-user field prose exception
+and the widened Scope are unchanged.
+[#443](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/443) still holds the open
+question that the 2026-08-22 amendment raised, and #478 re-parents it without answering it.
+
+**The Authority keeps its name and loses its worked example.**
+`.github/instructions/julia-docstrings.instructions.md` remains the Authority for every rule above.
+Its 380-line `## Complete Example` is deleted, because it is fictional, it can never be gated, and
+it breaks this repository's summary-sentence rule twice in its own text. ADR 0085 records what
+replaces it.

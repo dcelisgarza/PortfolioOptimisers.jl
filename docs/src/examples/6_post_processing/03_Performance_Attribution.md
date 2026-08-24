@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/6_post_processing/03_Performance_Attribution.jl"
 ```
@@ -17,12 +16,12 @@ Where the [plotting and reporting](02_Plotting_and_Reporting.md) page is a visua
 is the *quantitative* companion: the raw functions that return the numbers and series behind the
 plots, so you can tabulate, compare, and attribute.
 
-- [`cumulative_returns`](@ref) — the equity curve, simple (sum) or compounded (product).
-- [`drawdowns`](@ref) — the peak-to-trough path, from which max drawdown, average drawdown,
+  - [`cumulative_returns`](@ref) — the equity curve, simple (sum) or compounded (product).
+  - [`drawdowns`](@ref) — the peak-to-trough path, from which max drawdown, average drawdown,
     and the Ulcer index follow.
-- [`calc_net_returns`](@ref) and [`calc_fees`](@ref) — realised returns and cost drag after
+  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) — realised returns and cost drag after
     fees, so you can attribute how much performance the trading costs consumed.
-- [`risk_contribution`](@ref) — where the portfolio's risk comes from, by asset.
+  - [`risk_contribution`](@ref) — where the portfolio's risk comes from, by asset.
 
 !!! tip "When to reach for this"
     Reach for these after you have chosen a portfolio, to understand and compare candidates on
@@ -76,9 +75,9 @@ port_ret = [name => rd.X * w for (name, w) in books]
 [`cumulative_returns`](@ref) turns a return series into a wealth path. Its `compound` flag picks
 the convention:
 
-- `compound = false` (the default) sums the returns: `cumsum(X)` — the *absolute* cumulative
+  - `compound = false` (the default) sums the returns: `cumsum(X)` — the *absolute* cumulative
     return, additive and easy to reason about for short horizons.
-- `compound = true` multiplies them: `cumprod(1 .+ X)` — the *relative* (geometric) wealth
+  - `compound = true` multiplies them: `cumprod(1 .+ X)` — the *relative* (geometric) wealth
     multiple, which is what an investor actually realises through reinvestment.
 
 The dedicated [`absolute_cumulative_returns`](@ref) and [`relative_cumulative_returns`](@ref)
@@ -207,11 +206,11 @@ current()
 After the optimiser runs, the post-processing toolkit answers "how did this book actually
 behave?" without any re-optimisation:
 
-- [`cumulative_returns`](@ref) (simple/compounded) is the equity curve;
+  - [`cumulative_returns`](@ref) (simple/compounded) is the equity curve;
     [`drawdowns`](@ref) gives the loss path and the max-drawdown / Ulcer statistics.
-- [`calc_net_returns`](@ref) and [`calc_fees`](@ref) attribute the cost drag, separating gross
+  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) attribute the cost drag, separating gross
     from net performance.
-- [`risk_contribution`](@ref) shows where the risk lives, which weight alone hides.
+  - [`risk_contribution`](@ref) shows where the risk lives, which weight alone hides.
 
 Every one of these takes a plain weight vector, so the same diagnostics report on optimiser
 output, a benchmark, or any externally-supplied portfolio.

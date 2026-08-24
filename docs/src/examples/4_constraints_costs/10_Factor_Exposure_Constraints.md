@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/4_constraints_costs/10_Factor_Exposure_Constraints.jl"
 ```
@@ -460,18 +459,18 @@ about the problem changes. The boundary is therefore a property of the *mechanis
 rewrites a row and leaves the model alone, so a constraint that reaches the model through its own
 variables is out of reach even where the factor quantity is perfectly well defined.
 
-- **Cardinality** ([`IntegerPhylogeny`](@ref), `gcarde`, `sgcarde`) and **threshold**
+  - **Cardinality** ([`IntegerPhylogeny`](@ref), `gcarde`, `sgcarde`) and **threshold**
     ([`ThresholdEstimator`](@ref)) rows index the binary *held indicators*, not `w`. A projected
     row is neither integral nor an index into them. "At most 5 factors held" is a different
     feature — it needs its own binaries — not this one with a flag flipped.
-- **Weight bounds** ([`WeightBoundsEstimator`](@ref)) are a per-asset *box*. A factor box,
+  - **Weight bounds** ([`WeightBoundsEstimator`](@ref)) are a per-asset *box*. A factor box,
     `lb ≤ Mᵀw ≤ ub`, is a linear constraint and already has a home: write it as two rows through
     `lcse`.
-- **Turnover** ([`Turnover`](@ref)) and **tracking error** ([`TrackingError`](@ref)) are *norm*
+  - **Turnover** ([`Turnover`](@ref)) and **tracking error** ([`TrackingError`](@ref)) are *norm*
     forms. Each declares its own auxiliary variables and cones, so it is not a row to rewrite. The
     factor turnover `‖Mᵀ(w - w₀)‖` is a real quantity and is not equal to any asset-space
     turnover — it is re-basable in mathematics, and not by this mechanism.
-- **Fees** ([`Fees`](@ref)) are priced per *traded position*: the proportional rates index the
+  - **Fees** ([`Fees`](@ref)) are priced per *traded position*: the proportional rates index the
     long/short weight split, the fixed charges index the MIP indicator bits, and the total is
     subtracted from the return. A factor is not traded, so there is nothing for `M` to carry.
 

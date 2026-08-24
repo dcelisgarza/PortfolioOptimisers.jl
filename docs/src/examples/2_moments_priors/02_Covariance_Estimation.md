@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/2_moments_priors/02_Covariance_Estimation.jl"
 ```
@@ -11,11 +10,11 @@ short window it is badly estimated: with ``N`` assets and only a little more tha
 observations, the sample covariance is noisy and ill-conditioned, and inverting it (as
 mean–variance implicitly does) amplifies that noise. Two families of fixes help:
 
-- **Denoising** — separate signal from noise in the eigenspectrum. [`Denoise`](@ref) offers
+  - **Denoising** — separate signal from noise in the eigenspectrum. [`Denoise`](@ref) offers
     [`FixedDenoise`](@ref) (collapse the sub-threshold bulk), [`ShrunkDenoise`](@ref) (shrink
     it) and [`SpectralDenoise`](@ref) (zero it) — the last does not always lower the condition
     number, as we will see.
-- **Sparsification** — impose a relationship structure on the inverse. [`LoGo`](@ref) keeps
+  - **Sparsification** — impose a relationship structure on the inverse. [`LoGo`](@ref) keeps
     only the entries justified by the network topology, using a similarity measure such as
     [`MaximumDistanceSimilarity`](@ref) or [`ExponentialSimilarity`](@ref).
 
@@ -104,25 +103,40 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 
 ## 3. Visualising the eigenspectrum
 
-[`plot_eigenspectrum`](@ref) shows the Marchenko–Pastur ``\\lambda_+`` threshold: bars above it
+[`plot_eigenspectrum`](@ref) shows the Marchenko–Pastur ``\lambda_+`` threshold: bars above it
 carry signal, bars below are noise. Denoising acts on the sub-threshold bulk.
-
-Eigenspectrum: vanilla sample covariance.
 
 ````@example 02_Covariance_Estimation
 using StatsPlots, GraphRecipes
 ````
 
-Eigenspectrum: fixed-denoised covariance.
+Eigenspectrum: vanilla sample covariance.
 
 ````@example 02_Covariance_Estimation
 plot_eigenspectrum(prs[1].second, rd)
 ````
 
-Eigenspectrum: LoGo(MaxDist) sparsified covariance.
+Eigenspectrum: fixed-denoised covariance.
 
 ````@example 02_Covariance_Estimation
 plot_eigenspectrum(prs[2].second, rd)
+````
+
+Eigenspectrum: shrunk-denoised covariance.
+
+````@example 02_Covariance_Estimation
+plot_eigenspectrum(prs[3].second, rd)
+````
+
+Eigenspectrum: spectral-denoised covariance.
+
+````@example 02_Covariance_Estimation
+plot_eigenspectrum(prs[4].second, rd)
+````
+
+Eigenspectrum: LoGo(MaxDist) sparsified covariance.
+
+````@example 02_Covariance_Estimation
 plot_eigenspectrum(prs[5].second, rd)
 ````
 

@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/1_foundations/02_Data_Preprocessing.jl"
 ```
@@ -12,11 +11,11 @@ exchanges keep different holiday calendars so timestamps do not line up. Feeding
 into an optimiser is a recipe for silent errors. [`prices_to_returns`](@ref) handles all of it in
 one call, *before* it computes returns, through three cooperating controls:
 
-- `missing_col_percent` — drop any **asset** whose fraction of missing observations exceeds
+  - `missing_col_percent` — drop any **asset** whose fraction of missing observations exceeds
     this threshold (too sparse to trust).
-- `missing_row_percent` — drop any **timestamp** whose fraction of missing values across assets
+  - `missing_row_percent` — drop any **timestamp** whose fraction of missing values across assets
     exceeds this threshold (e.g. a misaligned holiday).
-- `impute_method` — fill the *remaining* gaps with an [`Impute`](https://github.com/invenia/Impute.jl)
+  - `impute_method` — fill the *remaining* gaps with an [`Impute`](https://github.com/invenia/Impute.jl)
     imputor before differencing prices into returns.
 
 The order matters: filter the hopeless rows/columns first, then impute what is left, then compute
@@ -159,11 +158,11 @@ heatmap(1:N, 1:T, Float64.(ismissing.(vals)); xlabel = "Asset", ylabel = "Day",
 
 `prices_to_returns` is the single entry point for cleaning price data:
 
-- `missing_col_percent` / `missing_row_percent` drop assets and dates that are too sparse to
+  - `missing_col_percent` / `missing_row_percent` drop assets and dates that are too sparse to
     trust, before any returns are computed.
-- `impute_method` fills the recoverable gaps with an `Impute.jl` imputor — `Impute.LOCF()` for
+  - `impute_method` fills the recoverable gaps with an `Impute.jl` imputor — `Impute.LOCF()` for
     halts and stale quotes, `Impute.Interpolate()` for short gaps.
-- The result is an ordinary [`ReturnsResult`](@ref) that feeds the rest of the pipeline
+  - The result is an ordinary [`ReturnsResult`](@ref) that feeds the rest of the pipeline
     unchanged.
 
 ---

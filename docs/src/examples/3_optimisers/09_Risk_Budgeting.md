@@ -1,5 +1,4 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../../examples/3_optimisers/09_Risk_Budgeting.jl"
 ```
@@ -212,11 +211,11 @@ plot_factor_risk_contribution(rfk, res_frb, rdf)
 
 Risk budgeting targets a *distribution of risk* rather than a return/risk trade-off:
 
-- [`AssetRiskBudgeting`](@ref) spreads risk across assets — equal budgets give the ERC
+  - [`AssetRiskBudgeting`](@ref) spreads risk across assets — equal budgets give the ERC
     portfolio, arbitrary budgets express convictions about where risk should sit.
-- [`RelaxedRiskBudgeting`](@ref) is the cheaper convex alternative; verify the realised
+  - [`RelaxedRiskBudgeting`](@ref) is the cheaper convex alternative; verify the realised
     contributions, as the relaxation need not reproduce exact risk parity.
-- [`FactorRiskBudgeting`](@ref) budgets risk across factors instead of assets, at the cost
+  - [`FactorRiskBudgeting`](@ref) budgets risk across factors instead of assets, at the cost
     of needing the returns data at optimise time.
 
 ---

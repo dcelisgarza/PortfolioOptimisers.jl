@@ -513,4 +513,38 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
         other = PricesResult(; X = TimeArray(ts, Float64.(reshape(1:5, 5, 1)), [:zz]))
         @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(fitted, other)
     end
+
+    @testset "the column filter of prices_to_returns reads the surviving rows" begin
+        # Issue #473. The column filter used to count the missing entries over the table as
+        # it was before the row filter ran, and to divide that count by the surviving row
+        # total. A column was then dropped for missing entries that sat only in rows that
+        # were already gone.
+        ts4 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4))
+        # Row 1 alone is incomplete. `A` and `B` are missing there, and `C` is complete.
+        X = TimeArray(ts4, [NaN NaN 1.0; 2.0 2.0 2.0; 3.0 3.0 3.0; 4.0 4.0 4.0],
+                      [:A, :B, :C])
+
+        # `missing_col_percent = 1.0` admits row 1, so every column keeps its one missing
+        # entry and the threshold of `0.3 * 4` rows admits it.
+        @test prices_to_returns(X; missing_col_percent = 1.0, missing_row_percent = 0.3).nx ==
+              ["A", "B", "C"]
+        # `missing_col_percent = 0.5` drops row 1. `A` and `B` then hold no missing entry at
+        # all, so tightening the row filter must not cost a column.
+        @test prices_to_returns(X; missing_col_percent = 0.5, missing_row_percent = 0.3).nx ==
+              ["A", "B", "C"]
+
+        # The column filter still drops a column whose missing entries survive the row
+        # filter. `A` is missing in rows 1, 2 and 3, and only row 1 goes.
+        ts5 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 5))
+        Y = TimeArray(ts5, [NaN NaN 1.0; NaN 2.0 2.0; NaN 3.0 3.0; 4.0 4.0 4.0
+                            5.0 5.0 5.0], [:A, :B, :C])
+        # Four rows survive, so the threshold is `0.2 * 4 = 0.8`. `A` holds two missing
+        # entries over those rows and goes; `B`'s one missing entry went with row 1.
+        @test prices_to_returns(Y; missing_col_percent = 0.5, missing_row_percent = 0.2).nx ==
+              ["B", "C"]
+        # The `nothing` branch reads the same counts. Over the surviving rows they are
+        # `[2, 0, 0]`, so the mode is `0` and the same two columns survive.
+        @test prices_to_returns(Y; missing_col_percent = 0.5,
+                                missing_row_percent = nothing).nx == ["B", "C"]
+    end
 end

@@ -584,14 +584,6 @@ its docstring.
 │   │   ├── [BackwardElimination](@ref)\
 │   │   └── [ForwardSelection](@ref)\
 │   ├── [AbstractStepwiseRegressionCriterion](@ref)\
-│   │   ├── [AbstractMinMaxValStepwiseRegressionCriterion](@ref)\
-│   │   │   ├── [AbstractMaxValStepwiseRegressionCriteria](@ref)\
-│   │   │   │   ├── [AdjustedRSquared](@ref)\
-│   │   │   │   └── [RSquared](@ref)\
-│   │   │   └── [AbstractMinValStepwiseRegressionCriterion](@ref)\
-│   │   │       ├── [AIC](@ref)\
-│   │   │       ├── [AICC](@ref)\
-│   │   │       └── [BIC](@ref)\
 │   │   └── [PValue](@ref)\
 │   └── [DimensionReductionTarget](@ref)\
 │       ├── [PCA](@ref)\
@@ -708,13 +700,12 @@ its docstring.
 │       ├── [QuadRiskExpr](@ref)\
 │       └── [SquaredSOCRiskExpr](@ref)\
 ├── [TopologyOnly](@ref)\
-├── [TrackingFormulation](@ref)\
-│   └── [VariableTracking](@ref)\
-│       ├── [DependentVariableTracking](@ref)\
-│       └── [IndependentVariableTracking](@ref)\
 ├── [ValueatRiskFormulation](@ref)\
 │   ├── [DistributionValueatRisk](@ref)\
 │   └── [MIPValueatRisk](@ref)\
+├── [VariableTracking](@ref)\
+│   ├── [DependentVariableTracking](@ref)\
+│   └── [IndependentVariableTracking](@ref)\
 ├── [VectorToScalarMeasure](@ref)\
 │   ├── [MaxValue](@ref)\
 │   ├── [MeanValue](@ref)\
