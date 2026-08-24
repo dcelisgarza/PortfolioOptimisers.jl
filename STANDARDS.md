@@ -80,7 +80,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |
 | `.github/instructions/julia-source-code.instructions.md` | type roles, constructors, aliases, validation, dispatch, exports | `src/**/*.jl` |
-| `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, `jldoctest` | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
+| `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, `jldoctest`, and the pointers to the reference docstrings | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
 | `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl` |
 | `.github/instructions/julia-test-writing.instructions.md` | test file layout, `@safetestset`, validation tests | `test/` |
 | `.github/prompts/*.prompt.md` | step-by-step workflows for adding a type or shipping a change | task-scoped |
