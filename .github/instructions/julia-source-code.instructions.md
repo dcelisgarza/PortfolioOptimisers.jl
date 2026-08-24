@@ -126,17 +126,11 @@ const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimat
 
 This avoids duplicating method definitions. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. Which sections that docstring carries is stated by [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases*, which is the Authority for it.
 
-## Docstring Documentation Dictionaries
+## Docstrings
 
-Four dictionaries in `01_Base.jl` provide standardised descriptions for arguments, fields, returns, and validation. **Always interpolate from these dictionaries** in docstrings instead of writing ad-hoc descriptions. This ensures consistency across the entire library.
+[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `01_Base.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
 
-- `arg_dict` — argument descriptions (e.g., `$(arg_dict[:ce])`).
-- `field_dict` — field descriptions, derived from `arg_dict` by stripping the parameter name prefix (e.g., `"$(field_dict[:ce])"`).
-- `val_dict` — validation rules (e.g., `$(val_dict[:oow])`).
-- `ret_dict` — return value descriptions (e.g., `$(ret_dict[:sigma])`).
-- `math_dict` — LaTeX mathematical notation descriptions (e.g., `$(math_dict[:tgt])`).
-
-If a parameter, field, or return value does not yet have an entry, add it to the appropriate dictionary in `01_Base.jl` before writing the docstring.
+An **alias** is the case to check first. Its docstring carries a different set of sections from the unit it names, the set differs by kind of alias, and `test/test_26_docs.jl` reds the file over a section outside that set. See § *Section Structure for Aliases*.
 
 ## Immutability and `Accessors.jl`
 
@@ -210,15 +204,3 @@ If a parameter, field, or return value does not yet have an entry, add it to the
   - `IsNonFiniteError` for non-finite numbers.
   - `DimensionMismatch` for size mismatches.
   - `DomainError` for out-of-range values.
-
-## Related Types References
-
-- Always include a `# Related` section in docstrings.
-- Link to abstract parent types, related estimators, algorithms, and result types.
-- Use the `[@ref]` syntax: ``[`TypeName`](@ref)``.
-
-## Examples in Docstrings
-
-- Use `jldoctest` blocks for testable examples when feasible.
-- Provide simple, clear examples that demonstrate basic usage.
-- For complex features, provide multiple examples showing different use cases.

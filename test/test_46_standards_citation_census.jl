@@ -217,6 +217,9 @@
                           "EnterWorktree" =>
                               "a Claude Code tool, cited by `CLAUDE.md` " *
                               "§ Parallel sessions",
+                          "ExitWorktree" =>
+                              "a Claude Code tool, cited by `CLAUDE.md` " *
+                              "§ Parallel sessions",
                           "servedocs" =>
                               "LiveServer.jl, a declared dependency of " *
                               "`docs/Project.toml`",
