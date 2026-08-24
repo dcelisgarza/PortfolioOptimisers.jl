@@ -44,7 +44,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
         Pkg.test()
         ```
 
-  - Add new tests as `test-*.jl` in `test/`.
+  - Add new tests as `test_*.jl` in `test/`.
   - Tests must pass before creating a pull request.
 
 ### Build and Development Commands

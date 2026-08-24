@@ -23,7 +23,7 @@ These three abstract hierarchies form the backbone of the library. Understanding
 - **Results** (`<: AbstractResult`):
   - Returned by functions that consume estimators when the output is complex enough to warrant its own type (e.g., contains multiple arrays, metadata).
   - Can themselves be passed as inputs to further computations — functions must dispatch on both estimator and result types where this makes sense.
-  - Example: `LowOrderPrior`, `ClustersResult`, `OptimisationResult`.
+  - Example: `LowOrderPrior`, `Clusters`, `OptimisationResult`.
 
 ## Type Definitions
 
@@ -199,7 +199,7 @@ If a parameter, field, or return value does not yet have an entry, add it to the
 - Accept other estimators/algorithms as parameters when appropriate.
 - Return result types that encapsulate outcomes for easy chaining.
 - Implement `factory(estimator, w::ObsWeights)` to propagate observation weights through composed estimators.
-- Implement `moment_view(estimator, i)` / `prior_view(estimator, i)` to support windowed or cross-validated slicing.
+- Implement `port_opt_view(estimator, i)` and `obs_weights_view(estimator, i)` to support windowed or cross-validated slicing.
 
 ## Error Handling
 

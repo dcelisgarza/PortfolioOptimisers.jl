@@ -125,12 +125,12 @@ MyEstimator
 
 ## Step 8 — Write tests
 
-Create or extend a `test/test-*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
+Create or extend a `test/test_*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
 
 1. Test constructor validation (all `@argcheck` conditions).
 2. Test normal usage with valid inputs.
 3. Test `factory` propagates weights correctly.
-4. Test `moment_view` returns the correct type and slice.
+4. Test `port_opt_view` returns the correct type and slice.
 5. Test each dispatch variant of the computation function.
 6. Test composability with other estimators.
 

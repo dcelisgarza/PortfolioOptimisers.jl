@@ -24,8 +24,8 @@ Decide which abstract algorithm type this algorithm belongs to:
 
 - `AbstractAlgorithm` (base for all algorithms)
 - `AbstractMomentAlgorithm` (`FullMoment`, `SemiMoment`)
-- `AbstractDenoiseAlgorithm`, `AbstractDetoneAlgorithm`
-- `AbstractPosdefAlgorithm`
+- `AbstractDenoiseAlgorithm`, `AbstractMatrixProcessingAlgorithm`
+- `AbstractDistanceAlgorithm`
 - Other domain-specific abstract algorithm type
 
 If no suitable abstract type exists, define a new abstract algorithm type first.
@@ -193,7 +193,7 @@ MyAlgorithm
 
 ## Step 8 — Write tests
 
-Create or extend a `test/test-*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
+Create or extend a `test/test_*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
 
 1. If the algorithm has parameters, test constructor validation.
 2. Test the dispatch method with valid inputs.

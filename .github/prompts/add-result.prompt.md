@@ -26,7 +26,7 @@ Read the following to understand patterns and conventions:
 Decide which abstract result type this result belongs to:
 
 - `AbstractResult` (base for all results)
-- `AbstractPriorResult`, `AbstractLowOrderPriorResult`, etc.
+- `AbstractPriorResult`, `AbstractClusteringResult`, etc.
 - Domain-specific abstract result type
 
 If no suitable abstract type exists, define a new one before defining the concrete result.
@@ -150,7 +150,7 @@ MyResult
 
 ## Step 8 — Write tests
 
-Create or extend a `test/test-*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
+Create or extend a `test/test_*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
 
 1. Test that the result is returned correctly by the producing function.
 2. Test the passthrough method: `my_function(result, ...) === result`.

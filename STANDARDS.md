@@ -26,10 +26,9 @@ picking a side — a contradiction between standards files is itself a defect.
  1. **`docs/adr/`** — a decision that reached `main` outranks every other file on the point it
     settles. An ADR describing superseded behaviour is correct history, not a bug. An ADR whose
     decision has **not** reached `main` does not yet hold this rank: it is a draft, it is rewritten
-    in place rather than amended, and it loses to the files below it until the branch merges. This
-    is not a corner case on a release branch — measured against `main` at `9adac7735b`, the current
-    `dev` carries **25 ADRs that `main` has never seen**, and amends 15 more. All 40 change tier on
-    merge.
+    in place rather than amended, and it loses to the files below it until the branch merges. A
+    draft ADR changes tier on the day its branch merges. Check where an ADR stands before you lean
+    on it.
  2. **`CONTEXT.md`** — the domain glossary. It fixes the words; nothing else may rename a concept.
  3. **`CLAUDE.md`** — the working agreements for this checkout, including the rules an agent must
     not break.
@@ -63,6 +62,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`sweep/manifest.toml`](sweep/manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
 | A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
+| A standards file, or a name or a path one cites | [`STANDARDS.md`](STANDARDS.md) § *Changing a standard* | `test/test_46_standards_citation_census.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing | CI regenerates and overwrites |
 | The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
@@ -106,6 +106,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_40_fallback_shortcut_census.jl` | a fallback shortcut's `Nothing` lands on `fb` | run the file |
 | `test/test_44_range_tails_census.jl` | a range risk measure declares its tails, or is on the fused list | run the file |
 | `test/test_45_sweep_census.jl` | every file under `src/` and `ext/` has a sweep-manifest row naming its child map of #404, and the file's documented-unit count still matches that row | run the file |
+| `test/test_46_standards_citation_census.jl` | every name and every path a standards file cites resolves against the repository, and no standards file states a count of the repository | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
