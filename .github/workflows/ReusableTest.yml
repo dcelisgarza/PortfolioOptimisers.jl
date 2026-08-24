@@ -91,7 +91,7 @@ jobs:
           version: ${{ steps.pin.outputs.version }}
       - name: Instantiate the gate's environment
         run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: lcov
           path: coverage_download
