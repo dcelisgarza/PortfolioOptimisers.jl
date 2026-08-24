@@ -184,6 +184,35 @@ end
         @test all(isone, LinearAlgebra.diag(c5))
         @test all(isone, LinearAlgebra.diag(c1))
     end
+    @testset "Ticket 476: SpectralDenoise on an all-noise spectrum" begin
+        #=
+        Every eigenvalue of this sample sits below the fitted edge. `SpectralDenoise`
+        zeroes them all, so its reconstruction is the zero matrix and `cov2cor` divides
+        zero by zero. It used to return `NaN` everywhere, and `posdef!` then raised an
+        `ArgumentError` from LAPACK that named neither the cause nor the file. The
+        identity is the answer that matches the claim of the algorithm: no signal
+        survives, so no pair keeps a correlation.
+        =#
+        rng = StableRNG(987654321)
+        C = cor(randn(rng, 24, 8))
+        q = 24 / 8
+        vals = LinearAlgebra.eigen(C).values
+        max_val = PortfolioOptimisers.find_max_eval(copy(vals), q,
+                                                    AverageShiftedHistograms.Kernels.gaussian,
+                                                    10, 1000, (), (;))
+        @test searchsortedlast(vals, max_val) == 8
+        Id = Matrix(1.0 * LinearAlgebra.I, 8, 8)
+        Xs = denoise(Denoise(; alg = SpectralDenoise()), C, q)
+        @test all(isfinite, Xs)
+        @test isapprox(Xs, Id)
+        # `FixedDenoise` already answered the identity here, so the two tags agree.
+        @test isapprox(denoise(Denoise(; alg = FixedDenoise()), C, q), Id)
+        # The covariance route keeps each asset's own variance and drops every covariance.
+        sd = collect(range(0.5, 2.0; length = 8))
+        S = StatsBase.cor2cov(copy(C), sd)
+        @test isapprox(denoise(Denoise(; alg = SpectralDenoise()), S, q),
+                       Matrix(LinearAlgebra.Diagonal(sd .^ 2)))
+    end
     @testset "Ticket 447: detone! removes the top n modes" begin
         # `detone!` decrements `n` and slices `(end - n):end`, so `dt.n` is the count of
         # modes removed and `dt.n = 1` removes the market mode alone.

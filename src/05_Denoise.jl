@@ -157,13 +157,22 @@ Where:
 
 Zeroing the noise eigenvalues takes the diagonal of ``\\mathbf{C}_{\\mathrm{signal}}`` below one, so the rescaling is not cosmetic: it changes every entry.
 
+When every eigenvalue is at or below ``\\lambda_+``, ``\\mathbf{C}_{\\mathrm{signal}}`` is the zero matrix and the rescaling is undefined. The denoised matrix is the identity in that case:
+
+```math
+\\tilde{\\mathbf{X}} = \\mathbf{I} \\quad \\textrm{if} \\quad \\lambda_i \\leq \\lambda_+ \\quad \\forall \\, i\\,.
+```
+
+No signal survives, so every asset keeps its own variance and no pair keeps a correlation. [`FixedDenoise`](@ref) returns the identity on the same input, so the two tags agree on this case.
+
 # Algorithm
 
 The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
 
- 1. Set the `num_factors` smallest entries of `vals` to zero. `vals` is sorted ascending, so those are the noise eigenvalues.
- 2. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the signal-only reconstruction ``\\mathbf{C}_{\\mathrm{signal}}``.
- 3. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
+ 1. When `num_factors` equals `length(vals)`, write the identity into `X` and return it. Every eigenvalue is noise, so steps 2 to 4 would divide zero by zero.
+ 2. Set the `num_factors` smallest entries of `vals` to zero. `vals` is sorted ascending, so those are the noise eigenvalues.
+ 3. Rebuild the matrix as `vecs * Diagonal(vals) * transpose(vecs)`, which is the signal-only reconstruction ``\\mathbf{C}_{\\mathrm{signal}}``.
+ 4. Rescale the reconstruction to unit diagonal with `StatsBase.cov2cor`, and write the result into `X`. The rescaling also sheds the round-off of the eigendecomposition, so this branch never pins the diagonal by hand.
 
 # Constructors
 
@@ -479,7 +488,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 The method that Julia selects is the algorithm. `vals` is sorted ascending, so the first `num_factors` entries are the noise eigenvalues and the rest are the signal eigenvalues.
 
- 1. `alg` is a [`SpectralDenoise`](@ref): zero the noise eigenvalues, rebuild from the signal components alone, and rescale to unit diagonal with `StatsBase.cov2cor`.
+ 1. `alg` is a [`SpectralDenoise`](@ref): zero the noise eigenvalues, rebuild from the signal components alone, and rescale to unit diagonal with `StatsBase.cov2cor`. When every eigenvalue is noise, the reconstruction is the zero matrix and the rescaling is undefined, so this branch writes the identity instead.
  2. `alg` is a [`FixedDenoise`](@ref): replace the noise eigenvalues by their own mean, rebuild from the flattened spectrum, and rescale to unit diagonal with `StatsBase.cov2cor`.
  3. `alg` is a [`ShrunkDenoise`](@ref): rebuild the two blocks separately, combine them under `alg.alpha`, and pin the diagonal to one. This branch does not route through `StatsBase.cov2cor`, so it is the only branch that pins its own diagonal.
 
@@ -515,6 +524,20 @@ Every branch writes into `X` and returns it.
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
+    #=
+    When every eigenvalue is noise, zeroing them all makes the reconstruction the zero
+    matrix, and `cov2cor` then divides zero by zero and returns `NaN` everywhere. The
+    identity is the answer that matches the claim: no signal survives, so every asset
+    keeps its own variance and no pair keeps a correlation. `FixedDenoise` already
+    returns the identity here, because it replaces the noise eigenvalues by their own
+    non-zero mean, and `cov2cor` rescales that positive multiple of the identity back
+    to unit diagonal.
+    =#
+    if num_factors == length(vals)
+        X .= zero(eltype(X))
+        X[LinearAlgebra.diagind(X)] .= one(eltype(X))
+        return X
+    end
     vals[1:num_factors] .= zero(eltype(X))
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return X
