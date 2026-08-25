@@ -89,6 +89,13 @@ Partition the assets into `k` clusters with the given non-hierarchical algorithm
 
 The whole extension contract of [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): a new member is a struct and one method of this function.
 
+# Algorithm
+
+The [`KMeansAlgorithm`](@ref) method runs these steps.
+
+ 1. Combine `alg.rng` and `alg.seed` with [`resolve_rng`](@ref), giving `rng`. A stated `seed` **copies** `alg.rng` and seeds the copy, so `alg.rng` never advances and two calls of one estimator draw the same starts. A `seed` of `nothing` passes `alg.rng` itself through, so its state advances and the next call draws different starts.
+ 2. Call `Clustering.kmeans(D, k; rng = rng, alg.kwargs...)`, giving the partition. Lloyd's algorithm runs inside that call, so the steps below `kmeans` belong to `Clustering.jl`.
+
 # Arguments
 
   - `alg`: Non-hierarchical clustering algorithm.
@@ -125,7 +132,18 @@ Clusters the distance matrix once per candidate count, scores the results, and r
 
 [`valid_k_clusters`](@ref) has no counterpart here. It rejects a count the dendrogram cannot be cut at, and a flat partition has no dendrogram, so the argmax is taken as it stands.
 
-The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here.
+The dispersion under [`SecondOrderDifference`](@ref) is also a different quantity from the hierarchical branch's: it is `onc.alg.alg` applied to the k-means **per-point costs**, not to within-cluster pairwise distances. That vector has one entry per asset whatever the cut, so a cut never reduces a one-value vector here. The two rise and fall in opposite directions, and they select different counts. On the 20-asset sample `randn(StableRNG(987654321), 200, 20)`, with columns `2` and `4` tied to columns `1` and `3` by `0.02` noise, the hierarchical dispersions run `11.27, 26.04, 47.89, 112.96, 114.11` over the counts `2` to `6` and select `3`, while the k-means per-point costs over the same counts run `6.58, 2.83, 2.57, 2.17, 2.06` and select `2`.
+
+# Algorithm
+
+The `Integer` method runs these steps.
+
+ 1. Read the stated count `onc.alg` into `k`, and the ceiling into `max_k`. The ceiling is `min(floor(Int, sqrt(N)), onc.max_k)`, where `N` is the number of assets; a `max_k` of `nothing` leaves it at `floor(Int, sqrt(N))`.
+ 2. Lower `k` to `max_k` when it exceeds it.
+ 3. Cluster `D` once at `k` with [`get_k_clusters_from_alg`](@ref), giving `res`.
+ 4. Return `res` and `k`.
+
+The `SecondOrderDifference` and `SilhouetteScore` methods run the steps their own algorithm types state, with one difference: there is no dendrogram to reject a count, so each takes the `argmax` as it stands. Each then returns `cluster_lvls[k]`, the run it already made at the winning count, together with `k`. No run is repeated.
 
 # Arguments
 
@@ -141,12 +159,16 @@ The dispersion under [`SecondOrderDifference`](@ref) is also a different quantit
 
 # Returns
 
-  - `(res, k)`: The clustering result and optimal number of clusters.
+  - `res::Clustering.ClusteringResult`: The partition made at the selected count.
+  - `k::Integer`: Selected number of clusters.
+
+Both come back as a **tuple**. The hierarchical methods of the same name in `03_Hierarchical.jl` return a bare `k` instead, because the dendrogram they were handed can be cut again at any count.
 
 # Related
 
   - [`OptimalNumberClusters`](@ref)
   - [`KMeansAlgorithm`](@ref)
+  - [`get_k_clusters_from_alg`](@ref)
 """
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
                                  alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
@@ -209,6 +231,12 @@ Cluster assets with a non-hierarchical algorithm and return a [`Clusters`](@ref)
 
 Estimates the similarity and distance matrices from `X`, then hands `D` to [`optimal_number_clusters`](@ref), which chooses `k` and returns the clustering for it. `P` is left as `nothing`, because the clustering ran on `D` itself.
 
+# Algorithm
+
+ 1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
+ 2. Hand `D` and the algorithm `cle.alg` to [`optimal_number_clusters`](@ref)`(cle.onc, cle.alg, D)`, giving both the partition `res` and its count `k`. No further clustering runs, because the partition is the one that won.
+ 3. Return `Clusters(; res = res, S = S, D = D, k = k)`. `P` is left as `nothing`, because the clustering ran on `D` itself.
+
 # Arguments
 
   - `cle`: Clustering estimator configured with a non-hierarchical algorithm.
@@ -234,13 +262,32 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any,
     return Clusters(; res = res, S = S, D = D, k = k)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    Clustering.assignments(clr::Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any})
+    Clustering.assignments(clr::Clusters{<:Clustering.ClusteringResult, <:Any, <:Any,
+                                         <:Any})
 
-Return the cluster assignments for a non-hierarchical [`Clusters`](@ref) result.
+Label every asset of a [`Clusters`](@ref) result with the cluster it belongs to.
+
+One name over both clustering families. The two methods differ only in where the labels come from: a dendrogram has none until it is cut, and a flat partition already carries them. The method for a `Clustering.Hclust` is declared in `03_Hierarchical.jl`, and the method for a `Clustering.ClusteringResult` here.
+
+# Algorithm
+
+ 1. A `Clustering.Hclust` in `clr.res` is a dendrogram, which labels nothing on its own. Cut it at `clr.k` with `Clustering.cutree`, giving one label per asset.
+ 2. A `Clustering.ClusteringResult` in `clr.res` was made at one count and carries its own labels. Read `clr.res.assignments`.
+
+# Arguments
+
+  - `clr`: Clustering result to label.
+
+# Returns
+
+  - `idx::AbstractVector{<:Integer}`: One label per asset, over `1:clr.k`, in the order of the universe's asset axis. Both methods answer with one entry per asset.
 
 # Related
 
   - [`Clusters`](@ref)
+  - [`clusterise`](@ref)
+  - [`optimal_number_clusters`](@ref)
 """
 function Clustering.assignments(clr::Clusters{<:Clustering.ClusteringResult, <:Any, <:Any,
                                               <:Any})

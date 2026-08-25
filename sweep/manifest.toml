@@ -96,9 +96,9 @@
 "src/10_JuMPModelOptimisation.jl" = { map = 10, units = 12, swept = false }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, algorithm = 5, swept = true }
 "src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, algorithm = 4, swept = true }
-"src/11_Phylogeny/03_Hierarchical.jl" = { map = 4, units = 12, swept = false }
+"src/11_Phylogeny/03_Hierarchical.jl" = { map = 4, units = 12, algorithm = 6, swept = true }
 "src/11_Phylogeny/04_DBHT.jl" = { map = 4, units = 37, swept = false }
-"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { map = 4, units = 5, swept = false }
+"src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { map = 4, units = 5, algorithm = 4, swept = true }
 "src/11_Phylogeny/06_Phylogeny.jl" = { map = 4, units = 63, swept = false }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { map = 5, units = 6, swept = false }
 "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 48, swept = false }

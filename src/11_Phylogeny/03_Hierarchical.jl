@@ -150,7 +150,11 @@ In order to implement a new traversal strategy that works seamlessly with the li
 
 ### Returns
 
-  - The property to collect.
+  - The property to collect. It must be an `Int` today; see below.
+
+# The property must be an `Int`
+
+[`pre_order`](@ref) collects into a `Vector{Int}` and keys its two visited sets on the type of the property while storing the node's `id` in them. A strategy whose property is not an `Int` therefore fails: one returning a `Float64` **silently truncates** every collected value, and one returning a `String` raises `MethodError: Cannot convert an object of type Int64 to an object of type String`. [`PreorderTreeByID`](@ref) is the only strategy that ships, and its property is the node's `id`, so no shipped path meets this. Issue #510 carries the repair.
 
 # Related
 
@@ -210,6 +214,17 @@ Walks the subtree rooted at `a` in preorder and collects one property per **leaf
 
 `preorder_by` is **positional**, not a keyword.
 
+# Algorithm
+
+ 1. Open the stack `curNode`, sized at `2 * a.level`. [`ClusterNode`](@ref)'s `level` counts the leaves below the node, so the stack holds twice as many slots as the walk can ever need.
+ 2. Put `a` in the first slot, and open the two sets `lvisited` and `rvisited`, which record the internal nodes whose left and whose right child the walk has already pushed.
+ 3. Read the node `nd` on top of the stack.
+ 4. A leaf pushes [`get_node_property`](@ref)'s value onto `preorder` and is popped.
+ 5. An internal node outside `lvisited` pushes its `left` child and joins `lvisited`.
+ 6. An internal node inside `lvisited` and outside `rvisited` pushes its `right` child and joins `rvisited`.
+ 7. An internal node inside both sets is popped, because the walk below it is finished.
+ 8. Repeat from step 3 until the stack is empty, giving `preorder`, one property per leaf in left-to-right order.
+
 # Arguments
 
   - `a`: Root node of the subtree to walk.
@@ -264,6 +279,15 @@ Rebuild a linkage matrix as a tree of [`ClusterNode`](@ref) objects.
 
 Reads a `Clustering.Hclust` from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html) and builds `2N - 1` nodes: one leaf per asset, numbered `1:N` in the clustering's own asset order, then one node per merge, numbered `N+1` upward in the order the merges happened. The last merge is therefore the root.
 
+# Algorithm
+
+ 1. Read `N`, the number of assets, from the length of `a.order`, and open `d`, a vector of `2N - 1` nodes.
+ 2. Build one leaf per asset, `d[i] = ClusterNode(i)`, so the leaves carry the ids `1:N` in the clustering's own asset order.
+ 3. Walk the merges in the order `a.heights` gives them, which is the order they happened in.
+ 4. Resolve each side of row `i` of `a.merges` to an index into `d`: a **negative** entry `fi` names the asset `-fi`, and a **positive** entry names the merge `fi + N`.
+ 5. Build the merge node `ClusterNode(i + N, d[fi], d[fj], height)` and store it at `d[N + i]`, so the merge nodes carry the ids `N+1:2N-1` in merge order.
+ 6. Return the node built last, which is the root, together with `d`.
+
 # Arguments
 
   - `a`: Hierarchical clustering object.
@@ -304,7 +328,14 @@ end
 
 Run hierarchical clustering and return the result as a [`Clusters`](@ref) object.
 
-This function applies the specified clustering estimator to the input data matrix, computes the similarity and distance matrices, performs hierarchical clustering, and selects the optimal number of clusters. The result is returned as a `Clusters` object.
+Estimates the similarity and distance matrices from `X`, runs the linkage `cle.alg` names, and cuts the dendrogram at the count `cle.onc` selects.
+
+# Algorithm
+
+ 1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
+ 2. Cluster `D` with `Clustering.hclust` under the linkage `cle.alg.linkage` and the branch order `branchorder`, giving `res`, the dendrogram.
+ 3. Choose the number of clusters with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`, giving `k`.
+ 4. Return `Clusters(; res = res, S = S, D = D, k = k)`. `P` is left as `nothing`, because the clustering ran on `D` itself.
 
 # Arguments
 
@@ -336,6 +367,21 @@ end
 Can this tree be cut into exactly `k` clusters?
 
 Cuts the tree at `k`, then walks the `k - 1` tallest nodes. Each non-leaf node among them must have at least one of the `k` clusters contained wholly within one of its two subtrees; a node for which no cluster does makes `k` invalid.
+
+# Only a tie in the heights makes the answer `false`
+
+When every height is distinct, the `k - 1` tallest nodes **are** the merges that the cut removes, so each of them carries a whole cluster below one of its children and the answer is `true`. Two merges of equal height break that correspondence, because `nodes` is ordered by `sortperm` and the cut is not, so the walk can reach a node the cut left standing. Measured over 160 dendrograms with distinct heights — 40 universes of 16 assets under each of the four linkages — no `k` from `1` to `6` was ever rejected; on an eight-leaf balanced tree whose four lowest merges tie and whose two middle merges tie, `3`, `5`, `6` and `7` are all rejected.
+
+`k = 1` is always valid: the walk of step 3 is then empty.
+
+# Algorithm
+
+ 1. Cut the tree at `k` with `Clustering.cutree`, giving `idx`, one label per asset.
+ 2. Collect the assets carrying each label into `clusters`, one vector of asset indices per cluster.
+ 3. Walk the `k - 1` tallest entries of `nodes`, skipping any leaf among them.
+ 4. List the leaves below the node's `left` child and below its `right` child with [`pre_order`](@ref), giving `ln` and `rn`.
+ 5. Count the clusters of step 2 that lie wholly inside `ln` or wholly inside `rn`, giving `count`. A `count` of zero answers `false` at once.
+ 6. Answer `true` once every node of step 3 has carried at least one such cluster.
 
 # Arguments
 
@@ -381,16 +427,26 @@ end
 
 Take the highest-scoring number of clusters the tree can be cut at.
 
-Takes a candidate, tests it with [`validate_k_value`](@ref), and on failure blanks that entry to `typemin(eltype(arr))` and takes the next. The candidate is `argmax(arr)`, or `length(arr)` when no entry of `arr` is finite. It returns `1` instead when a failed candidate leaves every entry infinite.
+Takes a candidate, tests it with [`validate_k_value`](@ref), and on failure blanks that entry to `typemin(eltype(arr))` and takes the next. The candidate is `argmax(arr)`, or `length(arr)` when no entry of `arr` is finite. It returns `1` instead when a rejected candidate leaves no finite entry behind.
 
 !!! warning
 
-    The scores are trusted as they arrive, and a `NaN` is not rejected. `argmax` returns the index of the first `NaN` in an array that carries one, ahead of every real score; an array that is `NaN` **throughout** instead takes the `length(arr)` branch, because a `NaN` is not finite and not infinite either. [`SecondOrderDifference`](@ref)'s default measure produces such an array whenever a cluster holds exactly two assets, and the `k` that comes back is then the length of the array rather than a maximiser.
+    The scores are trusted as they arrive, and a `NaN` is not rejected. `argmax` returns the index of the first `NaN` in an array that carries one, ahead of every real score. An array that is `NaN` **throughout** takes the `length(arr)` branch instead, because a `NaN` is neither finite nor infinite, and answers `1` when the tree rejects that candidate. [`SecondOrderDifference`](@ref)'s default measure no longer produces such an array: ADR 0080 makes an undefined standard deviation divide by one, so a cluster of exactly two assets contributes its single pairwise distance rather than a `NaN`.
+
+# Algorithm
+
+ 1. Rebuild the tree with [`to_tree`](@ref) and order its nodes by descending height, giving `nodes`.
+ 2. Take the candidate `k`: `argmax(arr)`, or `length(arr)` when no entry of `arr` is finite.
+ 3. Ask [`validate_k_value`](@ref) whether the tree can be cut at `k`, and return `k` when it can.
+ 4. Return `1` when step 3 rejected `k` and no entry of `arr` is finite, because blanking a non-finite entry offers the same candidate again.
+ 5. Write `typemin(eltype(arr))` into `arr[k]` and repeat from step 2.
+
+The loop ends after at most `length(arr)` rejections. Step 5 blanks a rejected entry, so `argmax` never offers it twice; once every entry is `typemin` step 2 takes the `length(arr)` branch, and step 4 then answers `1`. The search usually ends far sooner, because `k = 1` is always a valid cut.
 
 # Arguments
 
   - `res`: Hierarchical clustering object.
-  - `arr`: Score for each candidate number of clusters. **Modified in place**: a candidate that fails validation is set to `typemin(eltype(arr))` so that the next iteration skips it.
+  - `arr`: Score for each candidate number of clusters. **Modified in place**: a candidate that fails validation is set to `typemin(eltype(arr))` so that the next iteration skips it. Both callers pass a local score array and neither reads it after the call, so the mutation reaches no caller.
 
 # Returns
 
@@ -409,7 +465,10 @@ function valid_k_clusters(res::Clustering.Hclust, arr::VecNum)
         k = all(!isfinite, arr) ? length(arr) : argmax(arr)
         if validate_k_value(res, nodes, k)
             return k
-        elseif all(isinf, arr)
+            # No entry is finite, so `k` was `length(arr)` and blanking it changes nothing.
+            # Answering `1` here is what ends the loop; `all(isinf, arr)` let a `NaN` array
+            # re-offer the same rejected candidate for ever.
+        elseif all(!isfinite, arr)
             return 1
         end
         arr[k] = typemin(eltype(arr))
@@ -427,6 +486,22 @@ Cut a dendrogram at the number of clusters `onc` selects.
 
 Scores every candidate count up to the ceiling `onc` sets, then takes the highest-scoring count the **tree can actually be cut at**. A count no node of the dendrogram supports is rejected by [`validate_k_value`](@ref) and the next-highest score is tried, so the answer is the best *valid* count rather than the best score.
 
+Every method returns a **bare** `k`. The non-hierarchical methods of the same name return the tuple `(res, k)` instead, because a flat partition cannot be re-cut and the clustering *is* the choice of `k`.
+
+# Algorithm
+
+The `Integer` method runs these steps. It is a **search**, not a test: an invalid stated count is replaced, never refused.
+
+ 1. Read the stated count `onc.alg` into `k`, and the ceiling into `max_k`. The ceiling is `min(floor(Int, sqrt(N)), onc.max_k)`, where `N` is the number of assets; a `max_k` of `nothing` leaves it at `floor(Int, sqrt(N))`.
+ 2. Lower `k` to `max_k` when it exceeds it.
+ 3. Rebuild the tree with [`to_tree`](@ref) and order its nodes by descending height, giving `nodes`.
+ 4. Ask [`validate_k_value`](@ref) whether the tree can be cut at `k`, and return `k` when it can.
+ 5. Search upward from `k + 1` to `max_k` for the first valid count, giving `ku` and its distance `du = ku - k`. Both stay at `k` and `0` when the search finds none.
+ 6. Search downward from `k - 1` to `1` for the first valid count, giving `kl` and its distance `dl = k - kl`. This search always succeeds when `k > 1`, because `k = 1` is always a valid cut.
+ 7. Take the count. When one side alone found one, take that side. When both found one and `du != dl`, take the nearer. When both found one and `du == dl`, take `ku` if `max_k - ku > kl - 1` and `kl` otherwise, so a tie goes to the side with more room left.
+
+The `SecondOrderDifference` and `SilhouetteScore` methods run the steps their own algorithm types state. Both end by handing the score array to [`valid_k_clusters`](@ref), which walks down from the largest entry until the dendrogram admits the count.
+
 # Arguments
 
   - `onc`: Optimal number of clusters estimator.
@@ -441,7 +516,7 @@ Scores every candidate count up to the ceiling `onc` sets, then takes the highes
 
 # Returns
 
-  - `onc::Integer`: Selected optimal number of clusters.
+  - `k::Integer`: Selected number of clusters, and always a count the dendrogram can be cut at.
 
 # Related
 
@@ -522,9 +597,10 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         for j in 1:c2
             cluster = lvl .== j
             cluster_D = D[cluster, cluster]
-            if isempty(cluster_D)
-                continue
-            end
+            # No `isempty` guard. `Clustering.cutree` labels the assets `1:c2`, so no `j`
+            # selects an empty submatrix; and an empty one would fall through to the
+            # `isone(k)` arm below and contribute a zero, where the guard it replaced left
+            # `D_list[j]` undefined for `sum` to read.
             M = size(cluster_D, 1)
             C_list = Vector{eltype(D)}(undef, Int(M * (M - 1) / 2))
             k = 1

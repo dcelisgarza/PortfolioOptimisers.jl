@@ -3192,3 +3192,195 @@ end
         @test fonc.alg.alg.w === w
     end
 end
+
+# The claims `src/11_Phylogeny/03_Hierarchical.jl` and
+# `src/11_Phylogeny/05_NonHierarchicalClustering.jl` make about the tree, about the search
+# that replaces an invalid cut, and about the flat partition. Defined at top level because a
+# `@testset` body becomes a function, and the sweep of #468 reads these numbers.
+@testset "The dendrogram search and its rejection path (#468)" begin
+    using PortfolioOptimisers, Test, Clustering, StableRNGs, StatsBase, LinearAlgebra
+
+    # A balanced binary dendrogram whose merges tie level by level. `Clustering.cutree` and
+    # `sortperm` then disagree about which merges a cut removes, and that disagreement is the
+    # only way `validate_k_value` can answer `false`.
+    function balanced_hclust(m)
+        n = 2^m
+        merges = Matrix{Int}(undef, n - 1, 2)
+        heights = Vector{Float64}(undef, n - 1)
+        row = 0
+        ids = Int[]
+        for i in 1:2:(n - 1)
+            row += 1
+            merges[row, 1] = -i
+            merges[row, 2] = -(i + 1)
+            heights[row] = 1.0
+            push!(ids, row)
+        end
+        lvl = 2
+        while length(ids) > 1
+            nxt = Int[]
+            for i in 1:2:(length(ids) - 1)
+                row += 1
+                merges[row, 1] = ids[i]
+                merges[row, 2] = ids[i + 1]
+                heights[row] = Float64(lvl)
+                push!(nxt, row)
+            end
+            ids = nxt
+            lvl += 1
+        end
+        return Hclust(merges, heights, collect(1:n), :ward)
+    end
+    function tall_first(res)
+        nds = PortfolioOptimisers.to_tree(res)[2]
+        return nds[sortperm([i.height for i in nds]; rev = true)]
+    end
+
+    @testset "`to_tree` numbers the leaves first and returns the root last" begin
+        res8 = balanced_hclust(3)
+        root, nds8 = PortfolioOptimisers.to_tree(res8)
+        @test length(nds8) == 2 * 8 - 1
+        @test [n.id for n in nds8] == collect(1:15)
+        @test root === nds8[end]
+        @test root.level == 8
+        @test PortfolioOptimisers.pre_order(root) == collect(1:8)
+        @test length(PortfolioOptimisers.pre_order(root)) == root.level
+        @test PortfolioOptimisers.is_leaf(nds8[1])
+        @test !PortfolioOptimisers.is_leaf(root)
+        # A node given children takes `left.level + right.level` and ignores the argument.
+        @test ClusterNode(9, nds8[1], nds8[2], 1.0, 99).level == 2
+        @test PortfolioOptimisers.get_node_property(PreorderTreeByID(), nds8[3]) == 3
+    end
+
+    @testset "Only a tie in the heights makes a cut invalid" begin
+        # 160 dendrograms with distinct heights, and not one rejected count among them.
+        rejected = 0
+        for seed in 1:40, link in (:ward, :single, :complete, :average)
+            rng = StableRNG(seed)
+            Xr = randn(rng, 60, 16)
+            Xr[:, 2] = Xr[:, 1] + 0.01 * randn(rng, 60)
+            Xr[:, 4] = Xr[:, 3] + 0.01 * randn(rng, 60)
+            _, Dr = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), Xr)
+            rr = hclust(Dr; linkage = link, branchorder = :optimal)
+            nr = tall_first(rr)
+            rejected += count(k -> !PortfolioOptimisers.validate_k_value(rr, nr, k), 1:6)
+        end
+        @test rejected == 0
+
+        # The tied tree rejects. `k = 1` and `k = N` stay valid.
+        res8 = balanced_hclust(3)
+        nodes8 = tall_first(res8)
+        @test [k for k in 1:8 if PortfolioOptimisers.validate_k_value(res8, nodes8, k)] ==
+              [1, 2, 4, 8]
+
+        # A leaf reaches the walk only when a merge sits at height zero: `sortperm` is stable
+        # and the leaves come first among the ties.
+        res0 = Hclust([-1 -2; -3 -4; 1 2], [0.0, 1.0, 2.0], [1, 2, 3, 4], :ward)
+        nds0 = tall_first(res0)
+        @test PortfolioOptimisers.is_leaf(nds0[3])
+        @test PortfolioOptimisers.validate_k_value(res0, nds0, 4)
+    end
+
+    @testset "`valid_k_clusters` walks past a rejected candidate and always ends" begin
+        res8 = balanced_hclust(3)
+        # The maximiser is rejected, so it is blanked and the next one is taken.
+        arr = zeros(8)
+        arr[2] = 5.0
+        arr[3] = 10.0
+        @test PortfolioOptimisers.valid_k_clusters(res8, arr) == 2
+        @test arr[3] == typemin(Float64)
+        # The mutation reaches no caller: both callers pass a local score array.
+        @test PortfolioOptimisers.valid_k_clusters(res8, [0.0, 9.0, 1.0, 2.0]) == 2
+        # No finite entry, and the tree rejects `length(arr)`: the answer is `1`.
+        @test PortfolioOptimisers.valid_k_clusters(res8, fill(-Inf, 7)) == 1
+        # A wholly-`NaN` array takes the same escape. Under the old `all(isinf, arr)` guard
+        # it re-offered the same rejected candidate and the loop never ended.
+        @test PortfolioOptimisers.valid_k_clusters(res8, fill(NaN, 7)) == 1
+
+        # The index of the score array is the count the tree is cut at, so the second-order
+        # difference selects the LEFT end of its triple. This series peaks at `c = 3`, which
+        # is the triple `W[3], W[4], W[5]`, and the cut comes back as `3`.
+        W = [typemin(Float64), 10.0, 9.0, 3.0, 2.5, 2.4, 2.35]
+        gaps = W[1:(end - 2)] + W[3:end] - 2 * W[2:(end - 1)]
+        @test argmax(gaps) == 3
+        Xr = randn(StableRNG(7), 100, 25)
+        _, Dr = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), Xr)
+        rr = hclust(Dr; linkage = :ward, branchorder = :optimal)
+        @test PortfolioOptimisers.valid_k_clusters(rr, copy(gaps)) == 3
+        # The `typemin` seed keeps a single cluster out of the answer without emptying the
+        # `all(!isfinite, .)` test.
+        @test typemin(Float64) == -Inf
+        @test !isfinite(gaps[1])
+        @test !all(!isfinite, gaps)
+    end
+
+    @testset "The `Integer` method searches, and a tie goes to the side with more room" begin
+        # Valid counts on this tree are 1, 2, 4 and 8, and the ceiling is
+        # `floor(Int, sqrt(64)) = 8`.
+        res64 = balanced_hclust(6)
+        D64 = zeros(64, 64)
+        function onc_k(k, mk = nothing)
+            return PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = k,
+                                                                                     max_k = mk),
+                                                               res64, D64)
+        end
+        @test onc_k(2) == 2       # valid as stated
+        @test onc_k(3) == 4       # tie, and 8 - 4 > 2 - 1, so the upper side
+        @test onc_k(5) == 4       # du = 3, dl = 1, so the nearer lower side
+        @test onc_k(6) == 4       # tie, and 8 - 8 < 4 - 1, so the lower side
+        @test onc_k(7) == 8       # du = 1, dl = 3, so the nearer upper side
+        @test onc_k(5, 5) == 4    # nothing valid above a ceiling of 5, so the lower side
+        @test onc_k(100) == 8     # lowered to the ceiling, which this tree admits
+    end
+
+    @testset "The two branches measure different dispersions" begin
+        rng = StableRNG(987654321)
+        Xg = randn(rng, 200, 20)
+        Xg[:, 2] = Xg[:, 1] + 0.02 * randn(rng, 200)
+        Xg[:, 4] = Xg[:, 3] + 0.02 * randn(rng, 200)
+        cle = ClustersEstimator(; alg = HClustAlgorithm())
+        Sg, Dg = cor_and_dist(cle.de, cle.ce, Xg)
+        rg = hclust(Dg; linkage = cle.alg.linkage, branchorder = :optimal)
+        algk = KMeansAlgorithm(; rng = StableRNG(987654321), seed = 987654321)
+        kh = PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                               alg = SecondOrderDifference()),
+                                                         rg, Dg)
+        pk, kk = PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                   alg = SecondOrderDifference()),
+                                                             algk, Dg)
+        # The hierarchical dispersion sums within-cluster pairwise distances and rises with
+        # the count; the k-means per-point costs fall with it.
+        @test kh == 3
+        @test kk == 2
+        # The hierarchical method answers a bare `k`; the flat one answers `(res, k)`.
+        @test kh isa Integer
+        @test pk isa Clustering.ClusteringResult
+
+        # A universe too small to carry a second-order difference answers `c1` itself.
+        X2 = Xg[:, 1:2]
+        _, D2 = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), X2)
+        r2 = hclust(D2; linkage = :ward, branchorder = :optimal)
+        @test PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                alg = SecondOrderDifference()),
+                                                          r2, D2) == 2
+
+        # `resolve_rng` copies and seeds, so a seeded estimator never advances its own
+        # generator and two calls partition alike.
+        r = StableRNG(42)
+        @test PortfolioOptimisers.resolve_rng(r, nothing) === r
+        @test PortfolioOptimisers.resolve_rng(r, 7) !== r
+        a_seed = KMeansAlgorithm(; seed = 123456789)
+        p1 = PortfolioOptimisers.get_k_clusters_from_alg(a_seed, Dg, 3)
+        p2 = PortfolioOptimisers.get_k_clusters_from_alg(a_seed, Dg, 3)
+        @test p1.assignments == p2.assignments
+
+        # `assignments` answers one label per asset on both result shapes.
+        ah = assignments(Clusters(; res = rg, S = Sg, D = Dg, k = 3))
+        ak = assignments(Clusters(; res = p1, S = Sg, D = Dg, k = 3))
+        @test length(ah) == size(Dg, 1)
+        @test length(ak) == size(Dg, 1)
+        @test sort(unique(ah)) == 1:3
+        @test sort(unique(ak)) == 1:3
+    end
+end

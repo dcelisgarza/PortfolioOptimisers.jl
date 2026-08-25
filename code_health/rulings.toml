@@ -99,6 +99,19 @@ counting positional slots alone leaves 86 of the 196 files above the old thresho
 dropping every struct constructor leaves 87, against 101. Keyword arguments and estimator \
 constructors own the extreme tail, not the bulk."""
 
+[rationale.a-cut-into-one-cluster-is-always-valid]
+text = """
+`validate_k_value` walks the `k - 1` tallest nodes of the dendrogram, so at `k = 1` it walks none \
+and answers `true` whatever the tree looks like. The `Integer` method of \
+`optimal_number_clusters` reaches its two searches only when the stated `k` is invalid, which \
+needs `k >= 2`, and its downward search runs from `k - 1` down to `1`. That search therefore \
+always finds a valid count, and its distance `dl` is never zero at the decision below it. The arm \
+that reads `du != 0 && dl == 0` cannot be entered. It is the symmetric partner of the arm beside \
+it and is kept rather than deleted, because deleting it would rest this function on an invariant \
+of another function that no signature states. Measured by the sweep of issue #468: over 160 \
+dendrograms with distinct heights no count was rejected at all, and on the tied trees that do \
+reject one, every other arm of the decision is reached."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -236,11 +249,16 @@ rationale = "keyword-constructor-arity"
 # whether the file is **terminal**, which is #404's condition for closing a child map on coverage.
 # The ratchet still sees every miss.
 #
-# The list is empty. #408 built the machinery; the thirteen child maps of #404 write the rows as
-# they sweep. A row is written when a line cannot be reached, never when reaching it is merely
-# awkward.
+# #408 built the machinery; the thirteen child maps of #404 write the rows as they sweep. A row is
+# written when a line cannot be reached, never when reaching it is merely awkward.
 #
 # A line reached only by its own `jldoctest` is not exempt. Coverage is the test suite's number:
 # the `doctest` job of `Docs.yml` carries no instrumentation, and a doctest asserts a rendering
 # rather than a result. "The doctest reaches it" is therefore not a rationale, and the sweep writes
 # the test. ADR 0082, issue #411.
+
+[[coverage_exemption]]
+path = "src/11_Phylogeny/03_Hierarchical.jl"
+definition = "optimal_number_clusters"
+misses = 1
+rationale = "a-cut-into-one-cluster-is-always-valid"
