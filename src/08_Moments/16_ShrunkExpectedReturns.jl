@@ -611,7 +611,7 @@ Where:
 Two consequences of the form bound where it is usable.
 
   - ``N \\bar{\\lambda}`` is the trace of the covariance matrix, so ``N \\bar{\\lambda} \\leq 2 \\lambda_{\\max}`` whenever ``N \\leq 2``. The intensity is then negative and the blend extrapolates away from the target rather than toward it.
-  - The denominator is zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both reduce to the sample mean at ``N = 1``, so a one-asset sample returns `NaN` under either of them. [`MeanSquaredError`](@ref) does not read the sample mean, so it stays finite there.
+  - The denominator is zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both reduce to the sample mean at ``N = 1``, so a one-asset sample raises a `DomainError` under either of them. [`MeanSquaredError`](@ref) does not read the sample mean, so it stays finite there.
 
 # Algorithm
 
@@ -636,6 +636,10 @@ Two consequences of the form bound where it is usable.
   - $(arg_dict[:dims])
 
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
+
+# Validation
+
+  - `!iszero(dot(mu - b, mu - b))`. The [`JamesStein`](@ref) intensity divides by this denominator, and it is exactly zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both do so at ``N = 1``. The other two overloads state their own rules. ADR 0092 records the decision to raise here.
 
 # Returns
 
@@ -671,8 +675,11 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     end
     evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
-    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) /
-            T
+    mb2 = LinearAlgebra.dot(mb, mb)
+    @argcheck(!iszero(mb2),
+              DomainError(mb2,
+                          "the James-Stein intensity divides by `dot(mu - b, mu - b)`, which is exactly zero because the $(nameof(typeof(me.alg.tgt))) target equals the sample mean. GrandMean and VolatilityWeighted both reduce to the sample mean at N == 1, got N = $N"))
+    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / mb2 / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
 """
@@ -749,7 +756,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation. It needs ``T > N``: the term ``N/(T-N)`` is undefined at ``T = N`` and changes sign below it, so a square or wide returns matrix returns `Inf` or a coefficient of the wrong sign.
+[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation. It needs ``T > N``: the term ``N/(T-N)`` is undefined at ``T = N`` and changes sign below it, so a square or wide returns matrix raises a `DomainError`.
 
 # Mathematical definition
 
@@ -787,7 +794,7 @@ Where:
 Three consequences of the form separate this algorithm from the other two.
 
   - ``\\alpha`` and ``\\beta`` are set separately and do not sum to one, so the result is not a point on the segment that joins ``\\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{b}``. Cancelling the ``w^2`` term rewrites the coefficient as ``\\alpha = 1 - \\frac{N}{T-N} \\frac{v}{uv - w^2}``, so ``\\alpha < 1`` always, and ``\\alpha < 0`` exactly when ``\\frac{N}{T-N} v > uv - w^2``. The combination then extrapolates away from the sample mean.
-  - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample divides zero by zero and returns `NaN` under all three targets.
+  - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample raises a `DomainError` under all three targets.
   - Every target of this file is a multiple of the vector of ones, so writing ``\\boldsymbol{b} = c \\boldsymbol{1}`` makes ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha``, which is therefore the same for the three targets on one sample, and survives in ``\\beta \\boldsymbol{b}``, which is not.
 
 # Algorithm
@@ -801,6 +808,12 @@ Three consequences of the form separate this algorithm from the other two.
  7. Form the three quadratic forms `u`, `v` and `w` from `vm`, `vb` and `isigma`.
  8. Form `alpha` from `u`, `v`, `w`, `N` and `T`, then `beta` from `alpha`, `w` and `u`.
  9. Return the combination `alpha * mu + beta * b`.
+
+# Validation
+
+  - `T > N`, the estimator's own published condition. The term ``N/(T-N)`` is undefined at ``T = N`` and negative below it.
+  - `!iszero(u * v - w^2)`. Both coefficients divide by this Cauchy-Schwarz gap, and it is exactly zero when the target is a multiple of the sample mean. Every vector is such a multiple at ``N = 1``.
+  - ADR 0092 records the decision to raise on both.
 
 # Related
 
@@ -823,6 +836,9 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     if !flag
         N, T = T, N
     end
+    @argcheck(T > N,
+              DomainError((T, N),
+                          "the Bodnar-Okhrin-Parolya coefficients contain `N / (T - N)`, so they need more observations than assets. The term is undefined at T == N and negative below it, got T = $T, N = $N"))
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
     if flag
@@ -836,8 +852,12 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     u = LinearAlgebra.dot(vm, isigma, vm)
     v = LinearAlgebra.dot(vb, isigma, vb)
     w = LinearAlgebra.dot(vm, isigma, vb)
+    gap = u * v - w^2
+    @argcheck(!iszero(gap),
+              DomainError(gap,
+                          "the Bodnar-Okhrin-Parolya coefficients divide by the Cauchy-Schwarz gap `u * v - w^2`, which is exactly zero because the $(nameof(typeof(me.alg.tgt))) target is a multiple of the sample mean. Every vector is such a multiple at N == 1, got N = $N"))
     alpha = (u - N / (T - N)) * v - w^2
-    alpha /= u * v - w^2
+    alpha /= gap
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end

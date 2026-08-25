@@ -2429,15 +2429,17 @@ end
         end
 
         @testset "the degenerate samples the docstrings name" begin
+            # #497, ADR 0092, turned the three degeneracies below from a silent `NaN` or
+            # `Inf` into a `DomainError`. Each case names the guard that raises it.
+            #
             # One asset. `GrandMean` and `VolatilityWeighted` both reduce to the sample
             # mean, so the James-Stein denominator is exactly zero.
             X1 = X460[:, 1:1]
-            @test all(isnan, mean(ShrunkExpectedReturns(; alg = JamesStein()), X1))
-            @test all(isnan,
-                      mean(ShrunkExpectedReturns(;
-                                                 alg = JamesStein(;
-                                                                  tgt = VolatilityWeighted())),
-                           X1))
+            @test_throws DomainError mean(ShrunkExpectedReturns(; alg = JamesStein()), X1)
+            @test_throws DomainError mean(ShrunkExpectedReturns(;
+                                                                alg = JamesStein(;
+                                                                                 tgt = VolatilityWeighted())),
+                                          X1)
             # `MeanSquaredError` never reads the sample mean, so it stays finite there.
             @test all(isfinite,
                       mean(ShrunkExpectedReturns(;
@@ -2445,34 +2447,50 @@ end
                                                                   tgt = MeanSquaredError())),
                            X1))
             # At one asset the Cauchy-Schwarz gap `u v - w^2` is exactly zero, so
-            # Bodnar-Okhrin-Parolya divides zero by zero under every target.
+            # Bodnar-Okhrin-Parolya raises under every target. `T > N` holds here, so the
+            # gap guard is the one that fires, and its message names the gap.
             for tgt in tgts460
-                @test all(isnan,
-                          mean(ShrunkExpectedReturns(;
-                                                     alg = BodnarOkhrinParolya(; tgt = tgt)),
-                               X1))
+                @test_throws DomainError mean(ShrunkExpectedReturns(;
+                                                                    alg = BodnarOkhrinParolya(;
+                                                                                              tgt = tgt)),
+                                              X1)
+                err = try
+                    mean(ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(; tgt = tgt)),
+                         X1)
+                    nothing
+                catch e
+                    e
+                end
+                @test occursin("Cauchy-Schwarz gap", err.msg)
             end
             # Bayes-Stein has a strictly positive denominator, so it survives one asset.
             for tgt in tgts460
                 @test all(isfinite,
                           mean(ShrunkExpectedReturns(; alg = BayesStein(; tgt = tgt)), X1))
             end
-            # A square returns matrix. `N / (T - N)` is `Inf`, which is the reason the
-            # docstring states that the method needs more observations than assets.
+            # A square returns matrix. `N / (T - N)` is undefined, so the `T > N` guard
+            # raises before the coefficients are formed.
             Xsq = X460[1:N460, :]
             for tgt in tgts460
-                @test !all(isfinite,
-                           mean(ShrunkExpectedReturns(;
-                                                      alg = BodnarOkhrinParolya(;
-                                                                                tgt = tgt)),
-                                Xsq))
+                @test_throws DomainError mean(ShrunkExpectedReturns(;
+                                                                    alg = BodnarOkhrinParolya(;
+                                                                                              tgt = tgt)),
+                                              Xsq)
             end
             # Two observations and five assets. The covariance estimator repairs the
-            # singular matrix, so every algorithm returns a finite vector.
+            # singular matrix, so James-Stein and Bayes-Stein return a finite vector.
             X2 = X460[1:2, :]
-            for alg in algs460, tgt in tgts460
+            for alg in (JamesStein, BayesStein), tgt in tgts460
                 @test all(isfinite,
                           mean(ShrunkExpectedReturns(; alg = alg(; tgt = tgt)), X2))
+            end
+            # `T < N` makes `N / (T - N)` negative, which silently flipped the sign of the
+            # coefficient before #497. The same guard refuses it.
+            for tgt in tgts460
+                @test_throws DomainError mean(ShrunkExpectedReturns(;
+                                                                    alg = BodnarOkhrinParolya(;
+                                                                                              tgt = tgt)),
+                                              X2)
             end
         end
     end
