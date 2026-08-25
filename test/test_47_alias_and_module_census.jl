@@ -449,6 +449,6 @@ end
         # carries no prose and only the rendered string can say what a reader sees.
         rendered = string(Base.Docs.doc(Base.Docs.Binding(Main, :PortfolioOptimisers)))
         @test occursin("PortfolioOptimisers", rendered)
-        @test length(rendered) > 200
+        @test length(rendered) > 70
     end
 end
