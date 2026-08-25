@@ -99,6 +99,191 @@
 
         @test mean(MedianExpectedReturns(), rd.X) == median(rd.X; dims = 1)
     end
+    #=
+    Issue #461, under child map #417 of the map of maps #404.
+
+    Every claim these tests pin is a sentence of one of the five expected-returns docstrings
+    that #461 swept. The numbers are hand-computed here rather than taken from a stored
+    fixture, so a claim and its check can be read side by side.
+    =#
+    @testset "Expected returns estimators, swept claims" begin
+        # --- equilibrium_mu -------------------------------------------------
+        # `mu = l * sigma * w`, hand-computed on a three-asset sample.
+        S461 = [4.0 1.0 0.5; 1.0 9.0 2.0; 0.5 2.0 16.0]
+        w461 = [0.2, 0.3, 0.5]
+        l461 = 2.5
+        @test PortfolioOptimisers.equilibrium_mu(l461, S461, w461) ==
+              [l461 * sum(S461[i, j] * w461[j] for j in 1:3) for i in 1:3]
+        # `w = nothing` selects the equal-weight fallback, not a zero vector.
+        @test PortfolioOptimisers.equilibrium_mu(l461, S461, nothing) ≈
+              [l461 * sum(S461[i, j] for j in 1:3) / 3 for i in 1:3]
+        # `sigma` is a block, so the result has length `size(sigma, 1)`, not `size(sigma, 2)`.
+        B461 = [1.0 2.0 3.0; 4.0 5.0 6.0]
+        @test PortfolioOptimisers.equilibrium_mu(2.0, B461, w461) ==
+              [2.0 * sum(B461[i, j] * w461[j] for j in 1:3) for i in 1:2]
+        @test length(PortfolioOptimisers.equilibrium_mu(2.0, B461, w461)) == size(B461, 1)
+        # The length check reads `size(sigma, 2)`, and its message names both numbers.
+        @test_throws DimensionMismatch("length(w) (2) must match the number of assets, size(sigma, 2) (3)") PortfolioOptimisers.equilibrium_mu(1.0,
+                                                                                                                                               S461,
+                                                                                                                                               [1.0,
+                                                                                                                                                2.0])
+
+        # --- EquilibriumExpectedReturns -------------------------------------
+        # Every observation, so that `ew`, `fw` and `pw` line up with the rows.
+        X461 = rd.X[:, 1:3]
+        me461 = EquilibriumExpectedReturns(; w = w461, l = 3.0)
+        @test mean(me461, X461) ==
+              PortfolioOptimisers.equilibrium_mu(3.0, cov(me461.ce, X461), w461)
+        # The result is a plain vector for both values of `dims`, not a `1 x N` matrix.
+        @test isa(mean(me461, X461), Vector)
+        @test isa(mean(EquilibriumExpectedReturns(), X461; dims = 2), Vector)
+        @test length(mean(EquilibriumExpectedReturns(), X461)) == size(X461, 2)
+        @test length(mean(EquilibriumExpectedReturns(), X461; dims = 2)) == size(X461, 1)
+        # `dims` is checked by the covariance estimator, not by the method.
+        @test_throws DomainError mean(me461, X461; dims = 3)
+        # The observation weights reach the result through `ce`.
+        @test mean(factory(me461, pw), X461) ==
+              PortfolioOptimisers.equilibrium_mu(3.0, cov(factory(me461, pw).ce, X461),
+                                                 w461)
+        @test_throws PortfolioOptimisers.IsEmptyError EquilibriumExpectedReturns(;
+                                                                                 w = Float64[])
+        # `l` scales the whole vector, and `l == 0` gives a zero mean.
+        @test mean(EquilibriumExpectedReturns(; w = w461, l = 6.0), X461) ≈
+              2 * mean(me461, X461)
+        @test all(iszero, mean(EquilibriumExpectedReturns(; w = w461, l = 0), X461))
+        # `nothing` weights are the equal-weight vector, not a zero vector.
+        @test mean(EquilibriumExpectedReturns(; l = 3.0), X461) ≈
+              mean(EquilibriumExpectedReturns(; w = fill(inv(3), 3), l = 3.0), X461)
+
+        # --- ExcessExpectedReturns ------------------------------------------
+        exc461 = ExcessExpectedReturns(; me = SimpleExpectedReturns(), rf = 0.01)
+        @test mean(exc461, X461) == mean(SimpleExpectedReturns(), X461) .- 0.01
+        # The shape follows the nested estimator, because the subtraction is elementwise.
+        @test size(mean(exc461, X461)) == size(mean(SimpleExpectedReturns(), X461))
+        @test size(mean(exc461, X461; dims = 2)) ==
+              size(mean(SimpleExpectedReturns(), X461; dims = 2))
+        @test mean(factory(exc461, ew), X461) ==
+              mean(factory(SimpleExpectedReturns(), ew), X461) .- 0.01
+        @test_throws DomainError mean(exc461, X461; dims = 3)
+        @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = Inf)
+        @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = NaN)
+
+        # --- StandardDeviationExpectedReturns and VarianceExpectedReturns ----
+        # One is the elementwise square of the other, on the same data and the same `ce`.
+        sd461 = StandardDeviationExpectedReturns()
+        vr461 = VarianceExpectedReturns()
+        @test mean(vr461, X461) ≈ mean(sd461, X461) .^ 2
+        @test mean(sd461, X461) ≈ sqrt.(mean(vr461, X461))
+        @test size(mean(sd461, X461)) == (1, size(X461, 2))
+        @test size(mean(sd461, X461; dims = 2)) == (size(X461, 1), 1)
+        @test size(mean(vr461, X461)) == (1, size(X461, 2))
+        # Every choice inside `ce` reaches the result, so the weighted result differs.
+        @test mean(factory(vr461, pw), X461) ≈ mean(factory(sd461, pw), X461) .^ 2
+        @test !isapprox(mean(factory(sd461, fw), X461), mean(sd461, X461))
+        @test_throws DomainError mean(sd461, X461; dims = 3)
+        @test_throws DomainError mean(vr461, X461; dims = 3)
+
+        # --- MedianExpectedReturns ------------------------------------------
+        #=
+        `StatsBase.median(v, w)` is the 0.5 quantile of the weighted sample. It
+        interpolates between two order statistics, and `w_(1)` in its definition is the
+        weight of the SMALLEST value, not the weight of the first observation.
+        =#
+        v461 = [5.0, 1.0, 3.0, 7.0]
+        wq461 = StatsBase.Weights([0.4, 0.1, 0.2, 0.3])
+        p461 = sortperm(v461)
+        vs461, ws461 = v461[p461], wq461[p461]
+        S_461 = cumsum(ws461)
+        h461 = 0.5 * (sum(ws461) - ws461[1]) + ws461[1]     # w_(1) is the weight of 1.0
+        k461 = findlast(<=(h461), S_461)
+        hand461 = vs461[k461] +
+                  (h461 - S_461[k461]) / (S_461[k461 + 1] - S_461[k461]) *
+                  (vs461[k461 + 1] - vs461[k461])
+        @test median(v461, wq461) == hand461 == 4.25
+        # It interpolates: the answer is not one of the observed values.
+        @test hand461 ∉ v461
+        # Reading `w[1]` instead of the weight of the smallest value gives 5.0, not 4.25.
+        h_naive461 = 0.5 * (sum(wq461) - wq461[1]) + wq461[1]
+        kn461 = findlast(<=(h_naive461), S_461)
+        naive461 = vs461[kn461] +
+                   (h_naive461 - S_461[kn461]) / (S_461[kn461 + 1] - S_461[kn461]) *
+                   (vs461[kn461 + 1] - vs461[kn461])
+        @test naive461 == 5.0
+        @test naive461 != hand461
+        # The estimator is that quantile, column by column.
+        Xq461 = [5.0 10.0; 1.0 20.0; 3.0 30.0; 7.0 40.0]
+        mew461 = MedianExpectedReturns(; w = wq461)
+        @test mean(mew461, Xq461) ==
+              reshape([median(view(Xq461, :, j), wq461) for j in 1:2], 1, :)
+        @test mean(mew461, Xq461)[1, 1] == 4.25
+        @test size(mean(mew461, Xq461)) == (1, size(Xq461, 2))
+        @test size(mean(mew461, permutedims(Xq461); dims = 2)) == (size(Xq461, 2), 1)
+        # Under equal weights it reduces to the ordinary median.
+        @test mean(MedianExpectedReturns(; w = StatsBase.Weights(fill(0.25, 4))), Xq461) ==
+              mean(MedianExpectedReturns(), Xq461) ==
+              median(Xq461; dims = 1)
+        # The weighted branch checks `dims` through `dims_oriented`, not `assert_dims`.
+        @test_throws DomainError mean(mew461, Xq461; dims = 3)
+        @test_throws DomainError mean(MedianExpectedReturns(), Xq461; dims = 3)
+        @test_throws PortfolioOptimisers.IsEmptyError MedianExpectedReturns(;
+                                                                            w = StatsBase.Weights(Float64[]))
+
+        # --- CustomValueExpectedReturns -------------------------------------
+        # The assertion is the whole contract, so drive every rejection and assert the
+        # message, not only the type.
+        @test_throws ArgumentError("val must be a vector of numbers, one element per asset. Got\nval => Float64") PortfolioOptimisers.assert_custom_expected_returns_val(1.0,
+                                                                                                                                                                         3)
+        @test_throws ArgumentError("val must be a vector of numbers, one element per asset. Got\nval => typeof(sum)") PortfolioOptimisers.assert_custom_expected_returns_val(sum,
+                                                                                                                                                                             3)
+        @test_throws DimensionMismatch("length(val) (2) must match the number of assets (3)") PortfolioOptimisers.assert_custom_expected_returns_val([1.0,
+                                                                                                                                                      2.0],
+                                                                                                                                                     3)
+        @test isnothing(PortfolioOptimisers.assert_custom_expected_returns_val([1.0, 2.0,
+                                                                                3.0], 3))
+        # `val_sym` reaches the message of the callable branch.
+        @test_throws DimensionMismatch("length(val(X; dims = 1, kwargs...)) (2) must match the number of assets (3)") PortfolioOptimisers.assert_custom_expected_returns_val([1.0,
+                                                                                                                                                                              2.0],
+                                                                                                                                                                             3,
+                                                                                                                                                                             "val(X; dims = 1, kwargs...)")
+        # The scalar branch broadcasts and inserts the reduced dimension.
+        @test mean(CustomValueExpectedReturns(; val = 0.5), X461) ==
+              fill(0.5, 1, size(X461, 2))
+        @test mean(CustomValueExpectedReturns(; val = 0.5), X461; dims = 2) ==
+              fill(0.5, size(X461, 1), 1)
+        # The vector branch takes the stored vector and inserts the reduced dimension.
+        @test mean(CustomValueExpectedReturns(; val = [0.1, 0.2, 0.3]), X461) ==
+              [0.1 0.2 0.3]
+        @test_throws DimensionMismatch mean(CustomValueExpectedReturns(; val = [0.1, 0.2]),
+                                            X461)
+        # The callable branch returns the vector unchanged, and inserts no dimension.
+        cb461 = mean(CustomValueExpectedReturns(;
+                                                val = (X; dims = 1, kwargs...) -> fill(0.7,
+                                                                                       size(X,
+                                                                                            setdiff((1,
+                                                                                                     2),
+                                                                                                    (dims,))[1]))),
+                     X461)
+        @test isa(cb461, Vector)
+        @test cb461 == fill(0.7, size(X461, 2))
+        @test_throws DimensionMismatch mean(CustomValueExpectedReturns(;
+                                                                       val = (X; kwargs...) -> [0.1,
+                                                                                                0.2]),
+                                            X461)
+        @test_throws ArgumentError mean(CustomValueExpectedReturns(;
+                                                                   val = (X; kwargs...) -> 0.1),
+                                        X461)
+        @test_throws DomainError mean(CustomValueExpectedReturns(), X461; dims = 3)
+        @test_throws PortfolioOptimisers.IsEmptyError CustomValueExpectedReturns(;
+                                                                                 val = Float64[])
+
+        #=
+        `assert_nonempty` labelled its bullet `!isempty(sym)` and reported the value of
+        `isempty(sym)`, so the failure printed `!isempty(w) => true` while raising because
+        `!isempty(w)` was false. The label and the value now name the same expression.
+        =#
+        @test_throws PortfolioOptimisers.IsEmptyError("!isempty(w) must hold. Got\n!isempty(w) => false") PortfolioOptimisers.assert_nonempty(Float64[],
+                                                                                                                                              :w)
+    end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = FullMoment()),
                Covariance(; alg = FullMoment(), me = SimpleExpectedReturns(; w = ew),

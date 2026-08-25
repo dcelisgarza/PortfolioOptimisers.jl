@@ -3978,7 +3978,7 @@ No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
 function assert_nonempty(val::Union{<:AbstractDict, <:VecPair, <:ArrNum},
                          sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($sym) must hold. Got\n!isempty($sym) => $(isempty(val))"))
+              IsEmptyError("!isempty($sym) must hold. Got\n!isempty($sym) => $(!isempty(val))"))
     return nothing
 end
 """

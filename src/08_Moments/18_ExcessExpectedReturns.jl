@@ -76,7 +76,7 @@ end
 
 Compute excess expected returns by subtracting the risk-free rate.
 
-This method applies the mean estimator to the data and subtracts the risk-free rate from the resulting expected returns.
+This method applies the nested estimator `me.me` to the data, and subtracts the risk-free rate `me.rf` from every element of the result. The rate is the one stored on the estimator. It is not read from the data and it is not read from a keyword.
 
 # Mathematical definition
 
@@ -106,7 +106,7 @@ Where:
 
 # Returns
 
-  - `mu::ArrNum`: Excess expected returns vector.
+  - `mu::ArrNum`: Excess expected returns. The shape is the shape that `me.me` returns, because the subtraction is elementwise.
 
 # Examples
 

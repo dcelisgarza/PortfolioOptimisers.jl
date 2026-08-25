@@ -113,7 +113,10 @@ Where:
   - ``S_m``: Cumulative weight of the ``m`` smallest returns.
   - ``h``: Cumulative weight that the probability ``1/2`` corresponds to.
 
-The result is therefore not in general one of the observed returns. Under equal weights it reduces to the ordinary median.
+Two consequences follow, and both separate this from an order statistic.
+
+  - The result is **not in general one of the observed returns**, because the last line interpolates between ``r_{(k)j}`` and ``r_{(k+1)j}``. Under equal weights it reduces to the ordinary median.
+  - ``w_{(1)}`` in the second line is the weight of the **smallest** return, not the weight of the first observation. The weights are sorted with the returns before ``h`` is formed, so a sample whose smallest return arrives last gives a different ``h`` from the one that reading `w[1]` would give, and a different result.
 
 # Arguments
 
@@ -144,6 +147,20 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Computes per-asset weighted median using the [`ObsWeights`](@ref) stored in `me.w`.
+
+The weighted branch has no matrix-wide method to call, so it reduces one column at a time. The mathematics of one column is the weighted-quantile expression of the method above.
+
+# Algorithm
+
+ 1. Orient `X` with [`dims_oriented`](@ref), so that the observations run down the columns. This step also checks `dims`.
+ 2. Resolve `me.w` against the oriented `X` with [`get_observation_weights`](@ref), giving `w`.
+ 3. Allocate the result vector `Y`, of length `size(X, 2)`.
+ 4. For each column `i` of `X`, take the weighted median of that column under `w`, giving `Y[i]`.
+ 5. Insert the reduced dimension back into `Y` with `insertdims`, giving a `(1, N)` matrix when `dims == 1` and an `(N, 1)` matrix when `dims == 2`.
+
+# Validation
+
+  - $(val_dict[:dims]) The check is not made by this method: [`dims_oriented`](@ref) is what raises the `DomainError`.
 """
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset standard deviations.
 
-`StandardDeviationExpectedReturns` computes "expected returns" as the standard deviation of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+`StandardDeviationExpectedReturns` computes "expected returns" as the standard deviation of each asset, as estimated by the underlying covariance estimator. The result is in the units of the returns. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
 
 # Fields
 
@@ -57,6 +57,7 @@ StandardDeviationExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
+  - [`VarianceExpectedReturns`](@ref): The sibling that returns the square of this result.
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
@@ -80,7 +81,9 @@ end
 
 Compute expected returns as the standard deviation of each asset.
 
-This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`.
+This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the units of the returns in `X`. It is the elementwise square root of what [`mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
+
+The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
 
 # Mathematical definition
 
@@ -112,14 +115,11 @@ Where:
 
   - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
-# Details
-
-  - The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
-
 # Related
 
   - [`StandardDeviationExpectedReturns`](@ref)
   - [`std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref): Returns the square of this result.
 """
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
@@ -132,7 +132,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset variances.
 
-`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's variance. Variance is the square of volatility (standard deviation).
+`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. The result is in the squared units of the returns. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's variance. The variance is the square of the standard deviation, so this type returns the elementwise square of what [`StandardDeviationExpectedReturns`](@ref) returns on the same data and the same `ce`.
 
 # Fields
 
@@ -186,6 +186,7 @@ VarianceExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
+  - [`StandardDeviationExpectedReturns`](@ref): The sibling that returns the square root of this result.
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
@@ -208,7 +209,9 @@ end
 
 Compute expected returns as the variance of each asset.
 
-This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`.
+This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the squared units of the returns in `X`. It is the elementwise square of what [`mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
+
+The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
 
 # Mathematical definition
 
@@ -240,14 +243,11 @@ Where:
 
   - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
-# Details
-
-  - The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
-
 # Related
 
   - [`VarianceExpectedReturns`](@ref)
   - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref): Returns the square root of this result.
 """
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
