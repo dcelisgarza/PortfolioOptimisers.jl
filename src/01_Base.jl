@@ -805,6 +805,7 @@ const val_dict = unique_key_dict(:val_dict,
                                  :c2 => "`0 <= c2`.",#
                                  :c3 => "`0 <= c3`.",#
                                  :c3c2 => "`c3 > c2`.",#
+                                 :sbn => "`0 <= n`. `Inf` is permitted and `NaN` is not.",#
                                  :dims => "`dims in (1, 2)`.",#
                                  :alpha => "`0 < alpha < 1`.",#
                                  :beta => "`0 < beta < 1`.",#

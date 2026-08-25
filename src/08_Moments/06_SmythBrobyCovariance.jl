@@ -552,7 +552,8 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:c2])
   - $(val_dict[:c3])
   - $(val_dict[:c3c2])
-  - `c1`, `c2` and `c3` are validated with [`assert_nonempty_nonneg_finite_val`](@ref), so `Inf` and `NaN` are rejected. **`n` is validated by nothing**, and a negative `n` inverts the severity penalty of [`sb_delta`](@ref): a pair whose two magnitudes agree then contributes nothing, so the diagonal is zero and the result is not a correlation matrix.
+  - $(val_dict[:sbn])
+  - `c1`, `c2` and `c3` are validated with [`assert_nonempty_nonneg_finite_val`](@ref), so `Inf` and `NaN` are rejected. `n` is validated with [`assert_nonneg`](@ref), which rejects a negative `n` and `NaN` and admits `Inf`. The three thresholds are read on the scale of the data, where `Inf` admits no observation at all; `n` is an exponent whose infinite limit is a hard divergence gate, so it is kept. A negative `n` inverts the severity penalty of [`sb_delta`](@ref): a pair whose two magnitudes agree would then contribute nothing, and the diagonal would be zero rather than one.
 
 ## Propagated parameters
 
@@ -666,6 +667,7 @@ SmythBrobyCovariance
         assert_nonempty_nonneg_finite_val(c1, :c1)
         assert_nonempty_nonneg_finite_val(c2, :c2)
         assert_nonempty_nonneg_finite_val(c3, :c3)
+        assert_nonneg(n, :n)
         @argcheck(c2 < c3, DomainError("c2 must be less than c3, got c2 = $c2, c3 = $c3"))
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c1), typeof(c2), typeof(c3),
                    typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, c1, c2, c3, n, alg, ex)

@@ -29,12 +29,13 @@ FOUR FACTS SHAPE THE PROBES.
    and it means the same thing as it does in the Gerber family. Nine markers is the shape
    where an unreachable branch hides, so all nine are separated pairwise.
 
-4. `n` IS VALIDATED BY NOTHING. `c1`, `c2` and `c3` all pass through
-   `assert_nonempty_nonneg_finite_val` and `c2 < c3` is checked, but no guard reads `n`. A
-   NEGATIVE `n` INVERTS the severity penalty: `gamma^n` is `Inf` at the zero divergence an
-   asset always has against itself, so the DIAGONAL is zero while the off-diagonal is not,
-   and the result is not a correlation matrix. The present behaviour is pinned in both
-   directions below, so the test to change when that decision lands is named here.
+4. `n` IS NON-NEGATIVE, AND `Inf` IS LEGAL (ADR 0091, #496). `c1`, `c2` and `c3` pass
+   through `assert_nonempty_nonneg_finite_val`, which also rejects `Inf`; `n` passes
+   through `assert_nonneg`, which does not. The three thresholds are read on the scale of
+   the data, where `Inf` admits no observation; `n` is an exponent whose infinite limit is
+   a hard divergence gate. A NEGATIVE `n` INVERTED the severity penalty: `gamma^n` is `Inf`
+   at the zero divergence an asset always has against itself, so the DIAGONAL was zero
+   while the off-diagonal was not. That is what the guard now rejects.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs
 
@@ -356,7 +357,7 @@ end
         @test r0 == r1
     end
 
-    @testset "the constructor guards, and the one parameter no guard reads" begin
+    @testset "the constructor guards, and the severity exponent (#496, ADR 0091)" begin
         for kw in
             ((; c1 = -1e-9), (; c2 = -1e-9), (; c3 = -1e-9), (; c1 = Inf), (; c2 = NaN),
              (; c3 = Inf))
@@ -368,31 +369,33 @@ end
         @test_throws DomainError SmythBrobyCovariance(; c2 = 0.0, c3 = 0.0)
 
         #=
-        `n` IS VALIDATED BY NOTHING. These four are accepted today, and the negative case
-        is a defect: `gamma^n` is `Inf` at the zero divergence of an asset against itself,
-        so every contribution is zero and the diagonal is zero rather than one. The
-        behaviour is pinned in both directions, so these are the assertions to change when
-        that API decision lands.
+        `n` IS NON-NEGATIVE. A negative `n` inverted the severity penalty: `gamma^n` is
+        `Inf` at the zero divergence of an asset against itself, so every diagonal
+        contribution was zero and the result was not a correlation matrix. `assert_nonneg`
+        rejects a negative `n` and `NaN`, and admits `Inf`, whose limit is a hard
+        divergence gate rather than an empty statistic.
         =#
         X = randn(StableRNG(11), 60, 4)
-        for n in (-2, 0, 0.5, Inf)
+        for n in (-2, -1e-9, NaN)
+            @test_throws DomainError SmythBrobyCovariance(; n = n)
+        end
+        for n in (0, 0.5, 2, Inf)
             @test SmythBrobyCovariance(; n = n) isa SmythBrobyCovariance
         end
-        # A negative `n` INVERTS the severity penalty. A pair whose two magnitudes agree
-        # contributes NOTHING, and a pair whose magnitudes disagree contributes fully --
-        # the opposite of what the source's equation (1) is for.
+        # The kernel itself takes any `n`, so the inversion the guard rejects is still
+        # visible one level down. This is the behaviour the constructor now keeps out.
         @test PO.sb_delta(1.5, 1.5, -2) == 0.0
         @test PO.sb_delta(1.5, 0.5, -2) > 0.9
-        rneg = cor(SmythBrobyCovariance(; n = -2, alg = SmythBroby1(), pdm = nothing), X)
-        # An asset always has zero divergence against itself, so the DIAGONAL is zero and
-        # the result is not a correlation matrix at all. The off-diagonal is not zero.
-        @test all(iszero, diag(rneg))
-        @test any(!iszero, rneg)
+        # Every `n` the guard admits gives a unit diagonal and a finite matrix.
         for n in (0, 0.5, 2, Inf)
             r = cor(SmythBrobyCovariance(; n = n, alg = SmythBroby1(), pdm = nothing), X)
             @test all(isapprox.(diag(r), 1))
             @test all(isfinite, r)
         end
+        # `n = 2` is the default, and the guard moves no shipped number.
+        @test isapprox(cor(SmythBrobyCovariance(; alg = SmythBroby1(), pdm = nothing), X),
+                       cor(SmythBrobyCovariance(; n = 2, alg = SmythBroby1(),
+                                                pdm = nothing), X))
     end
 
     @testset "cov is cor rescaled by sd, and the diagonals agree" begin
