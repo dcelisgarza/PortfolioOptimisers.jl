@@ -43,9 +43,53 @@ observations. `Gerber2` was unaffected on the diagonal, because it normalises by
 The overlap needs a return that is exactly zero after centring, so the defect is reachable from
 synthetic data and from a caller who centres the data themselves.
 
+### The same edge in the Gerber IQ family
+
+[#498](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/498), opened on a raise from
+the documentation ticket [#456](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/456),
+found the same edge in
+[`GerberIQCovariance`](../../src/08_Moments/35_GerberIQCovariance.jl):
+
+```julia
+X = [1.0 2.0; 0.0 0.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0; -2.0 -2.0]
+
+ce = GerberIQCovariance(; c = 0.0, kind = BasicGerberIQ(; d = 0.0, n = 1.0),
+                        sc = AssetVolatilityGerberIQScaler(),
+                        decay = ExpGerberIQDecay(; e = 0.0, y = 0.0), pdm = nothing,
+                        alg = Gerber1(), me = SimpleExpectedReturns(; w = nothing))
+
+diag(cor(ce, X))     # [0.6667, 1.0]
+```
+
+The shape differs. That family has one noise threshold `c` rather than two band edges, and
+`comovement_step` gated on it with a strict `<` on the **absolute** return:
+
+```julia
+if axi < st.ci && axj < st.cj
+    return acc
+end
+```
+
+At `st.ci == 0` the test `axi < 0` is never true, so no observation is dropped. An observation
+whose return is exactly zero then reached the classification, where `axi >= st.ci` holds but
+neither sign test does, and it fell through to the neutral branch. There the two bands
+*overlapped* at a zero edge; here the gate *failed to exclude* a zero return. Both make a zero
+return count as something it is not.
+
+For an off-diagonal pair that is merely generous. For the diagonal pair `(i, i)` it is wrong: the
+neutral count holds the observations on which **exactly one** asset crossed, and an asset compared
+with itself can never be one of those. `Gerber1` divides by `pos + neg + nn`, so the
+inflated `nn` pulled the diagonal below one. `Gerber0` and `Gerber2` read no neutral count and were
+unaffected, exactly as `Gerber2` was unaffected in the classic family.
+
+The same `c = 0` also broke the reduction that ties the two families together. Gerber IQ with every
+weight set to one and no decay is the Gerber statistic, and at a zero threshold the two answered
+different matrices.
+
 ### The two readings
 
-The ticket named both.
+Ticket #491 named both. Ticket #498 named only the second one, and for the same reason: a
+threshold that a caller may be passing today should keep a clean meaning rather than be rejected.
 
  1. **Tighten the guard to `0 < t`.** The Gerber statistic is defined for a strictly positive
     threshold, and Riskfolio-Lib asserts `0 < threshold < 1`. `val_dict[:t]` already carries
@@ -56,8 +100,10 @@ The ticket named both.
 
 ## Decision
 
-**A zero band edge makes an exactly zero return neutral.** `gerber_updown` adds a sign test to
-each band:
+**A return of exactly zero never crosses a Gerber threshold, whatever the threshold is.** The rule
+holds for the whole Gerber family, and each member states it in the shape its own gate takes.
+
+**`GerberCovariance` adds a sign test to each band.** `gerber_updown` becomes:
 
 ```julia
 zx = zero(eltype(X))
@@ -65,9 +111,20 @@ U .= (X .>= ts) .& (X .> zx)
 D .= (X .<= -ts) .& (X .< zx)
 ```
 
+**`GerberIQCovariance` gets one crossing predicate, and `comovement_step` uses it for both
+axes.** The three sites that repeated the threshold comparison now read the same answer:
+
+```julia
+@inline function iq_crossed(x::Number, ax::Number, c::Number)
+    return ax >= c && !iszero(x)
+end
+```
+
 **The sign test binds only at a zero edge.** `ce.t` and `sd` are both non-negative, so `ts` is
-non-negative. For a positive `ts` the test is redundant, because `x >= ts > 0` already implies
-`x > 0`. Every result at a positive threshold is therefore unchanged, bit for bit.
+non-negative, and `ce.c` and the scaler's factor are both non-negative, so `st.ci` is non-negative.
+For a positive edge the test is redundant, because `x >= ts > 0` already implies `x > 0` and
+`ax >= c > 0` already implies that `x` is not zero. Every result at a positive threshold is
+therefore unchanged, bit for bit.
 
 **Both bands are strict at a zero edge, not one of them.** The ticket wrote "make one band
 strict", which would put a zero return in `U` alone. That is not the neutrality the same sentence
@@ -96,6 +153,25 @@ may be passing today, and it removes a threshold that now has a clean meaning.
 - **The math dictionary states the rule once.** `math_dict[:U_gerber]`, `math_dict[:D_gerber]` and
   `math_dict[:Nneut_gerber]` carry the sign test, so every Gerber docstring that interpolates them
   states it.
+- **The Gerber IQ diagonal is unit at every threshold.** The pair `(i, i)` crosses on both axes or
+  on neither, so it never reaches the neutral accumulator. `Gerber1` therefore answers
+  `pos / pos` on the diagonal, as `Gerber0` and `Gerber2` already did.
+- **The reduction to `GerberCovariance` holds at `c = 0`.** Gerber IQ with every weight set to
+  one, no decay and the per-asset volatility scaling reproduces the Gerber statistic at a zero
+  threshold as it does at a positive one. Before this decision the docstring of `gerber_IQ` had to
+  state that the reduction needed a positive threshold, and that sentence is gone.
+- **The Gerber IQ classification is exhaustive.** With `iq_crossed` on both axes, an observation
+  on which both assets crossed carries a product that is not zero, so it is concordant or
+  discordant and never neutral. The neutral branch is exactly the case its own docstring names:
+  one asset crossed and the other did not.
 - **`test_08_moments.jl` holds the contract.** The testset `Gerber statistic (#454)` pins that the
   bands of the sample at `t = 0` are the bands at `t = 0.5`, that the exactly zero returns are in
-  neither band, and that all three variants answer a unit diagonal.
+  neither band, and that all three variants answer a unit diagonal. The testset
+  `Gerber IQ zero threshold (#498)` pins the unit diagonal of all three Gerber IQ branches at
+  `c = 0`, the reduction to `GerberCovariance` at that threshold, and that no result at a positive
+  threshold moves.
+- **`SmythBrobyCovariance` carries the same shape and is not fixed here.**
+  [#499](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/499) records it. Its
+  indecision zone gates on `c2` over the **centred, standardised** return and its confusion zone
+  gates on `c1` over the **raw, uncentred** one, so which of the two gates takes the sign test is
+  a question this ADR does not answer.

@@ -1916,7 +1916,7 @@ GerberIQCovariance
     """
     pdm
     """
-    Noise threshold. A return within `c` scaled units of zero is noise, and a co-movement whose two returns are both noise is dropped. It must be no larger than every boundary of `kind`.
+    Noise threshold. A return within `c` scaled units of zero is noise, and so is a return of exactly zero at any `c`. A co-movement whose two returns are both noise is dropped. It must be no larger than every boundary of `kind`.
     """
     c
     """
@@ -2071,7 +2071,7 @@ Accumulate a neutral (one-sided) observation into the Gerber IQ pair accumulator
 
 Only [`Gerber1`](@ref) tracks neutral co-movements, adding the [`gerber_IQ_delta`](@ref) weight to the neutral score; the fall-through method returns the accumulator unchanged.
 
-A neutral co-movement is one on which exactly one of the two assets left the noise zone. [`Gerber1`](@ref) is the only branch whose denominator counts it, so the other two branches would carry the sum and never read it.
+A neutral co-movement is one on which exactly one of the two assets left the noise zone, which [`iq_crossed`](@ref) decides. [`Gerber1`](@ref) is the only branch whose denominator counts it, so the other two branches would carry the sum and never read it.
 
 # Arguments
 
@@ -2090,6 +2090,7 @@ A neutral co-movement is one on which exactly one of the two assets left the noi
 # Related
 
   - [`comovement_step`](@ref)
+  - [`iq_crossed`](@ref)
   - [`gerber_IQ_delta`](@ref)
   - [`GerberIQKernel`](@ref)
   - [`Gerber1`](@ref)
@@ -2105,18 +2106,48 @@ end
 @inline function iq_add_neutral(::GerberIQKernel, acc, args...)
     return acc
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Decide whether one asset left the noise zone at one observation.
+
+An asset leaves the noise zone when its return reaches the pair's scaled threshold **and** is not exactly zero. The sign test is redundant for a positive threshold, because `ax >= c > 0` already implies that `x` is not zero. It binds only at `c = 0`, where the closed comparison `ax >= 0` holds for every return, including one that is exactly zero. ADR 0090 settled that a return of exactly zero never crosses, and this is that rule for the Gerber IQ family.
+
+The rule is what keeps the diagonal of the statistic at one. The pair `(i, i)` either crosses on both axes or on neither, so it never reaches the neutral accumulator that [`Gerber1`](@ref) divides by. Without the sign test a zero return crosses on both axes but has no sign, so it fell through to that accumulator and pulled the diagonal below one.
+
+# Arguments
+
+  - `x`: Return of the asset at the observation.
+  - `ax`: Its absolute value.
+  - `c`: The asset's scaled noise threshold, from [`comovement_pair_state`](@ref).
+
+# Returns
+
+  - `crossed::Bool`: `true` when the asset left the noise zone.
+
+# Related
+
+  - [`comovement_step`](@ref)
+  - [`comovement_pair_state`](@ref)
+  - [`GerberIQKernel`](@ref)
+"""
+@inline function iq_crossed(x::Number, ax::Number, c::Number)
+    return ax >= c && !iszero(x)
+end
 @inline function comovement_step(pol::GerberIQKernel, acc, st, xi::Number, xj::Number,
                                  T::Integer, k::Integer)
     axi = abs(xi)
     axj = abs(xj)
-    if axi < st.ci && axj < st.cj
+    crossi = iq_crossed(xi, axi, st.ci)
+    crossj = iq_crossed(xj, axj, st.cj)
+    if !crossi && !crossj
         return acc
     end
-    return if axi >= st.ci && axj >= st.cj && xi * xj > zero(xi)
+    return if crossi && crossj && xi * xj > zero(xi)
         (; acc...,
          pos = acc.pos +
                gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
-    elseif axi >= st.ci && axj >= st.cj && xi * xj < zero(xi)
+    elseif crossi && crossj && xi * xj < zero(xi)
         (; acc...,
          neg = acc.neg +
                gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
@@ -2176,9 +2207,7 @@ Where:
 
 The Gerber1 branch is the source's own statistic. Its numerator runs over the observations on which both assets left the noise zone, and its denominator over those on which at least one did. The Gerber0 and Gerber2 branches are the classic Gerber family's denominators, applied here to the weighted, discounted accumulators; the source states neither.
 
-The Gerber statistic is the special case of this one that switches the squeezing and the decay off. With every weight set to one, ``\\gamma = 0``, the per-asset volatility scaling of [`AssetVolatilityGerberIQScaler`](@ref), and ``c`` equal to a **positive** Gerber threshold, all three branches reproduce [`GerberCovariance`](@ref) to the last bit.
-
-The reduction needs that threshold to be positive. The noise gate here drops an observation only when both absolute returns are **below** ``c``, so at ``c = 0`` it drops nothing and a return of exactly zero joins the neutral count instead. [`Gerber0`](@ref) and [`Gerber2`](@ref) ignore that count and agree anyway, but [`Gerber1`](@ref) divides by it and disagrees, and its diagonal is then not one. ADR 0090 settled the same edge for [`GerberCovariance`](@ref) and this family does not yet follow it; [#498](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/498) records the gap.
+The Gerber statistic is the special case of this one that switches the squeezing and the decay off. With every weight set to one, ``\\gamma = 0``, the per-asset volatility scaling of [`AssetVolatilityGerberIQScaler`](@ref), and ``c`` equal to a Gerber threshold, all three branches reproduce [`GerberCovariance`](@ref) to the last bit. The reduction holds at ``c = 0`` as it does at every positive threshold, because [`iq_crossed`](@ref) gives this family the rule ADR 0090 gave that one: a return of exactly zero never leaves the noise zone.
 
 Only the Gerber0 and Gerber1 branches are bounded by construction, because each divides by a sum of the same weights it subtracts. The Gerber2 branch relies on the template's weights meeting the bound [`clamp_gerber_iq_n`](@ref) enforces, which is a necessary condition and not a sufficient one; [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap.
 

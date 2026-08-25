@@ -1207,7 +1207,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fold one observation of a pair into the co-movement accumulator.
 
-**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
+**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
 
 # Algorithm
 

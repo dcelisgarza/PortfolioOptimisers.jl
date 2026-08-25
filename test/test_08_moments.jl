@@ -704,6 +704,82 @@
         @test minimum(eigvals(Symmetric(rho_pdm))) >= 0
         @test !isapprox(rho_raw, rho_pdm)
     end
+    @testset "Gerber IQ zero threshold (#498)" begin
+        # `c = 0` puts the noise threshold at zero. The gate `abs(x) < 0` then drops
+        # nothing, and the closed comparison `abs(x) >= 0` holds for a return of exactly
+        # zero. Such a return crossed on both axes but carried no sign, so neither sign
+        # test fired and it fell through to the neutral accumulator. `Gerber1` divides by
+        # that accumulator, and its diagonal was then not one. `iq_crossed` gives this
+        # family the rule ADR 0090 gave `GerberCovariance`: a return of exactly zero never
+        # crosses. #498.
+
+        # ---- the crossing predicate ------------------------------------------------------
+        # The sign test binds only at a zero threshold. For every positive `c` the
+        # predicate is the closed comparison it replaces, so no code path at a positive
+        # threshold can move.
+        for c in (0.5, 1.0, 2.0), x in (-2.0, -0.5, 0.0, 0.5, 2.0)
+            @test PortfolioOptimisers.iq_crossed(x, abs(x), c) == (abs(x) >= c)
+        end
+        for x in (-2.0, -0.5, 0.5, 2.0)
+            @test PortfolioOptimisers.iq_crossed(x, abs(x), 0.0)
+        end
+        @test !PortfolioOptimisers.iq_crossed(0.0, 0.0, 0.0)
+
+        # ---- the sample of the ticket ----------------------------------------------------
+        # Column 1 is centred exactly, so rows 2 and 5 carry an exactly zero return for
+        # asset 1. Column 2 carries none.
+        Xq = [1.0 2.0; 0.0 0.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0; -2.0 -2.0]
+        ceq(a) = GerberIQCovariance(; c = 0.0, kind = BasicGerberIQ(; d = 0.0, n = 1.0),
+                                    sc = AssetVolatilityGerberIQScaler(),
+                                    decay = ExpGerberIQDecay(; e = 0.0, y = 0.0),
+                                    pdm = nothing, alg = a)
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            @test isapprox(diag(cor(ceq(a), Xq)), ones(2))
+        end
+        # ---- the classification at a zero threshold --------------------------------------
+        # The neutral accumulator is not emptied, it is corrected: it holds the
+        # observations on which exactly one asset crossed, which is what its own docstring
+        # says. Drive the kernel directly at `c = 0`, with unit standard deviations so the
+        # pair's scaled thresholds are zero.
+        polq = PortfolioOptimisers.GerberIQKernel(Gerber1(),
+                                                  BasicGerberIQ(; d = 0.0, n = 1.0),
+                                                  ExpGerberIQDecay(; e = 0.0, y = 0.0),
+                                                  AssetVolatilityGerberIQScaler(), 0.0,
+                                                  [1.0, 1.0])
+        stq = PortfolioOptimisers.comovement_pair_state(polq, 1, 2)
+        @test stq.ci == stq.cj == 0.0
+        accq = (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        # Neither asset crosses, so the observation leaves the pair entirely.
+        @test PortfolioOptimisers.comovement_step(polq, accq, stq, 0.0, 0.0, 4, 1) == accq
+        # Exactly one asset crosses, so the observation is neutral.
+        accn = PortfolioOptimisers.comovement_step(polq, accq, stq, 0.0, 1.0, 4, 1)
+        @test accn.nn > 0
+        @test accn.pos == accn.neg == 0
+        # Both assets cross, so their product carries a sign and the observation is
+        # concordant or discordant. It can no longer reach the neutral accumulator.
+        accp = PortfolioOptimisers.comovement_step(polq, accq, stq, 1.0, 1.0, 4, 1)
+        @test accp.pos > 0
+        @test accp.neg == accp.nn == 0
+        accd = PortfolioOptimisers.comovement_step(polq, accq, stq, 1.0, -1.0, 4, 1)
+        @test accd.neg > 0
+        @test accd.pos == accd.nn == 0
+
+        # ---- the reduction to the Gerber statistic ----------------------------------------
+        # Every weight one, no decay and the per-asset volatility scaling make the Gerber
+        # IQ statistic the Gerber statistic. The reduction holds at `c = 0` as it holds at
+        # a positive threshold, and it is what the defect broke: `Gerber1` disagreed at a
+        # zero threshold while the other two branches, which read no neutral count, agreed.
+        Yq = randn(StableRNG(987654321), 60, 5)
+        Yq[3, 2] = 0.0
+        for t in (0.0, 0.5), a in (Gerber0(), Gerber1(), Gerber2())
+            cgq = GerberCovariance(; t = t, pdm = nothing, alg = a)
+            ciq = GerberIQCovariance(; c = t, kind = BasicGerberIQ(; d = t, n = 1.0),
+                                     sc = AssetVolatilityGerberIQScaler(),
+                                     decay = ExpGerberIQDecay(; e = 0.0, y = 0.0),
+                                     pdm = nothing, alg = a)
+            @test isapprox(cor(cgq, Yq), cor(ciq, Yq))
+        end
+    end
     @testset "GerberIQ region templates" begin
         # gerber_iq_weight maps a co-movement (r_i, r_j) to its region's squeezing weight.
         # Sentinel weights n_k = k/100 (and distinct thresholds) make every region identifiable,
