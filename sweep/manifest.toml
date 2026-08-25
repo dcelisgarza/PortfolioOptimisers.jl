@@ -72,8 +72,8 @@
 "src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
 "src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
 "src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 28, algorithm = 7, swept = true }
-"src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 14, swept = false }
-"src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, swept = false }
+"src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 14, algorithm = 10, swept = true }
+"src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, algorithm = 5, swept = true }
 "src/08_Moments/24_ImpliedVolatility.jl" = { map = 3, units = 11, swept = false }
 "src/08_Moments/25_CorrelationCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { map = 3, units = 2, algorithm = 2, swept = true }

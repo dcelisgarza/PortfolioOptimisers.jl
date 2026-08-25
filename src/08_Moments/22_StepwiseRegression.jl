@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects factors by the statistical significance of their coefficients.
 
-A candidate model is admissible when **every** one of its coefficient p-values is at or below `t`, the intercept excluded. This is the only criterion that reads the fitted coefficients rather than one model-wide score, so it is not a [`MinMaxValStepwiseRegressionCriterion`](@ref) and it takes its own stepwise methods.
+A candidate model is admissible when **every** one of its coefficient p-values is at or below `t`, the intercept excluded. This is the only criterion that reads the fitted coefficients rather than one model-wide score, so it is not a [`MinMaxValStepwiseRegressionCriterion`](@ref) and it takes its own stepwise methods. Under either algorithm the selection never returns an empty factor set: when no factor clears `t`, [`add_best_factor_after_pval_failure!`](@ref) adds the single best one and warns.
 
 # Fields
 
@@ -28,10 +28,6 @@ julia> PValue()
 PValue
   t ┴ Float64: 0.05
 ```
-
-# Details
-
-  - Under either algorithm the selection never returns an empty factor set. When no factor clears `t`, [`add_best_factor_after_pval_failure!`](@ref) adds the single best one and warns.
 
 # Related
 
@@ -61,7 +57,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Grows the factor set from empty, adding the factor that most improves the criterion.
 
-At each step the algorithm fits one model per excluded factor, keeps the best of them, and stops when no addition improves on the score of the set it already holds. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that criterion can take, so the first addition always happens; under [`PValue`](@ref) the step instead admits a candidate whose p-values all clear `t`.
+At each step the algorithm fits one model per excluded factor, keeps the best of them, and stops when no addition improves on the score of the set it already holds. Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the starting score is [`regression_threshold`](@ref), the worst value that criterion can take, so the first addition always happens; under [`PValue`](@ref) the step instead admits a candidate whose p-values all clear `t`. **The selection is therefore never empty under either criterion**, which is the one behaviour that separates this tag from [`BackwardElimination`](@ref). The steps are stated on the two methods that run them, `_regression(::StepwiseRegression{<:PValue, <:ForwardSelection}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:ForwardSelection}, ::VecNum, ::MatNum)`.
 
 # Related
 
@@ -80,7 +76,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks the factor set from full, removing the factor whose removal most improves the criterion.
 
-At each step the algorithm fits one model per included factor, each with that factor dropped, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set it already holds. The starting score is the score of the **full** model, not [`regression_threshold`](@ref); under [`PValue`](@ref) the step instead drops the factor with the largest p-value while any exceeds `t`.
+At each step the algorithm fits one model per included factor, each with that factor dropped, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set it already holds. The starting score is the score of the **full** model, not [`regression_threshold`](@ref); under [`PValue`](@ref) the step instead drops the factor with the largest p-value while any exceeds `t`. **Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the selection can therefore empty**, because a criterion that rewards every removal removes every factor; the asset then gets an intercept-only model, and its row of the loadings matrix is all zeros. The steps are stated on the two methods that run them, `_regression(::StepwiseRegression{<:PValue, <:BackwardElimination}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, ::VecNum, ::MatNum)`.
 
 # Related
 
@@ -203,28 +199,33 @@ end
                                         included::VecInt, F::MatNum,
                                         x::VecNum)
 
-Helper for stepwise regression: add the "best" asset by p-value if no variables are included.
+Adds the factor of smallest p-value when a p-value search selected none.
 
-This function is used in stepwise regression routines when no variables meet the p-value threshold for inclusion. It scans all excluded variables, fits a regression for each, and selects the variable with the lowest p-value (even if above the threshold). The index of this variable is pushed to `included`, ensuring the model always includes at least one variable.
+Both [`PValue`](@ref) methods of `_regression` call it last, so a p-value search never returns an empty factor set. It does nothing when `included` already holds a factor, and it warns whenever it adds one, because the factor it adds failed the threshold by construction.
+
+# Algorithm
+
+ 1. Return at once when `included` is not empty.
+ 2. For each factor `i` of `F`, fit `tgt` to an intercept column and column `i`, and read that column's p-value, giving `test_pval`.
+ 3. Keep the smallest `test_pval` of step 2 and the factor that carries it, giving `best_pval` and `new_factor`.
+ 4. Warn, naming `new_factor` and `best_pval`.
+ 5. Push `new_factor` onto `included`.
 
 # Arguments
 
-  - `tgt`: Regression target type (e.g., `LinearModel()`).
-  - `included`: Indices of currently included variables (modified in-place).
-  - `F`: Factor matrix (observations × factors).
-  - `x`: Response vector.
+  - `tgt`: Regression target that fits each candidate model.
+  - `included`: Indices of the factors the search selected. Written in place.
+  - $(arg_dict[:F])
+  - `x`: Response vector, `observations × 1`.
 
 # Returns
 
-  - `nothing`: Modifies `included` in-place.
-
-# Details
-
-If `included` is not empty, the function does nothing. Otherwise, it evaluates each excluded variable by fitting a regression and extracting its p-value, then adds the variable with the lowest p-value to `included`. A warning is issued if no variable meets the threshold.
+  - `nothing`: `included` gains exactly one index when it was empty, and is unchanged otherwise.
 
 # Related
 
   - [`StepwiseRegression`](@ref)
+  - [`PValue`](@ref)
   - [`regression`](@ref)
 """
 function add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
@@ -256,25 +257,29 @@ end
     _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::VecNum,
                F::MatNum)
 
-Perform forward stepwise regression using a p-value criterion.
+Grows a factor set from empty, admitting the model whose p-values all clear the threshold.
 
-This method implements forward selection for stepwise regression, where variables (columns of `F`) are added to the model one at a time based on their statistical significance (p-value), starting from an empty model. At each step, the variable with the lowest p-value (and all p-values below the specified threshold) is added. The process continues until no remaining variable meets the p-value threshold. If no variable meets the threshold at any step, the variable with the lowest p-value is included to ensure at least one variable is selected.
+A candidate is admissible only when **every** coefficient of that candidate model is significant, so a factor that is significant on its own is rejected when it makes an incumbent insignificant.
+
+# Algorithm
+
+ 1. Set `included` empty and `val` to zero, so the loop runs at least once.
+ 2. While `val` does not exceed `re.crit.t`, do steps 3 to 6.
+ 3. Take the factors that `included` does not hold, giving `excluded`.
+ 4. For each `i` of `excluded`, fit `re.tgt` to an intercept column and the columns `[included; i]`, and read the p-value of column `i`, giving `test_pval`. Keep `i` as `new_factor` when `test_pval` is the smallest so far **and** no p-value of that candidate model exceeds `re.crit.t`, and keep that model's p-values as `pvals`.
+ 5. Stop the loop when step 4 kept no factor. Otherwise push `new_factor` onto `included`.
+ 6. Set `val` to the largest entry of `pvals`.
+ 7. Call [`add_best_factor_after_pval_failure!`](@ref), which acts only when `included` is still empty.
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a `PValue` criterion and `ForwardSelection` algorithm.
-  - `x`: Response vector.
-  - `F`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a [`PValue`](@ref) criterion and the [`ForwardSelection`](@ref) algorithm.
+  - `x`: Response vector, `observations × 1`.
+  - $(arg_dict[:F])
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of variables selected by the forward stepwise regression.
-
-# Details
-
-  - Starts with no variables included in the regression.
-  - Tries to add variables one at a time based on p-value, stopping when no further variables can be added under the threshold.
-  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_factor_after_pval_failure!`](@ref)).
+  - `included::Vector{Int}`: Indices of the selected factors, in the order the loop added them, so it is not sorted. It holds at least one index.
 
 # Related
 
@@ -320,33 +325,33 @@ end
                                value::VecNum, excluded::VecInt,
                                included::VecInt, t::Number)
 
-Helper for forward stepwise regression with minimum-value criteria (e.g., a p-value, `:aic`).
+Moves the best excluded factor into `included` when it lowers a minimised criterion.
 
-This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is minimized (such as `:aic` or `:bic`). It finds the variable with the lowest value, and if this value is less than the current `t`, moves it from `excluded` to `included` and updates the threshold.
+`findmin` searches the **whole** `value` vector, and the answer is still the best **excluded** factor. An entry of an included factor holds the score that selected it; `t` is that same score, and it only falls, so every included entry is at or above the current `t`. A score strictly below `t` therefore belongs to an excluded factor, and `searchsortedfirst` always finds its index in `excluded`.
+
+# Algorithm
+
+ 1. Find the smallest entry of `value`, giving `val` and its index `idx`.
+ 2. Return `t` unchanged when `val` is not below `t`.
+ 3. Otherwise find the position of `idx` in `excluded`, move that entry to the end of `included`, and set `t` to `val`.
 
 # Arguments
 
-  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
-  - `value`: Vector of criterion values for each variable.
-  - `excluded`: Indices of currently excluded variables (modified in-place).
-  - `included`: Indices of currently included variables (modified in-place).
-  - `t`: Current threshold value for inclusion.
+  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion whose lower values are better.
+  - `value`: Criterion score of each factor. Entry `i` is the score of the model that **adds** factor `i` to `included`.
+  - `excluded`: Indices of the factors outside the model, in ascending order. Written in place.
+  - `included`: Indices of the factors inside the model, in the order the search added them. Written in place.
+  - $(arg_dict[:t])
 
 # Returns
 
-  - `t::Number`: Updated threshold value after inclusion (if any).
-
-# Details
-
-  - Finds the minimum of `value`.
-  - Searches the **whole** `value` vector, not only the entries of `excluded`. An entry of an already-included variable holds the score that selected it, and every one of those equals or exceeds the current `t`, so a value strictly beyond `t` can only belong to an excluded variable. `searchsortedfirst` is therefore safe, and the answer is the best excluded variable.
-  - If this value is less than `t`, moves the variable from `excluded` to `included` and updates `t`.
-  - If no variable meets the criterion, the sets remain unchanged and the threshold is not updated.
+  - `t::Number`: The score of the factor that moved, or the input `t` when no factor moved.
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`get_backward_reg_incl!`](@ref)
   - [`regression`](@ref)
 """
 function get_forward_reg_incl_excl!(::MinValStepwiseRegressionCriterion, value::VecNum,
@@ -364,33 +369,33 @@ end
                                value::VecNum, excluded::VecInt,
                                included::VecInt, t::Number)
 
-Helper for forward stepwise regression with maximum-value criteria (e.g., R²).
+Moves the best excluded factor into `included` when it raises a maximised criterion.
 
-This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is maximized (such as R²). It finds the variable with the highest value, and if this value is greater than the current `t`, moves it from `excluded` to `included` and updates the threshold.
+`findmax` searches the **whole** `value` vector, and the answer is still the best **excluded** factor. An entry of an included factor holds the score that selected it; `t` is that same score, and it only rises, so every included entry is at or below the current `t`. A score strictly above `t` therefore belongs to an excluded factor, and `searchsortedfirst` always finds its index in `excluded`.
+
+# Algorithm
+
+ 1. Find the largest entry of `value`, giving `val` and its index `idx`.
+ 2. Return `t` unchanged when `val` is not above `t`.
+ 3. Otherwise find the position of `idx` in `excluded`, move that entry to the end of `included`, and set `t` to `val`.
 
 # Arguments
 
-  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion type where higher values are better.
-  - `value`: Vector of criterion values for each variable.
-  - `excluded`: Indices of currently excluded variables (modified in-place).
-  - `included`: Indices of currently included variables (modified in-place).
-  - `t`: Current threshold value for inclusion.
+  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion whose higher values are better.
+  - `value`: Criterion score of each factor. Entry `i` is the score of the model that **adds** factor `i` to `included`.
+  - `excluded`: Indices of the factors outside the model, in ascending order. Written in place.
+  - `included`: Indices of the factors inside the model, in the order the search added them. Written in place.
+  - $(arg_dict[:t])
 
 # Returns
 
-  - `t::Number`: Updated threshold value after inclusion (if any).
-
-# Details
-
-  - Finds the maximum of `value`.
-  - Searches the **whole** `value` vector, not only the entries of `excluded`. An entry of an already-included variable holds the score that selected it, and every one of those equals or exceeds the current `t`, so a value strictly beyond `t` can only belong to an excluded variable. `searchsortedfirst` is therefore safe, and the answer is the best excluded variable.
-  - If this value is greater than `t`, moves the variable from `excluded` to `included` and updates `t`.
-  - If no variable meets the criterion, the sets remain unchanged and the threshold is not updated.
+  - `t::Number`: The score of the factor that moved, or the input `t` when no factor moved.
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
+  - [`get_backward_reg_incl!`](@ref)
   - [`regression`](@ref)
 """
 function get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
@@ -407,26 +412,29 @@ end
     _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                       <:ForwardSelection}, x::VecNum, F::MatNum)
 
-Perform forward stepwise regression using a general criterion (minimization or maximization).
+Grows a factor set from empty, adding the factor whose model scores best.
 
-This method implements forward selection for stepwise regression, where variables (columns of `F`) are added to the model one at a time based on a user-specified criterion. The criterion can be either minimized (e.g., a p-value, `:aic`) or maximized (e.g., `:r2`). At each step, the variable with the best criterion value (lowest for minimization, highest for maximization) is considered for inclusion if it improves upon the current threshold. The process continues until no remaining variable meets the criterion for inclusion.
+The starting score is the worst value the criterion can take, so the first addition always happens and the selection is never empty. [`get_forward_reg_incl_excl!`](@ref) dispatches on the direction, so one loop serves a minimised and a maximised criterion alike.
+
+# Algorithm
+
+ 1. Set `included` empty and `excluded` to every factor index, in ascending order.
+ 2. Read the criterion from `re.crit` and `re.tgt` with [`regression_criterion_func`](@ref), giving `criterion_func`, and the starting score from [`regression_threshold`](@ref), giving `t`.
+ 3. Fill `value` with that same worst score, one entry per factor.
+ 4. Do steps 5 to 7 at most once per observation.
+ 5. For each `i` of `excluded`, fit `re.tgt` to an intercept column and the columns `[included; i]`, and write `criterion_func` of that fit into `value[i]`.
+ 6. Call [`get_forward_reg_incl_excl!`](@ref), which moves the best factor and returns the new `t`.
+ 7. Stop when step 6 moved no factor.
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `ForwardSelection` algorithm.
-  - `x`: Response vector.
-  - `F`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a [`MinMaxValStepwiseRegressionCriterion`](@ref) criterion and the [`ForwardSelection`](@ref) algorithm.
+  - `x`: Response vector, `observations × 1`.
+  - $(arg_dict[:F])
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of variables selected by the forward stepwise regression.
-
-# Details
-
-  - At each iteration, the method fits a regression model for each excluded variable, computes the criterion value, and adds the variable with the best value if it improves upon the current threshold.
-  - The process stops when no further variables can be added under the criterion.
-  - The criterion function and threshold are determined by the estimator's `crit` field.
-  - Supports both minimization and maximization criteria via dispatch.
+  - `included::Vector{Int}`: Indices of the selected factors, in the order the loop added them, so it is not sorted. It holds at least one index.
 
 # Related
 
@@ -435,6 +443,8 @@ This method implements forward selection for stepwise regression, where variable
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`ForwardSelection`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
+  - [`regression_criterion_func`](@ref)
+  - [`regression_threshold`](@ref)
 """
 function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                             <:ForwardSelection}, x::VecNum, F::MatNum)
@@ -468,25 +478,27 @@ end
     _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x::VecNum,
                F::MatNum)
 
-Perform backward stepwise regression using a p-value criterion.
+Shrinks a factor set from full, dropping the factor of largest p-value while any exceeds the threshold.
 
-This method implements backward elimination for stepwise regression, where all variables (columns of `F`) are initially included in the model. At each step, the variable with the highest p-value is considered for removal if its p-value exceeds the specified threshold. The process continues until all remaining variables have p-values below the threshold. If all variables are excluded, the variable with the lowest p-value is included to ensure at least one variable is selected.
+# Algorithm
+
+ 1. Fit `re.tgt` to an intercept column and every column of `F`, read the coefficient p-values, and set `val` to the largest of them.
+ 2. Set `included` to every factor index and `excluded` empty.
+ 3. While `val` exceeds `re.crit.t`, do steps 4 to 6.
+ 4. Set `included` to the factors that `excluded` does not hold. Stop the loop when `included` is empty.
+ 5. Fit `re.tgt` to an intercept column and the columns `included`, giving `pvals`.
+ 6. Set `val` to the largest entry of `pvals`, and push that entry's factor onto `excluded`. The push acts only when step 3 runs the loop again, because step 4 is what reads `excluded`, so the last iteration's push is discarded.
+ 7. Call [`add_best_factor_after_pval_failure!`](@ref), which acts only when `included` is empty.
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a `PValue` criterion and `BackwardElimination` algorithm.
-  - `x`: Response vector.
-  - `F`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a [`PValue`](@ref) criterion and the [`BackwardElimination`](@ref) algorithm.
+  - `x`: Response vector, `observations × 1`.
+  - $(arg_dict[:F])
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of variables selected by the backward stepwise regression.
-
-# Details
-
-  - Starts with all variables included in the regression.
-  - Removes variables one at a time based on whichever has the largest p-value, stopping when the p-value falls under the threshold.
-  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_factor_after_pval_failure!`](@ref)).
+  - `included::VecInt`: Indices of the selected factors, in ascending order. It holds at least one index. It is the `1:size(F, 2)` range itself when the full model already passes the threshold, and a `Vector{Int}` otherwise.
 
 # Related
 
@@ -522,31 +534,32 @@ end
     get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
                            included::VecInt, t::Number)
 
-Helper for backward stepwise regression with minimum-value criteria (e.g., a p-value, `:aic`).
+Removes the best included factor from `included` when its removal lowers a minimised criterion.
 
-This function updates the `included` variable set in backward stepwise regression when the selection criterion is minimized (such as `:aic` or `:bic`). Each entry of `value` is the score of the model that **omits** that variable, so the lowest entry names the removal that helps most. It finds that variable, and if its value is less than the current `t`, removes it from `included` and updates the threshold.
+`findmin` searches the **whole** `value` vector, and the answer is still the best **included** factor. An entry of a removed factor holds the score that removed it; `t` is that same score, and it only falls, so every removed entry is at or above the current `t`. A score strictly below `t` therefore belongs to an included factor, and `searchsortedfirst` always finds its index in `included`.
+
+# Algorithm
+
+ 1. Find the smallest entry of `value`, giving `val` and its index `idx`. That is the best model reachable by one removal.
+ 2. Return `t` unchanged when `val` is not below `t`.
+ 3. Otherwise find the position of `idx` in `included`, remove that entry, and set `t` to `val`.
 
 # Arguments
 
-  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
-  - `value`: Vector of criterion values for each variable.
-  - `included`: Indices of currently included variables (modified in-place).
-  - `t`: Current threshold value for exclusion.
+  - `::MinValStepwiseRegressionCriterion`: Stepwise regression criterion whose lower values are better.
+  - `value`: Criterion score of each factor. Entry `j` is the score of the model that **omits** factor `j`, so the best entry names the removal that helps most.
+  - `included`: Indices of the factors inside the model, in ascending order. Written in place.
+  - $(arg_dict[:t])
 
 # Returns
 
-  - `t::Number`: Updated threshold value after exclusion (if any).
-
-# Details
-
-  - Finds the minimum of `value`, which is the best model reachable by removing one variable.
-  - Searches the **whole** `value` vector, not only the entries of `included`. An entry of an already-removed variable holds the score that removed it, and every one of those equals or exceeds the current `t`, so a value strictly beyond `t` can only belong to an included variable. `searchsortedfirst` is therefore safe, and the answer is the best included variable.
-  - If this value is less than `t`, removes the variable from `included` and updates `t`.
-  - If no variable meets the criterion, the set remains unchanged and the threshold is not updated.
+  - `t::Number`: The score of the model left by the removal, or the input `t` when no factor was removed.
 
 # Related
 
   - [`StepwiseRegression`](@ref)
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`get_forward_reg_incl_excl!`](@ref)
   - [`regression`](@ref)
 """
 function get_backward_reg_incl!(::MinValStepwiseRegressionCriterion, value::VecNum,
@@ -563,31 +576,32 @@ end
     get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
                            included::VecInt, t::Number)
 
-Helper for backward stepwise regression with maximum-value criteria (e.g., R²).
+Removes the best included factor from `included` when its removal raises a maximised criterion.
 
-This function updates the `included` variable set in backward stepwise regression when the selection criterion is maximized (such as R²). Each entry of `value` is the score of the model that **omits** that variable, so the highest entry names the removal that helps most. It finds that variable, and if its value is greater than the current `t`, removes it from `included` and updates the threshold.
+`findmax` searches the **whole** `value` vector, and the answer is still the best **included** factor. An entry of a removed factor holds the score that removed it; `t` is that same score, and it only rises, so every removed entry is at or below the current `t`. A score strictly above `t` therefore belongs to an included factor, and `searchsortedfirst` always finds its index in `included`.
+
+# Algorithm
+
+ 1. Find the largest entry of `value`, giving `val` and its index `idx`. That is the best model reachable by one removal.
+ 2. Return `t` unchanged when `val` is not above `t`.
+ 3. Otherwise find the position of `idx` in `included`, remove that entry, and set `t` to `val`.
 
 # Arguments
 
-  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion type where higher values are better.
-  - `value`: Vector of criterion values for each variable.
-  - `included`: Indices of currently included variables (modified in-place).
-  - `t`: Current threshold value for exclusion.
+  - `::MaxValStepwiseRegressionCriterion`: Stepwise regression criterion whose higher values are better.
+  - `value`: Criterion score of each factor. Entry `j` is the score of the model that **omits** factor `j`, so the best entry names the removal that helps most.
+  - `included`: Indices of the factors inside the model, in ascending order. Written in place.
+  - $(arg_dict[:t])
 
 # Returns
 
-  - `t::Number`: Updated threshold value after exclusion (if any).
-
-# Details
-
-  - Finds the maximum of `value`, which is the best model reachable by removing one variable.
-  - Searches the **whole** `value` vector, not only the entries of `included`. An entry of an already-removed variable holds the score that removed it, and every one of those equals or exceeds the current `t`, so a value strictly beyond `t` can only belong to an included variable. `searchsortedfirst` is therefore safe, and the answer is the best included variable.
-  - If this value is greater than `t`, removes the variable from `included` and updates `t`.
-  - If no variable meets the criterion, the set remains unchanged and the threshold is not updated.
+  - `t::Number`: The score of the model left by the removal, or the input `t` when no factor was removed.
 
 # Related
 
   - [`StepwiseRegression`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
+  - [`get_forward_reg_incl_excl!`](@ref)
   - [`regression`](@ref)
 """
 function get_backward_reg_incl!(::MaxValStepwiseRegressionCriterion, value::VecNum,
@@ -604,27 +618,30 @@ end
     _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                       <:BackwardElimination}, x::VecNum, F::MatNum)
 
-Perform backward stepwise regression using a general criterion (minimization or maximization).
+Shrinks a factor set from full, removing the factor whose reduced model scores best.
 
-This method implements backward elimination for stepwise regression, where all variables (columns of `F`) are initially included in the model. At each step it fits one model per included variable, each with that variable dropped, and removes the variable whose reduced model scores best, provided that score improves on the current threshold. The process continues until no removal improves the score.
+`value[j]` is the score of the model that **omits** `j`, so the reading of "best" is the same as the forward direction's and not its inverse: under a minimised criterion the code removes the factor of **lowest** value, and under a maximised one the factor of **highest**. On a 200×5 sample whose response is built from factors 1 and 3, the five reduced-model `:aic` scores were `[487.92, -372.72, 82.79, -369.15, -372.44]` against a full-model score of `-371.52`; the code removed factor 2, the lowest, and kept factor 1, the highest and the strongest signal in the response.
+
+# Algorithm
+
+ 1. Set `included` to every factor index, in ascending order.
+ 2. Read the criterion from `re.crit` and `re.tgt` with [`regression_criterion_func`](@ref), giving `criterion_func`.
+ 3. Fit `re.tgt` to an intercept column and every column of `F`, and set `t` to `criterion_func` of that full model.
+ 4. Fill `value` with the worst score the criterion can take, one entry per factor.
+ 5. Do steps 6 to 8 at most once per observation.
+ 6. For each factor of `included`, fit `re.tgt` to an intercept column and the other columns of `included`, and write `criterion_func` of that fit into that factor's entry of `value`. Fit the intercept column alone when `included` holds one factor.
+ 7. Call [`get_backward_reg_incl!`](@ref), which removes the best factor and returns the new `t`.
+ 8. Stop when step 7 removed no factor.
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `BackwardElimination` algorithm.
-  - `x`: Response vector.
-  - `F`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a [`MinMaxValStepwiseRegressionCriterion`](@ref) criterion and the [`BackwardElimination`](@ref) algorithm.
+  - `x`: Response vector, `observations × 1`.
+  - $(arg_dict[:F])
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of variables selected by the backward stepwise regression.
-
-# Details
-
-  - Starts with all variables included, and with the threshold set to the criterion value of the full model.
-  - `value[j]` is the score of the model that **omits** `j`, so the reading of "best" is inverted with respect to the forward direction: for a minimisation criterion the code removes the factor with the **lowest** value, and for a maximisation criterion the one with the **highest**. On a 200×5 sample the five reduced-model `:aic` values were `[493.57, 271.05, 327.82, 274.62, 271.34]` against a full-model `:aic` score of `272.25`; the code removed factor 2, the lowest, and factor 1 — the highest, and the response's true signal factor — was the one kept.
-  - The criterion function is determined by the estimator's `crit` field.
-  - The process stops on the first iteration that removes nothing, or when no variables remain.
-  - Supports both minimization and maximization criteria via dispatch.
+  - `included::Vector{Int}`: Indices of the selected factors, in ascending order. **It can be empty**: a criterion that rewards every removal removes every factor, which is the common outcome on a response the factors do not explain.
 
 # Related
 
@@ -633,6 +650,7 @@ This method implements backward elimination for stepwise regression, where all v
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`BackwardElimination`](@ref)
   - [`get_backward_reg_incl!`](@ref)
+  - [`regression_criterion_func`](@ref)
 """
 function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion,
                                             <:BackwardElimination}, x::VecNum, F::MatNum)
@@ -668,30 +686,32 @@ end
 """
     regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 
-Apply stepwise regression to each column of a response matrix.
+Runs one stepwise search per asset and assembles the loadings matrix from the fits.
 
-This method fits a stepwise regression model (as specified by `re`) to each column of the response matrix `X`, using the factor matrix `F` as predictors. For each response vector (column of `X`), the function selects variables via stepwise regression, fits the final model, and stores the estimated intercept and coefficients in the result.
+Each asset takes its own search, so the searches see one another only through the buffer they write into.
+
+# Algorithm
+
+ 1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros. A factor an asset never selected keeps its zero.
+ 2. For each asset `i`, do steps 3 to 5.
+ 3. Run the stepwise search of `re` on column `i` of `X`, giving `included`.
+ 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Fit the intercept column alone when `included` is empty.
+ 5. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order `included` holds them.
+ 6. Build a [`Regression`](@ref) from the first column of `rr` and its remaining columns.
 
 # Arguments
 
-  - `re`: Stepwise regression estimator specifying the criterion, algorithm, and regression target.
-  - `X`: Asset returns matrix (observations × assets).
-  - `F`: Factor returns matrix (observations × factors).
+  - `re`: Stepwise regression estimator that supplies the criterion, the algorithm and the regression target.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
 
 # Returns
 
-  - `reg::Regression`: A regression result object containing:
+  - `reg::Regression`: Regression result carrying:
 
-      + `b`: Vector of intercepts for each asset.
-      + `M`: Matrix of coefficients for each asset and factor (zeros for excluded factors).
-
-# Details
-
-  - For each column in `X`, stepwise regression is performed using the specified criterion and algorithm.
-  - Only the factors selected by the stepwise procedure are included in the final model for each response.
-  - The output `Regression` object contains the intercepts and a coefficient matrix with zeros for factors not selected for each response.
-  - `L` is left **unset**. The regression runs in the original factor basis, so `reg.L` reads back as `reg.M` through the result's `swap(L, M)` property rule, and `size(reg.L, 2)` is the number of columns of `F`.
-  - `M` and `b` are views into one dense buffer, not freshly allocated matrices.
+      + `b`: Intercept of each asset, a view of the first column of `rr`.
+      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. An unselected factor is an exact zero.
+      + `L`: Left **unset**. The regression runs in the original factor basis, so `reg.L` reads back as `reg.M` through the result's `swap(L, M)` property rule, and `size(reg.L, 2)` is the number of columns of `F`.
 
 # Related
 
