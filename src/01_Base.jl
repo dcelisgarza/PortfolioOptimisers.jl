@@ -928,6 +928,11 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#
                        :w_t_moment => "``w_t``: Observation weight of observation ``t``.",#
                        :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
+                       # Shrinkage of the sample expected returns.
+                       :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#
+                       :b_shrink_tgt => "``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector, every entry of which holds the same value.",#
+                       :b_j_shrink_tgt => "``b_j``: ``j``-th entry of the shrinkage target vector.",#
+                       :alpha_shrink_mu => "``\\alpha``: Shrinkage intensity, the weight the blend gives the target.",#
                        # Risk measure parameters.
                        :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                        :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#

@@ -113,7 +113,7 @@ A moment estimator restricting an inner moment estimator to a sub-window of the 
 Computes a per-asset mean-return vector. Variants:
 
 - **SimpleExpectedReturns**: sample mean, with optional observation weights.
-- **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`.
+- **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`, `MeanSquaredError`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`. The target and the algorithm are independent choices, so the estimator has nine combinations.
 - **EquilibriumExpectedReturns**: implied (equilibrium) returns via reverse optimisation, Π = λ·Σ·w_eq. The Black-Litterman equilibrium anchor.
 - **ExcessExpectedReturns**: returns net of a reference/risk-free rate.
 - **MedianExpectedReturns**: (weighted) per-asset median.

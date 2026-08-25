@@ -2249,4 +2249,231 @@ end
     @test mean(CustomValueExpectedReturns(; val = [0.1, 0.2, 0.3, 0.4]), X) ==
           [0.1 0.2 0.3 0.4]
     @test_throws DimensionMismatch mean(CustomValueExpectedReturns(; val = [0.1, 0.2]), X)
+    @testset "The shrunk expected returns sweep of #460" begin
+        # Every claim of `src/08_Moments/16_ShrunkExpectedReturns.jl` is checked by running
+        # it. The three targets are checked against a hand-computed vector, the three
+        # intensities against their own closed form, and the degeneracies the docstrings
+        # name are pinned so that a later change cannot turn a documented `NaN` into a
+        # silent number or the other way round.
+        rng460 = StableRNG(987654321)
+        X460 = randn(rng460, 40, 5) ./ 100
+        tgts460 = (GrandMean(), VolatilityWeighted(), MeanSquaredError())
+        algs460 = (JamesStein, BayesStein, BodnarOkhrinParolya)
+
+        # The sample moments the file's own default estimators produce. Every hand
+        # computation below starts here, so a change of default moves the check with the
+        # code.
+        me460 = ShrunkExpectedReturns()
+        mu460 = mean(me460.me, X460; dims = 1)
+        sigma460 = cov(me460.ce, X460; dims = 1)
+        isigma460 = sigma460 \ I
+        T460, N460 = size(X460)
+
+        @testset "each target against a hand-computed vector" begin
+            # `target_mean` returns a constant range, never a dense vector, so the length
+            # and the constancy are part of the contract.
+            for tgt in tgts460
+                b = PortfolioOptimisers.target_mean(tgt, mu460, sigma460, isigma460;
+                                                    T = T460)
+                @test b isa AbstractRange
+                @test length(b) == N460
+                @test all(==(first(b)), b)
+            end
+            # `GrandMean` is the unweighted mean of `mu`.
+            @test collect(PortfolioOptimisers.target_mean(GrandMean(), mu460, sigma460)) ==
+                  fill(mean(mu460), N460)
+            # `VolatilityWeighted` is `1'inv(S)mu / 1'inv(S)1`.
+            vw460 = sum(isigma460 * vec(mu460)) / sum(isigma460)
+            @test isapprox(collect(PortfolioOptimisers.target_mean(VolatilityWeighted(),
+                                                                   mu460, sigma460,
+                                                                   isigma460)),
+                           fill(vw460, N460))
+            # The same value comes back when the caller passes no inverse, so the internal
+            # solve and the supplied inverse agree.
+            @test isapprox(collect(PortfolioOptimisers.target_mean(VolatilityWeighted(),
+                                                                   mu460, sigma460)),
+                           collect(PortfolioOptimisers.target_mean(VolatilityWeighted(),
+                                                                   mu460, sigma460,
+                                                                   isigma460)))
+            # `MeanSquaredError` is the trace over `T`, and it reads neither `mu` nor the
+            # inverse.
+            @test collect(PortfolioOptimisers.target_mean(MeanSquaredError(), mu460,
+                                                          sigma460; T = T460)) ==
+                  fill(tr(sigma460) / T460, N460)
+        end
+
+        @testset "each intensity against its own closed form" begin
+            # Each of the three closed forms is written out separately here. A copied
+            # denominator is exactly what a shared helper would hide.
+            evals460 = eigvals(sigma460)
+            for tgt in tgts460
+                b = vec(collect(PortfolioOptimisers.target_mean(tgt, mu460, sigma460,
+                                                                isigma460; T = T460)))
+                vm = vec(mu460)
+                mb = vm - b
+
+                a_js = (N460 * mean(evals460) - 2 * maximum(evals460)) /
+                       (T460 * dot(mb, mb))
+                @test isapprox(vec(mean(ShrunkExpectedReturns(;
+                                                              alg = JamesStein(; tgt = tgt)),
+                                        X460)), (1 - a_js) * vm + a_js * b)
+
+                a_bs = (N460 + 2) / ((N460 + 2) + T460 * dot(mb, isigma460, mb))
+                @test isapprox(vec(mean(ShrunkExpectedReturns(;
+                                                              alg = BayesStein(; tgt = tgt)),
+                                        X460)), (1 - a_bs) * vm + a_bs * b)
+
+                u = dot(vm, isigma460, vm)
+                v = dot(b, isigma460, b)
+                w = dot(vm, isigma460, b)
+                a_bop = ((u - N460 / (T460 - N460)) * v - w^2) / (u * v - w^2)
+                b_bop = (1 - a_bop) * w / u
+                @test isapprox(vec(mean(ShrunkExpectedReturns(;
+                                                              alg = BodnarOkhrinParolya(;
+                                                                                        tgt = tgt)),
+                                        X460)), a_bop * vm + b_bop * b)
+            end
+        end
+
+        @testset "`dims = 2` agrees with `dims = 1`" begin
+            # The transposed branch of all three methods. It was the whole of this file's
+            # uncovered code before #460.
+            Xt460 = permutedims(X460)
+            for alg in algs460, tgt in tgts460
+                me = ShrunkExpectedReturns(; alg = alg(; tgt = tgt))
+                r1 = mean(me, X460; dims = 1)
+                r2 = mean(me, Xt460; dims = 2)
+                @test size(r1) == (1, N460)
+                @test size(r2) == (N460, 1)
+                @test isapprox(vec(r1), vec(r2))
+            end
+        end
+
+        @testset "the Bayes-Stein intensity is the only convex one" begin
+            # `alpha` is `(N+2) / ((N+2) + T q)` with `q` a non-negative quadratic form, so
+            # it lies in `(0, 1]` and the result lies between the sample mean and the
+            # target, componentwise. The docstring says so; this drives it.
+            for tgt in tgts460
+                b = vec(collect(PortfolioOptimisers.target_mean(tgt, mu460, sigma460,
+                                                                isigma460; T = T460)))
+                vm = vec(mu460)
+                mb = vm - b
+                a_bs = (N460 + 2) / ((N460 + 2) + T460 * dot(mb, isigma460, mb))
+                @test 0 < a_bs <= 1
+                r = vec(mean(ShrunkExpectedReturns(; alg = BayesStein(; tgt = tgt)), X460))
+                @test all(min.(vm, b) .- sqrt(eps()) .<= r .<= max.(vm, b) .+ sqrt(eps()))
+            end
+            # The other two are not convex on this sample, which is why the docstrings warn
+            # that nothing clamps them.
+            evals460 = eigvals(sigma460)
+            b_gm = vec(collect(PortfolioOptimisers.target_mean(GrandMean(), mu460,
+                                                               sigma460)))
+            mb_gm = vec(mu460) - b_gm
+            a_js = (N460 * mean(evals460) - 2 * maximum(evals460)) /
+                   (T460 * dot(mb_gm, mb_gm))
+            @test 0 < a_js < 1
+            u = dot(vec(mu460), isigma460, vec(mu460))
+            v = dot(b_gm, isigma460, b_gm)
+            w = dot(vec(mu460), isigma460, b_gm)
+            a_bop = ((u - N460 / (T460 - N460)) * v - w^2) / (u * v - w^2)
+            @test a_bop < 0
+        end
+
+        @testset "an intensity of one returns the target" begin
+            # When the target equals the sample mean the Bayes-Stein quadratic form is zero
+            # and `alpha` is exactly one. Columns that share a mean drive it: the grand mean
+            # is then the sample mean itself.
+            rng_eq = StableRNG(24680)
+            Xeq = randn(rng_eq, 60, 4) ./ 100
+            Xeq .-= mean(Xeq; dims = 1)
+            me_eq = ShrunkExpectedReturns(; alg = BayesStein())
+            mu_eq = mean(me_eq.me, Xeq; dims = 1)
+            b_eq = collect(PortfolioOptimisers.target_mean(GrandMean(), mu_eq,
+                                                           cov(me_eq.ce, Xeq; dims = 1)))
+            @test isapprox(vec(mu_eq), b_eq; atol = 1e-14)
+            @test isapprox(vec(mean(me_eq, Xeq)), b_eq; atol = 1e-14)
+        end
+
+        @testset "the Bodnar-Okhrin-Parolya coefficient does not read the target scale" begin
+            # Every target of this file is a multiple of the vector of ones, so the
+            # multiplier cancels in `alpha` and survives in `beta * b`. The coefficient is
+            # therefore one number per sample, and the three results still differ.
+            u = dot(vec(mu460), isigma460, vec(mu460))
+            alphas = map(tgts460) do tgt
+                b = vec(collect(PortfolioOptimisers.target_mean(tgt, mu460, sigma460,
+                                                                isigma460; T = T460)))
+                v = dot(b, isigma460, b)
+                w = dot(vec(mu460), isigma460, b)
+                return ((u - N460 / (T460 - N460)) * v - w^2) / (u * v - w^2)
+            end
+            @test all(a -> isapprox(a, first(alphas)), alphas)
+            results = map(tgts460) do tgt
+                return vec(mean(ShrunkExpectedReturns(;
+                                                      alg = BodnarOkhrinParolya(;
+                                                                                tgt = tgt)),
+                                X460))
+            end
+            @test !isapprox(results[1], results[2])
+            @test !isapprox(results[1], results[3])
+        end
+
+        @testset "the James-Stein intensity is negative for two assets or fewer" begin
+            # `N * mean(evals)` is the trace, so it never exceeds `2 * maximum(evals)` when
+            # `N <= 2`. The blend then extrapolates away from the target.
+            for n in (1, 2)
+                Xn = X460[:, 1:n]
+                sn = cov(me460.ce, Xn; dims = 1)
+                en = eigvals(sn)
+                @test n * mean(en) - 2 * maximum(en) <= 0
+            end
+        end
+
+        @testset "the degenerate samples the docstrings name" begin
+            # One asset. `GrandMean` and `VolatilityWeighted` both reduce to the sample
+            # mean, so the James-Stein denominator is exactly zero.
+            X1 = X460[:, 1:1]
+            @test all(isnan, mean(ShrunkExpectedReturns(; alg = JamesStein()), X1))
+            @test all(isnan,
+                      mean(ShrunkExpectedReturns(;
+                                                 alg = JamesStein(;
+                                                                  tgt = VolatilityWeighted())),
+                           X1))
+            # `MeanSquaredError` never reads the sample mean, so it stays finite there.
+            @test all(isfinite,
+                      mean(ShrunkExpectedReturns(;
+                                                 alg = JamesStein(;
+                                                                  tgt = MeanSquaredError())),
+                           X1))
+            # At one asset the Cauchy-Schwarz gap `u v - w^2` is exactly zero, so
+            # Bodnar-Okhrin-Parolya divides zero by zero under every target.
+            for tgt in tgts460
+                @test all(isnan,
+                          mean(ShrunkExpectedReturns(;
+                                                     alg = BodnarOkhrinParolya(; tgt = tgt)),
+                               X1))
+            end
+            # Bayes-Stein has a strictly positive denominator, so it survives one asset.
+            for tgt in tgts460
+                @test all(isfinite,
+                          mean(ShrunkExpectedReturns(; alg = BayesStein(; tgt = tgt)), X1))
+            end
+            # A square returns matrix. `N / (T - N)` is `Inf`, which is the reason the
+            # docstring states that the method needs more observations than assets.
+            Xsq = X460[1:N460, :]
+            for tgt in tgts460
+                @test !all(isfinite,
+                           mean(ShrunkExpectedReturns(;
+                                                      alg = BodnarOkhrinParolya(;
+                                                                                tgt = tgt)),
+                                Xsq))
+            end
+            # Two observations and five assets. The covariance estimator repairs the
+            # singular matrix, so every algorithm returns a finite vector.
+            X2 = X460[1:2, :]
+            for alg in algs460, tgt in tgts460
+                @test all(isfinite,
+                          mean(ShrunkExpectedReturns(; alg = alg(; tgt = tgt)), X2))
+            end
+        end
+    end
 end
