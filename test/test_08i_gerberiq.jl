@@ -20,9 +20,12 @@ FIVE FACTS SHAPE THE PROBES.
 
 2. THE IQ STATISTIC REDUCES TO THE CLASSIC GERBER STATISTIC. Set `n = 1` so every region
    keeps its full weight, `d = c` so the template has no body, a flat decay, and the
-   per-asset scaler that `GerberCovariance` itself uses. All three markers then agree with
-   `GerberCovariance` bit-for-bit. A degenerate case that reproduces the parent is the
-   strongest single check this file admits.
+   per-asset scaler that `GerberCovariance` itself uses. `Gerber0` and `Gerber1` then agree
+   with `GerberCovariance` bit-for-bit, and `Gerber2` agrees to one unit in the last place.
+   A degenerate case that reproduces the parent is the strongest single check this file
+   admits. The ulp is the associativity of the `Gerber2` denominator: this family divides by
+   `sqrt(di * dj)` and the classic one by `sqrt(di) * sqrt(dj)`. The first form is what makes
+   the diagonal EXACTLY one, which fact 5 needs.
 
 3. THE SCALER FIXES THE UNITS A CO-MOVEMENT IS JUDGED IN, and the three routes do not agree.
    `AssetVolatilityGerberIQScaler` returns `(sd_i, sd_j)`, so each asset carries its OWN
@@ -34,15 +37,17 @@ FIVE FACTS SHAPE THE PROBES.
    object when both parameters are already numbers, and a NEW one otherwise. Its argument
    still reads `nothing` afterwards.
 
-5. THE `Gerber2` BOUND IS A GEOMETRIC-MEAN CONDITION ON THE TEMPLATE, and the shipped
-   `FullGerberIQ` defaults BREAK it. Under `Gerber2` the pair entry is the raw `pos - neg`
-   and the matrix is divided by the geometric mean of its own diagonal. A pair `(i, i)` is
-   always concordant, so exactly SIX of the twenty-one weights sit on the diagonal -- `n11`,
-   `n4`, `n1`, `n2`, `n5`, `n12`, one per magnitude class. The other FIFTEEN each join two
-   distinct classes, one per unordered pair, discordant channels included. Cauchy-Schwarz
-   then bounds the statistic by one when every mixed weight is at most the geometric mean of
-   the two diagonal weights of the classes it joins. `clamp_gerber_iq_n` enforces four of the
-   fifteen. Four of the defaults break the other eleven. See #494 and #500.
+5. THE `Gerber2` BOUND IS A GEOMETRIC-MEAN CONDITION ON THE TEMPLATE, and it is the WHOLE
+   condition. Under `Gerber2` the pair entry is the net `pos - neg`, divided by the geometric
+   mean of the pair's two DIAGONAL PROJECTIONS: asset `i` measured against itself in the
+   units of the pair `(i, j)`. A projection is always concordant, so exactly SIX of the
+   twenty-one weights sit on the diagonal -- `n11`, `n4`, `n1`, `n2`, `n5`, `n12`, one per
+   magnitude class. The other FIFTEEN each join two distinct classes, one per unordered pair,
+   discordant channels included. The source's internet appendix proves that
+   `n_ab^2 <= n_aa n_bb` over every such channel is NECESSARY AND SUFFICIENT for
+   `|rho| <= 1`. `clamp_gerber_iq_n` enforces all fifteen, every shipped default meets them
+   by construction, and the projection makes the bound hold for EVERY scaler. #494 and #500
+   are the two defects this replaced, and ADR 0094 records the decision.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs
 
@@ -90,16 +95,24 @@ end
     sd = vec(std(SimpleVariance(), X; dims = 1))
 
     @testset "The three templates form a ladder" begin
-        # The three shipped defaults are three different statistics, and each carries a unit
-        # diagonal.
+        #=
+        Each shipped default carries a unit diagonal. `BasicGerberIQ` is a different
+        statistic from the other two, and THE OTHER TWO AGREE. `FullGerberIQ()` sets
+        `dp1 == dp2` and `dn1 == dn2`, so its moderate bands are empty and its six classes
+        collapse to the four `PartialGerberIQ` carries, and `PartialGerberIQ()` sets
+        `ddp == dcp` and `ddn == dcn`, so its discordant boundaries collapse onto its
+        concordant ones. Every default weight is now the geometric mean of the two diagonal
+        weights of its channel in BOTH templates, so the two collapse onto the same template.
+        Before ADR 0094 an inconsistent `n15` was the only thing that separated them.
+        =#
         rhos = map(k -> cor(GerberIQCovariance(; kind = k, pdm = nothing), X),
                    (BasicGerberIQ(), PartialGerberIQ(), FullGerberIQ()))
         for r in rhos
             @test isapprox(diag(r), ones(size(X, 2)))
         end
-        for (a, b) in ((1, 2), (1, 3), (2, 3))
-            @test !isapprox(rhos[a], rhos[b])
-        end
+        @test !isapprox(rhos[1], rhos[2])
+        @test !isapprox(rhos[1], rhos[3])
+        @test rhos[2] == rhos[3]
 
         # `PartialGerberIQ` reduces to `BasicGerberIQ` when its four boundaries agree and its
         # ten weights collapse onto the magnitude triple. `FullGerberIQ` reduces to the same
@@ -137,7 +150,18 @@ end
                                      decay = ExpGerberIQDecay(; e = 0.0, y = 0.0),
                                      alg = alg, pdm = nothing)
             cep = GerberCovariance(; t = c, alg = alg, pdm = nothing)
-            @test cor(ceq, X) == cor(cep, X)
+            #=
+            `Gerber0` and `Gerber1` divide by a sum this family builds the same way, so they
+            agree bit-for-bit. `Gerber2` divides by `sqrt(di * dj)` where the classic family
+            divides by `sqrt(di) * sqrt(dj)`, and the two group the same three operations
+            differently. The gap is one unit in the last place, and it buys the exactly
+            unit diagonal that `posdef!` reads with `isone`.
+            =#
+            if alg isa Gerber2
+                @test maximum(abs, cor(ceq, X) - cor(cep, X)) <= eps(1.0)
+            else
+                @test cor(ceq, X) == cor(cep, X)
+            end
         end
     end
 
@@ -317,28 +341,29 @@ end
               sort([Symbol("n$k") for k in 1:21])
     end
 
-    @testset "The Gerber2 bound and the shipped defaults (#494, #500)" begin
+    @testset "The Gerber2 bound holds (#494, #500)" begin
         #=
-        Cauchy-Schwarz bounds the `Gerber2` statistic by one when the scaler is
-        pair-separable AND every mixed weight is at most the geometric mean of the two
-        diagonal weights of the classes it joins. `clamp_gerber_iq_n` enforces four of the
-        fifteen conditions. FOUR OF THE SHIPPED `FullGerberIQ` DEFAULTS BREAK the other
-        eleven, because each is written as a geometric mean of two MIXED weights rather than
-        of the two DIAGONAL weights that flank it: `n15 = sqrt(n7 * n14)` and its three
-        siblings. #494 records the gap. Lower the four and the sample below returns one
-        exactly. FLIP THESE ASSERTIONS WHEN #494 IS FIXED.
+        The source's internet appendix proves `n_ab^2 <= n_aa n_bb` NECESSARY AND SUFFICIENT
+        for `|rho| <= 1` under a geometric-mean denominator, over every channel that joins
+        two distinct magnitude classes. `clamp_gerber_iq_n` enforces all fifteen of them for
+        `FullGerberIQ` and all six for `PartialGerberIQ`, and every shipped default is
+        written as the geometric mean of the two diagonal weights of the classes its channel
+        joins. So no default owes the clamp anything, and the clamp returns the template it
+        was handed.
         =#
         fd = FullGerberIQ()
         dg = (n11 = fd.n11, n4 = fd.n4, n1 = fd.n1, n2 = fd.n2, n5 = fd.n5, n12 = fd.n12)
         breaks = [m
                   for (a, b, m) in FULL_MIXED
                   if getfield(fd, m) > sqrt(dg[a] * dg[b]) * (1 + 1e-12)]
-        @test breaks == [:n15, :n18, :n21, :n16]
+        @test isempty(breaks)
+        @test PO.clamp_gerber_iq_n(fd, Gerber2()) == fd
+        @test PO.clamp_gerber_iq_n(PartialGerberIQ(), Gerber2()) == PartialGerberIQ()
 
         # Two assets, one always large positive and one always small positive, then both
         # negative. Every co-movement is concordant, so the pair entry is `n15 + n16` and the
-        # two diagonal entries are built from `n11`, `n12` and `n1`, `n2`. The scaler is
-        # constant, so it is pair-separable and cannot be the cause.
+        # two projections are built from `n11`, `n12` and `n1`, `n2`. Under the earlier
+        # defaults this sample returned `1.0299`, which is #494.
         Xb = Float64[4.0 1.5; 4.0 1.5; -4.0 -1.5; -4.0 -1.5]
         kind = FullGerberIQ(; dp1 = 3.0, dp2 = 2.0, dn1 = 3.0, dn2 = 2.0)
         mk(k) = GerberIQCovariance(; c = 1.0, kind = k, alg = Gerber2(),
@@ -348,37 +373,31 @@ end
         hand = 2 * (kind.n15 + kind.n16) /
                sqrt((2 * kind.n11 + 2 * kind.n12) * (2 * kind.n1 + 2 * kind.n2))
         @test cor(mk(kind), Xb)[1, 2] == hand
-        @test hand > 1
-        # Lowering every mixed weight onto its flanking bound restores the bound exactly.
-        @test cor(mk(clamp_every_mixed(kind)), Xb)[1, 2] == 1
+        @test hand == 1
+        # The clamp is what holds it there. A template that breaks the bound reaches the
+        # estimator through the clamp, and comes out on the bound.
+        kraw = FullGerberIQ(; dp1 = 3.0, dp2 = 2.0, dn1 = 3.0, dn2 = 2.0, n15 = 1.0,
+                            n16 = 1.0)
+        @test mk(kraw).kind == clamp_every_mixed(kraw)
+        @test cor(mk(kraw), Xb)[1, 2] == 1
 
         # #494's own reproduction, on the discordant channel `n13`. Its flanking classes are
         # large positive and large negative, and BOTH sit on the diagonal, so the
         # geometric-mean rule reads for a discordant channel exactly as it does for a
-        # concordant one.
+        # concordant one. It returned `-10` before the clamp reached `n13`.
         Xn = Float64[4.0 -4.0; 4.0 -4.0; -4.0 4.0; -4.0 4.0]
         kbad = FullGerberIQ(; dp1 = 3.0, dp2 = 2.0, dn1 = 3.0, dn2 = 2.0, n11 = 0.1,
                             n12 = 0.1, n13 = 1.0)
-        mkn(k) = GerberIQCovariance(; c = 1.0, kind = k, alg = Gerber2(),
-                                    sc = (x, y) -> (1.0, 1.0),
-                                    decay = ExpGerberIQDecay(; e = 0.0, y = 0.0),
-                                    pdm = nothing)
-        @test cor(mkn(kbad), Xn)[1, 2] == -10
-        @test cor(mkn(clamp_every_mixed(kbad)), Xn)[1, 2] == -1
+        @test mk(kbad).kind.n13 == sqrt(kbad.n11 * kbad.n12)
+        @test cor(mk(kbad), Xn)[1, 2] == -1
 
         #=
-        A PAIR-DEPENDENT scaler breaks the bound on its own, whatever the template does, and
-        this is the SECOND cause behind #500. `min` hands the pair the SMALLER of the two
-        volatilities, so the volatile asset clears a threshold off the diagonal that it never
-        clears on its own diagonal. The class it takes off the diagonal is then not the class
-        it takes on the diagonal, and Cauchy-Schwarz has nothing left to stand on.
-
-        Asset one is ten times as volatile as asset two, and every co-movement is concordant.
-        Off the diagonal both assets are judged against asset two's volatility: asset one is
-        LARGE there and asset two is SMALL, so the pair entry is `n7` per observation. On
-        each diagonal both are SMALL, so each diagonal entry is `n1` per observation. The
-        statistic is therefore `n7 / n1`, which is `sqrt(2)`. The same template under the
-        pair-separable scaler returns one.
+        A PAIR-DEPENDENT scaler cannot break the bound, because the denominator is read in
+        the pair's own units. `min` hands the pair the SMALLER of the two volatilities, so
+        the volatile asset clears a threshold off the diagonal that it never clears against
+        itself alone. The projection follows it there, so the class it takes in the numerator
+        is the class it takes in the denominator. This sample returned `sqrt(2)` while the
+        denominator was read from the assembled diagonal, which is #500.
         =#
         Xm = Float64[10.0 1.0; 10.0 1.0; -10.0 -1.0; -10.0 -1.0]
         mks(sc) = GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2(), sc = sc,
@@ -386,8 +405,53 @@ end
                                      pdm = nothing)
         sep = cor(mks(AssetVolatilityGerberIQScaler()), Xm)
         dep = cor(mks((x, y) -> (min(x, y), min(x, y))), Xm)
-        @test maximum(abs, sep) <= 1 + 8 * eps(1.0)
-        @test isapprox(dep[1, 2], PartialGerberIQ().n7 / PartialGerberIQ().n1)
-        @test dep[1, 2] > 1 + 8 * eps(1.0)
+        @test sep == dep
+        @test dep[1, 2] == 1
+
+        #=
+        The diagonal is EXACTLY one, and not one to within a rounding. The pair `(i, i)`
+        makes the numerator and both projections the same sum, so the ratio is `x / sqrt(x
+        * x)`. `posdef!` reads the diagonal with an exact `isone` test to choose between a
+        correlation matrix and a covariance matrix, so an exact one decides that branch by
+        construction. #500's second finding is what this closes.
+        =#
+        for sc in
+            (nothing, AssetVolatilityGerberIQScaler(), (x, y) -> (min(x, y), min(x, y)))
+            r = cor(GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber2(), sc = sc,
+                                       pdm = nothing), X)
+            @test all(isone, diag(r))
+            @test maximum(abs, r) <= 1
+        end
+
+        #=
+        The two conditions the bound needs are the template's, and nothing else. Random
+        diagonal weights, random boundaries, random data with a twenty-fold volatility
+        spread, and the three scalers in turn: the clamped template never leaves `[-1, 1]`.
+        =#
+        rngb = StableRNG(24680)
+        worst = 0.0
+        for trial in 1:60
+            Xr = randn(rngb, 60, 4) .* transpose(1 .+ 19 .* rand(rngb, 4))
+            d2 = 0.3 + 1.2 * rand(rngb)
+            k = FullGerberIQ(; dp1 = d2 + 1.5 * rand(rngb), dp2 = d2,
+                             dn1 = d2 + 1.5 * rand(rngb), dn2 = d2,
+                             Dict(Symbol("n$i") => rand(rngb) for i in 1:21)...)
+            sc = if trial % 3 == 0
+                nothing
+            else
+                (if trial % 3 == 1
+                     (x, y) -> (min(x, y), min(x, y))
+                 else
+                     (x, y) -> (max(x, y), max(x, y))
+                 end)
+            end
+            ce = GerberIQCovariance(; c = d2 * rand(rngb), kind = k, alg = Gerber2(),
+                                    sc = sc,
+                                    decay = ExpGerberIQDecay(; e = 0.0,
+                                                             y = 0.05 * rand(rngb)),
+                                    pdm = nothing)
+            worst = max(worst, maximum(abs, cor(ce, Xr)))
+        end
+        @test worst <= 1
     end
 end

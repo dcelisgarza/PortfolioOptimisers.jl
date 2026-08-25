@@ -89,8 +89,12 @@ defect names:
 - `Gerber1` and its siblings: on `(i, i)` the neutral term is zero too. A pair of one asset with
     itself is neutral on the same observations on both sides, so the count of observations on which
     exactly one side is neutral is zero. The reduction is again `p / p`, and again exactly one.
-- `Gerber2` and its siblings: `standardise_comovement!` divides the diagonal by its own square
-    root twice, which is one to within a **unit in the last place** rather than exactly one.
+- `Gerber2` and its siblings of the classic Gerber and Smyth-Broby families:
+    `standardise_comovement!` divides the diagonal by its own square root twice, which is one to
+    within a **unit in the last place** rather than exactly one.
+- `Gerber2` of the Gerber IQ family: exactly one. ADR 0094 moved that denominator into the pair
+    kernel, where the pair `(i, i)` makes the numerator and both projections the same sum, so the
+    reduction is `x / sqrt(x * x)`. That family no longer calls `standardise_comovement!`.
 
 The first draft of this ADR wrote the diagonal unconditionally, on the argument that a guard states
 the same rule twice. Measurement rejected that draft. `posdef!` reads
@@ -106,6 +110,11 @@ that already reads as one flipped that test, dropped the clamp, and moved the pi
 `test_08_moments.jl` for `GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2())` by
 `0.0355` on the `SP500` sample. That sample carries no degenerate asset, so the move had nothing to
 do with this defect. The guard keeps the fix to the defect.
+
+That measurement was taken on a matrix whose off-diagonal entries left `[-1, 1]`, which is the
+defect ADR 0094 later fixed. The clamp it dropped was therefore repairing a second defect by
+accident. The guard is still load-bearing for the two families that keep `standardise_comovement!`,
+whose diagonal still rounds off one.
 
 **The unit diagonal is written before `posdef!`, not after.** `posdef!` reads the diagonal to decide
 whether it holds a correlation matrix or a covariance matrix, and it divides by its square root.
@@ -127,12 +136,12 @@ The repair must see a diagonal it can use.
   diagonal rather than in spite of a zero one.
 - **No pinned number of the library moves.** The guard writes nothing on a sample in which every
   asset votes at least once, and every pinned regression sample is such a sample.
-- **Two findings that the measurement exposed are left open, and neither is this defect.** The
-  `Gerber2` normalisation does not bound its own statistic: eleven off-diagonal entries of the
-  `PartialGerberIQ` matrix above have a magnitude greater than one, the largest `1.224`. Whether
-  those entries are clamped is then decided by `posdef!`'s exact `isone` test on a diagonal that
-  differs from one by a unit in the last place. Both belong to the same ticket, and neither is
-  fixed here.
+- **Two findings that the measurement exposed are not this defect, and ADR 0094 carries them.** The
+  `Gerber2` normalisation did not bound its own statistic: eleven off-diagonal entries of the
+  `PartialGerberIQ` matrix above had a magnitude greater than one, the largest `1.224`. Whether
+  those entries were clamped was then decided by `posdef!`'s exact `isone` test on a diagonal that
+  differed from one by a unit in the last place. ADR 0094 fixed the first finding at its source, and
+  with it the Gerber IQ half of the second. `posdef!` keeps its exact test.
 - **The guard also keeps this ADR from masking a neighbouring defect.**
   [#498](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/498) reported a `Gerber1`
   diagonal that is not one, and its cause was an inflated neutral count at `c = 0` that also moves

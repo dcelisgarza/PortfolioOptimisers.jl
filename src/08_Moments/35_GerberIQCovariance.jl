@@ -389,7 +389,7 @@ Computes or returns the threshold scaling parameters for defining significant co
 
 Every threshold of the pair — the noise threshold `c` and each boundary of the squeezing template — is multiplied by the value this function returns for its own axis. So the scaler fixes the units in which a co-movement is judged large.
 
-A scaler is **pair-separable** when its first component reads `sdi` alone, so that an asset's thresholds are the same whatever partner it is measured against. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the pair mean moves with `sdj`, and a `Function` need not be. [`Gerber2`](@ref) is bounded by one only under a pair-separable scaler: it divides by the geometric mean of a diagonal built at the pair `(i, i)`, and a scaler that moves an asset's class off the diagonal breaks that comparison. [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records the defect and a four-row reproduction.
+A scaler is **pair-separable** when its first component reads `sdi` alone, so that an asset's thresholds are the same whatever partner it is measured against. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the pair mean moves with `sdj`, and a `Function` need not be. Every scaler is safe under every marker. [`Gerber2`](@ref) reads its denominator in the pair's own units through [`iq_add_diagonal`](@ref), so a scaler that moves an asset's class moves the numerator and the denominator together. ADR 0094 records that decision, and it is the fix of [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500).
 
 # Mathematical definition
 
@@ -1033,14 +1033,14 @@ $(DocStringExtensions.FIELDS)
 
     PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
                       ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
-                      n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
-                      n6::Number = n4, n7::Number = sqrt(n1 * n4),
-                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
-                      n10::Number = sqrt(n3 * n6))
+                      n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                      n6::Number = sqrt(n4 * n5), n7::Number = sqrt(n1 * n4),
+                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n4 * n2),
+                      n10::Number = sqrt(n1 * n5))
 
 Keywords correspond to the struct's fields.
 
-The default of every mixed-magnitude weight is the geometric mean of the two same-magnitude weights that flank it, which is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref).
+**Only the four diagonal weights carry a free default.** `n1`, `n2`, `n4` and `n5` name the four magnitude classes, and each of the other six defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the four are set to. The four boundaries are equal by default, so the case split that method makes over `ddp` against `dcp` does not bind on the defaults.
 
 ## Validation
 
@@ -1160,10 +1160,10 @@ PartialGerberIQ
 end
 function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
                          ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
-                         n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
-                         n6::Number = n4, n7::Number = sqrt(n1 * n4),
-                         n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
-                         n10::Number = sqrt(n3 * n6))::PartialGerberIQ
+                         n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                         n6::Number = sqrt(n4 * n5), n7::Number = sqrt(n1 * n4),
+                         n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n4 * n2),
+                         n10::Number = sqrt(n1 * n5))::PartialGerberIQ
     return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
 end
 """
@@ -1171,31 +1171,50 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lowers the mixed-magnitude weights of a [`PartialGerberIQ`](@ref) template so that the [`Gerber2`](@ref) statistic stays inside `[-1, 1]`. It does not make the matrix positive definite; that is `pdm`'s work.
 
-Under [`Gerber2`](@ref) the pairwise entry is the raw `pos - neg`, and the matrix is afterwards divided by the geometric mean of its own diagonal. A pair `(i, i)` compares an asset with itself, so its diagonal entry is built from the same-magnitude weights alone. A mixed-magnitude weight above the geometric mean of the two same-magnitude weights that flank it therefore lets the ratio leave `[-1, 1]`. With `n1 = n4 = 0.2` an unclamped `n7 = 1.0` returns `5.0`, and the clamp brings it to `1.0`.
+Under [`Gerber2`](@ref) the pairwise entry is the net `pos - neg`, divided by the geometric mean of the pair's two diagonal projections. A projection compares an asset with itself, so it is always concordant and it names a same-magnitude weight. The source proves that the ratio is bounded by one **if and only if** every weight that joins two distinct magnitude classes is at most the geometric mean of the two same-magnitude weights of those classes. Six of the ten weights join two classes, and this method lowers each onto its bound. With `n1 = n4 = 0.2` an unclamped `n7 = 1.0` returns `5.0`, and the clamp brings it to `1.0`.
 
-!!! warning
+The four discordant weights need a case split. A concordant pair is judged against `dcp` and `dcn`, and a discordant pair against `ddp` and `ddn`, so a return beyond a discordant boundary need not be beyond the concordant one that fixes its diagonal class. When the two boundaries disagree the method takes the smaller of the two candidate weights, which is the bound that holds for either class.
 
-    The clamp covers `n7` and `n8` only, so it is a necessary condition and not a sufficient one. A hand-tuned template can still leave `[-1, 1]` through a weight this method does not touch. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap and the reproduction. The shipped defaults sit exactly **on** the bound, so they meet it and carry no margin. A pair-dependent `sc` breaks the same bound on its own, whatever the template does; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
+!!! note
+
+    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) are the two defects this closes, and ADR 0094 records the decision. The shipped defaults sit exactly **on** the bound, so the clamp does not move them.
 
 # Mathematical definition
 
+Write ``h^{+}`` and ``l^{+}`` for the diagonal weights of the two positive classes a discordant channel can meet, and ``h^{-}`` and ``l^{-}`` for the negative pair:
+
 ```math
 \\begin{align}
-n_{7} &\\leftarrow \\min\\left(n_{7},\\, \\sqrt{n_{1} n_{4}}\\right)\\,, \\\\
-n_{8} &\\leftarrow \\min\\left(n_{8},\\, \\sqrt{n_{2} n_{5}}\\right)\\,.
+h^{+} &= \\begin{cases} n_{4} & \\delta_{d}^{+} \\geq \\delta_{c}^{+} \\\\ \\min(n_{1}, n_{4}) & \\text{otherwise} \\end{cases}\\,,
+&l^{+} &= \\begin{cases} n_{1} & \\delta_{d}^{+} \\leq \\delta_{c}^{+} \\\\ \\min(n_{1}, n_{4}) & \\text{otherwise} \\end{cases}\\,,
+\\end{align}
+```
+
+with ``h^{-}`` and ``l^{-}`` the same rule on ``n_{5}``, ``n_{2}``, ``\\delta_{d}^{-}`` and ``\\delta_{c}^{-}``. The six bounds are then
+
+```math
+\\begin{align}
+n_{7} &\\leftarrow \\min\\left(n_{7},\\, \\sqrt{n_{1} n_{4}}\\right)\\,, &
+n_{8} &\\leftarrow \\min\\left(n_{8},\\, \\sqrt{n_{2} n_{5}}\\right)\\,, \\\\
+n_{6} &\\leftarrow \\min\\left(n_{6},\\, \\sqrt{h^{+} h^{-}}\\right)\\,, &
+n_{9} &\\leftarrow \\min\\left(n_{9},\\, \\sqrt{h^{+} l^{-}}\\right)\\,, \\\\
+n_{10} &\\leftarrow \\min\\left(n_{10},\\, \\sqrt{l^{+} h^{-}}\\right)\\,, &
+n_{3} &\\leftarrow \\min\\left(n_{3},\\, \\sqrt{l^{+} l^{-}}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``n_{1}``, ``n_{4}``: Small and large positive concordant weights, the two that flank ``n_{7}``.
-  - ``n_{2}``, ``n_{5}``: Small and large negative concordant weights, the two that flank ``n_{8}``.
+  - ``n_{1}``, ``n_{4}``: Small and large positive concordant weights.
+  - ``n_{2}``, ``n_{5}``: Small and large negative concordant weights.
+  - ``\\delta_{c}^{\\pm}``, ``\\delta_{d}^{\\pm}``: The concordant and discordant boundaries, `dcp`/`dcn` and `ddp`/`ddn`.
 
 # Algorithm
 
- 1. Lower `n7` to `min(n7, sqrt(n1 * n4))`.
- 2. Lower `n8` to `min(n8, sqrt(n2 * n5))`.
- 3. Return a new [`PartialGerberIQ`](@ref) carrying the two lowered weights and every other field unchanged.
+ 1. Resolve the four discordant diagonal weights `hip`, `lop`, `hin` and `lon` from the two pairs of boundaries.
+ 2. Lower `n7` and `n8`, the two mixed concordant channels, onto the geometric mean of the two weights they join.
+ 3. Lower `n3`, `n6`, `n9` and `n10`, the four discordant channels, onto the geometric mean of the resolved weights they join.
+ 4. Return a new [`PartialGerberIQ`](@ref) carrying the six lowered weights and every other field unchanged.
 
 # Arguments
 
@@ -1217,12 +1236,20 @@ Where:
   - $(ref_dict[:gerber2025squeezing])
 """
 function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
-    (; n1, n2, n4, n5, n7, n8) = alg
-    n7 = min(n7, sqrt(n1 * n4))
-    n8 = min(n8, sqrt(n2 * n5))
-    return PartialGerberIQ(; dcp = alg.dcp, dcn = alg.dcn, ddp = alg.ddp, ddn = alg.ddn,
-                           n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
-                           n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10)
+    (; dcp, dcn, ddp, ddn, n1, n2, n4, n5) = alg
+    hip = ddp >= dcp ? n4 : min(n1, n4)
+    lop = ddp <= dcp ? n1 : min(n1, n4)
+    hin = ddn >= dcn ? n5 : min(n2, n5)
+    lon = ddn <= dcn ? n2 : min(n2, n5)
+    n3 = min(alg.n3, sqrt(lop * lon))
+    n6 = min(alg.n6, sqrt(hip * hin))
+    n7 = min(alg.n7, sqrt(n1 * n4))
+    n8 = min(alg.n8, sqrt(n2 * n5))
+    n9 = min(alg.n9, sqrt(hip * lon))
+    n10 = min(alg.n10, sqrt(lop * hin))
+    return PartialGerberIQ(; dcp = dcp, dcn = dcn, ddp = ddp, ddn = ddn, n1 = n1, n2 = n2,
+                           n3 = n3, n4 = n4, n5 = n5, n6 = n6, n7 = n7, n8 = n8, n9 = n9,
+                           n10 = n10)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1370,23 +1397,20 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
-                   dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
-                   n4::Number = 0.75, n5::Number = n4, n6::Number = n4,
-                   n7::Number = sqrt(n1 * n4), n8::Number = sqrt(n2 * n5),
-                   n9::Number = sqrt(n3 * n6), n10::Number = sqrt(n3 * n6),
-                   n11::Number = 1.0, n12::Number = n11, n13::Number = n11,
-                   n14::Number = sqrt(n4 * n11), n15::Number = sqrt(n7 * n14),
-                   n17::Number = sqrt(n5 * n12), n16::Number = sqrt(n8 * n17),
-                   n19::Number = sqrt(n6 * n13), n18::Number = sqrt(n9 * n19),
-                   n20::Number = sqrt(n6 * n13), n21::Number = sqrt(n10 * n20))
+                   dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1,
+                   n3::Number = sqrt(n1 * n2), n4::Number = 0.75, n5::Number = n4,
+                   n6::Number = sqrt(n4 * n5), n7::Number = sqrt(n1 * n4),
+                   n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n4 * n2),
+                   n10::Number = sqrt(n1 * n5), n11::Number = 1.0, n12::Number = n11,
+                   n13::Number = sqrt(n11 * n12), n14::Number = sqrt(n4 * n11),
+                   n15::Number = sqrt(n1 * n11), n16::Number = sqrt(n2 * n12),
+                   n17::Number = sqrt(n5 * n12), n18::Number = sqrt(n2 * n11),
+                   n19::Number = sqrt(n5 * n11), n20::Number = sqrt(n4 * n12),
+                   n21::Number = sqrt(n1 * n12))
 
 Keywords correspond to the struct's fields.
 
-Every mixed-class weight defaults to the geometric mean of two other weights. The keyword order is not the field order: `n17` precedes `n16` and `n19` precedes `n18`, because each of those defaults reads the other.
-
-!!! warning
-
-    Four of those defaults do **not** meet the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref). `n15`, `n16`, `n18` and `n21` each default to the geometric mean of two **mixed-class** weights rather than of the two **same-class** weights that flank the channel, and each exceeds its bound by a factor of `(n4^2 / (n1 n11))^(1/4)`. A two-asset sample then returns a correlation entry of `1.0299` under [`Gerber2`](@ref). [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap, the whole table of fifteen bounds and the reproduction.
+**Only the six diagonal weights carry a free default.** `n1`, `n2`, `n4`, `n5`, `n11` and `n12` name the six magnitude classes, and each of the other fifteen defaults to the geometric mean of the two diagonal weights of the classes its channel joins. That is the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref), so the default template meets it whatever the six are set to, and the clamp never moves a default. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) is the defect that made this the rule: four of the earlier defaults read two **mixed** weights instead, and a two-asset sample then returned `1.0299`.
 
 ## Validation
 
@@ -1419,13 +1443,13 @@ FullGerberIQ
   n12 ┼ Float64: 1.0
   n13 ┼ Float64: 1.0
   n14 ┼ Float64: 0.8660254037844386
-  n15 ┼ Float64: 0.7282376575609851
-  n16 ┼ Float64: 0.7282376575609851
+  n15 ┼ Float64: 0.7071067811865476
+  n16 ┼ Float64: 0.7071067811865476
   n17 ┼ Float64: 0.8660254037844386
-  n18 ┼ Float64: 0.7282376575609851
+  n18 ┼ Float64: 0.7071067811865476
   n19 ┼ Float64: 0.8660254037844386
   n20 ┼ Float64: 0.8660254037844386
-  n21 ┴ Float64: 0.7282376575609851
+  n21 ┴ Float64: 0.7071067811865476
 ```
 
 # Related
@@ -1583,15 +1607,16 @@ FullGerberIQ
     end
 end
 function FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
-                      dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
-                      n4::Number = 0.75, n5::Number = n4, n6::Number = n4,
-                      n7::Number = sqrt(n1 * n4), n8::Number = sqrt(n2 * n5),
-                      n9::Number = sqrt(n3 * n6), n10::Number = sqrt(n3 * n6),
-                      n11::Number = 1.0, n12::Number = n11, n13::Number = n11,
-                      n14::Number = sqrt(n4 * n11), n15::Number = sqrt(n7 * n14),
-                      n17::Number = sqrt(n5 * n12), n16::Number = sqrt(n8 * n17),
-                      n19::Number = sqrt(n6 * n13), n18::Number = sqrt(n9 * n19),
-                      n20::Number = sqrt(n6 * n13), n21::Number = sqrt(n10 * n20))
+                      dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1,
+                      n3::Number = sqrt(n1 * n2), n4::Number = 0.75, n5::Number = n4,
+                      n6::Number = sqrt(n4 * n5), n7::Number = sqrt(n1 * n4),
+                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n4 * n2),
+                      n10::Number = sqrt(n1 * n5), n11::Number = 1.0, n12::Number = n11,
+                      n13::Number = sqrt(n11 * n12), n14::Number = sqrt(n4 * n11),
+                      n15::Number = sqrt(n1 * n11), n16::Number = sqrt(n2 * n12),
+                      n17::Number = sqrt(n5 * n12), n18::Number = sqrt(n2 * n11),
+                      n19::Number = sqrt(n5 * n11), n20::Number = sqrt(n4 * n12),
+                      n21::Number = sqrt(n1 * n12))
     return FullGerberIQ(dp1, dp2, dn1, dn2, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
@@ -1646,20 +1671,33 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lowers the mixed-magnitude weights of a [`FullGerberIQ`](@ref) template so that the [`Gerber2`](@ref) statistic stays inside `[-1, 1]`. It does not make the matrix positive definite; that is `pdm`'s work.
 
-Under [`Gerber2`](@ref) the pairwise entry is the raw `pos - neg`, and the matrix is afterwards divided by the geometric mean of its own diagonal. A pair `(i, i)` compares an asset with itself, so both returns fall in the same magnitude class and the co-movement is always concordant. Exactly six of the twenty-one weights therefore sit on the diagonal, one per class: `n11`, `n4`, `n1`, `n2`, `n5` and `n12`. The other fifteen each join two distinct classes, one weight per unordered pair, **discordant channels included**, and a weight above the geometric mean of the two same-class weights that flank its channel lets the ratio leave `[-1, 1]`.
+Under [`Gerber2`](@ref) the pairwise entry is the net `pos - neg`, divided by the geometric mean of the pair's two diagonal projections. A projection compares an asset with itself, so both returns fall in the same magnitude class and the co-movement is always concordant. Exactly six of the twenty-one weights therefore sit on the diagonal, one per class: `n11`, `n4`, `n1`, `n2`, `n5` and `n12`. The other fifteen each join two distinct classes, one weight per unordered pair, **discordant channels included**, and `C(6, 2) = 15`.
 
-!!! warning
+The source proves that the ratio is bounded by one **if and only if** each of those fifteen is at most the geometric mean of the two diagonal weights of the classes it joins. This method lowers all fifteen onto that bound. A discordant channel obeys the rule like any other, because both of the classes it joins carry a diagonal weight. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns `10.0` unclamped, and `1.0` clamped.
 
-    The clamp covers `n7`, `n8`, `n14` and `n17` only. Fifteen of the twenty-one weights join two distinct classes and owe the bound, so the clamp is a necessary condition and not a sufficient one. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns a correlation entry of `10.0`, and the **shipped defaults** break the bound on `n15`, `n16`, `n18` and `n21`. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap, the whole table of fifteen bounds and the reproduction. A pair-dependent `sc` breaks the same bound on its own, whatever the template does; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
+!!! note
+
+    The clamp is a necessary and a sufficient condition on the **template**, and it is the whole condition. `sc` needs no restriction, because [`Gerber2`](@ref) reads its denominator in the pair's own units. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) are the two defects this closes, and ADR 0094 records the decision. Every shipped default meets the bound, so the clamp does not move one.
 
 # Mathematical definition
 
+For each of the fifteen mixed weights ``n_{k}``, with ``a`` and ``b`` the two classes its channel joins and ``n_{a}``, ``n_{b}`` their diagonal weights:
+
 ```math
 \\begin{align}
-n_{7} &\\leftarrow \\min\\left(n_{7},\\, \\sqrt{n_{1} n_{4}}\\right)\\,, \\\\
-n_{8} &\\leftarrow \\min\\left(n_{8},\\, \\sqrt{n_{2} n_{5}}\\right)\\,, \\\\
-n_{14} &\\leftarrow \\min\\left(n_{14},\\, \\sqrt{n_{4} n_{11}}\\right)\\,, \\\\
-n_{17} &\\leftarrow \\min\\left(n_{17},\\, \\sqrt{n_{5} n_{12}}\\right)\\,.
+n_{k} &\\leftarrow \\min\\left(n_{k},\\, \\sqrt{n_{a} n_{b}}\\right)\\,.
+\\end{align}
+```
+
+The fifteen channels and the pair of classes each joins are
+
+```math
+\\begin{align}
+n_{13} &: (n_{11}, n_{12})\\,, & n_{14} &: (n_{4}, n_{11})\\,, & n_{15} &: (n_{1}, n_{11})\\,, \\\\
+n_{16} &: (n_{2}, n_{12})\\,, & n_{17} &: (n_{5}, n_{12})\\,, & n_{18} &: (n_{2}, n_{11})\\,, \\\\
+n_{19} &: (n_{5}, n_{11})\\,, & n_{20} &: (n_{4}, n_{12})\\,, & n_{21} &: (n_{1}, n_{12})\\,, \\\\
+n_{3} &: (n_{1}, n_{2})\\,, & n_{6} &: (n_{4}, n_{5})\\,, & n_{7} &: (n_{1}, n_{4})\\,, \\\\
+n_{8} &: (n_{2}, n_{5})\\,, & n_{9} &: (n_{4}, n_{2})\\,, & n_{10} &: (n_{1}, n_{5})\\,.
 \\end{align}
 ```
 
@@ -1668,13 +1706,11 @@ Where:
   - ``n_{1}``, ``n_{4}``, ``n_{11}``: Small, moderate and large positive concordant weights.
   - ``n_{2}``, ``n_{5}``, ``n_{12}``: Small, moderate and large negative concordant weights.
 
-Each clamped weight names the channel between two of those classes, and its bound is the geometric mean of the two.
-
 # Algorithm
 
- 1. Lower `n7` to `min(n7, sqrt(n1 * n4))` and `n14` to `min(n14, sqrt(n4 * n11))`, the two mixed positive concordant channels.
- 2. Lower `n8` to `min(n8, sqrt(n2 * n5))` and `n17` to `min(n17, sqrt(n5 * n12))`, their negative counterparts.
- 3. Return a new [`FullGerberIQ`](@ref) carrying the four lowered weights and every other field unchanged.
+ 1. Read the six diagonal weights `n1`, `n2`, `n4`, `n5`, `n11` and `n12` from `alg`.
+ 2. Lower each of the fifteen mixed weights onto the geometric mean of the two diagonal weights of the classes its channel joins, by the table above.
+ 3. Return a new [`FullGerberIQ`](@ref) carrying the fifteen lowered weights and the four boundaries unchanged.
 
 # Arguments
 
@@ -1696,16 +1732,27 @@ Each clamped weight names the channel between two of those classes, and its boun
   - $(ref_dict[:gerber2025squeezing])
 """
 function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
-    (; n1, n2, n4, n5, n7, n8, n11, n12, n14, n17) = alg
-    n7 = min(n7, sqrt(n1 * n4))
-    n8 = min(n8, sqrt(n2 * n5))
-    n14 = min(n14, sqrt(n4 * n11))
-    n17 = min(n17, sqrt(n5 * n12))
+    (; n1, n2, n4, n5, n11, n12) = alg
+    n3 = min(alg.n3, sqrt(n1 * n2))
+    n6 = min(alg.n6, sqrt(n4 * n5))
+    n7 = min(alg.n7, sqrt(n1 * n4))
+    n8 = min(alg.n8, sqrt(n2 * n5))
+    n9 = min(alg.n9, sqrt(n4 * n2))
+    n10 = min(alg.n10, sqrt(n1 * n5))
+    n13 = min(alg.n13, sqrt(n11 * n12))
+    n14 = min(alg.n14, sqrt(n4 * n11))
+    n15 = min(alg.n15, sqrt(n1 * n11))
+    n16 = min(alg.n16, sqrt(n2 * n12))
+    n17 = min(alg.n17, sqrt(n5 * n12))
+    n18 = min(alg.n18, sqrt(n2 * n11))
+    n19 = min(alg.n19, sqrt(n5 * n11))
+    n20 = min(alg.n20, sqrt(n4 * n12))
+    n21 = min(alg.n21, sqrt(n1 * n12))
     return FullGerberIQ(; dp1 = alg.dp1, dp2 = alg.dp2, dn1 = alg.dn1, dn2 = alg.dn2,
-                        n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
-                        n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10, n11 = n11, n12 = n12,
-                        n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
-                        n18 = alg.n18, n19 = alg.n19, n20 = alg.n20, n21 = alg.n21)
+                        n1 = n1, n2 = n2, n3 = n3, n4 = n4, n5 = n5, n6 = n6, n7 = n7,
+                        n8 = n8, n9 = n9, n10 = n10, n11 = n11, n12 = n12, n13 = n13,
+                        n14 = n14, n15 = n15, n16 = n16, n17 = n17, n18 = n18, n19 = n19,
+                        n20 = n20, n21 = n21)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -2115,6 +2162,61 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Accumulate the two diagonal projections of one observation into the Gerber IQ pair accumulator.
+
+Only [`Gerber2`](@ref) reaches the acting method, because only its denominator reads them. The fall-through method returns the accumulator unchanged, so the other two markers pay for no weight they never divide by.
+
+The projection of an observation in the `i` direction is the co-movement `(x_i, x_i)`, judged in **this pair's** units. Both coordinates then fall in the same magnitude class and the co-movement is concordant, so the projection names the diagonal weight of asset `i` at that observation. The `j` direction is the mirror. An asset contributes only when it left the noise zone, which is the same admission test the numerator applies.
+
+The projection is what keeps the statistic inside `[-1, 1]`. An asset's magnitude class moves with its partner whenever `sc` is not pair-separable, and a denominator read from the assembled diagonal reads the class of the pair `(i, i)` instead. Cauchy-Schwarz then has nothing to stand on. Reading the class in the pair's own units restores it for every scaler. ADR 0094 records the decision, and [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) is the defect.
+
+# Arguments
+
+  - `pol`: The [`GerberIQKernel`](@ref) policy.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`.
+  - `st`: Pair state from [`comovement_pair_state`](@ref).
+  - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
+  - `axi`, `axj`: Their absolute values.
+  - `crossi`, `crossj`: Whether each asset left the noise zone, from [`iq_crossed`](@ref).
+  - `T`: Number of observations.
+  - `k`: Observation index.
+
+# Returns
+
+  - The accumulator, with `di` and `dj` raised by the projected [`gerber_IQ_delta`](@ref) contributions under [`Gerber2`](@ref), and unchanged otherwise.
+
+# Related
+
+  - [`comovement_step`](@ref)
+  - [`comovement_finalise`](@ref)
+  - [`iq_crossed`](@ref)
+  - [`gerber_IQ_delta`](@ref)
+  - [`GerberIQKernel`](@ref)
+  - [`Gerber2`](@ref)
+"""
+@inline function iq_add_diagonal(pol::GerberIQKernel{<:Gerber2}, acc, st, xi::Number,
+                                 xj::Number, axi::Number, axj::Number, crossi::Bool,
+                                 crossj::Bool, T::Integer, k::Integer)
+    di = if crossi
+        acc.di +
+        gerber_IQ_delta(xi, xi, axi, axi, pol.decay, T, k, st.sci, st.sci, pol.kind)
+    else
+        acc.di
+    end
+    dj = if crossj
+        acc.dj +
+        gerber_IQ_delta(xj, xj, axj, axj, pol.decay, T, k, st.scj, st.scj, pol.kind)
+    else
+        acc.dj
+    end
+    return (; acc..., di = di, dj = dj)
+end
+@inline function iq_add_diagonal(::GerberIQKernel, acc, args...)
+    return acc
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Decide whether one asset left the noise zone at one observation.
 
 An asset leaves the noise zone when its return reaches the pair's scaled threshold **and** is not exactly zero. The sign test is redundant for a positive threshold, because `ax >= c > 0` already implies that `x` is not zero. It binds only at `c = 0`, where the closed comparison `ax >= 0` holds for every return, including one that is exactly zero. ADR 0090 settled that a return of exactly zero never crosses, and this is that rule for the Gerber IQ family.
@@ -2149,6 +2251,7 @@ end
     if !crossi && !crossj
         return acc
     end
+    acc = iq_add_diagonal(pol, acc, st, xi, xj, axi, axj, crossi, crossj, T, k)
     return if crossi && crossj && xi * xj > zero(xi)
         (; acc...,
          pos = acc.pos +
@@ -2163,6 +2266,10 @@ end
 end
 @inline function comovement_finalise(pol::GerberIQKernel, acc, ::Type{T}) where {T}
     return comovement_ratio(pol.alg, acc.pos, acc.neg, acc.nn, T)
+end
+@inline function comovement_finalise(::GerberIQKernel{<:Gerber2}, acc, ::Type{T}) where {T}
+    den = sqrt(acc.di * acc.dj)
+    return !iszero(den) ? (acc.pos - acc.neg) / den : zero(T)
 end
 """
     gerber_IQ(
@@ -2198,7 +2305,7 @@ GerberIQ correlation:
 \\rho_{ij} &= \\begin{cases}
 (H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-}) & \\text{Gerber0} \\\\
 (H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-} + H_{ij}^{0}) & \\text{Gerber1} \\\\
-h_{ij} / \\sqrt{h_{ii}\\,h_{jj}} & \\text{Gerber2}
+(H_{ij}^{+} - H_{ij}^{-}) / \\sqrt{D_{ij}\\,D_{ji}} & \\text{Gerber2}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -2208,14 +2315,13 @@ Where:
   - ``\\rho_{ij}``: GerberIQ correlation between assets ``i`` and ``j``.
   - ``H_{ij}^{+}``, ``H_{ij}^{-}``: Weighted concordant and discordant accumulators.
   - ``H_{ij}^{0}``: Weighted neutral (neither concordant nor discordant) accumulator (Gerber1 only).
-  - ``h_{ij} = H_{ij}^{+} - H_{ij}^{-}``: The **raw** weighted difference, which is what Gerber2 standardises. Gerber2 does **not** normalise the Gerber0 ratio; the two agree only where ``H^{+} + H^{-}`` is constant across pairs.
-  - ``\\sqrt{h_{ii}\\,h_{jj}}``: Geometric mean of the diagonal, with the roots clamped below at ``\\sqrt{\\varepsilon}``.
+  - ``D_{ij} = \\sum_{k} w_{ii,k}\\, d_{k}``, over the observations on which asset ``i`` left the noise zone: the projection of asset ``i`` onto the lead diagonal, **in the units of the pair** ``(i, j)``. The projected co-movement ``(x_{ki}, x_{ki})`` falls in one magnitude class on both axes, so ``w_{ii,k}`` is the diagonal weight of asset ``i`` at that observation. ``D_{ij}`` and ``D_{ji}`` differ, and both move with the pair whenever `sc` is not pair-separable.
 
-The Gerber1 branch is the source's own statistic. Its numerator runs over the observations on which both assets left the noise zone, and its denominator over those on which at least one did. The Gerber0 and Gerber2 branches are the classic Gerber family's denominators, applied here to the weighted, discounted accumulators; the source states neither.
+The Gerber1 branch is the source's own statistic. Its numerator runs over the observations on which both assets left the noise zone, and its denominator over those on which at least one did. The Gerber0 and Gerber2 branches are the classic Gerber family's denominators, applied here to the weighted, discounted accumulators; the source's main text states neither. The source's internet appendix states a third form, whose denominator is the geometric mean of the two diagonal projections taken over the observations on which **both** assets crossed. This library does not ship that form. `Gerber2` projects the same way but keeps the classic denominator's observation set, which is the one that reduces to [`GerberCovariance`](@ref).
 
 The Gerber statistic is the special case of this one that switches the squeezing and the decay off. With every weight set to one, ``\\gamma = 0``, the per-asset volatility scaling of [`AssetVolatilityGerberIQScaler`](@ref), and ``c`` equal to a Gerber threshold, all three branches reproduce [`GerberCovariance`](@ref) to the last bit. The reduction holds at ``c = 0`` as it does at every positive threshold, because [`iq_crossed`](@ref) gives this family the rule ADR 0090 gave that one: a return of exactly zero never leaves the noise zone.
 
-Only the Gerber0 and Gerber1 branches are bounded by construction, because each divides by a sum of the same weights it subtracts. The Gerber2 branch is bounded only when **two** conditions hold together: every mixed-class weight of the template meets the geometric-mean bound [`clamp_gerber_iq_n`](@ref) enforces, and `sc` is **pair-separable**, so that an asset's magnitude class does not move when its partner changes. The clamp is a necessary condition and not a sufficient one, and the shipped [`FullGerberIQ`](@ref) defaults break it; [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records that half. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable and `nothing` is not, because it reads the pair mean; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
+All three branches are bounded by ``|\\rho_{ij}| \\leq 1``. Gerber0 and Gerber1 are bounded by construction, because each divides by a sum of the same weights it subtracts. Gerber2 is bounded by the source's own condition on the template: every weight that joins two distinct magnitude classes is at most the geometric mean of the two diagonal weights of those classes. [`clamp_gerber_iq_n`](@ref) enforces that condition on every such weight, and the source proves it necessary and sufficient. Cauchy-Schwarz then bounds the ratio, because ``D_{ij}`` reads asset ``i``'s class in the same units the numerator reads it in, whatever `sc` does. The diagonal is exactly one, because the pair ``(i, i)`` makes the numerator and both projections the same sum.
 
 # Algorithm
 
@@ -2223,11 +2329,10 @@ Only the Gerber0 and Gerber1 branches are bounded by construction, because each 
  2. Resolve the decay estimator against `X` with [`regenerate_decay`](@ref), so its delay and rate are numbers before the loop starts.
  3. Build the [`GerberIQKernel`](@ref) policy from the resolved decay and the estimator's `alg`, `kind`, `sc`, `c` and the standard deviations `sd`.
  4. Fill `rho` with [`gerber_comovement!`](@ref), which walks every pair and every observation and reduces each pair's accumulators. That loop skeleton is shared with the Smyth-Broby family and lives in one place.
- 5. Standardise the matrix with [`standardise_comovement!`](@ref). This is a no-op for [`Gerber0`](@ref) and [`Gerber1`](@ref), and divides by the geometric mean of the diagonal for [`Gerber2`](@ref).
- 6. Write one onto a zero diagonal entry with [`comovement_unit_diagonal!`](@ref). An asset that never leaves its noise zone reduces to a zero diagonal entry, and that entry is one by definition.
- 7. Repair the matrix with [`posdef!`](@ref), because the statistic is not guaranteed to be positive semi-definite. The source records the same and repairs by the nearest correlation matrix.
+ 5. Write one onto a zero diagonal entry with [`comovement_unit_diagonal!`](@ref). An asset that never leaves its noise zone reduces to a zero diagonal entry, and that entry is one by definition.
+ 6. Repair the matrix with [`posdef!`](@ref), because the statistic is not guaranteed to be positive semi-definite. The source records the same and repairs by the nearest correlation matrix.
 
-Steps 4 and 5 are where the three [`GerberCovarianceAlgorithm`](@ref) branches differ, and [`comovement_ratio`](@ref) owns that difference.
+Step 4 is where the three [`GerberCovarianceAlgorithm`](@ref) branches differ. [`comovement_ratio`](@ref) owns the [`Gerber0`](@ref) and [`Gerber1`](@ref) denominators, and [`comovement_finalise`](@ref) owns the [`Gerber2`](@ref) one. This family does not call [`standardise_comovement!`](@ref), which normalises after assembly and cannot read the pair's units.
 
 # Arguments
 
@@ -2263,7 +2368,6 @@ function gerber_IQ(ce::GerberIQCovariance, X::MatNum, sd::ArrNum)
     decay = regenerate_decay(ce.decay, X)
     pol = GerberIQKernel(ce.alg, ce.kind, decay, ce.sc, ce.c, sd)
     gerber_comovement!(rho, ce.ex, X, pol)
-    standardise_comovement!(ce.alg, rho)
     comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho

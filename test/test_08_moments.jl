@@ -1034,9 +1034,11 @@
 
         # ---- the write is a no-op wherever the asset votes at least once ----------------
         # A sample with no quiet asset answers bit for bit what it answered before, so
-        # applying the function to the answer changes nothing at all. The `2` markers are
-        # the reason the write is guarded rather than unconditional: their diagonal is one
-        # to within a unit in the last place, not exactly one.
+        # applying the function to the answer changes nothing at all. The `2` marker of the
+        # CLASSIC family is the reason the write is guarded rather than unconditional: its
+        # diagonal is one to within a unit in the last place, not exactly one. The Gerber IQ
+        # `2` marker reads its denominator per pair since ADR 0094, so its diagonal is exactly
+        # one and the guard writes nothing there either.
         Xu = randn(StableRNG(495495495), 60, 8)
         for a in galgs
             for ce in (GerberCovariance(; alg = a, pdm = nothing),

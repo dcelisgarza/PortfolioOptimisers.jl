@@ -859,6 +859,8 @@ Normalise a net co-movement matrix in place by the geometric mean of its own dia
 
 Only the [`GerberComovementTwo`](@ref) markers reach the acting method; the fall-through method is a no-op, so every caller may call this unconditionally. **It writes into `rho` and into nothing else**, so the marker it is handed and the estimator that owns the marker are unchanged afterwards.
 
+**The Gerber IQ family does not call this function.** Its thresholds move with the pair whenever `sc` is not pair-separable, so an asset's magnitude class off the diagonal is not the class the assembled diagonal records, and the ratio leaves `[-1, 1]`. [`gerber_IQ`](@ref) divides by the pair's own two diagonal projections instead, which [`iq_add_diagonal`](@ref) accumulates. The other three families threshold each asset in its own units, so the assembled diagonal is the same number and this function stands. ADR 0094 records the split.
+
 # Algorithm
 
 The acting method runs these steps. The fall-through method runs none of them.
@@ -939,7 +941,7 @@ The policy object `pol` (for example [`SmythBrobyKernel`](@ref) or [`GerberIQKer
  1. Read the observation count `T` from the first dimension of `X`.
  2. For every asset pair `(i, j)` with `i` at most `j`, run steps 3 to 6. The outer index is parallelised over the executor `ex`.
  3. Build the pair state `st` with [`comovement_pair_state`](@ref).
- 4. Open the accumulator `acc` as the named tuple `(pos, neg, nn, cpos, cneg, cnn)`, with the three scores at zero of `eltype(X)` and the three counts at integer zero.
+ 4. Open the accumulator `acc` as the named tuple `(pos, neg, nn, cpos, cneg, cnn, di, dj)`, with the five scores at zero of `eltype(X)` and the three counts at integer zero. A policy reads the slots its marker needs and leaves the rest at zero. `di` and `dj` carry the two diagonal projections that the Gerber IQ `2` marker divides by; [`iq_add_diagonal`](@ref) is their only writer.
  5. Fold every observation `k` of the pair through [`comovement_step`](@ref) into `acc`.
  6. Reduce `acc` with [`comovement_finalise`](@ref) and write the result into `rho[i, j]` and `rho[j, i]`.
 
@@ -968,7 +970,7 @@ function gerber_comovement!(rho::AbstractMatrix, ex::FLoops.Transducers.Executor
         for i in 1:j
             st = comovement_pair_state(pol, i, j)
             acc = (pos = zero(eltype(X)), neg = zero(eltype(X)), nn = zero(eltype(X)),
-                   cpos = 0, cneg = 0, cnn = 0)
+                   cpos = 0, cneg = 0, cnn = 0, di = zero(eltype(X)), dj = zero(eltype(X)))
             for k in 1:T
                 acc = comovement_step(pol, acc, st, X[k, i], X[k, j], T, k)
             end

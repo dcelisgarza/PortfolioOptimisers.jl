@@ -26,6 +26,7 @@ GerberIQCovariance
 gerber_IQ_delta
 GerberIQKernel
 iq_add_neutral
+iq_add_diagonal
 iq_crossed
 gerber_IQ
 cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1,
