@@ -767,6 +767,18 @@
         @test clr === clr2
         alg = HClustAlgorithm()
         @test factory(alg) === alg
+        # `HClustAlgorithm` above reaches `AbstractClustersAlgorithm`'s own identity method,
+        # not the one on `AbstractPhylogenyAlgorithm`. A tree type and a centrality algorithm
+        # are the phylogeny algorithms that carry no nearer method, so they are what reaches
+        # it. Nothing else in the suite did, which left both of its lines uncovered.
+        for palg in (KruskalTree(), BoruvkaTree(), PrimTree(), DegreeCentrality(),
+                     BetweennessCentrality())
+            @test factory(palg) === palg
+            @test factory(palg, wt) === palg
+            @test which(factory, Tuple{typeof(palg), Any}).sig ===
+                  Tuple{typeof(factory), PortfolioOptimisers.AbstractPhylogenyAlgorithm,
+                        Vararg{Any}}
+        end
         clr_t = Hclust{Float64}([-1 -13;
                                  -2 1;
                                  -7 -4;

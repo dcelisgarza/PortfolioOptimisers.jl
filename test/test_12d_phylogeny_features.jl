@@ -332,6 +332,22 @@ end
     @test !all(≈(rs[2] / rs[1]), rs[2:end] ./ rs[1:(end - 1)])
     @test rs[end] > es[end]                       # heavier tail
 
+    # `power` is a fall-off dial on the shipped spelling `(1 + d)^-p`: raising it lowers the
+    # score at every `d > 0` and moves `f(0) = 1` not at all. The rejected spelling
+    # `(1 + d^p)^-1` is what `ReciprocalDecay`'s docstring contrasts it with, and the
+    # contrast is that the rejected one pivots at `d = 1` and reverses direction across it.
+    for d in (0.25, 0.5, 1.0, 2.0, 4.0)
+        @test separation_decay(ReciprocalDecay(; power = 3.0), d, 9) <
+              separation_decay(ReciprocalDecay(; power = 1.0), d, 9)
+    end
+    @test separation_decay(ReciprocalDecay(; power = 3.0), 0, 9) ==
+          separation_decay(ReciprocalDecay(; power = 1.0), 0, 9) ==
+          1
+    alt_recip(d, p) = inv(1 + d^p)
+    @test alt_recip(1.0, 3.0) == alt_recip(1.0, 1.0) == 0.5
+    @test alt_recip(0.5, 3.0) > alt_recip(0.5, 1.0)
+    @test alt_recip(2.0, 3.0) < alt_recip(2.0, 1.0)
+
     # Field validation, on the members that carry a parameter.
     @test_throws DomainError ExponentialDecay(; rate = 0)
     @test_throws DomainError ExponentialDecay(; rate = -1.0)

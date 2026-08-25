@@ -94,7 +94,7 @@
 "src/09_Distance/04_Similarity.jl" = { map = 2, units = 10, algorithm = 8, swept = true }
 "src/09_Distance/05_FeatureDistance.jl" = { map = 2, units = 23, algorithm = 20, swept = true }
 "src/10_JuMPModelOptimisation.jl" = { map = 10, units = 12, swept = false }
-"src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, swept = false }
+"src/11_Phylogeny/01_Base_Phylogeny.jl" = { map = 4, units = 24, algorithm = 5, swept = true }
 "src/11_Phylogeny/02_Clusters.jl" = { map = 4, units = 18, swept = false }
 "src/11_Phylogeny/03_Hierarchical.jl" = { map = 4, units = 12, swept = false }
 "src/11_Phylogeny/04_DBHT.jl" = { map = 4, units = 37, swept = false }

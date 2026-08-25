@@ -1033,7 +1033,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :Y_dev => "``\\mathbf{Y}``: ``T \\times N`` deviation matrix. `FullMoment` takes the centred returns, and `SemiMoment` clips every positive entry of them to zero.",#
                        :y_t_dev => "``\\boldsymbol{y}_t``: ``N \\times 1`` deviation vector of observation ``t``, the ``t``-th row of ``\\mathbf{Y}``. Its ``i``-th entry is ``y_{t,\\,i}``.",#
                        :Z_pairprod => "``\\mathbf{Z}``: ``T \\times N^{2}`` pairwise expansion of ``\\mathbf{Y}``, whose ``t``-th row is ``\\mathbf{Z}_{t,\\cdot}`` and whose entry ``\\mathbf{Z}_{t,\\,(i-1)N+j}`` is the product ``y_{t,\\,i} \\, y_{t,\\,j}``.",#
-                       :w_obs_vec => "``\\boldsymbol{w}``: ``T \\times 1`` observation weights vector.")
+                       :w_obs_vec => "``\\boldsymbol{w}``: ``T \\times 1`` observation weights vector.",#
+                       # Separation decay. The four members of
+                       # `AbstractSeparationDecayAlgorithm` each state a closed form over the
+                       # same separation, so `01_Base_Phylogeny.jl` shares this symbol
+                       # between four Units.
+                       :d_sep => "``d``: Separation between two assets.")
 """
     ref_dict
 
