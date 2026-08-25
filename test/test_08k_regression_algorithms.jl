@@ -21,6 +21,9 @@ FIVE FACTS SHAPE THE PROBES.
    always happens. Backward elimination starts at the score of the FULL model, so a criterion
    that rewards every removal removes every factor. `The empty selection` pins both, and pins
    that the `Regression` such a run produces is an intercept-only model and still usable.
+   `regression` warns on the empty selection and names the asset (issue #503), so the empty
+   outcome is as loud as the `PValue` path's `add_best_factor_after_pval_failure!`, and the
+   testset pins the warning and pins that a non-empty search stays silent.
 
 3. `included` IS IN INSERTION ORDER, NOT SORTED. Forward selection pushes each winner onto the
    end, so `:r2` on the sample below returns `[1, 3, 4, 5, 2]`. `regression` then writes the
@@ -232,10 +235,32 @@ end
 
         # The `Regression` such a run produces is an intercept-only model, and it is usable:
         # the intercept is the response mean and the whole loadings row is zero.
-        reg = regression(StepwiseRegression(; crit = :aic, alg = BackwardElimination()),
-                         reshape(yn, :, 1), Fn)
+        # `regression` warns and names the asset, so the empty outcome is not silent (#503).
+        reg = @test_logs (:warn, r"Asset 1: the stepwise search selected no factor") regression(StepwiseRegression(;
+                                                                                                                   crit = :aic,
+                                                                                                                   alg = BackwardElimination()),
+                                                                                                reshape(yn,
+                                                                                                        :,
+                                                                                                        1),
+                                                                                                Fn)
         @test isapprox(reg.b[1], mean(yn))
         @test all(iszero, reg.M)
+
+        # A search that selects a factor logs nothing. `:r2` never falls when a factor is
+        # added, so forward selection keeps all four.
+        reg = @test_logs regression(StepwiseRegression(; crit = :r2,
+                                                       alg = ForwardSelection()),
+                                    reshape(yn, :, 1), Fn)
+        @test !all(iszero, reg.M)
+
+        # One warning per empty asset, and only for the assets that emptied.
+        Xn = [yn Fn[:, 1]]
+        reg = @test_logs (:warn, r"Asset 1: ") match_mode = :any regression(StepwiseRegression(;
+                                                                                               crit = :aic,
+                                                                                               alg = BackwardElimination()),
+                                                                            Xn, Fn)
+        @test all(iszero, view(reg.M, 1, :))
+        @test !all(iszero, view(reg.M, 2, :))
 
         # A p-value search never empties in either direction, because the helper adds one.
         for alg in (ForwardSelection(), BackwardElimination())

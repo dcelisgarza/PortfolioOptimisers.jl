@@ -76,7 +76,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks the factor set from full, removing the factor whose removal most improves the criterion.
 
-At each step the algorithm fits one model per included factor, each with that factor dropped, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set it already holds. The starting score is the score of the **full** model, not [`regression_threshold`](@ref); under [`PValue`](@ref) the step instead drops the factor with the largest p-value while any exceeds `t`. **Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the selection can therefore empty**, because a criterion that rewards every removal removes every factor; the asset then gets an intercept-only model, and its row of the loadings matrix is all zeros. The steps are stated on the two methods that run them, `_regression(::StepwiseRegression{<:PValue, <:BackwardElimination}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, ::VecNum, ::MatNum)`.
+At each step the algorithm fits one model per included factor, each with that factor dropped, and removes the factor whose reduced model scores best. It stops when no removal improves on the score of the set it already holds. The starting score is the score of the **full** model, not [`regression_threshold`](@ref); under [`PValue`](@ref) the step instead drops the factor with the largest p-value while any exceeds `t`. **Under a [`MinMaxValStepwiseRegressionCriterion`](@ref) the selection can therefore empty**, because a criterion that rewards every removal removes every factor; the asset then gets an intercept-only model, and its row of the loadings matrix is all zeros. [`regression`](@ref) warns when that happens, naming the asset, so an unexplained asset is never silent. The steps are stated on the two methods that run them, `_regression(::StepwiseRegression{<:PValue, <:BackwardElimination}, ::VecNum, ::MatNum)` and `_regression(::StepwiseRegression{<:MinMaxValStepwiseRegressionCriterion, <:BackwardElimination}, ::VecNum, ::MatNum)`.
 
 # Related
 
@@ -641,7 +641,7 @@ Shrinks a factor set from full, removing the factor whose reduced model scores b
 
 # Returns
 
-  - `included::Vector{Int}`: Indices of the selected factors, in ascending order. **It can be empty**: a criterion that rewards every removal removes every factor, which is the common outcome on a response the factors do not explain.
+  - `included::Vector{Int}`: Indices of the selected factors, in ascending order. **It can be empty**: a criterion that rewards every removal removes every factor, which is the common outcome on a response the factors do not explain. The caller [`regression`](@ref) warns on an empty return, naming the asset, and fits the intercept column alone.
 
 # Related
 
@@ -695,7 +695,7 @@ Each asset takes its own search, so the searches see one another only through th
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros. A factor an asset never selected keeps its zero.
  2. For each asset `i`, do steps 3 to 5.
  3. Run the stepwise search of `re` on column `i` of `X`, giving `included`.
- 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Fit the intercept column alone when `included` is empty.
+ 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Warn, naming the asset, and fit the intercept column alone when `included` is empty.
  5. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order `included` holds them.
  6. Build a [`Regression`](@ref) from the first column of `rr` and its remaining columns.
 
@@ -710,7 +710,7 @@ Each asset takes its own search, so the searches see one another only through th
   - `reg::Regression`: Regression result carrying:
 
       + `b`: Intercept of each asset, a view of the first column of `rr`.
-      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. An unselected factor is an exact zero.
+      + `M`: Coefficient of each asset and factor, a view of the remaining columns of `rr`. An unselected factor is an exact zero. A whole row is zero when the search selected no factor for that asset, which only [`BackwardElimination`](@ref) under a [`MinMaxValStepwiseRegressionCriterion`](@ref) can do, and which the loop warns about.
       + `L`: Left **unset**. The regression runs in the original factor basis, so `reg.L` reads back as `reg.M` through the result's `swap(L, M)` property rule, and `size(reg.L, 2)` is the number of columns of `F`.
 
 # Related
@@ -731,6 +731,9 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     for i in axes(rr, 1)
         included = _regression(re, view(X, :, i), F)
+        if isempty(included)
+            @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.")
+        end
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
         params = StatsAPI.coef(fri)
