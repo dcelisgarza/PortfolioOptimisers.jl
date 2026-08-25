@@ -3124,6 +3124,19 @@ end
     end
 end
 
+# Two traversal strategies whose property is not the node's `id`, for the element type
+# `pre_order` collects into (#510). Defined at top level because a `@testset` body becomes a
+# function, which cannot host a struct.
+struct PreorderTreeByHeight <: PortfolioOptimisers.AbstractPreorderBy end
+function PortfolioOptimisers.get_node_property(::PreorderTreeByHeight,
+                                               a::PortfolioOptimisers.ClusterNode)
+    return a.height
+end
+struct PreorderTreeByLabel <: PortfolioOptimisers.AbstractPreorderBy end
+function PortfolioOptimisers.get_node_property(::PreorderTreeByLabel,
+                                               a::PortfolioOptimisers.ClusterNode)
+    return string("asset_", a.id)
+end
 # The claims `src/11_Phylogeny/03_Hierarchical.jl` and
 # `src/11_Phylogeny/05_NonHierarchicalClustering.jl` make about the tree, about the search
 # that replaces an invalid cut, and about the flat partition. Defined at top level because a
@@ -3181,6 +3194,29 @@ end
         # A node given children takes `left.level + right.level` and ignores the argument.
         @test ClusterNode(9, nds8[1], nds8[2], 1.0, 99).level == 2
         @test PortfolioOptimisers.get_node_property(PreorderTreeByID(), nds8[3]) == 3
+    end
+
+    @testset "`pre_order` collects the strategy's own type (#510)" begin
+        res8 = balanced_hclust(3)
+        root, _ = PortfolioOptimisers.to_tree(res8)
+        # The default strategy is unmoved: the walk still returns a `Vector{Int}`.
+        @test PortfolioOptimisers.pre_order(root) isa Vector{Int}
+        # A `Float64` property is collected as a `Float64`. `to_tree` gives every leaf a
+        # height of `0.0`, which a `Vector{Int}` took silently.
+        hs = PortfolioOptimisers.pre_order(root, PreorderTreeByHeight())
+        @test hs isa Vector{Float64}
+        @test hs == zeros(8)
+        # A fractional leaf height is kept whole. A `Vector{Int}` raised an `InexactError`
+        # here, and truncated a whole-valued height without a word.
+        l1 = ClusterNode(1, nothing, nothing, 0.25, 1)
+        l2 = ClusterNode(2, nothing, nothing, 0.75, 1)
+        top = ClusterNode(3, l1, l2, 1.5, 2)
+        @test PortfolioOptimisers.pre_order(top, PreorderTreeByHeight()) == [0.25, 0.75]
+        # A `String` property no longer raises. The two visited sets are keyed on the node's
+        # `id`, which is what they store, and not on the property.
+        ls = PortfolioOptimisers.pre_order(root, PreorderTreeByLabel())
+        @test ls isa Vector{String}
+        @test ls == string.("asset_", 1:8)
     end
 
     @testset "Only a tie in the heights makes a cut invalid" begin

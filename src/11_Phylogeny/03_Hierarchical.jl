@@ -150,11 +150,11 @@ In order to implement a new traversal strategy that works seamlessly with the li
 
 ### Returns
 
-  - The property to collect. It must be an `Int` today; see below.
+  - The property to collect. Every leaf below one root must contribute the same type.
 
-# The property must be an `Int`
+# The property sets the element type of the walk
 
-[`pre_order`](@ref) collects into a `Vector{Int}` and keys its two visited sets on the type of the property while storing the node's `id` in them. A strategy whose property is not an `Int` therefore fails: one returning a `Float64` **silently truncates** every collected value, and one returning a `String` raises `MethodError: Cannot convert an object of type Int64 to an object of type String`. [`PreorderTreeByID`](@ref) is the only strategy that ships, and its property is the node's `id`, so no shipped path meets this. Issue #510 carries the repair.
+[`pre_order`](@ref) takes the element type of its output from the strategy. It reads `get_node_property(preorder_by, a)` at the root of the walk, and collects into a vector of that value's type. A property of any type therefore works. [`PreorderTreeByID`](@ref) is the only strategy that ships, and its property is the node's `id`, so the default output is a `Vector{Int}`.
 
 # Related
 
@@ -232,7 +232,7 @@ Walks the subtree rooted at `a` in preorder and collects one property per **leaf
 
 # Returns
 
-  - `res::Vector{Int}`: One property per leaf, in left-to-right order. Its length is `a.level`.
+  - `res::Vector`: One property per leaf, in left-to-right order. Its length is `a.level`. The element type is the type of `get_node_property(preorder_by, a)`, so the default strategy gives a `Vector{Int}`.
 
 # Related
 
@@ -243,11 +243,11 @@ Walks the subtree rooted at `a` in preorder and collects one property per **leaf
 """
 function pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTreeByID())
     curNode = Vector{ClusterNode}(undef, 2 * a.level)
-    lvisited = Set{typeof(get_node_property(preorder_by, a))}()
-    rvisited = Set{typeof(get_node_property(preorder_by, a))}()
+    lvisited = Set{typeof(a.id)}()
+    rvisited = Set{typeof(a.id)}()
     curNode[1] = a
     k::Int = 1
-    preorder = Vector{Int}(undef, 0)
+    preorder = Vector{typeof(get_node_property(preorder_by, a))}(undef, 0)
     while k >= 1
         nd = curNode[k]
         ndid = nd.id
