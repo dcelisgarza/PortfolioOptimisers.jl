@@ -151,7 +151,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Implied volatility algorithm that divides the latest implied volatility by a volatility risk premium adjustment.
 
-The adjustment factor is not a field of this type. The caller passes it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory: `ivpa = nothing` raises an `ArgumentError`. The closed form of the branch is stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
+The adjustment factor is not a field of this type. The caller passes it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory: `ivpa = nothing` raises an `ArgumentError`. Every entry of it must be finite and strictly positive, and one that is not raises a `DomainError`, because a non-positive factor makes a negative volatility whose sign `StatsBase.cor2cov!` then hides. The closed form of the branch, and the rules it enforces, are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
 
 # Constructors
 
@@ -529,6 +529,11 @@ The implied volatilities are the **second** positional argument and the returns 
   - `::Any`: Asset returns matrix (unused).
   - `ivpa`: Implied volatility premium adjustment factor (scalar or vector).
 
+# Validation
+
+  - Every entry of `ivpa` is finite and strictly positive. A non-positive factor turns a volatility negative, and `StatsBase.cor2cov!` hides the sign: it squares the factor on the diagonal, so a negative scalar returns the matrix its absolute value returns, and a negative entry of a vector flips the sign of every covariance of that asset alone. Both answers stay positive definite, so [`matrix_processing!`](@ref) finds nothing to repair and no later step sees the defect.
+  - A vector `ivpa` carries one entry per asset. A wrong length raises a `DimensionMismatch` from the broadcast.
+
 # Returns
 
   - `rv::AbstractArray`: Predicted realised volatilities (last row of `iv` divided by `ivpa`).
@@ -555,6 +560,7 @@ julia> PortfolioOptimisers.predict_realised_vols(ImpliedVolatilityPremium(),
 """
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
                                ivpa::Num_VecNum)
+    @argcheck(all(x -> isfinite(x) && x > zero(x), ivpa), DomainError)
     return view(iv, size(iv, 1), :) ⊘ ivpa
 end
 """
@@ -720,6 +726,7 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
+  - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
 
@@ -777,6 +784,7 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
+  - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
 

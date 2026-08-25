@@ -254,6 +254,28 @@ end
         @test_throws ArgumentError cov(ImpliedVolatility(;
                                                          alg = ImpliedVolatilityPremium()),
                                        X; iv = iv)
+        #=
+        A factor that is not finite and strictly positive divides the last implied
+        volatility into something that is not a volatility, and `cor2cov!` hides it. A
+        NEGATIVE SCALAR cancels: `cor2cov!` writes `C[i,j] *= s[i] * s[j]` and
+        `C[j,j] = s[j]^2`, so `-1.2` returned exactly the matrix `1.2` returns. A NEGATIVE
+        ENTRY of a vector flips the sign of every covariance between that asset and the
+        others, keeps its variance, and leaves the matrix positive definite, so
+        `matrix_processing!` found nothing to repair and the optimiser was handed an asset
+        whose correlations all pointed the wrong way. A `NaN` was refused, but only by
+        accident, and by `NearestCorrelationMatrix`, which named neither `ivpa` nor the
+        estimator. The reference implementation refuses all three at the fit.
+        =#
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        ivpam = copy(ivpav)
+        ivpam[1] = -ivpam[1]
+        for bad in (-1.2, zero(eltype(ivpav)), NaN, Inf, ivpam)
+            @test_throws DomainError cov(cep, X; iv = iv, ivpa = bad)
+            # `cor` refuses what `cov` refuses, though its answer cannot move.
+            @test_throws DomainError cor(cep, X; iv = iv, ivpa = bad)
+        end
+        # The positive factor the bad ones were derived from still answers.
+        @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
         # The implied volatility series itself is mandatory.
         @test_throws UndefKeywordError cov(ImpliedVolatility(), X)
         # A custom variance estimator that carries observation weights and implements no
