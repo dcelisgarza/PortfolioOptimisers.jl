@@ -1038,7 +1038,12 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # `AbstractSeparationDecayAlgorithm` each state a closed form over the
                        # same separation, so `01_Base_Phylogeny.jl` shares this symbol
                        # between four Units.
-                       :d_sep => "``d``: Separation between two assets.")
+                       :d_sep => "``d``: Separation between two assets.",#
+                       # Optimal number of clusters. The two members of
+                       # `AbstractOptimalNumberClustersAlgorithm` each maximise a score over
+                       # the same candidate counts, so `02_Clusters.jl` shares this symbol
+                       # between two Units.
+                       :c_star_clusters => "``c^{\\star}``: Selected number of clusters.")
 """
     ref_dict
 

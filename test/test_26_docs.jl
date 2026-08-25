@@ -1218,7 +1218,7 @@ in the sense of `STANDARDS.md`.
     library-wide pass.
     =#
     @testset "a math_dict value is interpolated, never copied" begin
-        MATH_COPY_TOTAL = 10
+        MATH_COPY_TOTAL = 8
 
         #=
         `math_dict` is read from source with the same instrument the rest of this testset

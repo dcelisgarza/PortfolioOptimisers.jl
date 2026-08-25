@@ -3124,3 +3124,71 @@ end
     @test k == argmax(gaps)
     @test k == clr.k
 end
+
+# The claims `src/11_Phylogeny/02_Clusters.jl` makes about the two selection scores, about the
+# `linkage` symbol and about the `Clusters` constructor. Defined at top level because a
+# `@testset` body becomes a function, and the sweep of #467 reads these numbers.
+@testset "The clustering vocabulary states what it does (#467)" begin
+    using PortfolioOptimisers, Test, StableRNGs, StatsBase
+    @testset "The two dispersion measures answer 6 and 4 on the named sample" begin
+        # `SecondOrderDifference`'s docstring names this sample and these two numbers. The
+        # source takes the mean of a cluster's pairwise distances; the default standardises
+        # it, which is a different statistic and selects a different count.
+        X = randn(StableRNG(987654321), 400, 40)
+        k(g) = clusterise(ClustersEstimator(;
+                                            onc = OptimalNumberClusters(;
+                                                                        alg = SecondOrderDifference(;
+                                                                                                    alg = g))),
+                          X).k
+        @test k(MeanValue()) == 6
+        @test k(StandardisedValue()) == 4
+        # 6 is the ceiling itself, so the two differ inside the admissible range.
+        @test floor(Int, sqrt(size(X, 2))) == 6
+    end
+    @testset "`linkage` is unchecked at construction and raises at use" begin
+        # The set of criteria belongs to `Clustering.hclust`, so the constructor takes any
+        # `Symbol` and the raise lands inside `clusterise`.
+        alg = HClustAlgorithm(; linkage = :nonsense)
+        @test alg.linkage === :nonsense
+        X = randn(StableRNG(987654321), 200, 10)
+        @test_throws ArgumentError clusterise(ClustersEstimator(; alg = alg), X)
+        # A criterion the package does accept clusters without a raise.
+        @test clusterise(ClustersEstimator(; alg = HClustAlgorithm(; linkage = :average)),
+                         X) isa Clusters
+    end
+    @testset "Every `Clusters` validation arm throws" begin
+        res = clusterise(ClustersEstimator(), randn(StableRNG(1), 50, 3)).res
+        S = [1.0 0.5; 0.5 1.0]
+        D = [0.0 0.5; 0.5 0.0]
+        @test_throws PortfolioOptimisers.IsEmptyError Clusters(; res = res, S = zeros(0, 0),
+                                                               D = D, k = 1)
+        @test_throws PortfolioOptimisers.IsEmptyError Clusters(; res = res, S = S,
+                                                               D = zeros(0, 0), k = 1)
+        @test_throws DimensionMismatch Clusters(; res = res, S = S, D = ones(3, 3), k = 1)
+        @test_throws PortfolioOptimisers.IsEmptyError Clusters(; res = res, S = S, D = D,
+                                                               P = zeros(0, 0), k = 1)
+        # A `P` of the wrong size is refused against `S`, which `D` already matches.
+        @test_throws DimensionMismatch Clusters(; res = res, S = S, D = D, P = ones(3, 3),
+                                                k = 1)
+        @test_throws DomainError Clusters(; res = res, S = S, D = D, k = 0)
+        # `P` is optional, and both shapes build.
+        @test isnothing(Clusters(; res = res, S = S, D = D, k = 1).P)
+        @test Clusters(; res = res, S = S, D = D, P = D, k = 1).P === D
+        @test_throws DomainError OptimalNumberClusters(; max_k = 0)
+        @test_throws DomainError OptimalNumberClusters(; alg = 0)
+    end
+    @testset "`factory` is the identity on a clustering algorithm" begin
+        w = pweights(fill(1 / 400, 400))
+        alg = HClustAlgorithm(; linkage = :average)
+        # An algorithm carries no prior-dependent field, so the same object comes back.
+        @test factory(alg, w) === alg
+        dbht = DBHT()
+        @test factory(dbht, w) === dbht
+        # `OptimalNumberClusters` is an estimator, so it rebuilds and propagates `alg`.
+        onc = OptimalNumberClusters(; max_k = 5,
+                                    alg = SecondOrderDifference(; alg = MeanValue()))
+        fonc = factory(onc, w)
+        @test fonc.max_k == 5
+        @test fonc.alg.alg.w === w
+    end
+end
