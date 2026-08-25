@@ -438,23 +438,40 @@ end
                        cov(ce, X; iv = iv))
     end
 
-    @testset "factory does not reach the algorithm's variance estimator" begin
+    @testset "factory reaches the algorithm's variance estimator" begin
         #=
-        `ce` carries `@fprop` and `alg` carries no tag, so `factory` pushes the incoming
-        weights into the base correlation estimator and leaves `alg.ve` alone. The `alg`
-        field's own description states that, and this is the statement.
+        Issue #505. `alg` carried no propagation tag and `ImpliedVolatilityRegression` was
+        not `@propagatable`, so `factory` weighted the base correlation estimator and left
+        `alg.ve` unweighted. One estimator answered a weighted correlation and an
+        unweighted realised volatility, silently.
+
+        Both tags are in place now, so one `factory` call reaches every estimator the type
+        holds.
         =#
         f = PortfolioOptimisers.factory(ImpliedVolatility(), aw)
-        @test isnothing(f.alg.ve.w)
         @test !isnothing(f.ce.ce.w)
-        # A weighted `ve` is therefore constructed into the algorithm by hand, and it
-        # survives `factory` untouched.
+        @test f.alg.ve.w === aw
+        @test f.alg.ve.me.w === aw
+        # The tag names one field, so everything else the algorithm holds is rebuilt as it
+        # stood.
+        @test f.alg.ws == ImpliedVolatility().alg.ws
+        @test f.alg.re isa LinearModel
+        # The algorithm answers the same weighted estimator on its own.
+        @test PortfolioOptimisers.factory(ImpliedVolatilityRegression(), aw).ve.w === aw
+        # `factory` writes the incoming value over a hand-set one, as it does on every
+        # `@wprop` field.
+        uw = AnalyticWeights(fill(inv(length(aw)), length(aw)))
         g = PortfolioOptimisers.factory(ImpliedVolatility(;
                                                           alg = ImpliedVolatilityRegression(;
                                                                                             ve = SimpleVariance(;
-                                                                                                                w = aw))),
+                                                                                                                w = uw))),
                                         aw)
         @test g.alg.ve.w === aw
+        # `ImpliedVolatilityPremium` holds no estimator, so it comes back unchanged.
+        p = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        @test PortfolioOptimisers.factory(p, aw).alg === p.alg
+        # A `factory` call that carries no weights leaves every estimator alone.
+        @test PortfolioOptimisers.factory(ImpliedVolatility(), nothing).alg.ve.w === nothing
     end
 
     @testset "the base estimator receives the oriented iv" begin

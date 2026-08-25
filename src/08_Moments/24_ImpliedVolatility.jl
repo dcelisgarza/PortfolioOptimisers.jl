@@ -82,6 +82,12 @@ Keywords correspond to the struct's fields.
 
   - `ws > 2`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `ve`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -105,6 +111,7 @@ ImpliedVolatilityRegression
   - [`predict_realised_vols`](@ref): the model and the steps of the branch this tag selects.
   - [`realised_vol`](@ref)
   - [`implied_vol`](@ref)
+  - [`factory`](@ref)
 
 # References
 
@@ -112,11 +119,11 @@ ImpliedVolatilityRegression
   - $(ref_dict[:christensenhansen2002])
   - $(ref_dict[:andersen2006])
 """
-@concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
+@propagatable @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop ve
     """
     Window size for computing rolling realised volatility. It also sets the number of windows, `div(size(X, 1), ws)`, and the regression needs more than two of them.
     """
@@ -200,6 +207,7 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
@@ -264,9 +272,9 @@ ImpliedVolatility
     """
     mp
     """
-    Implied volatility algorithm for predicting realised volatility. The field carries no propagation tag, so [`factory`](@ref) leaves it untouched and the variance estimator inside an [`ImpliedVolatilityRegression`](@ref) keeps the observation weights it was constructed with.
+    Implied volatility algorithm for predicting realised volatility.
     """
-    alg
+    @fprop alg
     """
     Annualisation factor for converting annualised implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(af)` before the algorithm reads them.
     """
