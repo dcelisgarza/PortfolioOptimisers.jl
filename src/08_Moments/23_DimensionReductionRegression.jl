@@ -129,7 +129,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the latent components of a Gaussian latent-variable model.
 
-The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s, because that library caps a latent-variable model at one less than the number of input dimensions: on five factors of full rank `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` lowers that width and **must not raise it to the factor count**: the fit itself succeeds, and `MultivariateStats.projection` then raises an `ArgumentError` out of its singular value decomposition, so the failure surfaces inside [`prep_dim_red_reg`](@ref) rather than at construction.
+The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s, because that library caps a latent-variable model at one less than the number of input dimensions: on five factors of full rank `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` lowers that width and **must not raise it to the factor count**: at the full width the third-party fit succeeds and `MultivariateStats.projection` then raises an `ArgumentError` out of its singular value decomposition, so the failure would surface inside [`prep_dim_red_reg`](@ref) rather than at construction. [`StatsAPI.fit(::PPCA, ::MatNum)`](@ref) checks the cap before it calls that library, and raises a `DomainError` naming `maxoutdim` instead. The constructor cannot hold the check, because it never sees the factor matrix.
 
 # Fields
 
@@ -183,12 +183,17 @@ This method applies PPCA as a dimension reduction technique for regression-based
 # Algorithm
 
  1. Read `drtgt.kwargs`, which carries the retained width through `maxoutdim`.
- 2. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PPCA` with `X` and those keyword arguments, giving the fitted model.
+ 2. If `maxoutdim` is present, check it against the number of factors, `size(X, 1)`.
+ 3. Call [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit) on `MultivariateStats.PPCA` with `X` and those keyword arguments, giving the fitted model.
 
 # Arguments
 
   - `drtgt`: A [`PPCA`](@ref) dimension reduction target, specifying keyword arguments for PPCA.
   - `X`: Data matrix `factors × observations`, standardised by the caller.
+
+# Validation
+
+  - If `drtgt.kwargs` carries a `maxoutdim` entry, `0 < drtgt.kwargs.maxoutdim < size(X, 1)` must hold. `MultivariateStats` caps a probabilistic PCA at one latent dimension fewer than the number of factors, and its own fit accepts the full width and returns a model whose weights are `NaN`. Without this check the failure reaches the caller as an `ArgumentError` from LAPACK, raised by `MultivariateStats.projection` inside [`prep_dim_red_reg`](@ref), which names neither the cause nor the keyword.
 
 # Returns
 
@@ -202,6 +207,12 @@ This method applies PPCA as a dimension reduction technique for regression-based
   - [`prep_dim_red_reg`](@ref)
 """
 function StatsAPI.fit(drtgt::PPCA, X::MatNum)
+    if haskey(drtgt.kwargs, :maxoutdim)
+        maxoutdim = drtgt.kwargs.maxoutdim
+        @argcheck(zero(maxoutdim) < maxoutdim < size(X, 1),
+                  DomainError(maxoutdim,
+                              "MultivariateStats caps a probabilistic PCA at one latent dimension fewer than the number of factors, so 0 < kwargs.maxoutdim < size(X, 1) must hold. Got\nkwargs.maxoutdim => $maxoutdim\nsize(X, 1) => $(size(X, 1))"))
+    end
     return StatsAPI.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """

@@ -35,9 +35,12 @@ FIVE FACTS SHAPE THE PROBES.
    compares the two predictions; matched agrees to 4.4e-16 and mismatched parts by 2.1e-3.
 
 5. `PPCA` CANNOT RETAIN EVERY COMPONENT. `MultivariateStats` caps a latent-variable model at
-   one less than the input dimension. The fit at the full width SUCCEEDS and
-   `MultivariateStats.projection` then raises, so the failure surfaces inside
-   `prep_dim_red_reg`. `The retained width` pins the cap and the raise.
+   one less than the input dimension. Its own fit at the full width SUCCEEDS and
+   `MultivariateStats.projection` then raises a LAPACK `ArgumentError`, so the failure once
+   surfaced inside `prep_dim_red_reg` with no mention of `maxoutdim`. That was issue #502.
+   `StatsAPI.fit(::PPCA, ::MatNum)` now checks the width against `size(X, 1)` and raises a
+   `DomainError` first. `The retained width` pins the cap, the guard, and the raw raise the
+   guard stands in front of.
 =#
 
 const PO = PortfolioOptimisers
@@ -397,15 +400,44 @@ end
         @test size(MVS.projection(StatsAPI.fit(PPCA(; kwargs = (; maxoutdim = 4)), Fs)),
                    2) == 4
 
-        # The cap is hard. The FIT at the full width succeeds, and `projection` raises, so a
-        # caller meets the failure inside `prep_dim_red_reg` rather than at construction.
-        model = StatsAPI.fit(PPCA(; kwargs = (; maxoutdim = 5)), Fs)
-        @test_throws ArgumentError MVS.projection(model)
-        @test_throws ArgumentError PO.prep_dim_red_reg(DimensionReductionRegression(;
-                                                                                    drtgt = PPCA(;
-                                                                                                 kwargs = (;
-                                                                                                           maxoutdim = 5))),
-                                                       Fn)
+        # The cap is hard, and the third-party fit does not enforce it: it accepts the full
+        # width, returns a model whose weights are NaN, and `projection` then raises a LAPACK
+        # `ArgumentError` that names neither the cause nor the keyword. Issue #502.
+        raw = MVS.fit(MVS.PPCA, Fs; maxoutdim = 5)
+        @test all(isnan, raw.W)
+        @test_throws ArgumentError MVS.projection(raw)
+
+        # The library checks the width first, so the caller meets a `DomainError` that names
+        # `maxoutdim` and the factor count. It is raised at the fit, before `MultivariateStats`
+        # is reached, so every caller of that fit inherits it.
+        drtgt5 = PPCA(; kwargs = (; maxoutdim = 5))
+        @test_throws DomainError StatsAPI.fit(drtgt5, Fs)
+        @test_throws DomainError PO.prep_dim_red_reg(DimensionReductionRegression(;
+                                                                                  drtgt = drtgt5),
+                                                     Fn)
+        @test_throws DomainError regression(DimensionReductionRegression(; drtgt = drtgt5),
+                                            randn(StableRNG(100), 300, 2), Fn)
+
+        # The message names the keyword, its value, and the bound it broke.
+        msg = try
+            StatsAPI.fit(drtgt5, Fs)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("kwargs.maxoutdim => 5", msg)
+        @test occursin("size(X, 1) => 5", msg)
+
+        # The guard holds the lower end too, where `MultivariateStats` raises a bare
+        # `ErrorException` whose message names no argument value.
+        @test_throws DomainError StatsAPI.fit(PPCA(; kwargs = (; maxoutdim = 0)), Fs)
+
+        # A `PPCA` that sets no width at all takes no guard, because it has no `maxoutdim`
+        # entry to check. The widths inside the cap are pinned above.
+        @test size(MVS.projection(StatsAPI.fit(PPCA(), Fs)), 2) == 4
+
+        # `PCA` retains every component, so it carries no such cap and no such guard.
+        @test size(MVS.projection(StatsAPI.fit(PCA(; kwargs = (; maxoutdim = 5)), Fs)),
+                   2) == 5
     end
 
     @testset "prep_dim_red_reg reads its statistics from ve" begin
