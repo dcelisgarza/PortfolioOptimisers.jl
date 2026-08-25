@@ -23,7 +23,7 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
 ### Returns
 
-  - `ckurt::MatNum`: Cokurtosis tensor `assets^2 × assets^2`.
+  - $(ret_dict[:ckurt])
 
 ## Factory
 
@@ -112,9 +112,9 @@ abstract type CokurtosisEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for cokurtosis estimators.
+Estimates the square cokurtosis matrix of a returns matrix.
 
-`Cokurtosis` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for cokurtosis estimation.
+`Cokurtosis` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`cokurtosis`](@ref) returns one `assets² × assets²` matrix, which is the source's stacked fourth comoment and not the `assets × assets³` tensor of the same name.
 
 # Fields
 
@@ -222,28 +222,21 @@ end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum
 
-Internal helper for cokurtosis computation.
+Internal helper that builds the square cokurtosis matrix from a deviation matrix.
 
-`_cokurtosis` computes the cokurtosis tensor for the input data matrix and applies matrix processing using the specified estimator.
+`_cokurtosis` returns the ``N^{2} \\times N^{2}`` matrix, which the matrix processing estimator repairs in place before the return.
 
 # Mathematical definition
 
-Let ``\\mathbf{X}`` be the ``T \\times N`` matrix of demeaned returns. Define the ``T \\times N^2`` matrix ``\\mathbf{Z}`` with rows:
+The pairwise expansion of the deviation matrix has the rows:
 
 ```math
 \\begin{align}
-\\mathbf{Z}_{t,\\cdot} &= (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{x}_t^\\intercal) \\odot (\\boldsymbol{x}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
+\\mathbf{Z}_{t,\\cdot} &= (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{y}_t^\\intercal) \\odot (\\boldsymbol{y}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
 \\end{align}
 ```
 
-Where:
-
-  - ``\\mathbf{Z}_{t,\\cdot}``: ``t``-th row of the auxiliary matrix ``\\mathbf{Z}``.
-  - ``\\boldsymbol{x}_t``: ``t``-th row of demeaned returns.
-  - ``\\otimes``: Kronecker product.
-  - ``\\odot``: Element-wise (Hadamard) product.
-
-The ``N^2 \\times N^2`` square cokurtosis matrix is:
+The ``N^{2} \\times N^{2}`` square cokurtosis matrix is:
 
 Unweighted:
 
@@ -263,27 +256,46 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` square cokurtosis matrix. This is the source's ``\\Sigma_{4}``, not its ``\\mathbf{M}_{4}``. The latter is ``N \\times N^3`` and the library never builds it.
-  - ``\\mathbf{Z}``: ``T \\times N^2`` auxiliary matrix of pairwise return products.
+  - ``\\hat{\\mathbf{K}}``: ``N^{2} \\times N^{2}`` square cokurtosis matrix. Its entry ``\\hat{\\mathbf{K}}_{(i-1)N+j,\\,(k-1)N+l}`` is the fourth comoment of the deviations of the assets ``i``, ``j``, ``k`` and ``l``, so the matrix is symmetric. This is the source's ``\\mathbf{\\Sigma}_{4}``, not its ``\\mathbf{M}_{4}``. The latter is ``N \\times N^{3}`` and the library never builds it.
+  - $(math_dict[:Y_dev])
+  - $(math_dict[:y_t_dev])
+  - $(math_dict[:Z_pairprod])
+  - $(math_dict[:w_obs_vec])
+  - $(math_dict[:w_t_moment])
   - $(math_dict[:T])
-  - ``\\boldsymbol{w}``: Observation weights vector ``T \\times 1``.
-  - ``w_t``: Observation weight at time ``t``.
+  - $(math_dict[:N])
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
+  - ``\\otimes``: Kronecker product.
+  - ``\\odot``: Element-wise product. Where the operands differ in shape, it broadcasts along the row axis.
+
+# Algorithm
+
+ 1. Build `o`, the ``1 \\times N`` row of ones.
+ 2. Build `z`, the pairwise expansion `kron(o, X) ⊙ kron(X, o)`. Its column `(i - 1) * N + j` is the element-wise product of the columns `i` and `j` of `X`.
+ 3. Without weights, form `ckurt` as `transpose(z) * z / T`.
+ 4. With weights, form `ckurt` as `transpose(w .* z) * z / sum(w)`. The weights multiply the left factor alone, so each summand carries one weight and not four.
+ 5. Run [`matrix_processing!`](@ref) on `ckurt` in place, and return it.
 
 # Arguments
 
-  - `X`: Data matrix (observations × assets).
+  - `X`: Deviation matrix (observations × assets), already centred by the caller.
   - `mp`: Matrix processing estimator.
-  - `w`: Optional observation weights.
+  - `w`: Optional observation weights. The unweighted method takes `nothing` through its `args...`.
 
 # Returns
 
-  - `ckurt::Matrix{<:Number}`: Cokurtosis tensor after matrix processing.
+  - $(ret_dict[:ckurt]) It is processed in place by `mp`.
 
 # Related
 
   - [`Cokurtosis`](@ref)
   - [`matrix_processing!`](@ref)
   - [`cokurtosis`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
+  - $(ref_dict[:pkurt])
 """
 function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     T, N = size(X)
@@ -305,11 +317,19 @@ end
     cokurtosis(kte::Option{<:Cokurtosis}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
-Compute the cokurtosis tensor for a dataset.
+Compute the square cokurtosis matrix of a dataset.
 
-This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. Observation weights in `kte.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
+This method centres the data with the estimator's mean estimator and repairs the result with its matrix processing estimator. Observation weights in `kte.w` are applied if set. [`FullMoment`](@ref) takes the centred returns, and [`SemiMoment`](@ref) clips every positive deviation to zero. If the estimator is `nothing`, returns `nothing`.
 
 `kte.w` weights the whole estimate, so it reaches the centre as well as the deviations. When `mean` is `nothing` and `kte.w` is not, the method sends `kte.me` through [`factory`](@ref) with `kte.w`, so `kte.w` wins over the weights that `kte.me` carries. Pass `mean` for a centre that `kte.w` does not describe. ADR 0088 records the decision.
+
+# Algorithm
+
+ 1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
+ 2. Resolve the observation weights `w` from `kte.w` with [`get_observation_weights`](@ref).
+ 3. Resolve the centre `mu`. Take it from `mean` when the caller gave one. Otherwise compute it with `kte.me`, and with `factory(kte.me, kte.w)` when `kte.w` is not `nothing`.
+ 4. Replace `X` with the deviation matrix. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
+ 5. Delegate to [`_cokurtosis`](@ref) with the deviation matrix, `kte.mp` and `w`, and return the matrix it returns.
 
 # Arguments
 
@@ -333,7 +353,7 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
 
 # Returns
 
-  - `ckurt::Matrix{<:Number}`: Cokurtosis tensor (assets^2 × assets^2).
+  - $(ret_dict[:ckurt])
 
 # Examples
 

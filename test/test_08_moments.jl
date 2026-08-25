@@ -1369,6 +1369,143 @@
         @test isapprox(cokurtosis(kte0, rd.X[(end - 49):end, :]),
                        cokurtosis(kte, rd.X[(end - 49):end, :]))
     end
+    #=
+    Issue #462, under child map #417 of the map of maps #404.
+
+    Every claim these tests pin is a sentence of one of the nine docstrings of
+    `src/08_Moments/19_Coskewness.jl` and `src/08_Moments/20_Cokurtosis.jl`. The comoments
+    are hand-built from explicit loops rather than taken from a stored fixture, so a claim
+    and its check read side by side. The sample has 11 observations and 3 assets, so a
+    transposed index cannot hide behind a square shape.
+    =#
+    @testset "Higher comoments, swept claims" begin
+        rng462 = StableRNG(987654321)
+        T462, N462 = 11, 3
+        X462 = randn(rng462, T462, N462)
+        mu462 = vec(Statistics.mean(X462; dims = 1))
+        Y462 = X462 .- transpose(mu462)
+        # `mp` runs on the reduced matrix, so a `Posdef` repair would move the numbers the
+        # closed forms below predict. Every estimator here therefore skips it.
+        mp462 = MatrixProcessing(; pdm = nothing)
+
+        # The third comoment matrix, cajas2025 Equation 3.6:
+        # `cskew[a, (i - 1) N + j] = E[y_a y_i y_j]`.
+        function comoment3(Y, w = nothing)
+            T, N = size(Y)
+            wv = isnothing(w) ? ones(T) : collect(w)
+            M = zeros(N, N^2)
+            for a in 1:N, i in 1:N, j in 1:N
+                M[a, (i - 1) * N + j] = sum(wv .* Y[:, a] .* Y[:, i] .* Y[:, j]) / sum(wv)
+            end
+            return M
+        end
+        # The square cokurtosis matrix, cajas2025 Equation 3.7:
+        # `ckurt[(i - 1) N + j, (k - 1) N + l] = E[y_i y_j y_k y_l]`.
+        function comoment4(Y, w = nothing)
+            T, N = size(Y)
+            wv = isnothing(w) ? ones(T) : collect(w)
+            K = zeros(N^2, N^2)
+            for i in 1:N, j in 1:N, k in 1:N, l in 1:N
+                K[(i - 1) * N + j, (k - 1) * N + l] = sum(wv .* Y[:, i] .* Y[:, j] .*
+                                                          Y[:, k] .* Y[:, l]) / sum(wv)
+            end
+            return K
+        end
+        # The negative spectral skewness matrix, cajas2025 Equations 7.104 and 7.105:
+        # keep the negative eigenvalues of each block and negate their sum.
+        function negspec(cskew)
+            N = size(cskew, 1)
+            V = zeros(N, N)
+            for i in 1:N
+                B = cskew[:, ((i - 1) * N + 1):(i * N)]
+                vals, vecs = LinearAlgebra.eigen(B)
+                V .-= vecs *
+                      LinearAlgebra.Diagonal(clamp.(vals, -Inf, 0.0)) *
+                      transpose(vecs)
+            end
+            return V
+        end
+
+        # --- shapes -----------------------------------------------------------
+        # `cskew` is `assets × assets^2` and `V` is `assets × assets`. The docstring said
+        # `observations × assets^2` for the first before #462.
+        cskew462, V462 = coskewness(Coskewness(; mp = mp462), X462)
+        ckurt462 = cokurtosis(Cokurtosis(; mp = mp462), X462)
+        @test size(cskew462) == (N462, N462^2)
+        @test size(V462) == (N462, N462)
+        @test size(ckurt462) == (N462^2, N462^2)
+
+        # --- the closed forms -------------------------------------------------
+        @test isapprox(cskew462, comoment3(Y462))
+        @test isapprox(ckurt462, comoment4(Y462))
+
+        # Each of the `N` blocks of `cskew` is symmetric, which is what makes every
+        # eigenvalue of a block real.
+        for i in 1:N462
+            B = cskew462[:, ((i - 1) * N462 + 1):(i * N462)]
+            @test isapprox(B, transpose(B))
+            @test eltype(LinearAlgebra.eigen(B).values) <: Real
+        end
+        @test isapprox(ckurt462, transpose(ckurt462))
+
+        # --- the negative spectral matrix -------------------------------------
+        # `V` is the reduction of `cskew`, not a processed copy of it.
+        @test isapprox(V462, negspec(cskew462))
+        @test minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(V462))) > 0
+        @test !isapprox(V462, cskew462[:, 1:N462])
+
+        # Both branches of the eigenvalue guard. A real spectrum takes the first, and it
+        # agrees with the closed form. A complex spectrum takes the fallback, which clamps
+        # each part and keeps the real part of the reconstruction; the result is a real
+        # matrix and the closed form no longer describes it.
+        cskew462c = [0.0 -1.0 0.0 0.0; 1.0 0.0 0.0 0.0]
+        V462c = PortfolioOptimisers.negative_spectral_coskewness(cskew462c,
+                                                                 randn(StableRNG(11), 6, 2),
+                                                                 mp462)
+        @test eltype(LinearAlgebra.eigen(cskew462c[:, 1:2]).values) <: Complex
+        @test eltype(V462c) <: Real
+        @test isapprox(V462c, [0.0 -0.5; -0.5 0.0])
+
+        # --- SemiMoment against FullMoment ------------------------------------
+        Yneg462 = min.(Y462, 0.0)
+        cskews462, Vs462 = coskewness(Coskewness(; mp = mp462, alg = SemiMoment()), X462)
+        ckurts462 = cokurtosis(Cokurtosis(; mp = mp462, alg = SemiMoment()), X462)
+        @test isapprox(cskews462, comoment3(Yneg462))
+        @test isapprox(ckurts462, comoment4(Yneg462))
+        @test isapprox(Vs462, negspec(cskews462))
+        @test !isapprox(cskews462, cskew462)
+        @test !isapprox(ckurts462, ckurt462)
+
+        # --- observation weights, ADR 0088 ------------------------------------
+        # `w` reaches the centre as well as the deviations, so the hand build centres with
+        # the weighted mean.
+        w462 = StatsBase.pweights(range(0.5, 1.5; length = T462))
+        muw462 = vec(sum(w462 .* X462; dims = 1)) / sum(w462)
+        Yw462 = X462 .- transpose(muw462)
+        cskeww462, Vw462 = coskewness(Coskewness(; mp = mp462, w = w462), X462)
+        ckurtw462 = cokurtosis(Cokurtosis(; mp = mp462, w = w462), X462)
+        @test isapprox(cskeww462, comoment3(Yw462, w462))
+        @test isapprox(ckurtw462, comoment4(Yw462, w462))
+        @test isapprox(Vw462, negspec(cskeww462))
+        # An unweighted centre with weighted deviations is a different estimate, which is
+        # the decision ADR 0088 records.
+        @test !isapprox(cskeww462, comoment3(Y462, w462))
+        @test !isapprox(ckurtw462, comoment4(Y462, w462))
+
+        # --- dims -------------------------------------------------------------
+        # `dims = 2` reads the transpose, and `dims_oriented` validates the value.
+        cskewt462, Vt462 = coskewness(Coskewness(; mp = mp462), transpose(X462); dims = 2)
+        @test isapprox(cskewt462, cskew462)
+        @test isapprox(Vt462, V462)
+        @test isapprox(cokurtosis(Cokurtosis(; mp = mp462), transpose(X462); dims = 2),
+                       ckurt462)
+        @test_throws DomainError coskewness(Coskewness(), X462; dims = 3)
+        @test_throws DomainError cokurtosis(Cokurtosis(), X462; dims = 3)
+
+        # --- the no-op estimators ---------------------------------------------
+        @test coskewness(nothing, X462) === (nothing, nothing)
+        @test isnothing(cokurtosis(nothing, X462))
+    end
     @testset "Distance" begin
         des = [Distance(; alg = SimpleAbsoluteDistance()),
                DistanceDistance(; alg = SimpleAbsoluteDistance()),

@@ -69,8 +69,8 @@
 "src/08_Moments/16_ShrunkExpectedReturns.jl" = { map = 3, units = 14, algorithm = 7, swept = true }
 "src/08_Moments/17_EquilibriumExpectedReturns.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { map = 3, units = 2, algorithm = 0, swept = true }
-"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, swept = false }
-"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, swept = false }
+"src/08_Moments/19_Coskewness.jl" = { map = 3, units = 5, algorithm = 3, swept = true }
+"src/08_Moments/20_Cokurtosis.jl" = { map = 3, units = 4, algorithm = 2, swept = true }
 "src/08_Moments/21_Base_Regression.jl" = { map = 3, units = 28, swept = false }
 "src/08_Moments/22_StepwiseRegression.jl" = { map = 3, units = 14, swept = false }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { map = 3, units = 10, swept = false }

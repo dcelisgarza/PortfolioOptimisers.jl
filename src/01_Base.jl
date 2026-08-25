@@ -876,6 +876,7 @@ const ret_dict = unique_key_dict(:ret_dict,
                                  :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
                                  :cskewV => "`V::MatNum`: Processed coskewness matrix `assets x assets`.",#
                                  :kte => "`kte::MatNum`: Cokurtosis matrix `assets x assets`.",#
+                                 :ckurt => "`ckurt::MatNum`: Square cokurtosis matrix `assets² x assets²`.",#
                                  :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                                  :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
                                  :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
@@ -1024,7 +1025,14 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :possum_sb => "``\\mathrm{pos}``, ``\\mathrm{neg}``, ``\\mathrm{nn}``: Contribution sums of a pair over ``C``, ``D`` and ``N``.",#
                        :poscount_sb => "``c^{+}``, ``c^{-}``, ``c^{0}``: Observation counts of a pair over ``C``, ``D`` and ``N``.",#
                        :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair, chosen from the sums and the counts by the marker prefix.",#
-                       :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.")
+                       :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.",#
+                       # The higher comoments. `19_Coskewness.jl` and `20_Cokurtosis.jl`
+                       # build both matrices from one deviation matrix and one pairwise
+                       # expansion of it, so the two files share these four symbols.
+                       :Y_dev => "``\\mathbf{Y}``: ``T \\times N`` deviation matrix. `FullMoment` takes the centred returns, and `SemiMoment` clips every positive entry of them to zero.",#
+                       :y_t_dev => "``\\boldsymbol{y}_t``: ``N \\times 1`` deviation vector of observation ``t``, the ``t``-th row of ``\\mathbf{Y}``. Its ``i``-th entry is ``y_{t,\\,i}``.",#
+                       :Z_pairprod => "``\\mathbf{Z}``: ``T \\times N^{2}`` pairwise expansion of ``\\mathbf{Y}``, whose ``t``-th row is ``\\mathbf{Z}_{t,\\cdot}`` and whose entry ``\\mathbf{Z}_{t,\\,(i-1)N+j}`` is the product ``y_{t,\\,i} \\, y_{t,\\,j}``.",#
+                       :w_obs_vec => "``\\boldsymbol{w}``: ``T \\times 1`` observation weights vector.")
 """
     ref_dict
 
