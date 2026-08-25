@@ -599,7 +599,7 @@ Where:
   - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
   - $(math_dict[:n_network])
 
-`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. Measured over a 20-asset minimum spanning tree, the first six entries of ``\\mathbf{D}_n`` are `[3, 1, 2, 4, 3, 1]` and the returned scores are `[0.1579, 0.0526, 0.1053, 0.2105, 0.1579, 0.0526]`, a maximum absolute difference of `3.7894736842105265`. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
+`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, the first six entries of ``\\mathbf{D}_n`` are `[3, 2, 1, 1, 2, 3]` and the returned scores are `[0.1579, 0.1053, 0.0526, 0.0526, 0.1053, 0.1579]`, a maximum absolute difference of `4.7368421052631575`. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
 
 The factor is the whole difference, and it re-ranks nothing. [`average_centrality`](@ref) is linear in the score vector, so a constant scale moves the average by that same constant.
 
@@ -774,9 +774,9 @@ The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathr
 
 # `alpha` must be below the reciprocal of the largest eigenvalue
 
-Above the bound the linear solve still returns a vector, and the vector is not a centrality: measured over a 20-asset minimum spanning tree, ``\\lambda_{\\mathrm{max}} = 2.3585443300773266`` and the bound is `0.42399033473634745`. At `alpha = 0.3` every score is positive, between `0.13148` and `0.36762`. At `alpha = 0.5` the scores run `-0.45187` to `0.45187`, and a negative centrality has no reading.
+Above the bound the linear solve still returns a vector, and the vector is not a centrality: measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, ``\\lambda_{\\mathrm{max}} = 2.57344493899609`` and the bound is `0.388584183343788`. At `alpha = 0.3` every score is positive, between `0.10752` and `0.46421`. At `alpha = 0.5` the scores run `-0.55627` to `0.19624`, eleven of the twenty are negative, and a negative centrality has no reading.
 
-**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets.
+**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets: over those same 20 assets the filtered graph has ``\\lambda_{\\mathrm{max}} = 6.174911353215694``, a bound of `0.16194564468998124`, and the default `alpha = 0.3` is outside it.
 
 # Fields
 
@@ -3150,7 +3150,7 @@ Where:
   - ``\\mathbf{B}_{k}``: Pairs joined by at least one walk of length exactly ``k``.
   - ``\\mathbf{B}_{1,\\,l}``: Pairs joined by at least one walk of length at most ``l``.
 
-The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell. Measured over a 20-asset minimum spanning tree, the two agree entry for entry at `n = 1, 2, 3, 4` — a maximum absolute difference of `0`, over `19`, `44`, `71` and `99` related pairs.
+The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz`, the two agree entry for entry at `n = 1, 2, 3, 4` — a maximum absolute difference of `0`, over `19`, `48`, `84` and `115` related pairs.
 
 # The result is `Int` under either separation
 
@@ -3449,7 +3449,7 @@ Where:
   - ``\\boldsymbol{C}_n``: Centrality score vector from [`centrality_vector`](@ref).
   - ``\\boldsymbol{x}``: Portfolio weight vector.
 
-There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here. Measured over a 20-asset minimum spanning tree, the code and the formula agree exactly.
+There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz` at equal weights, the code and the formula agree exactly.
 
 # Algorithm
 
@@ -3528,7 +3528,7 @@ Where:
   - ``\\boldsymbol{x}``: Portfolio weight vector.
   - ``\\boldsymbol{1}_n``: Column vector of ones of length ``n``.
 
-Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero. Measured over a 20-asset minimum spanning tree at a two-hop budget, the code and the formula agree to `5.551115123125783e-17`.
+Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero. Measured over the minimum spanning tree of the last 253 observations of the 20-asset sample in `test/assets/SP500.csv.gz` at a two-hop budget and equal weights, the code and the formula agree exactly.
 
 # Algorithm
 

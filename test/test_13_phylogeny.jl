@@ -3831,3 +3831,389 @@ end
         @test res[:optimal][7].heights == res[:default][7].heights
     end
 end
+
+#=
+Condition 2 of the sweep of `src/11_Phylogeny/06_Phylogeny.jl`, issue #472. The file was
+coverage terminal before this testset was written -- 319 executable lines, 0 misses -- and
+every check below exists because the line it covers was already executed and asserted
+nothing about the value it produced.
+
+The graphs are a path, a star and a cycle, which separate the eight centrality algorithms
+from each other and whose closed forms a reader can compute by hand. Each expected value is
+written as its closed form rather than as a recorded decimal, so the test carries its own
+authority and cannot pass a wrong answer.
+
+Defined at top level because a `@testset` body becomes a function.
+=#
+@testset "The network layer answers its own closed forms (#472)" begin
+    using PortfolioOptimisers, Test, CSV, DataFrames, TimeSeries, LinearAlgebra, Statistics
+
+    PO472 = PortfolioOptimisers
+    Gr472 = PortfolioOptimisers.Graphs
+    cc = PortfolioOptimisers.calc_centrality
+    rd472 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                          "./assets/SP500.csv.gz"));
+                                        timestamp = :Date)[(end - 252):end])
+    Xt = prior(EmpiricalPrior(), rd472).X
+
+    P4 = Gr472.path_graph(4)
+    S5 = Gr472.star_graph(5)
+    C5 = Gr472.cycle_graph(5)
+
+    @testset "The eight algorithms against their closed forms" begin
+        #=
+        Degree counts the edges that touch a node and divides by `n - 1`. Closeness is
+        `(n - 1) / sum(d)` on a connected graph. Betweenness counts the shortest paths
+        through a node over the unordered pairs and divides by `(n - 1)(n - 2) / 2`; stress
+        is the same count over the ORDERED pairs and divides by nothing. Radiality reads the
+        mean length against the diameter. Eigenvector and Katz are the leading eigenvector
+        and the resolvent, both at unit 2-norm. PageRank is the damped walk's stationary
+        share, which sums to one.
+        =#
+        # A path of four. Degrees 1, 2, 2, 1.
+        @test cc(DegreeCentrality(), P4) == [1, 2, 2, 1] ./ 3
+        @test cc(DegreeCentrality(; kwargs = (; normalize = false)), P4) == [1, 2, 2, 1]
+        # Distance sums 6, 4, 4, 6 against `n - 1 == 3`.
+        @test cc(ClosenessCentrality(), P4) == 3 ./ [6, 4, 4, 6]
+        # Node 2 lies on 1--3 and 1--4; node 3 on 1--4 and 2--4. `(n - 1)(n - 2) / 2 == 3`.
+        @test cc(BetweennessCentrality(), P4) == [0, 2, 2, 0] ./ 3
+        # The same two pairs, counted in both directions and left undivided.
+        @test cc(StressCentrality(), P4) == [0, 4, 4, 0]
+        # Diameter 3, mean lengths 6/3, 4/3, 4/3, 6/3 against `(3 + 1 - mean) / 3`.
+        @test cc(RadialityCentrality(), P4) == ((3 + 1) .- [6, 4, 4, 6] ./ 3) ./ 3
+        # The leading eigenvalue of a path of four is the golden ratio, and its eigenvector
+        # is `[1, phi, phi, 1]`.
+        phi = (1 + sqrt(5)) / 2
+        @test isapprox(cc(EigenvectorCentrality(), P4),
+                       [1, phi, phi, 1] ./ norm([1, phi, phi, 1]))
+        # The resolvent, solved directly.
+        vk4 = (I - 0.3 * Matrix{Float64}(Gr472.adjacency_matrix(P4))) \ ones(4)
+        @test isapprox(cc(KatzCentrality(), P4), vk4 ./ norm(vk4))
+        # `PR2 = 0.0375 + 0.85 * PR1 + 0.425 * PR2` and `PR1 = 0.0375 + 0.425 * PR2`.
+        pr2 = 0.069375 / 0.21375
+        # The stopping rule is `sum(abs, x - xlast) < n * epsilon`, so the closed form
+        # is met to about `n * epsilon` and not to `epsilon`.
+        @test isapprox(cc(Pagerank(), P4), [0.0375 + 0.425pr2, pr2, pr2, 0.0375 + 0.425pr2];
+                       atol = 1e-5)
+
+        # A star of five. The centre touches every leaf; a leaf touches the centre alone.
+        @test cc(DegreeCentrality(), S5) == [4, 1, 1, 1, 1] ./ 4
+        @test cc(DegreeCentrality(; kwargs = (; normalize = false)), S5) == [4, 1, 1, 1, 1]
+        # Distance sums 4 and 1 + 2 + 2 + 2 against `n - 1 == 4`.
+        @test cc(ClosenessCentrality(), S5) == 4 ./ [4, 7, 7, 7, 7]
+        # The centre carries every one of the `binomial(4, 2) == 6` leaf pairs, and
+        # `(n - 1)(n - 2) / 2 == 6`.
+        @test cc(BetweennessCentrality(), S5) == [1, 0, 0, 0, 0]
+        # The same six pairs in both directions.
+        @test cc(StressCentrality(), S5) == [12, 0, 0, 0, 0]
+        # Diameter 2, mean lengths 4/4 and 7/4 against `(2 + 1 - mean) / 2`.
+        @test cc(RadialityCentrality(), S5) == ((2 + 1) .- [4, 7, 7, 7, 7] ./ 4) ./ 2
+        # A star's leading eigenvector puts `sqrt(k)` on the centre and one on each leaf.
+        @test isapprox(cc(EigenvectorCentrality(), S5),
+                       [2, 1, 1, 1, 1] ./ norm([2, 1, 1, 1, 1]))
+        # `c = 1 + 4 * alpha * l` and `l = 1 + alpha * c`, so `c = (1 + 4a) / (1 - 4a^2)`.
+        cs = (1 + 4 * 0.3) / (1 - 4 * 0.3^2)
+        ls = 1 + 0.3 * cs
+        @test isapprox(cc(KatzCentrality(), S5),
+                       [cs, ls, ls, ls, ls] ./ norm([cs, ls, ls, ls, ls]))
+        # `PRc = 0.03 + 3.4 * PRl` and `PRc + 4 * PRl = 1`, so `PRl = 0.97 / 7.4`.
+        prl = 0.97 / 7.4
+        @test isapprox(cc(Pagerank(), S5), [1 - 4prl, prl, prl, prl, prl]; atol = 1e-5)
+
+        # A cycle of five. It is vertex-transitive, so every algorithm is constant on it.
+        @test cc(DegreeCentrality(), C5) == fill(2 / 4, 5)
+        @test cc(DegreeCentrality(; kwargs = (; normalize = false)), C5) == fill(2.0, 5)
+        # Every distance sum is `0 + 1 + 1 + 2 + 2 == 6` against `n - 1 == 4`.
+        @test cc(ClosenessCentrality(), C5) == fill(4 / 6, 5)
+        # One pair of the four remaining vertices routes through each node.
+        @test cc(BetweennessCentrality(), C5) == fill(1 / 6, 5)
+        @test cc(StressCentrality(), C5) == fill(2, 5)
+        @test cc(RadialityCentrality(), C5) == fill(((2 + 1) - 6 / 4) / 2, 5)
+        # `A * 1 == 2 * 1`, so both the eigenvector and the resolvent are constant.
+        @test isapprox(cc(EigenvectorCentrality(), C5), fill(1 / sqrt(5), 5))
+        @test isapprox(cc(KatzCentrality(), C5), fill(1 / sqrt(5), 5))
+        @test isapprox(cc(Pagerank(), C5), fill(1 / 5, 5); atol = 1e-5)
+    end
+
+    @testset "`DegreeCentrality`'s divisor, and its three `kind` values" begin
+        #=
+        The wrapper's name does not say that `Graphs._degree_centrality` divides by
+        `n - 1`. It does, and `normalize = false` recovers the count. `kind` selects the
+        total, the in- or the out-degree, which are one number on an undirected graph and
+        three on a directed one -- so the field is kept because `Graphs.jl` takes it, not
+        because it selects anything the library builds.
+        =#
+        for g in (P4, S5, C5)
+            n = Gr472.nv(g)
+            raw = cc(DegreeCentrality(; kwargs = (; normalize = false)), g)
+            @test cc(DegreeCentrality(), g) == raw ./ (n - 1)
+            @test raw == vec(sum(Gr472.adjacency_matrix(g); dims = 2))
+            # The three coincide, exactly, on every undirected structure.
+            @test allequal(cc(DegreeCentrality(; kind = k), g) for k in 0:2)
+        end
+        # And separate on a directed one, so the field is not inert in `Graphs.jl`.
+        dg = Gr472.SimpleDiGraph(4)
+        for (u, v) in ((1, 2), (2, 3), (3, 4), (1, 4))
+            Gr472.add_edge!(dg, u, v)
+        end
+        dirs = [cc(DegreeCentrality(; kind = k, kwargs = (; normalize = false)), dg)
+                for k in 0:2]
+        @test dirs[1] == [2, 2, 2, 2]        # total
+        @test dirs[2] == [0, 1, 1, 2]        # in
+        @test dirs[3] == [2, 1, 1, 0]        # out
+        @test dirs[1] == dirs[2] + dirs[3]
+        @test !allequal(dirs)
+        @test_throws DomainError DegreeCentrality(; kind = 3)
+        @test_throws DomainError DegreeCentrality(; kind = -1)
+    end
+
+    @testset "A forwarded argument reaches `Graphs.jl`" begin
+        #=
+        Four algorithms splat `args` and `kwargs` into the routine they select. The guards
+        of `assert_centrality_args` refuse a matrix in `args`, which is asserted elsewhere;
+        what is asserted here is that what survives the guard arrives and changes the
+        answer.
+        =#
+        # `normalize = false` replaces betweenness' `1 / ((n - 1)(n - 2))` by `1 / 2`, so
+        # the two answers differ by exactly `(n - 1)(n - 2) / 2`.
+        n4 = Gr472.nv(P4)
+        b_raw = cc(BetweennessCentrality(; kwargs = (; normalize = false)), P4)
+        @test b_raw == cc(BetweennessCentrality(), P4) .* ((n4 - 1) * (n4 - 2) / 2)
+        # Closeness' default carries the reachable-share factor, which is one on a
+        # connected graph and bites on a disconnected one.
+        two = Gr472.SimpleGraph(4)
+        Gr472.add_edge!(two, 1, 2)
+        Gr472.add_edge!(two, 3, 4)
+        @test cc(ClosenessCentrality(; kwargs = (; normalize = false)), two) == ones(4)
+        @test cc(ClosenessCentrality(), two) == fill(1 / 3, 4)
+        # A positional argument is a source list, so restricting it restricts the sum.
+        @test cc(StressCentrality(; args = ([1],)), P4) == [0, 2, 1, 0]
+        @test cc(BetweennessCentrality(; args = ([1],)), P4) == [0, 4, 2, 0] ./ 3
+    end
+
+    @testset "`EigenvectorCentrality` discards `ct`, and `ov` still reaches the polarity" begin
+        #=
+        Its `calc_centrality` method is `Graphs.eigenvector_centrality(g)` with the
+        algorithm dropped, so the override cannot act there. It acts one frame earlier, in
+        `centrality_polarity`, which is what decides the graph.
+        =#
+        for g in (P4, S5, C5)
+            @test isapprox(cc(EigenvectorCentrality(), g),
+                           cc(EigenvectorCentrality(; ov = TopologyOnly()), g))
+        end
+        @test centrality_polarity(EigenvectorCentrality()) === SimilarityPolarity()
+        @test centrality_polarity(EigenvectorCentrality(; ov = TopologyOnly())) === nothing
+    end
+
+    @testset "The three trees select one tree" begin
+        #=
+        Kruskal, Boruvka and Prim minimise the same total over the same graph, so on a
+        graph with distinct edge weights they must return the same edge set. They do not
+        return the same edge TYPE: `Graphs.prim_mst` answers with a `SimpleEdge` and the
+        other two with a `SimpleWeightedEdge`, so a caller reading a weight off an edge
+        must read it off the graph instead.
+        =#
+        SWG472 = PortfolioOptimisers.SimpleWeightedGraphs
+        W = [0.0 1.0 4.0 3.0
+             1.0 0.0 2.0 5.0
+             4.0 2.0 0.0 6.0
+             3.0 5.0 6.0 0.0]
+        gw = SWG472.SimpleWeightedGraph(PortfolioOptimisers.graph_weight_matrix(W))
+        nvw = size(W, 1)
+        keyed(t) = Set((min(Gr472.src(e), Gr472.dst(e)), max(Gr472.src(e), Gr472.dst(e)))
+                       for e in t)
+        total(t) = sum(W[Gr472.src(e), Gr472.dst(e)] for e in t)
+        ts = [PortfolioOptimisers.calc_mst(a, gw)
+              for a in (KruskalTree(), BoruvkaTree(), PrimTree())]
+        # The minimum spanning tree of this matrix is 1--2, 2--3, 1--4, of weight 6.
+        @test all(t -> length(t) == nvw - 1, ts)
+        @test all(t -> keyed(t) == Set([(1, 2), (2, 3), (1, 4)]), ts)
+        @test all(t -> total(t) == 6.0, ts)
+        @test allequal(keyed(t) for t in ts)
+        # Prim's edge type is the odd one out.
+        @test eltype(ts[3]) === Gr472.SimpleGraphs.SimpleEdge{Int}
+        @test eltype(ts[1]) === eltype(ts[2]) !== eltype(ts[3])
+    end
+
+    @testset "The hop separation is the graph distance, and the ball is a power sum" begin
+        #=
+        `separation_matrix(::HopCount, g)` is `Graphs.gdistances` per vertex, which on a
+        path is `abs(i - j)` and needs no routine to check. `_phylogeny_matrix`'s power sum
+        is the other half of the same statement: the `n`-ball of that distance is the
+        clamped sum of the first `n` powers of the adjacency matrix.
+        =#
+        p6 = Gr472.path_graph(6)
+        d6 = separation_matrix(HopCount(), p6)
+        @test d6 == [abs(i - j) for i in 1:6, j in 1:6]
+        A6 = Matrix{Int}(Gr472.adjacency_matrix(p6))
+        for n in 1:3
+            # The power sum, computed here rather than read from the source.
+            P = zeros(Int, 6, 6)
+            for i in 0:n
+                P .+= A6^i
+            end
+            @test Int.(d6 .<= n) - Matrix(I, 6, 6) == clamp!(P, 0, 1) - Matrix(I, 6, 6)
+        end
+        # An unreachable pair takes the sentinel rather than a repaired number.
+        @test separation_matrix(HopCount(), Gr472.SimpleGraph(2))[1, 2] == typemax(Int)
+    end
+
+    @testset "The quantile population is the off-diagonal, both triangles" begin
+        #=
+        `separation_quantile` collects `d[i, j]` for every `i != j`, so a symmetric matrix
+        enters each unordered pair twice. Doubling every entry leaves the empirical
+        distribution alone, so the answer equals the upper triangle's quantile -- and it is
+        NOT the whole matrix's, which the zero diagonal drags down.
+        =#
+        d4 = separation_matrix(HopCount(), P4)
+        offd = [d4[i, j] for j in 1:4 for i in 1:4 if i != j]
+        upper = [d4[i, j] for j in 1:4 for i in 1:4 if i < j]
+        @test sort(offd) == [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3]
+        @test sort(upper) == [1, 1, 1, 2, 2, 3]
+        for q in (0.0, 0.25, 0.5, 0.75, 1.0)
+            got = PortfolioOptimisers.separation_quantile(HopCount(), d4, q)
+            @test got == Statistics.quantile(offd, q)
+            @test got == Statistics.quantile(upper, q)
+        end
+        # The diagonal would move it. `q = 0.25` is `1` without it and `0.75` with it.
+        @test PortfolioOptimisers.separation_quantile(HopCount(), d4, 0.25) == 1
+        @test Statistics.quantile(vec(d4), 0.25) == 0.75
+        # The rules round the same population: a hop count to a shell, a path length not.
+        @test HopCountQuantile(; q = 0.5)(NetworkEstimator(), zeros(0, 0), P4) ==
+              round(Int, Statistics.quantile(offd, 0.5))
+        @test PathLengthQuantile(; q = 0.5)(NetworkEstimator(), zeros(0, 0), P4) ==
+              Statistics.quantile(offd, 0.5)
+    end
+
+    @testset "The observed diameter is a ceiling, and a stated budget builds nothing" begin
+        #=
+        `separation_budget(::PathLength, …)` returns `min(dmax, delta)`, so a budget above
+        the observed diameter is lowered to it rather than kept. And the resolved case of
+        `resolve_separation` builds no structure: a stated budget must not pay for one to
+        be told that it is already a value, which a `0 x 0` sample proves -- building one
+        would raise long before the budget was read.
+        =#
+        nte = NetworkEstimator()
+        gp = PortfolioOptimisers.calc_distance_weighted_graph(nte, Xt)
+        d = separation_matrix(PathLength(), gp)
+        diam = maximum(d)
+        @test isapprox(diam, 3.4743422191984883)
+        @test separation_budget(PathLength(), nte, d) == diam
+        @test separation_budget(PathLength(; dmax = diam / 2), nte, d) == diam / 2
+        for over in (diam + 1, 1.0e6)
+            @test separation_budget(PathLength(; dmax = over), nte, d) == diam
+        end
+        # No structure for a stated budget, on either member.
+        empty = zeros(0, 0)
+        stated_h = HopCount(; n = 3)
+        stated_p = PathLength(; dmax = 1.5)
+        @test resolve_separation(stated_h, nte, empty) === stated_h
+        @test resolve_separation(stated_p, nte, empty) === stated_p
+        # The same call on a rule does build one, and therefore raises on the same sample.
+        @test_throws Exception resolve_separation(HopCount(;
+                                                           n = (nte, X, g; kwargs...) -> 2),
+                                                  nte, empty)
+    end
+
+    @testset "The measured claims of the file's own docstrings" begin
+        #=
+        Five docstrings illustrate a claim with a number measured over "a 20-asset minimum
+        spanning tree". The tree is this one -- the file's own SP500 window -- and the
+        numbers are these. They were re-measured by the sweep of #472, because the values
+        the library-wide sweep recorded belonged to a structure no fixture in the
+        repository builds.
+        =#
+        nte = NetworkEstimator(; alg = KruskalTree())
+        gT = PortfolioOptimisers.centrality_graph(nothing, nte, Xt)
+        A = Gr472.adjacency_matrix(gT)
+        @test Gr472.nv(gT) == 20
+        @test Gr472.ne(gT) == 19
+
+        # `DegreeCentrality`: the divisor is `n - 1`, and the first six degrees are these.
+        dn = vec(sum(A; dims = 2))
+        sc = cc(DegreeCentrality(), gT)
+        @test dn[1:6] == [3, 2, 1, 1, 2, 3]
+        @test isapprox(round.(sc[1:6]; digits = 4),
+                       [0.1579, 0.1053, 0.0526, 0.0526, 0.1053, 0.1579])
+        @test isapprox(sc, dn ./ 19)
+        @test isapprox(maximum(abs.(dn .- sc)), 4.7368421052631575)
+
+        # `KatzCentrality`: the bound, and what falls outside it.
+        lmax = maximum(abs.(eigvals(Matrix{Float64}(A))))
+        @test isapprox(lmax, 2.57344493899609)
+        @test isapprox(inv(lmax), 0.388584183343788)
+        @test 0.3 < inv(lmax) < 0.5
+        inside = cc(KatzCentrality(; alpha = 0.3), gT)
+        @test all(>(0), inside)
+        @test isapprox(minimum(inside), 0.10751767636172335)
+        @test isapprox(maximum(inside), 0.4642121115623047)
+        # Above the bound the solve still answers, and the answer is not a centrality. It
+        # is a silent wrong number by design: the constructor cannot see the graph, so the
+        # bound is the caller's to respect. See the type's docstring.
+        outside = cc(KatzCentrality(; alpha = 0.5), gT)
+        @test count(<(0), outside) == 11
+        @test isapprox(minimum(outside), -0.5562688954034373)
+        @test isapprox(maximum(outside), 0.19623930476732365)
+        # A denser structure over the same assets lowers the bound below the default.
+        gpm = PortfolioOptimisers.centrality_graph(nothing,
+                                                   NetworkEstimator(;
+                                                                    alg = MaximumDistanceSimilarity()),
+                                                   Xt)
+        lpm = maximum(abs.(eigvals(Matrix{Float64}(Gr472.adjacency_matrix(gpm)))))
+        @test isapprox(lpm, 6.174911353215694)
+        @test isapprox(inv(lpm), 0.16194564468998124)
+        @test inv(lpm) < 0.3
+
+        # `_phylogeny_matrix`: the shell-by-shell form and the power sum agree, over these
+        # related-pair counts.
+        for (n, want) in zip(1:4, (19, 48, 84, 115))
+            Pn = phylogeny_matrix(NetworkEstimator(; alg = KruskalTree(),
+                                                   sep = HopCount(; n = n)), Xt).X
+            @test count(isone, Pn) ÷ 2 == want
+            # `B_{1,l}`, accumulated shell by shell, is the same selection.
+            shells = zeros(Int, size(A))
+            for k in 1:n
+                shells .+= clamp!(Matrix{Int}(A)^k + Matrix(I, 20, 20), 0, 1) -
+                           Matrix(I, 20, 20)
+            end
+            @test maximum(abs.(Pn - (clamp!(shells, 0, 1)))) == 0
+        end
+
+        # `average_centrality` and `asset_phylogeny`: the code equals the formula exactly at
+        # equal weights.
+        w = fill(inv(20), 20)
+        @test average_centrality(nte, DegreeCentrality(), w, Xt) == dot(sc, w)
+        plr = phylogeny_matrix(NetworkEstimator(; sep = HopCount(; n = 2)), Xt)
+        aw = abs.(w * transpose(w))
+        @test asset_phylogeny(plr, w) == dot(plr.X, aw) / sum(aw)
+    end
+
+    @testset "`Pagerank` converges inside `n`, and raises when it does not" begin
+        #=
+        The default `n = 100` is enough on both branches of this library's structures, and
+        the scores are a probability vector. It is not enough everywhere: a small `n` makes
+        `Graphs.pagerank` RAISE rather than return an unconverged vector, which is the
+        whole reason the knob is a field.
+        =#
+        # The sweeps each branch needs at the shipped `alpha` and `epsilon`. The tree
+        # takes 57 of the default 100 and the filtered graph 14, so the default holds
+        # on both and neither has much room: at `n = 50` the tree branch RAISES.
+        for (alg, want) in ((KruskalTree(), 57), (MaximumDistanceSimilarity(), 14))
+            g = PortfolioOptimisers.centrality_graph(nothing, NetworkEstimator(; alg = alg),
+                                                     Xt)
+            p = cc(Pagerank(), g)
+            @test all(>=(0), p)
+            @test isapprox(sum(p), 1)
+            @test want < 100
+            @test isapprox(cc(Pagerank(; n = want), g), p)
+            @test_throws ErrorException cc(Pagerank(; n = want - 1), g)
+        end
+        gT = PortfolioOptimisers.centrality_graph(nothing,
+                                                  NetworkEstimator(; alg = KruskalTree()),
+                                                  Xt)
+        @test_throws ErrorException cc(Pagerank(; n = 1, epsilon = 1e-12), gT)
+        @test_throws DomainError Pagerank(; n = 0)
+        @test_throws DomainError Pagerank(; epsilon = 0.0)
+        @test_throws Exception Pagerank(; alpha = 1.5)
+    end
+end
