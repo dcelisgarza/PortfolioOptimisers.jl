@@ -1793,6 +1793,57 @@
         @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
     =#
+    # The three defects that the documentation sweep of `src/11_Phylogeny/04_DBHT.jl`, issue
+    # #469, found on the `EqualRoot` path: #507, #508 and #509. The reference implementation
+    # is `DBHTs.m`, MATLAB Central File Exchange submission 46750 by Won-Min Song and Tomaso
+    # Aste, and it carries all three. The papers it cites are Song, Di Matteo and Aste,
+    # *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
+    # 2135-2146, and Song, Di Matteo and Aste, *Hierarchical information clustering by means
+    # of topologically embedded graphs*, PLoS ONE 7 (2012) e31929.
+    @testset "The EqualRoot path of #507, #508 and #509" begin
+        @testset "AdjCliq scores a candidate against itself alone (#507)" begin
+            # The reproduction of #507. No pair of the three cliques shares two vertices, so
+            # no pair is adjacent.
+            CliqList = [1 2 3; 4 5 6; 1 4 7]
+            Adj = PortfolioOptimisers.AdjCliq(zeros(7, 7), CliqList, [1, 2, 3])
+            @test Adj == SparseArrays.spzeros(Int, 3, 3)
+        end
+        @testset "AdjCliq joins the candidates that share an edge" begin
+            # Cliques 1 and 2 share the edge (1, 2). Clique 3 shares one vertex with each of
+            # them, so it is adjacent to neither.
+            CliqList = [1 2 3; 1 2 4; 1 5 6]
+            Adj = PortfolioOptimisers.AdjCliq(zeros(6, 6), CliqList, [1, 2, 3])
+            @test Adj == SparseArrays.sparse([1, 2], [2, 1], [1, 1], 3, 3)
+            @test Adj == transpose(Adj)
+            @test all(x -> x == 0 || x == 1, Adj)
+        end
+        @testset "AdjCliq indexes a column by the clique, not by the candidate" begin
+            # `CliqRoot` names cliques 2 and 4, which share the edge (1, 2). Cliques 1 and 3
+            # are not root candidates, so their rows and their columns stay empty.
+            CliqList = [7 8 9; 1 2 3; 7 8 10; 1 2 4]
+            Adj = PortfolioOptimisers.AdjCliq(zeros(10, 10), CliqList, [2, 4])
+            @test Adj == SparseArrays.sparse([2, 4], [4, 2], [1, 1], 4, 4)
+        end
+        @testset "CliqueRoot(::EqualRoot, …) answers on one root candidate (#508)" begin
+            # The reproduction of #508. Clique 1 is the root, and cliques 2 and 3 are its
+            # children. One candidate has nothing to be joined to, so the answer is the
+            # parent-child hierarchy alone.
+            H = PortfolioOptimisers.CliqueRoot(EqualRoot(), [1], [0, 1, 1], 3, zeros(5, 5),
+                                               [1 2 3; 1 2 4; 1 2 5])
+            @test H == SparseArrays.sparse([2, 3, 1, 1], [1, 1, 2, 3], [1, 1, 1, 1], 3, 3)
+        end
+        @testset "BuildHierarchy stops the loop at a parent tie (#509)" begin
+            # The reproduction of #509. Clique 1 holds the vertices {1, 2}. Cliques 2 and 3
+            # are both supersets of it and both hold three vertices, so column 1 ties.
+            M = SparseArrays.sparse([1 1 1; 1 1 1; 0 1 0; 0 0 1])
+            @test PortfolioOptimisers.BuildHierarchy(M) == Int[]
+        end
+        @testset "BuildHierarchy builds the hierarchy when no parent ties" begin
+            # Clique 1 holds {1, 2}, and clique 2 holds {1, 2, 3}, its only superset.
+            M = SparseArrays.sparse([1 1; 1 1; 0 1])
+            @test PortfolioOptimisers.BuildHierarchy(M) == [2, 0]
+        end
+    end
     @testset "Subsetting optimisers reject a precomputed phylogeny" begin
         #=
         A meta-optimiser hands its subproblems a subset of the universe, and a phylogeny

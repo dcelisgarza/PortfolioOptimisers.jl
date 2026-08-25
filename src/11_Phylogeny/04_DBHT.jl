@@ -702,7 +702,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
  2. Sum the rows of `M` over `Children`, and take as `Parents` every clique whose sum equals `length(Children)`. Such a clique holds every vertex of clique `n`, so it is a superset of it. Drop `n` itself from that list.
  3. Set `Pred[n] = 0` when `Parents` is empty, which makes clique `n` a root.
  4. Otherwise take the parent of the smallest vertex count, which is the smallest superset.
- 5. Replace the whole of `Pred` with an empty vector when two parents tie on the smallest count, which reports that no hierarchy was built. The loop does not stop there, so a later clique that writes its own parent raises `BoundsError` on the emptied vector. The empty vector reaches the caller only when no later iteration writes to `Pred`. Issue [#509](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/509) carries the reproduction and the decision this ticket did not take.
+ 5. Return an empty vector when two parents tie on the smallest count, which reports that no hierarchy was built. The loop stops at that point, so no later clique writes to the empty vector.
 
 # Arguments
 
@@ -710,7 +710,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 
 # Returns
 
-  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique. It is empty when step 5 of the algorithm fired and no later iteration wrote to it.
+  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique. It is empty when step 5 of the algorithm fired.
 
 # Related
 
@@ -730,7 +730,10 @@ function BuildHierarchy(M::MatNum)
         if !isempty(Parents)
             ParentSum = vec(sum(M[:, Parents]; dims = 1))
             a = findall(ParentSum .== minimum(ParentSum))
-            length(a) == 1 ? Pred[n] = Parents[a[1]] : Pred = Int[]
+            if length(a) != 1
+                return Int[]
+            end
+            Pred[n] = Parents[a[1]]
         else
             Pred[n] = 0
         end
@@ -743,16 +746,16 @@ end
 
 Find adjacent cliques to the root candidates in a Maximal Planar Graph (MPG).
 
-This function computes the adjacency matrix among root candidate 3-cliques, scoring each candidate against a running mark of the vertices the earlier candidates hold. Used internally by [`CliqueRoot`](@ref) with [`EqualRoot`](@ref) to construct a root from the adjacency tree of all root candidates.
+This function computes the adjacency matrix among root candidate 3-cliques. Two root candidates are adjacent when they share exactly two vertices. Used internally by [`CliqueRoot`](@ref) with [`EqualRoot`](@ref) to construct a root from the adjacency tree of all root candidates.
 
-`Indicator` accumulates. Step 1 of the algorithm below marks the vertices of candidate `n` and never clears the marks of the candidates before it, so from the second iteration on, `Indi` counts the vertices a candidate shares with the **union** of the candidates seen so far and not with candidate `n` alone. `A` is read for its size and for nothing else, so no edge of the MPG reaches the answer. Issue [#507](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/507) carries the reproduction and the decision this ticket did not take.
+`A` is read for its size and for nothing else, and no edge of the MPG reaches the answer. Nothing is lost by that. Every row of `CliqList` is a 3-clique of the MPG, so two rows that share two vertices both hold the edge between those two vertices. The count of the shared vertices is therefore the test for adjacency in the graph.
 
 # Algorithm
 
- 1. Mark the three vertices of root candidate `n` in `Indicator`, which already carries the marks of every earlier candidate.
+ 1. Clear `Indicator`, then mark in it the three vertices of root candidate `n`.
  2. Read `Indicator` back at the three vertex columns of every root candidate, giving `Indi`.
- 3. Take the root candidates whose row of `Indi` sums to `2`, and set their entries of column `n` of `Adj` to one.
- 4. Repeat from step 1 for the next candidate, then symmetrise `Adj`.
+ 3. Take the root candidates whose row of `Indi` sums to `2`, and set their entries of column `CliqRoot[n]` of `Adj` to one.
+ 4. Repeat from step 1 for the next candidate. The test of step 3 is symmetric, so `Adj` needs no symmetrisation.
 
 # Arguments
 
@@ -762,7 +765,7 @@ This function computes the adjacency matrix among root candidate 3-cliques, scor
 
 # Returns
 
-  - `Adj::SparseMatrixCSC{Int, Int}`: `Nc×Nc` symmetric adjacency matrix of the cliques. `Adj[i, j]` is non-zero when candidate `i` scored `2` against the running mark on the iteration of candidate `j`, or the other way round.
+  - `Adj::SparseMatrixCSC{Int, Int}`: `Nc×Nc` symmetric adjacency matrix of the cliques. `Adj[i, j]` is one when cliques `i` and `j` are both root candidates and share exactly two vertices. Every other entry is zero, so a clique that is not a root candidate carries an empty row and an empty column.
 
 # Related
 
@@ -776,14 +779,14 @@ function AdjCliq(A::MatNum, CliqList::MatNum, CliqRoot::VecNum)
     Adj = SparseArrays.spzeros(Int, Nc, Nc)
     Indicator = zeros(Int, N)
     for n in eachindex(CliqRoot)
+        Indicator .= 0
         Indicator[CliqList[CliqRoot[n], :]] .= 1
         Indi = hcat(Indicator[CliqList[CliqRoot, 1]], Indicator[CliqList[CliqRoot, 2]],
                     Indicator[CliqList[CliqRoot, 3]])
 
         adjacent = CliqRoot[vec(sum(Indi; dims = 2)) .== 2]
-        Adj[adjacent, n] .= 1
+        Adj[adjacent, CliqRoot[n]] .= 1
     end
-    Adj = Adj + transpose(Adj)
 
     return Adj
 end
@@ -919,11 +922,9 @@ Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Gr
 
 This method creates a root from the adjacency tree of all root candidate cliques, allowing for multiple equally plausible roots in the DBHT hierarchy. It is used internally by [`CliqHierarchyTree2s`](@ref) when the root selection method is [`EqualRoot`](@ref).
 
-`Adj` is bound only inside step 1 of the algorithm below, and step 4 reads it whatever step 1 did. A call that carries exactly one root candidate and a non-empty `Pred` therefore raises `UndefVarError: Adj not defined`. Issue [#508](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/508) carries the reproduction and the decision this ticket did not take.
-
 # Algorithm
 
- 1. When more than one root candidate exists, build the adjacency `Adj` among the candidates with [`AdjCliq`](@ref).
+ 1. When more than one root candidate exists, build the adjacency `Adj` among the candidates with [`AdjCliq`](@ref). One candidate alone has nothing to be joined to, so `Adj` is a zero matrix in that case, which makes step 4 add nothing.
  2. Allocate `H` over `Nc` rows and columns. This method adds no synthetic clique, so it needs no extra row.
  3. Write `H[n, Pred[n]] = 1` for every clique that has a parent.
  4. Return a `0 × 0` matrix when `Pred` is empty. Otherwise symmetrise `H` and add `Adj` to it, which joins the root candidates to each other.
@@ -950,8 +951,10 @@ This method creates a root from the adjacency tree of all root candidate cliques
 """
 function CliqueRoot(::EqualRoot, Root::VecNum, Pred::VecNum, Nc::Integer, A::MatNum,
                     CliqList::MatNum)
-    if length(Root) > 1
-        Adj = AdjCliq(A, CliqList, Root)
+    Adj = if length(Root) > 1
+        AdjCliq(A, CliqList, Root)
+    else
+        SparseArrays.spzeros(Int, Nc, Nc)
     end
 
     H = SparseArrays.spzeros(Int, Nc, Nc)
