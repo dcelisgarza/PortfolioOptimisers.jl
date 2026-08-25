@@ -389,6 +389,8 @@ Computes or returns the threshold scaling parameters for defining significant co
 
 Every threshold of the pair — the noise threshold `c` and each boundary of the squeezing template — is multiplied by the value this function returns for its own axis. So the scaler fixes the units in which a co-movement is judged large.
 
+A scaler is **pair-separable** when its first component reads `sdi` alone, so that an asset's thresholds are the same whatever partner it is measured against. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable. The fall-through is not, because the pair mean moves with `sdj`, and a `Function` need not be. [`Gerber2`](@ref) is bounded by one only under a pair-separable scaler: it divides by the geometric mean of a diagonal built at the pair `(i, i)`, and a scaler that moves an asset's class off the diagonal breaks that comparison. [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records the defect and a four-row reproduction.
+
 # Mathematical definition
 
 ```math
@@ -1173,7 +1175,7 @@ Under [`Gerber2`](@ref) the pairwise entry is the raw `pos - neg`, and the matri
 
 !!! warning
 
-    The clamp covers `n7` and `n8` only, so it is a necessary condition and not a sufficient one. A hand-tuned template can still leave `[-1, 1]` through a weight this method does not touch. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap and the reproduction. The shipped defaults meet the bound.
+    The clamp covers `n7` and `n8` only, so it is a necessary condition and not a sufficient one. A hand-tuned template can still leave `[-1, 1]` through a weight this method does not touch. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap and the reproduction. The shipped defaults sit exactly **on** the bound, so they meet it and carry no margin. A pair-dependent `sc` breaks the same bound on its own, whatever the template does; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
 
 # Mathematical definition
 
@@ -1380,7 +1382,11 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-Every mixed-magnitude weight defaults to the geometric mean of two weights of the classes it lies between, so the shipped defaults meet the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref). The keyword order is not the field order: `n17` precedes `n16` and `n19` precedes `n18`, because each of those defaults reads the other.
+Every mixed-class weight defaults to the geometric mean of two other weights. The keyword order is not the field order: `n17` precedes `n16` and `n19` precedes `n18`, because each of those defaults reads the other.
+
+!!! warning
+
+    Four of those defaults do **not** meet the bound [`clamp_gerber_iq_n`](@ref) enforces under [`Gerber2`](@ref). `n15`, `n16`, `n18` and `n21` each default to the geometric mean of two **mixed-class** weights rather than of the two **same-class** weights that flank the channel, and each exceeds its bound by a factor of `(n4^2 / (n1 n11))^(1/4)`. A two-asset sample then returns a correlation entry of `1.0299` under [`Gerber2`](@ref). [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap, the whole table of fifteen bounds and the reproduction.
 
 ## Validation
 
@@ -1640,11 +1646,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lowers the mixed-magnitude weights of a [`FullGerberIQ`](@ref) template so that the [`Gerber2`](@ref) statistic stays inside `[-1, 1]`. It does not make the matrix positive definite; that is `pdm`'s work.
 
-Under [`Gerber2`](@ref) the pairwise entry is the raw `pos - neg`, and the matrix is afterwards divided by the geometric mean of its own diagonal. A pair `(i, i)` compares an asset with itself, so its diagonal entry is built from the six concordant same-class weights alone. A weight of a mixed-class concordant channel above the geometric mean of the two same-class weights that flank it therefore lets the ratio leave `[-1, 1]`.
+Under [`Gerber2`](@ref) the pairwise entry is the raw `pos - neg`, and the matrix is afterwards divided by the geometric mean of its own diagonal. A pair `(i, i)` compares an asset with itself, so both returns fall in the same magnitude class and the co-movement is always concordant. Exactly six of the twenty-one weights therefore sit on the diagonal, one per class: `n11`, `n4`, `n1`, `n2`, `n5` and `n12`. The other fifteen each join two distinct classes, one weight per unordered pair, **discordant channels included**, and a weight above the geometric mean of the two same-class weights that flank its channel lets the ratio leave `[-1, 1]`.
 
 !!! warning
 
-    The clamp covers `n7`, `n8`, `n14` and `n17` only. It leaves `n15`, `n16` and every discordant weight untouched, so it is a necessary condition and not a sufficient one. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns a correlation entry of `10.0`. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap and the reproduction. The shipped defaults meet the bound.
+    The clamp covers `n7`, `n8`, `n14` and `n17` only. Fifteen of the twenty-one weights join two distinct classes and owe the bound, so the clamp is a necessary condition and not a sufficient one. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns a correlation entry of `10.0`, and the **shipped defaults** break the bound on `n15`, `n16`, `n18` and `n21`. [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap, the whole table of fifteen bounds and the reproduction. A pair-dependent `sc` breaks the same bound on its own, whatever the template does; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
 
 # Mathematical definition
 
@@ -2209,7 +2215,7 @@ The Gerber1 branch is the source's own statistic. Its numerator runs over the ob
 
 The Gerber statistic is the special case of this one that switches the squeezing and the decay off. With every weight set to one, ``\\gamma = 0``, the per-asset volatility scaling of [`AssetVolatilityGerberIQScaler`](@ref), and ``c`` equal to a Gerber threshold, all three branches reproduce [`GerberCovariance`](@ref) to the last bit. The reduction holds at ``c = 0`` as it does at every positive threshold, because [`iq_crossed`](@ref) gives this family the rule ADR 0090 gave that one: a return of exactly zero never leaves the noise zone.
 
-Only the Gerber0 and Gerber1 branches are bounded by construction, because each divides by a sum of the same weights it subtracts. The Gerber2 branch relies on the template's weights meeting the bound [`clamp_gerber_iq_n`](@ref) enforces, which is a necessary condition and not a sufficient one; [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records the gap.
+Only the Gerber0 and Gerber1 branches are bounded by construction, because each divides by a sum of the same weights it subtracts. The Gerber2 branch is bounded only when **two** conditions hold together: every mixed-class weight of the template meets the geometric-mean bound [`clamp_gerber_iq_n`](@ref) enforces, and `sc` is **pair-separable**, so that an asset's magnitude class does not move when its partner changes. The clamp is a necessary condition and not a sufficient one, and the shipped [`FullGerberIQ`](@ref) defaults break it; [#494](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/494) records that half. [`AssetVolatilityGerberIQScaler`](@ref) is pair-separable and `nothing` is not, because it reads the pair mean; [#500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/500) records that half.
 
 # Algorithm
 
