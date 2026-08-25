@@ -32,6 +32,7 @@ comovement_step
 comovement_finalise
 comovement_ratio
 standardise_comovement!
+comovement_unit_diagonal!
 sb_add_pos
 sb_add_neg
 sb_add_neutral

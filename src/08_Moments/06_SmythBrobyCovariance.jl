@@ -816,6 +816,8 @@ The marker selects one of three branches.
  2. [`GerberComovementOne`](@ref): return `(p - n) / (p + n + nn)`, or `zero(T)` when `p + n + nn` is zero. This is the only branch that reads `nn`.
  3. [`GerberComovementTwo`](@ref): return `p - n`, and apply no denominator. [`standardise_comovement!`](@ref) normalises the assembled matrix afterwards.
 
+A zero denominator means that the pair qualified no observation, and the guarded zero is the right answer for an **off-diagonal** entry. It is the wrong answer on the **diagonal**, where a correlation is one by definition. This function cannot separate the two cases, because it does not know whether the pair is `(i, i)`. [`comovement_unit_diagonal!`](@ref) writes the diagonal after the matrix is assembled, and ADR 0093 records the decision.
+
 # Arguments
 
   - `alg`: Co-movement algorithm marker.
@@ -831,6 +833,7 @@ The marker selects one of three branches.
   - [`gerber_comovement!`](@ref)
   - [`comovement_finalise`](@ref): the caller that reaches this function once per pair.
   - [`standardise_comovement!`](@ref)
+  - [`comovement_unit_diagonal!`](@ref): the function that corrects the guarded zero on the diagonal.
   - [`GerberComovementZero`](@ref)
   - [`GerberComovementOne`](@ref)
   - [`GerberComovementTwo`](@ref)
@@ -875,6 +878,7 @@ The acting method runs these steps. The fall-through method runs none of them.
 # Related
 
   - [`comovement_ratio`](@ref): the reduction whose [`GerberComovementTwo`](@ref) branch leaves the net score for this function to normalise.
+  - [`comovement_unit_diagonal!`](@ref): the repair of the diagonal that runs immediately after this function.
   - [`gerber_comovement!`](@ref)
   - [`GerberComovementTwo`](@ref)
 """
@@ -884,6 +888,43 @@ end
 function standardise_comovement!(::GerberComovementTwo, rho::AbstractMatrix)
     h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
     rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write one onto a zero diagonal entry of an assembled co-movement matrix, in place.
+
+The correlation of an asset with itself is one by definition, whatever the sample holds. Every reduction of [`comovement_ratio`](@ref) already returns one there when the asset crosses its threshold at least once, so only the degenerate case is left. An asset that crosses no threshold gives a zero denominator for every pair it belongs to, takes the guarded `zero(T)` over its whole row, and takes it on its diagonal entry too. **It writes into `rho` and into nothing else**, so every other entry is unchanged afterwards. ADR 0093 records the decision.
+
+**The write is guarded by `iszero`, and does not restate a diagonal that is already one.** A `2` marker divides the diagonal by its own square root twice, so its diagonal entry is one to within a unit in the last place rather than exactly one. [`posdef!`](@ref) reads its diagonal with an exact `isone` test to decide whether it holds a correlation matrix or a covariance matrix, and the two branches answer differently. Writing an exact one over an entry that already reads as one moves that branch, and with it the answer of a sample that carries no degenerate asset. The guard keeps this function to the defect it fixes.
+
+# Algorithm
+
+ 1. For each index `i` of the diagonal, write `one(eltype(rho))` onto `rho[i, i]` when that entry is zero.
+
+# Arguments
+
+  - `rho`: `N × N` co-movement matrix, whose zero diagonal entries are overwritten.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`comovement_ratio`](@ref): the reduction whose guarded zero reaches the diagonal.
+  - [`standardise_comovement!`](@ref): the normalisation that runs immediately before this function.
+  - [`gerber_comovement!`](@ref)
+  - [`posdef!`](@ref): the repair that runs immediately after this function, and that a zero diagonal turns into a `NaN`.
+"""
+function comovement_unit_diagonal!(rho::AbstractMatrix)
+    o = one(eltype(rho))
+    for i in axes(rho, 1)
+        if iszero(rho[i, i])
+            rho[i, i] = o
+        end
+    end
     return nothing
 end
 """
@@ -1403,7 +1444,8 @@ Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides 
  2. Build the policy `pol` as a [`SmythBrobyKernel`](@ref) from `ce.alg`, `mu`, `sd`, `ce.c1`, `ce.c2`, `ce.c3` and `ce.n`.
  3. Fill `rho` with [`gerber_comovement!`](@ref), over the executor `ce.ex`.
  4. Normalise `rho` in place with [`standardise_comovement!`](@ref). Only a `2` marker changes it.
- 5. Repair `rho` with [`posdef!`](@ref) and the estimator's `pdm`. A Smyth-Broby matrix is a matrix of pairwise scores and is not positive definite in general.
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that qualifies no observation reduces to a zero diagonal entry, and that entry is one by definition.
+ 6. Repair `rho` with [`posdef!`](@ref) and the estimator's `pdm`. A Smyth-Broby matrix is a matrix of pairwise scores and is not positive definite in general.
 
 # Arguments
 
@@ -1422,6 +1464,7 @@ Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides 
   - [`SmythBrobyKernel`](@ref)
   - [`gerber_comovement!`](@ref)
   - [`standardise_comovement!`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
   - [`GerberCovariance`](@ref): the statistic this family extends. Its matrix form is stated there and is not repeated here.
@@ -1436,6 +1479,7 @@ function smythbroby(ce::SmythBrobyCovariance, X::MatNum, mu::ArrNum, sd::ArrNum)
     pol = SmythBrobyKernel(ce.alg, mu, sd, ce.c1, ce.c2, ce.c3, ce.n)
     gerber_comovement!(rho, ce.ex, X, pol)
     standardise_comovement!(ce.alg, rho)
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end

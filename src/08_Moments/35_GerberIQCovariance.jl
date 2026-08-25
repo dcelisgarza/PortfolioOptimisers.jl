@@ -2218,7 +2218,8 @@ Only the Gerber0 and Gerber1 branches are bounded by construction, because each 
  3. Build the [`GerberIQKernel`](@ref) policy from the resolved decay and the estimator's `alg`, `kind`, `sc`, `c` and the standard deviations `sd`.
  4. Fill `rho` with [`gerber_comovement!`](@ref), which walks every pair and every observation and reduces each pair's accumulators. That loop skeleton is shared with the Smyth-Broby family and lives in one place.
  5. Standardise the matrix with [`standardise_comovement!`](@ref). This is a no-op for [`Gerber0`](@ref) and [`Gerber1`](@ref), and divides by the geometric mean of the diagonal for [`Gerber2`](@ref).
- 6. Repair the matrix with [`posdef!`](@ref), because the statistic is not guaranteed to be positive semi-definite. The source records the same and repairs by the nearest correlation matrix.
+ 6. Write one onto a zero diagonal entry with [`comovement_unit_diagonal!`](@ref). An asset that never leaves its noise zone reduces to a zero diagonal entry, and that entry is one by definition.
+ 7. Repair the matrix with [`posdef!`](@ref), because the statistic is not guaranteed to be positive semi-definite. The source records the same and repairs by the nearest correlation matrix.
 
 Steps 4 and 5 are where the three [`GerberCovarianceAlgorithm`](@ref) branches differ, and [`comovement_ratio`](@ref) owns that difference.
 
@@ -2237,6 +2238,7 @@ Steps 4 and 5 are where the three [`GerberCovarianceAlgorithm`](@ref) branches d
   - [`GerberIQCovariance`](@ref)
   - [`GerberIQKernel`](@ref)
   - [`gerber_comovement!`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
@@ -2256,6 +2258,7 @@ function gerber_IQ(ce::GerberIQCovariance, X::MatNum, sd::ArrNum)
     pol = GerberIQKernel(ce.alg, ce.kind, decay, ce.sc, ce.c, sd)
     gerber_comovement!(rho, ce.ex, X, pol)
     standardise_comovement!(ce.alg, rho)
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -2294,11 +2297,11 @@ The standard deviations serve two purposes at once. They scale the thresholds th
 
 # Returns
 
-  - `rho::MatNum`: The Gerber IQ correlation matrix. Its diagonal is one for every asset that leaves the noise zone at least once.
+  - `rho::MatNum`: The Gerber IQ correlation matrix. Its diagonal is one for every asset.
 
-!!! warning
+!!! note
 
-    An asset that never leaves its own noise zone gets a zero row **and a zero diagonal entry**, because no observation votes for any pair it belongs to. The default `pdm` then raises `ArgumentError: matrix contains Infs or NaNs`, which names neither the asset nor the cause. [#495](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/495) records it. Lower `c` when a short window meets a quiet asset.
+    An asset that never leaves its own noise zone gets a **zero row**, because no observation votes for any pair it belongs to. Its diagonal entry is one, which [`comovement_unit_diagonal!`](@ref) writes, so the matrix stays a formal correlation matrix and the asset reads as uncorrelated with every other one. That is what the sample says about it. Lower `c` when a short window meets a quiet asset, and the asset votes again. ADR 0093 records the decision, and [#495](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/495) is the defect that led to it.
 
 # Related
 
@@ -2366,7 +2369,7 @@ The covariance is the correlation of [`cor`](@ref) rescaled by the same standard
 
 # Returns
 
-  - `sigma::MatNum`: The Gerber IQ covariance matrix. `cor2cov!` writes the variance onto the diagonal whatever the correlation carried there, so the diagonal is the variance even for an asset whose correlation diagonal was zero.
+  - `sigma::MatNum`: The Gerber IQ covariance matrix. Its diagonal is the variance of each asset, because `cor2cov!` scales a unit correlation diagonal by ``\\boldsymbol{\\sigma}^2``.
 
 # Related
 

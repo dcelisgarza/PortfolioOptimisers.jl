@@ -361,8 +361,9 @@
         # through `comovement_ratio` / `standardise_comovement!` guards all of them to
         # zero, which is what the Smyth-Broby family already returned. Before the routing
         # the Gerber estimators returned a NaN row here. See ADR 0022.
-        # `posdef!` still cannot take the zero diagonal, and that is true of both families,
-        # so these compare the reductions with `pdm = nothing`.
+        # The column is zero away from the diagonal, where the guarded zero is the right
+        # answer, and one on the diagonal, which `comovement_unit_diagonal!` writes. These
+        # compare the reductions with `pdm = nothing` to read the guard directly.
         Xq = randn(StableRNG(987654321), 200, 4)
         Xq[:, 3] .= 0.02
         for (galg, salg) in
@@ -372,8 +373,9 @@
             sbrho = cor(SmythBrobyCovariance(; alg = salg, pdm = nothing), Xq)
             @test all(isfinite, rho)
             @test all(isfinite, sbrho)
-            @test all(iszero, view(rho, :, 3))
-            @test iszero(sbrho[3, 3])
+            @test all(iszero, view(rho, [1, 2, 4], 3))
+            @test isone(rho[3, 3])
+            @test isone(sbrho[3, 3])
             # The threshold crossings are unchanged away from the degenerate asset.
             @test isapprox(rho[1:2, 1:2],
                            cor(GerberCovariance(; alg = galg, pdm = nothing),
@@ -651,12 +653,16 @@
         # ---- the threshold's effect at both degenerate ends ----------------------------
         # A threshold above every observation: nothing crosses, every denominator
         # vanishes, and the guard in `comovement_ratio` / `standardise_comovement!` returns
-        # the zero matrix rather than a NaN. `posdef!` cannot take that zero diagonal, so
-        # this drives the reduction with `pdm = nothing`.
+        # zero rather than a NaN. The diagonal is the one entry that is a definition rather
+        # than a measurement, so `comovement_unit_diagonal!` writes one onto it and the
+        # matrix stays a correlation matrix. #495, ADR 0093.
         for a in (Gerber0(), Gerber1(), Gerber2())
             rbig = cor(GerberCovariance(; t = 1e3, pdm = nothing, alg = a), Xg)
             @test all(isfinite, rbig)
-            @test all(iszero, rbig)
+            @test isapprox(rbig, I(12))
+            # `posdef!` divided by the square root of the old zero diagonal and raised
+            # `ArgumentError: matrix contains Infs or NaNs`. It now takes the identity.
+            @test isapprox(cor(GerberCovariance(; t = 1e3, alg = a), Xg), I(12))
         end
         # A zero threshold: every observation whose centred return is not exactly zero
         # crosses, so no observation is neutral and Gerber0 and Gerber1 coincide.
@@ -778,6 +784,127 @@
                                      decay = ExpGerberIQDecay(; e = 0.0, y = 0.0),
                                      pdm = nothing, alg = a)
             @test isapprox(cor(cgq, Yq), cor(ciq, Yq))
+        end
+    end
+    @testset "Co-movement unit diagonal (#495)" begin
+        # An asset whose every return sits inside its own noise zone crosses no threshold.
+        # `comovement_ratio` then finds a zero denominator for every pair that asset
+        # belongs to and returns the guarded zero. That zero is right off the diagonal,
+        # where the pair has no measured co-movement, and wrong on the diagonal, where a
+        # correlation is one by definition. `posdef!` divided by the square root of that
+        # zero and raised `ArgumentError: matrix contains Infs or NaNs`, naming neither the
+        # asset nor the cause. `comovement_unit_diagonal!` writes the diagonal after the
+        # reduction and before the repair. #495, ADR 0093.
+
+        # A sample whose sixth asset crosses `t = 1.5` on no observation.
+        rngq = StableRNG(20260824)
+        Xq = nothing
+        for _ in 1:400
+            Xt = randn(rngq, 14, 6)
+            Xtc = Xt .- mean(Xt; dims = 1)
+            sdt = vec(std(Xtc; dims = 1, corrected = true))
+            if any(i -> count(k -> abs(Xtc[k, i]) >= 1.5 * sdt[i], axes(Xtc, 1)) == 0,
+                   axes(Xtc, 2))
+                Xq = Xt
+                break
+            end
+        end
+        @test !isnothing(Xq)
+        Xqc = Xq .- mean(Xq; dims = 1)
+        sdq = vec(std(Xqc; dims = 1, corrected = true))
+        crossings = [count(k -> abs(Xqc[k, i]) >= 1.5 * sdq[i], axes(Xqc, 1))
+                     for i in axes(Xqc, 2)]
+        @test crossings == [1, 1, 3, 2, 3, 0]
+
+        galgs = (Gerber0(), Gerber1(), Gerber2())
+        for a in galgs
+            # The quiet asset gets a zero row: it has no measured co-movement with anyone.
+            # Its diagonal entry is one, so the matrix is a correlation matrix.
+            for ce in (GerberCovariance(; t = 1.5, alg = a, pdm = nothing),
+                       GerberIQCovariance(; c = 1.5, alg = a, pdm = nothing))
+                rq = cor(ce, Xq)
+                @test isapprox(diag(rq), ones(6))
+                @test all(iszero, rq[1:5, 6])
+                @test all(iszero, rq[6, 1:5])
+            end
+            # The default `pdm` raised before the fix. It now answers a repaired matrix.
+            @test isposdef(cor(GerberCovariance(; t = 1.5, alg = a), Xq))
+            @test isposdef(cor(GerberIQCovariance(; c = 1.5, alg = a), Xq))
+        end
+
+        # The Smyth-Broby family reaches the same zero through the confusion zone. `c1`
+        # here excludes every observation of the FIRST asset and none of any other, so its
+        # diagonal pair qualifies nothing while its off-diagonal pairs still vote.
+        ratios = [maximum(abs, Xq[:, i]) / std(Xq[:, i]) for i in axes(Xq, 2)]
+        @test count(<(1.885), ratios) == 1
+        @test ratios[1] < 1.885
+        sbalgs = (SmythBroby0(), SmythBroby1(), SmythBroby2(), SmythBrobyGerber0(),
+                  SmythBrobyGerber1(), SmythBrobyGerber2(), SmythBrobyCount0(),
+                  SmythBrobyCount1(), SmythBrobyCount2())
+        for a in sbalgs
+            rq = cor(SmythBrobyCovariance(; c1 = 1.885, alg = a, pdm = nothing), Xq)
+            @test isapprox(diag(rq), ones(6))
+            @test isposdef(cor(SmythBrobyCovariance(; c1 = 1.885, alg = a), Xq))
+        end
+
+        # ---- the write is a no-op wherever the asset votes at least once ----------------
+        # A sample with no quiet asset answers bit for bit what it answered before, so
+        # applying the function to the answer changes nothing at all. The `2` markers are
+        # the reason the write is guarded rather than unconditional: their diagonal is one
+        # to within a unit in the last place, not exactly one.
+        Xu = randn(StableRNG(495495495), 60, 8)
+        for a in galgs
+            for ce in (GerberCovariance(; alg = a, pdm = nothing),
+                       GerberIQCovariance(; alg = a, pdm = nothing))
+                ru = cor(ce, Xu)
+                @test isapprox(diag(ru), ones(8))
+                rc = copy(ru)
+                PortfolioOptimisers.comovement_unit_diagonal!(rc)
+                @test rc == ru
+            end
+        end
+        for a in sbalgs
+            ru = cor(SmythBrobyCovariance(; alg = a, pdm = nothing), Xu)
+            @test isapprox(diag(ru), ones(8))
+            rc = copy(ru)
+            PortfolioOptimisers.comovement_unit_diagonal!(rc)
+            @test rc == ru
+        end
+        # The `0` and `1` markers divide a value by itself, so their diagonal is EXACTLY
+        # one. The `2` markers divide by the square root of that value twice, and on this
+        # sample the rounding shows. An unconditional write would move `posdef!` onto its
+        # other branch for such a matrix.
+        for a in (Gerber0(), Gerber1())
+            @test diag(cor(GerberCovariance(; alg = a, pdm = nothing), Xu)) == ones(8)
+        end
+        @test diag(cor(GerberCovariance(; alg = Gerber2(), pdm = nothing), Xu)) != ones(8)
+        @test isapprox(diag(cor(GerberCovariance(; alg = Gerber2(), pdm = nothing), Xu)),
+                       ones(8))
+
+        # ---- the function writes a zero diagonal entry and nothing else -----------------
+        # The `iszero` guard is load-bearing, not decoration. `posdef!` reads its diagonal
+        # with an exact `isone` test, and a `Gerber2` diagonal is one to within a unit in
+        # the last place rather than exactly one. Writing an exact one there flips that
+        # test, drops the `cov2cor!` clamp, and moves a pinned covariance on a sample with
+        # no degenerate asset. So the entry that already reads as one is left alone.
+        rw = reshape(collect(1.0:9.0), 3, 3)
+        rw[2, 2] = 0.0
+        rw[3, 3] = nextfloat(1.0)
+        rb = copy(rw)
+        @test isnothing(PortfolioOptimisers.comovement_unit_diagonal!(rw))
+        @test rw[1, 1] == rb[1, 1]
+        @test rw[2, 2] == 1.0
+        @test rw[3, 3] === nextfloat(1.0)
+        @test [rw[i, j] for i in 1:3 for j in 1:3 if i != j] ==
+              [rb[i, j] for i in 1:3 for j in 1:3 if i != j]
+
+        # ---- the covariance path keeps its variance diagonal ---------------------------
+        # `cor2cov!` scaled the old zero diagonal to the variance anyway, so the covariance
+        # answer does not move. It now follows from a unit correlation diagonal.
+        sdqr = vec(std(GerberCovariance().ve, Xq; dims = 1))
+        for a in galgs
+            @test isapprox(diag(cov(GerberCovariance(; t = 1.5, alg = a, pdm = nothing),
+                                    Xq)), sdqr .^ 2)
         end
     end
     @testset "GerberIQ region templates" begin

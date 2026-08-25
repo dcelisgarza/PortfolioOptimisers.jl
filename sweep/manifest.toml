@@ -56,7 +56,7 @@
 "src/08_Moments/03_Covariance.jl" = { map = 3, units = 9, algorithm = 7, swept = true }
 "src/08_Moments/04_SimpleVariance.jl" = { map = 3, units = 8, algorithm = 5, swept = true }
 "src/08_Moments/05_GerberCovariance.jl" = { map = 3, units = 13, algorithm = 9, swept = true }
-"src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 33, algorithm = 23, swept = true }
+"src/08_Moments/06_SmythBrobyCovariance.jl" = { map = 3, units = 34, algorithm = 24, swept = true }
 "src/08_Moments/07_DistanceCovariance.jl" = { map = 3, units = 8, algorithm = 7, swept = true }
 "src/08_Moments/08_LowerTailDependenceCovariance.jl" = { map = 3, units = 3, algorithm = 2, swept = true }
 "src/08_Moments/09_RankCovariance.jl" = { map = 3, units = 5, algorithm = 2, swept = true }

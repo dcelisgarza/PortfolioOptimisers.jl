@@ -333,20 +333,23 @@ end
         sdX = vec(std(SimpleVariance(), X; dims = 1))
 
         # A `c1` above every raw observation puts every pair in the confusion zone, so no
-        # observation is admitted and every marker returns the zero matrix rather than a NaN.
+        # observation is admitted and every marker returns zero rather than a NaN. The
+        # diagonal is a definition rather than a measurement, so `comovement_unit_diagonal!`
+        # writes one onto it and the answer is the identity. #495, ADR 0093.
         big = maximum(abs, X) / minimum(sdX) + 1
         for a in (SmythBroby0(), SmythBroby1(), SmythBroby2(), SmythBrobyGerber1(),
                   SmythBrobyCount1())
             r = cor(SmythBrobyCovariance(; c1 = big, alg = a, pdm = nothing), X)
-            @test all(iszero, r)
+            @test isapprox(r, I(4))
             @test all(isfinite, r)
+            @test all(iszero, r - Matrix(1.0I, 4, 4))
         end
 
         # A `c3` at the bottom of its range rejects on the outer cut-off instead, with the
         # same result and by a different arm.
         r = cor(SmythBrobyCovariance(; c2 = 0.0, c3 = 1e-12, alg = SmythBroby1(),
                                      pdm = nothing), X)
-        @test all(iszero, r)
+        @test isapprox(r, I(4))
 
         # At `c2 = 0` no observation is one-sided, so the neutral score is empty and the
         # trailing `0` and `1` markers coincide exactly.

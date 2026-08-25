@@ -462,7 +462,8 @@ The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the
  2. Form the signed crossing matrix `UmD = U - D` and the crossing matrix `UpD = U + D`.
  3. Recover the concordant count `nconc` and the discordant count `ndisc` from `transpose(UmD) * UmD` and `transpose(UpD) * UpD` with [`concordance_counts`](@ref).
  4. Reduce every pair with [`comovement_ratio`](@ref), giving `rho`.
- 5. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold reduces to a zero diagonal entry, and that entry is one by definition.
+ 6. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -481,6 +482,7 @@ The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the
   - [`gerber_updown`](@ref)
   - [`concordance_counts`](@ref)
   - [`comovement_ratio`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -494,6 +496,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::
     UpD = U + D
     nconc, ndisc = concordance_counts(transpose(UmD) * UmD, transpose(UpD) * UpD)
     rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, 0, eltype(X))
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -539,7 +542,8 @@ The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on w
  5. Recover the concordant count `nconc` and the discordant count `ndisc` from `transpose(UmD) * UmD` and the both-crossed count `T .- nneutral .- transpose(nneutral) .+ NtN` with [`concordance_counts`](@ref).
  6. Form `nneut = nneutral .+ transpose(nneutral) .- 2 .* NtN`, the count of observations on which exactly one asset of the pair crossed.
  7. Reduce every pair with [`comovement_ratio`](@ref), giving `rho`.
- 8. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
+ 8. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold reduces to a zero diagonal entry, and that entry is one by definition.
+ 9. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -558,6 +562,7 @@ The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on w
   - [`gerber_updown`](@ref)
   - [`concordance_counts`](@ref)
   - [`comovement_ratio`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -580,6 +585,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::
                                       T .- nneutral .- transpose(nneutral) .+ NtN)
     nneut = nneutral .+ transpose(nneutral) .- 2 .* NtN
     rho = comovement_ratio.(Ref(ce.alg), nconc, ndisc, nneut, eltype(X))
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -622,7 +628,8 @@ The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the norma
  2. Form the signed crossing matrix `UmD = U - D`.
  3. Form the raw net co-movement matrix `rho = transpose(UmD) * UmD`.
  4. Normalise `rho` in place with [`standardise_comovement!`](@ref).
- 5. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that crosses no threshold gets a zero diagonal entry of ``\\mathbf{G}``, which the clamp of step 4 leaves at zero, and that entry is one by definition.
+ 6. Repair `rho` with `posdef!`, which is a no-op when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -640,6 +647,7 @@ The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the norma
   - [`Gerber2`](@ref)
   - [`gerber_updown`](@ref)
   - [`standardise_comovement!`](@ref)
+  - [`comovement_unit_diagonal!`](@ref)
   - [`posdef!`](@ref)
 
 # References
@@ -652,6 +660,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::
     UmD = U - D
     rho = Matrix{eltype(X)}(transpose(UmD) * UmD)
     standardise_comovement!(ce.alg, rho)
+    comovement_unit_diagonal!(rho)
     posdef!(ce.pdm, rho)
     return rho
 end
