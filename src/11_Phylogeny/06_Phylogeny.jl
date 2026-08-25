@@ -225,6 +225,11 @@ The one refusal both splat guards make. A `Graphs.jl` entry point takes its weig
 
 The index of the offending entry is reported with its type, because `args` is splatted and the caller sees no argument names.
 
+# Algorithm
+
+ 1. Find the index of the first entry of `args` that is an `S`, giving `idx`.
+ 2. Throw a [`ConflictingArgumentError`](@ref) when `idx` is an index rather than `nothing`. The message carries `T`, `shape`, `channel`, `idx` and the type of the offending entry.
+
 # Arguments
 
   - `T`: Algorithm type, named in the error message.
@@ -269,6 +274,10 @@ Non-matrix entries are untouched: a vertex list or a sample count is a genuine p
 
 `kwargs` needs no companion guard. A keyword binds **by name**, so a matrix there cannot reach a positional slot: none of the four functions declares a matrix-valued keyword, and every one of `normalize`, `endpoints`, `rng` and `seed` refuses a matrix on its own. The whole family fails closed with a `MethodError` or a `TypeError`.
 
+# Algorithm
+
+ 1. Refuse an `AbstractMatrix` in `args` with [`assert_no_weight_channel_args`](@ref), naming [`centrality_polarity`](@ref) as the declared weight channel.
+
 # Arguments
 
   - `T`: Centrality algorithm type, named in the error message.
@@ -307,6 +316,11 @@ Both fields are splatted straight into the `Graphs.jl` spanning-tree function, a
   - `minimize` in `kwargs` inverts the sense of the search. The tree branch is *defined* by minimising a distance — [`calc_weighted_adjacency_graph`](@ref) and [`SimilarityPolarity`](@ref) both say so — and `minimize = false` yields a **maximum** spanning tree while everything downstream still reads it as a minimum one.
 
 Non-matrix, non-vector entries are untouched, and so is every other keyword. Those reach no weighting channel, and the three functions declare none, so they fail closed at the call.
+
+# Algorithm
+
+ 1. Refuse an `AbstractMatrix` or an `AbstractVector` in `args` with [`assert_no_weight_channel_args`](@ref), naming the graph [`calc_weighted_adjacency_graph`](@ref) built as the declared weight channel.
+ 2. Throw a [`ConflictingArgumentError`](@ref) when `kwargs` carries the key `minimize`. The message carries `T` and the value of that key.
 
 # Arguments
 
@@ -349,6 +363,23 @@ Builds a graph from the phylogeny matrix and applies `ct` to compute node centra
 
 The graph is **always unweighted**, whatever polarity `ct` declares. A precomputed [`PhylogenyResult`](@ref) is a matrix of `0`s and `1`s, so it is one of the weightless sources listed on [`centrality_vector`](@ref)'s warning, and the weights it does not carry cannot be recovered from it. Pass the estimator instead of its result to get the weighted answer.
 
+# Algorithm
+
+ 1. Read `plr.X`, the precomputed phylogeny matrix, into a plain `Graphs.SimpleGraph`, giving the structure `G`.
+ 2. Score the vertices of `G` with [`calc_centrality`](@ref), giving the centrality vector.
+ 3. Wrap that vector in a [`PhylogenyResult`](@ref).
+
+# Arguments
+
+  - `plr`: Phylogeny matrix result object.
+  - $(arg_dict[:cta])
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `plr::PhylogenyResult{<:VecNum}`: Centrality scores for each asset.
+
 # Related
 
   - [`PhylogenyResult`](@ref)
@@ -370,6 +401,25 @@ Scores each asset by the share of the network's shortest paths that run through 
 
 Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\mathrm{BC}_i &= \\dfrac{1}{(n - 1)(n - 2)} \\sum_{s \\neq i \\neq t} \\dfrac{\\sigma_{s,\\,t}(i)}{\\sigma_{s,\\,t}}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{BC}_i``: Betweenness centrality of asset ``i``.
+  - $(math_dict[:sigma_st_paths])
+  - $(math_dict[:sigma_st_i_paths])
+  - $(math_dict[:n_network])
+
+The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair twice and the leading factor is the reciprocal of ``(n - 1)(n - 2)`` rather than of half of it. `Graphs.jl` applies that factor by default, and `kwargs = (; normalize = false)` replaces it by ``1/2``, which is the count over the unordered pairs. `kwargs = (; endpoints = true)` counts the two ends of every path as well, which raises every score.
+
+A pair joined by several shortest paths shares one unit of score between them, because the summand is a fraction of ``\\sigma_{s,\\,t}``. [`StressCentrality`](@ref) omits that division and counts the paths themselves.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -383,6 +433,10 @@ $(DocStringExtensions.FIELDS)
     ) -> BetweennessCentrality
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ctargs_nomat])
 
 # Examples
 
@@ -439,6 +493,26 @@ Scores each asset by the reciprocal of its mean shortest-path distance to the ot
 
 Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\mathrm{CC}_i &= \\dfrac{r_i}{\\displaystyle\\sum_{j \\in \\mathcal{R}_i} \\ell_{i,\\,j}} \\cdot \\dfrac{r_i}{n - 1}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{CC}_i``: Closeness centrality of asset ``i``.
+  - ``\\mathcal{R}_i``: Set of assets that asset ``i`` reaches, excluding itself.
+  - ``r_i``: Cardinality of ``\\mathcal{R}_i``.
+  - $(math_dict[:ell_ij_path])
+  - $(math_dict[:n_network])
+
+The first factor is the reciprocal of the mean length from asset ``i`` to the assets it reaches. The second is the share of the universe it reaches, which `Graphs.jl` applies by default and `kwargs = (; normalize = false)` drops. On a connected network ``r_i = n - 1`` and the second factor is one, so the two settings agree there and part only where the network falls into components.
+
+An asset that reaches nothing scores zero rather than an infinity, because the sum in the denominator is over ``\\mathcal{R}_i`` alone and an unreachable asset never enters it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -452,6 +526,10 @@ $(DocStringExtensions.FIELDS)
     ) -> ClosenessCentrality
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ctargs_nomat])
 
 # Examples
 
@@ -516,8 +594,10 @@ The degree vector of an adjacency matrix ``\\mathbf{A}`` over ``n`` assets is
 
 Where:
 
-  - ``\\mathbf{A}``: Binary adjacency matrix of the network.
+  - ``\\mathbf{D}_n``: Degree vector of the network, whose ``i``-th entry counts the edges that touch asset ``i``.
+  - $(math_dict[:A_network])
   - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
+  - $(math_dict[:n_network])
 
 `Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. Measured over a 20-asset minimum spanning tree, the first six entries of ``\\mathbf{D}_n`` are `[3, 1, 2, 4, 3, 1]` and the returned scores are `[0.1579, 0.0526, 0.1053, 0.2105, 0.1579, 0.0526]`, a maximum absolute difference of `3.7894736842105265`. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
 
@@ -603,8 +683,9 @@ Scores each asset by the leading eigenvector of the network's adjacency matrix.
 
 Where:
 
-  - ``\\mathbf{A}``: Adjacency matrix of the network, weighted on the similarity branch.
-  - ``\\lambda_{\\mathrm{max}}``: Largest eigenvalue of ``\\mathbf{A}``.
+  - ``\\mathbf{EC}_n``: Eigenvector centrality vector of the network.
+  - $(math_dict[:A_network])
+  - $(math_dict[:lambda_max_network])
   - ``\\mathbf{q}_{\\mathrm{max}}``: Eigenvector of ``\\lambda_{\\mathrm{max}}``.
 
 The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. Measured over a 20-asset triangulated maximally filtered graph, the returned vector matches the formula above to `4.163336342344337e-16`, has 2-norm `1.0` and runs from `0.0715` to `0.4576`.
@@ -669,9 +750,31 @@ Declares no polarity and runs on the plain graph: `Graphs.katz_centrality` binar
 
 It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `KatzCentrality(; ov = TopologyOnly())` is a `MethodError`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\boldsymbol{v} &= \\sum_{k \\geq 0} \\alpha^{k}\\,\\mathbf{A}^{k}\\,\\mathbf{1}_n = \\left(\\mathbf{I}_n - \\alpha\\,\\mathbf{A}\\right)^{-1}\\mathbf{1}_n\\,, \\\\
+    \\mathbf{KC}_n &= \\dfrac{\\boldsymbol{v}}{\\lVert \\boldsymbol{v} \\rVert_2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{v}``: Walk sum of the network, whose ``i``-th entry adds up every walk that reaches asset ``i``, discounted by ``\\alpha`` for each edge on it.
+  - ``\\mathbf{KC}_n``: Katz centrality vector, the walk sum at unit 2-norm.
+  - ``\\alpha``: Attenuation factor, `alpha`.
+  - $(math_dict[:A_network])
+  - $(math_dict[:lambda_max_network])
+  - ``\\mathbf{I}_n``: Identity matrix of order ``n``.
+  - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
+  - $(math_dict[:n_network])
+
+The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, and the two right-hand sides are equal only there. Outside that range the resolvent is still defined at almost every ``\\alpha``, and the vector it gives is the walk sum of nothing.
+
 # `alpha` must be below the reciprocal of the largest eigenvalue
 
-The Katz score sums ``\\sum_{k \\geq 1} \\alpha^{k}\\mathbf{A}^{k}``, which converges only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, where ``\\lambda_{\\mathrm{max}}`` is the largest eigenvalue of the adjacency matrix. Above that bound the linear solve still returns a vector, and the vector is not a centrality: measured over a 20-asset minimum spanning tree, ``\\lambda_{\\mathrm{max}} = 2.3585443300773266`` and the bound is `0.42399033473634745`. At `alpha = 0.3` every score is positive, between `0.13148` and `0.36762`. At `alpha = 0.5` the scores run `-0.45187` to `0.45187`, and a negative centrality has no reading.
+Above the bound the linear solve still returns a vector, and the vector is not a centrality: measured over a 20-asset minimum spanning tree, ``\\lambda_{\\mathrm{max}} = 2.3585443300773266`` and the bound is `0.42399033473634745`. At `alpha = 0.3` every score is positive, between `0.13148` and `0.36762`. At `alpha = 0.5` the scores run `-0.45187` to `0.45187`, and a negative centrality has no reading.
 
 **The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets.
 
@@ -734,6 +837,27 @@ Declares no polarity and runs on the plain graph: `Graphs.pagerank` walks `outde
 
 It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` is a `MethodError`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\mathrm{PR}_i &= \\dfrac{1 - \\alpha}{n} + \\dfrac{\\alpha}{n}\\sum_{j \\in \\mathcal{D}} \\mathrm{PR}_j + \\alpha \\sum_{j \\in \\mathcal{I}_i} \\dfrac{\\mathrm{PR}_j}{k_j}\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{PR}_i``: PageRank of asset ``i``, the share of its time the damped walk spends there.
+  - ``\\alpha``: Damping factor, `alpha`. It is the probability that the walk follows an edge rather than teleporting.
+  - ``\\mathcal{I}_i``: Set of assets carrying an edge into asset ``i``.
+  - ``k_j``: Number of edges leaving asset ``j``.
+  - ``\\mathcal{D}``: Set of dangling assets, those that no edge leaves.
+  - $(math_dict[:n_network])
+
+The three terms are the walk's three moves: it teleports to a uniformly drawn asset, it teleports out of a dangling asset it cannot leave, or it follows one of the edges into asset ``i``. Every score is therefore non-negative and the vector sums to one, which is what separates this member from the counting scores of the family.
+
+Every network this library builds is **undirected**, where ``\\mathcal{I}_i`` is the neighbourhood of asset ``i`` and ``k_j`` is its degree. On a connected undirected network the solution approaches the degree vector [`DegreeCentrality`](@ref) counts, up to a scale, as ``\\alpha`` approaches one, and a smaller ``\\alpha`` blends that limit with the uniform distribution.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -777,15 +901,15 @@ Pagerank
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
     """
-    Number of iterations.
+    Number of iterations. `Graphs.pagerank` raises when the scores have not converged after this many sweeps.
     """
     n
     """
-    Damping factor.
+    Damping factor. It is the probability that the walk follows an edge rather than teleporting.
     """
     alpha
     """
-    Convergence threshold.
+    Convergence threshold. A sweep converges when the L1 change of the score vector falls below this value multiplied by the number of assets.
     """
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
@@ -807,6 +931,27 @@ Scores each asset by its mean shortest-path distance, measured against the netwo
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
 Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\bar{\\ell}_i &= \\dfrac{1}{n - 1}\\sum_{j} \\ell_{i,\\,j}\\,, \\\\
+    \\mathrm{RC}_i &= \\dfrac{D + 1 - \\bar{\\ell}_i}{D}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{\\ell}_i``: Mean length from asset ``i`` to every other asset.
+  - ``\\mathrm{RC}_i``: Radiality centrality of asset ``i``.
+  - ``D``: Diameter of the network, the largest ``\\ell_{i,\\,j}`` over every pair.
+  - $(math_dict[:ell_ij_path])
+  - $(math_dict[:n_network])
+
+The diameter is what separates this score from [`ClosenessCentrality`](@ref). Closeness reciprocates the mean length and reads a scale of its own; radiality subtracts it from the longest length the network holds, so the score says how far inside the network's own reach an asset sits.
+
+The score is at most ``1``, which an asset one edge away from every other reaches, and at least ``1/D``, which an asset whose mean length equals the diameter reaches. Both bounds move with ``D``, so two networks give comparable scores only when the two have the same diameter.
 
 # Fields
 
@@ -861,6 +1006,23 @@ Counts the shortest paths of the network that pass through each asset.
 
 Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+    \\mathrm{SC}_i &= \\sum_{s \\neq i \\neq t} \\sigma_{s,\\,t}(i)\\,,
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{SC}_i``: Stress centrality of asset ``i``.
+  - $(math_dict[:sigma_st_i_paths])
+
+The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair twice. There is no normalisation, so the score is a count rather than a rate: it grows with the size of the network, and two networks give comparable scores only when the two hold the same number of assets.
+
+It is [`BetweennessCentrality`](@ref)'s sum without the division by ``\\sigma_{s,\\,t}``. A pair joined by many shortest paths therefore contributes many units here and one unit there, so this score reads how much traffic an asset carries and betweenness reads how much of it the asset alone can carry.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -874,6 +1036,10 @@ $(DocStringExtensions.FIELDS)
     ) -> StressCentrality
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ctargs_nomat])
 
 # Examples
 
@@ -1056,6 +1222,12 @@ This function dispatches to the appropriate centrality computation from [`Graphs
 
 `g` may be weighted or unweighted, and nothing here inspects which. `Graphs.jl` weights implicitly — the `distmx` of every routine that takes one defaults to `weights(g)` — so the choice is made once, by [`centrality_graph`](@ref), and this function only forwards. Handing a weighted graph to an algorithm that declares no polarity is what [`centrality_graph`](@ref) exists to prevent: `Graphs.katz_centrality` throws an `InexactError` on one.
 
+# Algorithm
+
+ 1. Select the `Graphs.jl` routine that the type of `ct` names, from the list under `# Arguments`.
+ 2. Splat the configuration `ct` carries into that call. [`BetweennessCentrality`](@ref), [`ClosenessCentrality`](@ref) and [`StressCentrality`](@ref) pass `args` and `kwargs`; [`DegreeCentrality`](@ref) passes `kind` and `kwargs`; [`KatzCentrality`](@ref) passes `alpha`; [`Pagerank`](@ref) passes `alpha`, `n` and `epsilon`; [`EigenvectorCentrality`](@ref) and [`RadialityCentrality`](@ref) pass nothing.
+ 3. Return the scores that routine produced, one entry per vertex of `g`.
+
 # Arguments
 
   - `ct`: Centrality algorithm to use.
@@ -1169,6 +1341,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:treeargs_nochan])
+
 # Examples
 
 ```jldoctest
@@ -1223,6 +1399,10 @@ $(DocStringExtensions.FIELDS)
     ) -> BoruvkaTree
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:treeargs_nochan])
 
 # Examples
 
@@ -1279,6 +1459,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:treeargs_nochan])
+
 # Examples
 
 ```jldoctest
@@ -1320,6 +1504,12 @@ end
 Compute the minimum spanning tree (MST) of a graph using the specified algorithm.
 
 This function dispatches to the appropriate MST computation from `Graphs.jl` based on the type of `alg`. Supported algorithms include Kruskal, Boruvka, and Prim.
+
+# Algorithm
+
+ 1. Select the `Graphs.jl` spanning-tree routine that the type of `alg` names.
+ 2. Splat `alg.args` and `alg.kwargs` into that call. [`assert_tree_args`](@ref) refused every entry that could re-weight or re-orient the search, so the tree is minimised over the weights `g` already carries.
+ 3. Read the edge vector out of the answer. `Graphs.boruvka_mst` answers with a named tuple whose first field holds it, and the other two routines answer with the vector itself.
 
 # Arguments
 
@@ -1767,6 +1957,13 @@ Negative and `NaN` entries have no such nearest representable value and are reje
 
 `Inf` is left alone: it is the honest distance between uncorrelated assets under [`LogDistance`](@ref), the graph accepts it, and a spanning tree simply takes those edges last.
 
+# Algorithm
+
+ 1. Walk every off-diagonal entry of `D`. Throw a `DomainError` on a negative entry and on a `NaN`, and record whether any entry is zero, giving `repair`.
+ 2. Return `D` itself when `repair` is `false`. An input that needs no move is never copied.
+ 3. Copy `D` into `W`, and take `tiny`, the smallest representable positive value of the element type.
+ 4. Move every off-diagonal zero of `W` to `tiny`, giving the repaired matrix.
+
 # Arguments
 
   - `D`: Symmetric distance matrix.
@@ -1842,6 +2039,22 @@ The two-argument form exists for a caller that already holds that matrix. [`clus
   - Tree branch: strictly positive, and finite or `Inf`. [`graph_weight_matrix`](@ref) moves every zero distance off the value the representation reserves for *absent*, and rejects a negative or a `NaN`. `Inf` is legal — it is the honest [`LogDistance`](@ref) between two uncorrelated assets.
   - PMFG branch: strictly positive and finite. [`PMFG_T2s`](@ref) checks its input for non-negativity, and it inserts every remaining vertex whatever the gain, so it declines no edge. A zero weight would therefore be stored as an *absent* edge and silently shrink the structure, which is why [`assert_pmfg_weights`](@ref) refuses one here.
 
+# Algorithm
+
+**The tree branch**, under an [`AbstractTreeType`](@ref):
+
+ 1. Derive the distance matrix `D` from `X` with `nte.de` and `nte.ce`. The two-argument entry point is handed `D` and starts at step 2.
+ 2. Repair `D` with [`graph_weight_matrix`](@ref), and build the complete `SimpleWeightedGraphs.SimpleWeightedGraph` `G` over the repaired matrix.
+ 3. Minimise the distance over `G` with [`calc_mst`](@ref), giving the edge vector of the tree.
+ 4. Take the subgraph of `G` on those edges. It is the tree, and it carries `D`'s distances.
+
+**The similarity branch**, under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref):
+
+ 1. Derive the correlation and the distance matrix `D` from `X` with `nte.de` and `nte.ce`, check `D` against `nte.alg`'s domain with [`assert_similarity_domain`](@ref), and convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref). The two-argument entry point is handed `S` and starts at step 2.
+ 2. Maximise the planar gain over `S` with [`PMFG_T2s`](@ref), giving `A`, the weighted adjacency matrix of the triangulated maximally filtered graph.
+ 3. Refuse a zero weight in `A` with [`assert_pmfg_weights`](@ref).
+ 4. Build the `SimpleWeightedGraphs.SimpleWeightedGraph` over `A`. It carries `S`'s similarities.
+
 # Arguments
 
   - `alg`: Tree or similarity matrix algorithm.
@@ -1851,6 +2064,12 @@ The two-argument form exists for a caller that already holds that matrix. [`clus
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
+
+# Validation
+
+  - Tree branch: throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
+  - Similarity branch: throws a `DomainError` if a zero weight cost the triangulated maximally filtered graph an edge, through [`assert_pmfg_weights`](@ref).
+  - Similarity branch, on the estimator entry point alone: throws a `DomainError` if `D` leaves the domain of `alg`, through [`assert_similarity_domain`](@ref). The two-argument entry point is handed `S` and never sees `D`.
 
 # Returns
 
@@ -1904,6 +2123,11 @@ The sparsity pattern is the structure itself, so it is identical to [`calc_adjac
 
 The entry points are [`calc_weighted_adjacency_graph`](@ref)'s, one `Graphs.adjacency_matrix` call further on, plus one for a caller that already holds the graph itself. `W` is the selecting quantity — the distance on the tree branch, the similarity on the PMFG branch — and [`clusterise`](@ref) supplies it directly, having already paid for it; it then reads the matrix off the graph it keeps, through the one-argument form, because it needs that graph again to answer a budget **rule**.
 
+# Algorithm
+
+ 1. Build the network structure with [`calc_weighted_adjacency_graph`](@ref), through the entry point the arguments name. The one-argument method is handed the graph and starts at step 2.
+ 2. Read `Graphs.adjacency_matrix` off that graph. The graph is weighted, so the entries are its edge weights and not `0` and `1`.
+
 # Arguments
 
   - `G`: Network structure a caller already holds, from [`calc_weighted_adjacency_graph`](@ref).
@@ -1945,6 +2169,12 @@ The structure comes from [`calc_weighted_adjacency_graph`](@ref); this function 
 
 Consumers that need the weights call [`calc_weighted_adjacency`](@ref) instead. They must then observe the per-branch polarity documented on [`calc_weighted_adjacency_graph`](@ref). The binarisation here is what exempts this function from it.
 
+# Algorithm
+
+ 1. Build the weighted network structure with [`calc_weighted_adjacency_graph`](@ref).
+ 2. Rebuild it as a `Graphs.SimpleGraph`, which keeps the edge set and discards the weights.
+ 3. Read `Graphs.adjacency_matrix` off that graph, giving the binary matrix.
+
 # Arguments
 
   - $(arg_dict[:nte])
@@ -1983,12 +2213,31 @@ Re-weighting a structure with a quantity that did not select it is what [`calc_w
 
 What must not happen is a path taken over the similarities themselves. A shortest path *minimises* the sum of its edge weights, so over similarities it seeks the route through the **weakest** links — the ordering it produces is backwards. It is also quiet about it: measured over the four similarity algorithms, the backwards answer correlates `0.95` to `0.97` with the right one, which is close enough to pass a glance and not close enough to be usable.
 
+# Algorithm
+
+**The tree branch**, under an [`AbstractTreeType`](@ref):
+
+ 1. Return [`calc_weighted_adjacency_graph`](@ref)'s graph unchanged. That branch weights its edges with `D` already, so the two structures are one graph.
+
+**The similarity branch**, under an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref):
+
+ 1. Derive the correlation and the distance matrix `D` from `X`, check `D` against `nte.alg`'s domain with [`assert_similarity_domain`](@ref), and convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref).
+ 2. Repair `D` with [`graph_weight_matrix`](@ref), giving `W`. The repair is the tree branch's, needed here for the same reason: a zero distance is the value the representation reserves for *absent*.
+ 3. Select the edges by maximising the planar gain over `S` with [`PMFG_T2s`](@ref), giving `A`, and refuse a zero weight in it with [`assert_pmfg_weights`](@ref).
+ 4. Read the row and column index of every stored entry of `A`, and take the entry of `W` at each one, giving the length of every selected edge.
+ 5. Build the `SimpleWeightedGraphs.SimpleWeightedGraph` over those indices and lengths. It is `A`'s edge set carrying `D`'s distances.
+
 # Arguments
 
   - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
+
+# Validation
+
+  - Throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
+  - Similarity branch: throws a `DomainError` if `D` leaves the domain of `nte.alg`, through [`assert_similarity_domain`](@ref), and a `DomainError` if a zero weight cost the triangulated maximally filtered graph an edge, through [`assert_pmfg_weights`](@ref).
 
 # Returns
 
@@ -2047,6 +2296,15 @@ One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`
 The estimator-taking methods derive the structure from `X`. The graph-taking method is for a caller that already holds it: both [`clusterise`](@ref) methods build the structure from the selecting quantity they already paid for, through [`calc_weighted_adjacency_graph`](@ref)'s own two-argument entry point, and would otherwise re-derive the distance — `98%` of `clusterise`'s runtime under [`VariationInfoDistance`](@ref) — to answer a budget rule.
 
 [`PathLength`](@ref) has **no** graph-taking method, and cannot: a graph carries no polarity tag, so `G` is a distance-weighted structure on the tree branch and a similarity-weighted one on the PMFG branch, and nothing in the argument distinguishes them. Handing the PMFG's similarities to a shortest path returns an answer instead of raising — see [`calc_distance_weighted_graph`](@ref). The hop count is exempt because it discards the weights.
+
+# Algorithm
+
+ 1. Build the structure `X` implies, through the branch that `sep` selects.
+
+      + [`HopCount`](@ref): [`calc_adjacency`](@ref)'s binary matrix.
+      + [`PathLength`](@ref): [`calc_distance_weighted_graph`](@ref)'s distance-weighted structure, which is already the answer.
+
+ 2. Rebuild a [`HopCount`](@ref)'s structure as a `Graphs.SimpleGraph`, which discards the weights. The graph-taking method is handed `G` and starts here.
 
 # Arguments
 
@@ -2110,6 +2368,15 @@ An unreachable pair carries whatever sentinel the underlying routine uses, **not
 
 [`HopCount`](@ref) counts the edges of the binarised structure; [`PathLength`](@ref) sums the distances along them. Which structure each reads is [`separation_graph`](@ref)'s answer, not this function's. All-pairs shortest paths come from one `floyd_warshall_shortest_paths` call rather than a Dijkstra per vertex — measured about **7 times faster** on this shape, and within about `1.3` times of the breadth-first loop the hop count uses.
 
+# Algorithm
+
+ 1. Build the structure with [`separation_graph`](@ref). The graph-taking methods are handed `g` and start at step 2.
+
+ 2. Measure every pair over that structure, through the branch that `sep` selects.
+
+      + [`HopCount`](@ref): one `Graphs.gdistances` breadth-first traversal per vertex, whose answer becomes that vertex's column of a dense `Matrix{Int}`.
+      + [`PathLength`](@ref): one `Graphs.floyd_warshall_shortest_paths` call over the whole graph, whose `dists` field is the matrix.
+
 # Arguments
 
   - `sep`: Separation algorithm. Its budget is not read; a member whose budget is still a rule measures the same separations.
@@ -2168,11 +2435,24 @@ One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`
 
 [`PathLength`](@ref) clamps a chosen `dmax` to the observed diameter as well as substituting the diameter for `nothing`. The clamp **truncates nothing** — no pair sits beyond the diameter — so it is a scale-top correction and is visible only through [`LinearDecay`](@ref), the one decay reading the budget. Without it, `dmax = 100` on a graph of diameter `3.5` would flatten the scores towards a constant while forbidding no pair at all.
 
+# Algorithm
+
+ 1. Refuse a separation whose budget is still a rule. A [`HopCount`](@ref) carrying a [`HopCountAlgorithm`](@ref), and a [`PathLength`](@ref) carrying a [`PathLengthAlgorithm`](@ref), each throw here.
+
+ 2. Answer the budget, through the branch that `sep` selects.
+
+      + [`HopCount`](@ref): `sep.n`, the number of hops the caller stated. `d` is not read.
+      + [`PathLength`](@ref): walk `d`, keep the largest entry [`is_reachable`](@ref) admits, and call it `delta`, the observed diameter. Answer `delta` when `sep.dmax` is `nothing`, and the smaller of `sep.dmax` and `delta` otherwise.
+
 # Arguments
 
   - `sep`: Separation algorithm.
   - `nte`: Network estimator that owns `sep`. **Inert** for the shipped members.
   - `d`: Separation matrix from [`separation_matrix`](@ref). **Inert** for [`HopCount`](@ref), whose budget is configured rather than observed; read by [`PathLength`](@ref), whose budget is capped by what the graph turned out to be.
+
+# Validation
+
+  - Throws an `ArgumentError` if `sep` carries a budget rule rather than a value. Call [`resolve_separation`](@ref) first.
 
 # Returns
 
@@ -2227,11 +2507,21 @@ The population is the pairs a budget can be *about*: the diagonal is zero by con
 
 The population excludes an unreachable pair through [`is_reachable`](@ref) rather than through a test written out here. `isfinite` alone would not do it: it is `true` for every `Integer`, so it admits [`HopCount`](@ref)'s `typemax(Int)`.
 
+# Algorithm
+
+ 1. Collect the off-diagonal entries of `d` that [`is_reachable`](@ref) admits, giving `v`, the population of the quantile.
+ 2. Throw an `ArgumentError` when `v` is empty.
+ 3. Take the `q`-quantile of `v` with `Statistics.quantile`.
+
 # Arguments
 
   - `sep`: Separation algorithm the matrix was measured under, forwarded to [`is_reachable`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `q`: Quantile in `[0, 1]`.
+
+# Validation
+
+  - Throws an `ArgumentError` if no off-diagonal entry of `d` is reachable, because a budget cannot be placed at a quantile of an empty population.
 
 # Returns
 
@@ -2271,6 +2561,14 @@ A hop count is an `Integer` and the quantile is not, so the budget is rounded to
 Resolving this rule runs [`separation_matrix`](@ref) once, which the hop-ball branch of [`_phylogeny_matrix`](@ref) does not otherwise do — it walks matrix powers instead. A dynamic budget costs one all-pairs traversal that a stated one does not.
 
 It does **not** cost a second structure. The rule is handed the graph its consumer already built, through [`separation_graph`](@ref), so the distance derivation — `98%` of [`clusterise`](@ref)'s runtime under [`VariationInfoDistance`](@ref) — is paid once per consumer call whether the budget is a rule or a number.
+
+# Algorithm
+
+The steps below are the call operator's, which [`resolve_separation`](@ref) invokes.
+
+ 1. Measure the hop separations over `g` with [`separation_matrix`](@ref), giving `d`. A bare [`HopCount`](@ref) is the probe, because that kernel dispatches on the separation's type and reads no field of it.
+ 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref).
+ 3. Round that quantile to the nearest `Int`, giving the hop budget. The smallest off-diagonal hop separation is `1`, so the quantile never falls below one and the round never has to be clamped up to [`HopCount`](@ref)'s floor.
 
 # Fields
 
@@ -2341,6 +2639,13 @@ A stated `dmax` holds the **radius** still and lets the related-pair count move 
 # It reaches the cardinalities a hop count cannot
 
 This is where the radius ball's one real gain becomes reachable by name. A hop budget steps through a handful of shell cardinalities and cannot stop between them; `q` is continuous, so `PathLengthQuantile(; q = 0.3)` asks for a cardinality directly and lands on it closely.
+
+# Algorithm
+
+The steps below are the call operator's, which [`resolve_separation`](@ref) invokes.
+
+ 1. Measure the path separations over `g` with [`separation_matrix`](@ref), giving `d`. A bare [`PathLength`](@ref) is the probe, for the same reason as on the hop rule.
+ 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref). That quantile is the radius budget, and it takes no rounding.
 
 # Fields
 
@@ -2428,6 +2733,14 @@ A functor's return type is not part of its signature, so a [`HopCountAlgorithm`]
 
 Resolution goes back through the ordinary constructor, so the rule's answer meets exactly the validation a stated budget meets — `n >= 1`, `n <= RESOURCE_LIMITS[].max_hop_count`, and `dmax > 0`. That is why the resource cap needs no second check here: a rule that returns an absurd hop count is rejected by the same `assert_resource_cap` a stated one meets.
 
+# Algorithm
+
+ 1. Answer `sep` unchanged when its budget is already a value. The wrapper carries a method of its own for this case, so a stated budget builds no structure at all.
+ 2. Build the structure the rule measures over with [`separation_graph`](@ref), on the wrapper. The graph-taking methods are handed `g` and start at step 3.
+ 3. Call the rule in the budget field with `nte`, `X` and `g`, forwarding `dims` and `kwargs`, giving the budget the rule answers.
+ 4. Check the type of that answer. A [`HopCount`](@ref) rule must answer with an `Integer`, and a [`PathLength`](@ref) rule with a `Number`. Throw an `ArgumentError` otherwise.
+ 5. Rebuild the member through its ordinary constructor, carrying the answer as its budget.
+
 # Arguments
 
   - `sep`: Separation algorithm, resolved or not.
@@ -2504,6 +2817,18 @@ Internal dispatch helper for constructing a [`Clusters`](@ref) result within a n
 
 Selects the appropriate clustering routine based on `alg`, determines the optimal number of clusters, and returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
 
+# Algorithm
+
+ 1. Cluster `P`, through the branch that `alg` selects, giving `res`.
+
+      + [`HClustAlgorithm`](@ref): `Clustering.hclust` under `alg.linkage` and `branchorder`.
+      + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`, whose last returned value is the clustering.
+      + [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): [`optimal_number_clusters`](@ref), which answers with the clustering and the count together.
+
+ 2. Select the number of clusters `k` with [`optimal_number_clusters`](@ref) over `onc`, `res` and `P`. The third branch holds `k` from step 1 already.
+
+ 3. Assemble the [`Clusters`](@ref) result from `res`, `S`, `D`, `P` and `k`.
+
 # Arguments
 
   - `alg`: Clustering algorithm.
@@ -2568,6 +2893,14 @@ Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance
 # Only a hop count is admitted
 
 The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. The power sum is indexed by `nte.nte.sep.n`, and a matrix power counts edges: there is no radius analogue of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is the honest answer rather than a gap. [`phylogeny_matrix`](@ref) does have a radius method, so the two consumers of a network differ here on purpose.
+
+# Algorithm
+
+ 1. Derive the correlation matrix `S` and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`.
+ 2. Build the tree over `D` with [`calc_weighted_adjacency_graph`](@ref)'s two-argument entry point, giving the structure `G`, and read its weighted adjacency matrix `A` with [`calc_weighted_adjacency`](@ref).
+ 3. Resolve `nte.nte.sep` against `G` with [`resolve_separation`](@ref), and read the hop count `n` off the resolved separation.
+ 4. Accumulate the pseudo-distance matrix `P` as the sum of `D^i - A^i` over `i in 0:n`.
+ 5. Clear the diagonal of `P`, and hand the symmetric matrix to [`_clusterise`](@ref) together with `S` and `D`.
 
 # Arguments
 
@@ -2635,6 +2968,15 @@ Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a
 
 The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at **dispatch**. See the tree method: a matrix power counts edges, and there is no radius analogue of the power sum.
 
+# Algorithm
+
+ 1. Derive the correlation matrix and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`, and check `D` against `nte.nte.alg`'s domain with [`assert_similarity_domain`](@ref).
+ 2. Convert the pair to the similarity matrix `S` with [`distance_to_similarity`](@ref).
+ 3. Build the triangulated maximally filtered graph over `S` with [`calc_weighted_adjacency_graph`](@ref)'s two-argument entry point, giving the structure `G`, and read its weighted adjacency matrix `Rpm` with [`calc_weighted_adjacency`](@ref).
+ 4. Resolve `nte.nte.sep` against `G` with [`resolve_separation`](@ref), and read the hop count `n` off the resolved separation.
+ 5. Accumulate the pseudo-distance matrix `P` as the sum of `S^i - Rpm^i` over `i in 0:n`.
+ 6. Clear the diagonal of `P`, and hand the symmetric matrix to [`_clusterise`](@ref) together with `S` and `D`.
+
 # Arguments
 
   - `nte`: Network clustering estimator configured with a similarity-matrix-based [`NetworkEstimator`](@ref).
@@ -2642,6 +2984,10 @@ The fourth type parameter is narrowed to [`HopCount`](@ref), so a [`PathLength`]
   - $(arg_dict[:dims])
   - `branchorder`: Branch ordering strategy for hierarchical clustering.
   - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+
+# Validation
+
+  - Throws a `DomainError` if `D` leaves the domain of `nte.nte.alg`, through [`assert_similarity_domain`](@ref).
 
 # Returns
 
@@ -2723,6 +3069,20 @@ The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the sep
 
   - [`HopCount`](@ref): the **hop ball**, `sum(A^i for i in 0:n)` clamped to `0` or `1`, over `Graphs.adjacency_matrix(g)` — binary, because [`separation_graph`](@ref) hands a hop count a binarised structure and a power of a weighted matrix would sum products of distances. `sep.n` is read directly as a **matrix-power count** rather than through [`separation_budget`](@ref), which is what makes it a power count and not a budget.
   - [`PathLength`](@ref): the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref). No second traversal.
+
+# Algorithm
+
+**Under a [`HopCount`](@ref):**
+
+ 1. Read `Graphs.adjacency_matrix` off `g`, giving the binary matrix `A`.
+ 2. Accumulate `P` as the sum of `A^i` over `i in 0:sep.n`. Each entry counts the walks of length at most `sep.n` between its pair.
+ 3. Clamp `P` to `0` or `1`, which turns the walk count into the selection, and subtract the identity to clear the diagonal.
+
+**Under a [`PathLength`](@ref):**
+
+ 1. Measure the separations over `g` with [`separation_matrix`](@ref), giving `d`.
+ 2. Resolve the budget with [`separation_budget`](@ref), giving `dmax`.
+ 3. Select every pair [`is_related`](@ref) admits at `dmax`, and subtract the identity to clear the diagonal. [`is_related`](@ref) carries the unreachable sentinel as well as the budget.
 
 # Arguments
 
@@ -2806,6 +3166,13 @@ What it buys is **intermediate cardinalities between the shells**. Over the same
 
 `PathLength()` leaves `dmax = nothing`, which [`separation_budget`](@ref) resolves to the **observed diameter** — so no reachable pair sits outside it and the matrix is all ones off the diagonal. Measured: `190` of `190` pairs on both branches. This is the honest reading of an unstated budget rather than a fall-back, but it is the *opposite* end of the dial from [`HopCount`](@ref)'s default `n = 1`: a caller who swaps one separation for the other and changes nothing else gets the maximal ball where they had the minimal one. State a numeric `dmax` to select anything narrower.
 
+# Algorithm
+
+ 1. Build the structure `nte.sep` measures over with [`separation_graph`](@ref), giving `g`. One structure is built per call and both readers below share it.
+ 2. Resolve `nte.sep` against `g` with [`resolve_separation`](@ref). A budget that is already a value passes through and builds nothing.
+ 3. Select the related pairs with [`_phylogeny_matrix`](@ref), through the branch the resolved separation names.
+ 4. Wrap the selection in a [`PhylogenyResult`](@ref).
+
 # Arguments
 
   - `nte`: NetworkEstimator estimator.
@@ -2844,6 +3211,14 @@ end
 Compute the phylogeny matrix for a clustering estimator or result.
 
 This function clusterises the data, cuts the tree into the optimal number of clusters, and constructs a binary phylogeny matrix indicating shared cluster membership, with self-loops removed.
+
+# Algorithm
+
+ 1. Partition the assets with [`clusterise`](@ref), giving the [`Clusters`](@ref) result `res`.
+ 2. Read the cluster of every asset with [`assignments`](@ref).
+ 3. Build the `assets × res.k` membership matrix `P`, whose entry is one when the asset belongs to the cluster of its column.
+ 4. Multiply `P` by its own transpose, which is one exactly for a pair that shares a cluster, and subtract the identity to clear the diagonal.
+ 5. Wrap the selection in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
@@ -2909,6 +3284,19 @@ The unweighted route goes through [`phylogeny_matrix`](@ref), so it sees the [`A
 # Two entry points, because the polarity is resolved once
 
 The three-argument methods taking `ct` resolve [`centrality_polarity`](@ref) and forward to the methods taking the polarity itself, which is the same shape [`separation_matrix`](@ref) uses: the deciding algorithm comes first, and the estimator only supplies the graph.
+
+# Algorithm
+
+ 1. Answer the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref) at once when the source is a clustering estimator or a [`Clusters`](@ref). A partition carries no edge weights, so no polarity is read.
+
+ 2. Resolve the effective polarity of `ct` with [`centrality_polarity`](@ref). The methods that take the polarity itself are handed it and start at step 3.
+
+ 3. Build the graph, through the branch the polarity and the source name together.
+
+      + `nothing`: the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). It is the one route that reads the estimator's `sep`.
+      + [`DistancePolarity`](@ref): [`calc_distance_weighted_graph`](@ref)'s structure, which carries distances on either branch.
+      + [`SimilarityPolarity`](@ref) on a similarity branch: [`calc_weighted_adjacency_graph`](@ref)'s structure, carrying the similarities that selected its edges.
+      + [`SimilarityPolarity`](@ref) on a tree branch: the plain graph again, because a tree is selected by minimising a distance and holds no similarity to read.
 
 # Arguments
 
@@ -2981,6 +3369,12 @@ This function builds the graph with [`centrality_graph`](@ref) — weighted in t
      5. [`EigenvectorCentrality`](@ref) on a tree branch. The branch carries no similarity for it to read.
 
     On the weighted routes the estimator's `sep` field is **inert**: they read the structure itself rather than the separation closure [`phylogeny_matrix`](@ref) builds. At the default `HopCount(; n = 1)` the two agree, because the closure of a graph at one hop is the graph.
+
+# Algorithm
+
+ 1. Build the graph with [`centrality_graph`](@ref), weighted in the polarity `ct` declares wherever the source can supply it.
+ 2. Score the vertices of that graph with [`calc_centrality`](@ref).
+ 3. Wrap the scores in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
@@ -3057,6 +3451,11 @@ Where:
 
 There is no normalisation and no absolute value, so the average carries the units of the score. A [`DegreeCentrality`](@ref) score is divided by ``n - 1`` before it arrives here. Measured over a 20-asset minimum spanning tree, the code and the formula agree exactly.
 
+# Algorithm
+
+ 1. Score the assets with [`centrality_vector`](@ref), giving the score vector.
+ 2. Take the dot product of that vector and `w`.
+
 # Arguments
 
   - `pl`: NetworkEstimator estimator.
@@ -3131,6 +3530,12 @@ Where:
 
 Two assets that are not related contribute nothing, and a pair contributes nothing when either weight is zero. Measured over a 20-asset minimum spanning tree at a two-hop budget, the code and the formula agree to `5.551115123125783e-17`.
 
+# Algorithm
+
+ 1. Take the outer product of `w` with itself and its absolute value, giving `aw`, the gross weight of every pair.
+ 2. Take the dot product of `X` and `aw`, which adds up the gross weight of the related pairs alone.
+ 3. Divide by the sum of `aw`, the gross weight of every pair, giving the share invested in related assets.
+
 # Arguments
 
   - `w`: Weights vector.
@@ -3185,6 +3590,11 @@ end
 Compute the asset phylogeny score for a set of weights and a network or clustering estimator.
 
 This function computes the phylogeny matrix using the estimator and data, then computes the asset phylogeny score using the weights.
+
+# Algorithm
+
+ 1. Build the phylogeny matrix from `X` with [`phylogeny_matrix`](@ref).
+ 2. Score `w` against that matrix with [`asset_phylogeny`](@ref).
 
 # Arguments
 

@@ -834,6 +834,8 @@ const val_dict = unique_key_dict(:val_dict,
                                  :ntn => "If `n` is an `Integer`, `1 <= n <= RESOURCE_LIMITS[].max_hop_count` (three readers sum `A^i` over `i in 0:n`, so the compute cost is linear in `n`; see [`RESOURCE_LIMITS`](@ref)). A rule is checked when it is resolved, not when it is stored.",#
                                  :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. A rule is checked when it is resolved, not when it is stored.",#
                                  :sepq => "`0 <= q <= 1`.",#
+                                 :ctargs_nomat => "No entry of `args` is an `AbstractMatrix`. A weight matrix reaches a centrality algorithm through [`centrality_polarity`](@ref), and never through `args`.",#
+                                 :treeargs_nochan => "No entry of `args` is an `AbstractMatrix` or an `AbstractVector`, and `kwargs` holds no `minimize` key. Each of those reaches a channel that would re-weight or re-orient the graph the [`NetworkEstimator`](@ref) built.",#
                                  :A => "`!isempty(A)`.",#
                                  :B => "`!isempty(B)`.",#
                                  :A_B => "`size(A, 1) == length(B)`, one row of `A` per entry of `B`.",#
@@ -1039,6 +1041,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # same separation, so `01_Base_Phylogeny.jl` shares this symbol
                        # between four Units.
                        :d_sep => "``d``: Separation between two assets.",#
+                       # Network centrality. The eight members of
+                       # `AbstractCentralityAlgorithm` each state a closed form over the
+                       # same network, so `06_Phylogeny.jl` shares these symbols between
+                       # eight Units.
+                       :A_network => "``\\mathbf{A}``: Adjacency matrix of the network. It is binary on the unweighted route, and carries the edge weights of its own branch where the algorithm declares a polarity.",#
+                       :n_network => "``n``: Number of assets, which is the number of vertices of the network.",#
+                       :lambda_max_network => "``\\lambda_{\\mathrm{max}}``: Largest eigenvalue of ``\\mathbf{A}``.",#
+                       :ell_ij_path => "``\\ell_{i,\\,j}``: Length of a shortest path between assets ``i`` and ``j``. It counts the edges on an unweighted network, and sums the edge weights on a weighted one.",#
+                       :sigma_st_paths => "``\\sigma_{s,\\,t}``: Number of shortest paths between assets ``s`` and ``t``.",#
+                       :sigma_st_i_paths => "``\\sigma_{s,\\,t}(i)``: Number of the shortest paths between assets ``s`` and ``t`` that pass through asset ``i``.",#
                        # Optimal number of clusters. The two members of
                        # `AbstractOptimalNumberClustersAlgorithm` each maximise a score over
                        # the same candidate counts, so `02_Clusters.jl` shares this symbol
