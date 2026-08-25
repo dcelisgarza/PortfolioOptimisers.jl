@@ -119,10 +119,10 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :gerbalg => "`alg`: Gerber covariance algorithm.",#
                                  :gerbce => "`ce`: Gerber covariance estimator.",#
                                  :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
-                                 :c1 => "`c1`: Zone of confusion parameter.",#
-                                 :c2 => "`c2`: Zone of indecision lower bound.",#
-                                 :c3 => "`c3`: Zone of indecision upper bound.",#
-                                 :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
+                                 :c1 => "`c1`: Zone of confusion threshold, in units of the asset's standard deviation. It is read against the raw, uncentred return, and it rejects an observation only when both assets fall inside it.",#
+                                 :c2 => "`c2`: Zone of indecision threshold, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when both assets fall inside it.",#
+                                 :c3 => "`c3`: Outer cut-off, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
+                                 :sbn => "`n`: Severity exponent of the Smyth-Broby contribution. It sets how hard the divergence of a pair is penalised.",#
                                  :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
                                  ## Mutual and var info
                                  :bins => "`bins`: Binning algorithm or fixed number of bins.",#
@@ -801,8 +801,9 @@ const val_dict = unique_key_dict(:val_dict,
                                  :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
                                  :gerbt => "`0 <= t`.",#
                                  :t => "`0 < t < 1`.",#
-                                 :c1 => "`0 < c1 <= 1`.",#
-                                 :c2 => "`0 < c2 <= 1`.",#
+                                 :c1 => "`0 <= c1`.",#
+                                 :c2 => "`0 <= c2`.",#
+                                 :c3 => "`0 <= c3`.",#
                                  :c3c2 => "`c3 > c2`.",#
                                  :dims => "`dims in (1, 2)`.",#
                                  :alpha => "`0 < alpha < 1`.",#
@@ -1007,7 +1008,22 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :Vcross_gerber => "``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``: Crossing matrix. Its entry is ``1`` when the asset crossed its threshold in either direction, and ``0`` when it did not.",#
                        :nc_gerber => "``n_{c}``: Concordant count of a pair, the observations on which both assets crossed their thresholds in the same direction.",#
                        :nd_gerber => "``n_{d}``: Discordant count of a pair, the observations on which both assets crossed their thresholds in opposite directions.",#
-                       :nn_gerber => "``n_{n}``: Neutral count of a pair, the observations on which exactly one of the two assets crossed its threshold.")
+                       :nn_gerber => "``n_{n}``: Neutral count of a pair, the observations on which exactly one of the two assets crossed its threshold.",#
+                       # The Smyth-Broby family. `06_SmythBrobyCovariance.jl` states the
+                       # statistic, and it shares the Gerber symbols above.
+                       :r_tilde_sb => "``\\tilde{r}_{t,\\,i} = (x_{t,\\,i} - \\mu_i) / \\sigma_i``: Centred, standardised return of asset ``i`` at observation ``t``.",#
+                       :c1_sb => "``c_1``: Confusion-zone threshold. It is read against the **raw, uncentred** return, and it rejects an observation only when both assets fall inside it.",#
+                       :c2_sb => "``c_2``: Indecision-zone threshold. It is read against the **centred, standardised** return, and it rejects an observation when both assets fall inside it.",#
+                       :c3_sb => "``c_3``: Outer cut-off. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
+                       :kappa_sb => "``\\kappa``: Amplitude kernel of a pair, the geometric mean of the two gross standardised magnitudes.",#
+                       :gamma_sb => "``\\gamma``: Divergence of a pair, the absolute difference of the two standardised magnitudes.",#
+                       :n_sb => "``n``: Severity exponent. It sets how hard the divergence of a pair is penalised.",#
+                       :delta_sb => "``\\delta``: Smyth-Broby contribution of one admitted observation, in place of the Gerber vote.",#
+                       :CDN_sb => "``C``, ``D``, ``N``: Concordant, discordant and neutral observation sets of a pair, over the admitted observations.",#
+                       :possum_sb => "``\\mathrm{pos}``, ``\\mathrm{neg}``, ``\\mathrm{nn}``: Contribution sums of a pair over ``C``, ``D`` and ``N``.",#
+                       :poscount_sb => "``c^{+}``, ``c^{-}``, ``c^{0}``: Observation counts of a pair over ``C``, ``D`` and ``N``.",#
+                       :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair, chosen from the sums and the counts by the marker prefix.",#
+                       :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.")
 """
     ref_dict
 
