@@ -458,9 +458,15 @@ function distance_wei(L::MatNum)
                 T = SparseArrays.findnz(L1[v, :])[1] # neighbours of shortest nodes
                 d, wi = findmin(vcat(vcat(transpose(D[u, T]),
                                           transpose(D[u, v] .+ L1[v, T]))); dims = 1)
-                wi = vec(getindex.(wi, 2))
+                # `findmin(...; dims = 1)` returns one `CartesianIndex` per column, so
+                # component 1 is the row that won and component 2 is the column, which
+                # is the position in `T`. The winner is what decides the edge count, so
+                # read component 1. Row 2 is the path through `v`, one edge longer than
+                # the path to `v`. Reading component 2 and comparing it with `3` left
+                # `B` unrelated to any path. Issue #470.
+                wi = vec(getindex.(wi, 1))
                 D[u, T] = vec(d)   # Smallest of old/new path lengths
-                ind = T[wi .== 3]   # Indices of lengthened paths
+                ind = T[wi .== 2]   # Indices of lengthened paths
                 B[u, ind] .= B[u, v] + 1    # Increment number of edges in lengthened paths
             end
 
@@ -574,9 +580,13 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
  1. Colour every vertex white, set every entry of `distance` to `Inf`, and set every entry of `branch` to zero.
  2. Colour `source` grey, set its distance to zero and its branch to `-1`, and put it in the queue `Q`.
  3. Take the head `u` of `Q`, and read its out-neighbours `ns` from the stored entries of row `u`.
- 4. For each neighbour `v` whose distance is still zero, set it to `distance[u] + 1`. This is what records the distance of `source` to itself when the graph carries a self-loop.
+ 4. For each neighbour `v` whose distance is still zero, set it to `distance[u] + 1`. The source starts at zero, so this arm also fires on the source itself as soon as one of its own neighbours is expanded.
  5. For each white neighbour `v`, colour it grey, set `distance[v]` to `distance[u] + 1`, set `branch[v]` to `u`, and append `v` to `Q`.
  6. Drop `u` from `Q` and colour it black. Repeat from step 3 until `Q` is empty.
+
+!!! warning
+
+    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. Measured in issue #470 on a five-vertex path with a leaf, where the source reads `2.0`.
 
 # Arguments
 
@@ -585,7 +595,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 # Returns
 
-  - `distance::VecNum`: `N × 1` vector of shortest path distances from the source to each vertex (`0` for the source itself, `Inf` for unreachable nodes).
+  - `distance::VecNum`: `N × 1` vector of shortest path distances from the source to each vertex. `Inf` marks a vertex no path reaches. The source's own entry is **not** `0`; see the warning above.
   - `branch::Vector{Int}`: `N × 1` vector of predecessor indices for each vertex in the BFS tree (`-1` for the source, `0` for an unreachable vertex).
 
 # Related
@@ -2062,8 +2072,8 @@ function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistan
 end
 """
     const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
-                                     <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
-                                                        <:Any, <:Any}}
+                                     <:DistanceDistance{<:Any, <:Any, <:Any, <:Any,
+                                                        <:VariationInfoDistance}}
 
 Alias for distance types using variation of information metrics.
 
@@ -2076,8 +2086,8 @@ Matches either a [`VariationInfoDistance`](@ref)-based [`Distance`](@ref) or a [
   - [`DistanceDistance`](@ref)
 """
 const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
-                                 <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
-                                                    <:Any, <:Any}}
+                                 <:DistanceDistance{<:Any, <:Any, <:Any, <:Any,
+                                                    <:VariationInfoDistance}}
 """
     LoGo_dist_assert(de::DVarInfo_DDVarInfo, sigma::MatNum, X::MatNum)
 

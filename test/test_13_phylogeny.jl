@@ -3315,3 +3315,483 @@ end
         @test sort(unique(ak)) == 1:3
     end
 end
+
+# The numbers that `src/11_Phylogeny/04_DBHT.jl` claims, run rather than read. This is
+# condition 2 of the sweep of #470, under child map #418 of the map of maps #404. The file is
+# a port, so the check that carries weight is a number from a hand-computed answer set beside
+# the number the code returns. The sources are `DBHTs.m`, MATLAB Central File Exchange
+# submission 46750 by Won-Min Song and Tomaso Aste, and `distance_wei.m` and `breadth.m` of
+# the Brain Connectivity Toolbox by Mika Rubinov and Olaf Sporns. Defined at top level
+# because a `@testset` body becomes a function, and two of these bodies build a `struct`-free
+# fixture the whole file shares.
+@testset "The DBHT port answers its own numbers (#470)" begin
+    using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StatsBase,
+          SparseArrays, LinearAlgebra
+
+    PO470 = PortfolioOptimisers
+    rd470 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                          "./assets/SP500.csv.gz"));
+                                        timestamp = :Date)[(end - 252):end])
+    X470 = rd470.X
+    ce470 = PortfolioOptimisersCovariance()
+    rho470 = PO470.cor(ce470, X470)
+    dist470 = PO470.distance(Distance(; alg = SimpleDistance()), rho470, X470)
+    sim470 = MaximumDistanceSimilarity()
+    S470 = PO470.distance_to_similarity(sim470; S = rho470, D = dist470)
+
+    @testset "A maximal planar graph carries 3N - 6 edges, at two N" begin
+        #=
+        `PMFG_T2s`' docstring states that the structure is a maximal planar graph, so it
+        carries `3N - 6` edges against the `N - 1` of a minimum spanning tree, and that a
+        20-asset sample gives `54`. The count is structural: the greedy inserts every
+        remaining vertex into a face and each insertion adds exactly three edges, so no
+        near-tie in the gains can move it. Assert it at two `N`, so the identity is read
+        rather than one number.
+        =#
+        for n in (20, 12)
+            idx = 1:n
+            S = PO470.distance_to_similarity(sim470; S = rho470[idx, idx],
+                                             D = dist470[idx, idx])
+            A = PO470.PMFG_T2s(S)[1]
+            @test size(A, 1) == n
+            @test count(!iszero, A) ÷ 2 == 3 * n - 6
+            @test count(!iszero, A) ÷ 2 > n - 1
+        end
+        @test count(!iszero, PO470.PMFG_T2s(S470)[1]) ÷ 2 == 54
+
+        # The face list and the non-face 3-clique list carry the counts the algorithm
+        # section states: `2N - 4` faces of a triangulation, and one non-face 3-clique per
+        # vertex inserted after the tetrahedron.
+        A470, tri470, c3470 = PO470.PMFG_T2s(S470)[1:3]
+        @test size(tri470) == (2 * 20 - 4, 3)
+        @test size(c3470) == (20 - 4, 3)
+
+        #=
+        `[tri; clique3]` is claimed to be every 3-clique of the graph. `clique3` the
+        function answers the same question independently, by intersecting the neighbourhoods
+        of every edge, so the two lists must agree as sets.
+        =#
+        union470 = sort(collect(unique(eachrow(sort(vcat(tri470, c3470); dims = 2)))))
+        @test length(union470) == 52
+        @test union470 == sort(collect(eachrow(PO470.clique3(A470)[3])))
+    end
+
+    @testset "`nargout` is positional, and the last two outputs are built by arity" begin
+        # `cliques` is built when `nargout > 3` and `cliqueTree` when `nargout > 4`. Each is
+        # `nothing` otherwise, and the first three outputs are always built.
+        r3 = PO470.PMFG_T2s(S470)
+        r4 = PO470.PMFG_T2s(S470, 4)
+        r5 = PO470.PMFG_T2s(S470, 5)
+        @test isnothing(r3[4]) && isnothing(r3[5])
+        @test !isnothing(r4[4]) && isnothing(r4[5])
+        @test !isnothing(r5[4]) && !isnothing(r5[5])
+        # One 4-clique per vertex after the first three, so `N - 3` of them.
+        @test size(r4[4]) == (20 - 3, 4)
+        @test size(r5[5]) == (20 - 3, 20 - 3)
+        # The default arity is `3`, so the default and the explicit `3` agree.
+        @test isnothing(PO470.PMFG_T2s(S470, 3)[4])
+        for i in 1:3
+            @test r3[i] == r4[i] == r5[i]
+        end
+    end
+
+    @testset "Each of the three validation arms throws" begin
+        # `N >= 9` is a `DimensionMismatch`; the other two are a `DomainError`. The `NaN`
+        # arm is split from the non-negativity arm because `0 <= NaN` is `false`, so one
+        # check would report a `NaN` as a negative weight.
+        @test_throws DimensionMismatch PO470.PMFG_T2s(S470[1:8, 1:8])
+        Wnan = Matrix(copy(S470))
+        Wnan[2, 3] = NaN
+        @test_throws DomainError PO470.PMFG_T2s(Wnan)
+        Wneg = Matrix(copy(S470))
+        Wneg[2, 3] = -0.5
+        @test_throws DomainError PO470.PMFG_T2s(Wneg)
+        # Nine is the boundary, not a rejected size.
+        @test PO470.PMFG_T2s(S470[1:9, 1:9])[1] isa AbstractMatrix
+    end
+
+    @testset "`distance_wei` answers the hand-computed shortest path" begin
+        #=
+        A four-vertex path whose lengths are 1, 2 and 4, with a direct 1-4 edge of length
+        10. The shortest 1-4 route is the path, at 7, and it crosses three edges. `B` is
+        the edge count of the winning path, and `distance_wei` returned an unrelated
+        matrix until #470: it read the column of the `CartesianIndex` that `findmin`
+        returns instead of the row, and compared it with `3` where the matrix has two rows.
+        =#
+        L = SparseArrays.sparse(Float64[0 1 0 10; 1 0 2 0; 0 2 0 4; 10 0 4 0])
+        D, B = PO470.distance_wei(L)
+        @test D[1, :] == [0.0, 1.0, 3.0, 7.0]
+        @test D == transpose(D)
+        @test B[1, :] == [0, 1, 2, 3]
+        @test all(iszero, LinearAlgebra.diag(D))
+
+        # A star with a leaf: 1 joins 2, 3 and 4 at length 1, and 5 hangs off 2. The
+        # shortest 1-5 route crosses two edges, and 1-2, 1-3 and 1-4 cross one each.
+        Lg = SparseArrays.sparse(Float64[0 1 1 1 0; 1 0 0 0 1; 1 0 0 0 0; 1 0 0 0 0;
+                                         0 1 0 0 0])
+        Dg, Bg = PO470.distance_wei(Lg)
+        @test Dg[1, :] == [0.0, 1.0, 1.0, 1.0, 2.0]
+        @test Bg[1, :] == [0, 1, 1, 1, 2]
+
+        # A vertex no path reaches keeps the `typemax` the matrix was filled with, and its
+        # edge count stays zero.
+        L2 = SparseArrays.sparse(Float64[0 1 0 10 0; 1 0 2 0 0; 0 2 0 4 0; 10 0 4 0 0;
+                                         0 0 0 0 0])
+        D2, B2 = PO470.distance_wei(L2)
+        @test isinf(D2[1, 5])
+        @test all(isinf, D2[1:4, 5])
+        @test iszero(D2[5, 5])
+        @test iszero(B2[1, 5])
+        # The reachable block is the four-vertex answer above, unchanged by the extra
+        # vertex.
+        @test D2[1:4, 1:4] == D
+        @test B2[1:4, 1:4] == B
+    end
+
+    @testset "`breadth` walks the graph, and does not keep the source at zero" begin
+        #=
+        1-2-3-4 with a leaf 5 on vertex 1, and an isolated vertex 6. The BFS distances and
+        the BFS tree are read off the picture.
+
+        `distance[source]` is `2`, not `0`. The arm that reads a zero distance fires on the
+        source itself the first time one of its own neighbours is expanded, which is the
+        behaviour of the MATLAB original. Every caller resets the entry, so the value is
+        asserted here rather than corrected in the kernel.
+        =#
+        CIJ = SparseArrays.sparse(Int[0 1 0 0 1 0; 1 0 1 0 0 0; 0 1 0 1 0 0; 0 0 1 0 0 0;
+                                      1 0 0 0 0 0; 0 0 0 0 0 0])
+        d, b = PO470.breadth(CIJ, 1)
+        @test d[2:6] == [1.0, 2.0, 3.0, 1.0, Inf]
+        @test d[1] == 2.0
+        @test b == [-1, 1, 2, 3, 1, 0]
+
+        # A self-loop on the source makes the same arm write `1` instead.
+        CIJs = copy(CIJ)
+        CIJs[1, 1] = 1
+        @test PO470.breadth(CIJs, 1)[1][1] == 1.0
+
+        # A vertex no walk reaches keeps `Inf` and a branch of `0`, and starting there
+        # reaches nothing at all.
+        d6, b6 = PO470.breadth(CIJ, 6)
+        @test d6[6] == 0.0
+        @test all(isinf, d6[1:5])
+        @test b6 == [0, 0, 0, 0, 0, -1]
+    end
+
+    @testset "`clique3` finds every triangle, and `FindDisjoint` splits on one" begin
+        # `K4` is the smallest triangulation. Its four faces are its four 3-cliques.
+        K4 = SparseArrays.sparse(Int[0 1 1 1; 1 0 1 1; 1 1 0 1; 1 1 1 0])
+        @test PO470.clique3(K4)[3] == [1 2 3; 1 2 4; 1 3 4; 2 3 4]
+
+        #=
+        A separating triangle `{1, 2, 3}` with `{4, 5}` on one side and `{6, 7}` on the
+        other, and no edge between the two sides. `FindDisjoint` labels the triangle `0`,
+        the side that holds the first non-clique vertex `2`, and the far side `1`.
+        =#
+        Asep = zeros(Int, 7, 7)
+        for (i, j) in
+            ((1, 2), (1, 3), (2, 3), (1, 4), (2, 4), (3, 4), (4, 5), (1, 5), (2, 5), (1, 6),
+             (2, 6), (3, 6), (6, 7), (1, 7), (2, 7))
+            Asep[i, j] = 1
+            Asep[j, i] = 1
+        end
+        Asep = SparseArrays.sparse(Asep)
+        T, IndxNot = PO470.FindDisjoint(Asep, [1, 2, 3])
+        @test IndxNot == [4, 5, 6, 7]
+        @test T == [0, 0, 0, 2, 2, 1, 1]
+        # The label of a side is the side's own, so swapping the roles swaps the labels.
+        T2 = PO470.FindDisjoint(Asep, [1, 2, 6])[1]
+        @test T2[[1, 2, 6]] == [0, 0, 0]
+        @test length(unique(T2)) == 3
+    end
+
+    @testset "The two `CliqueRoot` methods are not the same clustering" begin
+        #=
+        `UniqueRoot` and `EqualRoot` are the one configuration knob of the clustering, and
+        they differ where the clique forest has more than one root. `CliqueRoot(::UniqueRoot,
+        …)` appends a virtual parent to `Pred` and points every root at it, so
+        `BubbleHierarchy` reads a different `Pred` and builds a different bubble matrix.
+        `CliqueRoot(::EqualRoot, …)` leaves `Pred` as it found it and joins the roots with
+        `AdjCliq` instead.
+
+        The knob is therefore not a no-op: `Mv` differs. It is also not a different answer:
+        the graph, the converging bubbles, the discrete clusters and the merge heights all
+        agree. It moves the order in which the leaves inside a bubble are merged.
+        =#
+        for n in (20, 15)
+            idx = 1:n
+            S = PO470.distance_to_similarity(sim470; S = rho470[idx, idx],
+                                             D = dist470[idx, idx])
+            D = dist470[idx, idx]
+            ru = PO470.DBHTs(D, S; branchorder = :default, root = UniqueRoot())
+            re = PO470.DBHTs(D, S; branchorder = :default, root = EqualRoot())
+            @test ru[1] == re[1]          # T8, the discrete clusters
+            @test ru[2] == re[2]          # Rpm, the weighted graph
+            @test ru[3] == re[3]          # Adjv, the converging-bubble membership
+            @test ru[4] == re[4]          # Dpm, the shortest paths
+            @test ru[7].heights == re[7].heights
+            @test ru[5] != re[5]          # Mv, the bubble matrix
+        end
+
+        # More than one root is the precondition the difference rests on. Assert it, so a
+        # regression names its cause rather than the symptom.
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        A = Rpm .!= 0
+        cl = PO470.clique3(A)[3]
+        M = SparseArrays.spzeros(Int, size(Rpm, 1), size(cl, 1))
+        for n in axes(cl, 1)
+            T = PO470.FindDisjoint(A, cl[n, :])[1]
+            i0 = findall(T .== 0)
+            i1 = findall(T .== 1)
+            i2 = findall(T .== 2)
+            is = length(i1) > length(i2) ? vcat(i2, i0) : vcat(i1, i0)
+            M[is, n] .= 1
+        end
+        @test count(iszero, PO470.BuildHierarchy(M)) == 4
+    end
+
+    @testset "`turn_into_Hclust_merges` writes the order `Clustering.Hclust` reads" begin
+        #=
+        The merge order is right when cutting the tree at `k` reproduces the discrete
+        cluster membership that `BubbleCluster8s` produced, asset by asset. The assertion is
+        equality and not a bijection of the labels, because the two agree label for label.
+        =#
+        T8, _, _, _, _, Z, hcl = PO470.DBHTs(dist470, S470; branchorder = :default)
+        k = maximum(T8)
+        @test k == 2
+        ct = Clustering.cutree(hcl; k = k)
+        @test ct == T8
+        # A leaf is a negative index and an earlier merge is a positive one, and the fourth
+        # column counts the leaves below each merge. The last merge holds every asset.
+        @test size(Z) == (length(T8) - 1, 4)
+        @test Z[end, 4] == length(T8)
+        @test all(<=(length(T8)), abs.(Z[:, 1:2]))
+        @test length(hcl.heights) == length(T8) - 1
+    end
+
+    @testset "`DirectHb` sums signed mass, and no shipped route can reach one" begin
+        #=
+        `PMFG_T2s`' docstring warns that a cancelling row manufactures a separating bubble
+        and that the failure is silent. Both halves are true, and the second is why the
+        first cannot arrive from a configuration this library ships.
+
+        The reachability first: `PMFG_T2s` refuses a negative weight with a `DomainError`,
+        and it returns `A = W ⊙ mask`, so every stored weight of `Rpm` is one of `W`'s own
+        non-negative entries. A negative mass cannot enter `DirectHb` through `DBHTs`.
+        =#
+        Rpm = PO470.DBHTs(dist470, S470; branchorder = :default)[2]
+        @test all(>=(0), SparseArrays.nonzeros(Rpm))
+        Wneg = Matrix(copy(S470))
+        Wneg[2, 3] = -0.5
+        Wneg[3, 2] = -0.5
+        @test_throws DomainError PO470.PMFG_T2s(Wneg)
+
+        # The mechanism, driven by calling `DirectHb` directly, which takes plain matrices
+        # and carries no type bound of its own.
+        H1, Hb, Mb, CliqList, Sb = PO470.CliqHierarchyTree2s(Rpm, UniqueRoot())
+        Mb = Mb[1:size(CliqList, 1), :]
+        Mv = SparseArrays.spzeros(Int, size(Rpm, 1), 0)
+        for n in axes(Mb, 2)
+            vc = SparseArrays.spzeros(Int, size(Rpm, 1))
+            vc[sort!(unique(CliqList[Mb[:, n] .!= 0, :]))] .= 1
+            Mv = hcat(Mv, vc)
+        end
+        Sep = PO470.DirectHb(Rpm, Hb, Mb, Mv, CliqList)[2]
+        # A converging bubble is a `1`. On the non-negative weights the sample has two.
+        @test count(==(1), Sep) == 2
+
+        # The same structure with the sign of the weights that cross vertex 10 flipped.
+        # Nothing raises, and the set of converging bubbles moves.
+        Rsigned = Matrix(Rpm)
+        for i in axes(Rsigned, 1), j in axes(Rsigned, 2)
+            if (i > 10) != (j > 10)
+                Rsigned[i, j] = -Rsigned[i, j]
+            end
+        end
+        Sep2 = PO470.DirectHb(SparseArrays.sparse(Rsigned), Hb, Mb, Mv, CliqList)[2]
+        @test any(<(0), Rsigned)
+        @test Sep2 != Sep
+        @test count(==(1), Sep2) == 3
+    end
+
+    @testset "`J_LoGo` sparsifies the precision, and the covariance stays dense" begin
+        #=
+        `logo!` writes `J_LoGo(sigma, separators, cliques) \\ I` into `sigma`, so the sparse
+        object is the **precision** and the covariance it ships is dense. Read the precision
+        back with an inverse and check that its zeros sit exactly off the clique support.
+        =#
+        sigma = PO470.cov(ce470, X470)
+        je = LoGo()
+        s = LinearAlgebra.diag(sigma)
+        R = StatsBase.cov2cor(sigma, sqrt.(s))
+        Sl = PO470.distance_to_similarity(je.sim; S = R, D = PO470.distance(je.de, R, X470))
+        cliques = PO470.PMFG_T2s(Sl, 4)[4]
+        support = falses(size(sigma))
+        for r in axes(cliques, 1), a in cliques[r, :], b in cliques[r, :]
+            support[a, b] = true
+        end
+
+        sg = PO470.logo(je, sigma, X470)
+        P = inv(sg)
+        @test count(!, support) == 272
+        @test maximum(abs, P[.!support]) < 1e-8
+        @test minimum(abs, P[support]) > 1
+        @test count(iszero, sg) == 0
+        @test isapprox(sg, transpose(sg))
+
+        # `logo` is `logo!` on a copy, and it leaves its argument alone.
+        sg2 = copy(sigma)
+        PO470.logo!(je, sg2, X470)
+        @test sg2 == sg
+        @test sigma == PO470.cov(ce470, X470)
+        # The `nothing` method of the seam is the no-op the callers expect.
+        @test isnothing(PO470.logo!(nothing))
+        @test isnothing(PO470.logo!(nothing, sigma, X470; dims = 1))
+    end
+
+    @testset "`LoGo_dist_assert` narrows on both variation-of-information estimators" begin
+        #=
+        The narrow method is bounded by `DVarInfo_DDVarInfo`, and its docstring states that
+        a `Distance` **and** a `DistanceDistance` whose algorithm is a
+        `VariationInfoDistance` both reach it. Until #470 the union named the algorithm in
+        the second type parameter of `DistanceDistance`, which is `args`, so the
+        `DistanceDistance` arm matched nothing and a mismatched `X` died in
+        `PMFG_T2s` with a `BoundsError` instead.
+        =#
+        sigma = PO470.cov(ce470, X470)
+        dv = Distance(; alg = VariationInfoDistance())
+        ddv = DistanceDistance(; alg = VariationInfoDistance())
+        @test dv isa PO470.DVarInfo_DDVarInfo
+        @test ddv isa PO470.DVarInfo_DDVarInfo
+        @test isnothing(PO470.LoGo_dist_assert(dv, sigma, X470))
+        @test isnothing(PO470.LoGo_dist_assert(ddv, sigma, X470))
+        @test_throws DimensionMismatch PO470.LoGo_dist_assert(dv, sigma[1:5, 1:5], X470)
+        @test_throws DimensionMismatch PO470.LoGo_dist_assert(ddv, sigma[1:5, 1:5], X470)
+        @test_throws DimensionMismatch PO470.logo(LoGo(; de = ddv), sigma[1:5, 1:5], X470)
+
+        # An estimator outside the union reads the correlation rather than `X`, so it takes
+        # the `args...` fallback and no shape is read.
+        dc = Distance(; alg = CanonicalDistance())
+        @test !(dc isa PO470.DVarInfo_DDVarInfo)
+        @test isnothing(PO470.LoGo_dist_assert(dc, sigma[1:5, 1:5], X470))
+        @test isnothing(PO470.LoGo_dist_assert())
+        @test isnothing(PO470.LoGo_dist_assert(1, 2, 3, 4))
+
+        # Both variation-of-information estimators run to a finite answer at the right
+        # shape, so the narrowing refuses a mismatch rather than the family.
+        for d in (dv, ddv)
+            sg = PO470.logo(LoGo(; de = d), sigma, X470)
+            @test size(sg) == size(sigma)
+            @test all(isfinite, sg)
+        end
+    end
+end
+
+# The four branches of `src/11_Phylogeny/04_DBHT.jl` that the suite left uncovered when #470
+# measured it, and the input that reaches each. Condition 3 of the sweep. Defined at top
+# level because a `@testset` body becomes a function.
+@testset "The DBHT branches the suite did not reach (#470)" begin
+    using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StatsBase,
+          SparseArrays, LinearAlgebra
+
+    PO470b = PortfolioOptimisers
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    X = rd.X
+    rho = PO470b.cor(PortfolioOptimisersCovariance(), X)
+    dist = PO470b.distance(Distance(; alg = SimpleDistance()), rho, X)
+    sim = MaximumDistanceSimilarity()
+
+    @testset "A clique-free graph takes the empty arms of the hierarchy" begin
+        #=
+        `CliqueRoot(::EqualRoot, …)` returns a `0 × 0` matrix when `Pred` is empty, and
+        `CliqHierarchyTree2s` then takes its own empty arm and returns two `0 × 0` matrices
+        rather than calling `BubbleHierarchy`. `Pred` is empty when the graph carries no
+        3-clique, so a cycle is the input: it is connected, it is planar, and it holds no
+        triangle.
+
+        `UniqueRoot` cannot reach the same arm. It builds an `Nc + 1` square matrix, which
+        is `1 × 1` at `Nc = 0` and therefore not empty.
+        =#
+        Cyc = SparseArrays.sparse(Float64[0 1 0 0 1; 1 0 1 0 0; 0 1 0 1 0; 0 0 1 0 1;
+                                          1 0 0 1 0])
+        @test isempty(PO470b.clique3(Cyc)[3])
+        H, H2, Mb, CliqList, Sb = PO470b.CliqHierarchyTree2s(Cyc, EqualRoot())
+        @test size(CliqList, 1) == 0
+        @test size(H) == (0, 0)
+        @test size(H2) == (0, 0)
+        @test size(Mb) == (0, 0)
+        @test isempty(H)
+        # The method called on its own, with the empty `Pred` the arm is keyed on.
+        @test size(PO470b.CliqueRoot(EqualRoot(), Int[], Int[], 0, Cyc,
+                                     Matrix{Int}(undef, 0, 3))) == (0, 0)
+        # The same graph under the other root is not empty, so the arm is `EqualRoot`'s.
+        @test !isempty(PO470b.CliqHierarchyTree2s(Cyc, UniqueRoot())[1])
+    end
+
+    @testset "A vertex in two converging bubbles is assigned by edge-weight share" begin
+        #=
+        `BubbleCluster8s` splits the vertices of the converging bubbles into those in one
+        bubble and those in more than one. The second set is `uv`, and each of its vertices
+        goes to the bubble whose share of its edge weight is largest, `chi(v, b_alpha)`.
+
+        No prefix of the sample reaches that loop: over `N = 9` to `20` every vertex of a
+        converging bubble sits in exactly one. This sixteen-column subset puts two vertices
+        in both, and the column list is written out rather than searched, so the fixture is
+        deterministic.
+        =#
+        cols = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 18, 19, 20]
+        D = dist[cols, cols]
+        S = PO470b.distance_to_similarity(sim; S = rho[cols, cols], D = D)
+        Rpm = PO470b.PMFG_T2s(S)[1]
+        H1, Hb, Mb, CliqList, Sb = PO470b.CliqHierarchyTree2s(Rpm, UniqueRoot())
+        Mb = Mb[1:size(CliqList, 1), :]
+        Mv = SparseArrays.spzeros(Int, size(Rpm, 1), 0)
+        for n in axes(Mb, 2)
+            vc = SparseArrays.spzeros(Int, size(Rpm, 1))
+            vc[sort!(unique(CliqList[Mb[:, n] .!= 0, :]))] .= 1
+            Mv = hcat(Mv, vc)
+        end
+        Sep = PO470b.DirectHb(Rpm, Hb, Mb, Mv, CliqList)[2]
+        indx = findall(Sep .== 1)
+        @test length(indx) == 2
+        Bubv = Mv[:, indx]
+        @test count(vec(sum(Bubv; dims = 2) .> 1)) == 2
+
+        Apm = copy(Rpm)
+        Apm[Apm .!= 0] = D[Apm .!= 0]
+        Dpm = PO470b.distance_wei(Apm)[1]
+        Adjv, Tc = PO470b.BubbleCluster8s(Rpm, Dpm, Hb, Mb, Mv, CliqList)
+        # Every vertex lands in exactly one discrete cluster, the shared ones included.
+        @test length(Tc) == length(cols)
+        @test sort(unique(Tc)) == 1:2
+        @test all(>(0), Tc)
+        @test size(Adjv) == (length(cols), 2)
+        # The full route agrees with the kernel, so the loop is on the shipped path.
+        @test PO470b.DBHTs(D, S; branchorder = :default)[1] == Tc
+    end
+
+    @testset "The three `branchorder` values each take their own arm" begin
+        #=
+        `:optimal` and `:barjoseph` both call `orderbranches_barjoseph!`, `:r` calls
+        `orderbranches_r!`, and anything else leaves the merge order as
+        `HierarchyConstruct4s` wrote it. The reordering permutes the leaves and leaves the
+        clustering alone, so the cut is the invariant across all four.
+        =#
+        S = PO470b.distance_to_similarity(sim; S = rho, D = dist)
+        res = Dict(b => PO470b.DBHTs(dist, S; branchorder = b)
+                   for b in (:optimal, :barjoseph, :r, :default))
+        for b in (:optimal, :barjoseph, :r, :default)
+            hcl = res[b][7]
+            @test hcl isa Clustering.Hclust
+            @test Clustering.cutree(hcl; k = 2) == res[b][1]
+            # Every leaf appears once as a negative index, and every merge but the
+            # root appears once as a positive one.
+            @test sort(-hcl.merges[hcl.merges .< 0]) == collect(1:size(dist, 1))
+            @test sort(hcl.merges[hcl.merges .> 0]) == collect(1:(size(dist, 1) - 2))
+        end
+        @test res[:optimal][7].merges == res[:barjoseph][7].merges
+        @test res[:r][7].merges != res[:default][7].merges
+        @test res[:optimal][7].heights == res[:default][7].heights
+    end
+end
