@@ -277,8 +277,8 @@ abstract type NonOptimisationNonSequentialCrossValidationResult <:
 $(DocStringExtensions.TYPEDEF)
 
 Stores the portfolio returns data associated with a cross-validation prediction. Packages
-asset returns, factor returns, benchmark returns, timestamps, and investment vehicle
-information for use in prediction result types.
+asset returns, factor returns, benchmark returns, timestamps, implied volatilities, and
+the implied volatility risk premium adjustment for use in prediction result types.
 
 # Fields
 
@@ -815,7 +815,7 @@ end
 
 Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
 
-Computes benchmark, investment vehicle and per-asset allocation data from the optimisation result weights and the original returns data.
+Computes the benchmark returns, the implied volatilities and the implied volatility risk premium adjustment from the optimisation result weights and the original returns data.
 
 ## No feature matrix
 
@@ -829,7 +829,7 @@ The fold does not collapse `rd.Z`. Only one weight vector is in scope here, whic
 
 # Returns
 
-  - [`PredictionReturnsResult`](@ref) with updated benchmark and investment vehicle data.
+  - [`PredictionReturnsResult`](@ref) with updated benchmark returns, implied volatilities and implied volatility risk premium adjustment.
 
 # Related
 
