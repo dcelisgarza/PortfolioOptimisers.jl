@@ -748,19 +748,20 @@ end
 
 Compute the correlation matrix using implied volatility scaling.
 
-This method computes the correlation matrix of `X` using the base estimator in `ce`, scales it to a covariance with the predicted realised volatilities and rescales it back, then post-processes it with the matrix processing estimator `ce.mp`.
+This method computes the correlation matrix of `X` using the base estimator in `ce`, normalises it, then post-processes it with the matrix processing estimator `ce.mp`.
 
-A correlation is scale free, so the returned matrix is the base correlation of `X`: the two scalings are a round trip and the implied volatilities do not move the answer. The pair is kept because it is where the volatility model runs, so a `ce.alg` that cannot answer the call raises here as it does in `cov`.
+A correlation is scale free, so the predicted realised volatilities cannot move the answer, and the returned matrix is the base correlation of `X`. The volatility model runs even so, because `cor` must refuse every configuration `cov` refuses: a `ce.alg` that cannot answer the call raises here as it does in `cov`. Its prediction is discarded, and never multiplied into `rho` and divided back out again.
+
+That round trip was the identity in exact arithmetic alone. In floating point the round-off of one multiplication and one division moved an off-diagonal entry, and a predicted volatility of zero made the second call divide zero by zero. One asset whose last implied volatility was zero therefore turned a whole row and column of the correlation into `NaN`, and `matrix_processing!` raised on a matrix that carried no defect of its own.
 
 # Algorithm
 
  1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
  2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`.
  3. Call `Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
- 4. Divide `iv` by `sqrt(ce.af)`, converting the annualised implied volatility to the frequency of `X`.
- 5. Call [`predict_realised_vols`](@ref) with `ce.alg`, giving `iv`, one predicted realised volatility per asset.
- 6. Scale `rho` in place with `StatsBase.cor2cov!`, then rescale it in place with `StatsBase.cov2cor!`. The pair is the identity in exact arithmetic. In floating point the diagonal returns exactly to one, and an off-diagonal entry moves by the round-off of one multiplication and one division.
- 7. Post-process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
+ 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.af)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.af)` for it exactly as it is in `cov`.
+ 5. Normalise `rho` in place with `StatsBase.cov2cor!`, which divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. The call also mirrors the lower triangle into the upper one, clamps every off-diagonal entry into `[-1, 1]`, and sets the diagonal to exactly one. The exact diagonal is what step 6 needs: [`matrix_processing!`](@ref) reads the value of the diagonal to decide whether it holds a correlation matrix or a covariance matrix.
+ 6. Post-process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
 # Arguments
 
@@ -792,9 +793,8 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     rho = Statistics.cor(ce.ce, X; dims = 1, mean = mean, iv = iv, kwargs...)
-    iv = iv / sqrt(ce.af)
-    iv = predict_realised_vols(ce.alg, iv, X, ivpa)
-    StatsBase.cor2cov!(rho, iv)
+    # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
+    predict_realised_vols(ce.alg, iv / sqrt(ce.af), X, ivpa)
     StatsBase.cov2cor!(rho)
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho

@@ -27,6 +27,13 @@ than `X` sampled windows counted forward from the start of `iv` and answered a c
 built from the wrong rows, silently. `size(X) == size(iv)` is now checked in both methods,
 right after `dims_oriented`.
 
+A SIXTH repair (#504) took the round trip out of `cor`. It scaled the base correlation to a
+covariance with the predicted volatilities and scaled it straight back, which a correlation
+cannot feel -- except in the last place, and except when a predicted volatility is zero,
+where the rescaling divides zero by zero and answers `NaN`. `cor` normalises the base
+correlation instead. It still runs the volatility model, and still discards it, because
+`cor` must refuse every configuration `cov` refuses.
+
 Three kinds of check run here, and the first two are what catch a drift no invariant sees:
 
   - REFERENCE VALUES, as the rest of the covariance family does it: nine configurations
@@ -194,7 +201,7 @@ end
             # Sigma = diag(sigma) rho diag(sigma).
             @test isapprox(sigma, Diagonal(sd) * rho * Diagonal(sd))
             # A correlation does not depend on the volatilities that scale it.
-            @test isapprox(cor(ce, X; iv = iv, kwargs...), rho)
+            @test cor(ce, X; iv = iv, kwargs...) == rho
         end
     end
 
@@ -371,7 +378,7 @@ end
             # The weights change the answer, so they are not being quietly dropped.
             @test !isapprox(sigma, base)
             # The correlation is untouched by the volatility model either way.
-            @test isapprox(cor(ce, X; iv = iv), cor(Covariance(), X))
+            @test cor(ce, X; iv = iv) == cor(Covariance(), X)
         end
     end
 
@@ -395,15 +402,15 @@ end
             # route and 5.4e-20 for the premium route, against entries of order 1e-4.
             @test maximum(abs, sigma - Diagonal(sd) * rho * Diagonal(sd)) <= 1e-18
             #=
-            `cor`'s step 6. `cor2cov!` followed by `cov2cor!` is the identity in exact
-            arithmetic, and IT IS NOT BIT-EXACT. The diagonal returns exactly to one; an
-            off-diagonal entry moves by half an eps under the regression route and a
-            quarter of one under the premium route. A test that demanded equality of the
-            whole matrix would fail, which is why the two bounds below are separate.
+            `cor`'s step 5. The base correlation is normalised and nothing else, so the
+            answer is BIT-EXACT. It was not while `cor` scaled `rho` by the predicted
+            volatilities and rescaled it back: that round trip moved 38 of the 400 entries
+            by half an eps under the regression route, and by a quarter of one under the
+            premium route (#504).
             =#
             rhoc = cor(ce, X; iv = iv, kwargs...)
             @test diag(rhoc) == ones(N)
-            @test maximum(abs, rhoc - rho) <= 4 * eps()
+            @test rhoc == rho
         end
     end
 
@@ -497,5 +504,51 @@ end
         v = PortfolioOptimisers.implied_vol(iv, 20)
         @test v isa SubArray
         @test parent(v) === iv
+    end
+
+    #=
+    -------------------------------------------------------------------- fix #504
+    =#
+
+    @testset "cor discards the predicted volatilities, and does not cancel them" begin
+        #=
+        `cor` runs the volatility model and throws the answer away. A correlation is scale
+        free, so the prediction cannot move the answer, and `cor` used to spend it on a
+        `cor2cov!`/`cov2cor!` round trip that bought nothing.
+
+        The round trip was not free. It moved 38 of the 400 entries by half an eps, and it
+        was not safe: a predicted volatility of ZERO makes `cov2cor!` divide zero by zero,
+        so one asset whose last implied volatility is zero turned a whole row and column
+        into `NaN` and `matrix_processing!` raised on it. `cor` now normalises the base
+        correlation and nothing else, so no volatility reaches the answer at all.
+        =#
+        base = cor(Covariance(), X)
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        # The answer does not move with the volatilities, at ANY scale, and is bit-exact.
+        for ivpa in (1.2, 1.7, ivpav, 1e-6, 1e6)
+            @test cor(cep, X; iv = iv, ivpa = ivpa) == base
+        end
+        for ws in (20, 25, 30)
+            @test cor(ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = ws)), X;
+                      iv = iv) == base
+        end
+        #=
+        A zero implied volatility. `cov` cannot answer it: the covariance it builds is
+        singular, and the posdef step forms a correlation from a zero diagonal entry. `cor`
+        can, because that covariance is never built.
+        =#
+        iv0 = copy(iv)
+        iv0[end, 3] = 0
+        @test_throws ArgumentError cov(cep, X; iv = iv0, ivpa = 1.2)
+        @test cor(cep, X; iv = iv0, ivpa = 1.2) == base
+        #=
+        The model still runs, which is why the discarded call is kept rather than deleted.
+        `cor` refuses every configuration `cov` refuses, and raises the same type.
+        =#
+        @test_throws ArgumentError cor(cep, X; iv = iv)
+        @test_throws ArgumentError cov(cep, X; iv = iv)
+        few = ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 100))
+        @test_throws DomainError cor(few, X; iv = iv)
+        @test_throws DomainError cov(few, X; iv = iv)
     end
 end
