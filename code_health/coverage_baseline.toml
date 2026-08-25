@@ -36,7 +36,7 @@ commit = "a6d87c6"
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { lines = 7, misses = 0 }
 "src/08_Moments/19_Coskewness.jl" = { lines = 46, misses = 0 }
 "src/08_Moments/20_Cokurtosis.jl" = { lines = 31, misses = 0 }
-"src/08_Moments/21_Base_Regression.jl" = { lines = 58, misses = 8 }
+"src/08_Moments/21_Base_Regression.jl" = { lines = 58, misses = 0 }
 "src/08_Moments/22_StepwiseRegression.jl" = { lines = 179, misses = 0 }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { lines = 52, misses = 0 }
 "src/08_Moments/24_ImpliedVolatility.jl" = { lines = 65, misses = 0 }

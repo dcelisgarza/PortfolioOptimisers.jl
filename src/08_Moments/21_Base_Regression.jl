@@ -197,6 +197,11 @@ end
 
 Return a new [`LinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
 
+# Algorithm
+
+ 1. Merge `w` into `re.kwargs` under the key `weights`, replacing any entry already stored there, giving the keyword arguments of the new target.
+ 2. Build a new [`LinearModel`](@ref) from them.
+
 # Arguments
 
   - `re`: Linear model regression target.
@@ -220,6 +225,11 @@ end
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
 This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the regression estimation framework.
+
+# Algorithm
+
+ 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 2. Call `StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)`, giving the fitted model.
 
 # Arguments
 
@@ -251,7 +261,32 @@ end
 
 Tuple of the pseudo-``R^2`` variants `StatsAPI.r2` accepts for a fitted [`GeneralisedLinearModel`](@ref).
 
-The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. The `variant` field of [`GeneralisedLinearModel`](@ref) is checked against this tuple at construction.
+The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. The `variant` field of [`GeneralisedLinearModel`](@ref) is checked against this tuple at construction. A generalised linear model has no classical ``R^2``, so each member scores the fitted model against the intercept-only model of the same family instead.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+R^2_{\\mathrm{McF}} &= 1 - \\frac{\\ln\\hat{L}}{\\ln\\hat{L}_{0}}\\,,\\\\
+R^2_{\\mathrm{CS}} &= 1 - \\left(\\frac{\\hat{L}_{0}}{\\hat{L}}\\right)^{2/T}\\,,\\\\
+R^2_{\\mathrm{N}} &= \\frac{R^2_{\\mathrm{CS}}}{1 - \\hat{L}_{0}^{\\,2/T}}\\,,\\\\
+R^2_{\\mathrm{dev}} &= 1 - \\frac{D}{D_{0}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``R^2_{\\mathrm{McF}}``: `:McFadden`.
+  - ``R^2_{\\mathrm{CS}}``: `:CoxSnell`.
+  - ``R^2_{\\mathrm{N}}``: `:Nagelkerke`.
+  - ``R^2_{\\mathrm{dev}}``: `:devianceratio`.
+  - ``\\hat{L}``: Maximum likelihood of the fitted model.
+  - ``\\hat{L}_{0}``: Maximum likelihood of the intercept-only model of the same family.
+  - ``D``: Deviance of the fitted model.
+  - ``D_{0}``: Deviance of the intercept-only model of the same family.
+  - $(math_dict[:T])
+
+Three consequences follow for the Normal family, which is the default of [`GeneralisedLinearModel`](@ref). Its deviance is the residual sum of squares, so ``R^2_{\\mathrm{dev}}`` is the classical ``R^2`` of the same fit. Its maximum likelihood carries the fitted dispersion, so ``\\left(\\hat{L}_{0}/\\hat{L}\\right)^{2/T} = D/D_{0}`` and ``R^2_{\\mathrm{CS}}`` equals ``R^2_{\\mathrm{dev}}`` exactly. Its likelihood is a density rather than a probability, so ``\\hat{L}_{0}`` sits on either side of one and the two forms built on the log-likelihood, ``R^2_{\\mathrm{McF}}`` and ``R^2_{\\mathrm{N}}``, leave ``[0, 1]`` in either direction: rescaling the response alone moves both from above one to below zero, while ``R^2_{\\mathrm{dev}}`` does not move at all. Only ``R^2_{\\mathrm{dev}}`` is continuous with the [`LinearModel`](@ref) path, which is why [`default_regression_criterion_variant`](@ref) returns `:devianceratio`.
 
 # Related
 
@@ -259,6 +294,13 @@ The members are `:McFadden`, `:CoxSnell`, `:Nagelkerke` and `:devianceratio`. Th
   - [`GeneralisedLinearModel`](@ref)
   - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
+
+# References
+
+  - $(ref_dict[:mcfadden1974])
+  - $(ref_dict[:coxsnell1989])
+  - $(ref_dict[:nagelkerke1991])
+  - $(ref_dict[:nelder1972])
 """
 const PSEUDO_R2_VARIANTS = (:McFadden, :CoxSnell, :Nagelkerke, :devianceratio)
 """
@@ -266,13 +308,43 @@ const PSEUDO_R2_VARIANTS = (:McFadden, :CoxSnell, :Nagelkerke, :devianceratio)
 
 Tuple of the pseudo-``R^2`` variants `StatsAPI.adjr2` accepts for a fitted [`GeneralisedLinearModel`](@ref).
 
-The members are `:McFadden` and `:devianceratio`, a strict subset of [`PSEUDO_R2_VARIANTS`](@ref). [`GeneralisedLinearModel`](@ref) cannot check against this tuple, because it does not know which criterion will read its `variant`. [`StepwiseRegression`](@ref) checks it instead: it is the first type that holds the criterion and the target together.
+The members are `:McFadden` and `:devianceratio`, a strict subset of [`PSEUDO_R2_VARIANTS`](@ref). [`GeneralisedLinearModel`](@ref) cannot check against this tuple, because it does not know which criterion will read its `variant`. [`StepwiseRegression`](@ref) checks it instead: it is the first type that holds the criterion and the target together. `StatsAPI.adjr2` raises an `ArgumentError` on either variant this tuple omits.
+
+# Mathematical definition
+
+Each member discounts its unadjusted form of [`PSEUDO_R2_VARIANTS`](@ref) by the parameters the model consumes.
+
+```math
+\\begin{align}
+\\bar{R}^2_{\\mathrm{McF}} &= 1 - \\frac{\\ln\\hat{L} - k}{\\ln\\hat{L}_{0}}\\,,\\\\
+\\bar{R}^2_{\\mathrm{dev}} &= 1 - \\frac{D\\,(T - 1)}{D_{0}\\,(T - k)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{R}^2_{\\mathrm{McF}}``: `:McFadden`.
+  - ``\\bar{R}^2_{\\mathrm{dev}}``: `:devianceratio`.
+  - ``\\hat{L}``: Maximum likelihood of the fitted model.
+  - ``\\hat{L}_{0}``: Maximum likelihood of the intercept-only model of the same family.
+  - ``D``: Deviance of the fitted model.
+  - ``D_{0}``: Deviance of the intercept-only model of the same family.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the dispersion.
+  - $(math_dict[:T])
+
+The ``k`` here is the one `:aic`, `:aicc` and `:bic` read, not the predictor count `:adjr2` reads on a fitted [`LinearModel`](@ref). See [`STEPWISE_REGRESSION_CRITERIA`](@ref), which states both.
 
 # Related
 
   - [`PSEUDO_R2_VARIANTS`](@ref)
   - [`GeneralisedLinearModel`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
   - [`StepwiseRegression`](@ref)
+
+# References
+
+  - $(ref_dict[:mcfadden1974])
+  - $(ref_dict[:nelder1972])
 """
 const ADJUSTED_PSEUDO_R2_VARIANTS = (:McFadden, :devianceratio)
 """
@@ -280,7 +352,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits each response by a generalised linear model through `GLM.GeneralizedLinearModel`.
 
-The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `variant` names the pseudo-``R^2`` a maximisation criterion reads.
+The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so `variant` names the pseudo-``R^2`` a maximisation criterion reads instead, and it supplies it to the `:r2` and `:adjr2` members of [`STEPWISE_REGRESSION_CRITERIA`](@ref). A `nothing` `variant` takes the default of the criterion, which [`default_regression_criterion_variant`](@ref) states. The field is dead under a minimisation criterion, which reads no variant at all.
 
 # Fields
 
@@ -298,7 +370,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If provided, `variant in PSEUDO_R2_VARIANTS`.
+  - If provided, `variant in PSEUDO_R2_VARIANTS`, the wider of the two variant tuples. `StatsAPI.adjr2` accepts [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref) alone, and [`StepwiseRegression`](@ref) rejects the difference when its criterion is `:adjr2`.
 
 # Examples
 
@@ -310,19 +382,15 @@ GeneralisedLinearModel
   variant ┴ nothing
 ```
 
-# Details
-
-  - `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so a generalised linear model needs a named pseudo-``R^2`` variant instead. `variant` supplies it to the `:r2` and `:adjr2` criteria of [`STEPWISE_REGRESSION_CRITERIA`](@ref).
-  - A `nothing` `variant` takes the default of the criterion. See [`default_regression_criterion_variant`](@ref).
-  - The constructor checks `variant` against [`PSEUDO_R2_VARIANTS`](@ref), the wider of the two sets. `StatsAPI.adjr2` accepts [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref) alone, and [`StepwiseRegression`](@ref) rejects the difference when its criterion is `:adjr2`.
-  - The field is dead under a minimisation criterion, which reads no variant.
-
 # Related
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
   - [`PSEUDO_R2_VARIANTS`](@ref)
+  - [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref)
+  - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
   - [`StepwiseRegression`](@ref)
+  - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 
@@ -362,6 +430,11 @@ end
 
 Return a new [`GeneralisedLinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
 
+# Algorithm
+
+ 1. Merge `w` into `re.kwargs` under the key `weights`, replacing any entry already stored there, giving the keyword arguments of the new target.
+ 2. Build a new [`GeneralisedLinearModel`](@ref) from them, carrying `re.args` and `re.variant` across unchanged.
+
 # Arguments
 
   - `re`: Generalised linear model regression target.
@@ -386,6 +459,11 @@ end
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
 This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` type, passing the design matrix `X`, response vector `y`, any positional arguments in `tgt.args`, and any keyword arguments in `tgt.kwargs`.
+
+# Algorithm
+
+ 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 2. Call `StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)`, giving the fitted model.
 
 # Arguments
 
@@ -445,9 +523,9 @@ const MAX_VAL_STEPWISE_REGRESSION_CRITERIA = (:r2, :adjr2)
 
 Tuple of the symbols that name a stepwise regression criterion scoring a fitted model with one number.
 
-[`StepwiseRegression`](@ref) accepts any symbol of this tuple in its `crit` field and stores it as a `Val`, which is what [`regression_criterion_func`](@ref), [`regression_threshold`](@ref) and the `get_*_reg_incl*!` helpers dispatch on. A symbol outside the tuple is rejected at construction. [`PValue`](@ref) is not a member: it reads the coefficient p-values of the fitted model instead of one score, so it stays a type and takes its own stepwise methods.
+[`StepwiseRegression`](@ref) accepts any symbol of this tuple in its `crit` field and stores it as a `Val`, which is what [`regression_criterion_func`](@ref), [`regression_threshold`](@ref) and the `get_*_reg_incl*!` helpers dispatch on. A symbol outside the tuple is rejected at construction. [`PValue`](@ref) is not a member: it reads the coefficient p-values of the fitted model instead of one score, so it stays a type and takes its own stepwise methods. `:aic`, `:aicc` and `:bic` score a fitted [`LinearModel`](@ref) and a fitted [`GeneralisedLinearModel`](@ref) alike, while `:r2` and `:adjr2` are defined for a fitted [`LinearModel`](@ref) only and read a named pseudo-``R^2`` variant under the other target.
 
-# Criteria
+# Mathematical definition
 
 ## `:aic` — Akaike Information Criterion
 
@@ -532,17 +610,14 @@ Where:
   - ``k``: Number of predictors, excluding the intercept. `:aic`, `:aicc` and `:bic` write ``k`` for a different count: the predictors, plus the intercept, plus the residual variance.
   - $(math_dict[:T])
 
-# Details
-
-  - `:aic`, `:aicc` and `:bic` accept a fitted [`LinearModel`](@ref) and a fitted [`GeneralisedLinearModel`](@ref) alike.
-  - `:r2` and `:adjr2` are defined for a fitted [`LinearModel`](@ref) only. Under a [`GeneralisedLinearModel`](@ref) target they read a named pseudo-``R^2`` variant instead. See [`regression_criterion_func`](@ref) and [`default_regression_criterion_variant`](@ref).
-
 # Related
 
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`StepwiseRegression`](@ref)
+  - [`PSEUDO_R2_VARIANTS`](@ref)
   - [`regression_criterion_func`](@ref)
+  - [`default_regression_criterion_variant`](@ref)
   - [`regression_threshold`](@ref)
   - [`PValue`](@ref)
 
@@ -612,6 +687,8 @@ const MinMaxValStepwiseRegressionCriterion = Union{MinValStepwiseRegressionCrite
 
 Return the pseudo-``R^2`` variant a maximisation criterion reads when the target names none.
 
+`:devianceratio` is the only member of [`PSEUDO_R2_VARIANTS`](@ref) that both `StatsAPI.r2` and `StatsAPI.adjr2` accept and that also reproduces the classical ``R^2`` of a fitted [`LinearModel`](@ref) on a Normal family. The default therefore keeps the score continuous with the [`LinearModel`](@ref) path under either criterion.
+
 # Arguments
 
   - `crit`: Maximisation criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
@@ -620,17 +697,13 @@ Return the pseudo-``R^2`` variant a maximisation criterion reads when the target
 
   - `variant::Symbol`: `:devianceratio`.
 
-# Details
-
-  - `:devianceratio` is the only variant both `StatsAPI.r2` and `StatsAPI.adjr2` accept that also matches the classical definition of ``R^2`` for a linear model. The default therefore keeps the score continuous with the [`LinearModel`](@ref) path, and it is valid under either criterion.
-  - A [`GeneralisedLinearModel`](@ref) whose `variant` is not `nothing` overrides this.
-
 # Related
 
   - [`MaxValStepwiseRegressionCriterion`](@ref)
-  - [`GeneralisedLinearModel`](@ref)
-  - [`regression_criterion_func`](@ref)
+  - [`GeneralisedLinearModel`](@ref) — a target whose `variant` is not `nothing` overrides this default.
+  - [`regression_criterion_func`](@ref) — the only caller, and it reads the default only when the target names no variant.
   - [`PSEUDO_R2_VARIANTS`](@ref)
+  - [`ADJUSTED_PSEUDO_R2_VARIANTS`](@ref)
 """
 function default_regression_criterion_variant(::MaxValStepwiseRegressionCriterion)
     return :devianceratio
@@ -641,20 +714,7 @@ end
 
 Return the function that scores a fitted model under a stepwise regression criterion.
 
-The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target.
-
-# Arguments
-
-  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
-  - `tgt`: Regression target the candidate models are fitted with.
-
-# Returns
-
-  - `f::Function`: The function that computes the criterion value for a fitted model.
-
-# Details
-
-The map is:
+The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target. The map is:
 
 | Criterion | [`LinearModel`](@ref) | [`GeneralisedLinearModel`](@ref)          |
 |:--------- |:--------------------- |:----------------------------------------- |
@@ -664,9 +724,23 @@ The map is:
 | `:r2`     | `StatsAPI.r2`         | `model -> StatsAPI.r2(model, variant)`    |
 | `:adjr2`  | `StatsAPI.adjr2`      | `model -> StatsAPI.adjr2(model, variant)` |
 
-  - `StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the minimisation criteria take one method each.
-  - `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant. A fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, which comes from `tgt.variant` when it is set and from [`default_regression_criterion_variant`](@ref) when it is `nothing`.
-  - [`PValue`](@ref) has no method here. It reads the coefficient p-values of the fitted model, not one score, so its stepwise methods are separate.
+`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
+
+# Algorithm
+
+The five methods that return a `StatsAPI` function run no steps. The two that close over a variant run these:
+
+ 1. Read `tgt.variant`. When it is `nothing`, take [`default_regression_criterion_variant`](@ref) of `crit` instead, giving `variant`.
+ 2. Build a closure over `variant` that calls `StatsAPI.r2(model, variant)`, or `StatsAPI.adjr2(model, variant)` under `:adjr2`.
+
+# Arguments
+
+  - `crit`: Criterion, as the `Val` the `crit` field of [`StepwiseRegression`](@ref) holds.
+  - `tgt`: Regression target the candidate models are fitted with.
+
+# Returns
+
+  - `f::Function`: The function that computes the criterion value for a fitted model.
 
 # Related
 
@@ -706,7 +780,7 @@ end
 
 Return the starting threshold for a forward stepwise regression search.
 
-The value is the worst score the criterion can take, so the first candidate model always improves on it. Dispatches on the polarity of the criterion.
+The value is the worst score the criterion can take, so the first candidate model always improves on it. Dispatches on the polarity of the criterion. Only [`ForwardSelection`](@ref) reads it: [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
 
 # Arguments
 
@@ -716,15 +790,13 @@ The value is the worst score the criterion can take, so the first candidate mode
 
   - `t::Number`: `Inf` for a minimisation criterion, `-Inf` for a maximisation criterion.
 
-# Details
-
-Only [`ForwardSelection`](@ref) reads this. [`BackwardElimination`](@ref) starts from the score of the full model instead, because its first move must beat a model that already exists.
-
 # Related
 
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
+  - [`ForwardSelection`](@ref) — the only caller.
+  - [`BackwardElimination`](@ref) — starts from the score of the full model, never from this value.
 """
 function regression_threshold(::MinValStepwiseRegressionCriterion)
     return Inf
@@ -737,7 +809,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the loadings matrix, the intercept vector and the reduced-basis loadings of a fitted factor model.
 
-`M` and `b` are the loadings matrix ``B`` and the intercept vector ``\\alpha`` of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors.
+`M` and `b` are the loadings matrix and the intercept vector of the factor model, one row per asset. `L` carries the same loadings written in the reduced basis a dimension reduction produced; it is unset when the estimator regresses on the original factors. **An unset `L` reads back as `M`.** A [`@forward_properties`](@ref) `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, so a consumer that decomposes risk in the factor basis needs no `Nothing` branch, and `isnothing(re.L)` is never true. Read `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does. [`StepwiseRegression`](@ref) leaves `L` unset and [`DimensionReductionRegression`](@ref) sets it, so `size(L, 2)` is the width of the basis risk is decomposed in: the original factors under the first, the retained principal components under the second.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{x}_{t} &= \\boldsymbol{b} + \\mathbf{M} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:x_t_obs])
+  - ``\\boldsymbol{b}``: Intercept vector ``N \\times 1``, `b`. The term is absent when `b` is unset.
+  - ``\\mathbf{M}``: Loadings matrix ``N \\times K`` of the factor model, `M`.
+  - ``\\boldsymbol{f}_{t}``: Factor returns for observation ``t``, the ``t``-th row of the factor matrix.
+  - ``\\boldsymbol{\\varepsilon}_{t}``: Residual returns for observation ``t``, the part of ``\\boldsymbol{x}_{t}`` the factors do not explain.
+  - $(math_dict[:N])
+  - ``K``: Number of factors.
 
 # Fields
 
@@ -757,12 +847,7 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(M)`.
   - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
-  - If provided, `size(L, 1) == size(M, 1)`. The constructor does **not** reject an empty `L`, so an `L` with the right number of rows and no columns is accepted.
-
-# Details
-
-  - **An unset `L` reads back as `M`.** A `@forward_properties` `swap(L, M)` rule makes `re.L` return `re.M` whenever `L` was not given, and a consumer that decomposes risk in the factor basis needs no `Nothing` branch. [`StepwiseRegression`](@ref) leaves `L` unset; [`DimensionReductionRegression`](@ref) sets it. Use `getfield(re, :L)` when the unset case must be told apart, as [`port_opt_view`](@ref) does.
-  - `size(L, 2)` is therefore the width of the basis risk is decomposed in: the original factors under a stepwise regression, and the retained principal components under a dimension reduction regression.
+  - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
 
 # Examples
 
@@ -827,6 +912,14 @@ end
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
 This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, and intercept vector `b` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
+
+# Algorithm
+
+ 1. Read `L` and `b` with `getfield`, never through property access. The `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so a property read would materialise `L` as a copy of `M` and lose the unset-ness.
+ 2. Take a row view of `M` over `i`, giving the loadings of the selected assets.
+ 3. Take a row view of `L` over `i` when step 1 found a matrix, and `nothing` otherwise.
+ 4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
+ 5. Build a new [`Regression`](@ref) from the three, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -897,10 +990,20 @@ Compute or extract a regression result from an estimator or result and a [`Retur
 
 This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression estimators and regression result objects to be used interchangeably in generic workflows. If `re` is an estimator, it computes the regression result using the data in `rd`. If `re` is already a result, it is returned unchanged.
 
+# Algorithm
+
+ 1. Check that `rd` carries both matrices, per `# Validation` below.
+ 2. Call `regression(re, rd.X, rd.F)`, giving the regression result.
+
 # Arguments
 
   - `re`: A regression estimator or result object.
   - `rd`: A returns result object containing data matrices `X` and `F`.
+
+# Validation
+
+  - `!isnothing(rd.X)`. A regression needs the asset returns it explains.
+  - `!isnothing(rd.F)`. A regression needs the factor returns it explains them with.
 
 # Returns
 
