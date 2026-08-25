@@ -39,7 +39,7 @@ commit = "a6d87c6"
 "src/08_Moments/21_Base_Regression.jl" = { lines = 58, misses = 0 }
 "src/08_Moments/22_StepwiseRegression.jl" = { lines = 179, misses = 0 }
 "src/08_Moments/23_DimensionReductionRegression.jl" = { lines = 52, misses = 0 }
-"src/08_Moments/24_ImpliedVolatility.jl" = { lines = 65, misses = 0 }
+"src/08_Moments/24_ImpliedVolatility.jl" = { lines = 67, misses = 0 }
 "src/08_Moments/25_CorrelationCovariance.jl" = { lines = 7, misses = 0 }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { lines = 6, misses = 0 }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { lines = 12, misses = 0 }

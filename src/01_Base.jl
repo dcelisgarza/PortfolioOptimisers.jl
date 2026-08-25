@@ -926,6 +926,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :mu_hat_j => "``\\hat{\\mu}_j``: Estimated mean of asset ``j``.",#
                        :sigma2_hat_j => "``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.",#
                        :sigma_hat_i => "``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.",#
+                       :sigma_rv_hat_i => "``\\hat{\\sigma}^{\\mathrm{rv}}_i``: Predicted realised volatility of asset ``i`` for the period that follows the sample.",#
                        :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
                        :Sigma_hat_ii => "``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal entry of ``\\hat{\\mathbf{\\Sigma}}``.",#
                        :Sigma_hat_ij => "``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.",#

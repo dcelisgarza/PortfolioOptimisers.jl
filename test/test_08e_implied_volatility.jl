@@ -18,6 +18,15 @@ The three defects, each of which a testset below now pins:
      documented `Sigma = diag(sigma) rho diag(sigma)` needs `cor2cov!`. The returned
      "covariance" carried a unit diagonal whatever the implied volatilities were.
 
+A FOURTH repair gave `realised_vol` a per-block estimator through `obs_weights_view`, so a
+weighted variance estimator no longer meets a window with the whole sample's weights.
+
+Sweeping the file (#465) found a fifth hole and closed it. `cov` and `cor` compared `iv`
+with nothing, and `implied_vol` takes its row count from `X`, so an `iv` with MORE rows
+than `X` sampled windows counted forward from the start of `iv` and answered a covariance
+built from the wrong rows, silently. `size(X) == size(iv)` is now checked in both methods,
+right after `dims_oriented`.
+
 Three kinds of check run here, and the first two are what catch a drift no invariant sees:
 
   - REFERENCE VALUES, as the rest of the covariance family does it: nine configurations
@@ -364,5 +373,112 @@ end
             # The correlation is untouched by the volatility model either way.
             @test isapprox(cor(ce, X; iv = iv), cor(Covariance(), X))
         end
+    end
+
+    #=
+    ------------------------------------------------------------------ sweep #465
+
+    The four testsets below were added when this file was swept. Each pins a claim that
+    a docstring in `src/08_Moments/24_ImpliedVolatility.jl` now makes, so a reader who
+    doubts the prose can run the number instead.
+    =#
+
+    @testset "The documented identities hold to the tolerance they are stated at" begin
+        rho = cor(Covariance(), X)
+        for (alg, kwargs) in [(ImpliedVolatilityRegression(), (;)),
+                              (ImpliedVolatilityPremium(), (; ivpa = 1.2))]
+            ce = ImpliedVolatility(; alg = alg)
+            sigma = cov(ce, X; iv = iv, kwargs...)
+            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.af), X,
+                                                           get(kwargs, :ivpa, nothing))
+            # `cov`'s `# Mathematical definition`. Measured at 1.1e-19 for the regression
+            # route and 5.4e-20 for the premium route, against entries of order 1e-4.
+            @test maximum(abs, sigma - Diagonal(sd) * rho * Diagonal(sd)) <= 1e-18
+            #=
+            `cor`'s step 6. `cor2cov!` followed by `cov2cor!` is the identity in exact
+            arithmetic, and IT IS NOT BIT-EXACT. The diagonal returns exactly to one; an
+            off-diagonal entry moves by half an eps under the regression route and a
+            quarter of one under the premium route. A test that demanded equality of the
+            whole matrix would fail, which is why the two bounds below are separate.
+            =#
+            rhoc = cor(ce, X; iv = iv, kwargs...)
+            @test diag(rhoc) == ones(N)
+            @test maximum(abs, rhoc - rho) <= 4 * eps()
+        end
+    end
+
+    @testset "cov and cor refuse an iv that is not shaped like X" begin
+        ce = ImpliedVolatility()
+        #=
+        A LONGER `iv` used to pass silently and answer a covariance built from the wrong
+        rows. `implied_vol` is handed the row count of `X`, so with more rows in `iv` it
+        sampled windows offset from the START of `iv` rather than counted back from its
+        end, and `size(rv) == size(iv)` still held. A shorter `iv` raised a raw
+        `BoundsError` from inside `implied_vol`. Neither reaches the estimator now.
+        =#
+        iv_long = vcat(iv, iv[1:48, :])
+        @test size(iv_long, 1) != T
+        @test_throws DimensionMismatch cov(ce, X; iv = iv_long)
+        @test_throws DimensionMismatch cor(ce, X; iv = iv_long)
+        @test_throws DimensionMismatch cov(ce, X; iv = iv[1:200, :])
+        @test_throws DimensionMismatch cor(ce, X; iv = iv[1:200, :])
+        # A narrower `iv` reached the argcheck inside the regression branch. It is refused
+        # before the base correlation is computed now.
+        @test_throws DimensionMismatch cov(ce, X; iv = iv[:, 1:10])
+        @test_throws DimensionMismatch cor(ce, X; iv = iv[:, 1:10])
+        # The premium branch reads no window at all, so nothing there ever raised.
+        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        @test_throws DimensionMismatch cov(cep, X; iv = iv_long, ivpa = 1.2)
+        @test_throws DimensionMismatch cor(cep, X; iv = iv_long, ivpa = 1.2)
+        # The guard runs AFTER `dims_oriented`, so a bad `dims` still answers `DomainError`.
+        @test_throws DomainError cov(ce, X; dims = 3, iv = iv_long)
+        # Both matrices are oriented before they are compared, so a transposed pair passes
+        # and gives the same answer.
+        @test isapprox(cov(ce, transpose(X); dims = 2, iv = transpose(iv)),
+                       cov(ce, X; iv = iv))
+    end
+
+    @testset "factory does not reach the algorithm's variance estimator" begin
+        #=
+        `ce` carries `@fprop` and `alg` carries no tag, so `factory` pushes the incoming
+        weights into the base correlation estimator and leaves `alg.ve` alone. The `alg`
+        field's own description states that, and this is the statement.
+        =#
+        f = PortfolioOptimisers.factory(ImpliedVolatility(), aw)
+        @test isnothing(f.alg.ve.w)
+        @test !isnothing(f.ce.ce.w)
+        # A weighted `ve` is therefore constructed into the algorithm by hand, and it
+        # survives `factory` untouched.
+        g = PortfolioOptimisers.factory(ImpliedVolatility(;
+                                                          alg = ImpliedVolatilityRegression(;
+                                                                                            ve = SimpleVariance(;
+                                                                                                                w = aw))),
+                                        aw)
+        @test g.alg.ve.w === aw
+    end
+
+    @testset "the base estimator receives the oriented iv" begin
+        #=
+        `cov` and `cor` forward `iv` to `ce.ce`. Every shipped estimator absorbs it into
+        its own `kwargs...` and ignores it; a nested `ImpliedVolatility` reads it, which is
+        the reason the keyword is forwarded rather than dropped.
+        =#
+        nested = ImpliedVolatility(;
+                                   ce = ImpliedVolatility(;
+                                                          alg = ImpliedVolatilityRegression(;
+                                                                                            ws = 30)))
+        sigma = cov(nested, X; iv = iv)
+        @test size(sigma) == (N, N)
+        @test isposdef(sigma)
+        # The inner estimator answers a correlation, so only the outer scaling reaches the
+        # diagonal.
+        @test isapprox(sqrt.(diag(sigma)),
+                       PortfolioOptimisers.predict_realised_vols(nested.alg,
+                                                                 iv / sqrt(nested.af), X,
+                                                                 nothing))
+        # `implied_vol` answers a view, as its `# Algorithm` step 2 says.
+        v = PortfolioOptimisers.implied_vol(iv, 20)
+        @test v isa SubArray
+        @test parent(v) === iv
     end
 end
