@@ -907,6 +907,92 @@
                                     Xq)), sdqr .^ 2)
         end
     end
+    @testset "Smyth-Broby zero indecision zone (#499)" begin
+        # `c2 = 0` puts the indecision zone at zero. The gate `ari < 0` then rejects
+        # nothing, and the closed comparison `ari >= 0` holds for a centred return of
+        # exactly zero. Such a return crossed on both axes but carried no sign, so neither
+        # sign test fired and it fell through to the neutral accumulator. The three `*1`
+        # markers divide by that accumulator, and their diagonal was then not one.
+        # `sb_crossed` gives this family the rule ADR 0090 gave `GerberCovariance` and
+        # `GerberIQCovariance`: a centred return of exactly zero never crosses. #499.
+
+        # ---- the crossing predicate ------------------------------------------------------
+        # The sign test binds only at a zero threshold. For every positive `c2` the
+        # predicate is the closed comparison it replaces, so no code path at a positive
+        # threshold can move.
+        for c in (0.5, 1.0, 2.0), r in (-2.0, -0.5, 0.0, 0.5, 2.0)
+            @test PortfolioOptimisers.sb_crossed(r, abs(r), c) == (abs(r) >= c)
+        end
+        for r in (-2.0, -0.5, 0.5, 2.0)
+            @test PortfolioOptimisers.sb_crossed(r, abs(r), 0.0)
+        end
+        @test !PortfolioOptimisers.sb_crossed(0.0, 0.0, 0.0)
+
+        # ---- the sample of the ticket ----------------------------------------------------
+        # Both column means are exactly zero, so rows 3 and 4 carry an exactly zero centred
+        # return for asset 1. `c3` is wide enough to admit every observation.
+        Xs = [2.0 2.0; -2.0 -2.0; 0.0 1.0; 0.0 -1.0]
+        ces(a) = SmythBrobyCovariance(; alg = a, c1 = 0.0, c2 = 0.0, c3 = 1e6,
+                                      pdm = nothing,
+                                      me = SimpleExpectedReturns(; w = nothing))
+        salgs = (SmythBroby0(), SmythBroby1(), SmythBroby2(), SmythBrobyGerber0(),
+                 SmythBrobyGerber1(), SmythBrobyGerber2(), SmythBrobyCount0(),
+                 SmythBrobyCount1(), SmythBrobyCount2())
+        for a in salgs
+            @test isapprox(diag(cor(ces(a), Xs)), ones(2))
+        end
+
+        # ---- the classification at a zero indecision zone --------------------------------
+        # The neutral accumulator is not emptied, it is corrected: it holds the
+        # observations on which exactly one asset crossed, which is what its own docstring
+        # says. Drive the kernel directly at `c2 = 0`, with zero means and unit standard
+        # deviations, so the centred standardised return is the raw one.
+        pols = PortfolioOptimisers.SmythBrobyKernel(SmythBroby1(), [0.0, 0.0], [1.0, 1.0],
+                                                    0.0, 0.0, 1e6, 2.0)
+        sts = PortfolioOptimisers.comovement_pair_state(pols, 1, 2)
+        @test sts.c1i == sts.c1j == 0.0
+        @test sts.mui == sts.muj == 0.0
+        accs = (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        # Neither asset crosses, so the observation leaves the pair entirely.
+        @test PortfolioOptimisers.comovement_step(pols, accs, sts, 0.0, 0.0, 4, 1) == accs
+        # Exactly one asset crosses, so the observation is neutral.
+        accsn = PortfolioOptimisers.comovement_step(pols, accs, sts, 0.0, 1.0, 4, 1)
+        @test accsn.nn > 0
+        @test accsn.pos == accsn.neg == 0
+        # Both assets cross, so their product carries a sign and the observation is
+        # concordant or discordant. It can no longer reach the neutral accumulator.
+        accsp = PortfolioOptimisers.comovement_step(pols, accs, sts, 1.0, 1.0, 4, 1)
+        @test accsp.pos > 0
+        @test accsp.neg == accsp.nn == 0
+        accsd = PortfolioOptimisers.comovement_step(pols, accs, sts, 1.0, -1.0, 4, 1)
+        @test accsd.neg > 0
+        @test accsd.pos == accsd.nn == 0
+
+        # ---- the confusion zone keeps its own meaning ------------------------------------
+        # The rule binds on the centred quantity alone. `c1` reads the raw, uncentred
+        # return, so `c1 = 0` still means "no confusion zone" and rejects nothing, even an
+        # observation on which both raw returns are exactly zero. Give the pair a non-zero
+        # mean, so the two raw zeros centre to a return that does cross.
+        polc = PortfolioOptimisers.SmythBrobyKernel(SmythBroby1(), [1.0, 1.0], [1.0, 1.0],
+                                                    0.0, 0.0, 1e6, 2.0)
+        stc = PortfolioOptimisers.comovement_pair_state(polc, 1, 2)
+        @test stc.c1i == stc.c1j == 0.0
+        accc = PortfolioOptimisers.comovement_step(polc, accs, stc, 0.0, 0.0, 4, 1)
+        @test accc.pos > 0
+        @test accc.neg == accc.nn == 0
+
+        # ---- a positive threshold keeps its diagonal too ---------------------------------
+        # The predicate loop above is the proof that no path at a positive `c2` moves: it
+        # is the closed comparison it replaces. This pins the contract the rule protects,
+        # on the same sample and at a positive threshold. Both column sums of `Xs` are
+        # exactly zero, so the two zero entries of column 1 centre to exactly zero.
+        for c2 in (0.25, 0.5, 1.0), a in salgs
+            ce1 = SmythBrobyCovariance(; alg = a, c1 = 0.0, c2 = c2, c3 = 1e6,
+                                       pdm = nothing,
+                                       me = SimpleExpectedReturns(; w = nothing))
+            @test isapprox(diag(cor(ce1, Xs)), ones(2))
+        end
+    end
     @testset "GerberIQ region templates" begin
         # gerber_iq_weight maps a co-movement (r_i, r_j) to its region's squeezing weight.
         # Sentinel weights n_k = k/100 (and distinct thresholds) make every region identifiable,

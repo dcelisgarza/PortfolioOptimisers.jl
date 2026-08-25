@@ -28,6 +28,7 @@ SmythBrobyCountAlg
 SmythBrobyKernel
 gerber_comovement!
 comovement_pair_state
+sb_crossed
 comovement_step
 comovement_finalise
 comovement_ratio

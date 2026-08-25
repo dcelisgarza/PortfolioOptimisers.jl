@@ -982,7 +982,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Co-movement policy for [`gerber_comovement!`](@ref) implementing the Smyth-Broby family.
 
-The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observations that pass it are centred and standardised per asset, restricted to the significance zone by `c2` and `c3`, and classified by the sign of the product of the standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)). This type is configuration handed to [`gerber_comovement!`](@ref); it holds no result and it is never mutated.
+The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observations that pass it are centred and standardised per asset, restricted to the significance zone by `c2` through [`sb_crossed`](@ref) and by `c3`, and classified by the sign of the product of the standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)). This type is configuration handed to [`gerber_comovement!`](@ref); it holds no result and it is never mutated.
 
 # Fields
 
@@ -1196,7 +1196,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Accumulate a neutral observation into the pair accumulator. An observation is neutral when exactly one of the two assets reaches `c2`.
+Accumulate a neutral observation into the pair accumulator. An observation is neutral when exactly one of the two assets left the indecision zone, which [`sb_crossed`](@ref) decides.
 
 Only the [`GerberComovementOne`](@ref) markers reach an acting method, because they are the only ones whose denominator carries a neutral term. The fall-through method returns the accumulator unchanged, so the neutral score of every other marker stays at zero and is read by no reduction.
 
@@ -1246,9 +1246,39 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Decide whether one asset left the indecision zone at one observation.
+
+An asset leaves the indecision zone when the magnitude of its centred, standardised return reaches `c2` **and** that return is not exactly zero. The sign test is redundant for a positive threshold, because `ar >= c > 0` already implies that `r` is not zero. It binds only at `c2 = 0`, where the closed comparison `ar >= 0` holds for every return, including one that is exactly zero. ADR 0090 settled that a return of exactly zero never crosses, and this is that rule for the Smyth-Broby family.
+
+The rule is what keeps the diagonal of the statistic at one. The pair `(i, i)` either crosses on both axes or on neither, so it never reaches the neutral accumulator that a [`GerberComovementOne`](@ref) marker divides by. Without the sign test a zero return crossed on both axes but carried no sign, so it fell through to that accumulator and pulled the diagonal below one.
+
+**The rule binds on this gate and not on the confusion zone.** The two gates read different quantities. Here the quantity is centred, so an exactly zero return is an asset that did not move away from its own mean, and it has no sign to classify. The confusion zone reads the **raw, uncentred** return, whose zero is an arbitrary point of the scale of the data: an asset whose raw return is zero moved by ``-\\mu`` against its mean, which is a deviation with a sign. That gate also only rejects and never classifies, so it produces no wrong count of its own. ADR 0090 records the asymmetry.
+
+# Arguments
+
+  - `r`: Centred, standardised return of the asset at the observation.
+  - `ar`: Its absolute value.
+  - `c`: The indecision-zone threshold `c2`.
+
+# Returns
+
+  - `crossed::Bool`: `true` when the asset left the indecision zone.
+
+# Related
+
+  - [`comovement_step`](@ref)
+  - [`SmythBrobyKernel`](@ref)
+  - [`sb_add_neutral`](@ref)
+"""
+@inline function sb_crossed(r::Number, ar::Number, c::Number)
+    return ar >= c && !iszero(r)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Fold one observation of a pair into the co-movement accumulator.
 
-**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
+**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The mix also decides which gate carries the rule of ADR 0090: [`sb_crossed`](@ref) keeps a return of exactly zero inside the indecision zone, and the confusion zone takes no such test, because the zero of a raw return is an arbitrary point of the scale of the data. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
 
 # Algorithm
 
@@ -1256,10 +1286,11 @@ The Smyth-Broby method runs these steps. It reads `T` and `k` in neither, becaus
 
  1. Return `acc` unchanged when `abs(xi)` is below `st.c1i` **and** `abs(xj)` is below `st.c1j`. This is the confusion zone, read on the raw return.
  2. Centre and standardise both returns with the pair state, giving `ri` and `rj`, and take their magnitudes `ari` and `arj`.
- 3. Return `acc` unchanged when either magnitude exceeds `pol.c3`, or when both fall below `pol.c2`. The first is the outer cut-off and the second is the indecision zone.
- 4. Accumulate through [`sb_add_pos`](@ref) when both magnitudes reach `pol.c2` and the product `ri * rj` is positive.
- 5. Accumulate through [`sb_add_neg`](@ref) when both magnitudes reach `pol.c2` and the product is negative.
- 6. Accumulate through [`sb_add_neutral`](@ref) otherwise, which is the case where exactly one magnitude reaches `pol.c2`.
+ 3. Decide with [`sb_crossed`](@ref) whether each asset left the indecision zone of `pol.c2`.
+ 4. Return `acc` unchanged when either magnitude exceeds `pol.c3`, or when neither asset left the indecision zone. The first is the outer cut-off and the second is the indecision zone itself.
+ 5. Accumulate through [`sb_add_pos`](@ref) when both assets crossed and the product `ri * rj` is positive.
+ 6. Accumulate through [`sb_add_neg`](@ref) when both assets crossed and the product is negative.
+ 7. Accumulate through [`sb_add_neutral`](@ref) otherwise, which is the case where exactly one asset crossed. Two crossings give a product that is not zero, so the three branches are exhaustive.
 
 # Arguments
 
@@ -1278,6 +1309,7 @@ The Smyth-Broby method runs these steps. It reads `T` and `k` in neither, becaus
 
   - [`gerber_comovement!`](@ref)
   - [`comovement_finalise`](@ref)
+  - [`sb_crossed`](@ref)
 """
 @inline function comovement_step(pol::SmythBrobyKernel, acc, st, xi::Number, xj::Number,
                                  ::Integer, ::Integer)
@@ -1289,12 +1321,14 @@ The Smyth-Broby method runs these steps. It reads `T` and `k` in neither, becaus
     ari = abs(ri)
     arj = abs(rj)
     c2 = pol.c2
-    if ari > pol.c3 || arj > pol.c3 || ari < c2 && arj < c2
+    crossi = sb_crossed(ri, ari, c2)
+    crossj = sb_crossed(rj, arj, c2)
+    if ari > pol.c3 || arj > pol.c3 || !crossi && !crossj
         return acc
     end
-    return if ari >= c2 && arj >= c2 && ri * rj > zero(ri)
+    return if crossi && crossj && ri * rj > zero(ri)
         sb_add_pos(pol.alg, acc, ari, arj, pol.n)
-    elseif ari >= c2 && arj >= c2 && ri * rj < zero(ri)
+    elseif crossi && crossj && ri * rj < zero(ri)
         sb_add_neg(pol.alg, acc, ari, arj, pol.n)
     else
         sb_add_neutral(pol.alg, acc, ari, arj, pol.n)
@@ -1379,7 +1413,7 @@ end
 
 Compute the Smyth-Broby co-movement correlation matrix for the algorithm marker in `ce.alg`.
 
-All nine variants share the pairwise kernel [`gerber_comovement!`](@ref) through a [`SmythBrobyKernel`](@ref) policy: observations are noise-gated by `c1 * sigma`, standardised, restricted to the `[c2, c3]` significance zone, and classified as concordant, discordant, or neutral by the sign of the product of standardised returns. The marker selects the accumulation family and denominator policy.
+All nine variants share the pairwise kernel [`gerber_comovement!`](@ref) through a [`SmythBrobyKernel`](@ref) policy: observations are noise-gated by `c1 * sigma`, standardised, restricted to the `[c2, c3]` significance zone by [`sb_crossed`](@ref), and classified as concordant, discordant, or neutral by the sign of the product of standardised returns. The marker selects the accumulation family and denominator policy.
 
 # Mathematical definition
 
@@ -1391,9 +1425,17 @@ For each pair ``(i, j)`` an observation ``t`` passes two admission tests. The **
 \\end{align}
 ```
 
-The **significance zone** compares the **centred, standardised** return ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``, and rejects ``t`` when either asset exceeds ``c_3`` or both fall below ``c_2``. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic.
+The **significance zone** compares the **centred, standardised** return ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``. Asset ``i`` crosses at ``t`` when
 
-An admitted observation is concordant when both ``|\\tilde{r}|`` reach ``c_2`` and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``, discordant when both reach ``c_2`` and the product is negative, and neutral otherwise. Accumulate the kernel and the count of each class over the admitted observations:
+```math
+\\begin{align}
+|\\tilde{r}_{ti}| \\geq c_2 \\quad \\text{and} \\quad \\tilde{r}_{ti} \\neq 0\\,,
+\\end{align}
+```
+
+and the zone rejects ``t`` when either asset exceeds ``c_3`` or neither asset crosses. The second test of the crossing binds only at ``c_2 = 0``, because ``|\\tilde{r}| \\geq c_2 > 0`` already excludes a zero return. It is the rule of ADR 0090 for this family, and [`sb_crossed`](@ref) is where the code states it. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic, and the rule of ADR 0090 binds on the centred quantity alone.
+
+An admitted observation is concordant when both assets cross and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``, discordant when both cross and the product is negative, and neutral otherwise, which is the case where exactly one asset crosses. Accumulate the kernel and the count of each class over the admitted observations:
 
 ```math
 \\begin{align}

@@ -120,7 +120,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :gerbce => "`ce`: Gerber covariance estimator.",#
                                  :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
                                  :c1 => "`c1`: Zone of confusion threshold, in units of the asset's standard deviation. It is read against the raw, uncentred return, and it rejects an observation only when both assets fall inside it.",#
-                                 :c2 => "`c2`: Zone of indecision threshold, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when both assets fall inside it.",#
+                                 :c2 => "`c2`: Zone of indecision threshold, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when both assets fall inside it. A centred return of exactly zero is inside it at every `c2`.",#
                                  :c3 => "`c3`: Outer cut-off, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
                                  :sbn => "`n`: Severity exponent of the Smyth-Broby contribution. It sets how hard the divergence of a pair is penalised.",#
                                  :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
@@ -1014,7 +1014,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # statistic, and it shares the Gerber symbols above.
                        :r_tilde_sb => "``\\tilde{r}_{t,\\,i} = (x_{t,\\,i} - \\mu_i) / \\sigma_i``: Centred, standardised return of asset ``i`` at observation ``t``.",#
                        :c1_sb => "``c_1``: Confusion-zone threshold. It is read against the **raw, uncentred** return, and it rejects an observation only when both assets fall inside it.",#
-                       :c2_sb => "``c_2``: Indecision-zone threshold. It is read against the **centred, standardised** return, and it rejects an observation when both assets fall inside it.",#
+                       :c2_sb => "``c_2``: Indecision-zone threshold. It is read against the **centred, standardised** return, and it rejects an observation when both assets fall inside it. A centred return of exactly zero is inside it at every ``c_2``.",#
                        :c3_sb => "``c_3``: Outer cut-off. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
                        :kappa_sb => "``\\kappa``: Amplitude kernel of a pair, the geometric mean of the two gross standardised magnitudes.",#
                        :gamma_sb => "``\\gamma``: Divergence of a pair, the absolute difference of the two standardised magnitudes.",#

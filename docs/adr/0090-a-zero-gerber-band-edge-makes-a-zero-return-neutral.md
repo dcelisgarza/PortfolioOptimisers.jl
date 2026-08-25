@@ -86,10 +86,46 @@ The same `c = 0` also broke the reduction that ties the two families together. G
 weight set to one and no decay is the Gerber statistic, and at a zero threshold the two answered
 different matrices.
 
+### The same edge in the Smyth-Broby family
+
+[#499](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/499), opened while #498 was
+fixed, found the same edge in
+[`SmythBrobyCovariance`](../../src/08_Moments/06_SmythBrobyCovariance.jl):
+
+```julia
+# The column means are exactly zero, so rows 3 and 4 carry an exactly zero centred return
+# for asset 1.
+X = [2.0 2.0; -2.0 -2.0; 0.0 1.0; 0.0 -1.0]
+
+ce(a) = SmythBrobyCovariance(; alg = a, c1 = 0.0, c2 = 0.0, c3 = 1e6, pdm = nothing,
+                             me = SimpleExpectedReturns(; w = nothing))
+
+diag(cor(ce(SmythBroby1()), X))       # [0.6899, 1.0]
+diag(cor(ce(SmythBrobyGerber1()), X)) # [0.6899, 1.0]
+diag(cor(ce(SmythBrobyCount1()), X))  # [0.5, 1.0]
+```
+
+The shape is the Gerber IQ one. `comovement_step` gated the indecision zone with a strict `<` on
+the **centred, standardised** magnitude, so at `pol.c2 == 0` the test `ari < 0` is never true and
+no observation is dropped. An observation whose centred return is exactly zero then reached the
+classification, where `ari >= c2` holds but neither sign test does, and it fell through to the
+neutral branch. The three `*1` markers divide by `pos + neg + nn`, so the inflated `nn` pulled the
+diagonal below one. The `*0` and `*2` markers read no neutral count and agreed anyway.
+
+`c2 = 0` is legal: the constructor validates `c1`, `c2` and `c3` with
+`assert_nonempty_nonneg_finite_val`, and asserts only `c2 < c3`.
+
+**This family has two gates, and only one of them reads a centred quantity.** The **indecision**
+zone gates on `c2` over the centred, standardised return, and it is the analogue of the Gerber band
+edge. The **confusion** zone gates on `c1` over the **raw, uncentred** return. At `c1 = 0` that
+gate drops nothing either, so a raw return of exactly zero survives it. Whether the rule binds
+there as well is the question #499 put to this ADR.
+
 ### The two readings
 
-Ticket #491 named both. Ticket #498 named only the second one, and for the same reason: a
-threshold that a caller may be passing today should keep a clean meaning rather than be rejected.
+Ticket #491 named both. Tickets #498 and #499 named only the second one, and for the same reason:
+a threshold that a caller may be passing today should keep a clean meaning rather than be
+rejected.
 
  1. **Tighten the guard to `0 < t`.** The Gerber statistic is defined for a strictly positive
     threshold, and Riskfolio-Lib asserts `0 < threshold < 1`. `val_dict[:t]` already carries
@@ -120,11 +156,31 @@ axes.** The three sites that repeated the threshold comparison now read the same
 end
 ```
 
+**`SmythBrobyCovariance` gets the same predicate on its indecision zone.** `comovement_step`
+repeated the `c2` comparison in three places, and all three now read one answer per axis:
+
+```julia
+@inline function sb_crossed(r::Number, ar::Number, c::Number)
+    return ar >= c && !iszero(r)
+end
+```
+
+**The Smyth-Broby confusion zone does not take the sign test.** The rule is about a **centred**
+quantity. A centred return of exactly zero is an asset that did not move away from its own mean,
+so it has no sign, and a gate that lets it through hands the classification an observation it
+cannot classify. The confusion zone reads the **raw, uncentred** return, whose zero is an
+arbitrary point of the scale of the data: an asset whose raw return is zero moved by `-mu` against
+its mean, which is a deviation that does carry a sign. Two further facts settle it. That gate only
+*rejects* and never classifies, so on its own it produces no wrong count. And at `c1 = 0` it means
+"no confusion zone", which is the meaning a reader expects of a zero threshold; a sign test would
+turn it into "reject the observations on which both raw returns are exactly zero", which is a rule
+about the origin of the data and not about the statistic.
+
 **The sign test binds only at a zero edge.** `ce.t` and `sd` are both non-negative, so `ts` is
-non-negative, and `ce.c` and the scaler's factor are both non-negative, so `st.ci` is non-negative.
-For a positive edge the test is redundant, because `x >= ts > 0` already implies `x > 0` and
-`ax >= c > 0` already implies that `x` is not zero. Every result at a positive threshold is
-therefore unchanged, bit for bit.
+non-negative; `ce.c` and the scaler's factor are both non-negative, so `st.ci` is non-negative; and
+`ce.c2` is non-negative by its own guard. For a positive edge the test is redundant, because
+`x >= ts > 0` already implies `x > 0`, and `ax >= c > 0` already implies that `x` is not zero.
+Every result at a positive threshold is therefore unchanged, bit for bit.
 
 **Both bands are strict at a zero edge, not one of them.** The ticket wrote "make one band
 strict", which would put a zero return in `U` alone. That is not the neutrality the same sentence
@@ -169,9 +225,18 @@ may be passing today, and it removes a threshold that now has a clean meaning.
   neither band, and that all three variants answer a unit diagonal. The testset
   `Gerber IQ zero threshold (#498)` pins the unit diagonal of all three Gerber IQ branches at
   `c = 0`, the reduction to `GerberCovariance` at that threshold, and that no result at a positive
-  threshold moves.
-- **`SmythBrobyCovariance` carries the same shape and is not fixed here.**
-  [#499](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/499) records it. Its
-  indecision zone gates on `c2` over the **centred, standardised** return and its confusion zone
-  gates on `c1` over the **raw, uncentred** one, so which of the two gates takes the sign test is
-  a question this ADR does not answer.
+  threshold moves. The testset `Smyth-Broby zero indecision zone (#499)` does the same for that
+  family and adds the two gates: that `c2 = 0` no longer inflates the neutral count, and that
+  `c1 = 0` still admits every observation.
+- **The Smyth-Broby diagonal is unit at every `c2`.** The pair `(i, i)` crosses on both axes or on
+  neither, so it never reaches the neutral accumulator, and the three `*1` markers answer
+  `pos / pos` on the diagonal as the `*0` and `*2` markers already did.
+- **The Smyth-Broby classification is exhaustive.** Two crossings give a product that is not zero,
+  so an observation on which both assets crossed is concordant or discordant and never neutral.
+  The neutral branch is exactly the case its own docstring names.
+- **A zero confusion threshold still admits every observation.** `c1 = 0` keeps its meaning of
+  "no confusion zone". The behaviour change of this decision in the Smyth-Broby family is confined
+  to a caller who passes `c2 = 0` over data that carry an exactly zero centred return.
+- **The rule now covers every member of the Gerber lineage.** `GerberCovariance`,
+  `GerberIQCovariance` and `SmythBrobyCovariance` each state it in the shape of their own gate, so
+  a new member of the lineage inherits a rule that is already written down.
