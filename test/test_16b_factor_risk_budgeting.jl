@@ -104,10 +104,15 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (12, 22) ||
-                  Sys.isapple() && i ∈ (18, 20) ||
-                  Sys.iswindows() && i == 10
+        rtol = if i ∈ (12, 18, 22) || Sys.isapple() && i == 20 || Sys.iswindows() && i == 10
             # 12 is host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
+            #
+            # 18 is host-sensitive too, and it is the reason this row is no longer keyed on
+            # the platform. It was granted 1e-3 on macOS alone and 5e-4 everywhere else, and
+            # it fails at 5e-4 on a Linux developer machine while CI passes at the same
+            # commit: the solve is a weight drift, not a failed solve, and the exported tip
+            # reproduces the drift to the last digit. So the threshold sits inside the
+            # spread of the hosts rather than on one platform's side of it. Issue #518.
             1e-3
         elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
             5e-4
@@ -115,7 +120,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             5e-3
         elseif i in (13, 14)
             1e-2
-        elseif i ∈ (18, 20, 24, 27)
+        elseif i ∈ (20, 24, 27)
             5e-4
         elseif i == 21
             5e-2

@@ -2377,11 +2377,27 @@
                                                                      "B" => 0.8)), sets)
         @test isapprox(rkb.val, [0.15, 0.6, 0.25])
         #=
-        The keyword constructor repeats the inner constructor's guards because a scalar
-        matches the generic constructor `@concrete` emits ahead of the inner `VecNum`
-        method. Without the repeat, a negative scalar would construct.
+        Both constructors run the same guards, and the POSITIONAL route is the one that
+        needed the fix. `@concrete` emits a generic `RiskBudget(val::__T_val) where
+        __T_val`, and a scalar matches it whenever the inner constructor is narrower than
+        a scalar. The inner one was typed `VecNum`, so `RiskBudget(-1.0)` returned an
+        object holding `-1.0` while `RiskBudget(; val = -1.0)` raised. `Num_VecNum` is
+        more specific than the unbounded generic for a scalar too, so the hole closes and
+        the keyword form needs no copy of the checks. `Threshold` has always been typed
+        this way, which is why it never had the hole. Issue #518.
         =#
+        @test_throws DomainError RiskBudget(-1.0)
         @test_throws DomainError RiskBudget(; val = -1.0)
+        @test_throws DomainError RiskBudget([0.5, -1.0])
         @test_throws DomainError RiskBudget(; val = [0.5, -1.0])
+        @test_throws PortfolioOptimisers.IsEmptyError RiskBudget(Float64[])
+        @test_throws PortfolioOptimisers.IsEmptyError RiskBudget(; val = Float64[])
+        # A scalar and a zero entry both stay admissible.
+        @test RiskBudget(0.7).val == 0.7
+        @test RiskBudget(; val = 0.7).val == 0.7
+        @test RiskBudget([0.0, 1.0]).val == [0.0, 1.0]
+        # `Threshold` is the sibling of the same shape, and every route raises there too.
+        @test_throws DomainError Threshold(-1.0)
+        @test_throws DomainError Threshold(; val = -1.0)
     end
 end
