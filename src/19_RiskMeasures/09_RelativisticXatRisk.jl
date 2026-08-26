@@ -48,15 +48,13 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                         theta[1:T]
                         epsilon[1:T]
                     end)
+    invat = inv(alpha * T)
+    ln_k = (invat^kappa - invat^(-kappa)) * ik2
     if isnothing(w)
-        invat = inv(alpha * T)
-        ln_k = (invat^kappa - invat^(-kappa)) * ik2
         JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
-        sw = sum(w)
-        invat = inv(alpha * sw)
-        ln_k = (invat^kappa - invat^(-kappa)) * ik2
-        JuMP.@expression(model, risk, t + ln_k * z + LinearAlgebra.dot(w, psi + theta))
+        wi = w / sum(w)
+        JuMP.@expression(model, risk, t + ln_k * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
     JuMP.@constraints(model,
                       begin
@@ -79,24 +77,27 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                             nu[1:T]
                             tau[1:T]
                         end)
-        if isnothing(w)
-            JuMP.@constraints(model, begin
-                                  sum(z) - 1 == 0
-                                  sum(nu - tau) * ik2 - ln_k <= 0
-                              end)
-            JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
-        else
-            JuMP.@constraints(model, begin
-                                  LinearAlgebra.dot(w, z) - 1 == 0
-                                  LinearAlgebra.dot(w, nu - tau) * ik2 - ln_k <= 0
-                              end)
-            JuMP.@expression(model, risk, -LinearAlgebra.dot(w .* z, x))
-        end
-        JuMP.@constraints(model,
-                          begin
-                              [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
-                              [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+        JuMP.@constraints(model, begin
+                              sum(z) - 1 == 0
+                              sum(nu - tau) * ik2 - ln_k <= 0
                           end)
+        JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
+        if isnothing(w)
+            JuMP.@constraints(model,
+                              begin
+                                  [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
+                                  [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+                              end)
+        else
+            wi = w / sum(w)
+            JuMP.@constraints(model,
+                              begin
+                                  [i = 1:T],
+                                  [nu[i], wi * T, z[i]] in JuMP.MOI.PowerCone(iopk)
+                                  [i = 1:T],
+                                  [z[i], wi * T, tau[i]] in JuMP.MOI.PowerCone(omk)
+                              end)
+        end
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
             JuMP.objective_value(model)

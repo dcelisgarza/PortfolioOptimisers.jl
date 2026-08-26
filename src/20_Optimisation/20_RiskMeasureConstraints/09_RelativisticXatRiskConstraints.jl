@@ -126,14 +126,13 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     state_set!(model, prefix, keys.epsilon, i, epsilon)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, pr.X)
+    iat = inv(alpha * T)
+    lnk = (iat^kappa - iat^(-kappa)) * ik2
     risk = if isnothing(wi)
-        iat = inv(alpha * T)
-        lnk = (iat^kappa - iat^(-kappa)) * ik2
         JuMP.@expression(model, t + lnk * z + sum(psi + theta))
     else
-        iat = inv(alpha * sum(wi))
-        lnk = (iat^kappa - iat^(-kappa)) * ik2
-        JuMP.@expression(model, t + lnk * z + LinearAlgebra.dot(wi, psi + theta))
+        wi /= sum(wi)
+        JuMP.@expression(model, t + lnk * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
     state_set!(model, prefix, keys.risk, i, risk)
     pcone_a, pcone_b, exceedance = JuMP.@constraints(model,
