@@ -93,9 +93,9 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
             JuMP.@constraints(model,
                               begin
                                   [i = 1:T],
-                                  [nu[i], wi * T, z[i]] in JuMP.MOI.PowerCone(iopk)
+                                  [nu[i], wi[i] * T, z[i]] in JuMP.MOI.PowerCone(iopk)
                                   [i = 1:T],
-                                  [z[i], wi * T, tau[i]] in JuMP.MOI.PowerCone(omk)
+                                  [z[i], wi[i] * T, tau[i]] in JuMP.MOI.PowerCone(omk)
                               end)
         end
         JuMP.@objective(model, Max, risk)
@@ -147,7 +147,7 @@ Where:
 
   - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
-For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the ``\\kappa``-logarithm argument ``\\frac{1}{\\alpha T}`` becomes ``\\frac{1}{\\alpha \\sum_{t=1}^{T} w_t}`` and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``\\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``.
+For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The ``\\kappa``-logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
 
 # Fields
 

@@ -79,6 +79,231 @@ function ep_evar_grid_row(x::VecNum, ebar::Number, z::Number)
     return c ./ sc, inv(sc)
 end
 """
+    ep_kappa_log(u::Number, kappa::Number)
+
+Evaluate the Kaniadakis logarithm.
+
+# Mathematical definition
+
+```math
+\\ln_{\\kappa}(u) = \\dfrac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}\\,.
+```
+
+# Arguments
+
+  - `u`: Argument of the logarithm.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+
+# Returns
+
+  - `lnk::Number`: Value of the Kaniadakis logarithm.
+
+# Related
+
+  - [`ep_rlvar`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_kappa_log(u::Number, kappa::Number)
+    return (u^kappa - u^(-kappa)) / (2 * kappa)
+end
+"""
+    ep_rlvar_tail(u::Number, z::Number, kappa::Number)
+
+Evaluate the smallest tail penalty the pair of power cones of one observation allows.
+
+The primal programme of the relativistic value at risk carries two power cones and two non-negative variables per observation. Their sum is minimised out in closed form, which is what turns a point of the primal programme into a row that is linear in the posterior probabilities.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\varphi_{\\kappa}(u, z) &= \\dfrac{\\kappa}{1+\\kappa} \\left(\\dfrac{2\\kappa}{(1+\\kappa) z}\\right)^{\\frac{1}{\\kappa}} \\left(\\dfrac{\\sigma - u}{2}\\right)^{\\frac{1+\\kappa}{\\kappa}} + \\kappa (1-\\kappa)^{\\frac{1-\\kappa}{\\kappa}} \\left(\\dfrac{z}{2\\kappa}\\right)^{\\frac{1}{\\kappa}} \\left(\\dfrac{\\sigma + u}{2}\\right)^{-\\frac{1-\\kappa}{\\kappa}}\\,,\\\\
+\\sigma &= \\sqrt{u^{2} + \\dfrac{(1 - \\kappa^{2}) z^{2}}{\\kappa^{2}}}\\,.
+\\end{align}
+```
+
+# Arguments
+
+  - `u`: Shifted return of the observation, `t - x` for a loss series `x`.
+  - `z`: Dual variable of the primal programme.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+
+# Returns
+
+  - `phi::Number`: Smallest sum of the two tail variables of the observation.
+
+# Related
+
+  - [`ep_rlvar`](@ref)
+  - [`ep_rlvar_grid_row`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_tail(u::Number, z::Number, kappa::Number)
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik = inv(kappa)
+    sigma = sqrt(u^2 + opk * omk * (z * ik)^2)
+    psi = kappa / opk * (2 * kappa / (opk * z))^ik * ((sigma - u) / 2)^(opk * ik)
+    theta = kappa * omk^(omk * ik) * (z / (2 * kappa))^ik * ((sigma + u) / 2)^(-omk * ik)
+    return psi + theta
+end
+"""
+    ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Number)
+
+Minimise the primal objective of the relativistic value at risk over its shift variable, at a fixed dual variable.
+
+# Mathematical definition
+
+```math
+\\min_{t} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+```
+
+# Arguments
+
+  - `x`: Loss series (`-returns`).
+  - `w`: Observation probabilities, summing to one.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `lnk`: Kaniadakis logarithm of `inv(alpha * T)`, from [`ep_kappa_log`](@ref).
+  - `z`: Dual variable of the primal programme.
+
+# Returns
+
+  - `res::@NamedTuple{risk::Number, t::Number}`: The value at the minimising shift, and that shift.
+
+# Algorithm
+
+ 1. Bracket the shift by the loss range widened by twice its span on each side. The minimising shift sits near the largest loss, so the bracket holds it with a wide margin.
+ 2. Minimise the objective over the bracket with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)'s Brent method.
+
+# Related
+
+  - [`ep_rlvar`](@ref)
+  - [`ep_rlvar_tail`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Number)
+    T = length(x)
+    xmin, xmax = extrema(x)
+    span = xmax - xmin
+    span = ifelse(span > zero(span), span, max(abs(xmax), one(xmax)))
+    f = function (t)
+        acc = zero(t * one(eltype(w)))
+        for j in eachindex(x, w)
+            acc += w[j] * ep_rlvar_tail(t - x[j], z, kappa)
+        end
+        return t + z * lnk + T * acc
+    end
+    res = Optim.optimize(f, xmin - 2 * span, xmax + 2 * span, Optim.Brent())
+    return (; risk = Optim.minimum(res), t = Optim.minimizer(res))
+end
+"""
+    ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number)
+
+Compute the sample relativistic value at risk of a loss series and the primal point that attains it.
+
+`ep_rlvar` minimises the two-variable primal objective of the sample RLVaR, whose per-observation power cones [`ep_rlvar_tail`](@ref) has already minimised out. It is used by the entropy pooling view machinery, which needs both the value (to compare a view against its prior) and the minimiser (to centre the grid of [`GridRelativisticValueatRiskView`](@ref)).
+
+# Mathematical definition
+
+```math
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) = \\min_{t,\\, z > 0} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+```
+
+# Arguments
+
+  - `x`: Loss series (`-returns`).
+  - `w`: Observation probabilities. Normalised to sum to one.
+  - `alpha`: Significance level.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+
+# Returns
+
+  - `res::@NamedTuple{rlvar::Number, t::Number, z::Number}`: The value and the primal pair that attains it.
+
+# Algorithm
+
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)'s Brent method, over a bracket running from about `2e-9` to about `2e4` times the loss range. The objective is convex in the pair, so the outer minimisation sees a convex function.
+ 2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
+ 3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
+
+# Related
+
+  - [`ep_rlvar_tail`](@ref)
+  - [`ep_rlvar_shift`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number)
+    T = length(x)
+    wi = w ./ sum(w)
+    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    xmin, xmax = extrema(x)
+    span = xmax - xmin
+    span = ifelse(span > zero(span), span, max(abs(xmax), one(xmax)))
+    lspan = log(span)
+    res = Optim.optimize(u -> ep_rlvar_shift(x, wi, kappa, lnk, exp(u)).risk, lspan - 20,
+                         lspan + 10, Optim.Brent())
+    z = exp(Optim.minimizer(res))
+    shift = ep_rlvar_shift(x, wi, kappa, lnk, z)
+    return (; rlvar = shift.risk, t = shift.t, z = z)
+end
+"""
+    ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha::Number,
+                      kappa::Number)
+
+Build one scaled row of the grid formulation of a relativistic value-at-risk view.
+
+`ep_rlvar_grid_row` returns the coefficients `T * phi(t - x, z)` divided by their largest entry, together with the target of the row divided by that same entry. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, which is what lets the big-M constant of [`GridRelativisticValueatRiskView`](@ref) be a plain number rather than a function of the data.
+
+# Arguments
+
+  - `x`: Loss series (`-returns`).
+  - `vbar`: Target relativistic value at risk.
+  - `t`: Shift variable of the grid point.
+  - `z`: Dual variable of the grid point.
+  - `alpha`: Significance level.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+
+# Returns
+
+  - `c::VecNum`: Scaled coefficients.
+  - `b::Number`: Scaled target the row is compared against.
+
+# Related
+
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskViewConstraint`](@ref)
+  - [`ep_rlvar_views!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha::Number,
+                           kappa::Number)
+    T = length(x)
+    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    c = T .* ep_rlvar_tail.(t .- x, z, kappa)
+    sc = maximum(c)
+    return c ./ sc, (vbar - t - z * lnk) / sc
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Carries the loss series, the significance level and the target of a linear conditional value-at-risk view.
@@ -265,6 +490,109 @@ Arguments correspond to the fields above.
     M
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Carries the loss series, the significance level, the deformation parameter and the target of a conic relativistic value-at-risk view.
+
+The view parser produces one of these per view that takes the conic formulation. [`add_ep_tail_view!`](@ref) then writes the power cones that are the dual representation of RLVaR from it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConicRelativisticValueatRiskViewConstraint(x, alpha, kappa, rhs)
+
+Arguments correspond to the fields above.
+
+# Related
+
+  - [`AbstractEntropyPoolingTailView`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+@concrete struct ConicRelativisticValueatRiskViewConstraint <:
+                 AbstractEntropyPoolingTailView
+    """
+    $(field_dict[:ep_loss])
+    """
+    x
+    """
+    $(field_dict[:ep_view_alpha])
+    """
+    alpha
+    """
+    $(field_dict[:ep_view_kappa])
+    """
+    kappa
+    """
+    $(field_dict[:ep_view_rhs])
+    """
+    rhs
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Carries the grid of primal points that an upper-bound or equality relativistic value-at-risk view selects one point of.
+
+A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this carrier. An equality view emits both: the rows go into the dictionary and the selector block comes here.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GridRelativisticValueatRiskViewConstraint(x, t, z, alpha, kappa, rhs, M)
+
+Arguments correspond to the fields above.
+
+# Related
+
+  - [`AbstractEntropyPoolingTailView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`add_ep_tail_view!`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+@concrete struct GridRelativisticValueatRiskViewConstraint <: AbstractEntropyPoolingTailView
+    """
+    $(field_dict[:ep_loss])
+    """
+    x
+    """
+    $(field_dict[:ep_rlvar_tgrid])
+    """
+    t
+    """
+    $(field_dict[:ep_rlvar_zgrid])
+    """
+    z
+    """
+    $(field_dict[:ep_view_alpha])
+    """
+    alpha
+    """
+    $(field_dict[:ep_view_kappa])
+    """
+    kappa
+    """
+    $(field_dict[:ep_view_rhs])
+    """
+    rhs
+    """
+    $(field_dict[:rlvar_bigM])
+    """
+    M
+end
+"""
     add_ep_tail_view!(model::JuMP.Model, pw, tv::AbstractEntropyPoolingTailView,
                       sc1::Number)
 
@@ -362,6 +690,49 @@ function add_ep_tail_view!(model::JuMP.Model, pw, tv::GridEntropicValueatRiskVie
     end
     return nothing
 end
+function add_ep_tail_view!(model::JuMP.Model, pw,
+                           tv::ConicRelativisticValueatRiskViewConstraint, sc1::Number)
+    (; x, alpha, kappa, rhs) = tv
+    T = length(x)
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik2 = inv(2 * kappa)
+    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    nu = JuMP.@variable(model, [1:T], lower_bound = 0, upper_bound = 1)
+    # Both bounds are implied by the cones and the budget: the first slot of a power cone
+    # is non-negative, and the budget is loosest at the largest `varsigma` the second cone
+    # allows, which is non-negative. Stating them is what turns a `SLOW_PROGRESS` report
+    # into an `OPTIMAL` one.
+    tau = JuMP.@variable(model, [1:T], lower_bound = 0)
+    varsigma = JuMP.@variable(model, [1:T], lower_bound = 0)
+    JuMP.@constraints(model,
+                      begin
+                          sc1 * (sum(nu) - one(alpha)) == 0
+                          sc1 * (rhs - LinearAlgebra.dot(nu, x)) <= 0
+                          sc1 * (sum(tau - varsigma) * ik2 - lnk) <= 0
+                          [j = 1:T],
+                          [sc1 * tau[j], sc1 * T * pw[j], sc1 * nu[j]] in
+                          JuMP.MOI.PowerCone(inv(opk))
+                          [j = 1:T],
+                          [sc1 * nu[j], sc1 * T * pw[j], sc1 * varsigma[j]] in
+                          JuMP.MOI.PowerCone(omk)
+                      end)
+    return nothing
+end
+function add_ep_tail_view!(model::JuMP.Model, pw,
+                           tv::GridRelativisticValueatRiskViewConstraint, sc1::Number)
+    (; x, t, z, alpha, kappa, rhs, M) = tv
+    K = length(z)
+    y = JuMP.@variable(model, [1:K], binary = true)
+    JuMP.@constraint(model, sc1 * (sum(y) - one(alpha)) == 0)
+    for k in 1:K
+        c, b = ep_rlvar_grid_row(x, rhs, t[k], z[k], alpha, kappa)
+        JuMP.@constraint(model,
+                         sc1 * (LinearAlgebra.dot(c, pw) - b - M * (one(alpha) - y[k])) <=
+                         0)
+    end
+    return nothing
+end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number)
 
@@ -391,6 +762,39 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::
     T = size(pr.X, 1)
     iT = inv(T)
     return ep_evar(-view(pr.X, :, i), range(iT, iT; length = T), alpha).evar
+end
+"""
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
+                 kappa::Number)
+
+Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result.
+
+`get_pr_value` computes the RLVaR at confidence level `alpha` and deformation parameter `kappa` for the asset indexed by `i` from the prior result object `pr`, by minimising the primal objective of the sample RLVaR with [`ep_rlvar`](@ref).
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:rlvar}`: Dispatch tag for RLVaR extraction.
+  - `alpha`: Confidence level (e.g. `0.05` for 5% RLVaR).
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+
+# Returns
+
+  - `rlvar::Number`: Relativistic Value-at-Risk for asset `i` at level `alpha` and deformation `kappa`.
+
+# Related
+
+  - [`ep_rlvar`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`get_pr_value`](@ref)
+"""
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
+                      kappa::Number)
+    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
+    T = size(pr.X, 1)
+    iT = inv(T)
+    return ep_rlvar(-view(pr.X, :, i), range(iT, iT; length = T), alpha, kappa).rlvar
 end
 """
     ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum; strict::Bool = false)
@@ -676,6 +1080,41 @@ function ep_evar_formulation(::Nothing, op::Symbol, rhs::Number, pv::Number)
     end
 end
 """
+    ep_rlvar_formulation(alg::Option{<:AbstractRelativisticValueatRiskViewFormulation},
+                         op::Symbol, rhs::Number, pv::Number)
+
+Pick the formulation of one relativistic value-at-risk view.
+
+A stated formulation is returned unchanged. `nothing` takes [`ConicRelativisticValueatRiskView`](@ref) wherever it expresses the view exactly, and [`GridRelativisticValueatRiskView`](@ref) otherwise, which is an upper bound and an equality below the prior RLVaR.
+
+# Arguments
+
+  - `alg`: Stated formulation, or `nothing`.
+  - `op`: Comparison operator of the view.
+  - `rhs`: Target value of the view.
+  - `pv`: Prior RLVaR of the asset the view names.
+
+# Returns
+
+  - `alg::AbstractRelativisticValueatRiskViewFormulation`: The formulation to use.
+
+# Related
+
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`ep_rlvar_views!`](@ref)
+"""
+function ep_rlvar_formulation(alg::AbstractRelativisticValueatRiskViewFormulation, args...)
+    return alg
+end
+function ep_rlvar_formulation(::Nothing, op::Symbol, rhs::Number, pv::Number)
+    return if op == :geq || op == :eq && rhs >= pv
+        ConicRelativisticValueatRiskView()
+    else
+        GridRelativisticValueatRiskView()
+    end
+end
+"""
     ep_add_cvar_view!(tvs::AbstractVector, alg::AbstractConditionalValueatRiskViewFormulation, X::MatNum,
                       idx::VecInt, coef::VecNum, op::Symbol, rhs::Number, alpha::Number,
                       w::VecNum, pv::Number, eqn::AbstractString)
@@ -801,6 +1240,85 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
     end
     if op == :leq || op == :eq
         push!(tvs, GridEntropicValueatRiskViewConstraint(x, z, alpha, rhs, M))
+    end
+    return nothing
+end
+"""
+    ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
+                       alg::AbstractRelativisticValueatRiskViewFormulation, x::VecNum,
+                       alpha::Number, kappa::Number, op::Symbol, rhs::Number, w::VecNum,
+                       zstar::Number, pv::Number, eqn::AbstractString)
+
+Lower one relativistic value-at-risk view into the constraints its formulation needs.
+
+[`ConicRelativisticValueatRiskView`](@ref) produces one tail view constraint. [`GridRelativisticValueatRiskView`](@ref) produces linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half, so an equality view produces both.
+
+# Arguments
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `tvs`: Tail view constraints, appended to.
+  - `alg`: Formulation of the view.
+  - `x`: Loss series of the asset the view names.
+  - `alpha`: Significance level of the view.
+  - `kappa`: Deformation parameter of the view.
+  - `op`: Comparison operator of the view.
+  - `rhs`: Target value of the view.
+  - `w`: Prior probability weights, which pin the shift of each grid point.
+  - `zstar`: Dual variable that attains the prior RLVaR of the asset.
+  - `pv`: Prior RLVaR of the asset. With `rhs` it fixes the translation the grid is anchored on.
+  - `eqn`: Equation of the view, used in the error messages.
+
+# Validation
+
+  - [`ConicRelativisticValueatRiskView`](@ref) needs an operator other than `<=`, and, for an equality, a target at or above the prior RLVaR.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`ep_rlvar_views!`](@ref)
+"""
+function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
+                            ::ConicRelativisticValueatRiskView, x::VecNum, alpha::Number,
+                            kappa::Number, op::Symbol, rhs::Number, w::VecNum,
+                            zstar::Number, pv::Number, eqn::AbstractString)
+    @argcheck(op != :leq,
+              ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView`."))
+    @argcheck(op != :eq || rhs >= pv,
+              ArgumentError("View `$(eqn)` targets $(rhs), below the prior RLVaR $(pv). `ConicRelativisticValueatRiskView` writes an equality as a lower bound, which is slack at the prior and would leave the view unmet; use `GridRelativisticValueatRiskView`."))
+    push!(tvs, ConicRelativisticValueatRiskViewConstraint(x, alpha, kappa, rhs))
+    return nothing
+end
+function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
+                            alg::GridRelativisticValueatRiskView, x::VecNum, alpha::Number,
+                            kappa::Number, op::Symbol, rhs::Number, w::VecNum,
+                            zstar::Number, pv::Number, eqn::AbstractString)
+    (; pct, K, M) = alg
+    wi = w ./ sum(w)
+    lnk = ep_kappa_log(inv(alpha * length(x)), kappa)
+    # RLVaR is translation-equivariant, and so is the shift that attains it: subtracting
+    # `delta` from every loss subtracts `delta` from both. A posterior that moves the RLVaR
+    # to the target behaves, to first order, like that translation, so the grid is anchored
+    # on the shift of the translated series rather than on the shift of the prior. Anchoring
+    # on the prior leaves an upper-bound view with no reachable grid point.
+    delta = pv - rhs
+    t = zeros(promote_type(eltype(x), typeof(zstar), typeof(delta)), K)
+    z = collect(range(zstar * (one(pct) - pct), zstar * (one(pct) + pct); length = K))
+    for (k, zk) in pairs(z)
+        t[k] = ep_rlvar_shift(x, wi, kappa, lnk, zk).t - delta
+    end
+    if op == :geq || op == :eq
+        for (tk, zk) in zip(t, z)
+            c, b = ep_rlvar_grid_row(x, rhs, tk, zk, alpha, kappa)
+            add_ep_constraint!(epc, reshape(-c, 1, :), [-b], :ineq)
+        end
+    end
+    if op == :leq || op == :eq
+        push!(tvs, GridRelativisticValueatRiskViewConstraint(x, t, z, alpha, kappa, rhs, M))
     end
     return nothing
 end
@@ -1058,6 +1576,131 @@ function ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict
     return nothing
 end
 """
+    ep_rlvar_views!(rlvar_views::Nothing, args...; kwargs...)
+
+No-op pass-through for relativistic value at risk (RLVaR) view constraints when none are specified.
+
+# Arguments
+
+  - `rlvar_views::Nothing`: Indicates that no RLVaR view constraints are specified.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ep_rlvar_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_rlvar_views!(rlvar_views::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDict,
+                    tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                    alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false)
+
+Parse relativistic value-at-risk views and lower them into entropy pooling constraints.
+
+`ep_rlvar_views!` parses RLVaR view equations from a [`LinearConstraintEstimator`](@ref), replaces prior references with their values, resolves the asset names against the universe, picks a formulation for each view, and appends the constraints that formulation needs. It accepts `==`, `>=` and `<=`. Each view names one asset, because [EPRLVaR](@cite) gives no formulation for a relative RLVaR view; a group name expands to its members, each carrying the coefficient the group carried, so only a group of one member names one asset. The view is normalised so its coefficient is one, which flips the operator when the coefficient is negative.
+
+# Arguments
+
+  - `rlvar_views`: RLVaR view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `tvs`: Tail view constraints, appended to.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `alpha`: Confidence level for RLVaR.
+  - `kappa`: Deformation parameter for RLVaR.
+  - `w`: Prior probability weights.
+  - `alg`: Formulation setting, spread over the views by [`ep_view_formulations`](@ref).
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`ep_rlvar_formulation`](@ref)
+  - [`ep_add_rlvar_view!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_views!(rlvar_views::RelativisticValueatRiskView, epc::AbstractDict,
+                         tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                         w::VecNum; strict::Bool = false)
+    return ep_rlvar_views!(rlvar_views.views, epc, tvs, pr, sets, rlvar_views.alpha,
+                           rlvar_views.kappa, w, rlvar_views.alg; strict = strict)
+end
+"""
+    ep_rlvar_views!(rlvar_views::AbstractVector{<:RelativisticValueatRiskView}, args...;
+                    kwargs...)
+
+Lower each group of relativistic value-at-risk views under its own settings.
+
+Every [`RelativisticValueatRiskView`](@ref) in the vector is lowered in turn, so the groups accumulate into the same constraint set and one entropy pooling solve answers all of them.
+
+# Arguments
+
+  - `rlvar_views`: Groups of RLVaR views.
+  - `args...`: Additional positional arguments forwarded to [`ep_rlvar_views!`](@ref).
+  - `kwargs...`: Additional keyword arguments forwarded to [`ep_rlvar_views!`](@ref).
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `tvs` in-place.
+
+# Related
+
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_rlvar_views!(rlvar_views::AbstractVector{<:RelativisticValueatRiskView},
+                         args...; kwargs...)
+    for rlvar_view in rlvar_views
+        ep_rlvar_views!(rlvar_view, args...; kwargs...)
+    end
+    return nothing
+end
+function ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDict,
+                         tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
+                         alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false)
+    X = pr.X
+    views = parse_equation(rlvar_views.val; ops1 = ("==", ">=", "<="),
+                           ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
+    views = replace_group_by_assets(views, sets, false, true, false)
+    views = replace_prior_views(views, pr, sets, :rlvar, alpha, kappa; strict = strict)
+    if !isa(views, AbstractVector)
+        views = [views]
+    end
+    algs = ep_view_formulations(alg, length(views), :alg)
+    for (res, algi) in zip(views, algs)
+        terms = ep_view_terms(res, sets, X; strict = strict)
+        if isnothing(terms)
+            continue
+        end
+        (; idx, coef, op, rhs) = terms
+        @argcheck(isone(length(idx)),
+                  ArgumentError("View `$(res.eqn)` names $(length(idx)) assets. An RLVaR view names one asset: there is no formulation for a relative RLVaR view."))
+        op, rhs = ep_normalise_view_term(coef[1], op, rhs)
+        x = -X[:, idx[1]]
+        ep_assert_reachable_view(op, rhs, x, res.eqn, "RLVaR")
+        rlv = ep_rlvar(x, w, alpha, kappa)
+        algi = ep_rlvar_formulation(algi, op, rhs, rlv.rlvar)
+        ep_add_rlvar_view!(epc, tvs, algi, x, alpha, kappa, op, rhs, w, rlv.z, rlv.rlvar,
+                           res.eqn)
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Reweights the observations of a prior so that its moments and its tails meet a set of views.
@@ -1078,6 +1721,7 @@ $(DocStringExtensions.FIELDS)
         var_views::Option{<:VV_VecVV} = nothing,
         cvar_views::Option{<:CVV_VecCVV} = nothing,
         evar_views::Option{<:EVV_VecEVV} = nothing,
+        rlvar_views::Option{<:RVV_VecRVV} = nothing,
         sigma_views::Option{<:LinearConstraintEstimator} = nothing,
         sk_views::Option{<:LinearConstraintEstimator} = nothing,
         kt_views::Option{<:LinearConstraintEstimator} = nothing,
@@ -1129,20 +1773,21 @@ The comparison operators accepted in each view's constraint strings depend on th
 
   - `mu_views`, `sigma_views`, `sk_views`, `kt_views`, `cov_views`, `rho_views` accept `==`, `>=` and `<=`.
   - `var_views` (Value at Risk) accepts only `==` and `>=`.
-  - `cvar_views` and `evar_views` accept `==`, `>=` and `<=`.
+  - `cvar_views`, `evar_views` and `rlvar_views` accept `==`, `>=` and `<=`.
 
 # Tail views
 
 A tail view needs auxiliary variables, so it is expressed in the JuMP model rather than reduced to rows that multiply the posterior probabilities. Two consequences follow.
 
-  - `opt` must be a [`JuMPEntropyPooling`](@ref) whenever `cvar_views` is set, and whenever an `evar_views` entry is anything other than a lower bound under [`GridEntropicValueatRiskView`](@ref), which is the one tail formulation that is linear in the posterior probabilities alone.
-  - A view that needs a binary variable — every [`IntegerConditionalValueatRiskView`](@ref), and an upper bound or equality under [`GridEntropicValueatRiskView`](@ref) — needs a solver that handles mixed-integer exponential cone programs.
+  - `opt` must be a [`JuMPEntropyPooling`](@ref) whenever `cvar_views` is set, and whenever an `evar_views` or `rlvar_views` entry is anything other than a lower bound under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref), which are the tail formulations that are linear in the posterior probabilities alone.
+  - A view that needs a binary variable — every [`IntegerConditionalValueatRiskView`](@ref), and an upper bound or equality under [`GridEntropicValueatRiskView`](@ref) or [`GridRelativisticValueatRiskView`](@ref) — needs a solver that handles mixed-integer exponential cone programs.
+  - [`ConicRelativisticValueatRiskView`](@ref) writes power cones, so its solver must handle the power cone alongside the exponential cone the objective needs.
 
-The `alg` field of a view group picks the formulation. A single formulation applies to every view in that group, a vector supplies one per view, and `nothing` lets each view take the cheapest formulation that expresses it exactly: [`LinearConditionalValueatRiskView`](@ref) and [`ConicEntropicValueatRiskView`](@ref) where they apply, [`IntegerConditionalValueatRiskView`](@ref) and [`GridEntropicValueatRiskView`](@ref) otherwise.
+The `alg` field of a view group picks the formulation. A single formulation applies to every view in that group, a vector supplies one per view, and `nothing` lets each view take the cheapest formulation that expresses it exactly: [`LinearConditionalValueatRiskView`](@ref), [`ConicEntropicValueatRiskView`](@ref) and [`ConicRelativisticValueatRiskView`](@ref) where they apply, [`IntegerConditionalValueatRiskView`](@ref), [`GridEntropicValueatRiskView`](@ref) and [`GridRelativisticValueatRiskView`](@ref) otherwise.
 
 # Tail views at several significance levels
 
-A significance level is part of the statistic, not a detail of the solve: the conditional value at risk at 1% and at 10% are different numbers on the same series. So the level lives on the view rather than on the estimator. `var_views`, `cvar_views` and `evar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref) or [`EntropicValueatRiskView`](@ref), or a vector of them, and each group carries the `alpha` its equations are read under. A `prior(...)` reference inside a group is replaced by the prior value at *that* group's level.
+A significance level is part of the statistic, not a detail of the solve: the conditional value at risk at 1% and at 10% are different numbers on the same series. So the level lives on the view rather than on the estimator. `var_views`, `cvar_views`, `evar_views` and `rlvar_views` each take one [`ValueatRiskView`](@ref), [`ConditionalValueatRiskView`](@ref), [`EntropicValueatRiskView`](@ref) or [`RelativisticValueatRiskView`](@ref), or a vector of them, and each group carries the `alpha` its equations are read under. A [`RelativisticValueatRiskView`](@ref) carries a `kappa` as well, on the same reasoning: the deformation parameter is part of the statistic. A `prior(...)` reference inside a group is replaced by the prior value at *that* group's level.
 
 A tail view group also carries `alg`, the formulation. For [`EntropicValueatRiskView`](@ref) that is where the grid of dual variables and the big-M constant live, so a [`GridEntropicValueatRiskView`](@ref) there gives one group its own `pct`, `K` and `M`. [`ValueatRiskView`](@ref) has no such field: a value at risk view is linear in the posterior probabilities, so there is no formulation to choose.
 
@@ -1183,6 +1828,7 @@ EntropyPoolingPrior
     var_views ┼ nothing
    cvar_views ┼ nothing
    evar_views ┼ nothing
+  rlvar_views ┼ nothing
   sigma_views ┼ nothing
      sk_views ┼ nothing
      kt_views ┼ nothing
@@ -1214,6 +1860,8 @@ EntropyPoolingPrior
   - [`IntegerConditionalValueatRiskView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
@@ -1226,6 +1874,7 @@ EntropyPoolingPrior
   - $(ref_dict[:meucci2008])
   - $(ref_dict[:vorobets2021])
   - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPRLVaR])
 """
 @propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """
@@ -1248,6 +1897,10 @@ EntropyPoolingPrior
     $(field_dict[:evar_views])
     """
     evar_views
+    """
+    $(field_dict[:rlvar_views])
+    """
+    rlvar_views
     """
     $(field_dict[:sigma_views])
     """
@@ -1289,6 +1942,7 @@ EntropyPoolingPrior
                                  var_views::Option{<:VV_VecVV},
                                  cvar_views::Option{<:CVV_VecCVV},
                                  evar_views::Option{<:EVV_VecEVV},
+                                 rlvar_views::Option{<:RVV_VecRVV},
                                  sigma_views::Option{<:LinearConstraintEstimator},
                                  sk_views::Option{<:LinearConstraintEstimator},
                                  kt_views::Option{<:LinearConstraintEstimator},
@@ -1309,6 +1963,7 @@ EntropyPoolingPrior
            !isnothing(var_views) ||
            !isnothing(cvar_views) ||
            !isnothing(evar_views) ||
+           !isnothing(rlvar_views) ||
            !isnothing(sigma_views) ||
            !isnothing(sk_views) ||
            !isnothing(kt_views) ||
@@ -1329,13 +1984,20 @@ EntropyPoolingPrior
         if isa(evar_views, AbstractVector)
             @argcheck(!isempty(evar_views), IsEmptyError("evar_views cannot be empty"))
         end
+        if isa(rlvar_views, AbstractVector)
+            @argcheck(!isempty(rlvar_views), IsEmptyError("rlvar_views cannot be empty"))
+        end
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
-                   typeof(evar_views), typeof(sigma_views), typeof(sk_views),
-                   typeof(kt_views), typeof(cov_views), typeof(rho_views), typeof(sets),
-                   typeof(opt), typeof(w), typeof(alg)}(pe, mu_views, var_views, cvar_views,
-                                                        evar_views, sigma_views, sk_views,
-                                                        kt_views, cov_views, rho_views,
-                                                        sets, opt, w, alg)
+                   typeof(evar_views), typeof(rlvar_views), typeof(sigma_views),
+                   typeof(sk_views), typeof(kt_views), typeof(cov_views), typeof(rho_views),
+                   typeof(sets), typeof(opt), typeof(w), typeof(alg)}(pe, mu_views,
+                                                                      var_views, cvar_views,
+                                                                      evar_views,
+                                                                      rlvar_views,
+                                                                      sigma_views, sk_views,
+                                                                      kt_views, cov_views,
+                                                                      rho_views, sets, opt,
+                                                                      w, alg)
     end
 end
 function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
@@ -1343,6 +2005,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              var_views::Option{<:VV_VecVV} = nothing,
                              cvar_views::Option{<:CVV_VecCVV} = nothing,
                              evar_views::Option{<:EVV_VecEVV} = nothing,
+                             rlvar_views::Option{<:RVV_VecRVV} = nothing,
                              sigma_views::Option{<:LinearConstraintEstimator} = nothing,
                              sk_views::Option{<:LinearConstraintEstimator} = nothing,
                              kt_views::Option{<:LinearConstraintEstimator} = nothing,
@@ -1352,8 +2015,9 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              opt::NonCVaREP = OptimEntropyPooling(),
                              w::Option{<:StatsBase.ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())::EntropyPoolingPrior
-    return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, sigma_views,
-                               sk_views, kt_views, cov_views, rho_views, sets, opt, w, alg)
+    return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, rlvar_views,
+                               sigma_views, sk_views, kt_views, cov_views, rho_views, sets,
+                               opt, w, alg)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -1440,7 +2104,7 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 
 The stages are:
 
- 1. Mean, value at risk, conditional value at risk and entropic value at risk views.
+ 1. Mean, value at risk, conditional value at risk, entropic value at risk and relativistic value at risk views.
  2. Variance and covariance views, with the mean of every asset they name pinned.
  3. Skewness, kurtosis and correlation views, with the mean and variance of every asset they name pinned.
 
@@ -1465,13 +2129,14 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
-    # mu, VaR, CVaR and EVaR
+    # mu, VaR, CVaR, EVaR and RLVaR
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
     ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     if !isempty(epc) || !isempty(tvs)
         w1 = entropy_pooling(w0, epc, tvs, pe.opt)
         pe = factory(pe, w1)
@@ -1567,11 +2232,12 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     tvs = Vector{AbstractEntropyPoolingTailView}(undef, 0)
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
-    # mu, VaR, CVaR and EVaR
+    # mu, VaR, CVaR, EVaR and RLVaR
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets; strict = strict)
     ep_cvar_views!(pe.cvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     ep_evar_views!(pe.evar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
+    ep_rlvar_views!(pe.rlvar_views, epc, tvs, pr, pe.sets, w0; strict = strict)
     # sigma
     if !isnothing(pe.sigma_views)
         ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)

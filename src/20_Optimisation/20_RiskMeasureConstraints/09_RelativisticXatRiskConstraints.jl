@@ -30,6 +30,11 @@ Where:
 
 encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(1-\\kappa)}``.
 
+For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with
+``\\sum_{t=1}^T w_t = 1``. The coefficient ``c_\\kappa(\\alpha)`` keeps the argument
+``\\alpha T``, and the sum ``\\sum_{t=1}^T (\\psi_t + \\theta_t)`` becomes
+``T \\sum_{t=1}^T w_t (\\psi_t + \\theta_t)``.
+
 # Arguments
 
   - $(arg_dict[:model])

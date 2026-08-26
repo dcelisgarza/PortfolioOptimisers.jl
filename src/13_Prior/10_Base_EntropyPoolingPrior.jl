@@ -530,7 +530,7 @@ function add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Sy
 end
 """
     replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::UniverseSets,
-                        key::Symbol; alpha::Option{<:Number} = nothing,
+                        key::Symbol, alpha::Option{<:Number} = nothing, params...;
                         strict::Bool = false)
 
 Replace prior references in view parsing results with their corresponding prior values.
@@ -548,6 +548,8 @@ Replace prior references in view parsing results with their corresponding prior 
   - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
 
   - `alpha`: Optional confidence level for VaR/CVaR views.
+
+  - `params...`: Further parameters of the statistic, forwarded to [`get_pr_value`](@ref). A relativistic value-at-risk view passes its deformation parameter here.
 
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
@@ -571,7 +573,8 @@ Replace prior references in view parsing results with their corresponding prior 
 """
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
                              sets::UniverseSets, key::Symbol,
-                             alpha::Option{<:Number} = nothing; strict::Bool = false)
+                             alpha::Option{<:Number} = nothing, params...;
+                             strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     nx = sets.dict[sets.xkey]
     variables, coeffs = res.vars, res.coef
@@ -591,7 +594,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
             push!(idx_rm, i)
             continue
         end
-        rhs -= get_pr_value(pr, j, Val(key), alpha) * c
+        rhs -= get_pr_value(pr, j, Val(key), alpha, params...) * c
         push!(idx_rm, i)
     end
     if isempty(idx_rm)
@@ -950,6 +953,23 @@ abstract type AbstractEntropicValueatRiskViewFormulation <:
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the formulations of a relativistic value-at-risk view.
+
+# Related
+
+  - [`AbstractEntropyPoolingViewFormulation`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+abstract type AbstractRelativisticValueatRiskViewFormulation <:
+              AbstractEntropyPoolingViewFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Linear formulation of a conditional value-at-risk view [EPTail](@cite).
 
 `LinearConditionalValueatRiskView` writes the view through the dual representation of CVaR. It adds ``T`` continuous variables and no integer variable, so it is the cheapest of the two CVaR formulations, and it is exact.
@@ -1229,6 +1249,167 @@ function GridEntropicValueatRiskView(; pct::Number = 0.5, K::Integer = 11,
     return GridEntropicValueatRiskView(pct, K, M)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite).
+
+`ConicRelativisticValueatRiskView` writes the view through the dual representation of RLVaR. It adds ``3T`` continuous variables and ``2T`` power cones, and it is exact.
+
+# Mathematical definition
+
+Let ``\\boldsymbol{x}`` be the loss series of the asset the view names, ``\\boldsymbol{w}`` the posterior probabilities, ``\\alpha`` the significance level, ``\\kappa`` the deformation parameter and ``\\bar{\\vartheta}`` the target. Write ``\\ln_{\\kappa}(u) = \\frac{u^{\\kappa} - u^{-\\kappa}}{2\\kappa}`` for the Kaniadakis logarithm. The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` is written as:
+
+```math
+\\begin{align}
+&0 \\leq \\nu_{j} \\leq 1\\,, &\\forall\\, j = 1,\\ldots,T\\\\
+&\\sum_{j=1}^{T} \\nu_{j} = 1\\\\
+&\\sum_{j=1}^{T} \\dfrac{\\tau_{j} - \\varsigma_{j}}{2\\kappa} \\leq \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right)\\\\
+&\\left(\\tau_{j},\\, T w_{j},\\, \\nu_{j}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\left(\\dfrac{1}{1+\\kappa}\\right)\\,, &\\forall\\, j = 1,\\ldots,T\\\\
+&\\left(\\nu_{j},\\, T w_{j},\\, \\varsigma_{j}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)\\,, &\\forall\\, j = 1,\\ldots,T\\\\
+&\\sum_{j=1}^{T} \\nu_{j} x_{j} \\geq \\bar{\\vartheta}\\,.
+\\end{align}
+```
+
+Where ``\\boldsymbol{\\nu}`` is the vector of weights that attains the RLVaR, ``\\boldsymbol{\\tau}`` and ``\\boldsymbol{\\varsigma}`` carry its Kaniadakis entropy budget, and ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}`` is the power cone. The budget is the dual description of RLVaR, so the constraint set is feasible if and only if ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}``.
+
+# Scope
+
+  - Operators: `>=` and `==`.
+  - One asset per view, with a positive coefficient.
+  - An equality view needs a target greater than or equal to the prior RLVaR of the asset. Use [`GridRelativisticValueatRiskView`](@ref) below it.
+  - The solver must handle the power cone alongside the exponential cone the entropy pooling objective needs.
+  - The programme is a demanding solve. A long sample, a small `alpha`, a small `kappa` or several of these views in one model can make a conic solver stop short of a solution. Give `opt` a vector of solver configurations, shorten the sample, or state the view under [`GridRelativisticValueatRiskView`](@ref), whose rows are linear in the posterior probabilities.
+
+# Examples
+
+```jldoctest
+julia> ConicRelativisticValueatRiskView()
+ConicRelativisticValueatRiskView()
+```
+
+# Related
+
+  - [`AbstractRelativisticValueatRiskViewFormulation`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`ConicEntropicValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+struct ConicRelativisticValueatRiskView <: AbstractRelativisticValueatRiskViewFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Grid formulation of a relativistic value-at-risk view.
+
+`GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, built around the point that attains the target on the translated prior. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Mathematical definition
+
+The sample RLVaR is the value of a two-variable minimisation, in which the pair of power cones of each observation is already minimised out:
+
+```math
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) = \\min_{t,\\, z > 0} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,,
+```
+
+Where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two power cones of one observation allow, and has the closed form:
+
+```math
+\\begin{align}
+\\varphi_{\\kappa}(u, z) &= \\dfrac{\\kappa}{1+\\kappa} \\left(\\dfrac{2\\kappa}{(1+\\kappa) z}\\right)^{\\frac{1}{\\kappa}} \\left(\\dfrac{\\sigma - u}{2}\\right)^{\\frac{1+\\kappa}{\\kappa}} + \\kappa (1-\\kappa)^{\\frac{1-\\kappa}{\\kappa}} \\left(\\dfrac{z}{2\\kappa}\\right)^{\\frac{1}{\\kappa}} \\left(\\dfrac{\\sigma + u}{2}\\right)^{-\\frac{1-\\kappa}{\\kappa}}\\,,\\\\
+\\sigma &= \\sqrt{u^{2} + \\dfrac{(1 - \\kappa^{2}) z^{2}}{\\kappa^{2}}}\\,.
+\\end{align}
+```
+
+The objective is linear in ``\\boldsymbol{w}`` once ``t`` and ``z`` are fixed, which is what makes a grid point a row. On a grid ``(\\bar{t}_{1}, \\bar{z}_{1}),\\ldots,(\\bar{t}_{K}, \\bar{z}_{K})`` that gives, for a lower-bound view:
+
+```math
+T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\geq \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right)\\,, \\quad \\forall\\, k = 1,\\ldots,K
+```
+
+and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`` a big constant:
+
+```math
+\\begin{align}
+&\\boldsymbol{1}^{\\intercal} \\boldsymbol{y} = 1\\\\
+&T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\leq \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + M(1 - y_{k})\\,, &\\forall\\, k = 1,\\ldots,K\\\\
+&\\boldsymbol{y} \\in \\{0,1\\}^{K}\\,.
+\\end{align}
+```
+
+An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so widen `pct` or raise `K` when the posterior value misses the target, and prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it. Rows are scaled by their largest coefficient before they reach the model, so the default `M` is far above the largest attainable violation.
+
+The grid spans `zstar * (1 - pct)` to `zstar * (1 + pct)`, where `zstar` attains the prior RLVaR of the asset, and `K` is odd so `zstar` sits in the middle. RLVaR and the shift that attains it are both translation-equivariant, so a posterior that moves the RLVaR to the target behaves, to first order, like translating every loss by the same amount. Each `t_k` is therefore the shift that minimises the objective at `z_k` under the prior probabilities, less the distance from the prior RLVaR to the target. A grid anchored on the prior instead leaves an upper-bound view with no reachable point.
+
+# Constructors
+
+    GridRelativisticValueatRiskView(;
+        pct::Number = 0.5,
+        K::Integer = 11,
+        M::Number = 10
+    ) -> GridRelativisticValueatRiskView
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 < pct < 1`.
+  - `K >= 1` and `isodd(K)`.
+  - `M > 0`.
+
+# Examples
+
+```jldoctest
+julia> GridRelativisticValueatRiskView()
+GridRelativisticValueatRiskView
+  pct ┼ Float64: 0.5
+    K ┼ Int64: 11
+    M ┴ Int64: 10
+```
+
+# Related
+
+  - [`AbstractRelativisticValueatRiskViewFormulation`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+  - [`GridEntropicValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+@concrete struct GridRelativisticValueatRiskView <:
+                 AbstractRelativisticValueatRiskViewFormulation
+    """
+    $(field_dict[:rlvar_zpct])
+    """
+    pct
+    """
+    $(field_dict[:rlvar_zK])
+    """
+    K
+    """
+    $(field_dict[:rlvar_bigM])
+    """
+    M
+    function GridRelativisticValueatRiskView(pct::Number, K::Integer, M::Number)
+        assert_unit_interval(pct, :pct)
+        @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
+        @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
+        return new{typeof(pct), typeof(K), typeof(M)}(pct, K, M)
+    end
+end
+function GridRelativisticValueatRiskView(; pct::Number = 0.5, K::Integer = 11,
+                                         M::Number = 10)::GridRelativisticValueatRiskView
+    return GridRelativisticValueatRiskView(pct, K, M)
+end
+"""
     const CVaRVF_VecCVaRVF = Union{<:AbstractConditionalValueatRiskViewFormulation,
                                    <:AbstractVector{<:AbstractConditionalValueatRiskViewFormulation}}
 
@@ -1252,6 +1433,18 @@ Alias for a union of a single entropic value-at-risk view formulation or a vecto
 """
 const EVaRVF_VecEVaRVF = Union{<:AbstractEntropicValueatRiskViewFormulation,
                                <:AbstractVector{<:AbstractEntropicValueatRiskViewFormulation}}
+"""
+    const RLVaRVF_VecRLVaRVF = Union{<:AbstractRelativisticValueatRiskViewFormulation,
+                                     <:AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
+
+Alias for a union of a single relativistic value-at-risk view formulation or a vector of them.
+
+# Related
+
+  - [`AbstractRelativisticValueatRiskViewFormulation`](@ref)
+"""
+const RLVaRVF_VecRLVaRVF = Union{<:AbstractRelativisticValueatRiskViewFormulation,
+                                 <:AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1437,6 +1630,91 @@ function EntropicValueatRiskView(; views::LinearConstraintEstimator, alpha::Numb
     return EntropicValueatRiskView(views, alpha, alg)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+A group of relativistic value-at-risk views, with the significance level, the deformation parameter and the formulation they are read under.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RelativisticValueatRiskView(;
+        views::LinearConstraintEstimator,
+        alpha::Number = 0.05,
+        kappa::Number = 0.3,
+        alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing
+    ) -> RelativisticValueatRiskView
+
+Keywords correspond to the struct's fields. `alg` left `nothing` lets each view in the group take the cheapest formulation that expresses it exactly, and is where the grid of primal points and the big-M constant live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`. A `prior(...)` reference inside `views` is replaced by the prior RLVaR at this group's `alpha` and `kappa`, so a view stated against the prior moves with both.
+
+## Validation
+
+  - `0 < alpha < 1`.
+  - `0 < kappa < 1`.
+  - If `alg` is a vector, `!isempty(alg)`.
+
+# Examples
+
+```jldoctest
+julia> RelativisticValueatRiskView(; alpha = 0.01, kappa = 0.5,
+                                   views = LinearConstraintEstimator(; val = \"A >= 0.09\"))
+RelativisticValueatRiskView
+  views ┼ LinearConstraintEstimator
+        │   val ┼ String: "A >= 0.09"
+        │   key ┴ nothing
+  alpha ┼ Float64: 0.01
+  kappa ┼ Float64: 0.5
+    alg ┴ nothing
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingTailViewEstimator`](@ref)
+  - [`EntropicValueatRiskView`](@ref)
+  - [`AbstractRelativisticValueatRiskViewFormulation`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+@concrete struct RelativisticValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
+    """
+    $(field_dict[:ep_tv_views])
+    """
+    views
+    """
+    $(field_dict[:ep_tv_alpha])
+    """
+    alpha
+    """
+    $(field_dict[:ep_tv_kappa])
+    """
+    kappa
+    """
+    $(field_dict[:ep_tv_alg])
+    """
+    alg
+    function RelativisticValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
+                                         kappa::Number, alg::Option{<:RLVaRVF_VecRLVaRVF})
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(kappa, :kappa)
+        if isa(alg, AbstractVector)
+            @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
+        end
+        return new{typeof(views), typeof(alpha), typeof(kappa), typeof(alg)}(views, alpha,
+                                                                             kappa, alg)
+    end
+end
+function RelativisticValueatRiskView(; views::LinearConstraintEstimator,
+                                     alpha::Number = 0.05, kappa::Number = 0.3,
+                                     alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing)::RelativisticValueatRiskView
+    return RelativisticValueatRiskView(views, alpha, kappa, alg)
+end
+"""
     const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
                              <:AbstractVector{<:ConditionalValueatRiskView}}
 
@@ -1462,6 +1740,19 @@ Alias for the shapes an `evar_views` field accepts: one [`EntropicValueatRiskVie
 """
 const EVV_VecEVV = Union{<:EntropicValueatRiskView,
                          <:AbstractVector{<:EntropicValueatRiskView}}
+"""
+    const RVV_VecRVV = Union{<:RelativisticValueatRiskView,
+                             <:AbstractVector{<:RelativisticValueatRiskView}}
+
+Alias for the shapes an `rlvar_views` field accepts: one [`RelativisticValueatRiskView`](@ref), or a vector of them read under their own significance levels, deformation parameters and formulations.
+
+# Related
+
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+const RVV_VecRVV = Union{<:RelativisticValueatRiskView,
+                         <:AbstractVector{<:RelativisticValueatRiskView}}
 """
     ep_var_views!(var_views::Nothing, args...; kwargs...)
 
@@ -2680,4 +2971,5 @@ export RhoParsingResult, LogEntropyPooling, ExpEntropyPooling, H0_EntropyPooling
        ConditionalValueatRiskEntropyPooling, ValueatRiskView, ConditionalValueatRiskView,
        EntropicValueatRiskView, LinearConditionalValueatRiskView,
        IntegerConditionalValueatRiskView, ConicEntropicValueatRiskView,
-       GridEntropicValueatRiskView
+       GridEntropicValueatRiskView, RelativisticValueatRiskView,
+       ConicRelativisticValueatRiskView, GridRelativisticValueatRiskView

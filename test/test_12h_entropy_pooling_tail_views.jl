@@ -26,6 +26,10 @@ ep_gcvar(wi, js) = sum(ep_cvar(j, wi) for j in js)
 # own.
 ep_cvar_at(j, wi, a) = ConditionalValueatRisk(; alpha = a, w = wi)(rd.X[:, j])
 ep_evar_at(j, wi, a) = PO.ep_evar(-rd.X[:, j], wi, a).evar
+const ep_k = 0.3
+ep_rlvar_of(j, wi) = PO.ep_rlvar(-rd.X[:, j], wi, ep_a, ep_k).rlvar
+ep_rlvar_at(j, wi, a, k) = PO.ep_rlvar(-rd.X[:, j], wi, a, k).rlvar
+const ep_prlvar = ep_rlvar_of(1, ep_w0)
 # Resolve one view equation the way `ep_cvar_views!` does, without solving anything.
 function ep_terms(eqn, key, sets = ep_gsets)
     res = PO.parse_equation(eqn; ops1 = ("==", ">=", "<="),
@@ -114,6 +118,169 @@ end
                                                                                                            val = "AAPL == 1.2*prior(AAPL)"))),
                 rd)
     @test isapprox(ep_evar_of(1, pr3.w), tgt, rtol = 1e-4)
+end
+
+@testset "ep_rlvar matches the RLVaR risk measure" begin
+    # `ep_rlvar` minimises the primal objective of the sample RLVaR with the two power
+    # cones of each observation already minimised out in closed form, so it has to agree
+    # with the conic risk measure a solver answers.
+    for j in (1, 5, 20)
+        @test isapprox(PO.ep_rlvar(-rd.X[:, j], ep_w0, ep_a, ep_k).rlvar,
+                       RelativisticValueatRisk(; slv = slv, alpha = ep_a, kappa = ep_k)(rd.X[:,
+                                                                                             j]),
+                       rtol = 1e-5)
+    end
+    # Several deformation parameters and significance levels.
+    for a in (0.01, 0.05, 0.1), k in (0.1, 0.3, 0.6)
+        @test isapprox(PO.ep_rlvar(-rd.X[:, 1], ep_w0, a, k).rlvar,
+                       RelativisticValueatRisk(; slv = slv, alpha = a, kappa = k)(rd.X[:,
+                                                                                       1]),
+                       rtol = 1e-5)
+    end
+    # The primal pair it returns is the one that attains the value.
+    res = PO.ep_rlvar(-rd.X[:, 1], ep_w0, ep_a, ep_k)
+    lnk = PO.ep_kappa_log(inv(ep_a * T), ep_k)
+    g = (t, z) -> t +
+                  z * lnk +
+                  T * sum(ep_w0[j] * PO.ep_rlvar_tail(t + rd.X[j, 1], z, ep_k) for j in 1:T)
+    @test isapprox(g(res.t, res.z), res.rlvar, rtol = 1e-8)
+    @test g(res.t, res.z) <= g(res.t * 1.01, res.z)
+    @test g(res.t, res.z) <= g(res.t * 0.99, res.z)
+    @test g(res.t, res.z) <= g(res.t, res.z * 1.05)
+    @test g(res.t, res.z) <= g(res.t, res.z * 0.95)
+    # Non-uniform prior weights. The Kaniadakis logarithm has no multiplication-to-addition
+    # property, so the weights cannot be folded into the normalisation the way they are for
+    # EVaR: they are normalised to sum to one and enter as `T * w`.
+    wv = StatsBase.pweights(LinearAlgebra.normalize(range(0.5, 1.5; length = T), 1))
+    @test isapprox(PO.ep_rlvar(-rd.X[:, 1], wv, ep_a, ep_k).rlvar,
+                   RelativisticValueatRisk(; slv = slv, alpha = ep_a, kappa = ep_k, w = wv)(rd.X[:,
+                                                                                                 1]),
+                   rtol = 1e-5)
+    # Uniform weights passed explicitly reproduce the unweighted answer.
+    @test isapprox(PO.ep_rlvar(-rd.X[:, 1], ep_w0, ep_a, ep_k).rlvar,
+                   RelativisticValueatRisk(; slv = slv, alpha = ep_a, kappa = ep_k,
+                                           w = ep_w0)(rd.X[:, 1]), rtol = 1e-5)
+end
+
+@testset "RLVaR views, conic formulation" begin
+    # RLVaR sits close to the worst realisation of the sample, so the headroom a lower
+    # bound has is small. A modest multiple keeps the view reachable.
+    tgt = ep_prlvar * 1.05
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                   rlvar_views = RelativisticValueatRiskView(;
+                                                                             views = LinearConstraintEstimator(;
+                                                                                                               val = "AAPL >= $tgt"))),
+               rd)
+    # The power cones this formulation writes are harder than the exponential cones of
+    # the EVaR view, so the solver lands a little above the target rather than on it. The
+    # direction is the safe one: the view holds.
+    @test ep_rlvar_of(1, pr.w) >= tgt * (1 - 1e-8)
+    @test isapprox(ep_rlvar_of(1, pr.w), tgt, rtol = 2e-3)
+    @test isapprox(sum(pr.w), 1)
+    @test all(>=(-eps()), pr.w)
+    @test pr.kld > 0
+
+    # An equality above the prior is the same problem.
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL == $tgt"))),
+                rd)
+    @test isapprox(pr.w, pr2.w, rtol = 1e-6)
+
+    # A `prior(...)` reference resolves to the prior RLVaR of the asset, read at this
+    # group's `alpha` *and* `kappa`.
+    pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL == 1.05*prior(AAPL)"))),
+                rd)
+    @test isapprox(ep_rlvar_of(1, pr3.w), tgt, rtol = 2e-3)
+
+    # A negative coefficient flips the operator rather than the answer.
+    pr4 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "-AAPL <= $(-tgt)"))),
+                rd)
+    @test isapprox(pr.w, pr4.w, rtol = 1e-6)
+
+    # A group of one member resolves to that member, so it takes the single-asset path.
+    pr5 = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_jopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "gS >= 1.04*prior(gS)"))),
+                rd)
+    @test isapprox(ep_rlvar_of(5, pr5.w), 1.04 * ep_rlvar_of(5, ep_w0), rtol = 2e-3)
+end
+
+@testset "RLVaR view guards and constructors" begin
+    v = LinearConstraintEstimator(; val = "AAPL >= $(ep_prlvar * 1.05)")
+    @test RelativisticValueatRiskView(; views = v).alpha == 0.05
+    @test RelativisticValueatRiskView(; views = v).kappa == 0.3
+    @test RelativisticValueatRiskView(; views = v).alg === nothing
+    @test RelativisticValueatRiskView(; views = v, alpha = 0.01, kappa = 0.7).kappa == 0.7
+    @test RelativisticValueatRiskView(; views = v,
+                                      alg = GridRelativisticValueatRiskView(; pct = 0.8,
+                                                                            K = 21)).alg.K ==
+          21
+    @test_throws DomainError RelativisticValueatRiskView(; views = v, alpha = 1.5)
+    @test_throws DomainError RelativisticValueatRiskView(; views = v, kappa = 0.0)
+    @test_throws DomainError RelativisticValueatRiskView(; views = v, kappa = 1.0)
+    @test_throws DomainError GridRelativisticValueatRiskView(; K = 10)
+    @test_throws DomainError GridRelativisticValueatRiskView(; pct = 1.0)
+    @test_throws DomainError GridRelativisticValueatRiskView(; M = 0)
+    @test_throws PortfolioOptimisers.IsEmptyError RelativisticValueatRiskView(; views = v,
+                                                                              alg = ConicRelativisticValueatRiskView[])
+    @test_throws UndefKeywordError RelativisticValueatRiskView(; alpha = 0.05)
+    @test_throws PortfolioOptimisers.IsEmptyError EntropyPoolingPrior(; sets = sets,
+                                                                      opt = ep_jopt,
+                                                                      rlvar_views = RelativisticValueatRiskView[])
+    @test_throws PortfolioOptimisers.IsNothingError EntropyPoolingPrior(; opt = ep_jopt,
+                                                                        rlvar_views = RelativisticValueatRiskView(;
+                                                                                                                  views = v))
+
+    # `nothing` takes the exact conic formulation where it applies, and the grid elsewhere.
+    @test PO.ep_rlvar_formulation(nothing, :geq, 0.1, 0.05) ===
+          ConicRelativisticValueatRiskView()
+    @test isa(PO.ep_rlvar_formulation(nothing, :leq, 0.1, 0.05),
+              GridRelativisticValueatRiskView)
+    @test isa(PO.ep_rlvar_formulation(nothing, :eq, 0.01, 0.05),
+              GridRelativisticValueatRiskView)
+    @test PO.ep_rlvar_formulation(ConicRelativisticValueatRiskView(), :leq, 0.0, 0.0) ===
+          ConicRelativisticValueatRiskView()
+
+    # The conic formulation bounds the RLVaR from below only.
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                                         rlvar_views = RelativisticValueatRiskView(;
+                                                                                                   alg = ConicRelativisticValueatRiskView(),
+                                                                                                   views = LinearConstraintEstimator(;
+                                                                                                                                     val = "AAPL <= $(ep_prlvar * 0.9)"))),
+                                     rd)
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                                         rlvar_views = RelativisticValueatRiskView(;
+                                                                                                   alg = ConicRelativisticValueatRiskView(),
+                                                                                                   views = LinearConstraintEstimator(;
+                                                                                                                                     val = "AAPL == $(ep_prlvar * 0.9)"))),
+                                     rd)
+    # There is no formulation for a relative RLVaR view.
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                                         rlvar_views = RelativisticValueatRiskView(;
+                                                                                                   views = LinearConstraintEstimator(;
+                                                                                                                                     val = "AAPL - XOM >= 0.01"))),
+                                     rd)
+    # A view no reweighting of the sample can reach.
+    @test_throws DomainError prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                                       rlvar_views = RelativisticValueatRiskView(;
+                                                                                                 views = LinearConstraintEstimator(;
+                                                                                                                                   val = "AAPL >= $(maximum(-rd.X[:, 1]) * 1.01)"))),
+                                   rd)
+    # A tail view needs auxiliary variables, which the dual formulation has no room for.
+    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = sets,
+                                                         opt = OptimEntropyPooling(),
+                                                         rlvar_views = RelativisticValueatRiskView(;
+                                                                                                   views = v)),
+                                     rd)
 end
 
 @testset "prior references in tail views" begin
@@ -536,6 +703,53 @@ ep_sevar(j, wi) = PO.ep_evar(-ep_sX[:, j], wi, ep_a).evar
 const ep_spcvar = ep_scvar(1, ep_sw0)
 const ep_spcvarN = ep_scvar(size(ep_sX, 2), ep_sw0)
 const ep_spevar = ep_sevar(1, ep_sw0)
+ep_srlvar(j, wi) = PO.ep_rlvar(-ep_sX[:, j], wi, ep_a, ep_k).rlvar
+const ep_sprlvar = ep_srlvar(1, ep_sw0)
+ep_srlvar_at(j, wi, a, k) = PO.ep_rlvar(-ep_sX[:, j], wi, a, k).rlvar
+
+@testset "RLVaR view groups carry their own level and deformation" begin
+    # The deformation parameter is part of the statistic, exactly as the significance
+    # level is, so it lives on the view group. One estimator holds groups at several
+    # pairs, and one solve answers them all. Two power cone blocks in one model is a
+    # demanding solve, so this runs on the short window.
+    sopt = JuMPEntropyPooling(; slv = slv)
+    r1 = ep_srlvar_at(1, ep_sw0, 0.05, 0.1)
+    r2 = ep_srlvar_at(20, ep_sw0, 0.20, 0.5)
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = sopt,
+                                   rlvar_views = [RelativisticValueatRiskView(;
+                                                                              alpha = 0.05,
+                                                                              kappa = 0.1,
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL >= $(r1 * 1.04)")),
+                                                  RelativisticValueatRiskView(;
+                                                                              alpha = 0.20,
+                                                                              kappa = 0.5,
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "XOM >= $(r2 * 1.04)"))]),
+               ep_srd)
+    @test isapprox(ep_srlvar_at(1, pr.w, 0.05, 0.1), r1 * 1.04, rtol = 2e-3)
+    @test isapprox(ep_srlvar_at(20, pr.w, 0.20, 0.5), r2 * 1.04, rtol = 2e-3)
+
+    # A `prior(...)` reference read at the wrong deformation could not pass this: the two
+    # values are far apart.
+    @test !isapprox(r1, ep_srlvar_at(1, ep_sw0, 0.05, 0.5), rtol = 1e-2)
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = sopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              alpha = 0.05,
+                                                                              kappa = 0.1,
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL >= 1.04*prior(AAPL)"))),
+                ep_srd)
+    @test isapprox(ep_srlvar_at(1, pr2.w, 0.05, 0.1), r1 * 1.04, rtol = 2e-3)
+
+    # A group that states neither takes the 0.05 and 0.3 defaults.
+    pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = sopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL >= $(ep_sprlvar * 1.04)"))),
+                ep_srd)
+    @test isapprox(ep_srlvar_at(1, pr3.w, 0.05, 0.3), ep_sprlvar * 1.04, rtol = 2e-3)
+end
 
 @testset "integer CVaR agrees with the linear formulation on a lower bound" begin
     # The two formulations describe the same set, so they must land on the same
@@ -652,4 +866,56 @@ end
                ep_srd)
     @test isapprox(ep_scvar(1, pr.w) + ep_scvar(2, pr.w) - ep_scvar(3, pr.w), tgt,
                    rtol = 5e-3)
+end
+
+@testset "grid RLVaR expresses the operators the conic formulation cannot" begin
+    # The grid fixes the primal pair, which is what turns the objective into a row that is
+    # linear in the posterior probabilities. Every grid point is a feasible point of the
+    # primal programme, so the upper bound it writes is conservative, never violated.
+    tgt = ep_sprlvar * 0.85
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                   rlvar_views = RelativisticValueatRiskView(;
+                                                                             views = LinearConstraintEstimator(;
+                                                                                                               val = "AAPL <= $tgt"))),
+               ep_srd)
+    @test ep_srlvar(1, pr.w) <= tgt * (1 + 1e-6)
+    @test isapprox(ep_srlvar(1, pr.w), tgt, rtol = 1e-2)
+
+    # An equality below the prior writes both blocks: the lower-bound rows and the
+    # upper-bound selector.
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL == $tgt"))),
+                ep_srd)
+    @test isapprox(ep_srlvar(1, pr2.w), tgt, rtol = 1e-2)
+
+    # A grid of its own on the group.
+    pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    rlvar_views = RelativisticValueatRiskView(;
+                                                                              alg = GridRelativisticValueatRiskView(;
+                                                                                                                    pct = 0.8,
+                                                                                                                    K = 21),
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL <= $tgt"))),
+                ep_srd)
+    @test ep_srlvar(1, pr3.w) <= tgt * (1 + 1e-6)
+end
+
+@testset "RLVaR lower bound, grid formulation, reaches the dual formulation" begin
+    # The lower-bound half of the grid formulation is linear in the posterior
+    # probabilities alone, so it is one of the two tail views the dual formulation carries.
+    tgt = ep_sprlvar * 1.03
+    v = LinearConstraintEstimator(; val = "AAPL >= $tgt")
+    w = nothing
+    for opt in (OptimEntropyPooling(), JuMPEntropyPooling(; slv = slv))
+        pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
+                                       rlvar_views = RelativisticValueatRiskView(;
+                                                                                 alg = GridRelativisticValueatRiskView(),
+                                                                                 views = v)),
+                   ep_srd)
+        # The grid enforces the bound at its points alone, so the answer is approximate.
+        @test isapprox(ep_srlvar(1, pr.w), tgt, rtol = 5e-3)
+        w = isnothing(w) ? pr.w : (@test isapprox(w, pr.w, rtol = 1e-4); w)
+    end
 end
