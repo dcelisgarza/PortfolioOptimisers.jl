@@ -72,8 +72,8 @@ picking a side — a contradiction between standards files is itself a defect.
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
 | Running Julia or the test suite | [`CLAUDE.md`](CLAUDE.md) § Running Julia | none — unenforced |
 | Running doctests | the `run-doctests` skill | `.github/workflows/Docs.yml` (`doctest` job) |
-| The line coverage of a file in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) | `.github/workflows/ReusableTest.yml` (`coverage` job) |
-| A Coverage Exemption | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md), `code_health/rulings.toml` | `.github/workflows/ReusableTest.yml` (`coverage` job) for the count it stands for; `test/test_49_coverage_attribution_census.jl` for the definition it names |
+| The line coverage of a file in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) | `.github/workflows/Coverage.yml` |
+| A Coverage Exemption | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md), `code_health/rulings.toml` | `.github/workflows/Coverage.yml` for the count it stands for; `test/test_49_coverage_attribution_census.jl` for the definition it names |
 
 ## The standards files
 
@@ -118,7 +118,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |
 | `.github/workflows/Paper.yml` | the paper's listing still runs against this checkout, and `docs/paper/main-jlyfish.json` is current | the workflow |
-| `.github/workflows/ReusableTest.yml` (`coverage`) | a file's miss count has not risen above `code_health/coverage_baseline.toml`, an added file enters with every line covered or exempted, and every Coverage Exemption states the exact count it stands for | `julia --project=code_health code_health/coverage.jl check`, with `COVERAGE_LCOV` pointing at an `lcov.info` |
+| `.github/workflows/Coverage.yml` | a file's miss count has not risen above `code_health/coverage_baseline.toml`, an added file enters with every line covered or exempted, and every Coverage Exemption states the exact count it stands for | `julia --project=code_health code_health/coverage.jl check`, with `COVERAGE_LCOV` pointing at an `lcov.info` |
 | `.github/workflows/Sweep.yml` | a file whose sweep-manifest row reads `swept = false` under a CLOSED child map of #404 reopens that map, reopens #404, and gets one `sweep` sub-issue | `julia --project=code_health code_health/sweep_triage.jl --maps <tsv>` for the plan; the workflow opens it |
 | `.github/workflows/Aqua.yml` | package-quality checks over the dependency graph | the workflow |
 | `.github/workflows/LinkChecker.yml` | links in the built documentation resolve | the workflow |

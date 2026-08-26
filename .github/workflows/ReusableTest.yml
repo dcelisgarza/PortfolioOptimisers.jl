@@ -55,9 +55,11 @@ jobs:
         with:
           file: lcov.info
           token: ${{ secrets.codecov_token }}
-      # The coverage ratchet runs in the job below, under the Julia the code-health gate pins,
+      # The coverage ratchet runs in `Coverage.yml`, under the Julia the code-health gate pins,
       # which is not the Julia this job floats on. Handing the file over as an artifact keeps both
       # pins intact: this job stays a build-and-test job, and the gate stays on ADR 0077's version.
+      # It also keeps the two verdicts apart, so a ratchet that trips leaves this workflow green.
+      # `Coverage.yml` reads this artifact by name, so a rename there is a rename here.
       - name: Publish lcov.info for the ratchet
         if: ${{ inputs.run_codecov }}
         uses: actions/upload-artifact@v4
@@ -65,47 +67,3 @@ jobs:
           name: lcov
           path: lcov.info
           if-no-files-found: error
-
-  # The line-coverage half of the code-health gate. ADR 0082.
-  #
-  # It is a job of this workflow rather than of each caller, so `Test.yml` and `TestOnPRs.yml` get
-  # it from one place. `needs: test` means a failing suite skips it: coverage taken from a run that
-  # did not finish is partial, and a ratchet fed partial data reports a fall that is not one.
-  coverage:
-    name: Coverage ratchet
-    if: ${{ inputs.run_codecov }}
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      # Checkout comes BEFORE setup-julia, because the Julia version is read out of the checkout.
-      # ADR 0077.
-      - uses: actions/checkout@v7
-      - name: Read the Julia pin from the Manifest
-        id: pin
-        run: |
-          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "The code-health gate is pinned to Julia $v."
-      - uses: julia-actions/setup-julia@latest
-        with:
-          version: ${{ steps.pin.outputs.version }}
-      - name: Instantiate the gate's environment
-        run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
-      - uses: actions/download-artifact@v4
-        with:
-          name: lcov
-          path: coverage_download
-      - name: Coverage ratchet
-        env:
-          COVERAGE_LCOV: coverage_download/lcov.info
-        run: julia --project=code_health code_health/coverage.jl check
-      # A run that trips publishes the Refresh Artifact: the baseline as `refresh --accept-rise`
-      # would write it. A contributor drops it in place and commits it with no Julia at all.
-      # ADR 0075.
-      - name: Publish the Refresh Artifact
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-refresh
-          path: code_health/_refresh/*.toml
-          if-no-files-found: ignore

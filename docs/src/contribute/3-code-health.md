@@ -92,9 +92,10 @@ The complexity check takes about 15 seconds and the Expansion Bound about 30 sec
 either as often as you like. **The JET check takes about 6 minutes 30 seconds and peaks at 2.6 GiB.**
 
 The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
-In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job
-wrote. Locally, run the suite with coverage on and process it, or download the `lcov` artifact from
-any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+In CI `.github/workflows/Coverage.yml` runs after a green `Test` or `Test on PRs` run and downloads
+the one that run's test job wrote, so a ratchet that trips reds the `Coverage` check and leaves the
+test check green. Locally, run the suite with coverage on and process it, or download the `lcov`
+artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
 
 `coverage.jl` takes one more verb than the other three. `terminal` answers #404's closing question
 for a child map's own files, and names the definitions that still hold an uncovered line.

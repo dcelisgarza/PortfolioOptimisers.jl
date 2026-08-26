@@ -1,0 +1,95 @@
+name: Coverage
+
+# The line-coverage half of the code-health gate. ADR 0082.
+#
+# It is its own workflow rather than a job of `ReusableTest.yml`, so a ratchet that trips reds THIS
+# check alone and leaves `Test` and `Test on PRs` green. The suite's verdict and the coverage
+# verdict are two claims about two things, and a reader of the Test check must see only the first.
+#
+# The gate needs two things this workflow cannot make: an `lcov.info`, and the tree that produced
+# it. `workflow_run` gives both. The test run publishes `lcov.info` as the `lcov` artifact, and
+# `github.event.workflow_run` names the run to download it from and the commit to check out.
+#
+# GitHub fires `workflow_run` only for a workflow file that is on the DEFAULT branch, so this gate
+# is silent until this file reaches `main`. `CodeHealth.yml` carries the same constraint for its
+# schedule. It is GitHub's rule and not a choice here.
+
+on:
+  workflow_run:
+    workflows: ["Test", "Test on PRs"]
+    types: [completed]
+
+# `actions: read` is the one scope this gate holds above `Complexity.yml`'s, and it is what
+# `actions/download-artifact` needs to reach an artifact of ANOTHER run.
+#
+# A `workflow_run` job runs in the base repository under the base repository's token, and the step
+# below runs the checked-out tree's own `code_health/coverage.jl`, which on a fork pull request is
+# code the fork wrote. The token is read-only and the job reads no secret, so that code can reach
+# what this public repository already publishes and can write nothing back. Add no scope here, and
+# add no secret here.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # One ratchet per branch, and nothing is cancelled. This inverts `Complexity.yml`'s idiom on
+  # purpose: a `workflow_run` job is the tail of a suite that already finished, so a superseded run
+  # costs one short job and blocks nothing.
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  coverage:
+    name: Coverage ratchet
+    # A suite that failed or was cancelled publishes partial coverage or none, and a ratchet fed
+    # partial data reports a fall that is not one. This is what `needs: test` did before the split.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout comes BEFORE setup-julia, because the Julia version is read out of the checkout.
+      # ADR 0077.
+      #
+      # A `workflow_run` job checks out the default branch unless it is told otherwise, so both the
+      # repository and the ref are named. `head_repository` is this repository for a push and for a
+      # branch pull request, and it is the fork for a fork pull request.
+      #
+      # `coverage.jl` reads the file set with `git ls-files`, so the gate needs a git checkout and
+      # an unpacked artifact would not serve.
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Read the Julia pin from the Manifest
+        id: pin
+        run: |
+          v=$(grep '^julia_version' code_health/Manifest.toml | cut -d'"' -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The code-health gate is pinned to Julia $v."
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ steps.pin.outputs.version }}
+      - name: Instantiate the gate's environment
+        run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
+      # `run-id` and `github-token` are what make this a CROSS-run download. Without them the
+      # action looks inside this workflow's own run, which holds no artifact at all.
+      - uses: actions/download-artifact@v4
+        with:
+          name: lcov
+          path: coverage_download
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Coverage ratchet
+        env:
+          COVERAGE_LCOV: coverage_download/lcov.info
+        run: julia --project=code_health code_health/coverage.jl check
+      # A run that trips publishes the Refresh Artifact: the baseline as `refresh --accept-rise`
+      # would write it. A contributor drops it in place and commits it with no Julia at all.
+      # ADR 0075.
+      - name: Publish the Refresh Artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-refresh
+          path: code_health/_refresh/*.toml
+          if-no-files-found: ignore
