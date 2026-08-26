@@ -1995,8 +1995,8 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
  4. Build the indicator of each variable name of the result over `nx`. A name that matches no entry is reported through [`strict_diagnostic`](@ref) and is dropped, and the row is assembled from whatever did match.
  5. Add the contribution [`constraint_row_term`](@ref) gives for the name and its coefficient to `At`. With `rr` the contribution arrives already projected, so `At` is asset-length while it is accumulated.
  6. Report the row through [`strict_diagnostic`](@ref) and drop it when `At` is still zero. The message separates a row whose names missed the universe from a row whose names hit it and whose loadings annihilated it, because the second is not a typo for the reader to hunt.
- 7. Negate the row and its right-hand side when the operator is `>=`. Both senses of an inequality are then written in the `<=` sense, which is the convention [`LinearConstraint`](@ref) states.
- 8. Append the row to the inequality accumulator when the operator was `<=` or `>=`, and to the equality accumulator when it was `==`.
+ 7. Read the sign and the inequality flag of the operator from [`comparison_sign_ineq_flag`](@ref), and scale the row and its right-hand side by the sign. That negates a `>=` row, so both senses of an inequality are written in the `<=` sense, which is the convention [`LinearConstraint`](@ref) states.
+ 8. Append the row to the inequality accumulator when the flag is `true`, and to the equality accumulator when it is `false`.
  9. Reshape each accumulator that holds a row into a matrix of `N` columns, and build the [`PartialLinearConstraint`](@ref) of that half.
 10. Return the [`LinearConstraint`](@ref) holding the halves that were built, or `nothing` when neither half holds a row.
 
@@ -2014,6 +2014,7 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
   - `lcs` is non-empty, when it is a vector.
   - A variable name that matches no entry of the universe raises when `strict` is `true`, and issues a warning otherwise. The row is assembled from the names that did match either way.
   - A row whose terms all fall away raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - Each `op` is one of `"=="`, `"<="` or `">="`, which [`comparison_sign_ineq_flag`](@ref) enforces.
 
 # Returns
 
@@ -2028,6 +2029,7 @@ A row takes one of two shapes. Without `rr` it runs over the universe the names 
   - [`constraint_row_term`](@ref)
   - [`constraint_row_length`](@ref)
   - [`universe_axis`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref)
 """
 function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                                 key::Option{<:AbstractString} = nothing;
@@ -2071,8 +2073,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             strict_diagnostic(msg, strict)
             continue
         end
-        d = ifelse(lc.op == ">=", -1, 1)
-        flag = d == -1 || lc.op == "<="
+        d, flag = comparison_sign_ineq_flag(lc.op)
         A = At .* d
         B = lc.rhs * d
         if flag

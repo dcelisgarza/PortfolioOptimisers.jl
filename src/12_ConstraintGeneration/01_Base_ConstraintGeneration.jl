@@ -38,12 +38,20 @@ This type is used to specify which comparison operators are valid for defining c
 const ComparisonOperator = Union{typeof(==), typeof(<=), typeof(>=)}
 """
     comparison_sign_ineq_flag(op::ComparisonOperator)
+    comparison_sign_ineq_flag(op::AbstractString)
 
 Return the multiplicative sign and inequality flag for a given comparison operator.
 
+This is the one table mapping a comparison operator to the pair every constraint generator needs: the sign that files a `>=` row as a `<=` row, and the flag that sorts the row into the inequality block or the equality block. A parsed constraint carries its operator as a `String`, and a constraint estimator carries it as a function, so the table dispatches on both spellings and neither caller writes its own copy.
+
 # Arguments
 
-  - `op::ComparisonOperator`: The comparison operator.
+  - `op::ComparisonOperator`: The comparison operator, as a function.
+  - `op::AbstractString`: The comparison operator, as the string a [`ParsingResult`](@ref) carries.
+
+# Validation
+
+  - A string `op` is one of `"=="`, `"<="` or `">="`.
 
 # Returns
 
@@ -61,11 +69,15 @@ julia> PortfolioOptimisers.comparison_sign_ineq_flag(<=)
 
 julia> PortfolioOptimisers.comparison_sign_ineq_flag(>=)
 (-1, true)
+
+julia> PortfolioOptimisers.comparison_sign_ineq_flag(\">=\")
+(-1, true)
 ```
 
 # Related
 
   - [`ComparisonOperator`](@ref)
+  - [`ParsingResult`](@ref)
 """
 function comparison_sign_ineq_flag(::typeof(==))::Tuple{Int, Bool}
     return 1, false
@@ -75,6 +87,17 @@ function comparison_sign_ineq_flag(::typeof(<=))::Tuple{Int, Bool}
 end
 function comparison_sign_ineq_flag(::typeof(>=))::Tuple{Int, Bool}
     return -1, true
+end
+function comparison_sign_ineq_flag(op::AbstractString)::Tuple{Int, Bool}
+    return if op == "=="
+        1, false
+    elseif op == "<="
+        1, true
+    elseif op == ">="
+        -1, true
+    else
+        throw(ArgumentError("`op` must be one of \"==\", \"<=\", \">=\". Got\nop => $op"))
+    end
 end
 """
     resolve_axis_name(name, nx::AbstractVector, sdict::AbstractDict) -> Option{Vector}

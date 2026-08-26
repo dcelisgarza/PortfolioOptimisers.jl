@@ -487,3 +487,46 @@ end
         @test replace_group_by_assets(eq6, s3, true).coef == [2.0, 2.0, 2.0]
     end
 end
+@testset "One comparison-operator table (issue #520)" begin
+    using PortfolioOptimisers, Test
+    # The (sign, is_inequality) table had five encodings and one caller each, so one
+    # change to it forced five edits. Both spellings of an operator — the function a
+    # constraint estimator carries and the string a `ParsingResult` carries — now go
+    # through `comparison_sign_ineq_flag`, and the two spellings must give the same row.
+    csif = PortfolioOptimisers.comparison_sign_ineq_flag
+    @test csif(==) == csif("==") == (1, false)
+    @test csif(<=) == csif("<=") == (1, true)
+    @test csif(>=) == csif(">=") == (-1, true)
+    @test all(r -> isa(r[1], Int) && isa(r[2], Bool),
+              (csif("=="), csif("<="), csif(">="), csif(==), csif(<=), csif(>=)))
+    # An operator outside the three used to fall through to the equality branch in
+    # silence. `ParsingResult` is exported and takes `op` positionally, so a hand-built
+    # result can carry any string and reach the table.
+    @test_throws ArgumentError csif("!=")
+    @test_throws ArgumentError csif("<")
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"],
+                                                                                         [1.0],
+                                                                                         "!=",
+                                                                                         1.0,
+                                                                                         "A != 1.0")],
+                                                                          sets)
+    # Each of the three operators still lands in the half, and with the sign, the table
+    # names: `==` in the equality half, `<=` and `>=` in the inequality half written in
+    # the `<=` sense.
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], "==", 1.0,
+                                                                   "A == 1.0")], sets)
+    @test isnothing(lc.ineq)
+    @test collect(lc.eq.A) == [1.0 0.0 0.0]
+    @test lc.eq.B == [1.0]
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], "<=", 1.0,
+                                                                   "A <= 1.0")], sets)
+    @test isnothing(lc.eq)
+    @test collect(lc.ineq.A) == [1.0 0.0 0.0]
+    @test lc.ineq.B == [1.0]
+    lc = PortfolioOptimisers.get_linear_constraints([ParsingResult(["A"], [1.0], ">=", 1.0,
+                                                                   "A >= 1.0")], sets)
+    @test isnothing(lc.eq)
+    @test collect(lc.ineq.A) == [-1.0 0.0 0.0]
+    @test lc.ineq.B == [-1.0]
+end

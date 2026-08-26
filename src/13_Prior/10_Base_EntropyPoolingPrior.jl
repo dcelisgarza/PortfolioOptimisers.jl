@@ -2230,6 +2230,7 @@ Parse and add covariance view constraints to the entropy pooling constraint dict
   - [`replace_coprior_views`](@ref)
   - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
@@ -2241,14 +2242,14 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
     for cov_view in cov_views
         @argcheck(length(cov_view.vars) == 1,
                   "Cannot mix multiple covariance pairs in a single view `$(cov_view.eqn)`.")
-        d = ifelse(cov_view.op == ">=", -1, 1)
+        d, flag = comparison_sign_ineq_flag(cov_view.op)
         i, j = cov_view.ij[1]
         Ai = d * cov_view.coef[1] * view(X, :, i) .* view(X, :, j)
         Bi = d * (cov_view.coef[1] * (pr.mu[i] ⊙ pr.mu[j]) ⊕ cov_view.rhs)
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(cov_view.op == "==", :eq, :ineq))
+        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
         to_fix[union(i, j)] .= true
     end
     return to_fix
@@ -2287,6 +2288,7 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
   - [`replace_coprior_views`](@ref)
   - [`get_pr_value`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
@@ -2301,7 +2303,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
         @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
-        d = ifelse(rho_view.op == ">=", -1, 1)
+        d, flag = comparison_sign_ineq_flag(rho_view.op)
         i, j = rho_view.ij[1]
         sigma_ij = if !isa(i, AbstractVector)
             sqrt(sigma[i] * sigma[j])
@@ -2313,7 +2315,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(rho_view.op == "==", :eq, :ineq))
+        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
         to_fix[union(i, j)] .= true
     end
     return to_fix

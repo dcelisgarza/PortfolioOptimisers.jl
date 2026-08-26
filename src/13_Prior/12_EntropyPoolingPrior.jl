@@ -416,6 +416,7 @@ Resolve one parsed tail view into the assets it names, their coefficients, its o
   - [`ep_cvar_views!`](@ref)
   - [`ep_evar_views!`](@ref)
   - [`get_linear_constraints`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum;
                        strict::Bool = false)
@@ -423,15 +424,17 @@ function ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum;
     if isnothing(lc)
         return nothing
     end
-    op, blk = if res.op == "=="
+    sgn, flag = comparison_sign_ineq_flag(res.op)
+    op, blk = if !flag
         :eq, lc.eq
-    elseif res.op == ">="
+    elseif sgn == -1
         :geq, lc.ineq
     else
         :leq, lc.ineq
     end
-    # `get_linear_constraints` negates a `>=` equation to file it as a `<=` row.
-    d = ifelse(op == :geq, -one(eltype(X)), one(eltype(X)))
+    # `get_linear_constraints` negates a `>=` equation to file it as a `<=` row, scaling by
+    # the same sign, so scaling by it again undoes the flip.
+    d = eltype(X)(sgn)
     A = vec(blk.A) * d
     rhs = blk.B[1] * d
     idx = findall(!iszero, A)
