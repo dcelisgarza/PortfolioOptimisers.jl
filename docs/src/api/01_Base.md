@@ -91,6 +91,7 @@ strict_diagnostic
 missing_group_assets_msg
 empty_row_msg
 empty_projected_row_msg
+zero_centrality_msg
 gross_budget_bounds_msg
 failed_solve_msg
 relaxed_preferences_msg

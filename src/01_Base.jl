@@ -2405,6 +2405,38 @@ function empty_projected_row_msg(eqn, nf, key, n; noun::AbstractString = "constr
     return "$(noun) `$(eqn)` resolved against the factor universe ($(length(nf)) factors under key `$(key)`) but projected to an all-zero row over $(n) assets: every matched factor has zero loadings; row dropped"
 end
 """
+    zero_centrality_msg(alg, n) -> String
+
+Build the warning/error text for a centrality constraint whose centrality vector carries no information, so the row it would build is dropped.
+
+The vector is either empty or all zero. Either way the row reads `0' w <= B`, which every set of weights satisfies, so it constrains nothing. This is a fact about the graph and never a mistyped name: two assets under [`BetweennessCentrality`](@ref) give the zero vector, because no vertex lies on a shortest path between two others. Reporting it through [`unknown_variable_msg`](@ref) or one of its siblings would send a reader hunting for a typo that is not there, which is why this message is its own.
+
+Names the centrality algorithm and the *length* of the vector only — never its entries — the same info-leak-safe discipline as [`empty_row_msg`](@ref).
+
+# Arguments
+
+  - `alg`: The centrality algorithm that produced the vector. Only its type name reaches the message.
+  - `n`: Length of the centrality vector. Zero means the vector is empty.
+
+# Returns
+
+  - `msg::String`: The diagnostic text.
+
+# Related
+
+  - [`strict_diagnostic`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`empty_projected_row_msg`](@ref)
+"""
+function zero_centrality_msg(alg, n)
+    cause = if iszero(n)
+        "its centrality vector is empty"
+    else
+        "all $(n) entries of its centrality vector are zero"
+    end
+    return "centrality constraint under `$(nameof(typeof(alg)))` contributes no row because $(cause): the row it would build holds for every set of weights; row dropped"
+end
+"""
     gross_budget_bounds_msg(lb, ub) -> String
 
 Build the error text for a gross budget (`gbgt`) whose weight bounds `lb` and `ub` admit no short position. With no negative bound the gross exposure equals the net exposure, so the net budget (`bgt`) already owns the constraint and `gbgt` has nothing left to express.
@@ -2441,9 +2473,9 @@ end
 """
     strict_diagnostic(msg::AbstractString, strict::Bool) -> Nothing
 
-Report an unresolvable **name**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
+Report a **term that cannot contribute a row**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
 
-`strict` governs names only. Nothing structural is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every name diagnostic in the library routes through here, so the strictness policy is one edit.
+`strict` governs what is droppable: a name that resolves against nothing, and a row whose coefficients carry no information, as with a zero centrality vector. Nothing else is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every such diagnostic in the library routes through here, so the strictness policy is one edit.
 
 # Algorithm
 
@@ -2468,6 +2500,7 @@ Report an unresolvable **name**: throw an `ArgumentError` under `strict`, warn o
   - [`unknown_variable_msg`](@ref)
   - [`missing_group_assets_msg`](@ref)
   - [`empty_row_msg`](@ref)
+  - [`zero_centrality_msg`](@ref)
 """
 function strict_diagnostic(msg::AbstractString, strict::Bool)::Nothing
     if strict

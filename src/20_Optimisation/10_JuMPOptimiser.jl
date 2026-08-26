@@ -1176,7 +1176,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
                               rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, z_src = opt.z_src, kwargs...)
+                                 x_src = opt.x_src, z_src = opt.z_src, strict = opt.strict,
+                                 kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx

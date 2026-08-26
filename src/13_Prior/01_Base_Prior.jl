@@ -814,7 +814,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
   - `rd`: Optional returns result (used when `x_src = :data` or `z_src = :data`).
   - `x_src`: If `:prior`, use asset returns from `pr`; if `:data`, use `rd`. Default is `:prior`.
   - `z_src`: Which carrier supplies the feature matrix a [`FeatureDistance`](@ref) reads: `:data` takes `rd.Z`, `:prior` takes `pr.Z`. Default is `:data`. Ignored when no [`FeatureDistance`](@ref) is in the estimator.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
+  - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it.
 
 # Returns
 

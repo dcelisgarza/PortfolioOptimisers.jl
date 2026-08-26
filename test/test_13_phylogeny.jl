@@ -4237,16 +4237,18 @@ end
     @test lc1.ineq.B == lc2.ineq.B
     @test_throws DomainError centrality_constraints(ccc, Xc; dims = 3)
 end
-@testset "A zero centrality vector drops its constraint without a diagnostic" begin
+@testset "A zero centrality vector drops its constraint and reports the drop" begin
     using PortfolioOptimisers, Test, StableRNGs
     #=
     Two assets give a one-edge tree, and no vertex lies on a shortest path between two
     others, so `BetweennessCentrality` and `StressCentrality` both give the zero vector.
-    `centrality_constraints` skips such a constraint and emits nothing: neither a warning
-    nor an error. A lone zero constraint therefore returns `nothing`, and a mixed vector
-    returns only the rows that survived. `strict_diagnostic` is not the instrument here:
-    it governs an unresolvable NAME, and a zero centrality vector is a fact about the
-    graph. Issue #516 measured the drop and left the behaviour as it stands.
+    The row such a constraint would build, `0' w <= B`, holds for every `w`, so
+    `centrality_constraints` drops it. Issue #516 measured the drop, and issue #527 chose
+    the diagnostic: the drop routes through `strict_diagnostic`, so `strict = true` raises
+    and the default warns. The drop happens either way. The NAME messages are NOT reused --
+    a zero centrality vector is a fact about the graph and not a typo -- which is what
+    `zero_centrality_msg` exists for. The message carries the algorithm and the LENGTH of
+    the vector, never its entries.
     =#
     X2 = randn(StableRNG(9), 200, 2)
     for ct in (BetweennessCentrality(), StressCentrality())
@@ -4254,10 +4256,18 @@ end
     end
     zc = CentralityConstraint(; A = CentralityEstimator(; ct = BetweennessCentrality()))
     dc = CentralityConstraint(; A = CentralityEstimator(; ct = DegreeCentrality()))
-    @test isnothing(@test_logs centrality_constraints(zc, X2))
-    lcm = @test_logs centrality_constraints([zc, dc], X2)
+    @test isnothing(@test_logs (:warn, r"BetweennessCentrality") centrality_constraints(zc,
+                                                                                        X2))
+    lcm = @test_logs (:warn, r"BetweennessCentrality") centrality_constraints([zc, dc], X2)
     @test size(lcm.ineq.A) == (1, 2)
     @test isnothing(lcm.eq)
+    @test_throws ArgumentError centrality_constraints(zc, X2; strict = true)
+    @test_throws ArgumentError centrality_constraints([zc, dc], X2; strict = true)
+    msg = PortfolioOptimisers.zero_centrality_msg(BetweennessCentrality(), 2)
+    @test occursin("BetweennessCentrality", msg)
+    @test occursin("all 2 entries", msg)
+    @test occursin("empty",
+                   PortfolioOptimisers.zero_centrality_msg(BetweennessCentrality(), 0))
     @test_throws PortfolioOptimisers.IsEmptyError centrality_constraints(CentralityConstraint[],
                                                                          X2)
 end

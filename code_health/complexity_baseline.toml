@@ -69,7 +69,7 @@ commit = "33b37c6946"
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = [] }
 "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 144, cog_sum = 174, arg_sum = 76, macros = ["@forward_properties"] }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 0, cyc_sum = 9, cog_sum = 4, arg_sum = 0, macros = ["@propagatable"] }
-"src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { cyc = 12, cog = 19, arg = 4, cyc_sum = 36, cog_sum = 30, arg_sum = 30, macros = [] }
+"src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { cyc = 13, cog = 21, arg = 5, cyc_sum = 37, cog_sum = 32, arg_sum = 31, macros = [] }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { cyc = 9, cog = 8, arg = 3, cyc_sum = 27, cog_sum = 12, arg_sum = 8, macros = ["@propagatable"] }
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { cyc = 9, cog = 16, arg = 5, cyc_sum = 72, cog_sum = 61, arg_sum = 43, macros = [] }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }

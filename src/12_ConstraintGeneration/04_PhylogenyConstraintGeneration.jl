@@ -852,18 +852,19 @@ Matches either a [`CentralityConstraint`](@ref), a vector of them, or a [`Linear
 """
 const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 """
-    centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
+    centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, strict::Bool = false,
+                           kwargs...)
 
 Reduce one or more [`CentralityConstraint`](@ref) estimators to a [`LinearConstraint`](@ref).
 
-Each estimator contributes one row. The coefficients of the row are the centrality vector of the asset network, and the right-hand side is read off that vector or given as a number. A constraint whose centrality vector is empty or all zero contributes **no row and no diagnostic**: two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`.
+Each estimator contributes one row. The coefficients of the row are the centrality vector of the asset network, and the right-hand side is read off that vector or given as a number. A constraint whose centrality vector is empty or all zero contributes **no row**, because the row it would build holds for every set of weights: two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`. The drop is reported through [`strict_diagnostic`](@ref), so `strict` decides whether it raises or warns.
 
 # Algorithm
 
  1. Check that `ccs` is not empty when it is a vector.
  2. Check `dims` with [`assert_dims`](@ref), and read the asset count `N` from the axis of `X` that `dims` does not name. `N` is the width of every row the loop builds.
  3. For each `cc` in `ccs`, compute the centrality vector `A` with the estimator in `cc.A`, along `dims`.
- 4. Skip `cc` when `A` is empty or all zero.
+ 4. Report `cc` through [`strict_diagnostic`](@ref) with [`zero_centrality_msg`](@ref) and skip it when `A` is empty or all zero.
  5. Read the sign `d` and the inequality flag `flag_ineq` of `cc.comp` from [`comparison_sign_ineq_flag`](@ref).
  6. Derive the right-hand side `B` from `cc.B` against the unscaled `A` with [`vec_to_real_measure`](@ref), and scale it by `d`.
  7. Scale `A` by `d`, which negates a `>=` row so that every inequality is stored in the `A w <= B` sense.
@@ -877,12 +878,14 @@ Step 6 runs before step 7 by design. Deriving the threshold from the scaled row 
   - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of them.
   - `X`: Data matrix.
   - $(arg_dict[:dims])
+  - `strict`: If `true`, a constraint whose centrality vector is empty or all zero raises an `ArgumentError`; if `false`, it issues a warning. The constraint is dropped either way.
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 
 # Validation
 
   - `!isempty(ccs)` when `ccs` is a vector. A breach raises an `IsEmptyError`.
   - $(val_dict[:dims]) The check is made with [`assert_dims`](@ref), which raises the `DomainError`.
+  - A centrality vector that is empty or all zero raises an `ArgumentError` when `strict` is `true`, and issues a warning otherwise. The constraint is dropped either way.
   - No value of `cc.B` is checked. A `NaN` or an `Inf` threshold reaches the returned right-hand side unchanged.
 
 # Returns
@@ -897,8 +900,11 @@ Step 6 runs before step 7 by design. Deriving the threshold from the scaled row 
   - [`centrality_vector`](@ref)
   - [`comparison_sign_ineq_flag`](@ref): the one sign and flag table, shared with [`get_linear_constraints`](@ref).
   - [`assert_dims`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`zero_centrality_msg`](@ref)
 """
-function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
+function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1,
+                                strict::Bool = false, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs), IsEmptyError("ccs cannot be empty"))
     end
@@ -912,6 +918,9 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs.
         A = centrality_vector(cc.A, X; dims = dims, kwargs...).X
         lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag
+            # A zero centrality vector is a fact about the graph, not a mistyped name, so the
+            # message is its own. The row it would build, `0' w <= B`, holds for every `w`.
+            strict_diagnostic(zero_centrality_msg(cc.A.ct, length(A)), strict)
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(cc.comp)
