@@ -283,6 +283,26 @@ end
                                      rd)
 end
 
+@testset "an RLVaR view naming an asset the universe does not hold" begin
+    using Logging
+    # `ep_view_terms` places every name a view holds. Under `strict = false` a name the
+    # universe does not hold is reported and dropped, so the view produces no constraint
+    # and the loop moves on. Nothing else in this file reaches that branch of
+    # `ep_rlvar_views!`.
+    epc = Dict{Symbol, Any}()
+    tvs = PO.AbstractEntropyPoolingTailView[]
+    v = LinearConstraintEstimator(; val = "NOTANASSET >= 0.1")
+    Logging.with_logger(Logging.NullLogger()) do
+        return PO.ep_rlvar_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_k, ep_w0, nothing;
+                                  strict = false)
+    end
+    @test isempty(epc)
+    @test isempty(tvs)
+    # The same name under `strict = true` raises instead.
+    @test_throws ArgumentError PO.ep_rlvar_views!(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_k,
+                                                  ep_w0, nothing; strict = true)
+end
+
 @testset "prior references in tail views" begin
     # A `prior(...)` reference is replaced by the prior value of the risk measure the view
     # family names, so a CVaR view reads the prior CVaR and an EVaR view the prior EVaR.

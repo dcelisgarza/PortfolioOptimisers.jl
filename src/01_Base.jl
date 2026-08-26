@@ -954,6 +954,20 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # relativistic risk measures, their JuMP constraint layer and the
                        # entropy pooling views all read the one symbol.
                        :ln_kappa => "``\\ln_{\\kappa}(u) = \\dfrac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}``: Kaniadakis logarithm.",#
+                       # The primal programme of the relativistic value at risk, whose
+                       # per-observation power cones `ep_rlvar_tail` minimises out. The two
+                       # entropy pooling view formulations and the three helpers around
+                       # them state one programme, so they share these symbols.
+                       :kappa_rm => "``\\kappa``: Deformation parameter, ``\\kappa \\in (0, 1)``.",#
+                       :rlvar_loss => "``\\boldsymbol{x}``: ``T \\times 1`` loss series of one asset, the negated returns, whose ``j``-th entry is ``x_{j}``.",#
+                       :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, summing to one. In a view they are the posterior probabilities the model solves for.",#
+                       :rlvar_stat => "``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X)``: Relativistic value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha`` and deformation ``\\kappa``.",#
+                       :rlvar_t => "``t``: Shift variable of the primal programme.",#
+                       :rlvar_z => "``z > 0``: Dual variable of the primal programme.",#
+                       :rlvar_u => "``u``: Shifted loss of one observation, ``t - x_{j}``.",#
+                       :rlvar_sigma => "``\\sigma``: Positive root of the stationarity condition of ``\\varphi_{\\kappa}``.",#
+                       :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum the pair of power cones of one observation allows.",#
+                       :rlvar_target => "``\\bar{\\vartheta}``: Target relativistic value at risk of the view.",#
                        # Absolute drawdown series.
                        :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
                        :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#

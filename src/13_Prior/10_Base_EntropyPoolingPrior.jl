@@ -1257,7 +1257,7 @@ Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite).
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x}`` be the loss series of the asset the view names, ``\\boldsymbol{w}`` the posterior probabilities, ``\\alpha`` the significance level, ``\\kappa`` the deformation parameter and ``\\bar{\\vartheta}`` the target. Write ``\\ln_{\\kappa}`` for the Kaniadakis logarithm, [`kappa_log`](@ref). The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` is written as:
+The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` on the asset the view names is written as:
 
 ```math
 \\begin{align}
@@ -1270,7 +1270,21 @@ Let ``\\boldsymbol{x}`` be the loss series of the asset the view names, ``\\bold
 \\end{align}
 ```
 
-Where ``\\boldsymbol{\\nu}`` is the vector of weights that attains the RLVaR, ``\\boldsymbol{\\tau}`` and ``\\boldsymbol{\\varsigma}`` carry its Kaniadakis entropy budget, and ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}`` is the power cone. The budget is the dual description of RLVaR, so the constraint set is feasible if and only if ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}``.
+Where:
+
+  - $(math_dict[:rlvar_stat])
+  - $(math_dict[:rlvar_loss])
+  - $(math_dict[:rlvar_probs])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:rlvar_target])
+  - ``\\boldsymbol{\\nu}``: ``T \\times 1`` vector of weights that attains the RLVaR.
+  - ``\\boldsymbol{\\tau}``, ``\\boldsymbol{\\varsigma}``: ``T \\times 1`` vectors that carry the Kaniadakis entropy budget of ``\\boldsymbol{\\nu}``.
+  - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
+
+The budget is the dual description of RLVaR, so the constraint set is feasible if and only if ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}``.
 
 # Scope
 
@@ -1307,6 +1321,8 @@ Grid formulation of a relativistic value-at-risk view.
 
 `GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, centred on the point a posterior that meets the view attains. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
 
+Rows reach the model divided by their largest coefficient, so the coefficients sit in `(0, 1]`, the posterior sums to one, and the left-hand side is bounded by one whatever the data. The default `M` clears that bound by an order of magnitude.
+
 As `kappa` approaches one the RLVaR approaches the largest loss, and [`ep_rlvar_tail`](@ref) overflows at the dual variable that attains it. The points it overflows at are dropped, and a grid that keeps none of them raises. The centre of the grid is found by an iteration that reads the same tail function, so it too stops converging there and the grid falls back to the prior's dual variable, which lands short of the target. Prefer a smaller `kappa`, or [`ConicRelativisticValueatRiskView`](@ref) where the operator admits it.
 
 # Fields
@@ -1318,10 +1334,12 @@ $(DocStringExtensions.FIELDS)
 The sample RLVaR is the value of a two-variable minimisation, in which the pair of power cones of each observation is already minimised out:
 
 ```math
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) = \\min_{t,\\, z > 0} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,,
+\\begin{align}
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) &= \\underset{t,\\, z > 0}{\\min} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,,
+\\end{align}
 ```
 
-Where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two power cones of one observation allow, and has the closed form:
+where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two power cones of one observation allow, and has the closed form:
 
 ```math
 \\begin{align}
@@ -1333,7 +1351,9 @@ Where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two p
 The objective is linear in ``\\boldsymbol{w}`` once ``t`` and ``z`` are fixed, which is what makes a grid point a row. On a grid ``(\\bar{t}_{1}, \\bar{z}_{1}),\\ldots,(\\bar{t}_{K}, \\bar{z}_{K})`` that gives, for a lower-bound view:
 
 ```math
-T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\geq \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right)\\,, \\quad \\forall\\, k = 1,\\ldots,K
+\\begin{align}
+&T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(\\bar{t}_{k} - x_{j},\\, \\bar{z}_{k}) \\geq \\bar{\\vartheta} - \\bar{t}_{k} - \\bar{z}_{k} \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right)\\,, &\\forall\\, k = 1,\\ldots,K
+\\end{align}
 ```
 
 and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`` a big constant:
@@ -1346,11 +1366,28 @@ and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`
 \\end{align}
 ```
 
-An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it. Rows are scaled by their largest coefficient before they reach the model, so the coefficients sit in `(0, 1]` and the posterior sums to one. The left-hand side is therefore bounded by one whatever the data, and the default `M` clears that bound by an order of magnitude.
+Where:
 
-The grid spans `zc * (1 - pct)` to `zc * (1 + pct)`, and `K` is odd so `zc` sits in the middle. A view that carries an upper-bound half takes `zc` from [`ep_rlvar_anchor`](@ref), which solves for the pair a posterior meeting the view attains, and each `t_k` is the shift that minimises the objective at `z_k` under that posterior. The view then lands on its target, and `pct` and `K` cover only the movement the other views of the model cause.
+  - $(math_dict[:rlvar_stat])
+  - $(math_dict[:rlvar_loss])
+  - $(math_dict[:rlvar_probs])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:rlvar_target])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z])
+  - $(math_dict[:rlvar_u])
+  - $(math_dict[:rlvar_sigma])
+  - $(math_dict[:rlvar_phi])
+  - ``\\psi``, ``\\theta``: The two tail variables of one observation, whose smallest sum is ``\\varphi_{\\kappa}``.
+  - ``\\bar{t}_{k}``, ``\\bar{z}_{k}``: Shift and dual variable of the ``k``-th grid point.
+  - ``K``: Number of grid points.
+  - ``\\boldsymbol{y}``: ``K \\times 1`` binary selector, one entry per grid point.
+  - ``M``: Big-M constant.
 
-A lower-bound view, and a view whose anchor does not converge, takes `zc` from the prior's dual variable. RLVaR and the shift that attains it are both translation-equivariant, so a posterior that moves the RLVaR to the target behaves, to first order, like translating every loss by the same amount. Each `t_k` is then the shift that minimises the objective at `z_k` under the prior probabilities, less the distance from the prior RLVaR to the target.
+An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it.
 
 # Constructors
 

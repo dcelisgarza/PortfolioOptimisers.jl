@@ -94,6 +94,14 @@ The primal programme of the relativistic value at risk carries two power cones a
 \\end{align}
 ```
 
+Where:
+
+  - $(math_dict[:rlvar_phi])
+  - $(math_dict[:rlvar_u])
+  - $(math_dict[:rlvar_z])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:rlvar_sigma])
+
 # Arguments
 
   - `u`: Shifted return of the observation, `t - x` for a loss series `x`.
@@ -131,8 +139,22 @@ Minimise the primal objective of the relativistic value at risk over its shift v
 # Mathematical definition
 
 ```math
-\\min_{t} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+\\begin{align}
+\\underset{t}{\\min} &\\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:rlvar_probs])
+  - $(math_dict[:rlvar_phi])
+  - $(math_dict[:rlvar_loss])
+  - $(math_dict[:kappa_rm])
 
 # Arguments
 
@@ -185,8 +207,23 @@ Compute the sample relativistic value at risk of a loss series and the primal po
 # Mathematical definition
 
 ```math
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) = \\min_{t,\\, z > 0} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+\\begin{align}
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) &= \\underset{t,\\, z > 0}{\\min} \\; t + z \\ln_{\\kappa}\\left(\\dfrac{1}{\\alpha T}\\right) + T \\sum_{j=1}^{T} w_{j} \\varphi_{\\kappa}(t - x_{j},\\, z)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:rlvar_stat])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:rlvar_probs])
+  - $(math_dict[:rlvar_phi])
+  - $(math_dict[:rlvar_loss])
+  - $(math_dict[:kappa_rm])
 
 # Arguments
 
@@ -201,7 +238,7 @@ Compute the sample relativistic value at risk of a loss series and the primal po
 
 # Algorithm
 
- 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)'s Brent method, over a bracket running from about `2e-9` to about `2e4` times the loss range. The objective is convex in the pair, so the outer minimisation sees a convex function.
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)'s Brent method, over a bracket running from about `2e-9` to about `2e4` times the loss range. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
  2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
  3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
 
@@ -412,7 +449,7 @@ end
 
 Build the grid of primal points a relativistic value-at-risk view is written on.
 
-A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor`](@ref) finds, and every shift is the one that minimises at the posterior that pair belongs to. A lower-bound view, and a view whose anchor does not converge, is centred on the prior's dual variable instead, and every shift is the one that minimises under the prior probabilities, less the distance from the prior value to the target.
+A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor`](@ref) finds, and every shift is the one that minimises at the posterior that pair belongs to. A lower-bound view, and a view whose anchor does not converge, is centred on the prior's dual variable instead, and every shift is the one that minimises under the prior probabilities, less the distance from the prior value to the target. The relativistic value at risk and the shift that attains it are both translation-equivariant, so a posterior that moves the value to the target behaves, to first order, like translating every loss by that distance.
 
 # Arguments
 
@@ -1880,9 +1917,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Reweights the observations of a prior so that its moments and its tails meet a set of views.
 
-`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis, views on the value at risk, and the conditional and entropic value at risk views of [EPTail](@cite).
+`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis, views on the value at risk, the conditional and entropic value at risk views of [EPTail](@cite), and the relativistic value at risk views of [EPRLVaR](@cite).
 
-The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of Meucci et al. hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with relative CVaR views and views on the entropic value at risk.
+The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of Meucci et al. hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with relative CVaR views and views on the entropic and the relativistic value at risk.
 
 # Fields
 
