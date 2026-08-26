@@ -79,38 +79,6 @@ function ep_evar_grid_row(x::VecNum, ebar::Number, z::Number)
     return c ./ sc, inv(sc)
 end
 """
-    ep_kappa_log(u::Number, kappa::Number)
-
-Evaluate the Kaniadakis logarithm.
-
-# Mathematical definition
-
-```math
-\\ln_{\\kappa}(u) = \\dfrac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}\\,.
-```
-
-# Arguments
-
-  - `u`: Argument of the logarithm.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
-
-# Returns
-
-  - `lnk::Number`: Value of the Kaniadakis logarithm.
-
-# Related
-
-  - [`ep_rlvar`](@ref)
-  - [`RelativisticValueatRisk`](@ref)
-
-# References
-
-  - $(ref_dict[:EPRLVaR])
-"""
-function ep_kappa_log(u::Number, kappa::Number)
-    return (u^kappa - u^(-kappa)) / (2 * kappa)
-end
-"""
     ep_rlvar_tail(u::Number, z::Number, kappa::Number)
 
 Evaluate the smallest tail penalty the pair of power cones of one observation allows.
@@ -171,7 +139,7 @@ Minimise the primal objective of the relativistic value at risk over its shift v
   - `x`: Loss series (`-returns`).
   - `w`: Observation probabilities, summing to one.
   - `kappa`: Deformation parameter, in `(0, 1)`.
-  - `lnk`: Kaniadakis logarithm of `inv(alpha * T)`, from [`ep_kappa_log`](@ref).
+  - `lnk`: Kaniadakis logarithm of `inv(alpha * T)`, from [`kappa_log`](@ref).
   - `z`: Dual variable of the primal programme.
 
 # Returns
@@ -252,7 +220,7 @@ Compute the sample relativistic value at risk of a loss series and the primal po
 function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number)
     T = length(x)
     wi = w ./ sum(w)
-    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    lnk = kappa_log(inv(alpha * T), kappa)
     xmin, xmax = extrema(x)
     span = xmax - xmin
     span = ifelse(span > zero(span), span, max(abs(xmax), one(xmax)))
@@ -298,7 +266,7 @@ Build one scaled row of the grid formulation of a relativistic value-at-risk vie
 function ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha::Number,
                            kappa::Number)
     T = length(x)
-    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    lnk = kappa_log(inv(alpha * T), kappa)
     c = T .* ep_rlvar_tail.(t .- x, z, kappa)
     sc = maximum(c)
     return c ./ sc, (vbar - t - z * lnk) / sc
@@ -697,7 +665,7 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
     opk = one(kappa) + kappa
     omk = one(kappa) - kappa
     ik2 = inv(2 * kappa)
-    lnk = ep_kappa_log(inv(alpha * T), kappa)
+    lnk = kappa_log(inv(alpha * T), kappa)
     nu = JuMP.@variable(model, [1:T], lower_bound = 0, upper_bound = 1)
     # Both bounds are implied by the cones and the budget: the first slot of a power cone
     # is non-negative, and the budget is loosest at the largest `varsigma` the second cone
@@ -1299,7 +1267,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             zstar::Number, pv::Number, eqn::AbstractString)
     (; pct, K, M) = alg
     wi = w ./ sum(w)
-    lnk = ep_kappa_log(inv(alpha * length(x)), kappa)
+    lnk = kappa_log(inv(alpha * length(x)), kappa)
     # RLVaR is translation-equivariant, and so is the shift that attains it: subtracting
     # `delta` from every loss subtracts `delta` from both. A posterior that moves the RLVaR
     # to the target behaves, to first order, like that translation, so the grid is anchored

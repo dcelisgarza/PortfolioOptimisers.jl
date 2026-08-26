@@ -11,7 +11,6 @@ ConicRelativisticValueatRiskViewConstraint
 GridRelativisticValueatRiskViewConstraint
 ep_evar
 ep_evar_grid_row
-ep_kappa_log
 ep_rlvar_tail
 ep_rlvar_shift
 ep_rlvar

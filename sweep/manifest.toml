@@ -44,7 +44,7 @@
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { map = 13, units = 0, swept = false }
 "ext/PortfolioOptimisersPlotsExt.jl" = { map = 13, units = 0, swept = false }
-"src/01_Base.jl" = { map = 1, units = 136, algorithm = 40, swept = true }
+"src/01_Base.jl" = { map = 1, units = 137, algorithm = 40, swept = true }
 "src/02_Tools.jl" = { map = 1, units = 69, algorithm = 49, swept = true }
 "src/03_Preprocessing.jl" = { map = 2, units = 44, algorithm = 22, swept = true }
 "src/04_PosdefMatrix.jl" = { map = 2, units = 4, algorithm = 2, swept = true }
@@ -119,7 +119,7 @@
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { map = 6, units = 68, swept = false }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { map = 6, units = 7, swept = false }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 41, swept = false }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 40, swept = false }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, swept = false }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, swept = false }
 "src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, swept = false }

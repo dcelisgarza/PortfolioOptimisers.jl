@@ -1257,7 +1257,7 @@ Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite).
 
 # Mathematical definition
 
-Let ``\\boldsymbol{x}`` be the loss series of the asset the view names, ``\\boldsymbol{w}`` the posterior probabilities, ``\\alpha`` the significance level, ``\\kappa`` the deformation parameter and ``\\bar{\\vartheta}`` the target. Write ``\\ln_{\\kappa}(u) = \\frac{u^{\\kappa} - u^{-\\kappa}}{2\\kappa}`` for the Kaniadakis logarithm. The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` is written as:
+Let ``\\boldsymbol{x}`` be the loss series of the asset the view names, ``\\boldsymbol{w}`` the posterior probabilities, ``\\alpha`` the significance level, ``\\kappa`` the deformation parameter and ``\\bar{\\vartheta}`` the target. Write ``\\ln_{\\kappa}`` for the Kaniadakis logarithm, [`kappa_log`](@ref). The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` is written as:
 
 ```math
 \\begin{align}
@@ -1293,6 +1293,7 @@ ConicRelativisticValueatRiskView()
   - [`GridRelativisticValueatRiskView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+  - [`kappa_log`](@ref)
 
 # References
 
@@ -1379,6 +1380,7 @@ GridRelativisticValueatRiskView
   - [`ConicRelativisticValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+  - [`kappa_log`](@ref)
 
 # References
 

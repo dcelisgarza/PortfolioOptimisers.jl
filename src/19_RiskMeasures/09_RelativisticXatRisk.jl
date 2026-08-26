@@ -48,8 +48,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                         theta[1:T]
                         epsilon[1:T]
                     end)
-    invat = inv(alpha * T)
-    ln_k = (invat^kappa - invat^(-kappa)) * ik2
+    ln_k = kappa_log(inv(alpha * T), kappa)
     if isnothing(w)
         JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
@@ -115,11 +114,11 @@ Represents the Relativistic Value-at-Risk (RLVaR) risk measure.
 
 # Mathematical definition
 
-Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RLVaR is:
+The RLVaR is:
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
 \\end{align}
 ```
 
@@ -130,7 +129,7 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
-  - ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``: ``\\kappa``-logarithm.
+  - $(math_dict[:ln_kappa])
   - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
 
 subject to the power-cone constraints:
@@ -147,7 +146,7 @@ Where:
 
   - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
-For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The ``\\kappa``-logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
+For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The Kaniadakis logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
 
 # Fields
 
@@ -204,6 +203,7 @@ RelativisticValueatRisk
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
+  - [`kappa_log`](@ref)
 
 # References
 

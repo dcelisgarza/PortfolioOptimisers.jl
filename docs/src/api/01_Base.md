@@ -70,6 +70,7 @@ LpNorm
 LInfNorm
 norm_error
 norm_factor
+kappa_log
 resolve_rng
 ```
 

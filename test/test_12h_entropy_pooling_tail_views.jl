@@ -139,7 +139,7 @@ end
     end
     # The primal pair it returns is the one that attains the value.
     res = PO.ep_rlvar(-rd.X[:, 1], ep_w0, ep_a, ep_k)
-    lnk = PO.ep_kappa_log(inv(ep_a * T), ep_k)
+    lnk = PO.kappa_log(inv(ep_a * T), ep_k)
     g = (t, z) -> t +
                   z * lnk +
                   T * sum(ep_w0[j] * PO.ep_rlvar_tail(t + rd.X[j, 1], z, ep_k) for j in 1:T)

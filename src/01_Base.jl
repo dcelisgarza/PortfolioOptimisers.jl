@@ -950,6 +950,10 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Risk measure parameters.
                        :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                        :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                       # The Kaniadakis logarithm. `kappa_log` states it, and the
+                       # relativistic risk measures, their JuMP constraint layer and the
+                       # entropy pooling views all read the one symbol.
+                       :ln_kappa => "``\\ln_{\\kappa}(u) = \\dfrac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}``: Kaniadakis logarithm.",#
                        # Absolute drawdown series.
                        :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
                        :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
@@ -5269,6 +5273,60 @@ function norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
 end
 function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a, Inf) / norm_factor(f, T)
+end
+"""
+    kappa_log(u::Number, kappa::Number)
+
+Evaluate the Kaniadakis logarithm.
+
+The relativistic risk measures, their JuMP constraint layer and the entropy pooling views of the relativistic value at risk all scale a dual variable by this quantity, so the library states it once here.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\ln_{\\kappa}(u) &= \\dfrac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:ln_kappa])
+  - ``u``: Argument of the logarithm.
+  - ``\\kappa \\in (0, 1)``: Deformation parameter.
+
+The value is negative for every ``u < 1``, and ``\\ln_{\\kappa}(u) \\to \\ln(u)`` as ``\\kappa \\to 0``.
+
+# Arguments
+
+  - `u`: Argument of the logarithm.
+  - $(arg_dict[:kappa])
+
+# Returns
+
+  - `lnk::Number`: Value of the Kaniadakis logarithm.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.kappa_log(2, 0.3)
+0.6981533616478014
+
+julia> PortfolioOptimisers.kappa_log(1, 0.3)
+0.0
+```
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`ConicRelativisticValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar])
+"""
+function kappa_log(u::Number, kappa::Number)
+    return (u^kappa - u^(-kappa)) / (2 * kappa)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
