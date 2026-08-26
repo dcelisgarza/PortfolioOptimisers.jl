@@ -112,6 +112,18 @@ of another function that no signature states. Measured by the sweep of issue #46
 dendrograms with distinct heights no count was rejected at all, and on the tied trees that do \
 reject one, every other arm of the decision is reached."""
 
+[rationale.a-signature-line-counter-the-test-job-cannot-reach]
+text = """
+Julia allocates the counter on the `function` line of some inner constructors to code that runs \
+when the method is **defined**, not when it is called. Definition happens during precompilation, \
+in a process whose coverage the test job discards, so the line reads zero however many times the \
+constructor runs. Measured by the sweep of issue #513 over seven test files: the constructor's \
+own body carries 196 on both of its lines while the signature line carries 0. It is an artifact \
+of counter allocation and not an unreached branch, so no test can pay it. The neighbouring \
+constructors show the two shapes it is not: `PartialLinearConstraint`, whose signature is one \
+line, carries 215 there, and `UniverseSets`, whose signature is three, carries 67. A row here is \
+therefore keyed to the one definition that shows it, never to multi-line signatures as a class."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -262,3 +274,9 @@ path = "src/11_Phylogeny/03_Hierarchical.jl"
 definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
+
+[[coverage_exemption]]
+path = "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl"
+definition = "LinearConstraint"
+misses = 1
+rationale = "a-signature-line-counter-the-test-job-cannot-reach"

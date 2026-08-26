@@ -623,3 +623,38 @@
         @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
     end
 end
+
+@testset "The two re-basis routes agree (issue #513)" begin
+    using PortfolioOptimisers, Test, Logging, LinearAlgebra
+    #        F1    F2
+    #   A    0.5   0.2
+    #   B    0.1   0.9
+    #   C    0.3   0.4
+    M = [0.5 0.2; 0.1 0.9; 0.3 0.4]
+    rr = Regression(; M = M)
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    # `constraint_row_term` projects each term as the row is assembled;
+    # `project_linear_constraint` projects the assembled factor-width row wholesale. The
+    # identity `aᵀ wf = (M a)ᵀ wa` says the two must land on the same row.
+    eqn = "F1 + 2*F2 <= 1"
+    stepwise = linear_constraints(eqn, sets, "nf"; rr = rr)
+    wholesale = PortfolioOptimisers.project_linear_constraint(linear_constraints(eqn, sets,
+                                                                                 "nf"), M)
+    @test collect(stepwise.ineq.A) ≈ collect(wholesale.ineq.A)
+    @test stepwise.ineq.B == wholesale.ineq.B
+    @test vec(collect(stepwise.ineq.A)) ≈ M[:, 1] + 2 * M[:, 2]
+
+    # A repeated factor name contributes every column bearing it, in both routes, which is
+    # how the asset path treats a duplicated asset name.
+    dsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F1"]))
+    dstep = linear_constraints("F1 <= 1", dsets, "nf"; rr = rr)
+    dwhole = PortfolioOptimisers.project_linear_constraint(linear_constraints("F1 <= 1",
+                                                                              dsets, "nf"),
+                                                           M)
+    @test collect(dstep.ineq.A) ≈ collect(dwhole.ineq.A)
+    @test vec(collect(dstep.ineq.A)) ≈ M[:, 1] + M[:, 2]
+
+    # The re-based row is asset-length whatever the row was written in.
+    @test PortfolioOptimisers.constraint_row_length(nothing, ["F1", "F2"]) == 2
+    @test PortfolioOptimisers.constraint_row_length(rr, ["F1", "F2"]) == 3
+end

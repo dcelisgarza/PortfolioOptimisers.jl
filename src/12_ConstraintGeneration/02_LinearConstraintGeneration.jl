@@ -1187,34 +1187,37 @@ function eval_numeric_functions(expr, datatype::DataType = Float64)
     end
 end
 """
-    _collect_terms(expr::Union{Symbol, Expr, <:Number})
+    _collect_terms(expr::Union{Symbol, Expr, <:Number}, datatype::DataType = Float64)
 
 Expand and collect all terms from a Julia expression representing a linear constraint equation.
 
 `_collect_terms` takes a Julia expression (such as the left-hand side of a constraint equation), recursively traverses its structure, and returns a vector of `(coefficient, variable)` pairs. It supports numeric constants, variables, and arithmetic operations (`+`, `-`, `*`, `/`), and is used to canonicalise linear constraint equations for further processing.
 
+The starting coefficient is `one(datatype)`, so every coefficient the walk builds is of that type. The caller asked for the numeric domain the optimiser works in, and the coefficients belong to it as much as the right-hand side does.
+
 # Algorithm
 
  1. Open an empty vector `terms`.
- 2. Walk `expr` with [`collect_terms!`](@ref), from the starting coefficient `1.0`. The walk appends one pair to `terms` per term it reaches: a constant as `(coefficient, nothing)`, and anything else as `(coefficient, name)`.
+ 2. Walk `expr` with [`collect_terms!`](@ref), from the starting coefficient `one(datatype)`. The walk appends one pair to `terms` per term it reaches: a constant as `(coefficient, nothing)`, and anything else as `(coefficient, name)`.
  3. Return `terms`.
 
 # Arguments
 
   - `expr`: The Julia expression to expand.
+  - `datatype`: Numeric type of the coefficients the walk builds.
 
 # Returns
 
-  - `terms::Vector{Tuple{Float64, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
+  - `terms::Vector{Tuple{datatype, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
 
 # Related
 
   - [`collect_terms!`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _collect_terms(expr)
+function _collect_terms(expr, datatype::DataType = Float64)
     terms = []
-    collect_terms!(expr, 1.0, terms)
+    collect_terms!(expr, one(datatype), terms)
     return terms
 end
 """
@@ -1238,7 +1241,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
   - `expr`: The Julia expression to traverse.
   - `coeff`: The current numeric coefficient to apply.
-  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Option{<:String})`, where `Nothing` indicates a constant term.
+  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(typeof(coeff), Option{<:String})`, where `Nothing` indicates a constant term.
 
 # Returns
 
@@ -1423,16 +1426,16 @@ function _parse_equation(lhs, opstr::AbstractString, rhs,
     diff_expr = :($lexpr - ($rexpr))
 
     # 5. Expand and collect like terms
-    terms = _collect_terms(diff_expr)
+    terms = _collect_terms(diff_expr, datatype)
 
     # 6. Separate variables and constant
-    varmap = Dict{String, Float64}()
+    varmap = Dict{String, datatype}()
     constant::datatype = 0.0
     for (coeff, var) in terms
         if isnothing(var)
             constant += coeff
         else
-            varmap[var] = get(varmap, var, 0.0) + coeff
+            varmap[var] = get(varmap, var, zero(datatype)) + coeff
         end
     end
 
@@ -1742,7 +1745,7 @@ ParsingResult
   coef ┼ Vector{Float64}: [2.0, 1.0, 1.0]
     op ┼ String: "=="
    rhs ┼ Float64: 1.0
-   eqn ┴ String: "2.0*C + 1.0*A + 1.0*B == 1.0"
+   eqn ┴ String: "2.0*C + A + B == 1.0"
 ```
 
 # Related
@@ -1842,7 +1845,9 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
     deleteat!(coeffs_new, idx_rm)
     append!(variables_new, variables_tmp)
     append!(coeffs_new, coeffs_tmp)
-    eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "), "+ -" => "-",
+    # Render through the same `format_term` the unexpanded string uses, so one constraint
+    # prints one way whether or not a group expanded.
+    eqn = replace(join(format_term.(coeffs_new, variables_new), " + "), "+ -" => "-",
                   "  " => " ")
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
@@ -2051,7 +2056,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                 continue
             end
             matched = true
-            At += constraint_row_term(rr, Ai, c)
+            At .+= constraint_row_term(rr, Ai, c)
         end
         if !any(!iszero, At)
             # Two distinct failures land here once a re-basis is possible: the names missed the

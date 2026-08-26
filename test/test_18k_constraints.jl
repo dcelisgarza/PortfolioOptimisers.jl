@@ -727,3 +727,118 @@ end
                                                                     partial_sets;
                                                                     strict = true)
 end
+
+@testset "Row assembly and carriers (issue #513)" begin
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+
+    # `merge_partial_linear_constraints` stacks the halves it is given, in input order,
+    # skips the absent ones, and refuses rows of differing width.
+    p1 = PartialLinearConstraint(; A = [1.0 0.0 0.0; 0.0 1.0 0.0], B = [1.0, 2.0])
+    p2 = PartialLinearConstraint(; A = [1.0 1.0 1.0], B = [3.0])
+    m = PortfolioOptimisers.merge_partial_linear_constraints([p1, nothing, p2])
+    @test size(m.A, 1) == length(m.B) == 3
+    @test m.B == [1.0, 2.0, 3.0]
+    @test isnothing(PortfolioOptimisers.merge_partial_linear_constraints([nothing, nothing]))
+    @test_throws DimensionMismatch PortfolioOptimisers.merge_partial_linear_constraints([p1,
+                                                                                         PartialLinearConstraint(;
+                                                                                                                 A = [1.0 1.0],
+                                                                                                                 B = [0.0])])
+
+    # A one-element vector comes back as the element itself, not as a copy of it, and a
+    # bare constraint reaches the same method through the `LinearConstraint` arity.
+    lc = LinearConstraint(; ineq = p1)
+    @test PortfolioOptimisers.merge_linear_constraints([lc]) === lc
+    @test PortfolioOptimisers.merge_linear_constraints(lc) === lc
+    @test_throws PortfolioOptimisers.IsEmptyError PortfolioOptimisers.merge_linear_constraints(LinearConstraint[])
+
+    # The four computed properties answer `nothing` for the half that is absent.
+    @test lc.A_ineq === p1.A
+    @test lc.B_ineq === p1.B
+    @test isnothing(lc.A_eq)
+    @test isnothing(lc.B_eq)
+    lce = LinearConstraint(; eq = p2)
+    @test isnothing(lce.A_ineq)
+    @test isnothing(lce.B_ineq)
+    @test lce.A_eq === p2.A
+    @test lce.B_eq === p2.B
+
+    # Two or more elements take the merging branch, and the halves concatenate in input
+    # order.
+    both = PortfolioOptimisers.merge_linear_constraints([lc, lce])
+    @test size(both.A_ineq, 1) == 2
+    @test size(both.A_eq, 1) == 1
+    @test both.B_ineq == [1.0, 2.0]
+    @test both.B_eq == [3.0]
+
+    # A precomputed constraint is carried through a sub-selection unchanged: the row is
+    # written over the whole universe it was assembled against, so slicing `A` would
+    # change what the row asserts. A row wider than the weight vector then fails loudly
+    # at model build time; `NestedClustered` refuses a bare precomputed constraint for
+    # exactly this reason.
+    @test PortfolioOptimisers.port_opt_view(lc, [1, 2]) === lc
+
+    # An already-assembled constraint, `nothing`, and a vector of constraints pass
+    # through `linear_constraints` untouched.
+    @test linear_constraints(lc, sets) === lc
+    @test isnothing(linear_constraints(nothing, sets))
+    v = [lc, lce]
+    @test linear_constraints(v, nothing) === v
+
+    # A row whose every term matched no name is dropped, so a constraint that keeps no
+    # row at all answers `nothing` rather than an empty matrix.
+    @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("Z <= 1", sets))
+    @test_throws ArgumentError linear_constraints("Z <= 1", sets; strict = true)
+
+    # A missing asset universe suggests only keys no other declared axis speaks for, so a
+    # dict carrying a feature axis alone is not answered with the feature key.
+    @test_throws KeyError UniverseSets(; dict = Dict("nxx" => ["A"], "nz" => ["z"]))
+    @test PortfolioOptimisers.unclaimed_sets_keys(Dict("nxx" => ["A"], "nz" => ["z"]),
+                                                  ("ux", "nf", "uf", "nz")) == ["nxx"]
+
+    # `universe_axis` reads the axis off the key, so a factor universe is named as one.
+    fsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    @test PortfolioOptimisers.universe_axis(fsets, "nx") == "asset"
+    @test PortfolioOptimisers.universe_axis(fsets, "nf") == "factor"
+    @test PortfolioOptimisers.universe_axis(fsets, "nf_style") == "factor"
+
+    # `factor_universe` and `feature_universe` each raise at the point of need, naming the
+    # axis they read and the matrix they reconcile it against.
+    @test_throws KeyError PortfolioOptimisers.factor_universe(sets, 2, "a test", "rr.M")
+    @test_throws DimensionMismatch PortfolioOptimisers.factor_universe(fsets, 3, "a test",
+                                                                       "rr.M")
+    @test PortfolioOptimisers.factor_universe(fsets, 2, "a test", "rr.M") == ["F1", "F2"]
+    @test_throws KeyError PortfolioOptimisers.feature_universe(sets, "a test")
+    zsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nz" => ["z1", "z2"]))
+    @test PortfolioOptimisers.feature_universe(zsets, "a test") == ["z1", "z2"]
+
+    # `estimator_to_val` answers each shape it is given against the same universe.
+    @test PortfolioOptimisers.estimator_to_val(nothing, sets) === nothing
+    @test PortfolioOptimisers.estimator_to_val(0.7, sets) == 0.7
+    @test PortfolioOptimisers.estimator_to_val([1.0, 2.0, 3.0], sets) == [1.0, 2.0, 3.0]
+    @test_throws DimensionMismatch PortfolioOptimisers.estimator_to_val([1.0, 2.0], sets)
+    # The matrix method validates `size(val, dims)`, and `dims` is 2 by default, so the
+    # universe names the *columns* of the matrix.
+    mat = [1.0 2.0 3.0; 4.0 5.0 6.0]
+    @test PortfolioOptimisers.estimator_to_val(mat, sets) === mat
+    tmat = transpose(mat)
+    @test PortfolioOptimisers.estimator_to_val(tmat, sets; dims = 1) === tmat
+    @test_throws DimensionMismatch PortfolioOptimisers.estimator_to_val(tmat, sets)
+    # `UniformValues` answers a range rather than a vector, and its entries sum to one.
+    for N in (3, 7, 10)
+        uv = PortfolioOptimisers.estimator_to_val(UniformValues(),
+                                                  UniverseSets(;
+                                                               dict = Dict("nx" =>
+                                                                               string.(1:N))))
+        @test uv isa AbstractRange
+        @test length(uv) == N
+        @test sum(uv) == 1.0
+    end
+    # Two entries naming overlapping groups let the last write win.
+    osets = UniverseSets(;
+                         dict = Dict("nx" => ["A", "B", "C"], "g1" => ["A", "B"],
+                                     "g2" => ["B", "C"]))
+    @test PortfolioOptimisers.estimator_to_val(["g1" => 1.0, "g2" => 2.0], osets) ==
+          [1.0, 2.0, 2.0]
+    @test PortfolioOptimisers.estimator_to_val(["g2" => 2.0, "g1" => 1.0], osets) ==
+          [1.0, 1.0, 2.0]
+end

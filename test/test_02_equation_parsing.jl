@@ -424,3 +424,66 @@ end
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
 end
+@testset "Canonicalisation invariants (issue #513)" begin
+    using PortfolioOptimisers, Test, Logging
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        # Repeated names accumulate into one coefficient rather than two entries.
+        res = parse_equation("2*A + 3*A <= 1")
+        @test res.vars == ["A"]
+        @test res.coef == [5.0]
+
+        # `collect_terms!` handles `:-` by negating the last argument, and a unary minus
+        # holds no argument but the last, so its one operand is the negated one.
+        res = parse_equation("-A <= 1")
+        @test res.coef == [-1.0]
+        res = parse_equation("A - B - C <= 1")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["A", "B", "C"]
+        @test res.coef[idx] == [1.0, -1.0, -1.0]
+        res = parse_equation("-(A - B) <= 1")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["A", "B"]
+        @test res.coef[idx] == [-1.0, 1.0]
+
+        # A product or a quotient of two non-numeric sides is opaque: it becomes one
+        # variable named by its own text, which resolves against the universe like any
+        # other name and is dropped when it matches none.
+        @test parse_equation("A/B <= 1").vars == ["A / B"]
+        @test parse_equation("A*B <= 1").vars == ["A * B"]
+        # A node whose head is not `:call` is rebuilt from its folded arguments, so a
+        # tuple survives the fold and becomes one opaque name.
+        @test parse_equation("(A, B) <= 1").vars == ["(A, B)"]
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        @test isnothing(@test_logs (:warn,) (:warn,) linear_constraints("A/B <= 1", sets))
+        @test_throws ArgumentError linear_constraints("A/B <= 1", sets; strict = true)
+
+        # `datatype` names the numeric domain of the coefficients as well as of the
+        # right-hand side. The walk starts from `one(datatype)`, so `coef` carries it.
+        res = parse_equation("2*A + 1 <= 3"; datatype = Float32)
+        @test res.coef isa Vector{Float32}
+        @test res.rhs isa Float32
+        @test res.coef == Float32[2.0]
+        @test res.rhs == Float32(2)
+
+        # One constraint prints one way whether or not a group expanded: both renderings
+        # go through `format_term`, which elides a unit coefficient.
+        gsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "g" => ["A", "B"]))
+        res = replace_group_by_assets(parse_equation("g + 2*C <= 1"), gsets)
+        @test res.eqn == "2.0*C + A + B <= 1.0"
+
+        # A `>=` row is the same constraint as the negated `<=` row, in both halves.
+        ge = linear_constraints("A >= 0.1", sets)
+        le = linear_constraints("-A <= -0.1", sets)
+        @test collect(ge.ineq.A) == collect(le.ineq.A)
+        @test ge.ineq.B == le.ineq.B
+        @test collect(ge.ineq.A) == [-1.0 0.0 0.0]
+        @test ge.ineq.B == [-0.1]
+
+        # A group carries the coefficient onto every member, and the Black-Litterman
+        # expansion divides it by the member count instead: a sum against a mean.
+        s3 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "g3" => ["A", "B", "C"]))
+        eq6 = parse_equation("6*g3 <= 1")
+        @test replace_group_by_assets(eq6, s3, false).coef == [6.0, 6.0, 6.0]
+        @test replace_group_by_assets(eq6, s3, true).coef == [2.0, 2.0, 2.0]
+    end
+end

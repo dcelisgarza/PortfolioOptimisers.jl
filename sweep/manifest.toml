@@ -101,7 +101,7 @@
 "src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { map = 4, units = 5, algorithm = 4, swept = true }
 "src/11_Phylogeny/06_Phylogeny.jl" = { map = 4, units = 63, algorithm = 27, swept = true }
 "src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { map = 5, units = 6, swept = false }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 48, swept = false }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { map = 5, units = 48, algorithm = 29, swept = true }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { map = 5, units = 7, swept = false }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { map = 5, units = 22, swept = false }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { map = 5, units = 11, swept = false }
