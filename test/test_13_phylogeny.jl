@@ -4217,3 +4217,182 @@ Defined at top level because a `@testset` body becomes a function.
         @test_throws Exception Pagerank(; alpha = 1.5)
     end
 end
+@testset "The centrality constraint row does not depend on the orientation of `X`" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    `centrality_constraints` accumulated each row flat and reshaped the accumulator with
+    `size(X, 2)`, which is the asset count only when `dims = 1`. Under `dims = 2` on a
+    non-square `X` the reshape RAISED rather than giving a wrong row: measured on an
+    8x250 matrix, `DimensionMismatch: array size 8 must be divisible by the product of
+    the new dimensions (250, Colon())`. Issue #516 found it. The count now follows
+    `dims`, and `assert_dims` refuses any other value, which the body did not check at
+    all before.
+    =#
+    Xc = randn(StableRNG(123456), 250, 8)
+    ccc = CentralityConstraint()
+    lc1 = centrality_constraints(ccc, Xc)
+    lc2 = centrality_constraints(ccc, permutedims(Xc); dims = 2)
+    @test size(lc1.ineq.A) == (1, 8)
+    @test lc1.ineq.A == lc2.ineq.A
+    @test lc1.ineq.B == lc2.ineq.B
+    @test_throws DomainError centrality_constraints(ccc, Xc; dims = 3)
+end
+@testset "A zero centrality vector drops its constraint without a diagnostic" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    Two assets give a one-edge tree, and no vertex lies on a shortest path between two
+    others, so `BetweennessCentrality` and `StressCentrality` both give the zero vector.
+    `centrality_constraints` skips such a constraint and emits nothing: neither a warning
+    nor an error. A lone zero constraint therefore returns `nothing`, and a mixed vector
+    returns only the rows that survived. `strict_diagnostic` is not the instrument here:
+    it governs an unresolvable NAME, and a zero centrality vector is a fact about the
+    graph. Issue #516 measured the drop and left the behaviour as it stands.
+    =#
+    X2 = randn(StableRNG(9), 200, 2)
+    for ct in (BetweennessCentrality(), StressCentrality())
+        @test all(iszero, centrality_vector(CentralityEstimator(; ct = ct), X2).X)
+    end
+    zc = CentralityConstraint(; A = CentralityEstimator(; ct = BetweennessCentrality()))
+    dc = CentralityConstraint(; A = CentralityEstimator(; ct = DegreeCentrality()))
+    @test isnothing(@test_logs centrality_constraints(zc, X2))
+    lcm = @test_logs centrality_constraints([zc, dc], X2)
+    @test size(lcm.ineq.A) == (1, 2)
+    @test isnothing(lcm.eq)
+    @test_throws PortfolioOptimisers.IsEmptyError centrality_constraints(CentralityConstraint[],
+                                                                         X2)
+end
+@testset "The centrality threshold is read off the unscaled vector" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    `B = d * vec_to_real_measure(cc.B, A)` runs BEFORE `A .*= d`, so the measure never
+    sees the sign-flipped row. Deriving it from the flipped row would negate it twice and
+    turn a `MinValue()` into a `MaxValue()` with the wrong sign. On this eight-asset
+    degree vector the smallest entry is 1/7 and the largest 3/7, so `>=` must give exactly
+    the negation of what `<=` gives.
+    =#
+    Xc = randn(StableRNG(123456), 250, 8)
+    cv = centrality_vector(CentralityEstimator(), Xc).X
+    @test isapprox(minimum(cv), 1 / 7)
+    @test isapprox(maximum(cv), 3 / 7)
+    for (Bm, want) in ((MinValue(), minimum(cv)), (MaxValue(), maximum(cv)), (0.2, 0.2))
+        le = centrality_constraints(CentralityConstraint(; B = Bm, comp = <=), Xc)
+        ge = centrality_constraints(CentralityConstraint(; B = Bm, comp = >=), Xc)
+        eq = centrality_constraints(CentralityConstraint(; B = Bm, comp = ==), Xc)
+        @test le.ineq.B == [want]
+        @test ge.ineq.B == [-want]
+        @test le.ineq.A == -ge.ineq.A
+        # `==` builds an equality row and leaves the inequality half empty.
+        @test isnothing(eq.ineq)
+        @test eq.eq.B == [want]
+        @test eq.eq.A == le.ineq.A
+    end
+    # A mixed vector puts each row in its own half, in the order it was given.
+    mixed = centrality_constraints([CentralityConstraint(; comp = <=),
+                                    CentralityConstraint(; comp = ==, B = MaxValue()),
+                                    CentralityConstraint(; comp = >=, B = 0.3)], Xc)
+    @test size(mixed.ineq.A) == (2, 8)
+    @test size(mixed.eq.A) == (1, 8)
+    @test isapprox(mixed.ineq.B, [minimum(cv), -0.3])
+    @test isapprox(mixed.eq.B, [maximum(cv)])
+end
+@testset "A centrality constraint checks no value it is given" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    `CentralityConstraint`'s inner constructor validates nothing, and
+    `centrality_constraints` adds no check of its own, so a non-finite threshold reaches
+    the generated right-hand side unchanged and the model carries it to the solver. Every
+    argument is bounded by its type alone. Measured under issue #516.
+    =#
+    Xc = randn(StableRNG(123456), 250, 8)
+    @test isnan(centrality_constraints(CentralityConstraint(; B = NaN), Xc).ineq.B[1])
+    @test centrality_constraints(CentralityConstraint(; B = Inf), Xc).ineq.B == [Inf]
+    @test_throws TypeError CentralityConstraint(; comp = <)
+    @test_throws TypeError CentralityConstraint(; A = NetworkEstimator())
+end
+@testset "`IntegerPhylogeny` stores the deduplicated row set, not the matrix it is given" begin
+    using PortfolioOptimisers, Test, LinearAlgebra
+    #=
+    The inner constructor replaces `A` with `unique(A + I; dims = 1)`, so `ip.A` is a
+    DERIVED quantity: one row per distinct neighbourhood or cluster, which is why the
+    stored matrix is usually shorter than it is wide. `length(B)` is checked against that
+    row count and not against the number of assets. Measured under issue #516.
+    =#
+    # Four assets in two clusters of two give two distinct rows out of four.
+    Acl = Float64[0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
+    ipc = IntegerPhylogeny(; A = Acl, B = [1, 1])
+    @test size(ipc.A) == (2, 4)
+    @test ipc.A == Float64[1 1 0 0; 0 0 1 1]
+    # A path relates three distinct neighbourhoods, so no row repeats and none is dropped.
+    Apa = Float64[0 1 0; 1 0 1; 0 1 0]
+    ipp = IntegerPhylogeny(; A = Apa, B = [1, 1, 1])
+    @test size(ipp.A) == (3, 3)
+    @test ipp.A == Apa + I
+    # The vector `B` is checked after the deduplication: four assets need two entries.
+    @test_throws DimensionMismatch IntegerPhylogeny(; A = Acl, B = [1, 1, 1, 1])
+    # A scalar `B` applies to every row, so it needs no length at all.
+    @test IntegerPhylogeny(; A = Acl, B = 1).B == 1
+    # The two guards that run before the rewrite.
+    @test_throws ArgumentError IntegerPhylogeny(; A = Float64[1 1; 1 1], B = 1)
+    @test_throws ArgumentError IntegerPhylogeny(; A = Float64[0 1; 0 0], B = 1)
+end
+@testset "The integer phylogeny `B` guard fires only for a stated cluster count" begin
+    using PortfolioOptimisers, Test
+    #=
+    `validate_length_integer_phylogeny_constraint_B` has four methods across two names,
+    and only the `ClustersEstimator` one does anything. A `NetworkEstimator` reaches the
+    fallback and passes at any length, and so does the DEFAULT `OptimalNumberClusters()`,
+    whose `max_k` is `nothing` and whose `alg` is a `SecondOrderDifference` rather than an
+    integer. Measured under issue #516.
+    =#
+    V = PortfolioOptimisers.validate_length_integer_phylogeny_constraint_B
+    _V = PortfolioOptimisers._validate_length_integer_phylogeny_constraint_B
+    @test isnothing(V(ClustersEstimator(; onc = OptimalNumberClusters(; max_k = 3)),
+                      [1, 1, 1]))
+    @test_throws DomainError V(ClustersEstimator(;
+                                                 onc = OptimalNumberClusters(; max_k = 3)),
+                               [1, 1, 1, 1])
+    # An integer `alg` bounds the length through the private delegate.
+    @test isnothing(V(ClustersEstimator(; onc = OptimalNumberClusters(; alg = 4)),
+                      collect(1:4)))
+    @test_throws DomainError V(ClustersEstimator(; onc = OptimalNumberClusters(; alg = 4)),
+                               collect(1:5))
+    # Neither bound exists on the default, so a `B` of any length passes.
+    dflt = ClustersEstimator()
+    @test isnothing(dflt.onc.max_k)
+    @test isa(dflt.onc.alg, SecondOrderDifference)
+    @test isnothing(V(dflt, collect(1:50)))
+    # Every guard is a no-op for a network source, the commonest one.
+    @test isnothing(V(NetworkEstimator(), collect(1:99)))
+    @test isnothing(_V(nothing, collect(1:99)))
+end
+@testset "`phylogeny_constraints` passes a result through and keeps a vector in order" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    #=
+    Four methods: one per estimator, an identity for a precomputed result or `nothing`,
+    and a broadcast over a vector. The identity returns the SAME object and builds
+    nothing, which is what lets a caller hand a fitted constraint back into the pipeline.
+    Measured under issue #516.
+    =#
+    Xp = randn(StableRNG(123456), 250, 8)
+    sdp = phylogeny_constraints(SemiDefinitePhylogenyEstimator(), Xp)
+    ipr = phylogeny_constraints(IntegerPhylogenyEstimator(), Xp)
+    @test isa(sdp, SemiDefinitePhylogeny)
+    @test size(sdp.A) == (8, 8)
+    @test sdp.p == 0.05
+    @test isa(ipr, IntegerPhylogeny)
+    @test ipr.B == 1
+    pre = SemiDefinitePhylogeny(; A = [0.0 1.0; 1.0 0.0])
+    @test phylogeny_constraints(pre, Xp) === pre
+    @test isnothing(phylogeny_constraints(nothing, Xp))
+    vres = phylogeny_constraints(PortfolioOptimisers.PlCE_PlC[IntegerPhylogenyEstimator(),
+                                                              SemiDefinitePhylogenyEstimator(),
+                                                              pre], Xp)
+    @test isa(vres[1], IntegerPhylogeny)
+    @test isa(vres[2], SemiDefinitePhylogeny)
+    @test vres[3] === pre
+    # The guards of the semidefinite pair.
+    @test_throws DomainError SemiDefinitePhylogenyEstimator(; p = -1.0)
+    @test_throws DomainError SemiDefinitePhylogeny(; A = [0.0 1.0; 1.0 0.0], p = -0.5)
+    @test_throws ArgumentError SemiDefinitePhylogeny(; A = [0.0 1.0; 0.0 0.0])
+    @test_throws ArgumentError SemiDefinitePhylogeny(; A = [1.0 1.0; 1.0 1.0])
+end

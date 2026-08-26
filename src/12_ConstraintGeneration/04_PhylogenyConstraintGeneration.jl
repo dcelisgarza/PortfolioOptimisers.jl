@@ -211,6 +211,8 @@ Drives the product of weights of every related pair of assets to zero through a 
 
 Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster.
 
+`p` sets the size of the **relaxation gap** and not the strength of the constraint. `A ⊙ W == 0` is written whether or not `p` is read, so a larger `p` forbids no more pairs. It only makes `W` track the outer product it stands for more closely. A wider gap lets a pair of related assets both hold weight while their entry of `W` absorbs the product.
+
 # Mathematical definition
 
 The relaxation replaces the outer product of the weights with a symmetric matrix variable and bounds it below through a Schur complement. Where the objective is already a trace against that variable — a variance — the constraint form applies:
@@ -244,10 +246,6 @@ Where:
   - ``\\odot``: Hadamard product.
   - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
   - ``\\mathcal{W}``: Rest of the feasible set.
-
-The two branches are what the code does: [`set_sdp_phylogeny_constraints!`](@ref) always writes `A ⊙ W == 0` and adds `p * tr(W)` to the objective penalty **only** when the model carries no variance. On a 250×6 sample the Hadamard constraint holds to `2.1e-18` under a variance objective and to `3.1e-21` under a conditional-value-at-risk objective.
-
-`p` therefore sets the size of the **relaxation gap**, not the strength of the constraint. `A ⊙ W == 0` is weight-inert: it is the same constraint at any magnitude of `A`. What `p` buys is how closely `W` tracks the outer product it stands for. On the same sample the largest entry of ``\\mathbf{W} - \\boldsymbol{w}\\boldsymbol{w}^\\intercal`` is `2.7e-5` under the variance objective, where the objective itself closes the gap, against `0.0274` under conditional value at risk at the default `p = 0.05` — three orders of magnitude wider. A wider gap lets a pair of related assets both hold weight while their entry of `W` absorbs the product.
 
 # Fields
 
@@ -284,7 +282,7 @@ SemiDefinitePhylogeny
 
   - [`set_sdp_constraints!`](@ref)
   - [`set_sdp_frc_constraints!`](@ref)
-  - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref): writes `A ⊙ W == 0` for every result of this type, and adds `p * tr(W)` to the objective penalty only when the model carries no variance.
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
@@ -322,38 +320,33 @@ function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum,
     return SemiDefinitePhylogeny(A, p)
 end
 """
-    _validate_length_integer_phylogeny_constraint_B(alg::Option{<:Integer},
-                                                    B::VecNum)
+    _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)
+    _validate_length_integer_phylogeny_constraint_B(args...)
 
-Validate that the length of the vector `B` does not exceed the integer value `alg`.
+Check the length of `B` against an integer cluster count `alg`.
 
-This function is used internally to ensure that the number of groups or allocations specified by `B` does not exceed the allowed maximum defined by `alg`. If the validation fails, a `DomainError` is thrown.
+The fallback method takes every other argument list and checks nothing, so a clustering algorithm that is not an integer count places no bound on `B`. The default [`OptimalNumberClusters`](@ref) carries a [`SecondOrderDifference`](@ref), so this guard is silent for it.
 
 # Arguments
 
-  - `alg`:
+  - `alg`: Number of clusters the source returns.
 
-      + `Nothing`: No validation is performed.
-      + `Integer`: Specifying the maximum allowed length for `B`.
+      + `Integer`: Bounds `length(B)`.
+      + Anything else: No check is made.
 
-  - `B`: Vector of integers representing group sizes or allocations.
+  - `B`: Vector of per-row bounds.
 
 # Validation
 
-  - Throws `DomainError` if `length(B) > alg`.
+  - `length(B) <= alg`, on the `Integer` method only. A breach raises a `DomainError`.
 
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - Checks that `length(B) <= alg`.
-  - Used in the construction and validation of integer phylogeny constraints.
-
 # Related
 
-  - [`validate_length_integer_phylogeny_constraint_B`](@ref)
+  - [`validate_length_integer_phylogeny_constraint_B`](@ref): the caller, which applies the `max_k` bound before it delegates here.
   - [`IntegerPhylogenyEstimator`](@ref)
 """
 function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)::Nothing
@@ -368,38 +361,35 @@ end
     validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
-Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `cle`.
+Check the length of `B` against the number of clusters the estimator `cle` may return.
+
+Only the [`ClustersEstimator`](@ref) method checks anything. Every other argument list reaches the fallback and passes, a [`NetworkEstimator`](@ref) included, so the commonest source of an [`IntegerPhylogenyEstimator`](@ref) is unguarded here. A network's row count is not known until [`phylogeny_matrix`](@ref) has run, and [`IntegerPhylogeny`](@ref)'s own constructor raises then.
 
 # Arguments
 
-  - `cle`: Clustering estimator containing algorithm and maximum group information.
-  - `B`: Vector of integers representing group sizes or allocations.
-  - `args...`: No validation is performed.
+  - `cle`: Clustering estimator whose `onc` field states the number of clusters.
+  - `B`: Vector of per-row bounds.
+  - `args...`: Every other argument list. No check is made.
 
 # Validation
 
-  - Throws `DomainError` if `length(B) > cle.onc.max_k` (when `max_k` is set).
-  - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
+  - `length(B) <= cle.onc.max_k`, when `max_k` is set. A breach raises a `DomainError`.
+  - `length(B) <= cle.onc.alg`, through [`_validate_length_integer_phylogeny_constraint_B`](@ref), when `alg` is an `Integer`.
+  - Neither bound exists on the default `OptimalNumberClusters()`, whose `max_k` is `nothing` and whose `alg` is a [`SecondOrderDifference`](@ref), so a `B` of any length passes.
 
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - Checks if `cle.onc.max_k` is set and validates `length(B)` accordingly.
-  - Delegates to `_validate_length_integer_phylogeny_constraint_B` for algorithm-specific validation.
-  - Used in the construction and validation of integer phylogeny constraints.
-
 # Related
 
-  - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
+  - [`_validate_length_integer_phylogeny_constraint_B`](@ref): the delegate that applies the `alg` bound.
   - [`IntegerPhylogenyEstimator`](@ref)
 """
 function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     if !isnothing(cle.onc.max_k)
         @argcheck(length(B) <= cle.onc.max_k,
-                  DomainError("`length(B) <= cle.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(cle.onc.max_k)"))
+                  DomainError("`length(B) <= cle.onc.max_k`:\nlength(B) => $(length(B))\ncle.onc.max_k => $(cle.onc.max_k)"))
     end
     _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing
@@ -516,7 +506,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Caps at `B` the number of related assets a mixed-integer model may hold at once.
 
-Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster.
+Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. A network source with `B = 1` forbids holding two assets that are neighbours. A clustering source with `B = 1` holds at most one asset per cluster.
 
 # Mathematical definition
 
@@ -542,7 +532,15 @@ Where:
   - ``\\odot``: Hadamard product.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-The constructor stores `unique(A + I; dims = 1)`, **not** the matrix it is given. The identity adds each asset to its own row, and the deduplication drops repeated rows, so one row survives per distinct neighbourhood or cluster. This is why the stored `A` is usually shorter than it is wide, and why a vector `B` is checked against the stored row count rather than against the number of assets. A network source with `B = 1` then forbids holding two assets that are neighbours; a clustering source with `B = 1` holds at most one asset per cluster.
+# Algorithm
+
+The constructor rewrites the matrix it is given, so the stored `A` is a derived quantity:
+
+ 1. Check that the diagonal of `A` is zero and that `A` is symmetric.
+ 2. Add the identity to `A`, which puts each asset in its own row.
+ 3. Drop the repeated rows of the sum with `unique(...; dims = 1)`, giving the stored `A`. One row survives per distinct neighbourhood or cluster, so the stored matrix is usually shorter than it is wide.
+ 4. Check that `B` is non-empty, non-negative and finite.
+ 5. Check `size(A, 1) == length(B)` when `B` is a vector, against the row count of step 3 and not against the number of assets.
 
 # Fields
 
@@ -717,9 +715,9 @@ Where:
   - ``\\phi``: Objective function of the optimiser.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-The source states this constraint as an equality against a desired average centrality. `comp` widens that: `==` builds an equality row and every other operator an inequality row.
+The source states this constraint as an equality against a desired average centrality. Either sense of the inequality is admitted here as well.
 
-When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph and the constraint always has a feasible point. The measure reads the centrality vector, never the row after `comp` has flipped its sign: `MinValue()` gives the smallest entry under `<=` and under `>=` alike. On an eight-asset degree vector both give `0.14285714285714285`, and `MaxValue()` gives `0.42857142857142855`.
+When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph and the constraint always has a feasible point.
 
 # Fields
 
@@ -734,6 +732,11 @@ $(DocStringExtensions.FIELDS)
     ) -> CentralityConstraint
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - Every argument is bounded by its type and by nothing else: `A` by [`CentralityEstimator`](@ref), `B` by [`Num_VecToScaM`](@ref), and `comp` by [`ComparisonOperator`](@ref). A value outside a bound raises a `TypeError` from the keyword constructor.
+  - No value is checked. A non-finite `B` reaches the generated row unchanged: [`centrality_constraints`](@ref) stores a `NaN` or an `Inf` right-hand side and the model carries it to the solver.
 
 # Examples
 
@@ -849,34 +852,42 @@ Matches either a [`CentralityConstraint`](@ref), a vector of them, or a [`Linear
 """
 const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 """
-    centrality_constraints(ccs::CC_VecCC,
-                           X::MatNum; dims::Int = 1, kwargs...)
+    centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
 
-Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
+Reduce one or more [`CentralityConstraint`](@ref) estimators to a [`LinearConstraint`](@ref).
 
-`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or threshold, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
+Each estimator contributes one row. The coefficients of the row are the centrality vector of the asset network, and the right-hand side is read off that vector or given as a number. A constraint whose centrality vector is empty or all zero contributes **no row and no diagnostic**: two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`.
+
+# Algorithm
+
+ 1. Check that `ccs` is not empty when it is a vector.
+ 2. Check `dims` with [`assert_dims`](@ref), and read the asset count `N` from the axis of `X` that `dims` does not name. `N` is the width of every row the loop builds.
+ 3. For each `cc` in `ccs`, compute the centrality vector `A` with the estimator in `cc.A`, along `dims`.
+ 4. Skip `cc` when `A` is empty or all zero.
+ 5. Read the sign `d` and the inequality flag `flag_ineq` of `cc.comp` from [`comparison_sign_ineq_flag`](@ref).
+ 6. Derive the right-hand side `B` from `cc.B` against the unscaled `A` with [`vec_to_real_measure`](@ref), and scale it by `d`.
+ 7. Scale `A` by `d`, which negates a `>=` row so that every inequality is stored in the `A w <= B` sense.
+ 8. Append `A` and `B` to the inequality pair or to the equality pair, as `flag_ineq` selects.
+ 9. Reshape each flat accumulator into `N` columns, giving one row per surviving constraint, and build the [`LinearConstraint`](@ref) from the halves that hold a row. Return `nothing` when neither half does.
+
+Step 6 runs before step 7 by design. Deriving the threshold from the scaled row negates it a second time, which cancels the flip and turns a `MinValue()` into a `MaxValue()` with the wrong sign.
 
 # Arguments
 
-  - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of such estimators.
-  - `X`: Data matrix (`observations × assets`).
+  - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of them.
+  - `X`: Data matrix.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 
+# Validation
+
+  - `!isempty(ccs)` when `ccs` is a vector. A breach raises an `IsEmptyError`.
+  - $(val_dict[:dims]) The check is made with [`assert_dims`](@ref), which raises the `DomainError`.
+  - No value of `cc.B` is checked. A `NaN` or an `Inf` threshold reaches the returned right-hand side unchanged.
+
 # Returns
 
-  - `lc::Option{<:LinearConstraint}`: An object containing the assembled inequality and equality constraints, or `nothing` if no constraints are present.
-
-# Details
-
-  - For each constraint, computes the centrality vector using the estimator in `cc.A`.
-  - Derives the threshold from `cc.B`. A number is the threshold itself; a [`VectorToScalarMeasure`](@ref) is applied to the centrality vector.
-  - Negates the row and the threshold together for an operator that points the other way, so every inequality is stored in the `A w <= B` form.
-  - Skips a constraint whose centrality vector is empty or all zero.
-  - Aggregates constraints into equality and inequality forms.
-  - Returns `nothing` if no valid constraints are generated.
-
-The threshold is derived **before** the negation, and negated once with the row. Deriving it from the negated row instead negates it a second time, which cancels the flip and turns a `MinValue()` into a `MaxValue()` with the wrong sign.
+  - `lc::Option{<:LinearConstraint}`: The assembled inequality and equality rows, or `nothing` when every constraint was skipped.
 
 # Related
 
@@ -884,11 +895,15 @@ The threshold is derived **before** the negation, and negated once with the row.
   - [`LinearConstraint`](@ref)
   - [`PartialLinearConstraint`](@ref)
   - [`centrality_vector`](@ref)
+  - [`comparison_sign_ineq_flag`](@ref): the one sign and flag table, shared with [`get_linear_constraints`](@ref).
+  - [`assert_dims`](@ref)
 """
 function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs), IsEmptyError("ccs cannot be empty"))
     end
+    assert_dims(dims)
+    N = size(X, isone(dims) ? 2 : 1)
     A_ineq = Vector{eltype(X)}(undef, 0)
     B_ineq = Vector{eltype(X)}(undef, 0)
     A_eq = Vector{eltype(X)}(undef, 0)
@@ -916,10 +931,10 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs.
     ineq_flag = !isempty(A_ineq)
     eq_flag = !isempty(A_eq)
     if ineq_flag
-        A_ineq = transpose(reshape(A_ineq, size(X, 2), :))
+        A_ineq = transpose(reshape(A_ineq, N, :))
     end
     if eq_flag
-        A_eq = transpose(reshape(A_eq, size(X, 2), :))
+        A_eq = transpose(reshape(A_eq, N, :))
     end
     return if !ineq_flag && !eq_flag
         nothing
