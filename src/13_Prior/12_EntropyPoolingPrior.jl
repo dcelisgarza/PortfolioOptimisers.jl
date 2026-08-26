@@ -1239,6 +1239,7 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
 # Validation
 
   - [`ConicRelativisticValueatRiskView`](@ref) needs an operator other than `<=`, and, for an equality, a target at or above the prior RLVaR.
+  - [`GridRelativisticValueatRiskView`](@ref) needs at least one grid point whose row is finite. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, which is where the grid sits when `kappa` approaches one; the points it overflows at are dropped, and a grid that keeps none of them raises.
 
 # Returns
 
@@ -1248,6 +1249,8 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
 
   - [`ConicRelativisticValueatRiskView`](@ref)
   - [`GridRelativisticValueatRiskView`](@ref)
+  - [`ep_rlvar_grid_row`](@ref)
+  - [`ep_rlvar_tail`](@ref)
   - [`ep_rlvar_views!`](@ref)
 """
 function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
@@ -1279,6 +1282,17 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
     for (k, zk) in pairs(z)
         t[k] = ep_rlvar_shift(x, wi, kappa, lnk, zk).t - delta
     end
+    # A point whose row is not finite is not a grid point. `ep_rlvar_tail` overflows at a
+    # dual variable near zero, which is where the grid sits when `kappa` approaches one, and
+    # a non-finite coefficient reaches the solver as `NaN * x[j]`.
+    keep = filter(eachindex(z)) do k
+        c, b = ep_rlvar_grid_row(x, rhs, t[k], z[k], alpha, kappa)
+        return all(isfinite, c) && isfinite(b)
+    end
+    @argcheck(!isempty(keep),
+              ArgumentError("View `$(eqn)` builds no finite grid point at `kappa = $(kappa)`. The tail function overflows at every dual variable the grid spans; state the view at a smaller `kappa`."))
+    t = t[keep]
+    z = z[keep]
     if op == :geq || op == :eq
         for (tk, zk) in zip(t, z)
             c, b = ep_rlvar_grid_row(x, rhs, tk, zk, alpha, kappa)

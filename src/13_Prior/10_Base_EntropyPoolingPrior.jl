@@ -1307,6 +1307,8 @@ Grid formulation of a relativistic value-at-risk view.
 
 `GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, built around the point that attains the target on the translated prior. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
 
+The grid loses its reach above `kappa = 0.5`, and no `pct` restores it. As `kappa` approaches one the RLVaR approaches the largest loss and the dual variable that attains it collapses toward zero, while the one the posterior attains does not. The span cannot exceed twice the prior's, because `pct < 1`, so the grid cannot hold the point the target needs. The view is never violated there, because every grid point is feasible for the primal programme, but it lands short of the target. Prefer a smaller `kappa`, or [`ConicRelativisticValueatRiskView`](@ref) where the operator admits it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1344,7 +1346,7 @@ and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector and ``M`
 \\end{align}
 ```
 
-An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so widen `pct` or raise `K` when the posterior value misses the target, and prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it. Rows are scaled by their largest coefficient before they reach the model, so the default `M` is far above the largest attainable violation.
+An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it. Rows are scaled by their largest coefficient before they reach the model, so the coefficients sit in `(0, 1]` and the posterior sums to one. The left-hand side is therefore bounded by one whatever the data, and the default `M` clears that bound by an order of magnitude.
 
 The grid spans `zstar * (1 - pct)` to `zstar * (1 + pct)`, where `zstar` attains the prior RLVaR of the asset, and `K` is odd so `zstar` sits in the middle. RLVaR and the shift that attains it are both translation-equivariant, so a posterior that moves the RLVaR to the target behaves, to first order, like translating every loss by the same amount. Each `t_k` is therefore the shift that minimises the objective at `z_k` under the prior probabilities, less the distance from the prior RLVaR to the target. A grid anchored on the prior instead leaves an upper-bound view with no reachable point.
 

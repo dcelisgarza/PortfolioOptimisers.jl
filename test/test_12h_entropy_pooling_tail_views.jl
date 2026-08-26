@@ -919,3 +919,71 @@ end
         w = isnothing(w) ? pr.w : (@test isapprox(w, pr.w, rtol = 1e-4); w)
     end
 end
+
+@testset "the grid RLVaR defaults are measured, not copied" begin
+    # Issue #525. The row is divided by its largest coefficient, so its coefficients sit in
+    # `(0, 1]` and the posterior sums to one: the left-hand side of a row cannot exceed one
+    # whatever the data. The default `M` clears that bound by an order of magnitude, and the
+    # measurement over the fixture found no right-hand side that narrows the margin.
+    dflt = GridRelativisticValueatRiskView()
+    @test dflt.pct == 0.5
+    @test dflt.K == 11
+    @test dflt.M == 10
+    x = -ep_sX[:, 1]
+    for a in (0.01, 0.05, 0.1), k in (0.1, 0.3, 0.5, 0.7), m in (0.5, 0.75, 0.95)
+        r = PO.ep_rlvar(x, ep_sw0, a, k)
+        vbar = m * r.rlvar
+        delta = r.rlvar - vbar
+        lnk = PO.kappa_log(inv(a * ep_sT), k)
+        for zk in range(r.z * (1 - dflt.pct), r.z * (1 + dflt.pct); length = dflt.K)
+            tk = PO.ep_rlvar_shift(x, ep_sw0, k, lnk, zk).t - delta
+            c, b = PO.ep_rlvar_grid_row(x, vbar, tk, zk, a, k)
+            @test all(isfinite, c)
+            @test isfinite(b)
+            @test all(>(0), c)
+            @test isapprox(maximum(c), 1)
+            # A deselected row must be slack, and `1 - b` is the largest it can ask for.
+            @test dflt.M >= 1 - b
+        end
+    end
+end
+
+@testset "a grid point whose row overflows is dropped" begin
+    # Issue #525. `ep_rlvar_tail` overflows at a dual variable near zero, which is where the
+    # grid sits when `kappa` approaches one. Before the guard the coefficients reached JuMP
+    # as `NaN * x[j]`, which it refuses with a message that names neither the view nor
+    # `kappa`. A dropped point is one the grid never had, so the upper bound still holds at
+    # the points it keeps: each of those is a feasible point of the primal programme.
+    x = -ep_sX[:, 1]
+    add(kappa, m, op) = begin
+        r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
+        epc = Dict{Any, Any}()
+        tvs = Any[]
+        PO.ep_add_rlvar_view!(epc, tvs, GridRelativisticValueatRiskView(), x, ep_a, kappa,
+                              op, m * r.rlvar, ep_sw0, r.z, r.rlvar,
+                              "AAPL <= $(m * r.rlvar)")
+        return epc, tvs
+    end
+    # Nothing overflows here, so the grid keeps every point it built.
+    _, tvs = add(0.7, 0.75, :leq)
+    @test length(only(tvs).z) == GridRelativisticValueatRiskView().K
+    # Here six of the eleven points overflow. The five that remain carry finite rows.
+    _, tvs = add(0.9, 0.75, :leq)
+    tv = only(tvs)
+    @test length(tv.z) == length(tv.t) < GridRelativisticValueatRiskView().K
+    for k in eachindex(tv.z)
+        c, b = PO.ep_rlvar_grid_row(x, tv.rhs, tv.t[k], tv.z[k], ep_a, 0.9)
+        @test all(isfinite, c)
+        @test isfinite(b)
+    end
+    # The lower-bound block writes its rows straight into the constraint set, and it drops
+    # the same points.
+    epc, _ = add(0.9, 0.75, :geq)
+    lhs, rhs = epc[:ineq]
+    @test size(lhs, 1) == length(rhs) == length(tv.z)
+    @test all(isfinite, lhs)
+    @test all(isfinite, rhs)
+    # Every point overflows here, and the raise names `kappa` rather than leaving JuMP to
+    # refuse a `NaN` coefficient.
+    @test_throws ArgumentError add(0.9, 0.5, :leq)
+end
