@@ -5,24 +5,24 @@
 julia = "1.12.7"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "33b37c6946"
+commit = "2107fc7a40"
 
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 365, cog_sum = 331, arg_sum = 820, macros = [] }
-"src/01_Base.jl" = { cyc = 28, cog = 54, arg = 7, cyc_sum = 200, cog_sum = 156, arg_sum = 178, macros = ["@define_pretty_show"] }
+"src/01_Base.jl" = { cyc = 27, cog = 50, arg = 7, cyc_sum = 201, cog_sum = 154, arg_sum = 181, macros = ["@define_pretty_show"] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 261, macros = ["@propagatable"] }
 "src/03_Preprocessing.jl" = { cyc = 19, cog = 28, arg = 15, cyc_sum = 160, cog_sum = 159, arg_sum = 137, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
-"src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 17, cog_sum = 10, arg_sum = 30, macros = [] }
+"src/05_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/06_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
 "src/07_MatrixProcessing.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 13, cog_sum = 2, arg_sum = 48, macros = [] }
-"src/08_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 8, cyc_sum = 109, cog_sum = 129, arg_sum = 115, macros = ["@define_pretty_show"] }
+"src/08_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 8, cyc_sum = 110, cog_sum = 131, arg_sum = 115, macros = ["@define_pretty_show"] }
 "src/08_Moments/02_SimpleExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 4, cog_sum = 3, arg_sum = 4, macros = ["@propagatable"] }
-"src/08_Moments/03_Covariance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 16, cog_sum = 14, arg_sum = 35, macros = ["@propagatable"] }
-"src/08_Moments/04_SimpleVariance.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 13, cog_sum = 7, arg_sum = 40, macros = ["@propagatable"] }
+"src/08_Moments/03_Covariance.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 16, cog_sum = 12, arg_sum = 41, macros = ["@propagatable"] }
+"src/08_Moments/04_SimpleVariance.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 14, cog_sum = 8, arg_sum = 40, macros = ["@propagatable"] }
 "src/08_Moments/05_GerberCovariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 9, cog_sum = 1, arg_sum = 27, macros = ["@propagatable"] }
-"src/08_Moments/06_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 9, cyc_sum = 45, cog_sum = 21, arg_sum = 116, macros = ["@propagatable"] }
+"src/08_Moments/06_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 9, cyc_sum = 50, cog_sum = 25, arg_sum = 120, macros = ["@propagatable"] }
 "src/08_Moments/07_DistanceCovariance.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 14, cog_sum = 9, arg_sum = 35, macros = ["@propagatable"] }
 "src/08_Moments/08_LowerTailDependenceCovariance.jl" = { cyc = 6, cog = 10, arg = 4, cyc_sum = 9, cog_sum = 11, arg_sum = 10, macros = ["@propagatable"] }
 "src/08_Moments/09_RankCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
@@ -35,12 +35,12 @@ commit = "33b37c6946"
 "src/08_Moments/16_ShrunkExpectedReturns.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 22, cog_sum = 13, arg_sum = 34, macros = ["@propagatable"] }
 "src/08_Moments/17_EquilibriumExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 1, arg_sum = 13, macros = ["@propagatable"] }
 "src/08_Moments/18_ExcessExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 3, cog_sum = 1, arg_sum = 6, macros = ["@propagatable"] }
-"src/08_Moments/19_Coskewness.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 12, cog_sum = 9, arg_sum = 28, macros = ["@propagatable"] }
-"src/08_Moments/20_Cokurtosis.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 9, cog_sum = 5, arg_sum = 23, macros = ["@propagatable"] }
+"src/08_Moments/19_Coskewness.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 14, cog_sum = 11, arg_sum = 28, macros = ["@propagatable"] }
+"src/08_Moments/20_Cokurtosis.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 11, cog_sum = 7, arg_sum = 23, macros = ["@propagatable"] }
 "src/08_Moments/21_Base_Regression.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 34, cog_sum = 17, arg_sum = 36, macros = ["@forward_properties"] }
-"src/08_Moments/22_StepwiseRegression.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 44, cog_sum = 49, arg_sum = 41, macros = ["@propagatable"] }
-"src/08_Moments/23_DimensionReductionRegression.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 16, cog_sum = 9, arg_sum = 23, macros = ["@propagatable"] }
-"src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 7, cyc_sum = 18, cog_sum = 7, arg_sum = 44, macros = ["@propagatable"] }
+"src/08_Moments/22_StepwiseRegression.jl" = { cyc = 7, cog = 12, arg = 5, cyc_sum = 45, cog_sum = 51, arg_sum = 41, macros = ["@propagatable"] }
+"src/08_Moments/23_DimensionReductionRegression.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 17, cog_sum = 10, arg_sum = 23, macros = ["@propagatable"] }
+"src/08_Moments/24_ImpliedVolatility.jl" = { cyc = 4, cog = 2, arg = 7, cyc_sum = 19, cog_sum = 8, arg_sum = 44, macros = ["@propagatable"] }
 "src/08_Moments/25_CorrelationCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 1, arg_sum = 9, macros = ["@propagatable"] }
 "src/08_Moments/26_AbstractCovarianceVariance.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 4, cog_sum = 4, arg_sum = 8, macros = [] }
 "src/08_Moments/27_StandardDeviationExpectedReturns.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
@@ -51,23 +51,23 @@ commit = "33b37c6946"
 "src/08_Moments/32_WindowedCokurtosis.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
 "src/08_Moments/33_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/08_Moments/34_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 7, cog_sum = 2, arg_sum = 13, macros = [] }
-"src/08_Moments/35_GerberIQCovariance.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 159, cog_sum = 125, arg_sum = 194, macros = ["@propagatable"] }
+"src/08_Moments/35_GerberIQCovariance.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 171, cog_sum = 140, arg_sum = 214, macros = ["@propagatable"] }
 "src/08_Moments/36_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 9, cyc_sum = 43, cog_sum = 45, arg_sum = 42, macros = [] }
 "src/08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = [] }
 "src/09_Distance/01_Base_Distance.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 3, cog_sum = 2, arg_sum = 2, macros = [] }
 "src/09_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/09_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
 "src/09_Distance/04_Similarity.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 11, cog_sum = 1, arg_sum = 17, macros = [] }
-"src/09_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 64, cog_sum = 51, arg_sum = 72, macros = ["@propagatable"] }
+"src/09_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 62, cog_sum = 49, arg_sum = 72, macros = ["@propagatable"] }
 "src/10_JuMPModelOptimisation.jl" = { cyc = 5, cog = 7, arg = 2, cyc_sum = 17, cog_sum = 16, arg_sum = 2, macros = [] }
 "src/11_Phylogeny/01_Base_Phylogeny.jl" = { cyc = 5, cog = 5, arg = 1, cyc_sum = 27, cog_sum = 13, arg_sum = 4, macros = [] }
 "src/11_Phylogeny/02_Clusters.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 17, cog_sum = 9, arg_sum = 20, macros = ["@propagatable"] }
-"src/11_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 56, cog_sum = 88, arg_sum = 31, macros = [] }
+"src/11_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 55, cog_sum = 85, arg_sum = 31, macros = [] }
 "src/11_Phylogeny/04_DBHT.jl" = { cyc = 7, cog = 14, arg = 8, cyc_sum = 105, cog_sum = 137, arg_sum = 107, macros = [] }
 "src/11_Phylogeny/05_NonHierarchicalClustering.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 18, cog_sum = 17, arg_sum = 20, macros = [] }
 "src/11_Phylogeny/06_Phylogeny.jl" = { cyc = 8, cog = 9, arg = 6, cyc_sum = 134, cog_sum = 51, arg_sum = 251, macros = ["@propagatable"] }
-"src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = [] }
-"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 144, cog_sum = 174, arg_sum = 76, macros = ["@forward_properties"] }
+"src/12_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 6, macros = [] }
+"src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 143, cog_sum = 173, arg_sum = 77, macros = ["@forward_properties"] }
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 0, cyc_sum = 9, cog_sum = 4, arg_sum = 0, macros = ["@propagatable"] }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { cyc = 13, cog = 21, arg = 5, cyc_sum = 37, cog_sum = 32, arg_sum = 31, macros = [] }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { cyc = 9, cog = 8, arg = 3, cyc_sum = 27, cog_sum = 12, arg_sum = 8, macros = ["@propagatable"] }
@@ -83,9 +83,9 @@ commit = "33b37c6946"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 15, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 13, cyc_sum = 6, cog_sum = 5, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 132, cog_sum = 134, arg_sum = 183, macros = [] }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 138, cog_sum = 138, arg_sum = 191, macros = [] }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 15, cog = 18, arg = 15, cyc_sum = 54, cog_sum = 61, arg_sum = 52, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 16, cog = 18, arg = 14, cyc_sum = 111, cog_sum = 92, arg_sum = 187, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 18, arg = 15, cyc_sum = 144, cog_sum = 115, arg_sum = 272, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 25, macros = ["@propagatable"] }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 5, cyc_sum = 44, cog_sum = 61, arg_sum = 17, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_FeaturePrior.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 28, cog_sum = 13, arg_sum = 42, macros = ["@forward_properties", "@propagatable"] }
