@@ -272,6 +272,209 @@ function ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha:
     return c ./ sc, (vbar - t - z * lnk) / sc
 end
 """
+    ep_row_tilt(w::VecNum, c::VecNum, b::Number)
+
+Tilt a probability vector so that one linear row holds with equality, at the smallest relative entropy.
+
+The row of a grid point is linear in the posterior probabilities, so the posterior that makes it tight and stays closest to the prior is an exponential tilt of the prior along the row's coefficients. It is the entropy pooling answer to that single row, and it needs no solver.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+q_{j}(\\theta) &= \\dfrac{w_{j} e^{-\\theta c_{j}}}{\\sum_{i=1}^{T} w_{i} e^{-\\theta c_{i}}}\\,,\\\\
+\\sum_{j=1}^{T} q_{j}(\\theta) c_{j} &= b\\,.
+\\end{align}
+```
+
+The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max_{j} c_{j}`` to ``\\min_{j} c_{j}``, so the tilt exists exactly when ``b`` sits strictly inside that range.
+
+# Arguments
+
+  - `w`: Prior probabilities, summing to one.
+  - `c`: Coefficients of the row.
+  - `b`: Value the row is to take.
+
+# Returns
+
+  - `q::Option{VecNum}`: The tilted probabilities, or `nothing` when `b` sits outside the range of `c` and no probability vector attains it.
+
+# Algorithm
+
+ 1. Return `nothing` when `b` sits outside the open range of `c`.
+ 2. Bracket the root by doubling the tilt away from zero until the row's value crosses `b`.
+ 3. Bisect the bracket to the resolution of the floating-point type.
+
+# Related
+
+  - [`ep_rlvar_anchor`](@ref)
+  - [`ep_rlvar_grid_row`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_row_tilt(w::VecNum, c::VecNum, b::Number)
+    lo, hi = extrema(c)
+    if !(lo < b < hi)
+        return nothing
+    end
+    q = Vector{float(promote_type(eltype(w), eltype(c), typeof(b)))}(undef, length(w))
+    # Each call leaves the unnormalised tilt in `q`, so the last call is the answer.
+    row = function (th)
+        q .= (-th) .* c
+        q .= w .* exp.(q .- maximum(q))
+        return LinearAlgebra.dot(q, c) / sum(q)
+    end
+    # The row's value falls as the tilt rises, so one side of zero holds the root. Doubling
+    # reaches it, because the value tends to an end of the range of `c` and `b` is inside.
+    sgn = ifelse(row(zero(b)) >= b, one(b), -one(b))
+    thb = sgn
+    while (row(thb) - b) * sgn > zero(b)
+        thb *= 2
+    end
+    tha = zero(b)
+    for _ in 1:200
+        thm = (tha + thb) / 2
+        if (thm == tha || thm == thb)
+            break
+        end
+        ((row(thm) - b) * sgn > zero(b)) ? (tha = thm) : (thb = thm)
+    end
+    row(thb)
+    return q ./ sum(q)
+end
+"""
+    ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs::Number,
+                    t::Number, z::Number; iters::Integer = 50, tol::Number = 1e-10)
+
+Find the primal point of the relativistic value at risk that a posterior meeting an upper-bound view attains.
+
+A grid point states the view as one row, and a posterior that makes the row tight reaches the target only where that point is the point the posterior itself attains. `ep_rlvar_anchor` solves for the pair that satisfies both conditions at once, which is the pair the grid of [`GridRelativisticValueatRiskView`](@ref) is centred on. It calls no solver.
+
+# Arguments
+
+  - `x`: Loss series (`-returns`).
+  - `w`: Prior probabilities, summing to one.
+  - `alpha`: Significance level.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `rhs`: Target relativistic value at risk.
+  - `t`: Shift variable the iteration starts from.
+  - `z`: Dual variable the iteration starts from.
+  - `iters::Integer = 50`: Largest number of steps the iteration takes.
+  - `tol::Number = 1e-10`: Relative distance from the target at which the iteration stops.
+
+# Returns
+
+  - `res::Option{@NamedTuple{t::Number, z::Number, w::VecNum}}`: The pair and the posterior that attains it, or `nothing` when the iteration does not reach the target.
+
+# Algorithm
+
+ 1. Build the row of the current pair with [`ep_rlvar_grid_row`](@ref). Return `nothing` when it is not finite.
+ 2. Tilt the prior so the row is tight with [`ep_row_tilt`](@ref). Return `nothing` when no probability vector makes it tight.
+ 3. Recompute the pair as the minimiser at the tilted probabilities with [`ep_rlvar`](@ref).
+ 4. Stop when the relativistic value at risk of the tilted probabilities is within `tol` of the target, and return the pair and those probabilities.
+ 5. Return `nothing` after `iters` steps without that.
+
+# Related
+
+  - [`ep_row_tilt`](@ref)
+  - [`ep_rlvar`](@ref)
+  - [`ep_rlvar_grid`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs::Number,
+                         t::Number, z::Number; iters::Integer = 50, tol::Number = 1e-10)
+    for _ in 1:iters
+        c, b = ep_rlvar_grid_row(x, rhs, t, z, alpha, kappa)
+        if !(all(isfinite, c) && isfinite(b))
+            return nothing
+        end
+        q = ep_row_tilt(w, c, b)
+        if isnothing(q)
+            return nothing
+        end
+        res = ep_rlvar(x, q, alpha, kappa)
+        if abs(res.rlvar - rhs) <= tol * abs(rhs)
+            return (; t = res.t, z = res.z, w = q)
+        end
+        t, z = res.t, res.z
+    end
+    return nothing
+end
+"""
+    ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::Symbol,
+                  rhs::Number, zstar::Number, pv::Number, pct::Number, K::Integer)
+
+Build the grid of primal points a relativistic value-at-risk view is written on.
+
+A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor`](@ref) finds, and every shift is the one that minimises at the posterior that pair belongs to. A lower-bound view, and a view whose anchor does not converge, is centred on the prior's dual variable instead, and every shift is the one that minimises under the prior probabilities, less the distance from the prior value to the target.
+
+# Arguments
+
+  - `x`: Loss series (`-returns`).
+  - `w`: Prior probabilities, summing to one.
+  - `alpha`: Significance level.
+  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `op`: Comparison operator of the view.
+  - `rhs`: Target relativistic value at risk.
+  - `zstar`: Dual variable that attains the prior RLVaR of the asset.
+  - `pv`: Prior RLVaR of the asset.
+  - `pct`: Half-width of the grid, as a fraction of the dual variable it is centred on.
+  - `K`: Number of grid points.
+
+# Returns
+
+  - `t::VecNum`: Shift variable of each grid point.
+  - `z::VecNum`: Dual variable of each grid point.
+
+# Algorithm
+
+ 1. Take the prior's pair as the centre, and the distance from the prior value to the target as the translation each shift carries.
+ 2. Where the view carries an upper-bound half, replace both with the pair and the posterior of [`ep_rlvar_anchor`](@ref), and drop the translation. Keep the prior's pair when the anchor does not converge.
+ 3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid.
+ 4. Minimise the objective over the shift at each point with [`ep_rlvar_shift`](@ref), and subtract the translation.
+
+# Related
+
+  - [`ep_rlvar_anchor`](@ref)
+  - [`ep_rlvar_shift`](@ref)
+  - [`ep_add_rlvar_view!`](@ref)
+  - [`GridRelativisticValueatRiskView`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+function ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::Symbol,
+                       rhs::Number, zstar::Number, pv::Number, pct::Number, K::Integer)
+    lnk = kappa_log(inv(alpha * length(x)), kappa)
+    # RLVaR is translation-equivariant, and so is the shift that attains it: subtracting
+    # `delta` from every loss subtracts `delta` from both. A posterior that moves the RLVaR
+    # to the target behaves, to first order, like that translation.
+    zc, wc, delta = zstar, w, pv - rhs
+    # Issue #530. To first order is not enough for the upper-bound half, which reaches the
+    # target only where the grid holds the pair the posterior itself attains. That pair is
+    # not the prior's, and over the fixture it reaches 8.4e5 times the prior's dual
+    # variable, which no `pct` spans. The anchor puts the centre of the grid on it.
+    anc = if op == :geq
+        nothing
+    else
+        ep_rlvar_anchor(x, w, alpha, kappa, rhs,
+                        ep_rlvar_shift(x, w, kappa, lnk, zstar).t - delta, zstar)
+    end
+    if !isnothing(anc)
+        zc, wc, delta = anc.z, anc.w, zero(delta)
+    end
+    z = collect(range(zc * (one(pct) - pct), zc * (one(pct) + pct); length = K))
+    t = [ep_rlvar_shift(x, wc, kappa, lnk, zk).t - delta for zk in z]
+    return t, z
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Carries the loss series, the significance level and the target of a linear conditional value-at-risk view.
@@ -1231,9 +1434,9 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
   - `kappa`: Deformation parameter of the view.
   - `op`: Comparison operator of the view.
   - `rhs`: Target value of the view.
-  - `w`: Prior probability weights, which pin the shift of each grid point.
+  - `w`: Prior probability weights. They start the search for the point the grid is centred on, and they pin the shift of each grid point where that search does not converge.
   - `zstar`: Dual variable that attains the prior RLVaR of the asset.
-  - `pv`: Prior RLVaR of the asset. With `rhs` it fixes the translation the grid is anchored on.
+  - `pv`: Prior RLVaR of the asset. With `rhs` it fixes the translation a grid centred on the prior carries.
   - `eqn`: Equation of the view, used in the error messages.
 
 # Validation
@@ -1249,6 +1452,7 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
 
   - [`ConicRelativisticValueatRiskView`](@ref)
   - [`GridRelativisticValueatRiskView`](@ref)
+  - [`ep_rlvar_grid`](@ref)
   - [`ep_rlvar_grid_row`](@ref)
   - [`ep_rlvar_tail`](@ref)
   - [`ep_rlvar_views!`](@ref)
@@ -1270,18 +1474,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             zstar::Number, pv::Number, eqn::AbstractString)
     (; pct, K, M) = alg
     wi = w ./ sum(w)
-    lnk = kappa_log(inv(alpha * length(x)), kappa)
-    # RLVaR is translation-equivariant, and so is the shift that attains it: subtracting
-    # `delta` from every loss subtracts `delta` from both. A posterior that moves the RLVaR
-    # to the target behaves, to first order, like that translation, so the grid is anchored
-    # on the shift of the translated series rather than on the shift of the prior. Anchoring
-    # on the prior leaves an upper-bound view with no reachable grid point.
-    delta = pv - rhs
-    t = zeros(promote_type(eltype(x), typeof(zstar), typeof(delta)), K)
-    z = collect(range(zstar * (one(pct) - pct), zstar * (one(pct) + pct); length = K))
-    for (k, zk) in pairs(z)
-        t[k] = ep_rlvar_shift(x, wi, kappa, lnk, zk).t - delta
-    end
+    t, z = ep_rlvar_grid(x, wi, alpha, kappa, op, rhs, zstar, pv, pct, K)
     # A point whose row is not finite is not a grid point. `ep_rlvar_tail` overflows at a
     # dual variable near zero, which is where the grid sits when `kappa` approaches one, and
     # a non-finite coefficient reaches the solver as `NaN * x[j]`.

@@ -987,3 +987,134 @@ end
     # refuse a `NaN` coefficient.
     @test_throws ArgumentError add(0.9, 0.5, :leq)
 end
+
+@testset "one row is made tight by an exponential tilt" begin
+    # Issue #530. The row of a grid point is linear in the posterior probabilities, so the
+    # posterior that makes it tight at the smallest relative entropy is an exponential tilt
+    # along its coefficients. It is the entropy pooling answer to that one row, and the
+    # anchor of the RLVaR grid iterates on it.
+    x = -ep_sX[:, 1]
+    r = PO.ep_rlvar(x, ep_sw0, ep_a, ep_k)
+    c, b = PO.ep_rlvar_grid_row(x, 0.75 * r.rlvar, r.t, r.z, ep_a, ep_k)
+    lo, hi = extrema(c)
+    # A value inside the range of the coefficients is attained exactly, from either side of
+    # the prior, and the answer is a probability vector. The last of the three sits close to
+    # the smallest coefficient, which is where the bracket has to travel furthest.
+    for tgt in (0.25 * lo + 0.75 * hi, 0.5 * (lo + hi), 0.999 * lo + 0.001 * hi)
+        q = PO.ep_row_tilt(ep_sw0, c, tgt)
+        @test isapprox(sum(q), 1)
+        @test all(>=(0), q)
+        @test isapprox(LinearAlgebra.dot(c, q), tgt, rtol = 1e-10)
+    end
+    # The prior itself is the answer when the prior already attains the value.
+    q = PO.ep_row_tilt(ep_sw0, c, LinearAlgebra.dot(c, ep_sw0))
+    @test isapprox(q, collect(ep_sw0), rtol = 1e-8)
+    # No probability vector reaches outside the range of the coefficients, so there is no
+    # tilt to return.
+    @test isnothing(PO.ep_row_tilt(ep_sw0, c, lo))
+    @test isnothing(PO.ep_row_tilt(ep_sw0, c, hi))
+    @test isnothing(PO.ep_row_tilt(ep_sw0, c, lo - one(lo)))
+    @test isnothing(PO.ep_row_tilt(ep_sw0, c, hi + one(hi)))
+end
+
+# The entropy pooling answer to a grid, without a solver. The grid asks for one of its rows,
+# so the posterior is the cheapest tilt over the rows that are finite and reachable. Issue
+# #530 checked this reading against a Pajarito solve and the two agreed to four digits.
+function ep_grid_post(x, w, alpha, kappa, rhs, t, z)
+    bq, bd = nothing, Inf
+    for k in eachindex(t, z)
+        c, b = PO.ep_rlvar_grid_row(x, rhs, t[k], z[k], alpha, kappa)
+        if !(all(isfinite, c) && isfinite(b))
+            continue
+        end
+        q = LinearAlgebra.dot(c, w) <= b ? collect(w) : PO.ep_row_tilt(w, c, b)
+        if isnothing(q)
+            continue
+        end
+        d = sum(qj > zero(qj) ? qj * log(qj / wj) : zero(qj) for (qj, wj) in zip(q, w))
+        d < bd && (bd = d; bq = q)
+    end
+    return bq, bd
+end
+
+@testset "the RLVaR grid is centred on the point the posterior attains" begin
+    # Issue #530. An upper-bound view reaches its target only where the grid holds the pair
+    # the posterior itself attains, and that pair is not the prior's: over this fixture its
+    # dual variable reaches five hundred times the prior's, which no `pct` below one spans.
+    # The anchor solves for the pair instead of guessing it, so the width covers only the
+    # movement the other views of the model cause.
+    #
+    # The cell below is the one issue #530 reports: `XOM`, `alpha = 0.01`, `kappa = 0.7`, a
+    # target five per cent below the prior. The grid centred on the prior lands twenty-three
+    # per cent below it. A lower-bound view keeps that centre, so the two calls are the grid
+    # before the fix and the grid after it.
+    x = -ep_sX[:, 20]
+    r = PO.ep_rlvar(x, ep_sw0, 0.01, 0.7)
+    tgt = 0.95 * r.rlvar
+    told, zold = PO.ep_rlvar_grid(x, ep_sw0, 0.01, 0.7, :geq, tgt, r.z, r.rlvar, 0.5, 11)
+    tnew, znew = PO.ep_rlvar_grid(x, ep_sw0, 0.01, 0.7, :leq, tgt, r.z, r.rlvar, 0.5, 11)
+    qold, dold = ep_grid_post(x, ep_sw0, 0.01, 0.7, tgt, told, zold)
+    qnew, dnew = ep_grid_post(x, ep_sw0, 0.01, 0.7, tgt, tnew, znew)
+    @test isapprox(abs(PO.ep_rlvar(x, qold, 0.01, 0.7).rlvar - tgt) / tgt, 0.22995,
+                   rtol = 1e-3)
+    @test abs(PO.ep_rlvar(x, qnew, 0.01, 0.7).rlvar - tgt) / tgt <= 1e-8
+    # The anchored grid reaches the target at a *lower* relative entropy than the grid
+    # centred on the prior reaches its own answer, so the target is not bought with
+    # divergence.
+    @test dnew < dold
+    # A lower-bound view is centred on the prior's dual variable, and `K` is odd, so the
+    # centre is a grid point.
+    @test isapprox(zold[(length(zold) + 1) ÷ 2], r.z, rtol = 1e-12)
+    # An upper-bound view is centred on the anchor instead, and the anchor's dual variable
+    # leaves the span the prior's admits, which is `2 * zstar` at most.
+    anc = PO.ep_rlvar_anchor(x, ep_sw0, 0.01, 0.7, tgt, r.t - (r.rlvar - tgt), r.z)
+    @test isapprox(znew[(length(znew) + 1) ÷ 2], anc.z, rtol = 1e-12)
+    @test anc.z > 100 * r.z
+    @test isapprox(PO.ep_rlvar(x, anc.w, 0.01, 0.7).rlvar, tgt, rtol = 1e-10)
+    # The shift of the centre is the shift that minimises at the anchor's own posterior, so
+    # the grid passes through the pair rather than through its dual variable alone.
+    @test isapprox(tnew[(length(tnew) + 1) ÷ 2], anc.t, rtol = 1e-6)
+
+    # The anchor holds over the design issue #530 measured: two levels, four deformations
+    # and two targets below the prior, on two assets.
+    for j in (1, 20), a in (0.01, 0.05), k in (0.1, 0.3, 0.5, 0.7), m in (0.6, 0.85)
+        xj = -ep_sX[:, j]
+        rj = PO.ep_rlvar(xj, ep_sw0, a, k)
+        mj = m * rj.rlvar
+        t, z = PO.ep_rlvar_grid(xj, ep_sw0, a, k, :leq, mj, rj.z, rj.rlvar, 0.5, 11)
+        q, _ = ep_grid_post(xj, ep_sw0, a, k, mj, t, z)
+        @test abs(PO.ep_rlvar(xj, q, a, k).rlvar - mj) / mj <= 1e-6
+    end
+end
+
+@testset "the RLVaR anchor gives up rather than answer wrongly" begin
+    # Issue #530. The iteration answers nothing on three paths, and each falls back to the
+    # grid centred on the prior, which is the grid a lower-bound view takes.
+    x = -ep_sX[:, 1]
+    r = PO.ep_rlvar(x, ep_sw0, ep_a, ep_k)
+    tgt = 0.75 * r.rlvar
+    # It reaches the target from the prior's pair, and it takes more than one step to do it.
+    @test !isnothing(PO.ep_rlvar_anchor(x, ep_sw0, ep_a, ep_k, tgt, r.t - (r.rlvar - tgt),
+                                        r.z))
+    @test isnothing(PO.ep_rlvar_anchor(x, ep_sw0, ep_a, ep_k, tgt, r.t - (r.rlvar - tgt),
+                                       r.z; iters = 1))
+    # A target above the prior asks one row to take a value outside the range of its
+    # coefficients, which no probability vector attains.
+    up = 1.25 * r.rlvar
+    @test isnothing(PO.ep_rlvar_anchor(x, ep_sw0, ep_a, ep_k, up, r.t - (r.rlvar - up),
+                                       r.z))
+    # `ep_rlvar_tail` overflows at the dual variable that attains the RLVaR as `kappa`
+    # approaches one, so the row the iteration reads is not finite.
+    r9 = PO.ep_rlvar(x, ep_sw0, ep_a, 0.9)
+    d9 = 0.5 * r9.rlvar
+    @test isnothing(PO.ep_rlvar_anchor(x, ep_sw0, ep_a, 0.9, d9, r9.t - (r9.rlvar - d9),
+                                       r9.z))
+    # Both of those cells fall back, so an upper-bound view builds the grid a lower-bound
+    # view builds.
+    for (k, m) in ((ep_k, 1.25), (0.9, 0.5))
+        rk = PO.ep_rlvar(x, ep_sw0, ep_a, k)
+        mk = m * rk.rlvar
+        @test PO.ep_rlvar_grid(x, ep_sw0, ep_a, k, :leq, mk, rk.z, rk.rlvar, 0.5, 11) ==
+              PO.ep_rlvar_grid(x, ep_sw0, ep_a, k, :geq, mk, rk.z, rk.rlvar, 0.5, 11)
+    end
+end
