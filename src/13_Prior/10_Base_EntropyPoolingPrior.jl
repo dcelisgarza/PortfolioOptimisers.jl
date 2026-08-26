@@ -1184,7 +1184,8 @@ An equality view carries both blocks.
 
 # Details
 
-  - The grid is `K` equidistant points spanning `zstar * (1 - pct)` to `zstar * (1 + pct)`, where `zstar` attains the prior EVaR of the asset. `K` is odd so `zstar` sits in the middle.
+  - The grid is `K` equidistant points spanning `zc * (1 - pct)` to `zc * (1 + pct)`, where `zc` is the dual variable [`ep_evar_anchor`](@ref) finds for an upper-bound view and the one that attains the prior EVaR of the asset otherwise. `K` is odd so `zc` sits in the middle.
+  - `iters` and `tol` stop that anchor. They reach a lower-bound view nowhere, because it runs no anchor.
   - The answer is approximate in both directions. A lower-bound view holds at the grid points and may fall short between them; an upper-bound view holds at one grid point and may be conservative. Widen `pct` or raise `K` when the posterior value misses the target, and prefer [`ConicEntropicValueatRiskView`](@ref) whenever the view admits it.
   - Rows are scaled by their largest coefficient before they reach the model, so the default `M` is far above the largest attainable violation.
 
@@ -1193,7 +1194,10 @@ An equality view carries both blocks.
     GridEntropicValueatRiskView(;
         pct::Number = 0.5,
         K::Integer = 11,
-        M::Number = 10
+        M::Number = 10,
+        iters::Integer = 50,
+        tol::Number = 1e-10,
+        tilt_iters::Integer = 200
     ) -> GridEntropicValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -1203,15 +1207,21 @@ Keywords correspond to the struct's fields.
   - `0 < pct < 1`.
   - `K >= 1` and `isodd(K)`.
   - `M > 0`.
+  - `iters >= 1`.
+  - `tol >= 0`.
+  - `tilt_iters >= 1`.
 
 # Examples
 
 ```jldoctest
 julia> GridEntropicValueatRiskView()
 GridEntropicValueatRiskView
-  pct ┼ Float64: 0.5
-    K ┼ Int64: 11
-    M ┴ Int64: 10
+         pct ┼ Float64: 0.5
+           K ┼ Int64: 11
+           M ┼ Int64: 10
+       iters ┼ Int64: 50
+         tol ┼ Float64: 1.0e-10
+  tilt_iters ┴ Int64: 200
 ```
 
 # Related
@@ -1219,6 +1229,8 @@ GridEntropicValueatRiskView
   - [`AbstractEntropicValueatRiskViewFormulation`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropyPoolingPrior`](@ref)
+  - [`ep_evar_anchor`](@ref)
+  - [`ep_evar_grid`](@ref)
 
 # References
 
@@ -1237,16 +1249,35 @@ GridEntropicValueatRiskView
     $(field_dict[:bigM])
     """
     M
-    function GridEntropicValueatRiskView(pct::Number, K::Integer, M::Number)
+    """
+    $(field_dict[:ep_grid_iters])
+    """
+    iters
+    """
+    $(field_dict[:ep_grid_tol])
+    """
+    tol
+    """
+    $(field_dict[:ep_grid_tilt_iters])
+    """
+    tilt_iters
+    function GridEntropicValueatRiskView(pct::Number, K::Integer, M::Number, iters::Integer,
+                                         tol::Number, tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
         @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
         @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
-        return new{typeof(pct), typeof(K), typeof(M)}(pct, K, M)
+        @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
+        @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))
+        @argcheck(tilt_iters >= one(tilt_iters),
+                  DomainError(tilt_iters, "tilt_iters must be >= 1"))
+        return new{typeof(pct), typeof(K), typeof(M), typeof(iters), typeof(tol),
+                   typeof(tilt_iters)}(pct, K, M, iters, tol, tilt_iters)
     end
 end
-function GridEntropicValueatRiskView(; pct::Number = 0.5, K::Integer = 11,
-                                     M::Number = 10)::GridEntropicValueatRiskView
-    return GridEntropicValueatRiskView(pct, K, M)
+function GridEntropicValueatRiskView(; pct::Number = 0.5, K::Integer = 11, M::Number = 10,
+                                     iters::Integer = 50, tol::Number = 1e-10,
+                                     tilt_iters::Integer = 200)::GridEntropicValueatRiskView
+    return GridEntropicValueatRiskView(pct, K, M, iters, tol, tilt_iters)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1394,7 +1425,10 @@ An equality view carries both blocks. Every grid point is a feasible point of th
     GridRelativisticValueatRiskView(;
         pct::Number = 0.5,
         K::Integer = 11,
-        M::Number = 10
+        M::Number = 10,
+        iters::Integer = 50,
+        tol::Number = 1e-10,
+        tilt_iters::Integer = 200
     ) -> GridRelativisticValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -1404,15 +1438,21 @@ Keywords correspond to the struct's fields.
   - `0 < pct < 1`.
   - `K >= 1` and `isodd(K)`.
   - `M > 0`.
+  - `iters >= 1`.
+  - `tol >= 0`.
+  - `tilt_iters >= 1`.
 
 # Examples
 
 ```jldoctest
 julia> GridRelativisticValueatRiskView()
 GridRelativisticValueatRiskView
-  pct ┼ Float64: 0.5
-    K ┼ Int64: 11
-    M ┴ Int64: 10
+         pct ┼ Float64: 0.5
+           K ┼ Int64: 11
+           M ┼ Int64: 10
+       iters ┼ Int64: 50
+         tol ┼ Float64: 1.0e-10
+  tilt_iters ┴ Int64: 200
 ```
 
 # Related
@@ -1444,16 +1484,37 @@ GridRelativisticValueatRiskView
     $(field_dict[:rlvar_bigM])
     """
     M
-    function GridRelativisticValueatRiskView(pct::Number, K::Integer, M::Number)
+    """
+    $(field_dict[:ep_grid_iters])
+    """
+    iters
+    """
+    $(field_dict[:ep_grid_tol])
+    """
+    tol
+    """
+    $(field_dict[:ep_grid_tilt_iters])
+    """
+    tilt_iters
+    function GridRelativisticValueatRiskView(pct::Number, K::Integer, M::Number,
+                                             iters::Integer, tol::Number,
+                                             tilt_iters::Integer)
         assert_unit_interval(pct, :pct)
         @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
         @argcheck(M > zero(M), DomainError(M, "M must be > 0"))
-        return new{typeof(pct), typeof(K), typeof(M)}(pct, K, M)
+        @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
+        @argcheck(tol >= zero(tol), DomainError(tol, "tol must be >= 0"))
+        @argcheck(tilt_iters >= one(tilt_iters),
+                  DomainError(tilt_iters, "tilt_iters must be >= 1"))
+        return new{typeof(pct), typeof(K), typeof(M), typeof(iters), typeof(tol),
+                   typeof(tilt_iters)}(pct, K, M, iters, tol, tilt_iters)
     end
 end
 function GridRelativisticValueatRiskView(; pct::Number = 0.5, K::Integer = 11,
-                                         M::Number = 10)::GridRelativisticValueatRiskView
-    return GridRelativisticValueatRiskView(pct, K, M)
+                                         M::Number = 10, iters::Integer = 50,
+                                         tol::Number = 1e-10,
+                                         tilt_iters::Integer = 200)::GridRelativisticValueatRiskView
+    return GridRelativisticValueatRiskView(pct, K, M, iters, tol, tilt_iters)
 end
 """
     const CVaRVF_VecCVaRVF = Union{<:AbstractConditionalValueatRiskViewFormulation,
@@ -1491,6 +1552,75 @@ Alias for a union of a single relativistic value-at-risk view formulation or a v
 """
 const RLVaRVF_VecRLVaRVF = Union{<:AbstractRelativisticValueatRiskViewFormulation,
                                  <:AbstractVector{<:AbstractRelativisticValueatRiskViewFormulation}}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Spans of the two searches that read a relativistic value at risk.
+
+[`ep_rlvar_shift`](@ref) minimises over the shift of the primal programme, and [`ep_rlvar`](@ref) minimises over the logarithm of the dual variable. Neither bracket is a proof: each is a margin wide enough for the data this library was measured on. Widen one where the minimiser lands on an end of it. `Optim` reports an end as converged, so read the minimiser rather than trust the flag.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RelativisticValueatRiskViewBracket(;
+        tspan::Number = 2,
+        zlo::Number = -20,
+        zhi::Number = 10
+    ) -> RelativisticValueatRiskViewBracket
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `tspan > 0`.
+  - `zlo < zhi`.
+
+# Examples
+
+```jldoctest
+julia> RelativisticValueatRiskViewBracket()
+RelativisticValueatRiskViewBracket
+  tspan ┼ Int64: 2
+    zlo ┼ Int64: -20
+    zhi ┴ Int64: 10
+```
+
+# Related
+
+  - [`RelativisticValueatRiskView`](@ref)
+  - [`ep_rlvar`](@ref)
+  - [`ep_rlvar_shift`](@ref)
+
+# References
+
+  - $(ref_dict[:EPRLVaR])
+"""
+@concrete struct RelativisticValueatRiskViewBracket <: AbstractAlgorithm
+    """
+    $(field_dict[:ep_bracket_rlvar_tspan])
+    """
+    tspan
+    """
+    $(field_dict[:ep_bracket_rlvar_zlo])
+    """
+    zlo
+    """
+    $(field_dict[:ep_bracket_rlvar_zhi])
+    """
+    zhi
+    function RelativisticValueatRiskViewBracket(tspan::Number, zlo::Number, zhi::Number)
+        @argcheck(tspan > zero(tspan), DomainError(tspan, "tspan must be > 0"))
+        @argcheck(zlo < zhi, DomainError((zlo, zhi), "zlo must be < zhi"))
+        return new{typeof(tspan), typeof(zlo), typeof(zhi)}(tspan, zlo, zhi)
+    end
+end
+function RelativisticValueatRiskViewBracket(; tspan::Number = 2, zlo::Number = -20,
+                                            zhi::Number = 10)::RelativisticValueatRiskViewBracket
+    return RelativisticValueatRiskViewBracket(tspan, zlo, zhi)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1607,7 +1737,7 @@ $(DocStringExtensions.FIELDS)
         alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
         args::Tuple = (),
         kwargs::NamedTuple = (;),
-        bracket::NamedTuple = (;)
+        zlo::Option{<:Number} = nothing
     ) -> EntropicValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -1616,6 +1746,7 @@ Keywords correspond to the struct's fields.
 
   - `0 < alpha < 1`.
   - If `alg` is a vector, `!isempty(alg)`.
+  - If `zlo` is a number, `0 < zlo < 1`.
 
 # Details
 
@@ -1630,17 +1761,20 @@ julia> EntropicValueatRiskView(; alpha = 0.01,
                                views = LinearConstraintEstimator(; val = \"A <= 0.09\"),
                                alg = GridEntropicValueatRiskView(; pct = 0.8, K = 21))
 EntropicValueatRiskView
-    views ┼ LinearConstraintEstimator
-          │   val ┼ String: "A <= 0.09"
-          │   key ┴ nothing
-    alpha ┼ Float64: 0.01
-      alg ┼ GridEntropicValueatRiskView
-          │   pct ┼ Float64: 0.8
-          │     K ┼ Int64: 21
-          │     M ┴ Int64: 10
-     args ┼ Tuple{}: ()
-   kwargs ┼ @NamedTuple{}: NamedTuple()
-  bracket ┴ @NamedTuple{}: NamedTuple()
+   views ┼ LinearConstraintEstimator
+         │   val ┼ String: "A <= 0.09"
+         │   key ┴ nothing
+   alpha ┼ Float64: 0.01
+     alg ┼ GridEntropicValueatRiskView
+         │          pct ┼ Float64: 0.8
+         │            K ┼ Int64: 21
+         │            M ┼ Int64: 10
+         │        iters ┼ Int64: 50
+         │          tol ┼ Float64: 1.0e-10
+         │   tilt_iters ┴ Int64: 200
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+     zlo ┴ nothing
 ```
 
 # Related
@@ -1677,27 +1811,28 @@ EntropicValueatRiskView
     """
     kwargs
     """
-    $(field_dict[:ep_tv_bracket]) [`ep_evar`](@ref) names the key it takes.
+    $(field_dict[:ep_tv_evar_zlo])
     """
-    bracket
+    zlo
     function EntropicValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
                                      alg::Option{<:EVaRVF_VecEVaRVF}, args::Tuple,
-                                     kwargs::NamedTuple, bracket::NamedTuple)
+                                     kwargs::NamedTuple, zlo::Option{<:Number})
         assert_unit_interval(alpha, :alpha)
         if isa(alg, AbstractVector)
             @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
         end
-        @argcheck(issubset(keys(bracket), (:zlo,)),
-                  ArgumentError("bracket takes the key `zlo` alone, got $(keys(bracket))"))
+        if !isnothing(zlo)
+            @argcheck(zero(zlo) < zlo < one(zlo), DomainError(zlo, "zlo must be in (0, 1)"))
+        end
         return new{typeof(views), typeof(alpha), typeof(alg), typeof(args), typeof(kwargs),
-                   typeof(bracket)}(views, alpha, alg, args, kwargs, bracket)
+                   typeof(zlo)}(views, alpha, alg, args, kwargs, zlo)
     end
 end
 function EntropicValueatRiskView(; views::LinearConstraintEstimator, alpha::Number = 0.05,
                                  alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
                                  args::Tuple = (), kwargs::NamedTuple = (;),
-                                 bracket::NamedTuple = (;))::EntropicValueatRiskView
-    return EntropicValueatRiskView(views, alpha, alg, args, kwargs, bracket)
+                                 zlo::Option{<:Number} = nothing)::EntropicValueatRiskView
+    return EntropicValueatRiskView(views, alpha, alg, args, kwargs, zlo)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1717,7 +1852,7 @@ $(DocStringExtensions.FIELDS)
         alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing,
         args::Tuple = (),
         kwargs::NamedTuple = (;),
-        bracket::NamedTuple = (;)
+        bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing
     ) -> RelativisticValueatRiskView
 
 Keywords correspond to the struct's fields. `alg` left `nothing` lets each view in the group take the cheapest formulation that expresses it exactly, and is where the grid of primal points and the big-M constant live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`. A `prior(...)` reference inside `views` is replaced by the prior RLVaR at this group's `alpha` and `kappa`, so a view stated against the prior moves with both.
@@ -1727,7 +1862,6 @@ Keywords correspond to the struct's fields. `alg` left `nothing` lets each view 
   - `0 < alpha < 1`.
   - `0 < kappa < 1`.
   - If `alg` is a vector, `!isempty(alg)`.
-  - `bracket` carries the keys `tspan`, `zlo` and `zhi` alone.
 
 # Examples
 
@@ -1743,7 +1877,7 @@ RelativisticValueatRiskView
       alg ┼ nothing
      args ┼ Tuple{}: ()
    kwargs ┼ @NamedTuple{}: NamedTuple()
-  bracket ┴ @NamedTuple{}: NamedTuple()
+  bracket ┴ nothing
 ```
 
 # Related
@@ -1784,20 +1918,18 @@ RelativisticValueatRiskView
     """
     kwargs
     """
-    $(field_dict[:ep_tv_bracket]) [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref) name the keys it takes.
+    $(field_dict[:ep_tv_bracket])
     """
     bracket
     function RelativisticValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
                                          kappa::Number, alg::Option{<:RLVaRVF_VecRLVaRVF},
                                          args::Tuple, kwargs::NamedTuple,
-                                         bracket::NamedTuple)
+                                         bracket::Option{<:RelativisticValueatRiskViewBracket})
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(kappa, :kappa)
         if isa(alg, AbstractVector)
             @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
         end
-        @argcheck(issubset(keys(bracket), (:tspan, :zlo, :zhi)),
-                  ArgumentError("bracket takes the keys `tspan`, `zlo` and `zhi`, got $(keys(bracket))"))
         return new{typeof(views), typeof(alpha), typeof(kappa), typeof(alg), typeof(args),
                    typeof(kwargs), typeof(bracket)}(views, alpha, kappa, alg, args, kwargs,
                                                     bracket)
@@ -1807,7 +1939,7 @@ function RelativisticValueatRiskView(; views::LinearConstraintEstimator,
                                      alpha::Number = 0.05, kappa::Number = 0.3,
                                      alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing,
                                      args::Tuple = (), kwargs::NamedTuple = (;),
-                                     bracket::NamedTuple = (;))::RelativisticValueatRiskView
+                                     bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)::RelativisticValueatRiskView
     return RelativisticValueatRiskView(views, alpha, kappa, alg, args, kwargs, bracket)
 end
 """
@@ -3068,4 +3200,5 @@ export RhoParsingResult, LogEntropyPooling, ExpEntropyPooling, H0_EntropyPooling
        EntropicValueatRiskView, LinearConditionalValueatRiskView,
        IntegerConditionalValueatRiskView, ConicEntropicValueatRiskView,
        GridEntropicValueatRiskView, RelativisticValueatRiskView,
-       ConicRelativisticValueatRiskView, GridRelativisticValueatRiskView
+       ConicRelativisticValueatRiskView, GridRelativisticValueatRiskView,
+       RelativisticValueatRiskViewBracket

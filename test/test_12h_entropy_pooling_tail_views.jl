@@ -682,6 +682,25 @@ end
     @test_throws DomainError GridEntropicValueatRiskView(; K = 10)
     @test_throws DomainError GridEntropicValueatRiskView(; pct = 1.5)
     @test_throws DomainError GridEntropicValueatRiskView(; M = 0)
+    # The anchor that centres the grid runs from a grid formulation alone, so its number of
+    # steps and its tolerance live there rather than on the view group.
+    for T in (GridEntropicValueatRiskView, GridRelativisticValueatRiskView)
+        @test T().iters == 50
+        @test T().tol == 1e-10
+        @test T().tilt_iters == 200
+        @test_throws DomainError T(; iters = 0)
+        @test_throws DomainError T(; tol = -1)
+        @test_throws DomainError T(; tilt_iters = 0)
+    end
+    # The tilt of one row bisects to the resolution of the floating-point type, which for
+    # `Float64` it reaches near step 64, so the cap binds only below that.
+    let c = exp.(range(0, 1; length = 8)), w = fill(inv(8), 8)
+        b = (minimum(c) + maximum(c)) / 2
+        @test PO.ep_row_tilt(w, c, b) ≈ PO.ep_row_tilt(w, c, b; iters = 200)
+        @test PO.ep_row_tilt(w, c, b) ≈ PO.ep_row_tilt(w, c, b; iters = 64)
+        @test !(PO.ep_row_tilt(w, c, b) ≈ PO.ep_row_tilt(w, c, b; iters = 4))
+        @test_throws DomainError PO.ep_row_tilt(w, c, b; iters = 0)
+    end
     # `ep_sbar` resolves a count, a fraction and the rule of thumb.
     # `ord` is ascending, as the paper writes it, so the rule of thumb counts positions
     # from the end. Pin the count itself, which is what fixes the direction of the scan.
@@ -1223,48 +1242,61 @@ end
 end
 
 @testset "a tail view group carries its own Optim settings" begin
-    # `args` and `kwargs` reach every `Optim.optimize` the group's views run, and `bracket`
-    # moves the spans those searches run over. Each is empty by default, and empty is the
-    # value the search documents, so a default group answers as the bare call does.
+    # `args` and `kwargs` reach every `Optim.optimize` the group's views run. The spans those
+    # searches run over are situational, so each is optional and `nothing` resolves at the
+    # point of use: the EVaR carries the one number it needs as a field of the view group,
+    # and the RLVaR carries its three in a `RelativisticValueatRiskViewBracket`.
     x = -rd.X[:, 1]
     r = PO.ep_rlvar(x, ep_w0, ep_a, ep_k)
     @test PO.ep_evar(x, ep_w0, ep_a) ==
           PO.ep_evar(x, ep_w0, ep_a; args = (PO.Optim.Brent(),))
+    # The bracket a caller states by hand is the bracket `nothing` resolves to.
     @test r == PO.ep_rlvar(x, ep_w0, ep_a, ep_k; args = (PO.Optim.Brent(),),
-                           bracket = (; tspan = 2, zlo = -20, zhi = 10))
+                           bracket = RelativisticValueatRiskViewBracket())
+    @test r == PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
+                           bracket = RelativisticValueatRiskViewBracket(; tspan = 2, zlo = -20,
+                                                                        zhi = 10))
     # A search stopped before it converges raises, rather than answering with the point it
     # reached.
     @test_throws ErrorException PO.ep_evar(x, ep_w0, ep_a; kwargs = (; iterations = 1))
     @test_throws ErrorException PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
                                             kwargs = (; iterations = 1))
-    # A `bracket` key the statistic does not name raises, so a typo does not fall through to
-    # the default.
-    @test_throws ArgumentError PO.ep_evar(x, ep_w0, ep_a; bracket = (; tspan = 2))
-    @test_throws ArgumentError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; pct = 0.5))
-    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; bracket = (; zlo = 2.0))
-    @test_throws DomainError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; zlo = 20))
-    @test_throws DomainError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; tspan = 0))
+    # The constructor of the bracket holds the defaults and the validation, so a span the
+    # search cannot use never reaches it.
+    @test RelativisticValueatRiskViewBracket().tspan == 2
+    @test RelativisticValueatRiskViewBracket().zlo == -20
+    @test RelativisticValueatRiskViewBracket().zhi == 10
+    @test_throws DomainError RelativisticValueatRiskViewBracket(; tspan = 0)
+    @test_throws DomainError RelativisticValueatRiskViewBracket(; zlo = 20)
+    @test_throws DomainError RelativisticValueatRiskViewBracket(; zlo = 5, zhi = 5)
+    # The EVaR carries one number rather than a struct, and the view group validates it.
+    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo = 2.0)
+    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; zlo = 0.0)
     # A wider span answers the same value, because the default already holds the minimiser.
-    @test isapprox(PO.ep_evar(x, ep_w0, ep_a; bracket = (; zlo = 1e-6)).evar, ep_pevar,
-                   rtol = 1e-10)
-    @test isapprox(PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; tspan = 5)).rlvar,
+    @test isapprox(PO.ep_evar(x, ep_w0, ep_a; zlo = 1e-6).evar, ep_pevar, rtol = 1e-10)
+    @test isapprox(PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
+                               bracket = RelativisticValueatRiskViewBracket(; tspan = 5)).rlvar,
                    r.rlvar, rtol = 1e-8)
-    # The fields carry the settings, and the constructors refuse an unnamed `bracket` key.
+    # The fields carry the settings, and both spans default to `nothing`.
     v = LinearConstraintEstimator(; val = "AAPL >= $(1.2 * ep_pevar)")
     ev = EntropicValueatRiskView(; views = v, args = (PO.Optim.Brent(),),
-                                 kwargs = (; abs_tol = 1e-10), bracket = (; zlo = 1e-6))
+                                 kwargs = (; abs_tol = 1e-10), zlo = 1e-6)
     @test ev.args == (PO.Optim.Brent(),)
     @test ev.kwargs == (; abs_tol = 1e-10)
-    @test ev.bracket == (; zlo = 1e-6)
-    rv = RelativisticValueatRiskView(; views = v, bracket = (; tspan = 3))
-    @test rv.bracket == (; tspan = 3)
+    @test ev.zlo == 1e-6
+    @test isnothing(EntropicValueatRiskView(; views = v).zlo)
+    @test_throws DomainError EntropicValueatRiskView(; views = v, zlo = 1.5)
+    bkt = RelativisticValueatRiskViewBracket(; tspan = 3)
+    rv = RelativisticValueatRiskView(; views = v, bracket = bkt)
+    @test rv.bracket === bkt
     @test rv.args == ()
     @test rv.kwargs == (;)
-    @test_throws ArgumentError EntropicValueatRiskView(; views = v, bracket = (; tspan = 2))
-    @test_throws ArgumentError RelativisticValueatRiskView(; views = v,
-                                                           bracket = (; pct = 0.5))
-    # They reach the solve. A group that states the defaults answers as a group that leaves
-    # them empty.
+    @test isnothing(RelativisticValueatRiskView(; views = v).bracket)
+    # A bracket built for the other statistic is a type the field does not admit. The
+    # keyword carries the bound, so the raise names the field and the type it wanted.
+    @test_throws TypeError RelativisticValueatRiskView(; views = v, bracket = (; tspan = 3))
+    # They reach the solve. A group that states the default answers as a group that leaves
+    # it out.
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    evar_views = EntropicValueatRiskView(;
                                                                         alg = GridEntropicValueatRiskView(),
@@ -1274,8 +1306,7 @@ end
                                                                          alg = GridEntropicValueatRiskView(),
                                                                          views = v,
                                                                          args = (PO.Optim.Brent(),),
-                                                                         bracket = (;
-                                                                                    zlo = sqrt(eps(Float64))))),
+                                                                         zlo = sqrt(eps(Float64)))),
                 rd)
     @test isapprox(pr.w, pr2.w, rtol = 1e-10)
     # A group that moves the span answers near the same place, and not at the same place:
@@ -1285,9 +1316,7 @@ end
                                     evar_views = EntropicValueatRiskView(;
                                                                          alg = GridEntropicValueatRiskView(),
                                                                          views = v,
-                                                                         bracket = (;
-                                                                                    zlo = 1e-8))),
-                rd)
+                                                                         zlo = 1e-8)), rd)
     @test isapprox(pr.w, pr3.w, rtol = 1e-3)
     @test !isapprox(pr.w, pr3.w, rtol = 1e-9)
     # A group whose search cannot converge raises rather than building a wrong grid.
@@ -1297,4 +1326,22 @@ end
                                                                                                kwargs = (;
                                                                                                          iterations = 1))),
                                       rd)
+    # The grid formulation's `iters` and `tol` reach the anchor. One step is not enough to
+    # reach the target, so the anchor gives up and the grid falls back to the one a
+    # lower-bound view builds, centred on the prior's dual variable.
+    e = PO.ep_evar(x, ep_w0, ep_a)
+    tgt = 0.4 * e.evar
+    grid_of(alg) = begin
+        epc, tvs = Dict{Symbol, Any}(), Any[]
+        PO.ep_add_evar_view!(epc, tvs, alg, x, ep_a, :leq, tgt, ep_w0, e.z, e.evar, "AAPL")
+        tvs[1].z
+    end
+    zanc = grid_of(GridEntropicValueatRiskView())
+    zone = grid_of(GridEntropicValueatRiskView(; iters = 1))
+    @test zone == PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.5, 11)
+    @test zanc != zone
+    @test isapprox(zanc[6] / e.z, 0.23115, rtol = 1e-4)
+    # A tolerance the iteration cannot miss stops it at the first step, which lands short of
+    # the anchor the default tolerance reaches.
+    @test grid_of(GridEntropicValueatRiskView(; tol = 1.0)) != zanc
 end

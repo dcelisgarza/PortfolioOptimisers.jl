@@ -37,6 +37,7 @@ GridRelativisticValueatRiskView
 CVaRVF_VecCVaRVF
 EVaRVF_VecEVaRVF
 RLVaRVF_VecRLVaRVF
+RelativisticValueatRiskViewBracket
 AbstractEntropyPoolingTailViewEstimator
 ConditionalValueatRiskView
 EntropicValueatRiskView

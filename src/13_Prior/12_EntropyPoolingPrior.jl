@@ -1,6 +1,6 @@
 """
     ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
-            kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+            kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
 
 Compute the sample entropic value-at-risk of a loss series and the dual variable that attains it.
 
@@ -19,11 +19,10 @@ Compute the sample entropic value-at-risk of a loss series and the dual variable
   - `alpha`: Significance level.
   - $(arg_dict[:optargs]) Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search. It takes the key `zlo` alone, the lower end of the bracket as a fraction of the upper end. Left empty it is `sqrt(eps(T))` for the element type `T`. The upper end is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, above which the objective already exceeds `maximum(x)`, which bounds the EVaR from above. That is a proof, so the upper end is not a knob and the lower one is.
+  - `zlo`: Lower end of the bracket of the dual variable, as a fraction of the upper end. `nothing` takes `sqrt(eps(T))` for the element type `T`, which the caller cannot state because the type follows from the data. The upper end is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, above which the objective already exceeds `maximum(x)`, which bounds the EVaR from above. That is a proof, so the upper end is not a knob and only the lower one is.
 
 # Validation
 
-  - `bracket` carries the key `zlo` alone.
   - `0 < zlo < 1`.
   - The search converges. It is a bracketed scalar minimisation of a convex function, so it fails only under `args` or `kwargs` that stop it early.
 
@@ -47,9 +46,7 @@ Compute the sample entropic value-at-risk of a loss series and the dual variable
   - $(ref_dict[:EPTail])
 """
 function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
-                 kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
-    @argcheck(issubset(keys(bracket), (:zlo,)),
-              ArgumentError("The `bracket` of an EVaR view takes the key `zlo` alone, got $(keys(bracket))."))
+                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
     lw = log.(w)
     lw .-= LogExpFunctions.logsumexp(lw)
     ila = -log(alpha)
@@ -59,7 +56,9 @@ function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
     hi = (maximum(x) - LinearAlgebra.dot(exp.(lw), x)) / ila
     ehi = eps(float(typeof(hi)))
     hi = ifelse(hi > zero(hi), hi, ehi)
-    zlo = get(bracket, :zlo, sqrt(ehi))
+    # The default lower end is the one the element type states, which a caller that holds no
+    # data cannot, so `nothing` resolves here rather than in the view that carries it.
+    zlo = isnothing(zlo) ? sqrt(ehi) : zlo
     @argcheck(zero(zlo) < zlo < one(zlo), DomainError(zlo, "zlo must be in (0, 1)"))
     lo = hi * zlo
     res = Optim.optimize(f, lo, hi, args...; kwargs...)
@@ -152,7 +151,7 @@ end
 """
     ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Number;
                    args::Tuple = (), kwargs::NamedTuple = (;),
-                   bracket::NamedTuple = (;))
+                   bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Minimise the primal objective of the relativistic value at risk over its shift variable, at a fixed dual variable.
 
@@ -185,12 +184,10 @@ Where:
   - `z`: Dual variable of the primal programme.
   - $(arg_dict[:optargs]) Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the searches of a relativistic value-at-risk view. This function reads the key `tspan`, the number of loss spans the shift bracket is widened by on each side. Left empty it is `2`. It is a margin, not a proof, so widen it where the minimising shift lands on an end of the bracket. The keys `zlo` and `zhi` belong to [`ep_rlvar`](@ref) and are accepted here so one `bracket` serves both.
+  - `bracket`: Spans of the searches of a relativistic value-at-risk view, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `tspan` alone. It is a margin, not a proof, so widen it where the minimising shift lands on an end of the bracket. [`ep_rlvar`](@ref) reads the other two fields.
 
 # Validation
 
-  - `bracket` carries the keys `tspan`, `zlo` and `zhi` alone.
-  - `tspan > 0`.
   - The search converges. It is a bracketed scalar minimisation of a convex function, so it fails only under `args` or `kwargs` that stop it early. A minimiser that lands on an end of the bracket does not fail it: `Optim` reports that end as converged.
 
 # Returns
@@ -214,11 +211,10 @@ Where:
 """
 function ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Number;
                         args::Tuple = (), kwargs::NamedTuple = (;),
-                        bracket::NamedTuple = (;))
-    @argcheck(issubset(keys(bracket), (:tspan, :zlo, :zhi)),
-              ArgumentError("The `bracket` of an RLVaR view takes the keys `tspan`, `zlo` and `zhi`, got $(keys(bracket))."))
-    tspan = get(bracket, :tspan, 2)
-    @argcheck(tspan > zero(tspan), DomainError(tspan, "tspan must be > 0"))
+                        bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+    # `nothing` resolves to the default bracket rather than to bare numbers, so the spans
+    # are written once, in the constructor that validates them.
+    tspan = something(bracket, RelativisticValueatRiskViewBracket()).tspan
     T = length(x)
     xmin, xmax = extrema(x)
     span = xmax - xmin
@@ -237,7 +233,7 @@ function ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Num
 end
 """
     ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tuple = (),
-             kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+             kwargs::NamedTuple = (;), bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Compute the sample relativistic value at risk of a loss series and the primal point that attains it.
 
@@ -272,12 +268,10 @@ Where:
   - `kappa`: Deformation parameter, in `(0, 1)`.
   - $(arg_dict[:optargs]) It reaches both searches. Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs]) They reach both searches.
-  - `bracket`: Span of the searches. It takes the keys `tspan`, `zlo` and `zhi`. This function reads `zlo` and `zhi`, the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. Left empty they are `-20` and `10`. They are a margin, not a proof, so widen one where the minimising dual variable lands on an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
+  - `bracket`: Spans of the searches, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `zlo` and `zhi`, the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. They are a margin, not a proof, so widen one where the minimising dual variable lands on an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
 
 # Validation
 
-  - `bracket` carries the keys `tspan`, `zlo` and `zhi` alone.
-  - `zlo < zhi`.
   - Both searches converge. Each is a bracketed scalar minimisation of a convex function, so one fails only under `args` or `kwargs` that stop it early. A minimiser that lands on an end of a bracket does not fail it: `Optim` reports that end as converged.
 
 # Returns
@@ -286,7 +280,7 @@ Where:
 
 # Algorithm
 
- 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), over a bracket running from `exp(zlo)` to `exp(zhi)` times the loss range, which is about `2e-9` to about `2e4` under the defaults. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), over a bracket running from `exp(zlo)` to `exp(zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
  2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
  3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
 
@@ -304,11 +298,12 @@ Where:
   - $(ref_dict[:EPRLVaR])
 """
 function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tuple = (),
-                  kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
-    @argcheck(issubset(keys(bracket), (:tspan, :zlo, :zhi)),
-              ArgumentError("The `bracket` of an RLVaR view takes the keys `tspan`, `zlo` and `zhi`, got $(keys(bracket))."))
-    zlo, zhi = get(bracket, :zlo, -20), get(bracket, :zhi, 10)
-    @argcheck(zlo < zhi, DomainError((zlo, zhi), "zlo must be < zhi"))
+                  kwargs::NamedTuple = (;),
+                  bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+    # `nothing` resolves to the default bracket rather than to bare numbers, so the spans
+    # are written once, in the constructor that validates them.
+    bkt = something(bracket, RelativisticValueatRiskViewBracket())
+    zlo, zhi = bkt.zlo, bkt.zhi
     T = length(x)
     wi = w ./ sum(w)
     lnk = kappa_log(inv(alpha * T), kappa)
@@ -367,7 +362,7 @@ function ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha:
     return c ./ sc, (vbar - t - z * lnk) / sc
 end
 """
-    ep_row_tilt(w::VecNum, c::VecNum, b::Number)
+    ep_row_tilt(w::VecNum, c::VecNum, b::Number; iters::Integer = 200)
 
 Tilt a probability vector so that one linear row holds with equality, at the smallest relative entropy.
 
@@ -389,6 +384,11 @@ The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max
   - `w`: Prior probabilities, summing to one.
   - `c`: Coefficients of the row.
   - `b`: Value the row is to take.
+  - `iters::Integer = 200`: Largest number of bisection steps. The bisection stops on its own when the midpoint stops moving, which for `Float64` happens near step 64, so this binds only a type of higher precision.
+
+# Validation
+
+  - `iters >= 1`.
 
 # Returns
 
@@ -398,7 +398,7 @@ The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max
 
  1. Return `nothing` when `b` sits outside the open range of `c`.
  2. Bracket the root by doubling the tilt away from zero until the row's value crosses `b`.
- 3. Bisect the bracket to the resolution of the floating-point type.
+ 3. Bisect the bracket to the resolution of the floating-point type, or for `iters` steps, whichever comes first.
 
 # Related
 
@@ -409,7 +409,8 @@ The row's value under the tilt falls strictly as ``\\theta`` rises, from ``\\max
 
   - $(ref_dict[:EPRLVaR])
 """
-function ep_row_tilt(w::VecNum, c::VecNum, b::Number)
+function ep_row_tilt(w::VecNum, c::VecNum, b::Number; iters::Integer = 200)
+    @argcheck(iters >= one(iters), DomainError(iters, "iters must be >= 1"))
     lo, hi = extrema(c)
     if !(lo < b < hi)
         return nothing
@@ -429,7 +430,7 @@ function ep_row_tilt(w::VecNum, c::VecNum, b::Number)
         thb *= 2
     end
     tha = zero(b)
-    for _ in 1:200
+    for _ in 1:iters
         thm = (tha + thb) / 2
         if (thm == tha || thm == thb)
             break
@@ -441,8 +442,9 @@ function ep_row_tilt(w::VecNum, c::VecNum, b::Number)
 end
 """
     ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
-                   iters::Integer = 50, tol::Number = 1e-10, args::Tuple = (),
-                   kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                   iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
+                   args::Tuple = (), kwargs::NamedTuple = (;),
+                   zlo::Option{<:Number} = nothing)
 
 Find the dual variable of the entropic value at risk that a posterior meeting an upper-bound view attains.
 
@@ -457,9 +459,10 @@ A grid point states the view as one row, and a posterior that makes the row tigh
   - `z`: Dual variable the iteration starts from.
   - `iters::Integer = 50`: Largest number of steps the iteration takes.
   - `tol::Number = 1e-10`: Relative distance from the target at which the iteration stops.
+  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search, forwarded to [`ep_evar`](@ref).
+  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -485,19 +488,20 @@ A grid point states the view as one row, and a posterior that makes the row tigh
   - $(ref_dict[:EPTail])
 """
 function ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
-                        iters::Integer = 50, tol::Number = 1e-10, args::Tuple = (),
-                        kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                        iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
+                        args::Tuple = (), kwargs::NamedTuple = (;),
+                        zlo::Option{<:Number} = nothing)
     for _ in 1:iters
         c, isc = ep_evar_grid_row(x, rhs, z)
         b = alpha * isc
         if !(all(isfinite, c) && isfinite(b))
             return nothing
         end
-        q = ep_row_tilt(w, c, b)
+        q = ep_row_tilt(w, c, b; iters = tilt_iters)
         if isnothing(q)
             return nothing
         end
-        res = ep_evar(x, q, alpha; args = args, kwargs = kwargs, bracket = bracket)
+        res = ep_evar(x, q, alpha; args = args, kwargs = kwargs, zlo = zlo)
         if abs(res.evar - rhs) <= tol * abs(rhs)
             return (; z = res.z, w = q)
         end
@@ -508,8 +512,8 @@ end
 """
     ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Number,
                  zstar::Number, pct::Number, K::Integer; iters::Integer = 50,
-                 tol::Number = 1e-10, args::Tuple = (), kwargs::NamedTuple = (;),
-                 bracket::NamedTuple = (;))
+                 tol::Number = 1e-10, tilt_iters::Integer = 200, args::Tuple = (),
+                 kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
 
 Build the grid of dual variables an entropic value-at-risk view is written on.
 
@@ -527,9 +531,10 @@ A view that carries an upper-bound half is centred on the dual variable [`ep_eva
   - `K`: Number of grid points.
   - `iters::Integer = 50`: Largest number of steps the anchor takes.
   - `tol::Number = 1e-10`: Relative distance from the target at which the anchor stops.
+  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search, forwarded to [`ep_evar`](@ref).
+  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -554,8 +559,8 @@ A view that carries an upper-bound half is centred on the dual variable [`ep_eva
 """
 function ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Number,
                       zstar::Number, pct::Number, K::Integer; iters::Integer = 50,
-                      tol::Number = 1e-10, args::Tuple = (), kwargs::NamedTuple = (;),
-                      bracket::NamedTuple = (;))
+                      tol::Number = 1e-10, tilt_iters::Integer = 200, args::Tuple = (),
+                      kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
     # EVaR is translation-equivariant and its dual variable is translation-invariant, so
     # the row of a grid point already carries the whole of the translation to the target.
     # The upper-bound half needs more: it reaches the target only where the grid holds the
@@ -565,8 +570,8 @@ function ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Numb
     anc = if op == :geq
         nothing
     else
-        ep_evar_anchor(x, w, alpha, rhs, zstar; iters = iters, tol = tol, args = args,
-                       kwargs = kwargs, bracket = bracket)
+        ep_evar_anchor(x, w, alpha, rhs, zstar; iters = iters, tol = tol,
+                       tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
     end
     if !isnothing(anc)
         zc = anc.z
@@ -576,8 +581,9 @@ end
 """
     ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs::Number,
                     t::Number, z::Number; iters::Integer = 50, tol::Number = 1e-10,
-                    args::Tuple = (), kwargs::NamedTuple = (;),
-                    bracket::NamedTuple = (;))
+                    tilt_iters::Integer = 200, args::Tuple = (),
+                    kwargs::NamedTuple = (;),
+                    bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Find the primal point of the relativistic value at risk that a posterior meeting an upper-bound view attains.
 
@@ -594,6 +600,7 @@ A grid point states the view as one row, and a posterior that makes the row tigh
   - `z`: Dual variable the iteration starts from.
   - `iters::Integer = 50`: Largest number of steps the iteration takes.
   - `tol::Number = 1e-10`: Relative distance from the target at which the iteration stops.
+  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
   - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
@@ -623,14 +630,15 @@ A grid point states the view as one row, and a posterior that makes the row tigh
 """
 function ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs::Number,
                          t::Number, z::Number; iters::Integer = 50, tol::Number = 1e-10,
-                         args::Tuple = (), kwargs::NamedTuple = (;),
-                         bracket::NamedTuple = (;))
+                         tilt_iters::Integer = 200, args::Tuple = (),
+                         kwargs::NamedTuple = (;),
+                         bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     for _ in 1:iters
         c, b = ep_rlvar_grid_row(x, rhs, t, z, alpha, kappa)
         if !(all(isfinite, c) && isfinite(b))
             return nothing
         end
-        q = ep_row_tilt(w, c, b)
+        q = ep_row_tilt(w, c, b; iters = tilt_iters)
         if isnothing(q)
             return nothing
         end
@@ -645,8 +653,9 @@ end
 """
     ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::Symbol,
                   rhs::Number, zstar::Number, pv::Number, pct::Number, K::Integer;
-                  iters::Integer = 50, tol::Number = 1e-10, args::Tuple = (),
-                  kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                  iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
+                  args::Tuple = (), kwargs::NamedTuple = (;),
+                  bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Build the grid of primal points a relativistic value-at-risk view is written on.
 
@@ -666,6 +675,7 @@ A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor
   - `K`: Number of grid points.
   - `iters::Integer = 50`: Largest number of steps the anchor takes.
   - `tol::Number = 1e-10`: Relative distance from the target at which the anchor stops.
+  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
   - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
@@ -695,8 +705,9 @@ A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor
 """
 function ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::Symbol,
                        rhs::Number, zstar::Number, pv::Number, pct::Number, K::Integer;
-                       iters::Integer = 50, tol::Number = 1e-10, args::Tuple = (),
-                       kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                       iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
+                       args::Tuple = (), kwargs::NamedTuple = (;),
+                       bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     lnk = kappa_log(inv(alpha * length(x)), kappa)
     # RLVaR is translation-equivariant, and so is the shift that attains it: subtracting
     # `delta` from every loss subtracts `delta` from both. A posterior that moves the RLVaR
@@ -712,8 +723,8 @@ function ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::S
         ep_rlvar_anchor(x, w, alpha, kappa, rhs,
                         ep_rlvar_shift(x, w, kappa, lnk, zstar; args = args,
                                        kwargs = kwargs, bracket = bracket).t - delta, zstar;
-                        iters = iters, tol = tol, args = args, kwargs = kwargs,
-                        bracket = bracket)
+                        iters = iters, tol = tol, tilt_iters = tilt_iters, args = args,
+                        kwargs = kwargs, bracket = bracket)
     end
     if !isnothing(anc)
         zc, wc, delta = anc.z, anc.w, zero(delta)
@@ -1156,7 +1167,7 @@ end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
                  args::Tuple = (), kwargs::NamedTuple = (;),
-                 bracket::NamedTuple = (;))
+                 zlo::Option{<:Number} = nothing)
 
 Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
 
@@ -1170,7 +1181,7 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
   - `alpha`: Confidence level (e.g. `0.05` for 5% EVaR).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search, forwarded to [`ep_evar`](@ref).
+  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
 
 # Returns
 
@@ -1183,17 +1194,18 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:evar}, alpha::Number,
-                      args::Tuple = (), kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                      args::Tuple = (), kwargs::NamedTuple = (;),
+                      zlo::Option{<:Number} = nothing)
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     T = size(pr.X, 1)
     iT = inv(T)
     return ep_evar(-view(pr.X, :, i), range(iT, iT; length = T), alpha; args = args,
-                   kwargs = kwargs, bracket = bracket).evar
+                   kwargs = kwargs, zlo = zlo).evar
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
                  kappa::Number, args::Tuple = (), kwargs::NamedTuple = (;),
-                 bracket::NamedTuple = (;))
+                 bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result.
 
@@ -1222,7 +1234,7 @@ Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha::Number,
                       kappa::Number, args::Tuple = (), kwargs::NamedTuple = (;),
-                      bracket::NamedTuple = (;))
+                      bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     T = size(pr.X, 1)
     iT = inv(T)
@@ -1616,7 +1628,7 @@ end
                       alg::AbstractEntropicValueatRiskViewFormulation, x::VecNum, alpha::Number,
                       op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                       eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                      bracket::NamedTuple = (;))
+                      zlo::Option{<:Number} = nothing)
 
 Lower one entropic value-at-risk view into the constraints its formulation needs.
 
@@ -1626,7 +1638,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `tvs`: Tail view constraints, appended to.
-  - `alg`: Formulation of the view.
+  - `alg`: Formulation of the view. A grid formulation is also where the number of steps and the tolerance of the anchor live.
   - `x`: Loss series of the asset the view names.
   - `alpha`: Significance level of the view.
   - `op`: Comparison operator of the view.
@@ -1637,7 +1649,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
   - `eqn`: Equation of the view, used in the error messages.
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search, forwarded to [`ep_evar`](@ref).
+  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref).
 
 # Validation
 
@@ -1658,7 +1670,7 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            ::ConicEntropicValueatRiskView, x::VecNum, alpha::Number,
                            op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                            eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                           bracket::NamedTuple = (;))
+                           zlo::Option{<:Number} = nothing)
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -1670,11 +1682,11 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            alg::GridEntropicValueatRiskView, x::VecNum, alpha::Number,
                            op::Symbol, rhs::Number, w::VecNum, zstar::Number, pv::Number,
                            eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
-                           bracket::NamedTuple = (;))
-    (; pct, K, M) = alg
+                           zlo::Option{<:Number} = nothing)
+    (; pct, K, M, iters, tol, tilt_iters) = alg
     wi = w ./ sum(w)
-    z = ep_evar_grid(x, wi, alpha, op, rhs, zstar, pct, K; args = args, kwargs = kwargs,
-                     bracket = bracket)
+    z = ep_evar_grid(x, wi, alpha, op, rhs, zstar, pct, K; iters = iters, tol = tol,
+                     tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
     if op == :geq || op == :eq
         for zk in z
             c, isc = ep_evar_grid_row(x, rhs, zk)
@@ -1691,7 +1703,7 @@ end
                        alg::AbstractRelativisticValueatRiskViewFormulation, x::VecNum,
                        alpha::Number, kappa::Number, op::Symbol, rhs::Number, w::VecNum,
                        zstar::Number, pv::Number, eqn::AbstractString; args::Tuple = (),
-                       kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                       kwargs::NamedTuple = (;), bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Lower one relativistic value-at-risk view into the constraints its formulation needs.
 
@@ -1701,7 +1713,7 @@ Lower one relativistic value-at-risk view into the constraints its formulation n
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `tvs`: Tail view constraints, appended to.
-  - `alg`: Formulation of the view.
+  - `alg`: Formulation of the view. A grid formulation is also where the number of steps and the tolerance of the anchor live.
   - `x`: Loss series of the asset the view names.
   - `alpha`: Significance level of the view.
   - `kappa`: Deformation parameter of the view.
@@ -1738,7 +1750,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             kappa::Number, op::Symbol, rhs::Number, w::VecNum,
                             zstar::Number, pv::Number, eqn::AbstractString;
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            bracket::NamedTuple = (;))
+                            bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -1751,11 +1763,12 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             kappa::Number, op::Symbol, rhs::Number, w::VecNum,
                             zstar::Number, pv::Number, eqn::AbstractString;
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            bracket::NamedTuple = (;))
-    (; pct, K, M) = alg
+                            bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+    (; pct, K, M, iters, tol, tilt_iters) = alg
     wi = w ./ sum(w)
-    t, z = ep_rlvar_grid(x, wi, alpha, kappa, op, rhs, zstar, pv, pct, K; args = args,
-                         kwargs = kwargs, bracket = bracket)
+    t, z = ep_rlvar_grid(x, wi, alpha, kappa, op, rhs, zstar, pv, pct, K; iters = iters,
+                         tol = tol, tilt_iters = tilt_iters, args = args, kwargs = kwargs,
+                         bracket = bracket)
     # A point whose row is not finite is not a grid point. `ep_rlvar_tail` overflows at a
     # dual variable near zero, which is where the grid sits when `kappa` approaches one, and
     # a non-finite coefficient reaches the solver as `NaN * x[j]`.
@@ -1932,7 +1945,7 @@ end
     ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict,
                    tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
                    alpha::Number, w::VecNum, alg; strict::Bool = false, args::Tuple = (),
-                   kwargs::NamedTuple = (;), bracket::NamedTuple = (;))
+                   kwargs::NamedTuple = (;), zlo::Option{<:Number} = nothing)
 
 Parse entropic value-at-risk views and lower them into entropy pooling constraints.
 
@@ -1951,7 +1964,7 @@ Parse entropic value-at-risk views and lower them into entropy pooling constrain
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
   - $(arg_dict[:optargs]) It reaches the prior EVaR a `prior(...)` reference resolves to, the prior EVaR each view is compared against, and the centre of the grid of [`ep_evar_anchor`](@ref).
   - $(arg_dict[:optkwargs])
-  - `bracket`: Span of the search, forwarded to [`ep_evar`](@ref). It reaches the same three searches `args` does.
+  - `zlo`: Lower end of the bracket, forwarded to [`ep_evar`](@ref). It reaches the same three searches `args` does.
 
 # Returns
 
@@ -1975,7 +1988,7 @@ function ep_evar_views!(evar_views::EntropicValueatRiskView, epc::AbstractDict,
                         w::VecNum; strict::Bool = false)
     return ep_evar_views!(evar_views.views, epc, tvs, pr, sets, evar_views.alpha, w,
                           evar_views.alg; strict = strict, args = evar_views.args,
-                          kwargs = evar_views.kwargs, bracket = evar_views.bracket)
+                          kwargs = evar_views.kwargs, zlo = evar_views.zlo)
 end
 """
     ep_evar_views!(evar_views::AbstractVector{<:EntropicValueatRiskView}, args...; kwargs...)
@@ -2010,12 +2023,12 @@ function ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict
                         tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
                         alpha::Number, w::VecNum, alg; strict::Bool = false,
                         args::Tuple = (), kwargs::NamedTuple = (;),
-                        bracket::NamedTuple = (;))
+                        zlo::Option{<:Number} = nothing)
     X = pr.X
     views = parse_equation(evar_views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))
     views = replace_group_by_assets(views, sets, false, true, false)
-    views = replace_prior_views(views, pr, sets, :evar, alpha, args, kwargs, bracket;
+    views = replace_prior_views(views, pr, sets, :evar, alpha, args, kwargs, zlo;
                                 strict = strict)
     if !isa(views, AbstractVector)
         views = [views]
@@ -2032,11 +2045,11 @@ function ep_evar_views!(evar_views::LinearConstraintEstimator, epc::AbstractDict
         op, rhs = ep_normalise_view_term(coef[1], op, rhs)
         x = -X[:, idx[1]]
         ep_assert_reachable_view(op, rhs, x, res.eqn, "EVaR")
-        evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, bracket = bracket)
+        evr = ep_evar(x, w, alpha; args = args, kwargs = kwargs, zlo = zlo)
         pv, zstar = evr.evar, evr.z
         algi = ep_evar_formulation(algi, op, rhs, pv)
         ep_add_evar_view!(epc, tvs, algi, x, alpha, op, rhs, w, zstar, pv, res.eqn;
-                          args = args, kwargs = kwargs, bracket = bracket)
+                          args = args, kwargs = kwargs, zlo = zlo)
     end
     return nothing
 end
@@ -2068,7 +2081,7 @@ end
                     tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
                     alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false,
                     args::Tuple = (), kwargs::NamedTuple = (;),
-                    bracket::NamedTuple = (;))
+                    bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
 Parse relativistic value-at-risk views and lower them into entropy pooling constraints.
 
@@ -2146,7 +2159,7 @@ function ep_rlvar_views!(rlvar_views::LinearConstraintEstimator, epc::AbstractDi
                          tvs::AbstractVector, pr::AbstractPriorResult, sets::UniverseSets,
                          alpha::Number, kappa::Number, w::VecNum, alg; strict::Bool = false,
                          args::Tuple = (), kwargs::NamedTuple = (;),
-                         bracket::NamedTuple = (;))
+                         bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     X = pr.X
     views = parse_equation(rlvar_views.val; ops1 = ("==", ">=", "<="),
                            ops2 = (:call, :(==), :(>=), :(<=)), datatype = eltype(X))

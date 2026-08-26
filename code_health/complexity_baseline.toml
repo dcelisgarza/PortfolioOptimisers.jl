@@ -83,9 +83,9 @@ commit = "2107fc7a40"
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 5, cog_sum = 4, arg_sum = 15, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { cyc = 3, cog = 4, arg = 13, cyc_sum = 6, cog_sum = 5, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { cyc = 4, cog = 5, arg = 13, cyc_sum = 8, cog_sum = 7, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 138, cog_sum = 138, arg_sum = 191, macros = [] }
+"src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { cyc = 16, cog = 36, arg = 8, cyc_sum = 141, cog_sum = 140, arg_sum = 206, macros = [] }
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { cyc = 15, cog = 18, arg = 15, cyc_sum = 54, cog_sum = 61, arg_sum = 52, macros = ["@forward_properties", "@propagatable"] }
-"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 18, arg = 15, cyc_sum = 144, cog_sum = 115, arg_sum = 272, macros = ["@forward_properties", "@propagatable"] }
+"src/13_Prior/12_EntropyPoolingPrior.jl" = { cyc = 18, cog = 18, arg = 16, cyc_sum = 170, cog_sum = 148, arg_sum = 365, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { cyc = 5, cog = 8, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 25, macros = ["@propagatable"] }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { cyc = 21, cog = 33, arg = 5, cyc_sum = 44, cog_sum = 61, arg_sum = 17, macros = ["@forward_properties", "@propagatable"] }
 "src/13_Prior/15_FeaturePrior.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 28, cog_sum = 13, arg_sum = 42, macros = ["@forward_properties", "@propagatable"] }
