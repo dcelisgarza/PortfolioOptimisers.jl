@@ -1138,3 +1138,163 @@ end
               PO.ep_rlvar_grid(x, ep_sw0, ep_a, k, :geq, mk, rk.z, rk.rlvar, 0.5, 11)
     end
 end
+
+# The entropy pooling answer to an EVaR grid, without a solver. The grid asks for one of its
+# rows, so the posterior is the cheapest tilt over the rows that are reachable. It is the
+# reading `ep_grid_post` gives the RLVaR grid, on the row `ep_evar_grid_row` builds.
+function ep_evar_grid_post(x, w, alpha, rhs, z)
+    bq, bd = nothing, Inf
+    for zk in z
+        c, isc = PO.ep_evar_grid_row(x, rhs, zk)
+        b = alpha * isc
+        if !(all(isfinite, c) && isfinite(b))
+            continue
+        end
+        q = LinearAlgebra.dot(c, w) <= b ? collect(w) : PO.ep_row_tilt(w, c, b)
+        if isnothing(q)
+            continue
+        end
+        d = sum(qj > zero(qj) ? qj * log(qj / wj) : zero(qj) for (qj, wj) in zip(q, w))
+        d < bd && (bd = d; bq = q)
+    end
+    return bq, bd
+end
+
+@testset "the EVaR grid is centred on the point the posterior attains" begin
+    # The RLVaR grid carries two devices, and an EVaR grid needs one of them. The shift of
+    # the primal programme of EVaR is closed form in the target and the dual variable, and
+    # `ep_evar_grid_row` already carries it, so the translation `ep_rlvar_grid` applies to
+    # its shift buys an EVaR grid nothing. The anchor is the half that does buy something:
+    # an upper-bound view reaches its target only where the grid holds the dual variable the
+    # posterior itself attains, and that one is not the prior's.
+    x = -rd.X[:, 1]
+    e = PO.ep_evar(x, ep_w0, ep_a)
+    tgt = 0.4 * e.evar
+    zold = PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.5, 11)
+    znew = PO.ep_evar_grid(x, ep_w0, ep_a, :leq, tgt, e.z, 0.5, 11)
+    qold, dold = ep_evar_grid_post(x, ep_w0, ep_a, tgt, zold)
+    qnew, dnew = ep_evar_grid_post(x, ep_w0, ep_a, tgt, znew)
+    # The grid centred on the prior lands seventeen per cent below the target.
+    @test isapprox(PO.ep_evar(x, qold, ep_a).evar / tgt, 0.82608, rtol = 1e-4)
+    # The anchored grid reaches it.
+    @test isapprox(PO.ep_evar(x, qnew, ep_a).evar, tgt, rtol = 1e-8)
+    # It reaches it at half the relative entropy the grid centred on the prior pays for its
+    # own answer, so the target is not bought with divergence.
+    @test dnew < dold
+    @test isapprox(dold, 0.074531, rtol = 1e-4)
+    @test isapprox(dnew, 0.037877, rtol = 1e-4)
+    # A lower-bound view keeps the prior's dual variable as the centre, and `K` is odd, so
+    # the centre is a grid point.
+    @test isapprox(zold[(length(zold) + 1) ÷ 2], e.z, rtol = 1e-12)
+    # An upper-bound view is centred on the anchor instead, whose dual variable is under a
+    # quarter of the prior's. That leaves the span the prior's admits, which is `2 * zstar`
+    # at most.
+    anc = PO.ep_evar_anchor(x, ep_w0, ep_a, tgt, e.z)
+    @test isapprox(znew[(length(znew) + 1) ÷ 2], anc.z, rtol = 1e-12)
+    @test isapprox(anc.z / e.z, 0.23115, rtol = 1e-4)
+    @test isapprox(PO.ep_evar(x, anc.w, ep_a).evar, tgt, rtol = 1e-10)
+    # The anchor holds over three assets, two levels and four targets below the prior.
+    for j in (1, 5, 20), a in (0.01, 0.05), m in (0.4, 0.6, 0.8, 0.95)
+        xj = -rd.X[:, j]
+        ej = PO.ep_evar(xj, ep_w0, a)
+        mj = m * ej.evar
+        zj = PO.ep_evar_grid(xj, ep_w0, a, :leq, mj, ej.z, 0.5, 11)
+        q, _ = ep_evar_grid_post(xj, ep_w0, a, mj, zj)
+        @test abs(PO.ep_evar(xj, q, a).evar - mj) / mj <= 1e-6
+    end
+end
+
+@testset "the EVaR anchor gives up rather than answer wrongly" begin
+    # The iteration answers nothing on two paths, and each falls back to the grid centred on
+    # the prior, which is the grid a lower-bound view takes.
+    x = -rd.X[:, 1]
+    e = PO.ep_evar(x, ep_w0, ep_a)
+    tgt = 0.75 * e.evar
+    # It reaches the target from the prior's dual variable, and it takes more than one step.
+    @test !isnothing(PO.ep_evar_anchor(x, ep_w0, ep_a, tgt, e.z))
+    @test isnothing(PO.ep_evar_anchor(x, ep_w0, ep_a, tgt, e.z; iters = 1))
+    # A target far above the prior asks the row to take a value outside the range of its
+    # coefficients, which no probability vector attains.
+    up = 2 * e.evar
+    @test isnothing(PO.ep_evar_anchor(x, ep_w0, ep_a, up, e.z))
+    # That cell falls back, so an upper-bound view builds the grid a lower-bound view builds.
+    @test PO.ep_evar_grid(x, ep_w0, ep_a, :leq, up, e.z, 0.5, 11) ==
+          PO.ep_evar_grid(x, ep_w0, ep_a, :geq, up, e.z, 0.5, 11)
+end
+
+@testset "a tail view group carries its own Optim settings" begin
+    # `args` and `kwargs` reach every `Optim.optimize` the group's views run, and `bracket`
+    # moves the spans those searches run over. Each is empty by default, and empty is the
+    # value the search documents, so a default group answers as the bare call does.
+    x = -rd.X[:, 1]
+    r = PO.ep_rlvar(x, ep_w0, ep_a, ep_k)
+    @test PO.ep_evar(x, ep_w0, ep_a) ==
+          PO.ep_evar(x, ep_w0, ep_a; args = (PO.Optim.Brent(),))
+    @test r == PO.ep_rlvar(x, ep_w0, ep_a, ep_k; args = (PO.Optim.Brent(),),
+                           bracket = (; tspan = 2, zlo = -20, zhi = 10))
+    # A search stopped before it converges raises, rather than answering with the point it
+    # reached.
+    @test_throws ErrorException PO.ep_evar(x, ep_w0, ep_a; kwargs = (; iterations = 1))
+    @test_throws ErrorException PO.ep_rlvar(x, ep_w0, ep_a, ep_k;
+                                            kwargs = (; iterations = 1))
+    # A `bracket` key the statistic does not name raises, so a typo does not fall through to
+    # the default.
+    @test_throws ArgumentError PO.ep_evar(x, ep_w0, ep_a; bracket = (; tspan = 2))
+    @test_throws ArgumentError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; pct = 0.5))
+    @test_throws DomainError PO.ep_evar(x, ep_w0, ep_a; bracket = (; zlo = 2.0))
+    @test_throws DomainError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; zlo = 20))
+    @test_throws DomainError PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; tspan = 0))
+    # A wider span answers the same value, because the default already holds the minimiser.
+    @test isapprox(PO.ep_evar(x, ep_w0, ep_a; bracket = (; zlo = 1e-6)).evar, ep_pevar,
+                   rtol = 1e-10)
+    @test isapprox(PO.ep_rlvar(x, ep_w0, ep_a, ep_k; bracket = (; tspan = 5)).rlvar,
+                   r.rlvar, rtol = 1e-8)
+    # The fields carry the settings, and the constructors refuse an unnamed `bracket` key.
+    v = LinearConstraintEstimator(; val = "AAPL >= $(1.2 * ep_pevar)")
+    ev = EntropicValueatRiskView(; views = v, args = (PO.Optim.Brent(),),
+                                 kwargs = (; abs_tol = 1e-10), bracket = (; zlo = 1e-6))
+    @test ev.args == (PO.Optim.Brent(),)
+    @test ev.kwargs == (; abs_tol = 1e-10)
+    @test ev.bracket == (; zlo = 1e-6)
+    rv = RelativisticValueatRiskView(; views = v, bracket = (; tspan = 3))
+    @test rv.bracket == (; tspan = 3)
+    @test rv.args == ()
+    @test rv.kwargs == (;)
+    @test_throws ArgumentError EntropicValueatRiskView(; views = v, bracket = (; tspan = 2))
+    @test_throws ArgumentError RelativisticValueatRiskView(; views = v,
+                                                           bracket = (; pct = 0.5))
+    # They reach the solve. A group that states the defaults answers as a group that leaves
+    # them empty.
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                   evar_views = EntropicValueatRiskView(;
+                                                                        alg = GridEntropicValueatRiskView(),
+                                                                        views = v)), rd)
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    evar_views = EntropicValueatRiskView(;
+                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         views = v,
+                                                                         args = (PO.Optim.Brent(),),
+                                                                         bracket = (;
+                                                                                    zlo = sqrt(eps(Float64))))),
+                rd)
+    @test isapprox(pr.w, pr2.w, rtol = 1e-10)
+    # A group that moves the span answers near the same place, and not at the same place:
+    # the end of the bracket moves where Brent samples, so it moves the dual variable the
+    # grid is centred on in the last digits.
+    pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    evar_views = EntropicValueatRiskView(;
+                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         views = v,
+                                                                         bracket = (;
+                                                                                    zlo = 1e-8))),
+                rd)
+    @test isapprox(pr.w, pr3.w, rtol = 1e-3)
+    @test !isapprox(pr.w, pr3.w, rtol = 1e-9)
+    # A group whose search cannot converge raises rather than building a wrong grid.
+    @test_throws ErrorException prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                                          evar_views = EntropicValueatRiskView(;
+                                                                                               views = v,
+                                                                                               kwargs = (;
+                                                                                                         iterations = 1))),
+                                      rd)
+end

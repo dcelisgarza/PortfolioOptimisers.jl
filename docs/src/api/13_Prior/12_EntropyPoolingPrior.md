@@ -16,6 +16,8 @@ ep_rlvar_shift
 ep_rlvar
 ep_rlvar_grid_row
 ep_row_tilt
+ep_evar_anchor
+ep_evar_grid
 ep_rlvar_anchor
 ep_rlvar_grid
 ep_view_terms

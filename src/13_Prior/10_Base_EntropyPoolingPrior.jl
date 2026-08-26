@@ -1604,7 +1604,10 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRiskView(;
         views::LinearConstraintEstimator,
         alpha::Number = 0.05,
-        alg::Option{<:EVaRVF_VecEVaRVF} = nothing
+        alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        bracket::NamedTuple = (;)
     ) -> EntropicValueatRiskView
 
 Keywords correspond to the struct's fields.
@@ -1627,14 +1630,17 @@ julia> EntropicValueatRiskView(; alpha = 0.01,
                                views = LinearConstraintEstimator(; val = \"A <= 0.09\"),
                                alg = GridEntropicValueatRiskView(; pct = 0.8, K = 21))
 EntropicValueatRiskView
-  views ┼ LinearConstraintEstimator
-        │   val ┼ String: "A <= 0.09"
-        │   key ┴ nothing
-  alpha ┼ Float64: 0.01
-    alg ┼ GridEntropicValueatRiskView
-        │   pct ┼ Float64: 0.8
-        │     K ┼ Int64: 21
-        │     M ┴ Int64: 10
+    views ┼ LinearConstraintEstimator
+          │   val ┼ String: "A <= 0.09"
+          │   key ┴ nothing
+    alpha ┼ Float64: 0.01
+      alg ┼ GridEntropicValueatRiskView
+          │   pct ┼ Float64: 0.8
+          │     K ┼ Int64: 21
+          │     M ┴ Int64: 10
+     args ┼ Tuple{}: ()
+   kwargs ┼ @NamedTuple{}: NamedTuple()
+  bracket ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -1662,18 +1668,36 @@ EntropicValueatRiskView
     $(field_dict[:ep_tv_alg])
     """
     alg
+    """
+    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) call these views make: the sample EVaR of [`ep_evar`](@ref), and the centre of the grid of [`ep_evar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
+    """
+    args
+    """
+    $(field_dict[:optkwargs]) They reach the same searches `args` does.
+    """
+    kwargs
+    """
+    $(field_dict[:ep_tv_bracket]) [`ep_evar`](@ref) names the key it takes.
+    """
+    bracket
     function EntropicValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
-                                     alg::Option{<:EVaRVF_VecEVaRVF})
+                                     alg::Option{<:EVaRVF_VecEVaRVF}, args::Tuple,
+                                     kwargs::NamedTuple, bracket::NamedTuple)
         assert_unit_interval(alpha, :alpha)
         if isa(alg, AbstractVector)
             @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
         end
-        return new{typeof(views), typeof(alpha), typeof(alg)}(views, alpha, alg)
+        @argcheck(issubset(keys(bracket), (:zlo,)),
+                  ArgumentError("bracket takes the key `zlo` alone, got $(keys(bracket))"))
+        return new{typeof(views), typeof(alpha), typeof(alg), typeof(args), typeof(kwargs),
+                   typeof(bracket)}(views, alpha, alg, args, kwargs, bracket)
     end
 end
 function EntropicValueatRiskView(; views::LinearConstraintEstimator, alpha::Number = 0.05,
-                                 alg::Option{<:EVaRVF_VecEVaRVF} = nothing)::EntropicValueatRiskView
-    return EntropicValueatRiskView(views, alpha, alg)
+                                 alg::Option{<:EVaRVF_VecEVaRVF} = nothing,
+                                 args::Tuple = (), kwargs::NamedTuple = (;),
+                                 bracket::NamedTuple = (;))::EntropicValueatRiskView
+    return EntropicValueatRiskView(views, alpha, alg, args, kwargs, bracket)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1690,7 +1714,10 @@ $(DocStringExtensions.FIELDS)
         views::LinearConstraintEstimator,
         alpha::Number = 0.05,
         kappa::Number = 0.3,
-        alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing
+        alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing,
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        bracket::NamedTuple = (;)
     ) -> RelativisticValueatRiskView
 
 Keywords correspond to the struct's fields. `alg` left `nothing` lets each view in the group take the cheapest formulation that expresses it exactly, and is where the grid of primal points and the big-M constant live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`. A `prior(...)` reference inside `views` is replaced by the prior RLVaR at this group's `alpha` and `kappa`, so a view stated against the prior moves with both.
@@ -1700,6 +1727,7 @@ Keywords correspond to the struct's fields. `alg` left `nothing` lets each view 
   - `0 < alpha < 1`.
   - `0 < kappa < 1`.
   - If `alg` is a vector, `!isempty(alg)`.
+  - `bracket` carries the keys `tspan`, `zlo` and `zhi` alone.
 
 # Examples
 
@@ -1707,12 +1735,15 @@ Keywords correspond to the struct's fields. `alg` left `nothing` lets each view 
 julia> RelativisticValueatRiskView(; alpha = 0.01, kappa = 0.5,
                                    views = LinearConstraintEstimator(; val = \"A >= 0.09\"))
 RelativisticValueatRiskView
-  views ┼ LinearConstraintEstimator
-        │   val ┼ String: "A >= 0.09"
-        │   key ┴ nothing
-  alpha ┼ Float64: 0.01
-  kappa ┼ Float64: 0.5
-    alg ┴ nothing
+    views ┼ LinearConstraintEstimator
+          │   val ┼ String: "A >= 0.09"
+          │   key ┴ nothing
+    alpha ┼ Float64: 0.01
+    kappa ┼ Float64: 0.5
+      alg ┼ nothing
+     args ┼ Tuple{}: ()
+   kwargs ┼ @NamedTuple{}: NamedTuple()
+  bracket ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -1744,21 +1775,40 @@ RelativisticValueatRiskView
     $(field_dict[:ep_tv_alg])
     """
     alg
+    """
+    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) call these views make: the two searches of [`ep_rlvar`](@ref), the shift of [`ep_rlvar_shift`](@ref), and the centre of the grid of [`ep_rlvar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
+    """
+    args
+    """
+    $(field_dict[:optkwargs]) They reach the same searches `args` does.
+    """
+    kwargs
+    """
+    $(field_dict[:ep_tv_bracket]) [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref) name the keys it takes.
+    """
+    bracket
     function RelativisticValueatRiskView(views::LinearConstraintEstimator, alpha::Number,
-                                         kappa::Number, alg::Option{<:RLVaRVF_VecRLVaRVF})
+                                         kappa::Number, alg::Option{<:RLVaRVF_VecRLVaRVF},
+                                         args::Tuple, kwargs::NamedTuple,
+                                         bracket::NamedTuple)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(kappa, :kappa)
         if isa(alg, AbstractVector)
             @argcheck(!isempty(alg), IsEmptyError("alg cannot be empty"))
         end
-        return new{typeof(views), typeof(alpha), typeof(kappa), typeof(alg)}(views, alpha,
-                                                                             kappa, alg)
+        @argcheck(issubset(keys(bracket), (:tspan, :zlo, :zhi)),
+                  ArgumentError("bracket takes the keys `tspan`, `zlo` and `zhi`, got $(keys(bracket))"))
+        return new{typeof(views), typeof(alpha), typeof(kappa), typeof(alg), typeof(args),
+                   typeof(kwargs), typeof(bracket)}(views, alpha, kappa, alg, args, kwargs,
+                                                    bracket)
     end
 end
 function RelativisticValueatRiskView(; views::LinearConstraintEstimator,
                                      alpha::Number = 0.05, kappa::Number = 0.3,
-                                     alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing)::RelativisticValueatRiskView
-    return RelativisticValueatRiskView(views, alpha, kappa, alg)
+                                     alg::Option{<:RLVaRVF_VecRLVaRVF} = nothing,
+                                     args::Tuple = (), kwargs::NamedTuple = (;),
+                                     bracket::NamedTuple = (;))::RelativisticValueatRiskView
+    return RelativisticValueatRiskView(views, alpha, kappa, alg, args, kwargs, bracket)
 end
 """
     const CVV_VecCVV = Union{<:ConditionalValueatRiskView,
