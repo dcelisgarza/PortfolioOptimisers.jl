@@ -611,7 +611,7 @@ end
 
 Whether a name in a graded feature program is a **taxonomy key**: a `sets.xkey`-prefixed key of `sets.dict`.
 
-[`UniverseSets`](@ref) guarantees every `sets.xkey`-prefixed dict key is asset-parallel, so the prefix rule alone decides the question — no new convention is needed, and row-selector precedence reduces to prefix, then asset, then group, exactly as [`estimator_to_val`](@ref) resolves.
+[`UniverseSets`](@ref) guarantees every `sets.xkey`-prefixed dict key is asset-parallel, so the prefix rule alone decides the question — no new convention is needed, and row-selector precedence becomes prefix, then asset, then group. The last two tiers are [`estimator_to_val`](@ref)'s, resolved by the shared [`resolve_axis_name`](@ref) once [`feature_entry!`](@ref) has taken the prefix tier off the front. The prefix tier itself is this grammar's own, and it is the tier a collision turns on: in a universe whose assets include a name that is *also* a taxonomy key, `\"nx_sector\" => targets` scopes the targets to **every** row, where `estimator_to_val(Dict(\"nx_sector\" => v), sets)` would write the one asset of that name. A graded program cannot reach such an asset by name; name the asset's group, or rename the asset.
 
 # Arguments
 

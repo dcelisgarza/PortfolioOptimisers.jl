@@ -105,7 +105,7 @@
 "src/12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { map = 5, units = 7, swept = false }
 "src/12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { map = 5, units = 22, swept = false }
 "src/12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { map = 5, units = 11, swept = false }
-"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 32, swept = false }
+"src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { map = 5, units = 32, algorithm = 12, swept = true }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { map = 5, units = 10, swept = false }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { map = 5, units = 14, swept = false }
 "src/13_Prior/01_Base_Prior.jl" = { map = 6, units = 39, swept = false }

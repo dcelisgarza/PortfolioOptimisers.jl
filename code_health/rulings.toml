@@ -124,6 +124,19 @@ constructors show the two shapes it is not: `PartialLinearConstraint`, whose sig
 line, carries 215 there, and `UniverseSets`, whose signature is three, carries 67. A row here is \
 therefore keyed to the one definition that shows it, never to multi-line signatures as a class."""
 
+[rationale.a-return-after-an-unconditional-throw]
+text = """
+A fallback method that exists only to reject a term has one unconditional `throw` for a body, and \
+keeps the `return nothing` its sibling methods end with so that all three read alike. No call can \
+reach that `return`: the `throw` above it takes no branch and returns to no caller, so the line is \
+unreachable by construction rather than merely untested. Julia allocates a counter to it anyway. \
+Measured by the sweep of issue #515 over nine test files: `feature_target!`'s fallback carries 3 on \
+its `function` line and 3 on its `throw`, and 0 on the `return` below them, while the `Pair` method \
+beside it carries 51 and every other line of the file is covered. The four malformed shapes \
+`test_12e_asset_sets_features.jl` drives through the grammar are what raise that 3, so the method \
+itself is reached and only its last line is not. Deleting the line would buy the number by making \
+one of three methods shaped unlike its siblings."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -280,3 +293,14 @@ path = "src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl"
 definition = "LinearConstraint"
 misses = 1
 rationale = "a-signature-line-counter-the-test-job-cannot-reach"
+
+# The definition is `feature_target!`'s fallback method. It is keyed `Nothing` because that is the
+# name `coverage.jl` gives a definition that declares a return type: `defname`'s `::` branch takes
+# the right-hand side of the annotation, so `function f(...)::Nothing` is named after `Nothing`.
+# Issue #521 carries the reproduction and the one-branch fix. Rename this row to `feature_target!`
+# when that lands; nothing else about it changes.
+[[coverage_exemption]]
+path = "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl"
+definition = "Nothing"
+misses = 1
+rationale = "a-return-after-an-unconditional-throw"

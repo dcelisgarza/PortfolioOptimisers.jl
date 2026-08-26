@@ -657,3 +657,110 @@ end
         @test isapprox(wd.w, wp.w)
     end
 end
+
+@testset "A numeric key restricted by one of its own numbers" begin
+    esg = findfirst(==("esg"), GSETS.dict["nz"])
+
+    # `feature_diagonal!`'s numeric branch reached *with* a group value. The group is a
+    # number here rather than a categorical label, because a numeric key's column is what
+    # the selector is matched against -- and the node stays the key's own, `nx_esg` with
+    # `nx_` stripped, since that is the only node a numeric key has.
+    Z = asset_sets_features(["nx_esg" => 0.80 => 5.0], GSETS)
+    @test Z[:, esg] == [0.0, 5.0, 0.0]
+    @test count(!iszero, Z) == 1
+
+    # The natural value is still that row's own number, so a marker resolves per cell even
+    # once the rows are restricted to one.
+    @test asset_sets_features(["nx_esg" => 0.80 => Scale(2.0)], GSETS)[:, esg] ==
+          [0.0, 1.6, 0.0]
+
+    # A number no asset carries selects no row, and that is a *name* failure rather than a
+    # syntax error: soft by default, and it names the count of distinct values under the
+    # key, never the values themselves.
+    miss = ["nx_esg" => 0.99 => 5.0]
+    @test_logs((:warn, r"matches no asset"), match_mode = :any,
+               asset_sets_features(miss, GSETS))
+    @test all(iszero, asset_sets_features(miss, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(miss, GSETS; strict = true)
+    @test occursin("group value `0.99` of taxonomy key `nx_esg`", res.value.msg)
+    @test occursin("3 distinct values under that key", res.value.msg)
+end
+
+@testset "A stale group member, and a target that resolves in no namespace" begin
+    # A group key that lists a name the universe no longer carries. `feature_rows` maps the
+    # resolved members to row indices and reports the missing ones once, through the shared
+    # `missing_group_assets_msg`, so a stale group reads the same here as it does through
+    # `name_to_val!`.
+    holey = UniverseSets(; xkey = "nx", zkey = "nz",
+                         dict = Dict{String, Any}("nx" => ["A", "B", "C"],
+                                                  "nz" => ["Tech", "Finance"],
+                                                  "nx_sector" =>
+                                                      ["Tech", "Tech", "Finance"],
+                                                  "ABZ" => ["A", "B", "Zz"]))
+    prog = ["ABZ" => ["nx_sector" => "Tech" => 1.0]]
+    Z = @test_logs (:warn, r"not in asset universe") match_mode = :any asset_sets_features(prog,
+                                                                                           holey)
+    # The surviving members still write: a stale member costs its own row, not the term.
+    @test Z[:, 1] == [1.0, 1.0, 0.0]
+    res = @test_throws ArgumentError asset_sets_features(prog, holey; strict = true)
+    @test occursin("group `ABZ`", res.value.msg)
+    @test occursin("[\"Zz\"]", res.value.msg)
+
+    # The mirror of the unresolved row selector, in *target* position. It reports against
+    # the asset axis, because a target's left half names an asset or a group and the
+    # declared axis is only reached once that name has resolved.
+    unknown = ["A" => ["Zzz" => 1.0]]
+    @test_logs((:warn, r"not in asset universe"), match_mode = :any,
+               asset_sets_features(unknown, GSETS))
+    @test all(iszero, asset_sets_features(unknown, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(unknown, GSETS; strict = true)
+    @test occursin("variable `Zzz` not in asset universe", res.value.msg)
+end
+
+@testset "Every shape the target grammar refuses, in every branch" begin
+    # Four different branches of `feature_target!`, one per shape: no `Pair` at all, a
+    # taxonomy key whose group carries a non-value, a taxonomy key whose right half is
+    # neither a group nor a value, and an asset target whose right half is not a value.
+    # Each is a syntax error, so each throws whatever `strict` says -- the asymmetry the
+    # docstring states, and the reason the message prints the grammar rather than naming a
+    # namespace.
+    for prog in (["A" => [1.0]], ["A" => ["nx_sector" => "Tech" => "oops"]],
+                 ["A" => ["nx_sector" => ["Tech"]]], ["A" => ["B" => ["C"]]])
+        for strict in (false, true)
+            res = @test_throws ArgumentError asset_sets_features(prog, GSETS;
+                                                                 strict = strict)
+            @test occursin("is not a well-formed graded feature program term",
+                           res.value.msg)
+            @test occursin("rowsel := asset | group | taxkey", res.value.msg)
+        end
+    end
+end
+
+@testset "A taxonomy key on the left takes three different branches" begin
+    col(n) = findfirst(==(n), GSETS.dict["nz"])
+
+    # The right side is `g => tail` and `g` is *itself* a taxonomy key, so `g` starts a
+    # target and the left side is a bare row selector over the whole universe. This is the
+    # grammar's one genuine ambiguity, and the prefix rule settles it.
+    Z2 = asset_sets_features(["nx_sector" => "nx_country" => "UK" => 0.4], GSETS)
+    @test Z2[:, col("UK")] == [0.4, 0.4, 0.4]
+    @test count(!iszero, Z2) == 3
+    # Contrast, one branch down: a `g` that is no taxonomy key restricts the rows instead,
+    # so only the `Tech` rows write and `C` stays zero.
+    @test asset_sets_features(["nx_sector" => "Tech" => ["nx_country" => "UK" => 0.4]],
+                              GSETS)[:, col("UK")] == [0.4, 0.4, 0.0]
+
+    # The right side is no `Pair` at all, so it is a target list over every row.
+    @test asset_sets_features(["nx_sector" => ["nx_country" => "US" => 0.75]], GSETS)[:,
+                                                                                      col("US")] ==
+          [0.75, 0.75, 0.75]
+
+    # And the restricting `g` that matches no row: a name failure, soft by default, named
+    # against the key whose column was searched.
+    miss = ["nx_sector" => "Zzz" => ["nx_country" => "UK" => 1.0]]
+    @test_logs((:warn, r"matches no asset"), match_mode = :any,
+               asset_sets_features(miss, GSETS))
+    @test all(iszero, asset_sets_features(miss, GSETS))
+    res = @test_throws ArgumentError asset_sets_features(miss, GSETS; strict = true)
+    @test occursin("group value `Zzz` of taxonomy key `nx_sector`", res.value.msg)
+end
