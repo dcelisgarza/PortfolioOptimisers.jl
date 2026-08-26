@@ -15,8 +15,8 @@ Relativistic Value-at-Risk (Damian et al. 2023):
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= t + c_{\\kappa}(\\alpha)\\, z + \\sum_{t=1}^T (\\psi_t + \\theta_t)\\,, \\\\
-c_{\\kappa}(\\alpha) &= \\frac{(\\alpha T)^\\kappa - (\\alpha T)^{-\\kappa}}{2\\kappa}\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= t + \\ln_{\\kappa}(\\alpha)\\, z + \\sum_{t=1}^T (\\psi_t + \\theta_t)\\,, \\\\
+\\ln_{\\kappa}(\\alpha) &= \\frac{(\\alpha T)^\\kappa - (\\alpha T)^{-\\kappa}}{2\\kappa}\\,.
 \\end{align}
 ```
 
@@ -24,14 +24,14 @@ Where:
 
   - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Value-at-Risk.
   - ``t``, ``z``, ``\\psi_t``, ``\\theta_t``: Dual variables for the power cone programme.
-  - ``c_\\kappa(\\alpha)``: Relativistic scaling coefficient.
+  - ``\\ln_{\\kappa}(\\alpha)``: Kanadakis logarithm.
   - $(math_dict[:alpha_rm])
   - ``\\kappa``: Relativistic parameter.
 
 encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(1-\\kappa)}``.
 
 For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with
-``\\sum_{t=1}^T w_t = 1``. The coefficient ``c_\\kappa(\\alpha)`` keeps the argument
+``\\sum_{t=1}^T w_t = 1``. The coefficient ``\\ln_{\\kappa}(\\alpha)`` keeps the argument
 ``\\alpha T``, and the sum ``\\sum_{t=1}^T (\\psi_t + \\theta_t)`` becomes
 ``T \\sum_{t=1}^T w_t (\\psi_t + \\theta_t)``.
 
