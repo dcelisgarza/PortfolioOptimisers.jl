@@ -117,6 +117,30 @@ end
 
 # --- attributing a line to a definition ------------------------------------
 
+"""
+    is_signature(e) -> Bool
+
+Whether an expression is the left side of a **definition** rather than the left side of an
+assignment. `f(x)`, `f(x) where {T}` and `f(x)::T` are signatures. `x` and `x::T` are not.
+
+A return type is what makes the two hard to tell apart, and telling them apart is the whole of issue
+#521. `f(x)::T` and the receiver slot `r::T` of a functor method are the same `Expr` head, so the
+side that carries the name differs between them, and `x::T = 1` is an assignment that looks like
+both.
+"""
+function is_signature(e)
+    if !(e isa Expr)
+        return false
+    end
+    if e.head === :call || e.head === :where
+        return true
+    end
+    if e.head === :(::)
+        return is_signature(e.args[1])
+    end
+    return false
+end
+
 defname(x::Symbol) = String(x)
 defname(x::QuoteNode) = defname(x.value)
 # A docstring parses to `Expr(:macrocall, GlobalRef(Core, Symbol("@doc")), …)`, and a `GlobalRef`
@@ -137,7 +161,11 @@ function defname(e::Expr)
         return defname(e.args[1])
     end
     if e.head === :(::)
-        return defname(e.args[end])
+        # The two shapes a `::` node arrives in are named from opposite sides. A signature with a
+        # declared return type, `f(x)::T`, is named `f`, because `T` names no method and one file
+        # holds many methods that return the same type. A receiver slot, `(r::T)(x)`, is named `T`,
+        # because that is what a reader calls the functor method. Issue #521.
+        return defname(is_signature(e.args[1]) ? e.args[1] : e.args[end])
     end
     if e.head === :curly
         return defname(e.args[1])
@@ -179,7 +207,10 @@ function definition_name(e0)
     end
     if e.head in (:function, :macro)
         return defname(e.args[1])
-    elseif e.head === :(=) && e.args[1] isa Expr && e.args[1].head in (:call, :where)
+    elseif e.head === :(=) && is_signature(e.args[1])
+        # A short form that declares a return type, `f(x)::Bool = true`, is a definition and not an
+        # assignment. Reading it as an assignment attributed its lines to `<toplevel>`, which is the
+        # second face of issue #521: a Coverage Exemption could name neither method.
         return defname(e.args[1])
     elseif e.head === :struct
         # `Expr(:struct, mutable, name, body)`.

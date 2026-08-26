@@ -294,13 +294,12 @@ definition = "LinearConstraint"
 misses = 1
 rationale = "a-signature-line-counter-the-test-job-cannot-reach"
 
-# The definition is `feature_target!`'s fallback method. It is keyed `Nothing` because that is the
-# name `coverage.jl` gives a definition that declares a return type: `defname`'s `::` branch takes
-# the right-hand side of the annotation, so `function f(...)::Nothing` is named after `Nothing`.
-# Issue #521 carries the reproduction and the one-branch fix. Rename this row to `feature_target!`
-# when that lands; nothing else about it changes.
+# The definition is `feature_target!`'s fallback method. The key names every `feature_target!`
+# method in the file, and the count of 1 is their sum. This row was keyed `Nothing` until issue
+# #521 was fixed, because `defname` named a definition that declares a return type after the return
+# type. Only the key changed.
 [[coverage_exemption]]
 path = "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl"
-definition = "Nothing"
+definition = "feature_target!"
 misses = 1
 rationale = "a-return-after-an-unconditional-throw"
