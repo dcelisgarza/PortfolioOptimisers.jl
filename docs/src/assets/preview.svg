@@ -12,11 +12,13 @@
       inkscape -o preview.png -w 1280 -h 640 preview.svg
 
   The mark repeats the four paths of `logo.svg`, with the transform pair that file uses, in
-  the Julia colours. The frontier curve stays clear of every chip and of the URL, so no chip
-  sits on a changing background.
+  the Julia colours. The frontier curve keeps to the bottom-right corner, which carries no
+  text, so no chip sits on a changing background.
 
-  The chip counts are censuses of the non-abstract leaves of the type trees, rounded down:
-  16 priors and views, 57 risk measures, 33 optimisers and constraints.
+  The four chips name one capability per stage of the pipeline: the prior, the risk measure,
+  the optimiser, and the constraint. Each names the part of that stage that few other
+  libraries carry. The count is a census of the non-abstract leaves of the risk-measure type
+  tree, 57, rounded down.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
      width="1280" height="640" viewBox="0 0 1280 640" version="1.1">
@@ -31,7 +33,7 @@
       <stop offset="0.66" stop-color="#4063d8"/>
       <stop offset="1.00" stop-color="#389826"/>
     </linearGradient>
-    <linearGradient id="frontier" gradientUnits="userSpaceOnUse" x1="620" y1="0" x2="1280" y2="0">
+    <linearGradient id="frontier" gradientUnits="userSpaceOnUse" x1="700" y1="0" x2="1280" y2="0">
       <stop offset="0" stop-color="#4063d8" stop-opacity="0.04"/>
       <stop offset="1" stop-color="#389826" stop-opacity="0.20"/>
     </linearGradient>
@@ -56,9 +58,9 @@
   <rect width="1280" height="640" fill="url(#bg)"/>
 
   <!-- A faint efficient frontier, in the corner that carries no text. -->
-  <path d="M 620,640 C 800,632 950,570 1070,440 1160,343 1225,190 1280,60 L 1280,640 Z"
+  <path d="M 700,640 C 870,634 1000,576 1090,450 1160,360 1230,190 1280,60 L 1280,640 Z"
         fill="url(#frontier)"/>
-  <path d="M 620,640 C 800,632 950,570 1070,440 1160,343 1225,190 1280,60"
+  <path d="M 700,640 C 870,634 1000,576 1090,450 1160,360 1230,190 1280,60"
         fill="none" stroke="#4063d8" stroke-width="3" stroke-opacity="0.32"/>
 
   <!-- Header: the mark and the name. -->
@@ -76,24 +78,24 @@
   <!-- Capability chips, two rows of two. -->
   <g font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="21">
     <g>
-      <rect x="80" y="400" width="273" height="52" rx="26" fill="#4063d8" fill-opacity="0.15"
+      <rect x="80" y="400" width="344" height="52" rx="26" fill="#4063d8" fill-opacity="0.15"
             stroke="#4063d8" stroke-opacity="0.6" stroke-width="1.5"/>
-      <text x="216.5" y="433.5" fill="#a8bcf5" text-anchor="middle">15+ priors and views</text>
+      <text x="252" y="433.5" fill="#a8bcf5" text-anchor="middle">Entropy and opinion pooling</text>
     </g>
     <g>
-      <rect x="371" y="400" width="247" height="52" rx="26" fill="#389826" fill-opacity="0.15"
+      <rect x="442" y="400" width="247" height="52" rx="26" fill="#389826" fill-opacity="0.15"
             stroke="#389826" stroke-opacity="0.6" stroke-width="1.5"/>
-      <text x="494.5" y="433.5" fill="#8fd47f" text-anchor="middle">50+ risk measures</text>
+      <text x="565.5" y="433.5" fill="#8fd47f" text-anchor="middle">50+ risk measures</text>
     </g>
     <g>
-      <rect x="80" y="466" width="380" height="52" rx="26" fill="#9558b2" fill-opacity="0.15"
+      <rect x="80" y="466" width="358" height="52" rx="26" fill="#9558b2" fill-opacity="0.15"
             stroke="#9558b2" stroke-opacity="0.6" stroke-width="1.5"/>
-      <text x="270" y="499.5" fill="#cdaade" text-anchor="middle">30+ optimisers and constraints</text>
+      <text x="259" y="499.5" fill="#cdaade" text-anchor="middle">Schur complement and HERC</text>
     </g>
     <g>
-      <rect x="478" y="466" width="337" height="52" rx="26" fill="#cb3c33" fill-opacity="0.15"
+      <rect x="456" y="466" width="434" height="52" rx="26" fill="#cb3c33" fill-opacity="0.15"
             stroke="#cb3c33" stroke-opacity="0.6" stroke-width="1.5"/>
-      <text x="646.5" y="499.5" fill="#f0a099" text-anchor="middle">Cross-validation and tuning</text>
+      <text x="673" y="499.5" fill="#f0a099" text-anchor="middle">Phylogeny and centrality constraints</text>
     </g>
   </g>
 
