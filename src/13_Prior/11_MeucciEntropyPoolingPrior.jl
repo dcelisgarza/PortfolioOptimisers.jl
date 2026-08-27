@@ -449,9 +449,6 @@ function ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
                               ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
                               dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
     X0 = pr.X
-    if !isa(cvar_views, AbstractVector)
-        cvar_views = [cvar_views]
-    end
     # Each group is parsed under its own significance level, because a `prior(...)`
     # reference resolves to the prior CVaR at that level. The groups are then flattened
     # into one root-find: the recursive algorithm carries one `eta` per view already, and
