@@ -2459,3 +2459,317 @@ three matrices at the subproblem's asset count rather than cutting them. Sweep t
     @test (v_d2.D2, v_d2.L2, v_d2.S2) == (nothing, nothing, nothing)
     @test isa(v_d2, HighOrderPrior)
 end
+
+#=
+Sweep ticket #536. One fixture serves the four testsets below: a `250 x 5` sample over three
+factors, built once as an exact factor model and once with a residual, and each of those with a
+non-zero and with a zero intercept. Every number the three Black-Litterman variants' docstrings
+quote was measured on it.
+=#
+const BL536_T, BL536_N, BL536_K = 250, 5, 3
+let rng = StableRNG(987654321)
+    global BL536_F = randn(rng, BL536_T, BL536_K) .* 0.02
+    global BL536_M = [0.9 0.2 -0.1; 1.1 -0.3 0.4; 0.7 0.5 0.2; 1.3 0.1 -0.5; 0.5 0.8 0.3]
+    global BL536_b = [0.001, -0.002, 0.0015, 0.0005, 0.0]
+    global BL536_Xe = BL536_F * transpose(BL536_M) .+ transpose(BL536_b)
+    global BL536_Xr = BL536_Xe .+ randn(rng, BL536_T, BL536_N) .* 0.005
+end
+const BL536_Xe0 = BL536_F * transpose(BL536_M)
+const BL536_Xr0 = BL536_Xe0 .+ randn(StableRNG(4242), BL536_T, BL536_N) .* 0.005
+const BL536_sets = UniverseSets(;
+                                dict = Dict("nx" => ["A1", "A2", "A3", "A4", "A5"],
+                                            "nf" => ["F1", "F2", "F3"]))
+const BL536_av = LinearConstraintEstimator(; val = ["A1 == 0.004", "A3 - A4 == 0.001"])
+const BL536_fv = LinearConstraintEstimator(; val = ["F1 == 0.003", "F2 == -0.001"])
+const BL536_ablv = BlackLittermanViews(; P = [1.0 0 0 0 0; 0 0 1.0 -1.0 0],
+                                       Q = [0.004, 0.001])
+const BL536_fblv = BlackLittermanViews(; P = [1.0 0 0; 0 1.0 0], Q = [0.003, -0.001])
+bl536_gap(pr) = maximum(abs.(pr.mu .- (pr.rr.M * pr.fpr.mu .+ pr.rr.b)))
+
+#=
+The identity `mu == rr.M * fpr.mu + rr.b` over all four Black-Litterman members, and the two
+independent causes that open the augmented member's gap. Sweep ticket #536.
+=#
+@testset "The Black-Litterman family identity, and the two causes that break it" begin
+    PO = PortfolioOptimisers
+    F, N = BL536_F, BL536_N
+    afs, av, fv = BL536_sets, BL536_av, BL536_fv
+
+    # The table the `AugmentedBlackLittermanPrior` docstring states.
+    prb = prior(BayesianBlackLittermanPrior(; sets = afs, views = fv), BL536_Xr, F)
+    prf = prior(FactorBlackLittermanPrior(; sets = afs, views = fv), BL536_Xr, F)
+    pra = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv),
+                BL536_Xr, F)
+    prl = prior(BlackLittermanPrior(; sets = afs, views = av), BL536_Xr, F)
+    @test bl536_gap(prb) < 1e-16
+    @test bl536_gap(prf) == 0
+    @test bl536_gap(pra) > 1e-3
+    # The vanilla member computes no posterior factor distribution, so the right-hand side of
+    # the identity cannot be formed at all.
+    @test isnothing(prl.fpr)
+    @test isnothing(prl.rr)
+
+    # Cause one: the intercept, on the `l === nothing` branch. On an exact factor model the
+    # whole gap is `b`, entry by entry — it does not depend on the views and does not shrink.
+    abl = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv)
+    pe_ = prior(abl, BL536_Xe, F)
+    @test isapprox(pe_.mu .- (pe_.rr.M * pe_.fpr.mu .+ pe_.rr.b), pe_.rr.b; atol = 1e-14)
+    @test isapprox(maximum(abs.(pe_.rr.b)), 0.002; atol = 1e-14)
+    # Zero the intercept and the exact model satisfies the identity to machine precision.
+    @test bl536_gap(prior(abl, BL536_Xe0, F)) < 1e-13
+    # Cause two: idiosyncratic variance. It survives a fitted intercept of `2.4e-4`.
+    @test 1e-4 < bl536_gap(prior(abl, BL536_Xr0, F)) < 1e-3
+
+    # Setting `l` removes cause one: the equilibrium mean carries no intercept. This also
+    # covers the `!isempty(w)` guard of the constructor, which no other test reaches.
+    abl_l = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv, l = 2.0,
+                                         w = fill(1 / N, N))
+    @test bl536_gap(prior(abl_l, BL536_Xe, F)) < 1e-13
+    @test 1e-5 < bl536_gap(prior(abl_l, BL536_Xr, F)) < 1e-3
+    @test_throws IsEmptyError AugmentedBlackLittermanPrior(; a_views = BL536_ablv,
+                                                           f_views = BL536_fblv,
+                                                           w = Float64[])
+
+    # Muting both view sets with views that repeat the prior leaves the gap at `b` exactly, so
+    # cause one is independent of the views.
+    ap0 = prior(EmpiricalPrior(), BL536_Xr0)
+    fp0 = prior(EmpiricalPrior(), F)
+    Pa = [1.0 0 0 0 0; 0 0 1.0 -1.0 0]
+    Pf = [1.0 0 0; 0 1.0 0]
+    an = BlackLittermanViews(; P = Pa, Q = Pa * ap0.mu)
+    fn = BlackLittermanViews(; P = Pf, Q = Pf * fp0.mu)
+    pn = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = an, f_views = fn),
+               BL536_Xr0, F)
+    @test isapprox(bl536_gap(pn), maximum(abs.(pn.rr.b)); atol = 1e-16)
+
+    # Before the update: the two priors satisfy the identity when both means are the plain
+    # sample mean, because least squares with an intercept zeroes the *unweighted* residual
+    # mean. One shared non-uniform weighting is not enough.
+    wodd = pweights(normalize(rand(StableRNG(7), BL536_T) .+ 0.5, 1))
+    epw(w) = EmpiricalPrior(;
+                            ce = PortfolioOptimisersCovariance(;
+                                                               ce = Covariance(;
+                                                                               me = SimpleExpectedReturns(;
+                                                                                                          w = w),
+                                                                               w = w)),
+                            me = SimpleExpectedReturns(; w = w))
+    function pgap(ape, fpe, X)
+        ap = prior(ape, X)
+        fp = prior(fpe, F)
+        rr, _ = PO.factor_reconstruction(StepwiseRegression(), X, F)
+        return maximum(abs.(ap.mu .- (rr.M * fp.mu .+ rr.b)))
+    end
+    @test pgap(EmpiricalPrior(), EmpiricalPrior(), BL536_Xr) < 1e-17
+    @test pgap(epw(wodd), epw(wodd), BL536_Xr) > 1e-5
+    @test pgap(EmpiricalPrior(), epw(wodd), BL536_Xr) > 1e-4
+    # On an exact factor model there is no residual to weight, so it holds again.
+    @test pgap(epw(wodd), epw(wodd), BL536_Xe) < 1e-17
+end
+
+#=
+`BayesianBlackLittermanPrior`'s four closed forms against a hand computation, the width of its
+view matrix, and the one site that adds the rate. Sweep ticket #536.
+=#
+@testset "Bayesian Black-Litterman, by hand" begin
+    PO = PortfolioOptimisers
+    F, N, K, T = BL536_F, BL536_N, BL536_K, BL536_T
+    afs, fv = BL536_sets, BL536_fv
+
+    pr_in = prior(FactorPrior(; pe = EmpiricalPrior(; me = EquilibriumExpectedReturns())),
+                  BL536_Xr, F)
+    f_mu, f_sigma = pr_in.fpr.mu, pr_in.fpr.sigma
+    Sigma, Mm, bb = pr_in.sigma, pr_in.rr.M, pr_in.rr.b
+    pk = PO.bl_preroll(fv, afs, nothing, f_sigma, nothing, T, Float64, false, :fkey)
+    P, Q, tau, Om = pk.P, pk.Q, pk.tau, pk.omega
+    # `P` is over the factor axis, so it is `K` wide and not `N`, and `tau` is `1/T`.
+    @test size(P) == (2, K)
+    @test tau == 1 / T
+
+    H = inv(f_sigma) + transpose(P) * (Om \ P)
+    Pibar = H \ (f_sigma \ f_mu + transpose(P) * (Om \ Q))
+    V = inv(H + transpose(Mm) * (Sigma \ Mm))
+    Sig_bbl = inv(inv(Sigma) - (Sigma \ Mm) * V * transpose(Mm) * inv(Sigma))
+    mu_bbl = Sig_bbl * (Sigma \ Mm) * V * H * Pibar .+ bb
+
+    pr = prior(BayesianBlackLittermanPrior(; sets = afs, views = fv), BL536_Xr, F)
+    @test isapprox(pr.fpr.mu, Pibar; atol = 1e-18)
+    @test isapprox(pr.fpr.sigma, inv(H); atol = 1e-20)
+    @test isapprox(pr.mu, mu_bbl; atol = 1e-16)
+    @test isapprox(pr.sigma, Sig_bbl; atol = 1e-16)
+    # `sigma_hat` is a precision, so the reported factor covariance is its inverse.
+    @test isapprox(pr.fpr.sigma * H, Matrix(1.0I, K, K); atol = 1e-12)
+    # Both blocks drop `chol`.
+    @test isnothing(pr.chol)
+    @test isnothing(pr.fpr.chol)
+
+    # An asset-axis `P` is refused rather than answered with a wrong shape. The width is the
+    # only thing that sees it, because a precomputed views object resolves no name.
+    wide = BlackLittermanViews(; P = [1.0 0 0 0 0; 0 0 1.0 -1.0 0], Q = [0.004, 0.001])
+    @test_throws DimensionMismatch prior(BayesianBlackLittermanPrior(; sets = afs,
+                                                                     views = wide),
+                                         BL536_Xr, F)
+    # Views written in asset names resolve nothing against the factor universe.
+    @test_throws PortfolioOptimisers.IsNothingError prior(BayesianBlackLittermanPrior(;
+                                                                                      sets = afs,
+                                                                                      views = LinearConstraintEstimator(;
+                                                                                                                        val = ["A1 == 0.004"])),
+                                                          BL536_Xr, F)
+
+    # The rate is added once, on the assets, and the factor block never carries it.
+    p0 = prior(BayesianBlackLittermanPrior(; sets = afs, views = fv, rf = 0.0), BL536_Xr, F)
+    p3 = prior(BayesianBlackLittermanPrior(; sets = afs, views = fv, rf = 0.03), BL536_Xr,
+               F)
+    @test isapprox(p3.mu .- p0.mu, fill(0.03, N); atol = 1e-17)
+    @test p3.fpr.mu == p0.fpr.mu
+    # The carrier is internally consistent on both rates.
+    @test isapprox(p3.mu, p3.rr.M * p3.fpr.mu .+ p3.rr.b .+ 0.03; atol = 1e-16)
+end
+
+#=
+`FactorBlackLittermanPrior` is the ordinary Black-Litterman posterior over the factor axis,
+lifted through the loadings. Sweep ticket #536.
+=#
+@testset "Factor Black-Litterman, by hand" begin
+    PO = PortfolioOptimisers
+    F, N, K, T = BL536_F, BL536_N, BL536_K, BL536_T
+    afs, fv = BL536_sets, BL536_fv
+
+    fp = prior(EmpiricalPrior(), F)
+    rr, pX = PO.factor_reconstruction(StepwiseRegression(), BL536_Xr, F)
+    pk = PO.bl_preroll(fv, afs, nothing, fp.sigma, nothing, T, Float64, false, :fkey)
+    # The factor moments are literally `vanilla_posteriors` run over the factor axis.
+    fmu, fsig = PO.vanilla_posteriors(pk.tau, PO.remove_rf(0.0, fp.mu), fp.sigma, pk.omega,
+                                      pk.P, pk.Q)
+    err = BL536_Xr .- pX
+    Seps = Diagonal(vec(var(SimpleVariance(), err; dims = 1)))
+
+    for (rsd, S) in ((true, Seps), (false, zeros(N, N)))
+        pr = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rsd = rsd), BL536_Xr,
+                   F)
+        @test pr.fpr.mu == fmu
+        @test pr.fpr.sigma == fsig
+        @test pr.mu == rr.M * fmu .+ rr.b
+        @test isapprox(pr.sigma, rr.M * fsig * transpose(rr.M) + S; atol = 1e-15)
+        # `factor_lift`'s Cholesky identity survives the Black-Litterman moments, and the
+        # residual block reaches the factor and the covariance together.
+        @test isapprox(transpose(pr.chol) * pr.chol, pr.sigma; atol = 1e-15)
+        # No `Z`, and the factor block drops `chol`.
+        @test isnothing(pr.Z)
+        @test isnothing(pr.fpr.chol)
+    end
+    # The residual block is what separates the two branches.
+    pt = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rsd = true), BL536_Xr, F)
+    pf = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rsd = false), BL536_Xr,
+               F)
+    @test all(diag(pt.sigma) .> diag(pf.sigma))
+
+    # The rate does not round-trip: it comes off the factor axis and goes on the asset axis.
+    G = pk.tau *
+        fp.sigma *
+        transpose(pk.P) *
+        inv(pk.P * (pk.tau * fp.sigma) * transpose(pk.P) + pk.omega)
+    shift = ones(N) .- rr.M * ((I - G * pk.P) * ones(K))
+    base = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = 0.0), BL536_Xr, F)
+    for rf in (0.03, 0.06)
+        pr = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = rf), BL536_Xr,
+                   F)
+        @test isapprox((pr.mu .- base.mu) ./ rf, shift; atol = 1e-14)
+    end
+    # And it is not `rf * (1 - s)` for the row sums `s` of the loadings: that is the no-view
+    # limit, and it does not even share a sign with the measured shift here.
+    @test !isapprox(shift, 1 .- vec(sum(rr.M; dims = 2)); atol = 1e-3)
+end
+
+#=
+`AugmentedBlackLittermanPrior`'s stack, its two axes, its guards and what it forwards.
+Sweep ticket #536.
+=#
+@testset "Augmented Black-Litterman, its stack and its two axes" begin
+    PO = PortfolioOptimisers
+    F, N, K, T = BL536_F, BL536_N, BL536_K, BL536_T
+    afs, av, fv = BL536_sets, BL536_av, BL536_fv
+
+    ap = prior(EmpiricalPrior(), BL536_Xr)
+    fp = prior(EmpiricalPrior(), F)
+    rr, _ = PO.factor_reconstruction(StepwiseRegression(), BL536_Xr, F)
+    Sa, Sf = ap.sigma, fp.sigma
+    aug = hcat(vcat(Sa, Sf * transpose(rr.M)), vcat(rr.M * Sf, Sf))
+    # The off-diagonal blocks are built from the *factor* covariance, and they are the
+    # cross-covariance the factor model implies.
+    @test aug[1:N, (N + 1):(N + K)] == rr.M * Sf
+    @test aug[(N + 1):(N + K), 1:N] == transpose(aug[1:N, (N + 1):(N + K)])
+    Xc = BL536_Xr .- transpose(ap.mu)
+    Fc = F .- transpose(fp.mu)
+    @test isapprox((transpose(Xc) * Fc) ./ (T - 1), rr.M * Sf; atol = 1e-16)
+
+    ak = PO.bl_preroll(av, afs, nothing, Sa, nothing, T, Float64, false)
+    fk = PO.bl_preroll(fv, afs, nothing, Sf, nothing, T, Float64, false, :fkey)
+    augP = [ak.P zeros(size(ak.P, 1), K); zeros(size(fk.P, 1), N) fk.P]
+    augQ = vcat(ak.Q, fk.Q)
+    augOm = [ak.omega zeros(2, 2); zeros(2, 2) fk.omega]
+    pmu, psig = PO.vanilla_posteriors(ak.tau, PO.remove_rf(0.0, vcat(ap.mu, fp.mu)), aug,
+                                      augOm, augP, augQ)
+    pr = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv),
+               BL536_Xr, F)
+    # The truncation reads the asset half from `1:N` and the factor half from `N+1:N+K`, and
+    # the asset half alone gains the intercept.
+    @test pr.mu == pmu[1:N] .+ rr.b
+    @test pr.fpr.mu == pmu[(N + 1):(N + K)]
+    @test pr.fpr.sigma == psig[(N + 1):(N + K), (N + 1):(N + K)]
+
+    # Four mandates. Each axis is needed only by the views that resolve names against it, so a
+    # precomputed pair needs no universe at all and answers the same as one given a universe.
+    m_both = pr
+    m_aonly = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av,
+                                                 f_views = BL536_fblv), BL536_Xr, F)
+    m_fonly = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = BL536_ablv,
+                                                 f_views = fv), BL536_Xr, F)
+    m_nosets = prior(AugmentedBlackLittermanPrior(; a_views = BL536_ablv,
+                                                  f_views = BL536_fblv), BL536_Xr, F)
+    m_sets = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = BL536_ablv,
+                                                f_views = BL536_fblv), BL536_Xr, F)
+    @test all(isa.((m_both, m_aonly, m_fonly, m_nosets), LowOrderPrior))
+    @test m_nosets.mu == m_sets.mu
+    # The two routes into the same views agree exactly.
+    @test m_aonly.mu == m_both.mu
+    @test m_fonly.mu == m_both.mu
+
+    # `port_opt_view` slices the asset entries and leaves the factor universe whole.
+    pv = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                      w = fill(1 / N, N))
+    sl = PO.port_opt_view(pv, [1, 3, 5], N)
+    @test sl.sets.dict["nx"] == ["A1", "A3", "A5"]
+    @test sl.sets.dict["nf"] == ["F1", "F2", "F3"]
+    @test length(sl.w) == 3
+
+    # The guards this file holds of its own.
+    short = UniverseSets(; dict = Dict("nx" => ["A1", "A2"], "nf" => ["F1", "F2", "F3"]))
+    @test_throws DimensionMismatch prior(AugmentedBlackLittermanPrior(; sets = short,
+                                                                      a_views = av,
+                                                                      f_views = BL536_fblv),
+                                         BL536_Xr, F)
+
+    # `w`, `ens`, `kld` and `ow` are the asset prior's, and `fpr.w` the factor prior's.
+    @test pr.w === ap.w
+    @test pr.ens === ap.ens
+    @test pr.kld === ap.kld
+    @test pr.ow === ap.ow
+    @test pr.fpr.w === fp.w
+    @test isnothing(pr.chol)
+    @test isnothing(pr.fpr.chol)
+
+    # The rate is not an inverse of the shift the update ran on, on either half.
+    Ga = ak.tau *
+         aug *
+         transpose(augP) *
+         inv(augP * (ak.tau * aug) * transpose(augP) + augOm)
+    shift = (ones(N + K) .- (I - Ga * augP) * ones(N + K))[1:N]
+    for rf in (0.03, 0.06)
+        pf_ = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                                 rf = rf), BL536_Xr, F)
+        @test isapprox((pf_.mu .- pr.mu) ./ rf, shift; atol = 1e-14)
+        @test maximum(abs.(pf_.fpr.mu .- pr.fpr.mu)) > 0.9 * rf
+    end
+    # This estimator adds no residual block, so it declares none.
+    @test isnothing(PO.factor_residual_config(pv))
+end
