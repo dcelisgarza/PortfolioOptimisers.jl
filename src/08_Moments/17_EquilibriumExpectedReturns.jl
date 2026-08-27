@@ -113,7 +113,7 @@ Compute equilibrium expected returns from a risk aversion parameter, a covarianc
 
 `equilibrium_mu` is the **single owner** of the ``\\lambda \\mathbf{\\Sigma} \\boldsymbol{w}`` expression and of its equal-weight fallback. [`EquilibriumExpectedReturns`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reach it, so the fallback and the length check are stated once.
 
-The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it. This is why the Black-Litterman members apply [`remove_rf`](@ref) only on the branch where they do *not* call this function.
+The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it. This is why the Black-Litterman members apply [`apply_rf`](@ref) to the result of this function, and only on the branch where they call it: a mean taken from a wrapped prior estimator is a total return already and needs no conversion.
 
 `sigma` is a covariance **block**, not necessarily a square covariance matrix. Its columns are the assets the weights are written over, so `size(sigma, 2)` is the length `w` must have. A square covariance gives the plain equilibrium returns. A rectangular block gives the equilibrium returns of the rows it spans, which is how the factor Black-Litterman members build a prior mean over factors from asset weights.
 

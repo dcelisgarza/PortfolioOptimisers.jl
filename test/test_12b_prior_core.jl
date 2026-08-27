@@ -608,15 +608,11 @@ end
                                         f_views = LinearConstraintEstimator(;
                                                                             val = ["MTUM == 0.0001",
                                                                                    "QUAL - USMV == -0.0003"]))]
+    # The fixture is the published reference this estimator was ported from, and the
+    # covariance still matches it exactly: ADR 0063's amendment moves the intercept and the
+    # rate into the prior stack, and the covariance path never reads the prior mean.
     for (i, pe) in enumerate(pes)
         pr = prior(pe, rd)
-        success = isapprox(pr.mu, df[1:20, i]; rtol = 1e-6)
-        if !success
-            println("Mu $i fails")
-            find_tol(pr.mu, df[1:20, i])
-        end
-        @test success
-
         success = isapprox(vec(pr.sigma), df[21:420, i]; rtol = 1e-6)
         if !success
             println("Sigma $i fails")
@@ -624,6 +620,23 @@ end
         end
         @test success
     end
+
+    # `mu` departs from the reference, deliberately and by a stated amount (#570).
+    #
+    # Column 1, `l === nothing`: the reference adds the loadings constant to a historical
+    # mean that already contains it, because least squares with an intercept makes the mean
+    # of `X` equal `M * mu_f + b`. Ours is the reference less `rr.b`, entry by entry.
+    pr1 = prior(pes[1], rd)
+    @test isapprox(pr1.mu, df[1:20, 1] .- pr1.rr.b; atol = 1e-16)
+    @test isapprox(maximum(abs, pr1.rr.b), 0.0016160796925727256; rtol = 1e-6)
+
+    # Column 2, `l = 2`: the equilibrium premium carries no intercept, so only the *place*
+    # differs. Ours blends the views against a prior that carries `b`, and the reference
+    # adds `b` whole afterwards, so the departure is `(I - G*P)b - b` on the asset half.
+    # That is not a plain offset, so it is pinned here as one measured number.
+    pr2 = prior(pes[2], rd)
+    @test isapprox(maximum(abs, pr2.mu .- df[1:20, 2]), 0.0006994080155258995; rtol = 1e-6)
+    @test !isapprox(pr2.mu, df[1:20, 2] .- pr2.rr.b; rtol = 1e-3)
 end
 
 @testset "Augmented Black Litterman reads both declared axes" begin
@@ -1578,13 +1591,10 @@ the two routes into `Lc_BLV` give the same rows. Sweep ticket #535.
     m3 = prior(BlackLittermanPrior(; views = lce, sets = sets, rf = 0.03), rd).mu
     # Not zero times, and not twice.
     @test isapprox(m3 - m0, fill(0.03, length(m0)); atol = 1e-16)
-    # `remove_rf` inverts `apply_rf` on the same vector, in both orders.
-    @test isapprox(PortfolioOptimisers.remove_rf(0.03,
-                                                 PortfolioOptimisers.apply_rf(0.03, m0)),
-                   m0; atol = 1e-16)
-    @test isapprox(PortfolioOptimisers.apply_rf(0.03,
-                                                PortfolioOptimisers.remove_rf(0.03, m0)),
-                   m0; atol = 1e-16)
+    # `apply_rf` shifts and does nothing else. Nothing in the library subtracts the rate:
+    # ADR 0063's amendment puts a missing level on the prior mean instead of taking one off.
+    @test isapprox(PortfolioOptimisers.apply_rf(0.03, m0), m0 .+ 0.03; atol = 1e-16)
+    @test isapprox(PortfolioOptimisers.apply_rf(0.0, m0), m0; atol = 1e-16)
 
     # The default tau is 1/T, read from the observation count `bl_preroll` is handed, and a
     # user-supplied tau wins.
@@ -1820,49 +1830,51 @@ end
     @test isa(LowOrderPrior(; X = fp.X, o_X = X, base...), LowOrderPrior)
 end
 
-@testset "The risk-free rate is one round trip: off before the update, back on after" begin
-    # ADR 0063. A Black-Litterman update is written in *excess* returns, so `rf` names one
-    # round trip. `remove_rf` takes it off the prior mean, `apply_rf` puts it back on the
-    # posterior asset mean, and each site is reached at most once per member.
+@testset "The risk-free rate goes on the prior mean, and only where there is a premium" begin
+    # ADR 0063 as amended, and issue #570. A Black-Litterman update blends the prior mean
+    # against the view returns by forming `Q - P * mu`, so the prior mean must be on the
+    # scale `Q` is written on, which is a total return. Nothing converts it away and back.
     #
-    # Which members convert, and what each therefore obeys:
+    # Which members read `rf`, and what each therefore obeys:
     #
     #   * `BlackLittermanPrior` and `BayesianBlackLittermanPrior` have no equilibrium
-    #     branch, so they take the wrapped mean on the scale it is given and only add.
-    #     `mu(r) == mu(0) .+ r`, exactly.
-    #   * `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` with `l` set take
-    #     the equilibrium mean, which is a risk premium and so an excess return already.
-    #     Nothing is taken off, so the same identity holds.
-    #   * The same two with `l === nothing` take the wrapped mean, a total return, and
-    #     `remove_rf` converts it. The rate then cancels against `apply_rf` on the prior
-    #     term but *not* inside the view blend, so the identity does not hold — see the two
-    #     testsets below, which pin what holds instead.
+    #     branch and so have nothing to convert. They add the rate to the posterior asset
+    #     mean, last, and `mu(r) == mu(0) .+ r` exactly.
+    #   * `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior` read the field only
+    #     where `l` is set, to convert the equilibrium risk premium. Where `l` is `nothing`
+    #     the field does not reach the answer at all, and `mu(r) == mu(0)` exactly.
     rf = 0.02
     bl_v = LinearConstraintEstimator(;
                                      val = ["$(rd.nx[1]) == 0.003", "$(rd.nx[2]) == 0.002"])
     f_v = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
 
-    # The two members that never convert.
-    unconverted(r) = [BlackLittermanPrior(; sets = sets, views = bl_v, rf = r),
-                      BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = xfsets,
-                                                  views = f_v, rf = r)]
-    # The two that convert, on the branch where they do not: `l` selects the equilibrium
-    # mean instead of the wrapped one.
-    equilibrium(r) = [FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = r,
-                                                l = 2.0),
-                      AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v,
-                                                   f_views = f_v, rf = r, l = 2.0)]
-    for (pe0, pe1) in zip(vcat(unconverted(0.0), equilibrium(0.0)),
-                          vcat(unconverted(rf), equilibrium(rf)))
+    # The two members that add the rate to the answer.
+    shifted(r) = [BlackLittermanPrior(; sets = sets, views = bl_v, rf = r),
+                  BayesianBlackLittermanPrior(; pe = FactorPrior(), sets = xfsets,
+                                              views = f_v, rf = r)]
+    for (pe0, pe1) in zip(shifted(0.0), shifted(rf))
         pr0 = prior(pe0, rd)
         pr1 = prior(pe1, rd)
         # The shift is exact, not approximate: the rate is added at one site, last.
         @test pr1.mu == pr0.mu .+ rf
-        # The rate is a property of the asset axis, so the factor block never carries it.
+        # It is added to the asset mean, so the factor block never carries it.
         # `BlackLittermanPrior` here wraps no factor prior and reports no block.
         if !isnothing(pr0.fpr)
             @test pr1.fpr.mu == pr0.fpr.mu
         end
+    end
+
+    # The two members with an equilibrium branch, on the branch where they have none. The
+    # field is inert there: the wrapped prior mean is a total return already, and nothing
+    # is added afterwards.
+    inert(r) = [FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = r),
+                AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
+                                             rf = r)]
+    for (pe0, pe1) in zip(inert(0.0), inert(rf))
+        pr0 = prior(pe0, rd)
+        pr1 = prior(pe1, rd)
+        @test pr1.mu == pr0.mu
+        @test pr1.fpr.mu == pr0.fpr.mu
     end
 
     # Isolation. The inner estimator applies its own rate; the outer neither undoes it nor
@@ -1880,87 +1892,69 @@ end
           outer0.mu
 end
 
-@testset "A relative view makes the round trip exact on one axis" begin
-    # The sharp case for `remove_rf`, and it is `AugmentedBlackLittermanPrior` that shows
-    # it. Its augmented prior spans `[assets; factors]`, so the rate comes off the asset
-    # rows and `apply_rf` puts it back on the same rows. Write the views so every row of
-    # `P` sums to zero -- each one a *difference* between two names -- and the view residual
-    # `Q - P * prior_mu` is untouched by the shift, so the rate cancels completely.
+@testset "With `l` set the rate is blended, and a relative view makes the blend exact" begin
+    # The equilibrium branch converts a risk premium, so the rate reaches the answer
+    # *through* the update. Writing `G` for the update gain, the prior mean gains `r * 1`
+    # and the posterior therefore gains `(I - G * P) * r * 1`.
     #
-    # `mu(r) == mu(0)`, exactly. That equality is what "one round trip" means, and it is
-    # unreachable without the subtraction: with it removed the rate would still be added at
-    # the end, and the answer would move by `r`.
+    # Write every view as a *difference* between two names and each row of `P` sums to
+    # zero, so `P * 1 == 0`, `G * P * 1 == 0`, and the whole shift survives the blend. That
+    # is the sharp case, and it is exact.
     rf = 0.02
     a_rel = LinearConstraintEstimator(; val = ["$(rd.nx[1]) - $(rd.nx[2]) == 0.001"])
     f_rel = LinearConstraintEstimator(; val = ["$(rd.nf[1]) - $(rd.nf[2]) == 0.001"])
-    pr0 = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_rel,
-                                             f_views = f_rel, rf = 0.0), rd)
-    pr1 = prior(AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_rel,
-                                             f_views = f_rel, rf = rf), rd)
-    @test isapprox(pr1.mu, pr0.mu)
-    # A real cancellation, not a rate that never arrived: the rate did come off, and the
-    # factor half of the augmented posterior still shows it, because nothing puts it back
-    # there. `rf` belongs to the asset axis.
-    @test isapprox(pr1.fpr.mu, pr0.fpr.mu .- rf)
-    @test !isapprox(pr1.mu, pr0.mu .+ rf)
-end
 
-@testset "The factor member crosses an axis, so the rate does not cancel" begin
-    # `FactorBlackLittermanPrior` takes the rate off the *factor* prior mean and puts it
-    # back on the *asset* mean, after the Factor Lift. Those are two axes, so the two moves
-    # are not inverses even under a purely relative view: the subtraction reaches the assets
-    # through the loadings as `M * (rf * 1)`, which is a projection of the rate rather than
-    # the rate.
-    #
-    # What holds instead is exact and is asserted here. Writing `s = M * ones` for the row
-    # sums of the loadings,
-    #
-    #     mu(r) == mu(0) + r * (1 - s)
-    #
-    # and the two moves cancel only for an asset whose loadings sum to one. The identity is
-    # the honest statement of the axis crossing, and it fails the moment either move is
-    # dropped.
-    rf = 0.02
-    f_rel = LinearConstraintEstimator(; val = ["$(rd.nf[1]) - $(rd.nf[2]) == 0.001"])
-    pr0 = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_rel, rf = 0.0), rd)
-    pr1 = prior(FactorBlackLittermanPrior(; sets = xfsets, views = f_rel, rf = rf), rd)
-    s = vec(sum(pr0.rr.M; dims = 2))
-    @test isapprox(pr1.mu, pr0.mu .+ rf .* (1 .- s))
-    # The loadings do not sum to one, so this is a live difference rather than a vacuous
-    # identity, and the plain shift is genuinely wrong.
+    # The augmented member stacks assets over factors and blends one system, so both halves
+    # gain the rate whole.
+    ma(r) = AugmentedBlackLittermanPrior(; sets = afsets, a_views = a_rel, f_views = f_rel,
+                                         rf = r, l = 2.0)
+    pr0 = prior(ma(0.0), rd)
+    pr1 = prior(ma(rf), rd)
+    @test isapprox(pr1.mu, pr0.mu .+ rf)
+    @test isapprox(pr1.fpr.mu, pr0.fpr.mu .+ rf)
+
+    # The factor member updates the factors alone and then lifts, so the factor half gains
+    # the rate whole and the assets receive it through the loadings: `mu(r) == mu(0) + r*s`
+    # for the row sums `s` of `M`. The loadings do not sum to one, so this is a live
+    # difference rather than a plain shift.
+    mf(r) = FactorBlackLittermanPrior(; sets = xfsets, views = f_rel, rf = r, l = 2.0)
+    fr0 = prior(mf(0.0), rd)
+    fr1 = prior(mf(rf), rd)
+    s = vec(sum(fr0.rr.M; dims = 2))
+    @test isapprox(fr1.mu, fr0.mu .+ rf .* s)
+    @test isapprox(fr1.fpr.mu, fr0.fpr.mu .+ rf)
     @test !isapprox(s, ones(length(s)))
-    @test !isapprox(pr1.mu, pr0.mu .+ rf)
-    # The factor block is left on the excess scale the update ran on: `rf` belongs to the
-    # asset axis and is never put back on the factors.
-    @test isapprox(pr1.fpr.mu, pr0.fpr.mu .- rf)
-    # The carrier stays internally consistent across the axis crossing.
-    @test isapprox(pr1.mu, pr1.rr.M * pr1.fpr.mu + pr1.rr.b .+ rf)
+    @test !isapprox(fr1.mu, fr0.mu .+ rf)
+    # The carrier stays internally consistent across the axis crossing, and carries no `rf`
+    # term of its own any more: the rate is inside `fpr.mu`.
+    @test isapprox(fr1.mu, fr1.rr.M * fr1.fpr.mu + fr1.rr.b)
 end
 
 @testset "An absolute view feels the rate through the blend" begin
-    # The complement of the testset above. Where a view row does not sum to zero, the
-    # conversion changes what the views are blended against, so the rate is *not* a plain
-    # shift of the answer. This is the behaviour the fix introduces, and asserting it stops
-    # the subtraction being dropped again as a no-op.
+    # The complement of the testset above, and the reason `rf * (1 - s)` was the wrong
+    # closed form for the arithmetic this replaced (#571): that expression is the no-view
+    # limit `G = 0`, and no estimator reaches it, because one with no views cannot be
+    # built. Where a view row does not sum to zero the gain absorbs part of the shift, so
+    # the answer moves by neither `r` nor `r * s`.
     rf = 0.02
     bl_v = LinearConstraintEstimator(;
                                      val = ["$(rd.nx[1]) == 0.003", "$(rd.nx[2]) == 0.002"])
     f_v = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
-    for (pe0, pe1) in
-        zip([FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = 0.0),
-             AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
-                                          rf = 0.0)],
-            [FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = rf),
-             AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
-                                          rf = rf)])
-        pr0 = prior(pe0, rd)
-        pr1 = prior(pe1, rd)
+    mkf(r) = FactorBlackLittermanPrior(; sets = xfsets, views = f_v, rf = r, l = 2.0)
+    mka(r) = AugmentedBlackLittermanPrior(; sets = afsets, a_views = bl_v, f_views = f_v,
+                                          rf = r, l = 2.0)
+    for mk in (mkf, mka)
+        pr0 = prior(mk(0.0), rd)
+        pr1 = prior(mk(rf), rd)
+        pr2 = prior(mk(2rf), rd)
         @test !isapprox(pr1.mu, pr0.mu .+ rf)
         @test !isapprox(pr1.mu, pr0.mu)
+        # Linear in the rate, whatever the views: the update is affine in the prior mean.
+        @test isapprox((pr1.mu .- pr0.mu) ./ rf, (pr2.mu .- pr0.mu) ./ (2rf))
     end
 end
 
-@testset "`apply_rf`, `remove_rf` and `equilibrium_mu` are the only sites" begin
+@testset "`apply_rf` and `equilibrium_mu` are the only sites" begin
     # A text census over the sources, so the convention is enforceable rather than
     # documented. It loads no package and reads no data.
     function code_lines(path)
@@ -1978,30 +1972,32 @@ end
         return out
     end
     src = joinpath(@__DIR__, "..", "src")
-    # The two members with no equilibrium branch add the rate and never take it off. The
-    # two with one do both, at one site each.
-    for (file, adds, removes) in
-        [("06_BlackLittermanPrior.jl", 1, 0), ("07_BayesianBlackLittermanPrior.jl", 1, 0),
-         ("08_FactorBlackLittermanPrior.jl", 1, 1),
-         ("09_AugmentedBlackLittermanPrior.jl", 1, 1)]
+    # ADR 0063 as amended: every member reads the field exactly once, through `apply_rf`,
+    # and nothing subtracts it. The two with no equilibrium branch add it to the posterior
+    # asset mean; the two with one convert the equilibrium mean before the update.
+    for file in ["06_BlackLittermanPrior.jl", "07_BayesianBlackLittermanPrior.jl",
+                 "08_FactorBlackLittermanPrior.jl", "09_AugmentedBlackLittermanPrior.jl"]
         lines = code_lines(joinpath(src, "13_Prior", file))
         reads = filter(l -> occursin("pe.rf", l), lines)
-        @test length(reads) == adds + removes
-        @test count(l -> occursin("apply_rf(pe.rf", l), reads) == adds
-        @test count(l -> occursin("remove_rf(pe.rf", l), reads) == removes
-        # Every read goes through one of the two verbs; none is hand-written arithmetic.
-        @test all(l -> occursin("apply_rf(pe.rf", l) || occursin("remove_rf(pe.rf", l),
-                  reads)
+        @test length(reads) == 1
+        # The one read goes through the verb; none is hand-written arithmetic.
+        @test all(l -> occursin("apply_rf(pe.rf", l), reads)
         # No member writes the equilibrium mean itself.
         @test isempty(filter(l -> occursin("pe.l *", l), lines))
     end
+    # The intercept is applied once too, and `AugmentedBlackLittermanPrior` is where it was
+    # applied twice (#570). It goes into the prior stack now, so the only `rr.b` the body
+    # reads is the one the equilibrium branch adds.
+    aug = code_lines(joinpath(src, "13_Prior", "09_AugmentedBlackLittermanPrior.jl"))
+    @test count(l -> occursin(r"\bb\b", l) && occursin("vcat(b,", l), aug) == 1
     # The kernel carries no rate of its own.
     kernel = code_lines(joinpath(src, "13_Prior", "06_BlackLittermanPrior.jl"))
     decl = only(filter(l -> occursin("function vanilla_posteriors(", l), kernel))
     @test !occursin("rf", decl)
-    # Both verbs are declared once, in the file that owns the family's kernel.
+    # The one verb is declared once, in the file that owns the family's kernel, and the
+    # subtraction it used to pair with is gone from the library entirely.
     @test count(l -> occursin("function apply_rf(", l), kernel) == 1
-    @test count(l -> occursin("function remove_rf(", l), kernel) == 1
+    @test !isdefined(PortfolioOptimisers, :remove_rf)
     # `equilibrium_mu` owns `l * sigma * w` and its equal-weight fallback.
     owner = code_lines(joinpath(src, "08_Moments", "17_EquilibriumExpectedReturns.jl"))
     @test count(l -> occursin("function equilibrium_mu(", l), owner) == 2
@@ -2503,25 +2499,26 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     prl = prior(BlackLittermanPrior(; sets = afs, views = av), BL536_Xr, F)
     @test bl536_gap(prb) < 1e-16
     @test bl536_gap(prf) == 0
-    @test bl536_gap(pra) > 1e-3
+    @test 1e-5 < bl536_gap(pra) < 1e-3
     # The vanilla member computes no posterior factor distribution, so the right-hand side of
     # the identity cannot be formed at all.
     @test isnothing(prl.fpr)
     @test isnothing(prl.rr)
 
-    # Cause one: the intercept, on the `l === nothing` branch. On an exact factor model the
-    # whole gap is `b`, entry by entry — it does not depend on the views and does not shrink.
+    # The intercept is no longer a cause, on either branch (#570). It goes into the prior
+    # stack, where the update is affine in it, so on an exact factor model the identity
+    # holds to machine precision whatever the intercept is.
     abl = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv)
     pe_ = prior(abl, BL536_Xe, F)
-    @test isapprox(pe_.mu .- (pe_.rr.M * pe_.fpr.mu .+ pe_.rr.b), pe_.rr.b; atol = 1e-14)
     @test isapprox(maximum(abs.(pe_.rr.b)), 0.002; atol = 1e-14)
-    # Zero the intercept and the exact model satisfies the identity to machine precision.
+    @test bl536_gap(pe_) < 1e-13
+    # Zeroing the intercept changes nothing, which is the point: it is no longer the cause.
     @test bl536_gap(prior(abl, BL536_Xe0, F)) < 1e-13
-    # Cause two: idiosyncratic variance. It survives a fitted intercept of `2.4e-4`.
+    # Cause one: idiosyncratic variance. It survives a fitted intercept of `2.4e-4`.
     @test 1e-4 < bl536_gap(prior(abl, BL536_Xr0, F)) < 1e-3
 
-    # Setting `l` removes cause one: the equilibrium mean carries no intercept. This also
-    # covers the `!isempty(w)` guard of the constructor, which no other test reaches.
+    # Setting `l` changes neither statement. This also covers the `!isempty(w)` guard of
+    # the constructor, which no other test reaches.
     abl_l = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv, l = 2.0,
                                          w = fill(1 / N, N))
     @test bl536_gap(prior(abl_l, BL536_Xe, F)) < 1e-13
@@ -2530,8 +2527,22 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
                                                            f_views = BL536_fblv,
                                                            w = Float64[])
 
-    # Muting both view sets with views that repeat the prior leaves the gap at `b` exactly, so
-    # cause one is independent of the views.
+    # Cause two: a non-zero `rf` with `l` set. The equilibrium branch adds the rate to the
+    # whole stack, so the asset half gains `rf` and the factor half gains `rf` as well. The
+    # identity carries the factor half through the loadings, so the two agree only where an
+    # asset's loadings sum to one, and the gap is `rf * (1 - s)` exactly. It is zero at the
+    # default `rf = 0.0`, and it is the only way the rate reaches this identity.
+    ablr = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv, l = 2.0,
+                                        rf = 0.03)
+    prr = prior(ablr, BL536_Xe, F)
+    s536 = vec(sum(prr.rr.M; dims = 2))
+    @test isapprox(prr.mu .- (prr.rr.M * prr.fpr.mu .+ prr.rr.b), 0.03 .* (1 .- s536);
+                   atol = 1e-13)
+    @test !isapprox(s536, ones(N))
+
+    # Muting both view sets with views that repeat the prior makes the update null, so the
+    # posterior is the prior and the identity holds exactly. Before #570 the gap here was
+    # `b`, which is what showed that the intercept cause was independent of the views.
     ap0 = prior(EmpiricalPrior(), BL536_Xr0)
     fp0 = prior(EmpiricalPrior(), F)
     Pa = [1.0 0 0 0 0; 0 0 1.0 -1.0 0]
@@ -2540,7 +2551,7 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     fn = BlackLittermanViews(; P = Pf, Q = Pf * fp0.mu)
     pn = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = an, f_views = fn),
                BL536_Xr0, F)
-    @test isapprox(bl536_gap(pn), maximum(abs.(pn.rr.b)); atol = 1e-16)
+    @test bl536_gap(pn) < 1e-17
 
     # Before the update: the two priors satisfy the identity when both means are the plain
     # sample mean, because least squares with an intercept zeroes the *unweighted* residual
@@ -2638,8 +2649,7 @@ lifted through the loadings. Sweep ticket #536.
     rr, pX = PO.factor_reconstruction(StepwiseRegression(), BL536_Xr, F)
     pk = PO.bl_preroll(fv, afs, nothing, fp.sigma, nothing, T, Float64, false, :fkey)
     # The factor moments are literally `vanilla_posteriors` run over the factor axis.
-    fmu, fsig = PO.vanilla_posteriors(pk.tau, PO.remove_rf(0.0, fp.mu), fp.sigma, pk.omega,
-                                      pk.P, pk.Q)
+    fmu, fsig = PO.vanilla_posteriors(pk.tau, fp.mu, fp.sigma, pk.omega, pk.P, pk.Q)
     err = BL536_Xr .- pX
     Seps = Diagonal(vec(var(SimpleVariance(), err; dims = 1)))
 
@@ -2663,20 +2673,31 @@ lifted through the loadings. Sweep ticket #536.
                F)
     @test all(diag(pt.sigma) .> diag(pf.sigma))
 
-    # The rate does not round-trip: it comes off the factor axis and goes on the asset axis.
+    # The rate reaches the answer through the factors, and only on the `l` branch: there the
+    # equilibrium mean is a risk premium and `apply_rf` converts it before the update, so
+    # the shift is the whole factor shift carried through the blend and the loadings. Where
+    # `l` is `nothing` the factor prior's own mean is a total return already, nothing reads
+    # `pe.rf`, and the answer does not move at all.
     G = pk.tau *
         fp.sigma *
         transpose(pk.P) *
         inv(pk.P * (pk.tau * fp.sigma) * transpose(pk.P) + pk.omega)
-    shift = ones(N) .- rr.M * ((I - G * pk.P) * ones(K))
+    shift = rr.M * ((I - G * pk.P) * ones(K))
     base = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = 0.0), BL536_Xr, F)
+    base_l = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = 0.0, l = 2.0),
+                   BL536_Xr, F)
     for rf in (0.03, 0.06)
         pr = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = rf), BL536_Xr,
                    F)
-        @test isapprox((pr.mu .- base.mu) ./ rf, shift; atol = 1e-14)
+        @test pr.mu == base.mu
+        @test pr.fpr.mu == base.fpr.mu
+        prl = prior(FactorBlackLittermanPrior(; sets = afs, views = fv, rf = rf, l = 2.0),
+                    BL536_Xr, F)
+        @test isapprox((prl.mu .- base_l.mu) ./ rf, shift; atol = 1e-14)
     end
-    # And it is not `rf * (1 - s)` for the row sums `s` of the loadings: that is the no-view
-    # limit, and it does not even share a sign with the measured shift here.
+    # And it is not `rf * (1 - s)` for the row sums `s` of the loadings: that expression is
+    # the no-view limit `G = 0` of the arithmetic this replaced, and no estimator reaches
+    # it, because one with no views cannot be built (#571).
     @test !isapprox(shift, 1 .- vec(sum(rr.M; dims = 2)); atol = 1e-3)
 end
 
@@ -2707,13 +2728,14 @@ Sweep ticket #536.
     augP = [ak.P zeros(size(ak.P, 1), K); zeros(size(fk.P, 1), N) fk.P]
     augQ = vcat(ak.Q, fk.Q)
     augOm = [ak.omega zeros(2, 2); zeros(2, 2) fk.omega]
-    pmu, psig = PO.vanilla_posteriors(ak.tau, PO.remove_rf(0.0, vcat(ap.mu, fp.mu)), aug,
-                                      augOm, augP, augQ)
+    pmu, psig = PO.vanilla_posteriors(ak.tau, vcat(ap.mu, fp.mu), aug, augOm, augP, augQ)
     pr = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv),
                BL536_Xr, F)
     # The truncation reads the asset half from `1:N` and the factor half from `N+1:N+K`, and
-    # the asset half alone gains the intercept.
-    @test pr.mu == pmu[1:N] .+ rr.b
+    # adds nothing to either. The intercept is inside `ap.mu` already, because least squares
+    # with an intercept makes the mean of `X` equal `M * fp.mu + b` (#570).
+    @test pr.mu == pmu[1:N]
+    @test isapprox(ap.mu, rr.M * fp.mu .+ rr.b; atol = 1e-17)
     @test pr.fpr.mu == pmu[(N + 1):(N + K)]
     @test pr.fpr.sigma == psig[(N + 1):(N + K), (N + 1):(N + K)]
 
@@ -2758,17 +2780,26 @@ Sweep ticket #536.
     @test isnothing(pr.chol)
     @test isnothing(pr.fpr.chol)
 
-    # The rate is not an inverse of the shift the update ran on, on either half.
+    # The rate goes on the whole equilibrium stack, so both halves move by the same gain
+    # applied to a vector of ones. Where `l` is `nothing` the two wrapped means are total
+    # returns already, nothing reads `pe.rf`, and neither half moves at all.
     Ga = ak.tau *
          aug *
          transpose(augP) *
          inv(augP * (ak.tau * aug) * transpose(augP) + augOm)
-    shift = (ones(N + K) .- (I - Ga * augP) * ones(N + K))[1:N]
+    shift = (I - Ga * augP) * ones(N + K)
+    base_l = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                                l = 2.0), BL536_Xr, F)
     for rf in (0.03, 0.06)
         pf_ = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
                                                  rf = rf), BL536_Xr, F)
-        @test isapprox((pf_.mu .- pr.mu) ./ rf, shift; atol = 1e-14)
-        @test maximum(abs.(pf_.fpr.mu .- pr.fpr.mu)) > 0.9 * rf
+        @test pf_.mu == pr.mu
+        @test pf_.fpr.mu == pr.fpr.mu
+        pl_ = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                                 rf = rf, l = 2.0), BL536_Xr, F)
+        @test isapprox((pl_.mu .- base_l.mu) ./ rf, shift[1:N]; atol = 1e-14)
+        @test isapprox((pl_.fpr.mu .- base_l.fpr.mu) ./ rf, shift[(N + 1):(N + K)];
+                       atol = 1e-14)
     end
     # This estimator adds no residual block, so it declares none.
     @test isnothing(PO.factor_residual_config(pv))

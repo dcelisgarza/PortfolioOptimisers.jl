@@ -19,10 +19,14 @@ Augmented prior moments (stacking asset and factor priors):
 
 ```math
 \\begin{align}
-\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}\\,, \\\\
+\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}
+\\quad\\text{or}\\quad
+\\lambda\\begin{pmatrix}\\boldsymbol{\\Sigma}_a \\\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal}\\end{pmatrix}\\boldsymbol{w} + \\begin{pmatrix}\\boldsymbol{b} \\\\ \\mathbf{0}\\end{pmatrix} + r_{f}\\,, \\\\
 \\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\mathbf{M}\\boldsymbol{\\Sigma}_f \\\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal} & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
 \\end{align}
 ```
+
+The left prior mean is the stacked pair of wrapped means, and it is what `pe.l === nothing` uses. The right one is the equilibrium alternative `pe.l` selects, and it carries two corrections the wrapped pair does not need: the asset-side intercept ``\\boldsymbol{b}``, and the risk-free rate. Both are levels the wrapped means already contain, and both must be in ``\\boldsymbol{\\mu}_{aug}`` rather than added afterwards, because the update blends this mean against ``\\boldsymbol{q}_{aug}`` by forming the residual ``\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}``.
 
 The off-diagonal blocks are the cross-covariance the factor model implies, ``\\mathrm{cov}(\\mathbf{X}, \\mathbf{F}) = \\mathbf{M}\\boldsymbol{\\Sigma}_f``. They are built from the **factor** covariance and not from the asset one, so they carry factor variance alone while the leading block carries factor *and* residual variance. That asymmetry is what opens the gap described in the second warning below.
 
@@ -45,11 +49,11 @@ Black-Litterman posterior on the augmented space, by the ordinary master equatio
 \\end{align}
 ```
 
-The two halves are then read off by truncation, and the asset half alone gains the intercept and the risk-free rate:
+The two halves are then read off by truncation, and nothing else. The intercept and the risk-free rate are in ``\\boldsymbol{\\mu}_{aug}`` above, where the views are blended against them:
 
 ```math
 \\begin{align}
-\\hat{\\boldsymbol{\\mu}} &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{1:N} + \\boldsymbol{b} + r_{f}\\,, \\quad
+\\hat{\\boldsymbol{\\mu}} &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{1:N}\\,, \\quad
 \\hat{\\mathbf{\\Sigma}} = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{1:N,\\,1:N}\\,, \\\\
 \\hat{\\boldsymbol{\\mu}}_f &= \\left(\\boldsymbol{\\mu}_{post}\\right)_{N+1:N+K}\\,, \\quad
 \\hat{\\mathbf{\\Sigma}}_f = \\left(\\boldsymbol{\\Sigma}_{post}\\right)_{N+1:N+K,\\,N+1:N+K}\\,.
@@ -73,7 +77,8 @@ Where:
   - ``\\mathbf{P}_{aug}``, ``\\boldsymbol{q}_{aug}``, ``\\boldsymbol{\\Omega}_{aug}``: The same three stacked over the augmented axis, the asset rows above the factor rows.
   - ``\\hat{\\boldsymbol{\\mu}}``, ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times 1`` and ``N \\times N`` posterior asset moments, `pr.mu` and `pr.sigma`.
   - ``\\hat{\\boldsymbol{\\mu}}_f``, ``\\hat{\\mathbf{\\Sigma}}_f``: ``K \\times 1`` and ``K \\times K`` posterior factor moments, `pr.fpr.mu` and `pr.fpr.sigma`.
-  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref).
+  - ``\\lambda``, ``\\boldsymbol{w}``: The risk-aversion coefficient `pe.l` and the equilibrium weights `pe.w`, read by [`equilibrium_mu`](@ref) and only where `pe.l` is set.
+  - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref) to the equilibrium mean. It is absent where `pe.l` is `nothing`, because the wrapped means are total returns already.
 
 Every block above is measured on a ``250 \\times 5`` sample over three factors with two asset views and two factor views. The off-diagonal blocks of ``\\boldsymbol{\\Sigma}_{aug}`` are ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose to `0.0`, and that product is the empirical ``\\mathrm{cov}(\\mathbf{X}, \\mathbf{F})`` to `7.6e-19` against a scale of `5.3e-4`. The block-diagonal stack and the truncation agree with a hand computation to `0.0` on ``\\hat{\\boldsymbol{\\mu}}``, ``\\hat{\\boldsymbol{\\mu}}_f`` and ``\\hat{\\mathbf{\\Sigma}}_f``.
 
@@ -115,13 +120,13 @@ This estimator **merges two** priors rather than forwarding one along its own ax
 
 !!! warning
 
-    `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`, even though **both** blocks are posterior. Two independent causes open the gap, and only the second is a property of the update.
-
-    **The intercept, on the `l === nothing` branch.** The prior mean handed to the update is the stacked pair of wrapped means, and the asset half of that pair is the mean of `X`, which the factor model already writes as `M * mu_f + b`. The asset half of the posterior is then given `b` a second time. The size of that contribution is exactly `b`, so it does not shrink with the sample and does not depend on the views: mute both view sets with views that repeat the prior, and the gap is `b` to machine precision. Setting `l` removes this cause, because [`equilibrium_mu`](@ref) builds a risk premium that carries no intercept. This follows the published reference, which adds the loadings constant to a historical prior mean in the same place.
+    `pr.mu != pr.rr.M * pr.fpr.mu + pr.rr.b`, even though **both** blocks are posterior. Two independent causes open the gap, and both are properties of the update. The intercept is **not** one of them: it enters the prior stack, and the update is affine in that stack, so it reaches both sides of the identity together.
 
     **Idiosyncratic variance, on every branch.** The augmented covariance stacks the full asset covariance `sigma_a` — factor *and* residual variance — against a cross-covariance `M * sigma_f` that is pure factor. The update therefore moves the asset half by `tau * sigma_a * P'(…)` and the factor half by `tau * sigma_f * M' * P'(…)`, and for the two to stay related by `M` it would need `sigma_a == M * sigma_f * M'`. That holds only when the factor model is exact. This part scales with the residual variance, and both view sets contribute to it.
 
-    Measured on a `250 × 5` sample over three factors with two asset views and two factor views. At `l = nothing` the gap is `2.0e-3` on returns built as an exact factor model whose intercept is `[0.001, -0.002, 0.0015, 0.0005, 0.0]`, and it equals that intercept to `1.8e-15`; on returns built as an exact factor model with a zero intercept it is `3.2e-15`; on returns built with a residual and a fitted intercept of `2.4e-4` it is `3.3e-4`. At `l = 2.0` the same exact returns give `3.7e-15` and the same residual returns `1.3e-4`, so the intercept cause is gone and the residual cause remains.
+    **A non-zero `rf`, on the `l` branch alone.** [`apply_rf`](@ref) puts the rate on the whole equilibrium stack, so the asset half gains `rf` and the factor half gains `rf` too. The identity carries the factor half through the loadings, which turns that `rf` into `rf * s` for the row sums `s` of `M`, so the two sides agree only where an asset's loadings sum to one. The gap this opens is `rf * (1 - s)`, exactly. It is zero at the default `rf = 0.0`, and where `pe.l` is `nothing` the field is never read.
+
+    Measured on a `250 × 5` sample over three factors with two asset views and two factor views, at the default `rf = 0.0` unless stated. On returns built as an exact factor model whose intercept is `[0.001, -0.002, 0.0015, 0.0005, 0.0]` the gap is `1.8e-15` at `l = nothing` and `2.3e-15` at `l = 2.0`; on the same returns with a zero intercept it is `3.2e-15` and `3.7e-15`, so the intercept does not reach it. On returns built with a residual and a fitted intercept of `2.4e-4` it is `1.2e-4` and `1.4e-4`. At `l = 2.0` and `rf = 0.03` the exact returns give `1.8e-2`, which is `rf * (1 - s)` to `1e-13`.
 
     The two *priors* satisfy the identity before the update only when both means are the plain sample mean, because least squares with an intercept zeroes the **unweighted** residual mean — measured at `1.7e-18`. One shared *non-uniform* weighting is not enough: the same weighting on both priors gives `1.1e-4`, because the weighted residual mean is not zero, and two different weightings give `1.3e-3`. On an exact factor model a shared non-uniform weighting does satisfy it, at `4.8e-18`, because there is no residual to weight.
 
@@ -385,7 +390,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the augmented Black-Litterman model, combining asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views over one dual-axis universe sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
-When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the number of observations of the oriented `X`. The mean handed to the update is an **excess** return, and the factor half is reported on that scale. `pe.rf` goes back on the asset half alone, and the two moves are **not** inverses: writing ``\\mathbf{G}`` for the augmented update gain and ``\\mathbf{1}`` for the vector of ones, the answer moves against the same estimator at `rf = 0` by `rf * (1 - (I - G P_aug) * 1)` on the asset half, and the factor half moves too, because it was shifted by `-rf` and never shifted back. On a `250 × 5` sample over three factors with two views on each axis the asset shift is `[0.694, 0.500, 0.711, 0.831, 0.734]` per unit of `rf`, matching that closed form to `1e-16` and linear between `rf = 0.03` and `rf = 0.06`; the factor half moves by `0.0297` per `0.03` of `rf`.
+When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the number of observations of the oriented `X`. The mean handed to the update is a **total** return, and both halves are reported on that scale. `pe.rf` reaches the update on the `pe.l` branch alone, where it converts the equilibrium risk premium, and it goes on the whole stack. Writing ``\\mathbf{G}`` for the augmented update gain and ``\\mathbf{1}`` for the vector of ones, the answer therefore moves against the same estimator at `rf = 0` by `rf * (I - G P_aug) * 1`, read on each half. On a `250 × 5` sample over three factors with two views on each axis the asset half moves by `[0.306, 0.500, 0.289, 0.169, 0.266]` per unit of `rf` and the factor half by `[0.390, 0.453, 0.991]`, both matching that closed form to `1e-16` and linear between `rf = 0.03` and `rf = 0.06`. Where `pe.l` is `nothing` the field is never read, and two fits differing only in `rf` agree to `0.0` on both halves.
 
 # Arguments
 
@@ -418,11 +423,11 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  6. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the asset prior covariance, and the factor views at `:fkey`, over the factor prior covariance.
  7. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
  8. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
- 9. Put the stacked prior mean on the excess scale, giving `aug_prior_excess_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), which is a risk premium already; otherwise it is the stacked wrapped means less `pe.rf`, by [`remove_rf`](@ref).
+ 9. Put the stacked prior mean on the total-return scale the views are written on, giving `aug_prior_mu`. When `pe.l` is `nothing` this is the stacked wrapped means, which are on that scale already. When `pe.l` is set it is the equilibrium mean of [`equilibrium_mu`](@ref), a bare risk premium, plus `pe.rf` by [`apply_rf`](@ref) and plus `rr.b` on the asset half.
 10. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space, giving the augmented posterior pair.
 11. Process the augmented posterior covariance in place with [`matrix_processing!`](@ref), under `pe.mp` and the two return matrices side by side.
-12. Truncate the asset half from `1:N`, add `rr.b`, and add `pe.rf` with [`apply_rf`](@ref). This is the one site that adds the rate.
-13. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the update ran on the excess scale, and no second processing pass, because a principal submatrix of a processed matrix is already processed.
+12. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 9, and the update is affine in that mean.
+13. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed.
 14. Build the carrier directly, taking `w`, its diagnostics and `Z` from `a_prior`.
 
 # Related
@@ -433,7 +438,6 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
   - [`apply_rf`](@ref)
-  - [`remove_rf`](@ref)
   - [`equilibrium_mu`](@ref)
 """
 function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
@@ -484,33 +488,42 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     # weights `pe.w`. The expression and its equal-weight fallback belong to
     # [`equilibrium_mu`](@ref).
     #
-    # Both branches must leave an *excess* return, because that is the scale the view returns
-    # in `aug_Q` are written on, and the scale [`apply_rf`](@ref) undoes at the end. The
-    # equilibrium mean is one already — it is the risk premium reverse optimisation implies.
-    # The two wrapped means are total returns, so [`remove_rf`](@ref) takes the rate off the
-    # stack first.
-    aug_prior_excess_mu = if !isnothing(pe.l)
-        equilibrium_mu(pe.l, vcat(a_prior_sigma, f_prior_sigma * transpose(M)), pe.w)
+    # Both branches must leave the stack on the scale this estimator *returns*: a total
+    # return, with the regression intercept in the asset half. That is the scale the view
+    # returns in `aug_Q` are written on, so it is the scale the view residual
+    # `aug_Q - aug_P * mu` must be formed on, and a level missing from the prior mean is a
+    # level the views are blended against wrongly (ADR 0063, amended).
+    #
+    # The two wrapped means are on it already. Least squares with an intercept zeroes the
+    # residual mean, so the mean of `X` *is* `M * f_prior_mu + b`: the asset half carries the
+    # intercept, and both halves are total returns.
+    #
+    # The equilibrium mean is not. It is a bare risk premium, so this branch adds the two
+    # levels it lacks: `pe.rf` through [`apply_rf`](@ref), and the asset-side intercept `b`.
+    # The factor half takes the rate and no intercept, because the intercept is the
+    # regression's and hence asset-only.
+    aug_prior_mu = if !isnothing(pe.l)
+        apply_rf(pe.rf,
+                 equilibrium_mu(pe.l, vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
+                                pe.w)) .+ vcat(b, zeros(dt, size(F, 2)))
     else
-        remove_rf(pe.rf, vcat(a_prior_mu, f_prior_mu))
+        vcat(a_prior_mu, f_prior_mu)
     end
-    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, aug_prior_excess_mu,
+    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, aug_prior_mu,
                                                                aug_prior_sigma, aug_omega,
                                                                aug_P, aug_Q)
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
-    # `pe.rf` goes back on here and only here (see [`apply_rf`](@ref)): once, on the asset
-    # expected returns this estimator returns. It is not an inverse of the `remove_rf` above,
-    # even on the asset half: the update is affine in the prior mean, so a shift of `-rf` on
-    # the whole stack reaches the asset half as `-(I - G*P_aug)*rf*1` rather than as `-rf*1`.
-    # The docstring states the measured shift. The factor half below keeps the excess scale
-    # the augmented update ran on, and is therefore itself a function of `rf`.
-    posterior_mu = apply_rf(pe.rf, aug_posterior_mu[1:size(X, 2)] + b)
+    # Nothing is added here. `aug_prior_mu` reached the update on the scale this estimator
+    # returns, and the update is affine in it, so the asset half comes off that scale with
+    # the intercept and the rate already in it. Truncation is the whole of the step.
+    posterior_mu = aug_posterior_mu[1:size(X, 2)]
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     # The augmented system is jointly posterior over `[assets; factors]`, so truncating it to
     # the asset half discards a factor half that *is* the posterior factor distribution. The
-    # factor block reports that half rather than `f_prior`'s prior moments. No `rf` shift back
-    # and no `b`: the intercept is the regression's, hence asset-only, and the update returns
-    # the factor half on the excess scale it ran on, which is where the rate belongs. No second
+    # factor block reports that half rather than `f_prior`'s prior moments. It is truncated and
+    # nothing else: no `b`, because the intercept is the regression's and hence asset-only, and
+    # no rate, because the stack reached the update on the total-return scale and comes off it
+    # on the same one. The factor half is therefore on the scale `f_prior` supplied. No second
     # `matrix_processing!` either — `aug_posterior_sigma` was processed as a whole above, and a
     # principal submatrix of the result is already processed.
     f_idx = (size(X, 2) + 1):length(aug_posterior_mu)

@@ -241,7 +241,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :un_cost => "`un`: Upper limit on negative weight changes. Non-negative.",#
                                  :beta_mic => "`beta`: Reciprocal of the market impact exponent, `0 < beta < 1`. The realised exponent is `1/beta`.",#
                                  :rf => "`rf`: Risk-free rate.",#
-                                 :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update runs on excess returns, so a prior mean that arrives as a total return loses the rate first. The rate is added back exactly once, to the posterior asset expected returns. That round trip leaves the wrapped prior estimators alone, so a risk-free rate one of them applied internally stays where it is.",#
+                                 :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A mean taken from a wrapped prior estimator is on that scale already; an equilibrium mean is a bare risk premium, and the rate converts it before the update. A member with no equilibrium branch has nothing to convert and adds the rate to the posterior asset expected returns instead. It is added exactly once either way, and the wrapped prior estimators are left alone, so a risk-free rate one of them applied internally stays where it is.",#
                                  # Errors
                                  :msg => "`msg`: Error message describing the condition that triggered the exception.",#
                                  # Solver

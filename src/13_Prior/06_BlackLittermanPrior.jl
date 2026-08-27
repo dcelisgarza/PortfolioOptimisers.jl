@@ -410,7 +410,7 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 `vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
 
-The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, to the posterior asset expected returns, through [`apply_rf`](@ref).
+The kernel carries no risk-free rate. Each Black-Litterman prior estimator adds its own `rf` once, through [`apply_rf`](@ref), which owns the site each member adds it at.
 
 The two equations below are the **inverse-free** form of the master equations. They are algebraically the same object as the form stated on [`prior`](@ref): the covariance term is the Woodbury expansion of ``\\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}\\right]^{-1}``, and the two agree to `2.2e-19` on the mean and `1.4e-20` on the covariance for a ``200 \\times 6`` sample with three views. This form is used because it inverts one ``K \\times K`` matrix rather than three ``N \\times N`` ones.
 
@@ -485,19 +485,22 @@ end
 """
     apply_rf(rf::Number, mu::VecNum)
 
-Shift a Black-Litterman posterior asset mean by the risk-free rate.
+Shift a Black-Litterman mean by the risk-free rate.
 
-`apply_rf` is the **single site that adds** the `rf` field of a Black-Litterman prior estimator. The four families -- [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) -- each call it once, on the asset expected returns they return, and nowhere else. [`remove_rf`](@ref) is its inverse and the only site that takes the rate off.
+`apply_rf` is the **single site that reads** the `rf` field of a Black-Litterman prior estimator. The four families -- [`BlackLittermanPrior`](@ref), [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) -- each call it once, and nowhere else. Nothing subtracts the rate.
 
 Three properties follow, and all three are contracts of the family:
 
   - **The rate is added once.** No body adds it twice.
-  - **The update runs on excess returns.** A prior mean that arrives as a total return loses the rate first, through [`remove_rf`](@ref), so the rate `apply_rf` puts back is the one that came off. A mean that is an excess return already -- the equilibrium mean of [`equilibrium_mu`](@ref) -- is used as it stands.
-  - **A prior is isolated.** The rate applies to the posterior this estimator computes. A wrapped prior estimator is never re-fitted, and the scale conversion around the update is a round trip, so a risk-free rate one of them applied internally stays where it is.
+  - **The update runs on the scale the views are written on.** A Black-Litterman update blends the prior mean against the view returns in `Q` by forming the residual `Q - P * mu`, so the prior mean must be on the scale of `Q`, which is a total return. A mean taken from a wrapped prior estimator is one already and reaches the update untouched. The equilibrium mean of [`equilibrium_mu`](@ref) is a bare risk premium, so the two members that can build one add the rate to it **before** the update, on the axis that mean lives on. A level that is missing from the prior mean is a level the views are blended against wrongly, which is why the rate goes on first rather than last.
+  - **A prior is isolated.** A wrapped prior estimator is never re-fitted and its mean is never rescaled, so a risk-free rate one of them applied internally stays where it is.
 
-The rate is a property of the asset axis, so the factor block of a result never carries it. Where [`remove_rf`](@ref) took the rate off a factor mean, nothing puts it back: the factor posterior is reported on the excess scale the update ran on, which is `pe.rf` below the scale the factor prior was supplied on. `FactorBlackLittermanPrior` is therefore not a plain round trip -- it takes the rate off the factor axis and adds it on the asset axis, and the two moves reach the assets differently. Writing `s` for the row sums of the loadings, its answer moves by `rf * (1 - s)`, and cancels only where an asset's loadings sum to one.
+Where each member calls it, and what the field therefore does:
 
-"Once" is measured, not asserted. Two [`BlackLittermanPrior`](@ref) fits over one ``200 \\times 3`` sample, differing only in `rf`, give posterior means whose difference is `rf` in every entry to the last bit: at `rf = 0.03` the difference is `[0.03, 0.03, 0.03]` and `max|diff - rf|` is `0.0`. The pair with [`remove_rf`](@ref) round-trips a mean to `1.6e-18` in both orders.
+  - [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch and so have nothing to convert. They add the rate to the posterior asset mean, last, and the field is a plain shift of the answer.
+  - [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it on the equilibrium mean, and only where `l` is set. Where `l` is `nothing` neither reads the field at all, so it does not reach the answer.
+
+"Once" is measured, not asserted. Two [`BlackLittermanPrior`](@ref) fits over one ``200 \\times 3`` sample, differing only in `rf`, give posterior means whose difference is `rf` in every entry to the last bit: at `rf = 0.03` the difference is `[0.03, 0.03, 0.03]` and `max|diff - rf|` is `0.0`.
 
 # Algorithm
 
@@ -506,7 +509,7 @@ The rate is a property of the asset axis, so the factor block of a result never 
 # Arguments
 
   - `rf`: Risk-free rate.
-  - `mu`: Posterior asset expected returns vector.
+  - `mu`: Expected returns vector. It is a posterior asset mean for the two members with no equilibrium branch, and a prior equilibrium mean for the two with one.
 
 # Returns
 
@@ -519,44 +522,10 @@ The rate is a property of the asset axis, so the factor block of a result never 
   - [`FactorBlackLittermanPrior`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
   - [`vanilla_posteriors`](@ref)
+  - [`equilibrium_mu`](@ref)
 """
 function apply_rf(rf::Number, mu::VecNum)
     return mu .+ rf
-end
-"""
-    remove_rf(rf::Number, mu::VecNum)
-
-Convert a total-return mean to an excess-return mean.
-
-`remove_rf` is the **single site that subtracts** the `rf` field of a Black-Litterman prior estimator. It is the inverse of [`apply_rf`](@ref), and the two act as a pair: a mean goes onto the excess scale before the Black-Litterman update, and comes off it after.
-
-The update is written in excess returns. The view returns in `Q` are excess returns, and the equilibrium mean [`equilibrium_mu`](@ref) computes is an excess return by construction, because `l * sigma * w` is the risk premium that reverse optimisation implies. A mean taken from a wrapped prior estimator is a total return, so it must lose the rate before it can blend against either of them.
-
-Only [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) call it, and only where `l` is `nothing`. Those two are the members that can build the equilibrium mean themselves, so they are the two whose prior mean must reach [`vanilla_posteriors`](@ref) on one known scale either way. [`BlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) have no equilibrium branch, and take the wrapped mean as it stands.
-
-# Algorithm
-
- 1. Subtract `rf` from every entry of `mu`, and return the result. The input is not modified.
-
-# Arguments
-
-  - `rf`: Risk-free rate.
-  - `mu`: Prior asset or factor expected returns vector, as a total return.
-
-# Returns
-
-  - `mu::VecNum`: `mu` less `rf`.
-
-# Related
-
-  - [`apply_rf`](@ref)
-  - [`equilibrium_mu`](@ref)
-  - [`FactorBlackLittermanPrior`](@ref)
-  - [`AugmentedBlackLittermanPrior`](@ref)
-  - [`vanilla_posteriors`](@ref)
-"""
-function remove_rf(rf::Number, mu::VecNum)
-    return mu .- rf
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

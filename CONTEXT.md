@@ -191,7 +191,8 @@ A view on a quantile risk measure of the posterior — CVaR or EVaR — as oppos
 *Avoid*: confusing it with a **View** (§1), which is the index-selection mechanism.
 
 **Risk-Free Shift**
-The round trip a Black-Litterman prior makes around its own update: the rate comes off before the update, because the update is written in excess returns, and goes back on after it.
+The one place a Black-Litterman prior reads its `rf` field. The update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A prior mean taken from a wrapped estimator is on that scale already and is left alone; an equilibrium mean from `EquilibriumExpectedReturns` is a bare risk premium, and the rate converts it *before* the update. A member with no equilibrium branch has nothing to convert, and adds the rate to the posterior asset mean instead.
+*Avoid*: calling it a round trip. Nothing subtracts the rate, and the update is affine rather than a translation, so a conversion and its inverse around the update would not cancel.
 
 **Factor Lift**
 The hop from the factor axis to the asset axis: fit the loadings, rebuild the returns through them, project the factor moments, and optionally add a residual block.
