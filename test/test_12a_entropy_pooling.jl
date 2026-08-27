@@ -1022,9 +1022,8 @@ end
     @test isapprox(collect(prh1.w), collect(prh2.w), rtol = 5e-2)
     # A CVaR view rides every stage, and it still holds on the final posterior beside the
     # stage-one mean view. The variance view names a different asset from the CVaR view: a
-    # variance view that shrinks the same asset the CVaR view fattens is infeasible, and #572
-    # tracks the fact that the search answers that pair with a degenerate posterior instead of
-    # a raise.
+    # variance view that shrinks the same asset the CVaR view fattens is infeasible, and the
+    # testset below pins what that pair answers.
     prc = prior(MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_v,
                                           sigma_views = LinearConstraintEstimator(;
                                                                                   val = "WMT == 1.3*prior(WMT)"),
@@ -1076,4 +1075,41 @@ end
     @test all(>(0), prop.w)
     # The pooled posterior sits inside the range its members span.
     @test 0.06 < ConditionalValueatRisk(; w = prop.w)(rd.X[:, 1]) < 0.08
+end
+
+# #572: an infeasible view set answers without a raise, and this testset pins that answer.
+# `Optim` reports the runaway dual of an infeasible set as converged, because `x_converged`
+# or `f_converged` fires once the iterate stops moving. `Optim.g_converged` does separate the
+# two, because the gradient of this dual is the primal residual of the view set, but it also
+# refuses a solve that is correct and merely loose, so acting on it needs a tolerance on the
+# residual. The docstrings state the failure and the three signs that name it. Change this
+# testset in the commit that changes that decision.
+@testset "MeucciEntropyPoolingPrior answers an infeasible view pair" begin
+    cvv = ConditionalValueatRiskView(;
+                                     views = LinearConstraintEstimator(;
+                                                                       val = "AAPL == 0.07"))
+    T0 = size(rd.X, 1)
+    # The variance view shrinks AAPL while the CVaR view fattens AAPL's tail. No posterior
+    # carries both. The staged route and the single-shot route answer alike, each with a
+    # posterior on one observation, so it is not an artefact of the staging. `H2` is left out
+    # because it shares the staged route with `H1` and each run of this pair is slow.
+    for alg in (H1_EntropyPooling(), H0_EntropyPooling())
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets, alg = alg,
+                                             sigma_views = LinearConstraintEstimator(;
+                                                                                     val = "AAPL == 0.2*prior(AAPL)"),
+                                             cvar_views = cvv), rd)
+        @test pr.ens < 10
+        @test maximum(pr.w) > 0.5
+        # The view the caller wrote is missed by a wide margin.
+        @test ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]) < 0.9 * 0.07
+    end
+    # The same pair on two different assets is feasible and solves normally, so it is the
+    # direction of the views and not the pairing.
+    prok = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                           sigma_views = LinearConstraintEstimator(;
+                                                                                   val = "WMT == 1.3*prior(WMT)"),
+                                           cvar_views = cvv), rd)
+    @test prok.ens > 0.5 * T0
+    @test maximum(prok.w) < 0.05
+    @test isapprox(ConditionalValueatRisk(; w = prok.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
 end

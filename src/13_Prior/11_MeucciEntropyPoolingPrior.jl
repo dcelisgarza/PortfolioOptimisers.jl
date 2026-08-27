@@ -11,6 +11,10 @@ Reach for [`EntropyPoolingPrior`](@ref) instead where a tail view has to be an i
 
 The comparison operator a view accepts depends on the moment it constrains: `var_views` takes `==` and `>=`, `cvar_views` takes `==` alone, and every other view family takes `==`, `>=` and `<=`. An unsupported operator raises a `Meta.ParseError` naming the operators that view accepts.
 
+!!! warning
+
+    An infeasible view set answers without a raise. Neither the entropy pooling solve nor the CVaR search detects one: the dual of an infeasible set is unbounded, so the minimiser runs away, the posterior collapses onto one observation, and `Optim` reports the solve as converged. The residual the CVaR search minimises is small on such a posterior, so the search reports success too. Read the result rather than the flag: `ens` falls to a handful out of the number of observations, one weight sits near one, `kld` is large, and the posterior statistic the view named is far from its target. Views that pull one asset in two directions at once are the common way to reach it, such as a `sigma_views` row that shrinks an asset written beside a `cvar_views` row that fattens the same asset's tail. The same pair on two different assets is feasible and solves normally, so it is the direction and not the pairing. [`entropy_pooling`](@ref) states the mechanism.
+
 # Algorithm
 
 The constructor derives the prior probabilities, and validates everything else.
@@ -418,6 +422,7 @@ Where:
   - Every target stays below the worst realisation of the asset it names. A target that reaches it raises an `ArgumentError` naming every offending view beside the largest target its asset admits.
   - Every candidate value at risk stays in `[0, B]`. A candidate outside the box raises a `DomainError`.
   - The search must succeed. A `Roots.find_zero` that raises is rethrown as an `ErrorException`, and an `Optim.optimize` that `Optim.converged` reports as failed raises an `ErrorException`.
+  - An infeasible view set is **not** caught. The residual this search minimises is the posterior tail mass minus `alpha`, and a posterior that sits on one observation carries a small residual while it misses the view by any margin. The summary paragraph of [`MeucciEntropyPoolingPrior`](@ref) states how to recognise that answer.
 
 # Returns
 

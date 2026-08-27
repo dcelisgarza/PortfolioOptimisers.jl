@@ -322,6 +322,8 @@ Solves the dual of the entropy pooling problem with Optim.jl.
 
 The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm.
 
+This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) states the mechanism and the three signs that name that answer.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -2344,6 +2346,10 @@ The two optimisation algorithms minimise the same objective and reach the same p
 
 The dual carries one variable per row rather than one per observation, and it has no room for an auxiliary variable, so it expresses no tail view. It also has no slack variable: the fixed equality rows of the `:feq` key are relaxed by holding their dual variables in the box ``[-s_{c2},\\, s_{c2}]``, which is the dual of a penalty of weight ``s_{c2}`` on the norm of the slack the primal would carry.
 
+!!! warning
+
+    An infeasible view set answers without a raise. The dual of such a set is unbounded below, so the minimiser runs away rather than settling. The iterate stops moving once the exponential underflows, `Optim` reports `x_converged` or `f_converged`, and `Optim.converged` accepts it. The posterior it returns is degenerate: the probability collapses onto the observation with the largest coefficient, and the view the caller wrote is missed by any margin. Read the answer rather than the flag. The effective number of scenarios falls to a handful out of ``T`` and one weight sits near one, the Kullback-Leibler divergence is large, and the posterior statistic the view named is far from its target. Views that pull one asset in two directions at once are the common way to reach it: a variance view that shrinks an asset, written beside a conditional value at risk view that fattens the same asset's tail, asks for a thin body and a fat tail at once. The same pair on two different assets is feasible and solves normally, so it is the direction and not the pairing. The gradient of this dual is ``\\boldsymbol{B} - \\mathbf{A} \\boldsymbol{y}``, the primal residual of the view set, so `Optim.g_converged` and `Optim.g_residual` do separate the two outcomes. Neither is read: `Optim.g_converged` also refuses a solve that is correct and merely loose, so acting on it needs a tolerance on the residual, and that tolerance is a policy this library does not set.
+
 # Mathematical definition
 
 The primal minimises the Kullback-Leibler divergence of the posterior from the prior, over the probabilities that meet every row. Its dual carries one Lagrange multiplier per row, and is unconstrained apart from the box the sense of each row imposes:
@@ -2399,6 +2405,7 @@ Where:
 
   - Every key of `epc` is one of `:eq`, `:ineq`, `:cvar_eq` and `:feq`. Any other key raises a `KeyError`.
   - The solve must converge. A solve that `Optim.converged` reports as failed raises an `ErrorException`.
+  - An infeasible view set is **not** caught. `Optim.converged` is true on `x_converged` or `f_converged` alone, and the dual of an infeasible set stops on one of those. The summary paragraph states the shape of that answer and how to recognise it.
 
 # Returns
 
@@ -2482,6 +2489,15 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
                                 opt.kwargs...)
     end
     #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    #! An infeasible view set is not caught here. `Optim.converged` is true on
+    #! `x_converged` or `f_converged` alone, and the dual of an infeasible set stops on one
+    #! of those: the minimiser runs away, the recovered probabilities collapse onto the
+    #! observation with the largest coefficient, and the solve is reported as converged
+    #! while the views are missed. The gradient of this dual is `B - A * y`, the primal
+    #! residual of the view set, so `Optim.g_converged` does separate the two. It is not
+    #! read here: it also refuses a solve that is correct and merely loose, so it would
+    #! need a tolerance on the residual, and that tolerance is a policy this library does
+    #! not set. The docstring states the failure and how to recognise it. See issue #572.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
@@ -2555,6 +2571,15 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
                                 opt.kwargs...)
     end
     #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    #! An infeasible view set is not caught here. `Optim.converged` is true on
+    #! `x_converged` or `f_converged` alone, and the dual of an infeasible set stops on one
+    #! of those: the minimiser runs away, the recovered probabilities collapse onto the
+    #! observation with the largest coefficient, and the solve is reported as converged
+    #! while the views are missed. The gradient of this dual is `B - A * y`, the primal
+    #! residual of the view set, so `Optim.g_converged` does separate the two. It is not
+    #! read here: it also refuses a solve that is correct and merely loose, so it would
+    #! need a tolerance on the residual, and that tolerance is a policy this library does
+    #! not set. The docstring states the failure and how to recognise it. See issue #572.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
