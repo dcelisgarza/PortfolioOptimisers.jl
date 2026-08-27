@@ -1466,6 +1466,18 @@
         @test eltype(V462c) <: Real
         @test isapprox(V462c, [0.0 -0.5; -0.5 0.0])
 
+        # Issue #543: `mp` is optional, because `matrix_processing!` already carries a
+        # `Nothing` no-op. `nothing` returns the accumulated sum untouched, so it agrees
+        # with the `pdm = nothing` estimator. A processing estimator that does act on the
+        # matrix separates the two: this `V` is indefinite, so the default `Posdef()`
+        # moves it.
+        X462c = randn(StableRNG(11), 6, 2)
+        V462cn = PortfolioOptimisers.negative_spectral_coskewness(cskew462c, X462c, nothing)
+        @test isapprox(V462cn, V462c)
+        V462cp = PortfolioOptimisers.negative_spectral_coskewness(cskew462c, X462c,
+                                                                  MatrixProcessing())
+        @test !isapprox(V462cp, V462cn)
+
         # --- SemiMoment against FullMoment ------------------------------------
         Yneg462 = min.(Y462, 0.0)
         cskews462, Vs462 = coskewness(Coskewness(; mp = mp462, alg = SemiMoment()), X462)

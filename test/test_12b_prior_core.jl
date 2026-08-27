@@ -1649,6 +1649,19 @@ end
     # The view is a carrier, so it passed every `@argcheck` of the constructor.
     @test isa(v, HighOrderPrior)
 
+    # Issue #543: the constructor does not bind `skmp` to `sk`, so a hand-built carrier
+    # can hold `sk` and `V` with `skmp === nothing`. `nothing` means "no processing"
+    # everywhere else in the chain, so the slice rebuilds `V` with no processing step
+    # instead of raising a `MethodError`.
+    no_skmp = HighOrderPrior(; pr = lo, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V)
+    @test isnothing(no_skmp.skmp)
+    v_no_skmp = PortfolioOptimisers.port_opt_view(no_skmp, i)
+    @test isa(v_no_skmp, HighOrderPrior)
+    @test Matrix(v_no_skmp.sk) == sk[i, idx]
+    @test Matrix(v_no_skmp.V) ==
+          PortfolioOptimisers.negative_spectral_coskewness(sk[i, idx], X[:, i], nothing)
+    @test isnothing(v_no_skmp.skmp)
+
     # `S2` without `D2`: the second branch takes `L2` and `S2` alone.
     no_D2 = HighOrderPrior(; pr = lo, kt = kt, L2 = L2, S2 = S2)
     v_no_D2 = PortfolioOptimisers.port_opt_view(no_D2, i)

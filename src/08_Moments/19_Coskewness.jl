@@ -229,7 +229,7 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                 mp::AbstractMatrixProcessingEstimator)
+                 mp::Option{<:AbstractMatrixProcessingEstimator})
 
 Internal helper that builds the negative spectral skewness matrix.
 
@@ -270,7 +270,9 @@ The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of t
 
   - `cskew`: Coskewness tensor, `assets × assets²`, laid out as `N` blocks of `N` columns.
   - `X`: Data matrix (observations × assets). [`matrix_processing!`](@ref) reads it, and the spectral step does not.
-  - `mp`: Matrix processing estimator.
+  - $(arg_dict[:omp])
+      + `::AbstractMatrixProcessingEstimator`: The estimator processes the accumulated `V` in-place.
+      + `::Nothing`: No-op. `V` is the raw sum of the negated negative parts.
 
 # Returns
 
@@ -289,7 +291,7 @@ The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of t
   - $(ref_dict[:nskew])
 """
 function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
-                                      mp::AbstractMatrixProcessingEstimator)
+                                      mp::Option{<:AbstractMatrixProcessingEstimator})
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
     for i in 1:N
