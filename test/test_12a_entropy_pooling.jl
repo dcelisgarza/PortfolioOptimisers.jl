@@ -110,6 +110,55 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                                                          views = var_views)),
                          rd).w, rtol = 1e-6)
 
+    #=
+    Issue #537. `OptimEntropyPooling`'s `g!` wrote the UNSCALED gradient into `G` and returned
+    `sc1 * G`. `Optim` reads the mutated `G` and discards the return value, so `sc1` scaled
+    the objective and not the gradient. The two disagreed, and `sc1` reached nothing: every
+    value of it returned the same posterior to the last bit. With the gradient scaled to
+    match, `sc1` is the knob its description promises, and raising it tightens both the view
+    and the sum to one.
+    =#
+    epc_sc1 = Dict{Symbol, Any}()
+    PortfolioOptimisers.ep_mu_views!(LinearConstraintEstimator(; val = "AAPL == 0.002"),
+                                     epc_sc1, pr0, sets)
+    w_sc1 = fill(inv(size(rd.X, 1)), size(rd.X, 1))
+    for alg in (ExpEntropyPooling(), LogEntropyPooling())
+        lo = PortfolioOptimisers.entropy_pooling(w_sc1, epc_sc1,
+                                                 OptimEntropyPooling(; sc1 = 1, alg = alg))
+        hi = PortfolioOptimisers.entropy_pooling(w_sc1, epc_sc1,
+                                                 OptimEntropyPooling(; sc1 = 1e6,
+                                                                     alg = alg))
+        @test abs(dot(hi, rd.X[:, 1]) - 0.002) < abs(dot(lo, rd.X[:, 1]) - 0.002)
+        @test abs(sum(hi) - 1) < abs(sum(lo) - 1)
+    end
+
+    #=
+    Issue #537. A `>=` value at risk view reaches `ep_var_views!` normalised to `A * p <= B`,
+    so `B` is the negated target and never positive. The sign rule read `B[i] >= 0` as a `<=`
+    view, which only a ZERO target can satisfy, and flipped that row: the view `AAPL >= 0`
+    wrote `sum(p) <= alpha` over the losing observations rather than `>= alpha`. That row is
+    already met at the prior, so the posterior stayed on the prior and the view was silently
+    dropped.
+
+    The row itself is tested rather than the quantile it states. The view drives the tail
+    mass to exactly `alpha`, and a weighted quantile read at exactly `alpha` sits on a knife
+    edge between two neighbouring observations, which the two optimisers land on either side
+    of. `alpha = 0.5` is used because the prior tail mass of AAPL falls short of it there,
+    which makes the view binding.
+    =#
+    var_views = LinearConstraintEstimator(; val = "AAPL >= 0")
+    idx = rd.X[:, 1] .<= 0
+    @test sum(fill(inv(size(rd.X, 1)), size(rd.X, 1))[idx]) < 0.5
+    pr = prior(EntropyPoolingPrior(; sets = sets,
+                                   var_views = ValueatRiskView(; alpha = 0.5,
+                                                               views = var_views)), rd)
+    @test isapprox(sum(pr.w[idx]), 0.5, rtol = 1e-5)
+    @test isapprox(pr.w,
+                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                             var_views = ValueatRiskView(; alpha = 0.5,
+                                                                         views = var_views)),
+                         rd).w, rtol = 1e-6)
+
     var_views = LinearConstraintEstimator(; val = ["AAPL == 0.028", "XOM >= 0.027"])
     pr = prior(EntropyPoolingPrior(; sets = sets,
                                    var_views = ValueatRiskView(; alpha = 0.07,

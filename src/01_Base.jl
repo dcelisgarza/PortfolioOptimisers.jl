@@ -320,9 +320,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
                                  :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
                                  :evar_views => "`evar_views`: Entropic value-at-risk views estimator or result.",#
-                                 :sbar => "`sbar`: Number of largest losses considered by the integer conditional value-at-risk formulation. An `Integer` is a count, a fraction in `(0, 1]` is a fraction of the observations, and `nothing` applies the rule of thumb.",#
-                                 :zpct => "`pct`: Fractional half-width of the grid of entropic value-at-risk dual variables, centred on the value that attains the prior entropic value-at-risk.",#
-                                 :zK => "`K`: Number of points of the grid of entropic value-at-risk dual variables. Must be odd.",#
+                                 :sbar => "`sbar`: Number of largest losses considered by the integer conditional value-at-risk formulation. An `Integer` is a count, a fraction in `(0, 1]` is a fraction of the observations, and `nothing` applies the rule of thumb `max(2 * s, ceil(Int, 2 * alpha * T))` capped at `T`, where `s` is the number of positions, counted from the largest loss, at which the prior probabilities first reach `alpha`. The rule comes from the reference, which observes that a view above the prior CVaR needs about `s` positions and a view below it needs more. It trades exactness for solve time: `sbar = T` is always exact, and a smaller `sbar` is exact whenever the posterior puts at least `alpha` of its mass on the `sbar` largest losses, and infeasible otherwise. Raise it when the solve reports infeasibility.",#
+                                 :zpct => "`pct`: Fractional half-width of the grid of entropic value-at-risk dual variables, centred on the value that attains the prior entropic value-at-risk. An upper-bound or equality view centres the grid on the value [`ep_evar_anchor`](@ref) finds instead, and the width then covers the movement the other views of the model cause.",#
+                                 :zK => "`K`: Number of points of the grid of entropic value-at-risk dual variables. Must be odd, so the centre is a point of the grid. The points are equidistant and span `zc * (1 - pct)` to `zc * (1 + pct)` for a grid centred on `zc`, so `K` sets the resolution of the grid alone. Every point is one more binary variable of the mixed-integer program an upper-bound or equality view builds, so raise it when `pct` widens rather than on its own.",#
                                  :bigM => "`M`: Big-M constant of the grid entropic value-at-risk formulation.",#
                                  :ep_vv_views => "`views`: Value-at-risk view constraints estimator.",#
                                  :ep_tv_views => "`views`: Tail view constraints estimator.",#
@@ -977,6 +977,20 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :rlvar_sigma => "``\\sigma``: Positive root of the stationarity condition of ``\\varphi_{\\kappa}``.",#
                        :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum the pair of power cones of one observation allows.",#
                        :rlvar_target => "``\\bar{\\vartheta}``: Target relativistic value at risk of the view.",#
+                       # Entropy pooling tail views.
+                       :cvar_stat => "``\\mathrm{CVaR}_{\\alpha}(X)``: Conditional value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha``.",#
+                       :cvar_target => "``\\bar{c}``: Target conditional value at risk of the view.",#
+                       :evar_stat => "``\\mathrm{EVaR}_{\\alpha}(X)``: Entropic value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha``.",#
+                       :evar_target => "``\\bar{e}``: Target entropic value at risk of the view.",#
+                       :ep_tail_nu => "``\\boldsymbol{\\nu}``: ``T \\times 1`` vector of weights that attains the risk measure, the variable of its dual representation.",#
+                       # Entropy pooling.
+                       :ep_prior_probs => "``\\boldsymbol{q}``: ``T \\times 1`` prior probabilities of the observations, summing to one.",#
+                       :ep_post_probs => "``\\boldsymbol{p}``: ``T \\times 1`` posterior probabilities of the observations, summing to one. They are the unknown of the entropy pooling problem.",#
+                       :ep_mu_prior_i => "``\\mu_{i}``: Prior mean of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior mean at it.",#
+                       :ep_sigma2_prior_i => "``\\sigma_{i}^{2}``: Prior variance of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior variance at it.",#
+                       :ep_sc1 => "``s_{c1}``: Constraint scale of the entropy pooling optimiser. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
+                       :ep_sc2 => "``s_{c2}``: Slack penalty of the fixed equality rows. It weights the norm of the slack in the objective, so a larger value holds those rows tighter.",#
+                       :ep_so => "``s_{o}``: Objective scale of the entropy pooling optimiser. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
                        # Absolute drawdown series.
                        :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
                        :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
