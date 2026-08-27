@@ -152,6 +152,31 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
                                                         Z = rand(rng, 9, 3, 2))
         end
 
+        @testset "both-or-neither evidence states the truth" begin
+            # The label reads `!isnothing(x)`, so the value under it must be the value of
+            # `!isnothing(x)`. Issue #544: the two lines interpolated `isnothing(x)`, so
+            # each `Got` block stated the opposite of the fact that raised the error, and a
+            # test on the exception type alone passed with the values inverted.
+            nx = ["A", "B", "C"]
+            msg = sprint(showerror,
+                         try
+                             ReturnsResult(; X = [0.01 0.02 0.03; 0.04 0.05 0.06])
+                         catch e
+                             e
+                         end)
+            @test occursin("nx cannot be nothing if X is not `nothing`", msg)
+            @test occursin("!isnothing(nx) => false", msg)
+            @test occursin("!isnothing(X) => true", msg)
+            msg = sprint(showerror, try
+                             ReturnsResult(; nx = nx)
+                         catch e
+                             e
+                         end)
+            @test occursin("X cannot be nothing if nx is not `nothing`", msg)
+            @test occursin("!isnothing(nx) => true", msg)
+            @test occursin("!isnothing(X) => false", msg)
+        end
+
         @testset "ReturnsResult views" begin
             X = rand(rng, 5, 3)
             nx = ["A", "B", "C"]

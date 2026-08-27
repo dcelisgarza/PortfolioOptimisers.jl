@@ -70,9 +70,9 @@ function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:M
     end
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
-                  IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(!isnothing(names))\n!isnothing($mat_sym) => $(!isnothing(mat))"))
         @argcheck(!isnothing(mat),
-                  IsNothingError("$mat_sym cannot be nothing if $names_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$mat_sym cannot be nothing if $names_sym is not `nothing`. Got\n!isnothing($names_sym) => $(!isnothing(names))\n!isnothing($mat_sym) => $(!isnothing(mat))"))
         @argcheck(!isempty(names), IsEmptyError("$names_sym cannot be empty."))
         @argcheck(!isempty(mat), IsEmptyError("$mat_sym cannot be empty."))
         @argcheck(length(names) == size(mat, 2),
