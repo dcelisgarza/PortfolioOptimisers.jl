@@ -184,6 +184,10 @@ contribute = [joinpath("contribute", file)
               if splitext(file)[2] == ".md"]
 idx1 = findfirst("api", api_pages[1][1])[1]
 
+# The base URL of the deployed site. `Documenter.HTML` writes it into every page's
+# `<link rel="canonical">`, and `generate_sitemap` roots every sitemap entry at it.
+const CANONICAL_URL = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable"
+
 makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
@@ -196,7 +200,11 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                   # local build therefore needs a server, not `file://`:
                                   # `using LiveServer; serve(; dir = "docs/build")`.
                                   prettyurls = true,
-                                  canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable",
+                                  # The base URL of the deployed site.
+                                  # `generate_sitemap` roots every sitemap
+                                  # entry at the same constant, so the sitemap
+                                  # and the canonical tags cannot disagree.
+                                  canonical = CANONICAL_URL,
                                   # `repo` above is a String, so Documenter cannot
                                   # derive the navbar link. Name the remote explicitly.
                                   repolink = "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
@@ -240,6 +248,11 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric), CodeBlocks(), LandingPage()])
+
+# The sitemap is written from the pages `makedocs` actually built, so it must run after
+# `makedocs`, and before `deploydocs` copies `docs/build` into the deployed tree.
+include(joinpath(@__DIR__, "generate_sitemap.jl"))
+generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
            devbranch = "main", branch = "gh-pages", push_preview = true)
