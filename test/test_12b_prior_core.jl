@@ -1,4 +1,5 @@
 include(joinpath(@__DIR__, "test12_setup.jl"))
+using LinearAlgebra
 
 @testset "Empirical Prior" begin
     pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
@@ -27,12 +28,57 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     end
 end
 
+#=
+The horizon conversion of `prior(::EmpiricalPrior{<:Any, <:Any, <:Number}, …)` runs in three
+lines whose order is load-bearing: the covariance reads the `mu` that still holds
+`\hat{\mu}_i + 1`, because the decrement has not run yet. The `# Algorithm` of that method
+states it, and these are the numbers behind the statement. Sweep ticket #533.
+=#
+@testset "Empirical prior horizon conversion" begin
+    Xh = rd.X[:, 1:4]
+    h = 12.0
+    pr = prior(EmpiricalPrior(; horizon = h), Xh)
+
+    # The two closed forms, by hand, off the horizon-scaled log moments.
+    Xl = log1p.(Xh)
+    mu_log = vec(mean(SimpleExpectedReturns(), Xl))
+    sigma_log = cov(PortfolioOptimisersCovariance(), Xl)
+    mu_t = h .* mu_log
+    sigma_t = h .* sigma_log
+    mu_hand = exp.(mu_t .+ 0.5 .* diag(sigma_t)) .- 1
+    sigma_hand = [(mu_hand[i] + 1) * (mu_hand[j] + 1) * (exp(sigma_t[i, j]) - 1)
+                  for i in 1:4, j in 1:4]
+    @test isapprox(pr.mu, mu_hand)
+    @test isapprox(pr.sigma, sigma_hand)
+
+    # The order is not free. Reading the decremented `mu` instead drops the covariance by
+    # more than three orders of magnitude on this series.
+    sigma_wrong = [mu_hand[i] * mu_hand[j] * (exp(sigma_t[i, j]) - 1)
+                   for i in 1:4, j in 1:4]
+    @test maximum(abs, sigma_wrong) < 1e-3 * maximum(abs, pr.sigma)
+
+    # `X` is the arithmetic matrix the caller passed, not the log-returns.
+    @test pr.X == Xh
+    @test pr.X != Xl
+
+    # `horizon = 1` is not the `Nothing` method. That one takes the arithmetic moments
+    # directly, and this one still makes the log round trip.
+    pr1 = prior(EmpiricalPrior(; horizon = 1), Xh)
+    pr0 = prior(EmpiricalPrior(), Xh)
+    @test isapprox(pr1.mu, exp.(mu_log .+ 0.5 .* diag(sigma_log)) .- 1)
+    @test pr1.mu != pr0.mu
+    @test pr1.sigma != pr0.sigma
+    @test isapprox(pr0.mu, vec(mean(SimpleExpectedReturns(), Xh)))
+    @test isapprox(pr0.sigma, cov(PortfolioOptimisersCovariance(), Xh))
+
+    # The `horizon > 0` guard.
+    @test_throws DomainError EmpiricalPrior(; horizon = 0)
+    @test_throws DomainError EmpiricalPrior(; horizon = -3)
+end
+
 @testset "Factor Prior" begin
-    pes = [FactorPrior(; rsd = false), FactorPrior(; rsd = true)]
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorPrior1.csv.gz"), DataFrame)
     pr = prior(FactorPrior(; rsd = false), rd)
-
-    df[!, "1"] = [pr.mu; vec(pr.sigma); vec(pr.chol)]
 
     mut = reshape(df[1:20, 1], size(pr.mu))
     sigmat = reshape(df[21:420, 1], size(pr.sigma))
@@ -92,6 +138,65 @@ end
         find_tol(pr.chol, cholt)
     end
     @test success
+end
+
+#=
+The identities `factor_lift` states: `chol` factorises the covariance *before* matrix
+processing, and the residual block enters `sigma` and `chol` once each. Sweep ticket #533.
+=#
+@testset "Factor lift identities" begin
+    PO = PortfolioOptimisers
+    re = StepwiseRegression()
+    mp = MatrixProcessing()
+    ve = SimpleVariance()
+    rr, posterior_X = PO.factor_reconstruction(re, rd.X, rd.F)
+
+    # The reconstruction is the loadings applied to the factors.
+    @test isapprox(posterior_X, rd.F * transpose(rr.M) .+ transpose(rr.b))
+    @test size(posterior_X) == size(rd.X)
+
+    f_pr = prior(EmpiricalPrior(), rd.F)
+    N, K = size(rr.M)
+    systematic = rr.M * f_pr.sigma * transpose(rr.M)
+
+    # `rsd = false`: `chol` carries the factor Cholesky factor through the loadings, and it
+    # factorises the systematic block exactly.
+    l0 = PO.factor_lift(mp, ve, false, rr, f_pr.mu, f_pr.sigma, rd.X, posterior_X)
+    @test size(l0.chol) == (K, N)
+    @test isapprox(l0.mu, rr.M * f_pr.mu .+ rr.b)
+    @test isapprox(l0.sigma, systematic)
+    @test isapprox(transpose(l0.chol) * l0.chol, systematic)
+    @test isapprox(transpose(l0.chol), rr.M * cholesky(f_pr.sigma).L)
+
+    # `rsd = true`: the residual block enters `sigma` once and `chol` once, and the two agree.
+    l1 = PO.factor_lift(mp, ve, true, rr, f_pr.mu, f_pr.sigma, rd.X, posterior_X)
+    err_sigma = diagm(vec(var(ve, rd.X - posterior_X; dims = 1)))
+    @test size(l1.chol) == (K + N, N)
+    @test isapprox(l1.sigma, systematic + err_sigma)
+    @test isapprox(transpose(l1.chol) * l1.chol, l1.sigma)
+    tail = transpose(l1.chol)[:, (K + 1):(K + N)]
+    @test isapprox(tail, sqrt.(err_sigma))
+    @test isapprox(tail * transpose(tail), err_sigma)
+
+    # The systematic block alone is singular whenever `N > K`, and the residual block is what
+    # makes the sum full rank. That is what the `posdef!` of the `rsd` branch re-conditions.
+    @test N > K
+    @test minimum(eigvals(Symmetric(l0.sigma))) < 1e-12
+    @test minimum(eigvals(Symmetric(l1.sigma))) > 1e-12
+
+    # Matrix processing moves `sigma` and leaves `chol` behind, so the stated identity holds
+    # against the unprocessed covariance alone. The docstring of `factor_lift` says so.
+    lt = PO.factor_lift(MatrixProcessing(; dt = Detone()), ve, false, rr, f_pr.mu,
+                        f_pr.sigma, rd.X, posterior_X)
+    @test !isapprox(lt.sigma, systematic)
+    @test isapprox(transpose(lt.chol) * lt.chol, systematic)
+    @test !isapprox(transpose(lt.chol) * lt.chol, lt.sigma)
+
+    # Every field of the answer of `factor_residual_config` is the estimator's own.
+    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = false)
+    cfg = PO.factor_residual_config(fp)
+    @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, fp.mp.pdm, fp.rsd)
+    @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
 end
 
 @testset "High Order Prior" begin

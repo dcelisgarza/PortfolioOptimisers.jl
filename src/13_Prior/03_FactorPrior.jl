@@ -164,6 +164,11 @@ This is the first half of the factor lift, and the only half every factor-axis e
 
 The second half — projecting the factor moments through the loadings — is [`factor_lift`](@ref). The two are separate because [`FactorBlackLittermanPrior`](@ref) needs the reconstruction before it has the moments to project: its views land on the factor distribution, so the factor moments only exist after the Black-Litterman update.
 
+# Algorithm
+
+ 1. Fit `re` on `(X, F)` with [`regression`](@ref), giving `rr`. It carries the ``N \\times K`` loadings `rr.M` and the ``N \\times 1`` intercepts `rr.b`.
+ 2. Rebuild the asset returns as `F * transpose(rr.M) .+ transpose(rr.b)`, giving `posterior_X`, which has `F`'s rows and `X`'s columns.
+
 # Arguments
 
   - $(arg_dict[:re])
@@ -216,7 +221,21 @@ Where:
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The returned `chol` is the ``N \\times (K + N)`` matrix ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]`` transposed, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It therefore satisfies ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` before matrix processing.
+The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
+
+``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds **before** matrix processing, and that qualifier is load-bearing. `chol` is built from the `f_sigma` the caller passed, so step 4 of the algorithm rewrites `sigma` without rewriting `chol`. Under an `mp` that leaves the projected covariance where it found it — which the default [`MatrixProcessing`](@ref) does, its `pdm` being a no-op on a matrix that is already positive semi-definite — the two agree and the identity holds on the returned pair. Under an `mp` that denoises or detones, `sigma` moves and `chol` stays behind, so the identity holds against the unprocessed covariance alone. A consumer that needs a factor of the returned `sigma` must refactorise it.
+
+# Algorithm
+
+ 1. Read the loadings `M` and the intercepts `b` off `rr`.
+ 2. Project the factor mean through the loadings, giving `posterior_mu`.
+ 3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
+ 4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
+ 5. Carry the lower Cholesky factor of `f_sigma` through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and size the residual block as `err_sigma`, the diagonal matrix of the column variances of `err` under `ve`.
+ 7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
+ 8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
+ 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the three quantities.
 
 # Arguments
 
@@ -354,6 +373,14 @@ Where:
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances (when `rsd = true`).
 
 The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come from `pe.pe` fit on `F`, and the loadings from `pe.re` fit on `(X, F)`. The two equations are [`factor_lift`](@ref).
+
+# Algorithm
+
+ 1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
+ 2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
+ 3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma` and `chol`.
+ 5. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
 
 # Arguments
 
