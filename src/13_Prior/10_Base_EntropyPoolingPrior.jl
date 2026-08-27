@@ -324,6 +324,24 @@ The dual has one variable per constraint rather than one per observation, and it
 
 This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) states the mechanism and the three signs that name that answer.
 
+!!! tip "The default stopping rule leaves the dual short of its optimum"
+
+    An empty `args` runs `Optim` under its own default `Options`, which stops on the step in `x`, on the change in the objective, or on the gradient, whichever comes first. The first two arrive before the dual reaches stationarity, so the posterior meets its views closely rather than exactly. Over the twelve single-view CVaR cases of `test/test_12a_entropy_pooling.jl` the default holds a posterior conditional value at risk to about `1e-7` of its target, and an `Optim.Options` with `g_abstol = 1e-12` and `outer_iterations = 50` holds it to about `1e-11`. The default is the right trade for a view read once, and the tighter rule costs about 9% more time over that file.
+
+    Two readers magnify the shortfall. A staged chain refits the wrapped estimator between stages, so stage two projects a reference that already carries the error of stage one. The recursive CVaR route of [`MeucciEntropyPoolingPrior`](@ref) re-solves the whole problem at each candidate value at risk, so a solve that stops early moves the root the search returns. Where the answer must be repeatable to more than seven digits, pass a tighter `Optim.Options` in `args`:
+
+    ```julia
+    using PortfolioOptimisers: Optim
+
+    OptimEntropyPooling(;
+                        args = (Optim.Fminbox(; mu0 = 1e-5),
+                                Optim.Options(; x_abstol = 1e-12, f_reltol = 1e-14,
+                                              g_abstol = 1e-12, outer_x_abstol = 1e-12,
+                                              iterations = 10_000, outer_iterations = 50)))
+    ```
+
+    `Optim` reaches this package as an internal binding, so the block names it through `PortfolioOptimisers`. A non-empty `args` replaces the `Optim.Fminbox(; mu0 = 1e-5)` that [`entropy_pooling`](@ref) supplies, so carry it yourself. See issues #573 and #574.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

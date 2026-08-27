@@ -13,7 +13,9 @@ The comparison operator a view accepts depends on the moment it constrains: `var
 
 !!! warning
 
-    An infeasible view set answers without a raise. Neither the entropy pooling solve nor the CVaR search detects one: the dual of an infeasible set is unbounded, so the minimiser runs away, the posterior collapses onto one observation, and `Optim` reports the solve as converged. The residual the CVaR search minimises is small on such a posterior, so the search reports success too. Read the result rather than the flag: `ens` falls to a handful out of the number of observations, one weight sits near one, `kld` is large, and the posterior statistic the view named is far from its target. Views that pull one asset in two directions at once are the common way to reach it, such as a `sigma_views` row that shrinks an asset written beside a `cvar_views` row that fattens the same asset's tail. The same pair on two different assets is feasible and solves normally, so it is the direction and not the pairing. [`entropy_pooling`](@ref) states the mechanism.
+    An infeasible view set is never detected. Neither the entropy pooling solve nor the CVaR search reads one: the dual of an infeasible set is unbounded, so the minimiser runs away, the posterior collapses onto one observation, and `Optim` reports the solve as converged. The residual the CVaR search minimises is small on such a posterior, so the search reports success too. Read the result rather than the flag: `ens` falls to a handful out of the number of observations, one weight sits near one, `kld` is large, and the posterior statistic the view named is far from its target. Views that pull one asset in two directions at once are the common way to reach it, such as a `sigma_views` row that shrinks an asset written beside a `cvar_views` row that fattens the same asset's tail. The same pair on two different assets is feasible and solves normally, so it is the direction and not the pairing. [`entropy_pooling`](@ref) states the mechanism.
+
+    A runaway dual sometimes overflows before it settles, and the view set then raises rather than answering. The staged route reaches the moment estimators with non-finite weights, which raise an `ArgumentError` naming Infs or NaNs. The single-shot route raises the CVaR search's own `ErrorException`. Neither raise detects the infeasibility. Both are the same runaway dual met further along, and which of the three a given view set gives is not stable: the search over an infeasible set is chaotic, so a change in the sequence of candidate value at risk levels moves the answer between them. Treat any of the three as the same finding, and read the views rather than the message.
 
 # Algorithm
 
@@ -364,6 +366,8 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 
 The search runs over the value at risk levels `etas`, one per view, each bounded by `[0, B]`. This is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes instead; it reaches the same target and it takes more than one view.
 
+The single-view bracket stops a hair inside `B`, at `B * (1 - sqrt(eps))`. At `B` itself the constraint demands a posterior tail contribution of exactly zero, and no interior posterior carries one, so the problem there is degenerate and its dual is unbounded. `Roots` evaluates both ends of a bracket before it searches, so every single-view solve would run that problem once. The root sits near half of `B`, so the shrunk end holds it.
+
 # Mathematical definition
 
 The conditional value at risk of asset ``i`` is the value of the Rockafellar-Uryasev programme, whose minimiser is the value at risk. A view that pins it to ``\\bar{c}`` is therefore a pair of conditions on the posterior, one linear in ``\\boldsymbol{p}`` at a fixed ``\\eta`` and one that fixes ``\\eta``:
@@ -399,7 +403,7 @@ Where:
  6. Read the worst realisation of every named asset into `min_X`, and raise when any target reaches it.
  7. Choose the search `d_opt`. One view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
  8. Define `func(etas)`. It writes the second line above into `epc` under the key `:cvar_eq` at the candidate `etas`, solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` beside the residual of the third line. One view residual is the posterior tail mass minus `alpha`. More than one is the [`norm_error`](@ref) of the posterior conditional value at risk minus the target, over the views.
- 9. Search for the value at risk `res`. One view root-finds the residual of `func` over `[0, B[1]]` with `Roots.find_zero`. More than one minimises it over the box `[0, B]` from the start `0.5 * B` with `Optim.optimize`.
+ 9. Search for the value at risk `res`. One view root-finds the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]` with `Roots.find_zero`. More than one minimises it over the box `[0, B]` from the start `0.5 * B` with `Optim.optimize`.
 10. Call `func(res)` once more, and return the posterior probability weights it produces.
 
 # Arguments
@@ -431,7 +435,7 @@ Where:
 # Related
 
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
-  - [`OptimEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref): its stopping rule sets how closely each inner solve meets the constraint this search re-solves, and its own tip states the size of that.
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`entropy_pooling`](@ref)
   - [`replace_prior_views`](@ref): resolves the `prior(...)` reference a target may carry.
@@ -520,8 +524,21 @@ function ep_cvar_views_solve!(cvar_views::CVV_VecCVV, epc::AbstractDict,
         return wi, err
     end
     res = if N == 1
+        #! The constraint at `eta = B[1]` reads `E_p[(-x - eta)^+] / alpha = 0`, and the
+        #! positive part is non-zero on the observations worse than `-B[1]`, a non-empty set
+        #! under the guard above. No interior posterior carries a tail contribution of
+        #! exactly zero, so the problem there is degenerate: its dual is unbounded, and a
+        #! tighter stopping rule only runs the dual further. `Roots` evaluates both ends of
+        #! a bracket, so every single-view search would run that problem once. `sqrt(eps)`
+        #! is the smallest shrink that bounds it. Over the twelve cases of
+        #! `test_12a_entropy_pooling.jl` two stopping rules stop the dual a factor of 1.4 to
+        #! 2.4 apart at `B[1]`, and still 1.2 to 1.9 apart at `B[1] * (1 - eps)`, where at
+        #! `B[1] * (1 - sqrt(eps))` they agree to four significant digits. The root sits
+        #! between 0.32 and 0.64 of `B[1]`, so the shrink does not move it. See issue #574.
+        hi = B[1] * (one(eltype(B)) - sqrt(eps(eltype(B))))
         try
-            [Roots.find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)]
+            [Roots.find_zero(x -> func(x)[2], (zero(eltype(B)), hi), d_opt.args...;
+                             d_opt.kwargs...)]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end

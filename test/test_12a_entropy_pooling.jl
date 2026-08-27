@@ -961,18 +961,67 @@ const EP_TIGHT = OptimEntropyPooling(;
     end
 end
 
+# #574: the single-view CVaR search brackets `[0, B]`, and `Roots` evaluates both ends before
+# it searches. At `eta = B` the constraint reads `E_p[(-x - eta)^+] / alpha == 0`, and the
+# positive part is non-zero on the observations worse than `-B`, so the demanded value is
+# unreachable, the dual is unbounded, and a tighter stopping rule only runs the dual further:
+# the two rules below answer 7.6e-12 and 5.6e-21 there. The bracket now stops at
+# `B * (1 - sqrt(eps))`, where the demanded value is strictly positive and both rules meet it.
+@testset "MeucciEntropyPoolingPrior CVaR bracket ends inside B" begin
+    ep_end = function (x, a, Bt, eta, opt)
+        pos = max.(-x .- eta, zero(eltype(x)))
+        epc = Dict{Symbol, Tuple{Matrix{Float64}, Vector{Float64}}}()
+        PortfolioOptimisers.add_ep_constraint!(epc, transpose(pos ./ a), [Bt - eta],
+                                               :cvar_eq)
+        wi = PortfolioOptimisers.entropy_pooling(w, epc, opt)
+        return LinearAlgebra.dot(wi, pos) / a
+    end
+    for j in (1, 5, 13, 20), a in (0.05, 0.10, 0.20)
+        x = rd.X[:, j]
+        Bt = ConditionalValueatRisk(; alpha = a)(x) * 1.10
+        hi = Bt * (1 - sqrt(eps(eltype(Bt))))
+        # The end the search now uses demands a strictly positive tail contribution, so an
+        # interior posterior answers it and the dual that carries it is bounded.
+        @test Bt - hi > 0
+        @test isapprox(ep_end(x, a, Bt, hi, OptimEntropyPooling()), Bt - hi, rtol = 1e-2)
+        @test isapprox(ep_end(x, a, Bt, hi, EP_TIGHT), Bt - hi, rtol = 1e-6)
+        # The end the search used before demands exactly zero, which no interior posterior
+        # carries, so the solve only approaches it and no relative tolerance states the miss.
+        @test iszero(Bt - Bt)
+        @test ep_end(x, a, Bt, Bt, OptimEntropyPooling()) > 0
+    end
+    # The root the search returns sits well inside the shrunk end, so the shrink holds it.
+    for j in (1, 20), a in (0.05, 0.20)
+        x = rd.X[:, j]
+        Bt = ConditionalValueatRisk(; alpha = a)(x) * 1.10
+        prj = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
+                                              cvar_views = ConditionalValueatRiskView(;
+                                                                                      alpha = a,
+                                                                                      views = LinearConstraintEstimator(;
+                                                                                                                        val = "$(rd.nx[j]) == prior($(rd.nx[j]))*1.10"))),
+                    rd)
+        @test 0.3 < ValueatRisk(; alpha = a, w = prj.w)(x) / Bt < 0.7
+    end
+end
+
 # #539: prior observation weights reach both `ep_prior` routes. Every `MeucciEntropyPoolingPrior`
 # in the suite left `w` at `nothing`, so the branch that reads `pe.w` was never taken. The
 # constructor normalises `w` in place, so each case builds its own.
+#
+# #574 gave this testset `EP_TIGHT`, for the reason #573 records: under the default stopping rule
+# the CVaR search lands on a different root depending on what ran before it, and the testsets
+# above it now run a different sequence of solves. The view here is feasible and the default
+# reaches it standalone, so the setting buys repeatability and not correctness.
 @testset "MeucciEntropyPoolingPrior takes prior observation weights" begin
     T0 = size(rd.X, 1)
     mkw = () -> StatsBase.pweights(exp.(range(-1, 0; length = T0)))
     cvv = ConditionalValueatRiskView(;
                                      views = LinearConstraintEstimator(;
                                                                        val = "AAPL == 0.07"))
-    prn = prior(MeucciEntropyPoolingPrior(; sets = sets, cvar_views = cvv), rd)
+    prn = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT, cvar_views = cvv),
+                rd)
     for alg in (H1_EntropyPooling(), H0_EntropyPooling())
-        pe = MeucciEntropyPoolingPrior(; sets = sets, alg = alg, w = mkw(),
+        pe = MeucciEntropyPoolingPrior(; sets = sets, alg = alg, w = mkw(), opt = EP_TIGHT,
                                        cvar_views = cvv)
         @test isapprox(sum(pe.w), 1, rtol = 1e-10)
         pr = prior(pe, rd)
@@ -1098,32 +1147,40 @@ end
     @test 0.06 < ConditionalValueatRisk(; w = prop.w)(rd.X[:, 1]) < 0.08
 end
 
-# #572: an infeasible view set answers without a raise, and this testset pins that answer.
+# #572: an infeasible view set is never detected, and this testset pins what it gives instead.
 # `Optim` reports the runaway dual of an infeasible set as converged, because `x_converged`
 # or `f_converged` fires once the iterate stops moving. `Optim.g_converged` does separate the
 # two, because the gradient of this dual is the primal residual of the view set, but it also
 # refuses a solve that is correct and merely loose, so acting on it needs a tolerance on the
-# residual. The docstrings state the failure and the three signs that name it. Change this
-# testset in the commit that changes that decision.
-@testset "MeucciEntropyPoolingPrior answers an infeasible view pair" begin
+# residual. The docstrings state the failure and the signs that name it. Change this testset
+# in the commit that changes that decision.
+#
+# #574 moved what this pair gives. The single-view CVaR bracket ends at `B * (1 - sqrt(eps))`
+# rather than at `B`, so the search visits a different sequence of candidates, and the runaway
+# dual now overflows before it settles. The pair raises where it used to answer a posterior on
+# one observation. Neither raise detects the infeasibility: both are the same runaway dual met
+# further along, and the `MeucciEntropyPoolingPrior` warning names them. The answer of an
+# infeasible set is not robust, because the search over one is chaotic: any perturbation of the
+# candidate sequence moves it. The feasible control below still solves, so the raise is the
+# direction of the views and not the shrink.
+@testset "MeucciEntropyPoolingPrior does not detect an infeasible view pair" begin
     cvv = ConditionalValueatRiskView(;
                                      views = LinearConstraintEstimator(;
                                                                        val = "AAPL == 0.07"))
     T0 = size(rd.X, 1)
     # The variance view shrinks AAPL while the CVaR view fattens AAPL's tail. No posterior
-    # carries both. The staged route and the single-shot route answer alike, each with a
-    # posterior on one observation, so it is not an artefact of the staging. `H2` is left out
-    # because it shares the staged route with `H1` and each run of this pair is slow.
-    for alg in (H1_EntropyPooling(), H0_EntropyPooling())
-        pr = prior(MeucciEntropyPoolingPrior(; sets = sets, alg = alg,
-                                             sigma_views = LinearConstraintEstimator(;
-                                                                                     val = "AAPL == 0.2*prior(AAPL)"),
-                                             cvar_views = cvv), rd)
-        @test pr.ens < 10
-        @test maximum(pr.w) > 0.5
-        # The view the caller wrote is missed by a wide margin.
-        @test ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]) < 0.9 * 0.07
-    end
+    # carries both. `H2` is left out because it shares the staged route with `H1` and each run
+    # of this pair is slow.
+    mk = alg -> MeucciEntropyPoolingPrior(; sets = sets, alg = alg,
+                                          sigma_views = LinearConstraintEstimator(;
+                                                                                  val = "AAPL == 0.2*prior(AAPL)"),
+                                          cvar_views = cvv)
+    # The staged route overflows inside the search, and the non-finite weights reach the
+    # moment estimators, which raise on them. The `EntropyPoolingPrior` warning names this.
+    @test_throws ArgumentError prior(mk(H1_EntropyPooling()), rd)
+    # The single-shot route overflows too, and there the CVaR search raises its own message,
+    # which names the ways out. The two routes give alike, so it is not an artefact of staging.
+    @test_throws ErrorException prior(mk(H0_EntropyPooling()), rd)
     # The same pair on two different assets is feasible and solves normally, so it is the
     # direction of the views and not the pairing.
     prok = prior(MeucciEntropyPoolingPrior(; sets = sets,
