@@ -1,5 +1,6 @@
 #=
-`code_health/coverage.jl` is a script rather than a package. `Coverage.yml` runs it as
+`code_health/coverage.jl` is a script rather than a package. The `coverage` job of
+`ReusableTest.yml` runs it as
 `julia --project=code_health code_health/coverage.jl check`, and before this file nothing
 under `test/` loaded it at all. Its command block is guarded by
 `abspath(PROGRAM_FILE) == @__FILE__`, so it loads cleanly as a library, and it needs only

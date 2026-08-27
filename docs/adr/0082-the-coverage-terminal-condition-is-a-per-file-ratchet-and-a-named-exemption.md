@@ -210,9 +210,9 @@ is partial, and a ratchet fed partial data reports a fall that is not one.
   an example. The sweep writes the test instead. CI does exercise such a line on every push, so the
   number understates what runs, and that cost is accepted.
 
-## Amendment (2026-08-26)
+## Amendment (2026-08-27)
 
-### The gate is its own workflow, not a job of `ReusableTest.yml`
+### A tripped ratchet does not red the test check, and the gate still runs beside the suite
 
 *The gate runs in its own job, fed by an artifact* above put the `coverage` job inside
 `ReusableTest.yml`. A job of a reusable workflow is a job of whichever caller ran it, so a tripped
@@ -220,49 +220,48 @@ ratchet turned `Test` and `Test on PRs` red. That conflates two claims. The test
 whether the library works. The ratchet answers whether one file's miss count rose, which is a
 question about the sweep's progress and never about whether the code runs.
 
-The ratchet now lives in **`.github/workflows/Coverage.yml`**, on `workflow_run`:
+Splitting the two claims does not need a second workflow, and a second workflow costs the gate its
+reach. A workflow triggered by `workflow_run` fires only for a workflow file that is already on the
+default branch, which is GitHub's rule. `main` is current to the last release, so such a gate stays
+silent on `dev` and on every pull request until a release carries the file over, and every later
+edit to it is inert until the next release. A gate that cannot run on the branch where the work
+happens gates nothing.
+
+The `coverage` job therefore stays where the ADR put it, and the split is made at the step instead:
 
 ```yaml
-on:
-  workflow_run:
-    workflows: ["Test", "Test on PRs"]
-    types: [completed]
+- name: Coverage ratchet
+  id: ratchet
+  continue-on-error: true
+  env:
+    COVERAGE_LCOV: coverage_download/lcov.info
+  run: julia --project=code_health code_health/coverage.jl check
 ```
 
-`ReusableTest.yml` keeps the `lcov` artifact upload and nothing else. What made the hand-over worth
-doing survives unchanged: the test job stays on the floating release of
-[ADR 0056](0056-the-julia-setup-action-floats-on-latest.md), the gate stays on the pinned one of
-[ADR 0077](0077-the-code-health-gate-is-two-workflows-pinned-by-a-manifest.md), and both callers
-still get one gate from one file.
+`continue-on-error` on the step, rather than on the job, is deliberate. It settles the conclusion
+inside the job, where the rule is plain: the step is marked failed and ignored, the job passes, and
+the calling workflow passes with it. The job-level form asks the caller to derive the same answer
+across a `workflow_call` boundary, and the whole point of the change is that the caller must not go
+red.
 
-Four things follow from the trigger, and each replaces a mechanism the job form had for free.
-
-- **`if: github.event.workflow_run.conclusion == 'success'`** replaces `needs: test`. A suite that
-  failed or was cancelled publishes partial coverage or none, and a ratchet fed partial data
-  reports a fall that is not one.
-- **The download names the other run.** `actions/download-artifact` takes a `run-id` and a
-  `github-token`, and the workflow takes `actions: read` so that they work.
-- **The checkout names the commit and the repository.** A `workflow_run` job checks out the default
-  branch unless it is told otherwise. `coverage.jl` reads its file set with `git ls-files`, so it
-  needs the tested tree as a git checkout and an unpacked artifact would not serve.
-- **The gate reads the head commit where the job read the merge commit.** On a pull request
-  `workflow_run.head_sha` is the branch's own tip, while the `lcov.info` it is compared against was
-  measured on the merge commit. The baseline that must bind an author is the one the author
-  committed, so the head commit is the right file to read here, but this does diverge from
-  [ADR 0075](0075-a-run-that-trips-publishes-the-refresh-artifact.md)'s rule for `Complexity.yml`.
+The ratchet keeps its voice. `coverage.jl` writes one `::error` annotation per offending file and a
+rise table to the run summary, so a trip is legible on the run's own page. A further step states in
+one line that the ratchet tripped and that the test check is green on purpose, and the Refresh
+Artifact is published on `steps.ratchet.outcome == 'failure'` where it was published on `failure()`.
 
 ### Consequences of the amendment
 
-- **A tripped ratchet no longer reds the test check.** It reds `Coverage`, which is its own check
-  with its own history, and a reader of `Test` sees the suite's verdict alone.
-- **GitHub fires `workflow_run` only for a workflow file on the default branch.** The gate is
-  silent on every branch until `Coverage.yml` reaches `main`, and a later edit to it is inert on
-  `dev` until that edit is merged. `CodeHealth.yml` carries the same constraint for its schedule.
-- **The verdict arrives after the suite rather than beside it**, and GitHub attaches a
-  `workflow_run` check to the head commit rather than to a pull request's merge box. A reviewer
-  reads it in the Actions tab or in the commit's checks, and whoever configures branch protection
-  later must reach it by that name.
-- **The gate runs the checked-out tree's own `coverage.jl`.** On a fork pull request that is code
-  the fork wrote, run under the base repository's token. The workflow therefore takes
-  `contents: read` and `actions: read`, reads no secret, and sets `persist-credentials: false`. Any
-  scope or secret added to it would be a write capability handed to a fork.
+- **A tripped ratchet no longer reds the test check**, and no longer reds anything. It is a warning
+  annotation, a set of `::error` annotations, a rise table, and a Refresh Artifact. The reader of
+  the test check sees the suite's verdict alone.
+- **The verdict is advisory, not blocking.** The baseline is enforced by whoever reads the run, and
+  a rise can reach `dev` unnoticed by a contributor who does not open the run. That cost is
+  accepted, because the alternative on offer was a gate that does not run at all outside `main`.
+  Turning the gate blocking again is the removal of one line.
+- **The gate runs wherever the suite runs**, on `main`, on `dev*`, on `agents/*`, on a tag, and on
+  every pull request that `TestOnPRs.yml` covers, with no dependency on which files are on the
+  default branch.
+- **The gate reads the same commit as the test job**, which on a pull request is the merge commit.
+  This holds ADR 0075's rule for `Complexity.yml` rather than diverging from it.
+- **The artifact belongs to the gate's own run**, so `actions/download-artifact` needs neither a
+  `run-id` nor a token, and the workflow needs no scope above `contents: read`.
