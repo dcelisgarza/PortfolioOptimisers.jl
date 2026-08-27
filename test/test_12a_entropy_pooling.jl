@@ -826,6 +826,27 @@ end
                                    rd)
 end
 
+# #573: `Optim`'s default stopping rule leaves the entropy pooling dual short of its own
+# optimum, and the two testsets below read the answer through a statistic that magnifies the
+# shortfall. The staged chain misses the mean view it binds by 9e-4 of the bound, against a
+# tolerance of 1e-3, and the outer CVaR search re-solves the whole problem at each candidate
+# value at risk, so an inner solve that stops early moves the root. Both then land differently
+# on a different host and after a different sequence of solves in the same process. This
+# optimiser drives the same dual to stationarity: it holds the CVaR views to 1e-10 of their
+# targets where the default holds them to 1e-7, and the mean view to 7e-6 of the bound. It is
+# a caller-side setting, so no library default and no tolerance moves with it. `Fminbox`
+# carries its `mu0` because a non-empty `args` replaces the one `entropy_pooling` supplies.
+const EP_TIGHT = OptimEntropyPooling(;
+                                     args = (PortfolioOptimisers.Optim.Fminbox(;
+                                                                               mu0 = 1e-5),
+                                             PortfolioOptimisers.Optim.Options(;
+                                                                               x_abstol = 1e-12,
+                                                                               f_reltol = 1e-14,
+                                                                               g_abstol = 1e-12,
+                                                                               outer_x_abstol = 1e-12,
+                                                                               iterations = 10_000,
+                                                                               outer_iterations = 50)))
+
 # #539: the outer search lands on the value at risk the CVaR view implies. With one view and
 # no other row the posterior is an exponential tilt in closed form, so the check needs no
 # entropy pooling solver and it separates the formulation from the solver.
@@ -902,7 +923,7 @@ end
     # The bracket holds the root strictly inside over several assets and several levels.
     for j in (1, 5, 13, 20), a in (0.05, 0.10, 0.20)
         nm = rd.nx[j]
-        prj = prior(MeucciEntropyPoolingPrior(; sets = sets,
+        prj = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
                                               cvar_views = ConditionalValueatRiskView(;
                                                                                       alpha = a,
                                                                                       views = LinearConstraintEstimator(;
@@ -989,10 +1010,10 @@ end
     rho_v = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
     kt_v = LinearConstraintEstimator(; val = "AAPL >= prior(AAPL)*0.3")
     sk_v = LinearConstraintEstimator(; val = "WMT == prior(WMT)*1.4")
-    mk = alg -> MeucciEntropyPoolingPrior(; sets = sets, alg = alg, mu_views = mu_v,
-                                          sigma_views = sig_v, cov_views = cov_v,
-                                          rho_views = rho_v, kt_views = kt_v,
-                                          sk_views = sk_v)
+    mk = alg -> MeucciEntropyPoolingPrior(; sets = sets, alg = alg, opt = EP_TIGHT,
+                                          mu_views = mu_v, sigma_views = sig_v,
+                                          cov_views = cov_v, rho_views = rho_v,
+                                          kt_views = kt_v, sk_views = sk_v)
     prh0 = prior(mk(H0_EntropyPooling()), rd)
     prh1 = prior(mk(H1_EntropyPooling()), rd)
     prh2 = prior(mk(H2_EntropyPooling()), rd)
@@ -1024,7 +1045,7 @@ end
     # stage-one mean view. The variance view names a different asset from the CVaR view: a
     # variance view that shrinks the same asset the CVaR view fattens is infeasible, and the
     # testset below pins what that pair answers.
-    prc = prior(MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_v,
+    prc = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT, mu_views = mu_v,
                                           sigma_views = LinearConstraintEstimator(;
                                                                                   val = "WMT == 1.3*prior(WMT)"),
                                           cvar_views = ConditionalValueatRiskView(;
