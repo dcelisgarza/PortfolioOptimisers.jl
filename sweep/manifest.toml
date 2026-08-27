@@ -112,8 +112,8 @@
 "src/13_Prior/02_EmpiricalPrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true }
 "src/13_Prior/03_FactorPrior.jl" = { map = 6, units = 6, algorithm = 3, swept = true }
 "src/13_Prior/04_HighOrderPrior.jl" = { map = 6, units = 9, algorithm = 8, swept = true }
-"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, swept = false }
-"src/13_Prior/06_BlackLittermanPrior.jl" = { map = 6, units = 11, swept = false }
+"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { map = 6, units = 5, algorithm = 2, swept = true }
+"src/13_Prior/06_BlackLittermanPrior.jl" = { map = 6, units = 11, algorithm = 8, swept = true }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { map = 6, units = 2, swept = false }

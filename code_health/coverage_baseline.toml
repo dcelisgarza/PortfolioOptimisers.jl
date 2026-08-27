@@ -77,7 +77,7 @@ commit = "a6d87c6"
 "src/13_Prior/02_EmpiricalPrior.jl" = { lines = 23, misses = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { lines = 32, misses = 0 }
 "src/13_Prior/04_HighOrderPrior.jl" = { lines = 170, misses = 0 }
-"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { lines = 64, misses = 2 }
+"src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { lines = 64, misses = 0 }
 "src/13_Prior/06_BlackLittermanPrior.jl" = { lines = 55, misses = 0 }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { lines = 26, misses = 0 }
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { lines = 23, misses = 0 }

@@ -1432,6 +1432,302 @@ end
                                                   prior(EmpiricalPrior(), rd).sigma)))
 end
 
+#=
+The Black-Litterman core, swept under #535. Condition 2 of that ticket asks for the view
+uncertainty matrix, the master equations and the risk-free rate to be checked with numbers
+rather than read. Every assertion below is the closed form of `calc_omega` or of
+`vanilla_posteriors` evaluated beside the code that implements it, on a 200 × 3 sample with
+two views.
+=#
+@testset "Black-Litterman core: the view uncertainty matrix on all three branches" begin
+    rng = StableRNG(987654321)
+    Tn, N = 200, 3
+    Xs = randn(rng, Tn, N) .* 0.01 .+ 0.0005
+    Sigma = cov(Xs)
+    P = [1.0 -1.0 0.0; 0.0 0.0 1.0]
+    tau = inv(Tn)
+    hand = Diagonal(P * (tau * Sigma) * transpose(P))
+
+    # No confidence: Omega is the diagonal of P (tau Sigma) P'.
+    @test diag(PortfolioOptimisers.calc_omega(nothing, P, tau * Sigma)) == diag(hand)
+    # `bl_preroll` calls `calc_omega` on the unscaled covariance and scales the answer, so
+    # the two orders must agree. `calc_omega` is homogeneous of degree one in `sigma`.
+    @test diag(tau * PortfolioOptimisers.calc_omega(nothing, P, Sigma)) == diag(hand)
+
+    # Scalar confidence: the 1/v - 1 rescale of Idzorek's method in Walters' closed form.
+    for v in (0.1, 0.5, 0.9)
+        @test isapprox(diag(PortfolioOptimisers.calc_omega(v, P, tau * Sigma)),
+                       (inv(v) - one(v)) .* diag(hand))
+    end
+    # The direction is the thing a reader gets wrong: a high confidence shrinks Omega and a
+    # low one widens it.
+    lo = diag(PortfolioOptimisers.calc_omega(0.1, P, tau * Sigma))
+    hi = diag(PortfolioOptimisers.calc_omega(0.9, P, tau * Sigma))
+    @test all(lo .> hi)
+
+    # Vector confidence: elementwise, and equal to the scalar branch for a constant vector.
+    @test diag(PortfolioOptimisers.calc_omega(fill(0.6, 2), P, tau * Sigma)) ==
+          diag(PortfolioOptimisers.calc_omega(0.6, P, tau * Sigma))
+    vv = [0.25, 0.75]
+    @test isapprox(diag(PortfolioOptimisers.calc_omega(vv, P, tau * Sigma)),
+                   (inv.(vv) .- one(eltype(vv))) .* diag(hand))
+
+    #=
+    Both endpoints are refused, and the bound is strict on purpose. At `v = 1` the docstring
+    of `calc_omega` says that `P tau Sigma P' + Omega` is singular for a rank-deficient `P`.
+    Two identical views give exactly such a `P`, so build one and show the singularity.
+    =#
+    Pr = [1.0 -1.0 0.0; 1.0 -1.0 0.0]
+    @test rank(Pr) == 1
+    A = Pr * (tau * Sigma) * transpose(Pr)
+    @test all(iszero, diag(PortfolioOptimisers.calc_omega(1.0, Pr, tau * Sigma)))
+    Msing = A + PortfolioOptimisers.calc_omega(1.0, Pr, tau * Sigma)
+    @test iszero(det(Msing))
+    @test rank(Msing) == 1
+    @test_throws SingularException Msing \ [1.0, 1.0]
+    # Just inside the bound the same system is only ill-conditioned, never singular.
+    for v in (1 - 1e-8, 0.99)
+        Mv = A + PortfolioOptimisers.calc_omega(v, Pr, tau * Sigma)
+        @test !iszero(det(Mv))
+        @test isfinite(cond(Mv))
+    end
+
+    # Both endpoints, and just inside each, through the guard itself.
+    blv = BlackLittermanViews(; P = P, Q = [0.002, 0.001])
+    @test_throws DomainError PortfolioOptimisers.assert_bl_views_conf(fill(0.0, 2), blv)
+    @test_throws DomainError PortfolioOptimisers.assert_bl_views_conf(fill(1.0, 2), blv)
+    @test isnothing(PortfolioOptimisers.assert_bl_views_conf(fill(1e-12, 2), blv))
+    @test isnothing(PortfolioOptimisers.assert_bl_views_conf(fill(1 - 1e-12, 2), blv))
+
+    # The length guards. A vector states one confidence per view and is counted; a scalar is
+    # one confidence for every view and is not.
+    @test_throws DimensionMismatch PortfolioOptimisers.assert_bl_views_conf([0.5], blv)
+    @test isnothing(PortfolioOptimisers.assert_bl_views_conf(0.5, blv))
+    @test_throws DimensionMismatch PortfolioOptimisers.assert_bl_views_conf([0.5, 0.5],
+                                                                            "A == 0.01")
+    @test isnothing(PortfolioOptimisers.assert_bl_views_conf([0.5], "A == 0.01"))
+    @test isnothing(PortfolioOptimisers.assert_bl_views_conf([0.5, 0.5],
+                                                             ["A == 0.01", "B == 0.02"]))
+end
+
+#=
+The master equations of `vanilla_posteriors`, against the two closed forms the library
+publishes: the inverse-free pair on `vanilla_posteriors` itself, and the inverse-heavy pair
+on `prior(::BlackLittermanPrior, …)`. Sweep ticket #535.
+=#
+@testset "Black-Litterman core: the master equations" begin
+    rng = StableRNG(987654321)
+    Tn, N = 200, 3
+    Xs = randn(rng, Tn, N) .* 0.01 .+ 0.0005
+    Sigma = cov(Xs)
+    Pi = vec(mean(Xs; dims = 1))
+    P = [1.0 -1.0 0.0; 0.0 0.0 1.0]
+    Q = [0.002, 0.001]
+
+    for t in (inv(Tn), 0.05, 0.5)
+        om = PortfolioOptimisers.calc_omega(nothing, P, t * Sigma)
+        pmu, psig = PortfolioOptimisers.vanilla_posteriors(t, Pi, Sigma, om, P, Q)
+        ts = t * Sigma
+        gain = ts * transpose(P) * inv(P * ts * transpose(P) + om)
+        @test isapprox(pmu, Pi + gain * (Q - P * Pi))
+        @test isapprox(psig, Sigma + ts - gain * P * ts)
+        # The Woodbury form the `prior` docstring states. The two agree to 3.3e-19 on the
+        # mean and 1.4e-20 on the covariance.
+        minv = inv(inv(ts) + transpose(P) * inv(om) * P)
+        @test isapprox(pmu, minv * (inv(ts) * Pi + transpose(P) * inv(om) * Q))
+        @test isapprox(psig, Sigma + minv)
+    end
+
+    # A view that repeats the prior is a null update: the residual q - P Pi is zero, so the
+    # posterior mean is the prior mean to machine precision. Measured at 0.0.
+    tau = inv(Tn)
+    om = PortfolioOptimisers.calc_omega(nothing, P, tau * Sigma)
+    nullmu, _ = PortfolioOptimisers.vanilla_posteriors(tau, Pi, Sigma, om, P, P * Pi)
+    @test isapprox(nullmu, Pi; atol = 1e-16)
+
+    #=
+    tau stands in both closed forms, but it cancels out of the posterior mean once Omega
+    carries it too — `calc_omega` is homogeneous of degree one in the covariance it reads,
+    and `bl_preroll` scales its answer by tau. It does not cancel out of the covariance.
+    =#
+    for vc in (nothing, 0.4, [0.25, 0.75])
+        mus = map((inv(Tn), 0.05, 0.5)) do t
+            omt = t * PortfolioOptimisers.calc_omega(vc, P, Sigma)
+            return first(PortfolioOptimisers.vanilla_posteriors(t, Pi, Sigma, omt, P, Q))
+        end
+        @test isapprox(mus[1], mus[2]; atol = 1e-16)
+        @test isapprox(mus[1], mus[3]; atol = 1e-16)
+    end
+    excess = map((0.001, 0.01, 0.1)) do t
+        omt = t * PortfolioOptimisers.calc_omega(nothing, P, Sigma)
+        return tr(last(PortfolioOptimisers.vanilla_posteriors(t, Pi, Sigma, omt, P, Q)) -
+                  Sigma)
+    end
+    @test all(>(0), excess)
+    @test isapprox(excess[2] / excess[1], 10; rtol = 1e-8)
+    @test isapprox(excess[3] / excess[2], 10; rtol = 1e-8)
+end
+
+#=
+The risk-free rate is added once, the default tau is read from the observation count, and
+the two routes into `Lc_BLV` give the same rows. Sweep ticket #535.
+=#
+@testset "Black-Litterman core: the rate, tau, and the two view routes" begin
+    lce = LinearConstraintEstimator(; val = ["$(rd.nx[1]) == 0.002"])
+    m0 = prior(BlackLittermanPrior(; views = lce, sets = sets, rf = 0.0), rd).mu
+    m3 = prior(BlackLittermanPrior(; views = lce, sets = sets, rf = 0.03), rd).mu
+    # Not zero times, and not twice.
+    @test isapprox(m3 - m0, fill(0.03, length(m0)); atol = 1e-16)
+    # `remove_rf` inverts `apply_rf` on the same vector, in both orders.
+    @test isapprox(PortfolioOptimisers.remove_rf(0.03,
+                                                 PortfolioOptimisers.apply_rf(0.03, m0)),
+                   m0; atol = 1e-16)
+    @test isapprox(PortfolioOptimisers.apply_rf(0.03,
+                                                PortfolioOptimisers.remove_rf(0.03, m0)),
+                   m0; atol = 1e-16)
+
+    # The default tau is 1/T, read from the observation count `bl_preroll` is handed, and a
+    # user-supplied tau wins.
+    psig = prior(EmpiricalPrior(), rd).sigma
+    for Tn in (50, 120, 252)
+        r = PortfolioOptimisers.bl_preroll(lce, sets, nothing, psig, nothing, Tn, Float64,
+                                           false)
+        @test r.tau == inv(Tn)
+    end
+    @test PortfolioOptimisers.bl_preroll(lce, sets, nothing, psig, 0.07, 252, Float64,
+                                         false).tau == 0.07
+    @test_throws DomainError BlackLittermanPrior(; views = lce, sets = sets, tau = 0.0)
+    @test_throws DomainError BlackLittermanPrior(; views = lce, sets = sets, tau = -0.1)
+
+    # `Lc_BLV` admits a `LinearConstraintEstimator` or a ready-made `BlackLittermanViews`,
+    # and the two routes assemble the same rows and reach the same posterior.
+    lce2 = LinearConstraintEstimator(;
+                                     val = ["$(rd.nx[1]) + $(rd.nx[2]) == 0.05",
+                                            "$(rd.nx[3]) == 0.02"])
+    via_eqn = black_litterman_views(lce2, sets)
+    ready = BlackLittermanViews(; P = collect(via_eqn.P), Q = copy(via_eqn.Q))
+    via_res = black_litterman_views(ready, sets)
+    @test collect(via_eqn.P) == collect(via_res.P)
+    @test via_eqn.Q == via_res.Q
+    @test prior(BlackLittermanPrior(; views = lce2, sets = sets), rd).mu ==
+          prior(BlackLittermanPrior(; views = ready), rd).mu
+
+    #=
+    A scalar `views_conf` is one confidence for every view. The equation-shaped routes have
+    always accepted it over any number of views, but the `BlackLittermanViews` method
+    counted a scalar's `length` of 1 against the views and refused `views_conf = 0.4` over
+    two precomputed views while accepting `[0.4, 0.4]`, which reaches `calc_omega` as the
+    same number. Fixed under #535: only a vector is counted.
+    =#
+    @test isa(BlackLittermanPrior(; views = ready, views_conf = 0.4), BlackLittermanPrior)
+    a = prior(BlackLittermanPrior(; views = ready, views_conf = 0.4), rd).mu
+    b = prior(BlackLittermanPrior(; views = ready, views_conf = [0.4, 0.4]), rd).mu
+    c = prior(BlackLittermanPrior(; views = lce2, sets = sets, views_conf = 0.4), rd).mu
+    @test a == b
+    @test a == c
+    # A vector is still counted, on both routes.
+    @test_throws DimensionMismatch BlackLittermanPrior(; views = ready,
+                                                       views_conf = [0.4, 0.4, 0.4])
+end
+
+#=
+The views the caller wrote: the constructor guards, the exclusion of a view that resolves
+no name, and the two guards that stand between a view and the wrong axis. Sweep ticket #535.
+=#
+@testset "Black-Litterman core: the views the caller wrote" begin
+    # The `BlackLittermanViews` guards.
+    @test_throws IsEmptyError BlackLittermanViews(; P = zeros(0, 3), Q = Float64[])
+    @test_throws IsEmptyError BlackLittermanViews(; P = ones(1, 3), Q = Float64[])
+    @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01])
+    @test_throws IsEmptyError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                  excl = Int[])
+    @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                       excl = [1, 2, 3])
+    @test isa(BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02], excl = [1, 2]),
+              BlackLittermanViews)
+
+    bsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C"]))
+    #=
+    A view that resolves no name is dropped, not refused. Its index joins `excl`, the
+    remaining rows keep the order the caller wrote them in, and `remove_excl_views` drops
+    the matching entry of a per-view confidence vector.
+    =#
+    blv = PortfolioOptimisers.get_black_litterman_views(parse_equation(["A == 0.01",
+                                                                        "ZZZ == 0.02",
+                                                                        "C == 0.03"]),
+                                                        bsets)
+    @test size(blv.P) == (2, 3)
+    @test collect(blv.P) == [1.0 0.0 0.0; 0.0 0.0 1.0]
+    @test blv.Q == [0.01, 0.03]
+    @test blv.excl == [2]
+    @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3], blv.excl)) ==
+          [0.1, 0.3]
+    # `strict = true` refuses the same input rather than dropping it.
+    @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation(["ZZZ == 0.02"]),
+                                                                             bsets;
+                                                                             strict = true)
+
+    #=
+    When every view is dropped there is no row left, and `get_black_litterman_views`
+    answers `nothing`. `bl_preroll` destructured that and the caller read `FieldError: type
+    Nothing has no field P`, which names neither the views nor the universe they failed
+    against. Fixed under #535.
+    =#
+    @test isnothing(PortfolioOptimisers.get_black_litterman_views(parse_equation(["YY == 0.01",
+                                                                                  "ZZ == 0.02"]),
+                                                                  bsets))
+    Xb = randn(StableRNG(123456789), 60, 3) .* 0.01
+    gone = BlackLittermanPrior(; views = LinearConstraintEstimator(; val = ["ZZ == 0.01"]),
+                               sets = bsets)
+    @test_throws IsNothingError prior(gone, Xb)
+
+    # The three `remove_excl_views` methods.
+    @test PortfolioOptimisers.remove_excl_views(0.4, [2]) == 0.4
+    @test isnothing(PortfolioOptimisers.remove_excl_views(nothing, [2]))
+    @test PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3], nothing) == [0.1, 0.2, 0.3]
+    @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3], [1, 3])) == [0.2]
+    @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3, 0.4], [2])) ==
+          [0.1, 0.3, 0.4]
+    @test isempty(PortfolioOptimisers.remove_excl_views([0.1, 0.2], [1, 2]))
+
+    # `bl_preroll`'s axis selector names a declared axis a view can land on, and nothing
+    # else. A third axis is refused before anything is resolved.
+    ready = BlackLittermanViews(; P = ones(1, 3), Q = [0.01])
+    Sb = cov(Xb)
+    for ax in (:xkey, :fkey)
+        @test isa(PortfolioOptimisers.bl_preroll(ready, nothing, nothing, Sb, nothing, 60,
+                                                 Float64, false, ax), NamedTuple)
+    end
+    @test_throws DomainError PortfolioOptimisers.bl_preroll(ready, nothing, nothing, Sb,
+                                                            nothing, 60, Float64, false,
+                                                            :zkey)
+
+    # An asset-axis view against a factor-axis covariance. The message names both widths.
+    wide = BlackLittermanViews(; P = ones(1, 5), Q = [0.01])
+    ew = try
+        PortfolioOptimisers.bl_preroll(wide, nothing, nothing, Sb, nothing, 60, Float64,
+                                       false)
+    catch e
+        e
+    end
+    @test isa(ew, DimensionMismatch)
+    @test occursin("size(P, 2) => 5", ew.msg)
+    @test occursin("size(prior_sigma, 1) => 3", ew.msg)
+
+    # The universe and the returns matrix must agree, and the message names both counts.
+    big = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
+    eb = try
+        prior(BlackLittermanPrior(;
+                                  views = LinearConstraintEstimator(; val = ["A == 0.01"]),
+                                  sets = big), Xb)
+    catch e
+        e
+    end
+    @test isa(eb, DimensionMismatch)
+    @test occursin("(4)", eb.msg)
+    @test occursin("(3)", eb.msg)
+end
+
 @testset "The carrier records the original returns matrix" begin
     #=
     Three estimators overwrite `X` with the reconstruction `F * transpose(M) .+
