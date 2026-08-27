@@ -102,4 +102,79 @@
         @test isapprox(expected_risk(factory(ExpectedReturnRiskRatio(; rf = rf), pr), res.w,
                                      pr, fes[1]), srf)
     end
+    # Issue #545, condition 2: the reference-weight vocabulary of `src/15_Turnover.jl`,
+    # checked with numbers rather than read.
+    @testset "Turnover reference weights, name resolution and views" begin
+        w0 = [0.2, 0.3, 0.5]
+        wn = [0.1, 0.4, 0.5]
+        tnf = TurnoverEstimator(; w = w0, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.0,
+                                fixed = true)
+        tnv = TurnoverEstimator(; w = w0, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.0,
+                                fixed = false)
+
+        # `fixed` decides which weight vector survives.
+        @test factory(tnf, wn) === tnf
+        @test factory(tnf, wn).w == w0
+        @test factory(tnv, wn).w == wn
+        @test factory(Turnover(; w = w0, val = 0.1, fixed = true), wn).w == w0
+        @test factory(Turnover(; w = w0, val = 0.1, fixed = false), wn).w == wn
+
+        # `needs_previous_weights` is `!fixed`, and the vector method is `any`, not `all`.
+        @test PortfolioOptimisers.needs_previous_weights(tnf) == !tnf.fixed
+        @test PortfolioOptimisers.needs_previous_weights(tnv) == !tnv.fixed
+        tnmix = PortfolioOptimisers.concrete_typed_array([tnf, tnv])
+        @test PortfolioOptimisers.needs_previous_weights(tnmix)
+        @test !all(PortfolioOptimisers.needs_previous_weights.(tnmix))
+        @test !PortfolioOptimisers.needs_previous_weights([tnf, tnf])
+
+        # Name resolution follows the universe, and `dval` fills what the keys miss.
+        tnsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        tnd = TurnoverEstimator(; w = w0, val = Dict("C" => 0.3, "A" => 0.1), dval = 0.05)
+        @test turnover_constraints(tnd, tnsets).val == [0.1, 0.05, 0.3]
+
+        # `dval = nothing` fills with `zero(datatype)`, and `datatype` reaches the fill.
+        tnn = TurnoverEstimator(; w = w0, val = Dict("C" => 0.3, "A" => 0.1))
+        @test turnover_constraints(tnn, tnsets).val == [0.1, 0.0, 0.3]
+        @test eltype(turnover_constraints(tnn, tnsets).val) == Float64
+        @test eltype(turnover_constraints(tnn, tnsets; datatype = Float32).val) == Float32
+
+        # An unmatched name raises when `strict` is set, and warns otherwise.
+        tnx = TurnoverEstimator(; w = w0, val = Dict("Z" => 0.3))
+        @test_throws ArgumentError turnover_constraints(tnx, tnsets; strict = true)
+        @test (@test_logs (:warn,) turnover_constraints(tnx, tnsets; strict = false)).val ==
+              [0.0, 0.0, 0.0]
+
+        # The vector method maps over the vector and preserves its order.
+        tn2 = TurnoverEstimator(; w = wn, val = Dict("B" => 0.15))
+        tnvec = turnover_constraints([tnd, tn2], tnsets)
+        @test [tni.val for tni in tnvec] == [[0.1, 0.05, 0.3], [0.0, 0.15, 0.0]]
+        @test [tni.w for tni in tnvec] == [w0, wn]
+
+        # A `Turnover` passes through `turnover_constraints` unchanged.
+        tnres = Turnover(; w = w0, val = [0.1, 0.2, 0.3])
+        @test turnover_constraints(tnres, tnsets) === tnres
+        @test isnothing(turnover_constraints(nothing, tnsets))
+
+        # The constructor guards, by exception type.
+        @test_throws DimensionMismatch Turnover(; w = w0, val = [0.1, 0.2])
+        @test_throws DomainError Turnover(; w = w0, val = [0.1, -0.2, 0.3])
+        @test_throws DomainError Turnover(; w = w0, val = [0.1, NaN, 0.3])
+        @test_throws DomainError Turnover(; w = w0, val = NaN)
+        @test_throws PortfolioOptimisers.IsEmptyError Turnover(; w = Float64[], val = 0.1)
+
+        # The view slices `w` and a vector `val` alike, and leaves a scalar `val` alone.
+        tvv = Turnover(; w = w0, val = [0.1, 0.2, 0.4], fixed = true)
+        tvs = Turnover(; w = w0, val = 0.02)
+        vv = PortfolioOptimisers.port_opt_view(tvv, [1, 3])
+        vs = PortfolioOptimisers.port_opt_view(tvs, [1, 3])
+        hand = Turnover(; w = w0[[1, 3]], val = [0.1, 0.4], fixed = true)
+        @test collect(vv.w) == hand.w
+        @test collect(vv.val) == hand.val
+        @test vv.fixed == hand.fixed
+        @test collect(vs.w) == w0[[1, 3]]
+        @test vs.val === tvs.val
+        ve = PortfolioOptimisers.port_opt_view(tnf, [1, 3])
+        @test collect(ve.w) == w0[[1, 3]]
+        @test ve.val === tnf.val
+    end
 end
