@@ -785,7 +785,6 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     end
     return var_mtx
 end
-# COV_EXCL_START
 """
     mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
 
@@ -897,7 +896,6 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
 
     return mut_mtx, var_mtx
 end
-# COV_EXCL_STOP
 """
     mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                 normalise::Bool = true)

@@ -265,3 +265,67 @@ Artifact is published on `steps.ratchet.outcome == 'failure'` where it was publi
   This holds ADR 0075's rule for `Complexity.yml` rather than diverging from it.
 - **The artifact belongs to the gate's own run**, so `actions/download-artifact` needs neither a
   `run-id` nor a token, and the workflow needs no scope above `contents: read`.
+
+## Amendment (2026-08-27): a `COV_EXCL` pair is not an exemption
+
+*A Coverage Exemption is keyed by definition, and states its count* above describes the exemption
+mechanism as though it were the only one. It was not.
+[Issue #552](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/552) found a second one
+already in the tree. `CoverageTools` honours a `# COV_EXCL_START` / `# COV_EXCL_STOP` comment pair
+when `julia-processcoverage` converts the test job's `.cov` files to `lcov.info`, and it drops every
+line between the two from `lcov.info` altogether. Such a line is neither a hit nor a miss. The gate
+reads `lcov.info` and reads nothing else, so it never sees the line at all.
+
+Two files carried a pair. `src/13_Prior/04_HighOrderPrior.jl` hid 304 source lines holding
+`duplication_matrix`, `elimination_matrix` and `summation_matrix`, and reported `misses = 0` on a
+row whose `lines = 66` counted less than half of the file. `src/08_Moments/10_Histogram.jl` hid 113
+source lines holding `mutual_variation_info`.
+
+### The ruling
+
+**`COV_EXCL` is not admitted. A Coverage Exemption is the one mechanism, and it is a row in
+`code_health/rulings.toml`.**
+
+The row carries four things this ADR asks of a claim that a line may stay uncovered: a key that
+names the definition, an exact count held to equality in both directions, a Rationale block that
+states why, and the maintainer's approval on that block. A `COV_EXCL` pair carries none of them. It
+is unkeyed, uncounted, unexplained and unapproved, and it is invisible to `terminal`, so a file it
+touches cannot be judged against the condition #404 sets. It is also strictly stronger than the
+mechanism it evades: an exemption leaves the miss in the baseline and binds only whether the file is
+terminal, whereas the pair removes the line from the measurement.
+
+The two pairs were deleted, and the code they hid was covered rather than exempted.
+`test_07_linear_algebra.jl::"Duplication, elimination and summation matrices"` reaches the three
+structure matrices under both settings of `diag`, and `test_08_moments.jl` reaches
+`mutual_variation_info` under both settings of `normalise`. Neither file needed a
+`[[coverage_exemption]]` row, which is the outcome the ADR prefers: the sweep writes the test.
+
+### The census
+
+Check 4 of `test/test_49_coverage_attribution_census.jl` fails when any tracked `.jl` file under
+`src/` or `ext/` holds the string `COV_EXCL`. The marker works only as a comment, so a plain text
+search over the measured roots is the whole check, and it costs one pass over the corpus.
+
+It is a test rather than a step of `coverage.jl` for one reason: the coverage gate is advisory by
+the amendment above, and this rule is not. A pair that arrives in a pull request must turn something
+red on the day it lands, because every later measurement of that file is wrong while it stands.
+
+### Consequences of forbidding `COV_EXCL`
+
+- **The two rows the pairs stood behind rise in `lines`.** The region was instrumented all along, so
+  the counters were allocated and the numbers were only stripped on the way out.
+  `src/13_Prior/04_HighOrderPrior.jl` goes from `lines = 66` to `lines = 170`, and
+  `src/08_Moments/10_Histogram.jl` from `lines = 112` to `lines = 137`. `misses` does not rise for
+  either file, because the code the pairs hid is covered.
+- **`lines` cannot be measured outside CI, and it does not bind.** `code_health/coverage.jl` reads
+  the `lcov.info` that only the test job writes. The rows were amended from a local `CoverageTools`
+  measurement of the same source, and the first CI run either confirms them or publishes the
+  Refresh Artifact that replaces them. This is the route the first baseline took, stated in
+  *The first baseline is a provisional seed* above.
+- **`src/08_Moments/10_Histogram.jl` falls from `misses = 1` to `misses = 0`.** Its row had never
+  moved since the provisional seed, because a ratchet trips on a rise alone and a stale-high row
+  therefore stands until a refresh runs. The local measurement finds no uncovered line in the file,
+  and it is a strict subset of the suite that CI runs.
+- **A file's coverage number now means what it says.** Before this ruling a row could read
+  `misses = 0` over a third of a file, and nothing in the baseline, the rulings or the manifest
+  recorded the gap.

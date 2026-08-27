@@ -168,4 +168,37 @@ end
         @test isempty(unresolved)
         isempty(unresolved) || println(join(unresolved, "\n"))
     end
+
+    # ------------------------------------- check 4: there is only one exemption mechanism
+
+    @testset "No source file carries a `COV_EXCL` marker" begin
+        #=
+        `CoverageTools` reads a `# COV_EXCL_START` / `# COV_EXCL_STOP` pair when the CI test
+        job converts the `.cov` files to `lcov.info`, and it DROPS every line between the
+        two from `lcov.info` altogether. Such a line is neither a hit nor a miss, so the
+        gate of ADR 0082 never sees it, and a file reports `misses = 0` while a third of it
+        is untested.
+
+        That is a second exemption mechanism, and ADR 0082 admits one. A Coverage Exemption
+        is a named row in `code_health/rulings.toml`, keyed `(path, definition)`, carrying
+        an exact count and a Rationale, and held to equality in both directions. A
+        `COV_EXCL` pair carries no count, no rationale and no key, and before this check
+        nothing gated it.
+
+        Issue #552 removed the two pairs the library held and covered the code they hid.
+        This check is what stops a third from arriving in silence. The marker only works as
+        a comment, so a plain text search over the tracked files is the whole test.
+        =#
+        files = filter(CA.CodeHealth.in_scope, CA.CodeHealth.tracked_jl_files())
+        @test !isempty(files)
+
+        marked = String[]
+        for f in files
+            for (n, line) in enumerate(eachline(joinpath(ROOT, f)))
+                occursin("COV_EXCL", line) && push!(marked, string(f, ":", n, ": ", line))
+            end
+        end
+        @test isempty(marked)
+        isempty(marked) || println(join(marked, "\n"))
+    end
 end

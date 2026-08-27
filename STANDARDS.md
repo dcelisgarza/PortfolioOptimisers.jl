@@ -74,6 +74,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | Running doctests | the `run-doctests` skill | `.github/workflows/Docs.yml` (`doctest` job) |
 | The line coverage of a file in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) | `.github/workflows/ReusableTest.yml` (`coverage` job) |
 | A Coverage Exemption | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md), `code_health/rulings.toml` | `.github/workflows/ReusableTest.yml` (`coverage` job) for the count it stands for; `test/test_49_coverage_attribution_census.jl` for the definition it names |
+| A `COV_EXCL` marker in `src/` or `ext/` | [ADR 0082](docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) — it is not admitted, and a Coverage Exemption is the one mechanism | `test/test_49_coverage_attribution_census.jl` |
 
 ## The standards files
 
@@ -111,7 +112,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_45_sweep_census.jl` | every file under `src/` and `ext/` has a sweep-manifest row naming its child map of #404, and the file's documented-unit count still matches that row | run the file |
 | `test/test_47_alias_and_module_census.jl` | an acronym alias of `src/25_Aliases.jl` IS the binding its docstring names, a factory alias of that file EQUALS the long form its sentence names, and `src/PortfolioOptimisers.jl` `include`s every other file under `src/` exactly once | run the file |
 | `test/test_46_standards_citation_census.jl` | every name and every path a standards file cites resolves against the repository, and no standards file states a count of the repository | run the file |
-| `test/test_49_coverage_attribution_census.jl` | `code_health/coverage.jl` names a return-annotated definition by its function and a functor method by its receiver type, and every Coverage Exemption in `code_health/rulings.toml` names a definition its file holds | run the file |
+| `test/test_49_coverage_attribution_census.jl` | `code_health/coverage.jl` names a return-annotated definition by its function and a functor method by its receiver type, every Coverage Exemption in `code_health/rulings.toml` names a definition its file holds, and no file under `src/` or `ext/` carries a `COV_EXCL` marker | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |

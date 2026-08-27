@@ -25,7 +25,7 @@ commit = "a6d87c6"
 "src/08_Moments/07_DistanceCovariance.jl" = { lines = 62, misses = 0 }
 "src/08_Moments/08_LowerTailDependenceCovariance.jl" = { lines = 27, misses = 0 }
 "src/08_Moments/09_RankCovariance.jl" = { lines = 12, misses = 0 }
-"src/08_Moments/10_Histogram.jl" = { lines = 112, misses = 1 }
+"src/08_Moments/10_Histogram.jl" = { lines = 137, misses = 0 }
 "src/08_Moments/11_MutualInfoCovariance.jl" = { lines = 10, misses = 0 }
 "src/08_Moments/12_DenoiseCovariance.jl" = { lines = 3, misses = 0 }
 "src/08_Moments/13_DetoneCovariance.jl" = { lines = 3, misses = 0 }
@@ -76,7 +76,7 @@ commit = "a6d87c6"
 "src/13_Prior/01_Base_Prior.jl" = { lines = 179, misses = 0 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { lines = 23, misses = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { lines = 32, misses = 0 }
-"src/13_Prior/04_HighOrderPrior.jl" = { lines = 66, misses = 0 }
+"src/13_Prior/04_HighOrderPrior.jl" = { lines = 170, misses = 0 }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { lines = 64, misses = 2 }
 "src/13_Prior/06_BlackLittermanPrior.jl" = { lines = 55, misses = 0 }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { lines = 26, misses = 0 }

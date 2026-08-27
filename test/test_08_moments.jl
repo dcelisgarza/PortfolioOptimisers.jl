@@ -2246,6 +2246,22 @@
         @test vmv ≈ Vn
         @test all(iszero, diag(vmv))
         @test all(x -> isapprox(x, 1), diag(mmv))
+        #=
+        The unnormalised call takes the branch that divides by neither normaliser, so it
+        returns the two closed forms. The MI diagonal is the marginal entropy there, and the
+        VI diagonal stays pinned at zero. Issue #552 removed the `COV_EXCL` pair that hid
+        this branch from the coverage gate.
+        =#
+        mmu, vmu = PO.mutual_variation_info(Zv, 8, false)
+        @test mmu ≈ PO.mutual_info(Zv, 8, false)
+        @test vmu ≈ Vu
+        @test all(iszero, diag(vmu))
+        @test all(!iszero, diag(mmu))
+        # The default `bins` is `Knuth` here and `HacineGharbiRavier` in the other two, so
+        # the three agree only when `bins` is given. The two-argument call takes the default.
+        mmk, vmk = PO.mutual_variation_info(Zv)
+        @test mmk ≈ PO.mutual_info(Zv, Knuth(), true)
+        @test vmk ≈ PO.variation_info(Zv, Knuth(), true)
         # --- `MutualInfoCovariance` ---
         Xc = randn(StableRNG(4242), 400, 4)
         vc = vec(var(SimpleVariance(), Xc))

@@ -91,7 +91,6 @@ function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     end
     return A_vec
 end
-# COV_EXCL_START
 """
     duplication_matrix(n::Int, diag::Bool = true)
 
@@ -394,7 +393,6 @@ function summation_matrix(n::Int, diag::Bool = true)
         SparseArrays.sparse(1:m, v1, 2, m, nsq)
     end
 end
-# COV_EXCL_STOP
 """
     dup_elim_sum_matrices(n::Int)
 
