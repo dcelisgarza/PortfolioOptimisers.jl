@@ -493,3 +493,232 @@ end
     @test_throws DomainError OptimEntropyPooling(; sc1 = -1)
     @test OptimEntropyPooling(; sc2 = 0).sc2 == 0
 end
+
+# #538: a view naming an asset the universe does not hold. `replace_prior_views` and both
+# branches of `replace_coprior_views` drop the term under `strict = false` and raise under
+# `strict = true`. The three drops were unreached before this testset.
+@testset "A view naming an unknown asset is dropped" begin
+    using PortfolioOptimisers, Test, Logging
+    pr0 = prior(EmpiricalPrior(), rd)
+    dt = eltype(pr0.X)
+    rpv = PortfolioOptimisers.replace_prior_views
+    rcv = PortfolioOptimisers.replace_coprior_views
+    pe(s) = PortfolioOptimisers.parse_equation(s; datatype = dt)
+
+    # The `prior(...)` term goes, the plain term stays, and the right-hand side keeps the
+    # constant the dropped term never contributed to.
+    r = @test_logs (:warn,) rpv(pe("AAPL - prior(NOPE) == 0.001"), pr0, sets, :mu;
+                                strict = false)
+    @test r.vars == ["AAPL"]
+    @test isapprox(r.rhs, 0.001)
+    @test_throws ArgumentError rpv(pe("AAPL - prior(NOPE) == 0.001"), pr0, sets, :mu;
+                                   strict = true)
+
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        # The plain `(a, b)` branch, with the unknown name in either position.
+        r1 = rcv(pe("(NOPE, BAC) + (AAPL, BBY) == 0.0001"), pr0, sets, :cov; strict = false)
+        @test r1.vars == ["(AAPL, BBY)"]
+        @test r1.ij == [(1, 4)]
+        r2 = rcv(pe("(AAPL, NOPE) + (AAPL, BBY) == 0.0001"), pr0, sets, :cov;
+                 strict = false)
+        @test r2.vars == ["(AAPL, BBY)"]
+        @test r2.ij == [(1, 4)]
+
+        # The `prior(a, b)` branch, with the unknown name in either position.
+        r3 = rcv(pe("(AAPL, BAC) - prior(NOPE, BBY) == 0.0001"), pr0, sets, :cov;
+                 strict = false)
+        @test r3.vars == ["(AAPL, BAC)"]
+        @test isapprox(r3.rhs, 0.0001)
+        r4 = rcv(pe("(AAPL, BAC) - prior(AMD, NOPE) == 0.0001"), pr0, sets, :cov;
+                 strict = false)
+        @test r4.vars == ["(AAPL, BAC)"]
+        @test isapprox(r4.rhs, 0.0001)
+    end
+    @test_throws ArgumentError rcv(pe("(NOPE, BAC) + (AAPL, BBY) == 0.0001"), pr0, sets,
+                                   :cov; strict = true)
+    @test_throws ArgumentError rcv(pe("(AAPL, BAC) - prior(NOPE, BBY) == 0.0001"), pr0,
+                                   sets, :cov; strict = true)
+end
+
+# #538: a vector of `ValueatRiskView` states one view per entry, each with its own `alpha`.
+# The vector method was unreached: every test before this one stated a single view.
+@testset "A vector of ValueatRiskView states one view per entry" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    X = pr0.X
+    var_views = [ValueatRiskView(;
+                                 views = LinearConstraintEstimator(; val = "AAPL == 0.04"),
+                                 alpha = 0.05),
+                 ValueatRiskView(; views = LinearConstraintEstimator(; val = "AMD == 0.06"),
+                                 alpha = 0.1)]
+    epc = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    PortfolioOptimisers.ep_var_views!(var_views, epc, pr0, sets)
+    @test size(epc[:eq][1], 1) == 2
+
+    # A value at risk view is a statement about the tail MASS: the posterior probability of
+    # the observations at or below `-target` must equal the view's own `alpha`.
+    pw = collect(prior(EntropyPoolingPrior(; w = w, sets = sets, var_views = var_views),
+                       rd).w)
+    @test isapprox(sum(pw[X[:, 1] .<= -0.04]), 0.05, rtol = 5e-6)
+    @test isapprox(sum(pw[X[:, 2] .<= -0.06]), 0.1, rtol = 5e-6)
+end
+
+# #538: two covariance pairs in one estimator reach the vector method of
+# `replace_coprior_views`, which every single-pair test before this one stepped over.
+@testset "Two covariance pairs in one estimator" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    X = pr0.X
+    t1 = 1.3 * pr0.sigma[1, 2]
+    t2 = 0.7 * pr0.sigma[3, 4]
+    pw = collect(prior(EntropyPoolingPrior(; w = w, sets = sets,
+                                           cov_views = LinearConstraintEstimator(;
+                                                                                 val = ["(AAPL, AMD) == $(t1)",
+                                                                                        "(BAC, BBY) == $(t2)"])),
+                       rd).w)
+    # `ep_cov_views!` states the second moment about the PRIOR means, so that is where the
+    # target lands.
+    cw(a, b) = sum(pw .* X[:, a] .* X[:, b]) - pr0.mu[a] * pr0.mu[b]
+    @test isapprox(cw(1, 2), t1, rtol = 5e-6)
+    @test isapprox(cw(3, 4), t2, rtol = 5e-6)
+end
+
+# #538: `wb` boxes a `:feq` dual variable by `sc2`, and the start was `1/sqrt(T)` for every
+# coordinate. Any `sc2` below that value put the start outside the box, and `Optim` raised
+# `ArgumentError: Initial x[(3,)]=0.0315 is outside of [-0.031, 0.031]` instead of solving.
+@testset "OptimEntropyPooling starts inside its box" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    X = pr0.X
+    target = pr0.mu[1] + 0.002
+    function epc_with_fix()
+        epc = Dict{Symbol,
+                   Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+        PortfolioOptimisers.ep_mu_views!(LinearConstraintEstimator(;
+                                                                   val = "AAPL == $(target)"),
+                                         epc, pr0, sets)
+        to_fix = falses(size(X, 2))
+        to_fix[1] = true
+        PortfolioOptimisers.fix_mu!(epc, falses(size(X, 2)), to_fix, pr0)
+        return epc
+    end
+    post(opt) = sum(collect(PortfolioOptimisers.entropy_pooling(w, epc_with_fix(), opt)) .*
+                    X[:, 1])
+    # `1/sqrt(T)` is the start, so these three `sc2` values bracket it from below.
+    for sc2 in (1e-4, 0.031, inv(sqrt(size(X, 1))))
+        @test isapprox(post(OptimEntropyPooling(; sc2 = sc2)), target, rtol = 5e-7)
+        @test isapprox(post(OptimEntropyPooling(; sc2 = sc2, alg = LogEntropyPooling())),
+                       target, rtol = 5e-7)
+    end
+    # `sc2 = 0` pins the `:feq` dual variable to zero, so the fix carries no weight. That is
+    # what the JuMP route's penalty of weight `sc2` already gave, and the two now agree.
+    epc_eq_only = Dict{Symbol,
+                       Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    PortfolioOptimisers.ep_mu_views!(LinearConstraintEstimator(; val = "AAPL == $(target)"),
+                                     epc_eq_only, pr0, sets)
+    eq_only = sum(collect(PortfolioOptimisers.entropy_pooling(w, epc_eq_only,
+                                                              OptimEntropyPooling())) .*
+                  X[:, 1])
+    @test isapprox(post(OptimEntropyPooling(; sc2 = 0)), eq_only, rtol = 1e-12)
+    @test isapprox(post(OptimEntropyPooling(; sc2 = 0, alg = LogEntropyPooling())), eq_only,
+                   rtol = 1e-12)
+    @test isapprox(post(JuMPEntropyPooling(; slv = slv, sc2 = 0)), eq_only, rtol = 5e-7)
+
+    # The documented key set is `:eq`, `:ineq`, `:feq` and `:cvar_eq`. Both algorithms raise
+    # on anything else; `:cvar_ineq` was a dead disjunct of the `Exp` branch alone.
+    bogus = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    bogus[:cvar_ineq] = (reshape(X[:, 1], 1, :), [0.002])
+    @test_throws KeyError PortfolioOptimisers.entropy_pooling(w, bogus,
+                                                              OptimEntropyPooling())
+    @test_throws KeyError PortfolioOptimisers.entropy_pooling(w, bogus,
+                                                              OptimEntropyPooling(;
+                                                                                  alg = LogEntropyPooling()))
+end
+
+# #538: the guard read `any` where it needed `all`. A row over a universe of more than one
+# asset always carries a zero, so `any` held for every view and the guard never fired. The
+# body then read the target off `B` while it discarded the coefficient, which doubled the
+# threshold a `2*AAPL` view asks for: 28 observations sat below `-0.04` where 124 sat below
+# the `-0.02` the view means.
+@testset "A ValueatRiskView takes a coefficient of one alone" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    epc() = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    vv(s) = ValueatRiskView(; views = LinearConstraintEstimator(; val = s), alpha = 0.05)
+    @test_throws ArgumentError PortfolioOptimisers.ep_var_views!(vv("2*AAPL == 0.04"),
+                                                                 epc(), pr0, sets)
+    @test_throws ArgumentError PortfolioOptimisers.ep_var_views!(vv("0.5*AAPL >= 0.04"),
+                                                                 epc(), pr0, sets)
+    e = epc()
+    PortfolioOptimisers.ep_var_views!(vv("AAPL == 0.04"), e, pr0, sets)
+    @test size(e[:eq][1], 1) == 1
+end
+
+# #538: a covariance or correlation view naming an asset the universe does not hold RAISED
+# under `strict = false`. `replace_coprior_views` drops the pair, which leaves the view with
+# no pair, and the "mix multiple pairs" guard then reported a view of no pairs as one of
+# several and named an equation with no variable in it. The `strict` contract is that
+# `false` warns and drops, which the four linear families already honoured.
+@testset "A covariance pair naming an unknown asset is dropped" begin
+    using PortfolioOptimisers, Test, Logging
+    pr0 = prior(EmpiricalPrior(), rd)
+    N = size(pr0.X, 2)
+    epc() = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    lce(v) = LinearConstraintEstimator(; val = v)
+    cov_val = ["(NOPE, AMD) == 0.0002", "(AAPL, AMD) == 0.0006"]
+    rho_val = ["(NOPE, AMD) == 0.5", "(AAPL, AMD) == 0.5"]
+
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        e = epc()
+        to_fix = PortfolioOptimisers.ep_cov_views!(lce(cov_val), e, pr0, sets;
+                                                   strict = false)
+        # The surviving view still lands its row, and it alone marks its two assets.
+        @test size(e[:eq][1], 1) == 1
+        @test findall(to_fix) == [1, 2]
+
+        e = epc()
+        to_fix = PortfolioOptimisers.ep_rho_views!(lce(rho_val), e, pr0, sets;
+                                                   strict = false)
+        @test size(e[:eq][1], 1) == 1
+        @test findall(to_fix) == [1, 2]
+    end
+    # The dropped row is reported, not silent.
+    @test_logs (:warn,) (:warn,) match_mode = :any PortfolioOptimisers.ep_cov_views!(lce(cov_val),
+                                                                                     epc(),
+                                                                                     pr0,
+                                                                                     sets;
+                                                                                     strict = false)
+    @test_throws ArgumentError PortfolioOptimisers.ep_cov_views!(lce(cov_val), epc(), pr0,
+                                                                 sets; strict = true)
+    @test_throws ArgumentError PortfolioOptimisers.ep_rho_views!(lce(rho_val), epc(), pr0,
+                                                                 sets; strict = true)
+end
+
+# #538: an `:ineq` block through the two dual algorithms. `LogEntropyPooling`'s `:ineq` box
+# was the one line of this file the two entropy pooling test files never reached: every
+# inequality view they state runs through `ExpEntropyPooling` or through JuMP.
+@testset "An inequality view runs through both dual algorithms" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    X = pr0.X
+    function epc_two()
+        epc = Dict{Symbol,
+                   Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+        PortfolioOptimisers.ep_mu_views!(LinearConstraintEstimator(;
+                                                                   val = ["AAPL == 0.002",
+                                                                          "AMD >= 0.004"]),
+                                         epc, pr0, sets)
+        return epc
+    end
+    @test sort(collect(keys(epc_two()))) == [:eq, :ineq]
+    # The prior mean of AMD is 0.00187, so the lower bound binds.
+    pexp = collect(PortfolioOptimisers.entropy_pooling(w, epc_two(),
+                                                       OptimEntropyPooling(;
+                                                                           alg = ExpEntropyPooling())))
+    plog = collect(PortfolioOptimisers.entropy_pooling(w, epc_two(),
+                                                       OptimEntropyPooling(;
+                                                                           alg = LogEntropyPooling())))
+    for p in (pexp, plog)
+        @test isapprox(sum(p .* X[:, 1]), 0.002, rtol = 5e-6)
+        @test isapprox(sum(p .* X[:, 2]), 0.004, rtol = 5e-6)
+        @test isapprox(sum(p), 1, rtol = 5e-7)
+        @test all(>(0), p)
+    end
+    # Two parameterisations of one problem.
+    @test isapprox(pexp, plog, rtol = 1e-12)
+end

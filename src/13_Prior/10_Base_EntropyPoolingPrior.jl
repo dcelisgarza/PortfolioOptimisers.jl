@@ -2228,7 +2228,7 @@ Where:
 
 # Validation
 
-  - Every coefficient is zero or one. Any other coefficient raises an `ArgumentError`.
+  - Every coefficient has magnitude zero or one. Any other coefficient raises an `ArgumentError`. The check reads the magnitude because the parser normalises a `>=` row to `<=` by negation, which carries a coefficient of one into the block as minus one.
   - Every view names one asset. A view over more than one asset raises an `ArgumentError`.
   - Every target is non-negative. A negative target raises a `DomainError`.
   - The sample must hold at least one observation whose loss reaches the target. A view more extreme than the worst realisation raises a `DomainError` naming the largest target the asset admits.
@@ -2291,8 +2291,14 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(X), strict = strict)
-    @argcheck(!(!isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
-                !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)),
+    #! `all`, not `any`: a row of a universe of more than one asset always carries a zero,
+    #! so `any` held for every view and the guard never fired. The body then read the
+    #! target off `B` while it discarded the coefficient, which doubles the threshold a
+    #! `2*AAPL` view asks for. The magnitude, not the value: the parser normalises a `>=`
+    #! row to `<=` by negation, so a coefficient of one reaches `A_ineq` as `-1`.
+    unit_coef = x -> (iszero(x) || isone(abs(x)))
+    @argcheck(!(!isnothing(lcs.ineq) && !all(unit_coef, lcs.A_ineq) ||
+                !isnothing(lcs.eq) && !all(unit_coef, lcs.A_eq)),
               ArgumentError("var_view only supports coefficients of 1.\n$var_views"))
     @argcheck(!(!isnothing(lcs.ineq) &&
                 any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
@@ -2372,8 +2378,8 @@ Where:
 # Algorithm
 
  1. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
- 2. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key.
- 3. Start every dual variable at ``1/\\sqrt{T}``.
+ 2. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
+ 3. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
  4. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
  5. Raise when `Optim.converged` reports that the solve failed.
  6. Recover the posterior probabilities from the minimiser, and return them as `StatsBase.pweights`.
@@ -2420,12 +2426,19 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     B = [factor]
     wb = [typemin(eltype(w)) typemax(eltype(w))]
     for (key, val) in epc
+        s = length(val[2])
+        #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
+        #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and
+        #! it is what the JuMP route gives. `Optim` cannot start inside a box of zero
+        #! width, so the block is left out rather than boxed to a point.
+        if key == :feq && iszero(opt.sc2)
+            continue
+        end
         A = vcat(A, val[1])
         B = vcat(B, val[2])
-        s = length(val[2])
         wb = if key == :eq || key == :cvar_eq
             vcat(wb, [fill(typemin(eltype(w)), s) fill(typemax(eltype(w)), s)])
-        elseif key == :ineq || key == :cvar_ineq
+        elseif key == :ineq
             vcat(wb, [zeros(eltype(w), s) fill(typemax(eltype(w)), s)])
         elseif key == :feq
             vcat(wb, [fill(-opt.sc2, s) fill(opt.sc2, s)])
@@ -2433,7 +2446,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
             throw(KeyError("Unknown key $(key) in epc."))
         end
     end
-    x0 = fill(factor, size(A, 1))
+    #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
+    #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
+    #! `sc2 < 1/sqrt(T)`, and `Optim` raises an opaque `ArgumentError` instead of solving.
+    #! The box is halved before the clamp because `Optim` also refuses a start that sits
+    #! *on* a boundary. Halving leaves the infinite bounds and the `:ineq` zero untouched.
+    x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
     G = similar(x0)
     last_x = similar(x0)
     grad = similar(G)
@@ -2478,9 +2496,16 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     B = [factor]
     wb = [typemin(eltype(w)) typemax(eltype(w))]
     for (key, val) in epc
+        s = length(val[2])
+        #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
+        #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and
+        #! it is what the JuMP route gives. `Optim` cannot start inside a box of zero
+        #! width, so the block is left out rather than boxed to a point.
+        if key == :feq && iszero(opt.sc2)
+            continue
+        end
         A = vcat(A, val[1])
         B = vcat(B, val[2])
-        s = length(val[2])
         wb = if key == :eq || key == :cvar_eq
             vcat(wb, [fill(typemin(eltype(w)), s) fill(typemax(eltype(w)), s)])
         elseif key == :ineq
@@ -2492,7 +2517,12 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         end
     end
     log_p = log.(w)
-    x0 = fill(factor, size(A, 1))
+    #! `wb` bounds a `:feq` dual variable by `sc2`, and the constructor admits any
+    #! `sc2 >= 0`. An unclamped start of `factor` therefore sits outside the box whenever
+    #! `sc2 < 1/sqrt(T)`, and `Optim` raises an opaque `ArgumentError` instead of solving.
+    #! The box is halved before the clamp because `Optim` also refuses a start that sits
+    #! *on* a boundary. Halving leaves the infinite bounds and the `:ineq` zero untouched.
+    x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
     G = similar(x0)
     last_x = similar(x0)
     grad = similar(G)
@@ -3078,7 +3108,7 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
  1. Parse the view equations of `cov_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans, keeping a pair view a pair view.
  3. Replace every `prior(a, b)` reference by the prior covariance, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) carrying its index pairs.
- 4. For each view in turn, raise unless it names exactly one pair.
+ 4. For each view in turn, drop it when step 3 left it with no pair, and raise unless it names exactly one.
  5. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  6. Read the index pair `(i, j)`, and build `Ai`, the product of the two return columns scaled by `d` and the view's coefficient.
  7. Build `Bi`, the target moved by the product of the prior means, scaled the same way. A single asset pair gives a scalar, which is wrapped into a one-element vector; a group pair gives one entry per spanned pair.
@@ -3094,7 +3124,7 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
 
 # Validation
 
-  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`.
+  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. A view left with no pair, because every pair it named holds an asset the universe does not, is dropped with a report under `strict = false`; `strict = true` has already raised by then.
 
 # Returns
 
@@ -3119,6 +3149,16 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
     cov_views = replace_coprior_views(cov_views, pr, sets, :cov; strict = strict)
     to_fix = falses(size(X, 2))
     for cov_view in cov_views
+        #! `replace_coprior_views` drops a pair naming an asset the universe does not hold,
+        #! which leaves the view with no pair at all. Under `strict = false` that must drop
+        #! the row, as `get_linear_constraints` does for the linear families. Without this
+        #! the guard below raised, called a view of no pairs one of several, and named an
+        #! equation with no variable in it.
+        if isempty(cov_view.vars)
+            strict_diagnostic(empty_row_msg(cov_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view"), strict)
+            continue
+        end
         @argcheck(length(cov_view.vars) == 1,
                   "Cannot mix multiple covariance pairs in a single view `$(cov_view.eqn)`.")
         d, flag = comparison_sign_ineq_flag(cov_view.op)
@@ -3182,7 +3222,7 @@ The identity holds only while the posterior means and variances of assets ``i`` 
  2. Replace every group name by the assets it spans, keeping a pair view a pair view.
  3. Replace every `prior(a, b)` reference by the prior correlation, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) carrying its index pairs.
  4. Read the prior variances, the diagonal of `pr.sigma`, into `sigma`.
- 5. For each view in turn, raise unless it names exactly one pair, and raise unless every target lies in ``[-1, 1]``.
+ 5. For each view in turn, drop it when step 3 left it with no pair, raise unless it names exactly one, and raise unless every target lies in ``[-1, 1]``.
  6. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  7. Read the index pair `(i, j)`, and build `sigma_ij`, the root of the product of the two prior variances.
  8. Build `Ai`, the product of the two return columns scaled by `d` and the view's coefficient.
@@ -3199,7 +3239,7 @@ The identity holds only while the posterior means and variances of assets ``i`` 
 
 # Validation
 
-  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`.
+  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. A view left with no pair, because every pair it named holds an asset the universe does not, is dropped with a report under `strict = false`; `strict = true` has already raised by then.
   - Every target lies in ``[-1, 1]``. A target outside that range raises an `ArgumentError`.
 
 # Returns
@@ -3226,6 +3266,13 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     to_fix = falses(size(X, 2))
     sigma = LinearAlgebra.diag(pr.sigma)
     for rho_view in rho_views
+        #! See the twin note in `ep_cov_views!`: a pair naming an unknown asset leaves the
+        #! view with no pair, and under `strict = false` that drops the row.
+        if isempty(rho_view.vars)
+            strict_diagnostic(empty_row_msg(rho_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view"), strict)
+            continue
+        end
         @argcheck(length(rho_view.vars) == 1,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
         @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
