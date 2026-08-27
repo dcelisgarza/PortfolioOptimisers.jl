@@ -3,7 +3,7 @@
 ```@docs
 LowOrderPrior
 HighOrderPrior
-prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
 assert_prior_regression
 prior_regression_remedy

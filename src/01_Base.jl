@@ -146,6 +146,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :pe => "`pe`: Prior estimator.",#
                                  :pr => "`pr`: Prior result.",#
                                  :per => "`pr`: Prior estimator or result.",#
+                                 :pr_rr => "`pr`: Prior result or returns result. Both carry the asset returns matrix `X` and the feature matrix `Z`, so either can supply them.",#
                                  # Phylogeny.
                                  :cle => "`cle`: Clusters estimator.",#
                                  :clr => "`clr`: Clusters result.",#
