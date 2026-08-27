@@ -76,7 +76,7 @@ commit = "a6d87c6"
 "src/13_Prior/01_Base_Prior.jl" = { lines = 179, misses = 0 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { lines = 23, misses = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { lines = 32, misses = 0 }
-"src/13_Prior/04_HighOrderPrior.jl" = { lines = 66, misses = 3 }
+"src/13_Prior/04_HighOrderPrior.jl" = { lines = 66, misses = 0 }
 "src/13_Prior/05_BlackLittermanViewsGeneration.jl" = { lines = 64, misses = 2 }
 "src/13_Prior/06_BlackLittermanPrior.jl" = { lines = 55, misses = 0 }
 "src/13_Prior/07_BayesianBlackLittermanPrior.jl" = { lines = 26, misses = 0 }
@@ -86,7 +86,7 @@ commit = "a6d87c6"
 "src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { lines = 155, misses = 67 }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { lines = 329, misses = 5 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { lines = 51, misses = 0 }
-"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { lines = 114, misses = 8 }
+"src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { lines = 114, misses = 0 }
 "src/13_Prior/15_FeaturePrior.jl" = { lines = 62, misses = 0 }
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { lines = 102, misses = 4 }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { lines = 19, misses = 0 }

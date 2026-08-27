@@ -1,5 +1,5 @@
 include(joinpath(@__DIR__, "test12_setup.jl"))
-using LinearAlgebra
+using LinearAlgebra, FLoops, SparseArrays, StableRNGs
 
 @testset "Empirical Prior" begin
     pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
@@ -1834,4 +1834,332 @@ end
     # A fresh call rebuilds the vector, and rebuilds it the same way.
     @test pool == PortfolioOptimisers.prior_result_property_pool()
     @test pool !== PortfolioOptimisers.prior_result_property_pool()
+end
+
+#=
+The residual comoments of `src/13_Prior/14_HighOrderFactorPriorEstimator.jl`, checked against
+hand-built matrices rather than read. Sweep ticket #534. Riskfolio-Lib carries the reference
+implementation of both, and this library's branch chain matches it entry for entry; what differs
+is that the reference builds the systematic covariance itself from the loadings, while this
+library takes it as an argument and asks the caller to remove the residual block first.
+=#
+@testset "Residual coskewness and cokurtosis" begin
+    PO = PortfolioOptimisers
+    me = SimpleExpectedReturns()
+    mean_ = PO.Statistics.mean
+
+    # `coskewness_residuals` writes `E[e_i^3]` at `(i, (i - 1) * N + i)` and zero elsewhere.
+    # The index arithmetic is the whole function, so it is checked against a hand-built
+    # matrix at two asset counts.
+    for N in (2, 3)
+        rng = StableRNG(987)
+        X = randn(rng, 5000, N) .* reshape([0.5, 1.5, 2.5][1:N], 1, N)
+        sk = PO.coskewness_residuals(X, me)
+        H = zeros(N, N^2)
+        for i in 1:N
+            H[i, (i - 1) * N + i] = mean_(X[:, i] .^ 3)
+        end
+        @test size(sk) == (N, N^2)
+        @test Array(sk) ≈ H
+        @test SparseArrays.nnz(sk) == N
+    end
+
+    #=
+    Nothing is demeaned. The zero-mean assumption belongs to the factor model, so residuals
+    with a mean of their own give the RAW third moment. For a unit-variance zero-mean `e`
+    shifted by `c`, that is `c^3 + 3c`: `[0.5, -1.0]` predicts `[1.625, -4.0]` and the sample
+    of 100000 draws lands on `[1.6072, -3.9911]`. The central third moment is zero, and the
+    demeaned sample gives `[-0.0133, 0.0014]` instead.
+    =#
+    N = 2
+    E = randn(StableRNG(7), 100_000, N)
+    c = [0.5, -1.0]
+    raw = Array(PO.coskewness_residuals(E .+ reshape(c, 1, N), me))
+    central = Array(PO.coskewness_residuals(E, me))
+    raw_entries = [raw[i, (i - 1) * N + i] for i in 1:N]
+    central_entries = [central[i, (i - 1) * N + i] for i in 1:N]
+    @test isapprox(raw_entries, c .^ 3 .+ 3 .* c; rtol = 5e-2)
+    @test all(abs.(central_entries) .< 5e-2)
+    @test !isapprox(raw_entries, central_entries; rtol = 1e-1)
+
+    #=
+    `cokurtosis_residuals` runs a `FLoops.@floop` over the `N^2` columns. Each column writes
+    only its own entries, so the executor changes the visit order and nothing else: the
+    threaded default and the sequential executor are BIT-identical, not merely close.
+    =#
+    N = 2
+    Er = randn(StableRNG(11), 20_000, N) .* reshape([0.7, 1.3], 1, N)
+    sig = [0.04 0.01; 0.01 0.09]
+    kt_thr = PO.cokurtosis_residuals(sig, Er, me, FLoops.ThreadedEx())
+    kt_seq = PO.cokurtosis_residuals(sig, Er, me, FLoops.SequentialEx())
+    @test kt_thr == kt_seq
+    @test PO.cokurtosis_residuals(sig, Er, me) == kt_seq
+    @test kt_thr == transpose(kt_thr)
+    @test size(kt_thr) == (N^2, N^2)
+
+    #=
+    With a zero systematic covariance the closed form collapses to the population cokurtosis
+    of an independent residual set: `E[e_i^4]` on the four-equal pattern, `E[e_i^2] E[e_k^2]`
+    on the two-pair pattern, and zero elsewhere. That makes the check exact rather than
+    statistical.
+    =#
+    e2 = vec(mean_(Er .^ 2; dims = 1))
+    e4 = vec(mean_(Er .^ 4; dims = 1))
+    Pop = zeros(N^2, N^2)
+    for i in 1:N, k in 1:N, j in 1:N, l in 1:N
+        s = sort([i, k, j, l])
+        Pop[(i - 1) * N + k, (j - 1) * N + l] = if s[1] == s[4]
+            e4[s[1]]
+        elseif s[1] == s[2] && s[3] == s[4]
+            e2[s[1]] * e2[s[3]]
+        else
+            0.0
+        end
+    end
+    @test PO.cokurtosis_residuals(zeros(N, N), Er, me) == Pop
+
+    #=
+    The docstring used to say that every pattern with a lone index is zero. It is not: only
+    the pattern whose four indices are ALL DISTINCT vanishes. A pair with two singles gives
+    `e2[a] * sigma[b, c]`, which is what the reference implementation gives too. Sweep ticket
+    #534 moved the documentation, not the code.
+    =#
+    N4 = 4
+    E4 = randn(StableRNG(99), 20_000, N4) .* reshape([0.5, 0.8, 1.2, 0.9], 1, N4)
+    S4 = [1.0 0.5 0.3 0.2; 0.5 1.2 0.4 0.1; 0.3 0.4 0.9 0.6; 0.2 0.1 0.6 1.4]
+    k4 = PO.cokurtosis_residuals(S4, E4, me)
+    e2_4 = vec(mean_(E4 .^ 2; dims = 1))
+    e4_4 = vec(mean_(E4 .^ 4; dims = 1))
+    # All four distinct: (i, k, j, l) = (1, 2, 3, 4).
+    @test k4[(1 - 1) * N4 + 2, (3 - 1) * N4 + 4] == 0
+    # One pair and two singles: (1, 3, 1, 4) gives `e2[1] * S4[3, 4]`, not zero.
+    @test k4[(1 - 1) * N4 + 3, (1 - 1) * N4 + 4] == e2_4[1] * S4[3, 4]
+    @test !iszero(k4[(1 - 1) * N4 + 3, (1 - 1) * N4 + 4])
+    # Three equal and one lone: (1, 1, 1, 2) gives `3 * e2[1] * S4[1, 2]`.
+    @test k4[(1 - 1) * N4 + 1, (1 - 1) * N4 + 2] == 3 * e2_4[1] * S4[1, 2]
+    # Two pairs: (1, 2, 1, 2) gives `e2[2] S[1, 1] + e2[1] S[2, 2] + e2[1] e2[2]`.
+    @test k4[(1 - 1) * N4 + 2, (1 - 1) * N4 + 2] ==
+          e2_4[2] * S4[1, 1] + e2_4[1] * S4[2, 2] + e2_4[1] * e2_4[2]
+    # All four equal: `6 e2[1] S[1, 1] + e4[1]`.
+    @test k4[1, 1] == 6 * e2_4[1] * S4[1, 1] + e4_4[1]
+end
+
+#=
+The correction is a subtraction, and it must undo what the factor lift added. Sweep ticket #534.
+=#
+@testset "The residual block comes off before the cokurtosis correction" begin
+    PO = PortfolioOptimisers
+    var_ = PO.Statistics.var
+
+    # The covariance the lift produced before it added the residual block: the projected
+    # factor covariance, processed, and nothing else.
+    function pre_block(pe, pr)
+        S = pr.rr.M * pr.fpr.sigma * transpose(pr.rr.M)
+        matrix_processing!(pe.mp, S, pr.X)
+        return S
+    end
+
+    fp_t = FactorPrior(; rsd = true)
+    fp_f = FactorPrior(; rsd = false)
+    pr_t = prior(fp_t, rd)
+    pr_f = prior(fp_f, rd)
+    cfg_t = PO.factor_residual_config(fp_t)
+    @test cfg_t.rsd
+    @test !PO.factor_residual_config(fp_f).rsd
+
+    # Subtracting the block recovers the systematic covariance the lift started from, to
+    # 1.08e-19 against a `max|sigma|` of 6.06e-4.
+    err = rd.X - pr_t.X
+    recovered = pr_t.sigma - Diagonal(vec(var_(cfg_t.ve, err; dims = 1)))
+    posdef!(cfg_t.pdm, recovered)
+    @test isapprox(recovered, pre_block(fp_t, pr_t); atol = 1e-16)
+
+    # With `rsd = false` no block was ever added, so the covariance is the pre-block one
+    # exactly and the correction must leave it alone.
+    @test pr_f.sigma == pre_block(fp_f, pr_f)
+
+    #=
+    `HighOrderFactorPriorEstimator` forwards the wrapped declaration and never answers for
+    itself. Its OWN `rsd` governs the co-moment corrections, not the covariance, so flipping
+    it does not change the answer.
+    =#
+    cfg = PO.factor_residual_config(fp_t)
+    @test PO.factor_residual_config(HighOrderFactorPriorEstimator(; pe = fp_t)) === cfg
+    @test PO.factor_residual_config(HighOrderFactorPriorEstimator(; pe = fp_t, rsd = false)) ===
+          cfg
+    @test !PO.factor_residual_config(HighOrderFactorPriorEstimator(; pe = fp_f)).rsd
+
+    # A wrapped estimator that declares `nothing` forwards a `nothing`.
+    abl = AugmentedBlackLittermanPrior(; sets = afsets,
+                                       a_views = LinearConstraintEstimator(;
+                                                                           val = "$(rd.nx[1]) == 0.01"),
+                                       f_views = LinearConstraintEstimator(;
+                                                                           val = "$(rd.nf[1]) == 0.02"))
+    @test isnothing(PO.factor_residual_config(abl))
+    @test isnothing(PO.factor_residual_config(HighOrderFactorPriorEstimator(; pe = abl)))
+
+    #=
+    A `nothing` declaration and one whose `rsd` is `false` both mean "no block was added", so
+    the correction is built on `pr.sigma` untouched. The number the branch produces is the
+    cokurtosis of the `rsd = false` route plus exactly that correction.
+    =#
+    h_off = HighOrderFactorPriorEstimator(; pe = fp_f)
+    p_on = prior(h_off, rd)
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = fp_f, rsd = false), rd)
+    kt_ref = PO.cokurtosis_residuals(pr_f.sigma, rd.X - pr_f.X, h_off.kte.me, h_off.ex)
+    @test p_on.kt == p_off.kt + kt_ref
+end
+
+#=
+`ShrunkFactorPrior` is the falsification witness for the guard in step 9 of
+`prior(::HighOrderFactorPriorEstimator, …)`: a wrapper that declares a residual block and then
+reports a covariance the block was never added to. Sweep ticket #534.
+=#
+struct ShrunkFactorPrior{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_AF
+    pe::T
+end
+function PortfolioOptimisers.prior(pe::ShrunkFactorPrior, X::PortfolioOptimisers.MatNum,
+                                   F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing;
+                                   dims::Int = 1, kwargs...)
+    pr = PortfolioOptimisers.prior(pe.pe, X, F; dims = dims, kwargs...)
+    return PortfolioOptimisers.forward_prior(pr; sigma = pr.sigma * 0.05, chol = nothing)
+end
+function PortfolioOptimisers.factor_residual_config(pe::ShrunkFactorPrior)
+    return PortfolioOptimisers.factor_residual_config(pe.pe)
+end
+
+@testset "A residual variance above the prior variance keeps the prior variance" begin
+    PO = PortfolioOptimisers
+    var_ = PO.Statistics.var
+    sfp = ShrunkFactorPrior(FactorPrior())
+    pr_s = prior(sfp, rd)
+    cfg = PO.factor_residual_config(sfp)
+    @test cfg.rsd
+    @test !isnothing(pr_s.rr)
+
+    # Every one of the twenty assets trips the guard, because the wrapper shrank the whole
+    # covariance to a twentieth while the residuals stayed where they were.
+    err = rd.X - pr_s.X
+    err_sigma = vec(var_(cfg.ve, err; dims = 1))
+    @test count(err_sigma .> diag(pr_s.sigma)) == 20
+
+    h = HighOrderFactorPriorEstimator(; pe = sfp)
+    p_on = @test_logs (:warn,) match_mode = :any prior(h, rd)
+    # The guard keeps `pr.sigma` whole, so the correction is the one built on it.
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = sfp, rsd = false), rd)
+    kt_ref = PO.cokurtosis_residuals(pr_s.sigma, err, h.kte.me, h.ex)
+    @test p_on.kt == p_off.kt + kt_ref
+end
+
+#=
+The shapes `prior(::HighOrderPriorEstimator, …)` and `prior(::HighOrderFactorPriorEstimator, …)`
+produce, on each of the three co-moment branches, and the constructor guards they must satisfy.
+Sweep ticket #534.
+=#
+@testset "Every co-moment branch of both high order estimators" begin
+    PO = PortfolioOptimisers
+    N = size(rd.X, 2)
+    N2 = N^2
+    m = div(N * (N + 1), 2)
+
+    # Both moments: all three structure matrices, at the shapes the nineteen constructor
+    # guards of `HighOrderPrior` demand.
+    both = prior(HighOrderPriorEstimator(), rd)
+    @test size(both.kt) == (N2, N2)
+    @test size(both.sk) == (N, N2)
+    @test size(both.D2) == (N2, m)
+    @test size(both.L2) == size(both.S2) == (m, N2)
+    @test size(both.V) == (N, N)
+
+    # Cokurtosis alone: `L2` and `S2` serve `kt`, so they are built and `D2` stays `nothing`.
+    kt_only = prior(HighOrderPriorEstimator(; ske = nothing), rd)
+    @test isnothing(kt_only.sk)
+    @test isnothing(kt_only.V)
+    @test isnothing(kt_only.D2)
+    @test isnothing(kt_only.skmp)
+    @test size(kt_only.kt) == (N2, N2)
+    @test size(kt_only.L2) == size(kt_only.S2) == (m, N2)
+
+    # Coskewness alone: no `kt`, so none of the three is built.
+    sk_only = prior(HighOrderPriorEstimator(; kte = nothing), rd)
+    @test isnothing(sk_only.kt)
+    @test isnothing(sk_only.D2)
+    @test isnothing(sk_only.L2)
+    @test isnothing(sk_only.S2)
+    @test size(sk_only.sk) == (N, N2)
+
+    # Neither: a plain low order carrier wearing a high order jacket.
+    neither = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), rd)
+    @test all(isnothing,
+              (neither.kt, neither.sk, neither.V, neither.D2, neither.L2, neither.S2))
+
+    # The same three branches at the factor dimension. The nested carrier validates its own
+    # triple against the factor count, so both dimensions are built together.
+    K = size(rd.F, 2)
+    K2 = K^2
+    mk = div(K * (K + 1), 2)
+    fboth = prior(HighOrderFactorPriorEstimator(), rd)
+    @test size(fboth.D2) == (N2, m)
+    @test size(fboth.f_D2) == (K2, mk)
+    @test size(fboth.f_L2) == size(fboth.f_S2) == (mk, K2)
+
+    f_kt_only = prior(HighOrderFactorPriorEstimator(; ske = nothing), rd)
+    @test isnothing(f_kt_only.sk)
+    @test isnothing(f_kt_only.D2)
+    @test isnothing(f_kt_only.f_D2)
+    @test size(f_kt_only.L2) == size(f_kt_only.S2) == (m, N2)
+    @test size(f_kt_only.f_L2) == size(f_kt_only.f_S2) == (mk, K2)
+
+    # No cokurtosis: `kM` is built by the coskewness branch instead, and the projection still
+    # lands on the asset axis.
+    f_sk_only = prior(HighOrderFactorPriorEstimator(; kte = nothing), rd)
+    @test isnothing(f_sk_only.kt)
+    @test isnothing(f_sk_only.L2)
+    @test size(f_sk_only.sk) == (N, N2)
+    @test size(f_sk_only.f_sk) == (K, K2)
+
+    # Neither: the nested factor carrier is dropped altogether.
+    f_neither = prior(HighOrderFactorPriorEstimator(; kte = nothing, ske = nothing), rd)
+    @test isnothing(f_neither.fpr)
+    @test all(isnothing, (f_neither.kt, f_neither.sk, f_neither.V))
+    @test isapprox(f_neither.sigma, prior(FactorPrior(), rd).sigma)
+end
+
+#=
+`dup_elim_sum_view` is what `port_opt_view` reaches for a subset universe, and it rebuilds the
+three matrices at the subproblem's asset count rather than cutting them. Sweep ticket #534.
+=#
+@testset "A subset universe rebuilds the structure matrices at its own size" begin
+    PO = PortfolioOptimisers
+    X4 = rd.X[:, 1:4]
+    pr4 = prior(HighOrderPriorEstimator(), X4)
+    i = [1, 3]
+    v = PO.port_opt_view(pr4, i)
+
+    # The full carrier holds the `n = 4` matrices and the view holds the `n = 2` ones.
+    @test size(pr4.D2) == (16, 10)
+    @test size(pr4.L2) == size(pr4.S2) == (10, 16)
+    @test size(v.D2) == (4, 3)
+    @test size(v.L2) == size(v.S2) == (3, 4)
+    @test (v.D2, v.L2, v.S2) == PO.dup_elim_sum_matrices(2)
+
+    # And they satisfy the identities on a hand-built symmetric two-asset matrix, which a cut
+    # of the four-asset matrices could not.
+    A = [2.0 5.0; 5.0 7.0]
+    vechA = [A[a, b] for b in 1:2 for a in b:2]
+    @test v.D2 * vechA == vec(A)
+    @test v.L2 * vec(A) == vechA
+    @test v.S2 == transpose(v.D2) * v.D2 * v.L2
+
+    #=
+    A carrier holding `D2` and no `kt` is the case the varargs fallback of
+    `dup_elim_sum_view` answers. `D2` serves `sk`, which such a carrier does not hold, so the
+    view drops all three rather than rebuilding a matrix with no consumer.
+    =#
+    lo4 = prior(EmpiricalPrior(), X4)
+    d2_only = HighOrderPrior(; pr = lo4, D2 = PO.duplication_matrix(4))
+    @test size(d2_only.D2) == (16, 10)
+    v_d2 = PO.port_opt_view(d2_only, i)
+    @test (v_d2.D2, v_d2.L2, v_d2.S2) == (nothing, nothing, nothing)
+    @test isa(v_d2, HighOrderPrior)
 end
