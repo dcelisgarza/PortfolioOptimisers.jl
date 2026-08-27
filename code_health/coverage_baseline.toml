@@ -83,7 +83,7 @@ commit = "a6d87c6"
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { lines = 23, misses = 0 }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { lines = 40, misses = 0 }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { lines = 478, misses = 0 }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { lines = 155, misses = 67 }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { lines = 155, misses = 0 }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { lines = 329, misses = 5 }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { lines = 51, misses = 0 }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { lines = 114, misses = 0 }

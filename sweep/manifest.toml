@@ -118,7 +118,7 @@
 "src/13_Prior/08_FactorBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }
 "src/13_Prior/09_AugmentedBlackLittermanPrior.jl" = { map = 6, units = 2, algorithm = 1, swept = true }
 "src/13_Prior/10_Base_EntropyPoolingPrior.jl" = { map = 6, units = 69, algorithm = 19, swept = true }
-"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { map = 6, units = 7, swept = false }
+"src/13_Prior/11_MeucciEntropyPoolingPrior.jl" = { map = 6, units = 7, algorithm = 6, swept = true }
 "src/13_Prior/12_EntropyPoolingPrior.jl" = { map = 6, units = 45, swept = false }
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, swept = false }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, algorithm = 3, swept = true }

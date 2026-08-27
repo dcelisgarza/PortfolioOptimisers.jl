@@ -722,3 +722,358 @@ end
     # Two parameterisations of one problem.
     @test isapprox(pexp, plog, rtol = 1e-12)
 end
+
+# #539: the constructor guards of `MeucciEntropyPoolingPrior`. Nothing in the suite passed an
+# empty `w` or an empty `var_views` vector, so both raises were dead lines.
+@testset "MeucciEntropyPoolingPrior constructor guards" begin
+    @test_throws PortfolioOptimisers.IsEmptyError MeucciEntropyPoolingPrior(;
+                                                                            w = StatsBase.pweights(Float64[]))
+    @test_throws PortfolioOptimisers.IsNothingError MeucciEntropyPoolingPrior(;
+                                                                              mu_views = LinearConstraintEstimator(;
+                                                                                                                   val = "AAPL == 0.002"))
+    @test_throws PortfolioOptimisers.IsEmptyError MeucciEntropyPoolingPrior(; sets = sets,
+                                                                            var_views = ValueatRiskView[])
+    # A non-empty vector of value at risk views passes the same guard.
+    vv = [ValueatRiskView(; views = LinearConstraintEstimator(; val = "AAPL == 0.03"))]
+    @test isa(MeucciEntropyPoolingPrior(; sets = sets, var_views = vv).var_views,
+              AbstractVector)
+    # The constructor normalises `w` to sum to one. A mutable value is normalised in place and
+    # an immutable one is rebuilt, so both reach the field summing to one.
+    T0 = size(rd.X, 1)
+    wmut = StatsBase.pweights(collect(range(1.0, 2.0; length = T0)))
+    wimm = StatsBase.pweights(range(1.0, 2.0; length = T0))
+    @test !isapprox(sum(wmut), 1; rtol = 1e-3)
+    for pe in
+        (MeucciEntropyPoolingPrior(; w = wmut), MeucciEntropyPoolingPrior(; w = wimm))
+        @test isapprox(sum(pe.w), 1; rtol = 1e-10)
+    end
+end
+
+# #539: with no CVaR view the solve takes the `::Nothing` method of `ep_cvar_views_solve!`,
+# which no test reached: every `MeucciEntropyPoolingPrior` in the suite carried `cvar_views`.
+@testset "MeucciEntropyPoolingPrior without a CVaR view" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    mu_v = LinearConstraintEstimator(; val = "AAPL == 0.002")
+    function epc_mu()
+        epc = Dict{Symbol,
+                   Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+        PortfolioOptimisers.ep_mu_views!(mu_v, epc, pr0, sets)
+        return epc
+    end
+    opt = OptimEntropyPooling()
+    # The `::Nothing` method is a pass-through: it must return exactly what a direct
+    # `entropy_pooling` call returns, ignoring `pr`, `sets`, `ds_opt` and `dm_opt`.
+    wnone = PortfolioOptimisers.ep_cvar_views_solve!(nothing, epc_mu(), pr0, sets, w, opt,
+                                                     nothing, nothing)
+    wdirect = PortfolioOptimisers.entropy_pooling(w, epc_mu(), opt)
+    @test wnone == wdirect
+    # And the same weights reach the caller through `prior`.
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_v), rd)
+    @test isapprox(collect(pr.w), collect(wnone), rtol = 1e-6)
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-6)
+    @test isapprox(sum(pr.w), 1, rtol = 5e-7)
+    @test all(>(0), pr.w)
+end
+
+# #539: the raises of the CVaR search. A view beyond the worst realisation is refused before
+# any solve, a view group carrying a formulation has nothing to apply it to, and a search that
+# cannot converge is reported rather than returned.
+@testset "MeucciEntropyPoolingPrior refuses an unattainable CVaR view" begin
+    x = rd.X[:, 1]
+    worst = -minimum(x)
+    # The message names every offending view beside the largest target its asset admits.
+    err = try
+        prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                        cvar_views = ConditionalValueatRiskView(;
+                                                                                views = LinearConstraintEstimator(;
+                                                                                                                  val = "AAPL == $(worst * 1.01)"))),
+              rd)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin("too extreme", err.msg)
+    @test occursin(string(worst), err.msg)
+    # A `ds_opt` that stops after one iteration cannot bracket the root, so the catch rethrows
+    # the failure as an `ErrorException` naming the ways out. This is also the only route that
+    # reaches the `ds_opt` arm of the single-view branch.
+    @test_throws ErrorException prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                                                ds_opt = ConditionalValueatRiskEntropyPooling(;
+                                                                                                              kwargs = (;
+                                                                                                                        maxiters = 1)),
+                                                                cvar_views = ConditionalValueatRiskView(;
+                                                                                                        views = LinearConstraintEstimator(;
+                                                                                                                                          val = "AAPL == 0.07"))),
+                                      rd)
+    # A view group carrying a formulation has nothing to apply it to on this route.
+    @test_throws ArgumentError prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                                               cvar_views = ConditionalValueatRiskView(;
+                                                                                                       alg = LinearConditionalValueatRiskView(),
+                                                                                                       views = LinearConstraintEstimator(;
+                                                                                                                                         val = "AAPL == 0.07"))),
+                                     rd)
+    # One asset per view, and a non-negative target.
+    @test_throws ArgumentError prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                                               cvar_views = ConditionalValueatRiskView(;
+                                                                                                       views = LinearConstraintEstimator(;
+                                                                                                                                         val = "AAPL + XOM == 0.07"))),
+                                     rd)
+    @test_throws DomainError prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                                             cvar_views = ConditionalValueatRiskView(;
+                                                                                                     views = LinearConstraintEstimator(;
+                                                                                                                                       val = "AAPL == -0.07"))),
+                                   rd)
+end
+
+# #539: the outer search lands on the value at risk the CVaR view implies. With one view and
+# no other row the posterior is an exponential tilt in closed form, so the check needs no
+# entropy pooling solver and it separates the formulation from the solver.
+@testset "MeucciEntropyPoolingPrior CVaR search finds the value at risk" begin
+    x = rd.X[:, 1]
+    T0, alpha, target = length(x), 0.05, 0.07
+    q = fill(inv(T0), T0)
+    # A plain bisection keeps the check free of a solver and of a new test dependency.
+    bisect = function (f, lo, hi, tol)
+        flo = f(lo)
+        for _ in 1:200
+            mid = 0.5 * (lo + hi)
+            hi - lo <= tol && return mid
+            fm = f(mid)
+            if (flo < 0) == (fm < 0)
+                lo, flo = mid, fm
+            else
+                hi = mid
+            end
+        end
+        return 0.5 * (lo + hi)
+    end
+    tiltp = function (c, lam)
+        u = log.(q) .- lam .* c
+        u .-= maximum(u)
+        z = exp.(u)
+        z ./= sum(z)
+        return z
+    end
+    tilt = function (c, b)
+        f = lam -> LinearAlgebra.dot(tiltp(c, lam), c) - b
+        lo, hi = -1.0, 1.0
+        while f(lo) < 0 && lo > -1e8
+            lo *= 4
+        end
+        while f(hi) > 0 && hi < 1e8
+            hi *= 4
+        end
+        return tiltp(c, bisect(f, lo, hi, 1e-12))
+    end
+    # `eta` is the value at risk: the tilted posterior must leave exactly `alpha` beyond it.
+    g = function (eta)
+        c = max.(-x .- eta, 0.0) ./ alpha
+        return sum(tilt(c, target - eta)[.!iszero.(c)]) - alpha
+    end
+    eta = bisect(g, 1e-8, target * 0.999, 1e-13)
+    pcf = tilt(max.(-x .- eta, 0.0) ./ alpha, target - eta)
+
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                         cvar_views = ConditionalValueatRiskView(;
+                                                                                 views = LinearConstraintEstimator(;
+                                                                                                                   val = "AAPL == $target"))),
+               rd)
+    @test isapprox(ConditionalValueatRisk(; w = pr.w)(x), target, rtol = 1e-7)
+    # The library's posterior value at risk is the root the outer search returned.
+    @test isapprox(ValueatRisk(; w = pr.w)(x), eta, rtol = 1e-8)
+    # And the whole posterior is the closed-form tilt.
+    @test isapprox(collect(pr.w), pcf, rtol = 1e-5)
+    @test isapprox(pr.kld, sum(pcf .* log.(pcf ./ q)), rtol = 1e-5)
+    # The root sits strictly inside the bracket `[0, B]`, and not against either end.
+    @test 0.3 < eta / target < 0.9
+    # A target below the prior conditional value at risk is met as readily as one above it.
+    for f in (0.80, 1.10)
+        prf = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                              cvar_views = ConditionalValueatRiskView(;
+                                                                                      views = LinearConstraintEstimator(;
+                                                                                                                        val = "AAPL == prior(AAPL)*$f"))),
+                    rd)
+        @test isapprox(ConditionalValueatRisk(; w = prf.w)(x),
+                       ConditionalValueatRisk()(x) * f, rtol = 1e-5)
+        @test isapprox(sum(prf.w), 1, rtol = 5e-7)
+        @test all(>(0), prf.w)
+    end
+    # The bracket holds the root strictly inside over several assets and several levels.
+    for j in (1, 5, 13, 20), a in (0.05, 0.10, 0.20)
+        nm = rd.nx[j]
+        prj = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                              cvar_views = ConditionalValueatRiskView(;
+                                                                                      alpha = a,
+                                                                                      views = LinearConstraintEstimator(;
+                                                                                                                        val = "$nm == prior($nm)*1.10"))),
+                    rd)
+        xj = rd.X[:, j]
+        B = ConditionalValueatRisk(; alpha = a)(xj) * 1.10
+        @test isapprox(ConditionalValueatRisk(; alpha = a, w = prj.w)(xj), B, rtol = 1e-2)
+        @test 0 < ValueatRisk(; alpha = a, w = prj.w)(xj) / B < 1
+    end
+    # Two views take the multi-view branch, which searches a box rather than a bracket. A
+    # `dm_opt` reaches its own arm of that branch.
+    two = ConditionalValueatRiskView(;
+                                     views = LinearConstraintEstimator(;
+                                                                       val = ["AAPL == 0.053",
+                                                                              "XOM == 0.045"]))
+    for dm in (nothing,
+               OptimEntropyPooling(;
+                                   args = (PortfolioOptimisers.Optim.Fminbox(),
+                                           PortfolioOptimisers.Optim.Options(;
+                                                                             outer_x_abstol = 1e-4,
+                                                                             x_abstol = 1e-4))))
+        prt = prior(MeucciEntropyPoolingPrior(; sets = sets, dm_opt = dm, cvar_views = two),
+                    rd)
+        # The box search stops at an `x_abstol` of 1e-4 on each `eta`, and the targets are
+        # near 0.05, so it holds the views to a few percent rather than to the 1e-9 the
+        # single-view bracket reaches. The tolerance states that bound, and it is still far
+        # tighter than the gap to the prior conditional value at risk, which is 0.049.
+        @test isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, 1]), 0.053, rtol = 5e-2)
+        @test isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, end]), 0.045,
+                       rtol = 5e-2)
+        @test all(>(0), prt.w)
+        # The posterior is not degenerate: the box search reached a real interior solution.
+        @test prt.ens > 0.5 * size(rd.X, 1)
+    end
+end
+
+# #539: prior observation weights reach both `ep_prior` routes. Every `MeucciEntropyPoolingPrior`
+# in the suite left `w` at `nothing`, so the branch that reads `pe.w` was never taken. The
+# constructor normalises `w` in place, so each case builds its own.
+@testset "MeucciEntropyPoolingPrior takes prior observation weights" begin
+    T0 = size(rd.X, 1)
+    mkw = () -> StatsBase.pweights(exp.(range(-1, 0; length = T0)))
+    cvv = ConditionalValueatRiskView(;
+                                     views = LinearConstraintEstimator(;
+                                                                       val = "AAPL == 0.07"))
+    prn = prior(MeucciEntropyPoolingPrior(; sets = sets, cvar_views = cvv), rd)
+    for alg in (H1_EntropyPooling(), H0_EntropyPooling())
+        pe = MeucciEntropyPoolingPrior(; sets = sets, alg = alg, w = mkw(),
+                                       cvar_views = cvv)
+        @test isapprox(sum(pe.w), 1, rtol = 1e-10)
+        pr = prior(pe, rd)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
+        @test isapprox(sum(pr.w), 1, rtol = 5e-7)
+        @test all(>(0), pr.w)
+        # The divergence is measured from the exponential weights, not from the uniform ones,
+        # so the posterior differs from the one the uniform prior gives.
+        @test !isapprox(collect(pr.w), collect(prn.w), rtol = 1e-3)
+        @test pr.ens < prn.ens
+    end
+    # A length that does not match the number of observations is refused on both routes.
+    for alg in (H1_EntropyPooling(), H0_EntropyPooling())
+        @test_throws DimensionMismatch prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                                                       alg = alg,
+                                                                       w = StatsBase.pweights(fill(inv(7),
+                                                                                                   7)),
+                                                                       cvar_views = cvv),
+                                             rd)
+    end
+end
+
+# #539: the stages of both `ep_prior` routes. The suite only ever gave this estimator a CVaR
+# view, so the variance stage, the higher moment stage and the whole single-shot method were
+# never run. The two routes answer the same view set differently, and that is the point of
+# keeping both.
+@testset "MeucciEntropyPoolingPrior runs every stage of both routes" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    mu_v = LinearConstraintEstimator(;
+                                     val = ["AAPL<=0.75*prior(AAPL)",
+                                            "XOM >= 0.4*prior(XOM)"])
+    sig_v = LinearConstraintEstimator(;
+                                      val = ["AAPL==0.2prior(AAPL)", "WMT==1.4prior(WMT)"])
+    cov_v = LinearConstraintEstimator(; val = "(MSFT, PEP) <= prior(MSFT, PEP)*0.8")
+    rho_v = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
+    kt_v = LinearConstraintEstimator(; val = "AAPL >= prior(AAPL)*0.3")
+    sk_v = LinearConstraintEstimator(; val = "WMT == prior(WMT)*1.4")
+    mk = alg -> MeucciEntropyPoolingPrior(; sets = sets, alg = alg, mu_views = mu_v,
+                                          sigma_views = sig_v, cov_views = cov_v,
+                                          rho_views = rho_v, kt_views = kt_v,
+                                          sk_views = sk_v)
+    prh0 = prior(mk(H0_EntropyPooling()), rd)
+    prh1 = prior(mk(H1_EntropyPooling()), rd)
+    prh2 = prior(mk(H2_EntropyPooling()), rd)
+    for pr in (prh0, prh1, prh2)
+        @test isapprox(sum(pr.w), 1, rtol = 5e-7)
+        @test all(>(0), pr.w)
+        @test pr.kld > 0
+        @test 0 < pr.ens < size(rd.X, 1)
+        # The mean view binds at its bound on every route.
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1], rtol = 1e-3)
+    end
+    # The staged routes pin the mean and the variance before the higher moment stage, so the
+    # correlation view lands on its target. The single-shot route pins nothing and misses it
+    # by a wide margin, which is the whole difference between the two algorithms.
+    rho_h1 = StatsBase.cov2cor(prh1.sigma)[1, 20]
+    rho_h2 = StatsBase.cov2cor(prh2.sigma)[1, 20]
+    rho_h0 = StatsBase.cov2cor(prh0.sigma)[1, 20]
+    @test isapprox(rho_h1, 0.35, rtol = 5e-3)
+    @test isapprox(rho_h2, 0.35, rtol = 5e-3)
+    @test rho_h0 > 0.6
+    # Pinning nothing costs divergence: the single-shot posterior sits much further from the
+    # prior than either staged one, and it keeps far fewer effective scenarios.
+    @test prh0.kld > 2 * prh1.kld
+    @test prh0.ens < 0.8 * prh1.ens
+    # The two staged references agree here: the stage sets nest, so projecting the prior onto
+    # the last one and projecting each stage onto the next reach the same posterior.
+    @test isapprox(collect(prh1.w), collect(prh2.w), rtol = 5e-2)
+    # A CVaR view rides every stage, and it still holds on the final posterior beside the
+    # stage-one mean view. The variance view names a different asset from the CVaR view: a
+    # variance view that shrinks the same asset the CVaR view fattens is infeasible, and #572
+    # tracks the fact that the search answers that pair with a degenerate posterior instead of
+    # a raise.
+    prc = prior(MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_v,
+                                          sigma_views = LinearConstraintEstimator(;
+                                                                                  val = "WMT == 1.3*prior(WMT)"),
+                                          cvar_views = ConditionalValueatRiskView(;
+                                                                                  views = LinearConstraintEstimator(;
+                                                                                                                    val = "AAPL == 0.07"))),
+                rd)
+    @test isapprox(ConditionalValueatRisk(; w = prc.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
+    # The mean view is an upper bound. The CVaR view fattens AAPL's left tail, which pulls the
+    # posterior mean below that bound rather than onto it, so the view holds slack.
+    @test prc.mu[1] <= 0.75 * pr0.mu[1] + sqrt(eps())
+    # The posterior spreads over the sample rather than collapsing onto a few observations.
+    @test prc.ens > 0.5 * size(rd.X, 1)
+    @test maximum(prc.w) < 0.05
+end
+
+# #539: `factor_residual_config` forwards the wrapped estimator's declaration, and
+# `VecMeucciEP` admits a vector of these estimators.
+@testset "MeucciEntropyPoolingPrior forwards its residual declaration" begin
+    cvv = ConditionalValueatRiskView(;
+                                     views = LinearConstraintEstimator(;
+                                                                       val = "AAPL == 0.07"))
+    # An empirical inner estimator declares no residual block, and a factor one declares the
+    # `(ve, pdm, rsd)` shape. Both reach the caller unchanged.
+    pe_emp = MeucciEntropyPoolingPrior(; sets = sets, cvar_views = cvv)
+    pe_fac = MeucciEntropyPoolingPrior(; pe = FactorPrior(), sets = sets, cvar_views = cvv)
+    @test isnothing(PortfolioOptimisers.factor_residual_config(pe_emp))
+    cfg = PortfolioOptimisers.factor_residual_config(pe_fac)
+    @test isa(cfg, NamedTuple)
+    @test keys(cfg) == (:ve, :pdm, :rsd)
+    @test cfg == PortfolioOptimisers.factor_residual_config(FactorPrior())
+
+    # A vector of these estimators is a `VecMeucciEP`, and pooling one keeps its order.
+    pes = [MeucciEntropyPoolingPrior(; sets = sets,
+                                     cvar_views = ConditionalValueatRiskView(;
+                                                                             views = LinearConstraintEstimator(;
+                                                                                                               val = "AAPL == $t")))
+           for t in (0.06, 0.07, 0.08)]
+    @test isa(pes, PortfolioOptimisers.VecMeucciEP)
+    op = OpinionPoolingPrior(; pes = pes)
+    @test [p.cvar_views.views.val for p in op.pes] ==
+          ["AAPL == 0.06", "AAPL == 0.07", "AAPL == 0.08"]
+    for (p, t) in zip(op.pes, (0.06, 0.07, 0.08))
+        @test isapprox(ConditionalValueatRisk(; w = prior(p, rd).w)(rd.X[:, 1]), t,
+                       rtol = 1e-5)
+    end
+    prop = prior(op, rd)
+    @test isapprox(sum(prop.w), 1, rtol = 5e-7)
+    @test all(>(0), prop.w)
+    # The pooled posterior sits inside the range its members span.
+    @test 0.06 < ConditionalValueatRisk(; w = prop.w)(rd.X[:, 1]) < 0.08
+end
