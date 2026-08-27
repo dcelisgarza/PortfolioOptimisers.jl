@@ -1255,7 +1255,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - If `ow` is not `nothing`, `!isempty(ow)`.
   - `rr` and `fpr` must be provided together or not at all.
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
-  - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`.
+  - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the carrier that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
   - If `Z` is not `nothing`, it is non-empty, all-finite, and assets-major against `X`: `size(Z, 1) == size(X, 2)` when static, `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)` when time-varying (see [`check_feature_matrix`](@ref)).
 

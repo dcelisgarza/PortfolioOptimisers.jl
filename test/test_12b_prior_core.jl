@@ -1395,6 +1395,16 @@ end
     base = (mu = fp.mu, sigma = fp.sigma, rr = fp.rr, fpr = fp.fpr)
     # `o_X === X` says nothing, and would be a second encoding of "no reconstruction".
     @test_throws ArgumentError LowOrderPrior(; X = fp.X, o_X = fp.X, base...)
+    #=
+    The guard is an identity test and not an equality test, and the two calls read
+    identically at a call site. A copy carrying the same values is admitted, because it is
+    a matrix of its own that a later change to `X` cannot follow. What the guard rejects is
+    the carrier with no original distinct from the one it asserts.
+    =#
+    twin = copy(fp.X)
+    @test twin == fp.X
+    @test twin !== fp.X
+    @test isa(LowOrderPrior(; X = fp.X, o_X = twin, base...), LowOrderPrior)
     # The original describes the same observations and the same assets.
     @test_throws DimensionMismatch LowOrderPrior(; X = fp.X, o_X = X[1:(end - 1), :],
                                                  base...)
@@ -1594,4 +1604,116 @@ end
     # `equilibrium_mu` owns `l * sigma * w` and its equal-weight fallback.
     owner = code_lines(joinpath(src, "08_Moments", "17_EquilibriumExpectedReturns.jl"))
     @test count(l -> occursin("function equilibrium_mu(", l), owner) == 2
+end
+
+@testset "A view of a high order carrier takes each co-moment branch" begin
+    #=
+    `port_opt_view(::HighOrderPrior, i)` is the one place in `01_Base_Prior.jl` where a
+    wrong index gives a well-shaped wrong answer, so the index is checked against a
+    hand-computed one rather than against the generator that produced it. `kt` is
+    `N^2 x N^2` over ordered pairs of assets, laid out column-major, so the pair `(a, b)`
+    sits at `a + (b - 1) * N`. For `N = 3` and the subset `[1, 3]` that is `[1, 3, 7, 9]`.
+    =#
+    X = [0.01 0.02 0.03; 0.04 0.05 0.06; 0.07 0.08 0.09; 0.10 0.11 0.12]
+    mu = [0.02, 0.03, 0.04]
+    sigma = [0.001 0.0 0.0; 0.0 0.001 0.0; 0.0 0.0 0.001]
+    lo = LowOrderPrior(; X = X, mu = mu, sigma = sigma)
+    i = [1, 3]
+    idx = [a + (b - 1) * 3 for b in i for a in i]
+    @test idx == [1, 3, 7, 9]
+    @test collect(PortfolioOptimisers.fourth_moment_index_generator(3, i)) == idx
+
+    kt = reshape(collect(1.0:81.0), 9, 9)
+    D2 = PortfolioOptimisers.duplication_matrix(3)
+    L2 = PortfolioOptimisers.elimination_matrix(3)
+    S2 = PortfolioOptimisers.summation_matrix(3)
+    sk = reshape(collect(1.0:27.0), 3, 9) / 100
+    V = [0.5 0.1 0.2; 0.1 0.6 0.3; 0.2 0.3 0.7]
+    skmp = Coskewness().mp
+
+    # Every moment field present: the co-moments are cut by `idx`, and `V` is rebuilt.
+    full = HighOrderPrior(; pr = lo, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
+                          skmp = skmp)
+    v = PortfolioOptimisers.port_opt_view(full, i)
+    @test Matrix(v.kt) == kt[idx, idx]
+    @test Matrix(v.sk) == sk[i, idx]
+    # `V` is a spectral quantity of `sk`, so the submatrix of `V` is not the `V` of the
+    # submatrix. It is rebuilt from the cut `sk` and the cut returns.
+    @test Matrix(v.V) != V[i, i]
+    @test Matrix(v.V) ==
+          PortfolioOptimisers.negative_spectral_coskewness(sk[i, idx], X[:, i], skmp)
+    # `D2`, `L2` and `S2` are rebuilt at the subproblem's asset count, never cut.
+    @test size(v.D2) == (4, 3)
+    @test size(v.L2) == size(v.S2) == (3, 4)
+    @test v.skmp === skmp
+    # The view is a carrier, so it passed every `@argcheck` of the constructor.
+    @test isa(v, HighOrderPrior)
+
+    # `S2` without `D2`: the second branch takes `L2` and `S2` alone.
+    no_D2 = HighOrderPrior(; pr = lo, kt = kt, L2 = L2, S2 = S2)
+    v_no_D2 = PortfolioOptimisers.port_opt_view(no_D2, i)
+    @test isnothing(v_no_D2.D2)
+    @test size(v_no_D2.L2) == size(v_no_D2.S2) == (3, 4)
+    # No `sk`, so nothing is rebuilt from it either.
+    @test isnothing(v_no_D2.sk)
+    @test isnothing(v_no_D2.V)
+
+    # Neither: a carrier holding no co-moment at all still slices, and keeps every
+    # `nothing` a `nothing`.
+    bare = HighOrderPrior(; pr = lo)
+    v_bare = PortfolioOptimisers.port_opt_view(bare, i)
+    @test isnothing(v_bare.kt)
+    @test isnothing(v_bare.D2)
+    @test isnothing(v_bare.L2)
+    @test isnothing(v_bare.S2)
+    @test isnothing(v_bare.sk)
+    @test isnothing(v_bare.V)
+    @test v_bare.mu == mu[i]
+end
+
+@testset "A prior with nothing on the asset axis passes through a view unchanged" begin
+    #=
+    An estimator carries a recipe rather than data on an asset axis, so a subproblem refits
+    it on its own universe. A vector arrives already resolved per subproblem, so the entry
+    has been chosen by the time the view is taken. Both are returned by identity.
+    =#
+    i = [1, 3]
+    pe = EmpiricalPrior()
+    @test PortfolioOptimisers.port_opt_view(pe, i) === pe
+    @test isnothing(PortfolioOptimisers.port_opt_view(nothing, i))
+    # The second positional argument is the asset index, and neither method reads it, so a
+    # value that indexes nothing is accepted too.
+    @test PortfolioOptimisers.port_opt_view(pe, nothing) === pe
+    # Further positional and keyword arguments are accepted and ignored.
+    @test PortfolioOptimisers.port_opt_view(pe, i, :ignored; also = :ignored) === pe
+
+    X = [0.01 0.02 0.03; 0.04 0.05 0.06; 0.07 0.08 0.09; 0.10 0.11 0.12]
+    lo = LowOrderPrior(; X = X, mu = [0.02, 0.03, 0.04],
+                       sigma = [0.001 0.0 0.0; 0.0 0.001 0.0; 0.0 0.0 0.001])
+    prs = [lo, lo]
+    @test PortfolioOptimisers.port_opt_view(prs, i) === prs
+    pes = [pe, EmpiricalPrior(; horizon = 252)]
+    @test PortfolioOptimisers.port_opt_view(pes, i) === pes
+    @test PortfolioOptimisers.port_opt_view(pes, i, :ignored; also = :ignored) === pes
+end
+
+@testset "The property pool is the union of both carriers' fields, in a stable order" begin
+    #=
+    `prior_result_property_pool` is the candidate pool an `@pprop` field name is checked
+    against, so a downstream reflection reads it positionally. The order is therefore part
+    of the contract and is written out here rather than derived a second way.
+    =#
+    pool = PortfolioOptimisers.prior_result_property_pool()
+    @test pool ==
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :Z, :pr, :kt, :D2,
+           :L2, :S2, :sk, :V, :skmp]
+    @test allunique(pool)
+    # `fpr` is a field of both carriers, so the concatenation is not already unique.
+    @test :fpr in fieldnames(LowOrderPrior)
+    @test :fpr in fieldnames(HighOrderPrior)
+    @test length(pool) ==
+          length(fieldnames(LowOrderPrior)) + length(fieldnames(HighOrderPrior)) - 1
+    # A fresh call rebuilds the vector, and rebuilds it the same way.
+    @test pool == PortfolioOptimisers.prior_result_property_pool()
+    @test pool !== PortfolioOptimisers.prior_result_property_pool()
 end

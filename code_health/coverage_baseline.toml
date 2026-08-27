@@ -73,7 +73,7 @@ commit = "a6d87c6"
 "src/12_ConstraintGeneration/06_AssetSetsMatrix.jl" = { lines = 174, misses = 13 }
 "src/12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { lines = 18, misses = 0 }
 "src/12_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { lines = 41, misses = 0 }
-"src/13_Prior/01_Base_Prior.jl" = { lines = 179, misses = 9 }
+"src/13_Prior/01_Base_Prior.jl" = { lines = 179, misses = 0 }
 "src/13_Prior/02_EmpiricalPrior.jl" = { lines = 23, misses = 0 }
 "src/13_Prior/03_FactorPrior.jl" = { lines = 32, misses = 0 }
 "src/13_Prior/04_HighOrderPrior.jl" = { lines = 66, misses = 3 }
