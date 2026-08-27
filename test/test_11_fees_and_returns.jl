@@ -177,4 +177,138 @@
         @test collect(ve.w) == w0[[1, 3]]
         @test ve.val === tnf.val
     end
+    # Issue #546, condition 2: the fee arithmetic of `src/16_Fees.jl`, checked with
+    # numbers rather than read.
+    @testset "Fee terms, the per-asset identity and name resolution" begin
+        wf = [0.6, -0.4, 0.0, 0.25]
+        pf = [100.0, 50.0, 20.0, 10.0]
+        tnf = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = [0.01, 0.02, 0.03, 0.04])
+        fev = Fees(; tn = tnf, l = [0.001, 0.002, 0.003, 0.004],
+                   s = [0.005, 0.006, 0.007, 0.008], fl = [1.0, 2.0, 3.0, 4.0],
+                   fs = [5.0, 6.0, 7.0, 8.0])
+        tns = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.02)
+        fesc = Fees(; tn = tns, l = 0.001, s = 0.005, fl = 1.0, fs = 5.0)
+
+        # The per-asset fee sums to the portfolio fee, up to the order of summation.
+        @test isapprox(sum(calc_asset_fees(wf, pf, fev)), calc_fees(wf, pf, fev))
+        @test isapprox(sum(calc_asset_fees(wf, fev)), calc_fees(wf, fev))
+        @test isapprox(sum(calc_asset_fees(wf, pf, fesc)), calc_fees(wf, pf, fesc))
+        @test isapprox(sum(calc_asset_fees(wf, fesc)), calc_fees(wf, fesc))
+
+        # The short proportional term is a positive charge, not a credit.
+        @test calc_fees([0.6, -0.4], Fees(; s = 0.01)) == 0.004
+        @test calc_asset_fees([0.6, -0.4], Fees(; s = 0.01)) == [0.0, 0.004]
+        @test calc_fees([0.6, -0.4], [100.0, 50.0], Fees(; s = 0.01)) == 0.2
+
+        # The fixed term carries no price: change `p` and read the same number.
+        ffx = Fees(; fl = 3.0, fs = 7.0)
+        @test calc_fees([0.6, -0.4], [100.0, 50.0], ffx) ==
+              calc_fees([0.6, -0.4], [1.0, 1.0], ffx) ==
+              calc_fees([0.6, -0.4], ffx) ==
+              10.0
+        @test calc_fixed_fees([0.6, -0.4], 3.0, (; atol = 1e-8), .>=) == 3.0
+        @test calc_fixed_fees([0.6, -0.4], 7.0, (; atol = 1e-8), .<) == 7.0
+
+        # `kwargs` decides how near zero counts as zero, and `atol` moves the boundary.
+        @test Fees(; fl = 2.0).kwargs == (; atol = 1e-8)
+        @test calc_fees([1e-9, 0.5], Fees(; fl = 2.0)) == 2.0
+        @test calc_fees([1e-7, 0.5], Fees(; fl = 2.0)) == 4.0
+        @test calc_fees([1e-7, 0.5], Fees(; fl = 2.0, kwargs = (; atol = 1e-6))) == 2.0
+        @test calc_fees([1e-9, 0.5], Fees(; fl = 2.0, kwargs = (; atol = 1e-10))) == 4.0
+
+        # Issue #546: `calc_asset_fixed_fees` on a vector rate used to raise a
+        # `DimensionMismatch` whenever the selected side held a near-zero weight, because
+        # it wrote one entry per charged position into one slot per selected position.
+        @test calc_asset_fixed_fees([0.6, 0.0, 0.25], [2.0, 3.0, 4.0], (; atol = 1e-8),
+                                    .>=) == [2.0, 0.0, 4.0]
+        @test sum(calc_asset_fixed_fees([0.6, 0.0, 0.25], [2.0, 3.0, 4.0], (; atol = 1e-8),
+                                        .>=)) ==
+              calc_fixed_fees([0.6, 0.0, 0.25], [2.0, 3.0, 4.0], (; atol = 1e-8), .>=)
+        @test calc_asset_fixed_fees([-0.6, 0.0, -0.25], [2.0, 3.0, 4.0], (; atol = 1e-8),
+                                    .<) == [2.0, 0.0, 4.0]
+
+        # The turnover term, against the two expressions computed by hand.
+        @test calc_fees(wf, pf, tns) == tns.val * dot(abs.(wf - tns.w), pf)
+        tnc = Turnover(; w = tns.w, val = fill(0.02, 4))
+        @test calc_fees(wf, pf, tnc) == dot(tnc.val, abs.(wf - tnc.w) .* pf)
+        @test isapprox(calc_fees(wf, pf, tns), calc_fees(wf, pf, tnc))
+        @test calc_fees(wf, tns) == tns.val * sum(abs.(wf - tns.w))
+        @test calc_fees(wf, tnc) == dot(tnc.val, abs.(wf - tnc.w))
+        @test isapprox(calc_fees(wf, tns), calc_fees(wf, tnc))
+
+        # `fixed` is a `factory` flag; no `calc_fees` method reads it.
+        tn_fx = Turnover(; w = tns.w, val = 0.02, fixed = true)
+        tn_fr = Turnover(; w = tns.w, val = 0.02, fixed = false)
+        @test calc_fees(wf, pf, tn_fx) == calc_fees(wf, pf, tn_fr)
+        @test calc_fees(wf, tn_fx) == calc_fees(wf, tn_fr)
+        @test calc_asset_fees(wf, pf, tn_fx) == calc_asset_fees(wf, pf, tn_fr)
+        @test calc_asset_fees(wf, tn_fx) == calc_asset_fees(wf, tn_fr)
+        @test calc_fees(wf, factory(tn_fx, wf)) == calc_fees(wf, tn_fx)
+        @test iszero(calc_fees(wf, factory(tn_fr, wf)))
+
+        # The `Nothing` methods return a typed zero, and the priced ones promote `w` and `p`.
+        w32 = Float32[0.6, -0.4]
+        p64 = [100.0, 50.0]
+        @test typeof(calc_fees(w32, p64, nothing, .>=)) === Float64
+        @test typeof(calc_fees(w32, p64, nothing)) === Float64
+        @test typeof(calc_fees(w32, nothing, .>=)) === Float32
+        @test typeof(calc_fees(w32, nothing)) === Float32
+        @test typeof(calc_fixed_fees(w32, nothing, (; atol = 1e-8), .>=)) === Float32
+        @test eltype(calc_asset_fees(w32, p64, nothing, .>=)) === Float64
+        @test eltype(calc_asset_fees(w32, p64, nothing)) === Float64
+        @test eltype(calc_asset_fees(w32, nothing, .>=)) === Float32
+        @test eltype(calc_asset_fees(w32, nothing)) === Float32
+        @test eltype(calc_asset_fixed_fees(w32, nothing, (; atol = 1e-8), .>=)) === Float32
+
+        # Each default fills its own field and never a neighbour's.
+        fsets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        fest2 = FeesEstimator(;
+                              tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5],
+                                                     val = Dict("C" => 0.3), dval = 0.05),
+                              l = Dict("A" => 0.001), dl = 0.01, s = Dict("B" => 0.002),
+                              ds = 0.02, fl = Dict("C" => 3.0), dfl = 30.0,
+                              fs = Dict("A" => 4.0), dfs = 40.0)
+        fr2 = fees_constraints(fest2, fsets)
+        @test fr2.l == [0.001, 0.01, 0.01]
+        @test fr2.s == [0.02, 0.002, 0.02]
+        @test fr2.fl == [30.0, 30.0, 3.0]
+        @test fr2.fs == [4.0, 40.0, 40.0]
+
+        # The nested `tn` resolves too, so a `TurnoverEstimator` becomes a `Turnover`.
+        @test fr2.tn isa Turnover
+        @test fr2.tn.val == [0.05, 0.05, 0.3]
+        @test fr2.tn.w == [0.2, 0.3, 0.5]
+
+        # Issue #546: `fees_constraints` used to drop the estimator's `kwargs`, so the
+        # `atol` a caller set never reached the fixed-fee boundary.
+        festk = FeesEstimator(; fl = Dict("A" => 2.0), dfl = 2.0, kwargs = (; atol = 1e-4))
+        @test fees_constraints(festk, fsets).kwargs === festk.kwargs
+        @test calc_fees([1e-5, 0.5, 0.5], fees_constraints(festk, fsets)) == 4.0
+        @test calc_fees([1e-5, 0.5, 0.5],
+                        fees_constraints(FeesEstimator(; fl = Dict("A" => 2.0), dfl = 2.0),
+                                         fsets)) == 6.0
+
+        # An unmatched name raises when `strict` is set, and warns otherwise.
+        festx = FeesEstimator(; l = Dict("Z" => 0.001), dl = 0.01)
+        @test_throws ArgumentError fees_constraints(festx, fsets; strict = true)
+        @test (@test_logs (:warn,) fees_constraints(festx, fsets; strict = false)).l ==
+              [0.01, 0.01, 0.01]
+
+        # A `nothing` fee field stays `nothing`; no default invents one.
+        femp = fees_constraints(FeesEstimator(), fsets)
+        @test isnothing(femp.tn)
+        @test isnothing(femp.l)
+        @test isnothing(femp.s)
+        @test isnothing(femp.fl)
+        @test isnothing(femp.fs)
+
+        # A `Fees` passes through `fees_constraints` unchanged.
+        @test fees_constraints(fev) === fev
+        @test isnothing(fees_constraints(nothing))
+
+        # Only the turnover term needs a previous weight vector.
+        @test PortfolioOptimisers.needs_previous_weights(Fees(; tn = tn_fr))
+        @test !PortfolioOptimisers.needs_previous_weights(Fees(; tn = tn_fx))
+        @test !PortfolioOptimisers.needs_previous_weights(Fees(; l = 0.01, fl = 1.0))
+    end
 end

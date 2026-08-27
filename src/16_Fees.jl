@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Names the per-asset fee rates, for [`fees_constraints`](@ref) to align to a universe.
 
-Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name, and the matching `d*` field fills every asset the keys miss. [`fees_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Fees`](@ref), whose fee fields are plain per-asset vectors.
+Every fee field accepts a dictionary, a pair, or a vector of pairs keyed by asset or group name, and the matching `d*` field fills every asset the keys miss. Each default fills only its own field: `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`, and never on a neighbour's. [`fees_constraints`](@ref) resolves the names against a [`UniverseSets`](@ref) and returns a [`Fees`](@ref), whose fee fields are plain per-asset vectors and whose `kwargs` is the `kwargs` of this estimator.
 
 !!! warning
 
@@ -220,6 +220,7 @@ The finite optimisation uses fees somewhat differently because it uses a finite 
 
 Where:
 
+  - $(math_dict[:w_port])
   - ``F``: Portfolio fee.
   - ``\\boldsymbol{F}``: `N × 1` per asset vector of portfolio fees.
   - ``\\boldsymbol{X}``: `N × 1` asset price vector.
@@ -231,13 +232,23 @@ Where:
   - ``\\boldsymbol{w} \\neq 0``: Read as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms carry it: a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
-The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge.
+The short proportional term is **subtracted**. ``\\boldsymbol{w}`` is negative wherever its indicator fires, so the minus sign is what makes the fee a positive charge. On ``\\boldsymbol{w} = [0.6,\\, -0.4]`` with a short rate of `0.01` and no other term, [`calc_fees`](@ref) returns `0.004`.
+
+## The per asset fees sum to the portfolio fee
+
+The two families compute one definition. [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar, so the entries of the vector sum to the scalar. The sums differ in the order in which they add, so the identity holds to rounding and not to `==`. On ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set, a [`Turnover`](@ref) whose `w` differs from the candidate, and prices ``[100,\\, 50,\\, 20,\\, 10]``, both sides gave `12.530000000000001`. Without the price vector they gave `11.036000000000001` and `11.036`, a difference of `1.8e-15`.
 
 ## The JuMP model charges the same fee only when the decomposition is pinned
 
 [`set_non_fixed_fees!`](@ref) writes the proportional terms against the model's `lw` and `sw` variables rather than against ``\\boldsymbol{w}``, and it writes no fixed term at all — a fixed fee needs a binary and is emitted by the MIP builder instead.
 
-Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. On a 200×5 sample with `bgt = 1`, `sbgt = 1`, `l = 0.002`, `s = 0.003` and an all-long solution, the model reported `0.007` against the functor's `0.002`: the budget pins `sum(sw)` to `sbgt` whether or not a short position is held. Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the two then agreed to `5e-18` on the same problem. A long-only model needs no pinning and agreed to `9e-9`.
+Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition.
+
+The sample that measures the gap is the last 201 rows of the first five columns of `test/assets/SP500.csv.gz`, turned into 200 returns. It is solved with [`MeanRisk`](@ref) over a [`Variance`](@ref), under `lb = -1`, `ub = 1`, `bgt = 1`, `sbgt = 1`, `l = 0.002` and `s = 0.003`. The model reported `0.007` and the functor `0.003282488224724545`, a gap of `0.0037`. The budget pins `sum(lw)` to `2` and `sum(sw)` to `sbgt`, whether or not a short position is held, so the model charges both sides in full.
+
+Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition. It writes binaries, so the same problem then needs a mixed-integer conic solver rather than a conic one. On that sample the model reported `0.0069999999999999975` and the functor `0.006999999999999652`, a difference of `3.5e-16`.
+
+A long-only model needs no pinning. With `lb = 0`, `bgt = 1` and `l = 0.002` as the only fee, the model and the functor both reported `0.002`, and the difference was exactly zero.
 
 # Fields
 
@@ -312,6 +323,9 @@ Fees
   - [`calc_net_returns`](@ref)
   - [`set_non_fixed_fees!`](@ref)
   - [`PartsBoundWeights`](@ref)
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`Variance`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 
@@ -379,6 +393,12 @@ const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
 
 Check if a fee constraint or estimator requires previous portfolio weights by calling [`needs_previous_weights`](@ref) on `fe.tn`.
 
+Only the turnover term reads a previous weight vector. The proportional and fixed terms key on the sign of the position that `w` already carries, so a [`Fees`](@ref) whose `tn` is `nothing` needs none.
+
+# Algorithm
+
+ 1. Read `fe.tn` and forward it to [`needs_previous_weights`](@ref), which answers `!tn.fixed` on a turnover object and `false` on `nothing`.
+
 # Arguments
 
   - `fe`: Fee constraint or estimator.
@@ -399,9 +419,18 @@ end
     fees_constraints(fees::FeesEstimator, sets::UniverseSets; datatype::DataType = Float64,
                      strict::Bool = false)
 
-Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set.
+Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors.
 
-`fees_constraints` constructs a [`Fees`](@ref) object representing transaction fee constraints for the assets in `sets`, using the specifications in `fees`. Supports asset-specific turnover, long/short proportional fees, and long/short fixed fees via dictionaries, pairs, or vectors of pairs, with flexible assignment and validation.
+Nine fields carry the specification and each of the four proportional and fixed fields draws its gaps from its **own** default: `l` from `dl`, `s` from `ds`, `fl` from `dfl` and `fs` from `dfs`. A default never fills a neighbour's field. The nested `tn` resolves through [`turnover_constraints`](@ref), so a [`FeesEstimator`](@ref) holding a [`TurnoverEstimator`](@ref) returns a [`Fees`](@ref) holding a [`Turnover`](@ref).
+
+# Algorithm
+
+ 1. Resolve `fees.tn` against the universe of `sets` with [`turnover_constraints`](@ref), giving a [`Turnover`](@ref) whose `val` is one turnover fee rate per asset. A `nothing` `tn` stays `nothing`.
+ 2. Resolve `fees.l` with [`estimator_to_val`](@ref), giving `l`, one long proportional rate per asset in the order of the universe. Every asset the keys miss takes `fees.dl`, or `zero(datatype)` when `fees.dl` is `nothing`. A `nothing` `fees.l` stays `nothing`.
+ 3. Resolve `fees.s` the same way against `fees.ds`, giving `s`.
+ 4. Resolve `fees.fl` the same way against `fees.dfl`, giving `fl`.
+ 5. Resolve `fees.fs` the same way against `fees.dfs`, giving `fs`.
+ 6. Build a [`Fees`](@ref) from the five resolved fields and `fees.kwargs`, which reaches the result unchanged and sets the boundary the fixed terms read.
 
 # Arguments
 
@@ -410,15 +439,13 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
   - `datatype`: Output data type for fee values.
   - `strict`: If `true`, enforces strict matching between assets and fee values (throws error on mismatch); if `false`, issues a warning.
 
+# Validation
+
+  - A key that names neither an asset nor a group of `sets` raises an `ArgumentError` when `strict` is `true`, and warns otherwise. Steps 1 to 5 each check their own field, so one bad key in `l` raises whatever `s`, `fl` and `fs` hold.
+
 # Returns
 
   - `fe::Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
-
-# Details
-
-  - Fee values are extracted and mapped to assets using [`estimator_to_val`](@ref).
-  - If a fee value is missing for an asset, assigns zero unless `strict` is `true`.
-  - Turnover constraints are generated using [`turnover_constraints`](@ref).
 
 # Examples
 
@@ -467,6 +494,8 @@ Fees
   - [`FeesEstimator`](@ref)
   - [`Fees`](@ref)
   - [`turnover_constraints`](@ref)
+  - [`TurnoverEstimator`](@ref)
+  - [`Turnover`](@ref)
   - [`estimator_to_val`](@ref)
   - [`UniverseSets`](@ref)
 """
@@ -482,7 +511,7 @@ function fees_constraints(fees::FeesEstimator, sets::UniverseSets;
                 fl = estimator_to_val(fees.fl, sets, fees.dfl; datatype = datatype,
                                       strict = strict),
                 fs = estimator_to_val(fees.fs, sets, fees.dfs; datatype = datatype,
-                                      strict = strict))
+                                      strict = strict), kwargs = fees.kwargs)
 end
 """
     fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
@@ -490,6 +519,10 @@ end
 Propagate or pass through portfolio transaction fee constraints.
 
 `fees_constraints` returns the input [`Fees`](@ref) object or `nothing` unchanged. This method is used to propagate already constructed fee constraints or missing constraints, enabling composability and uniform interface handling in constraint generation workflows.
+
+# Algorithm
+
+ 1. Return `fees`. A [`Fees`](@ref) already carries one rate per asset, so no universe is resolved. The method reads none of its other arguments and none of its keywords.
 
 # Arguments
 
@@ -538,6 +571,15 @@ end
     calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
 
 Compute the actual proportional fees for portfolio weights and prices.
+
+This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``.
+
+# Algorithm
+
+ 1. On a `nothing` `fees`, return `zero(promote_type(eltype(w), eltype(p)))`. The method reads neither `w` nor `op`.
+ 2. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 3. On a `Number` `fees`, contract the selected weights with the selected prices, and scale that sum by the one rate.
+ 4. On a `VecNum` `fees`, contract the selected rates with the selected weights multiplied elementwise by the selected prices.
 
 # Arguments
 
@@ -590,6 +632,17 @@ end
 
 Compute the actual turnover fees for portfolio weights and prices.
 
+This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, and reads `tn.val` as a per-asset fee rate rather than as a bound. The `fixed` flag of [`Turnover`](@ref) reaches no method here: it decides which reference weights `tn.w` holds, through [`factory`](@ref), and by the time this method runs `tn.w` is already the vector the fee must be charged against.
+
+# Algorithm
+
+ 1. On a `nothing` `tn`, return `zero(promote_type(eltype(w), eltype(p)))`. The method reads neither `w` nor `p`.
+ 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
+ 3. On a `Number` `tn.val`, contract the traded amount with the prices, and scale that sum by the one rate.
+ 4. On a `VecNum` `tn.val`, contract the rates with the traded amount multiplied elementwise by the prices.
+
+Steps 3 and 4 are not the same expression. They agree to rounding when `tn.val` is a constant vector, and they differed by `-2.22e-16` on `w = [0.6, -0.4, 0.0, 0.25]`, `p = [100.0, 50.0, 20.0, 10.0]`, `tn.w = [0.1, 0.2, 0.3, 0.4]` and a rate of `0.02`.
+
 # Arguments
 
   - `w`: Portfolio weights.
@@ -637,7 +690,16 @@ end
 
 Compute total actual fees for portfolio weights and prices.
 
-Sums actual proportional, fixed, and turnover fees for all assets.
+Sums actual proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long proportional term `fees_long`, the call of [`calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge.
+ 3. Charge the long fixed term `fees_fixed_long`, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`. It carries no price, because a fixed fee is a currency amount already.
+ 4. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`.
+ 5. Charge the turnover term `fees_turnover`, the call of [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) on `fees.tn`.
+ 6. Return the sum of the five terms.
 
 # Arguments
 
@@ -681,7 +743,16 @@ end
     calc_fees(w::VecNum, fees::Number, op::Function)
     calc_fees(w::VecNum, fees::VecNum, op::Function)
 
-Compute the proportional fees for portfolio weights and prices.
+Compute the proportional fees for portfolio weights.
+
+This is one term of the total fee, not the whole fee. [`calc_fees(w::VecNum, fees::Fees)`](@ref) calls it twice, under `.>=` for the long side and under `.<` for the short side, and negates the short call. [`Fees`](@ref) states the closed form as ``F_{\\text{p}}``, in the pair of equations that carries no price vector.
+
+# Algorithm
+
+ 1. On a `nothing` `fees`, return `zero(eltype(w))`. The method reads neither `w` nor `op`.
+ 2. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 3. On a `Number` `fees`, scale the selected weights by the one rate, and sum them.
+ 4. On a `VecNum` `fees`, contract the selected rates with the selected weights.
 
 # Arguments
 
@@ -730,7 +801,18 @@ end
     calc_fees(w::VecNum, ::Nothing)
     calc_fees(w::VecNum, tn::Turnover)
 
-Compute the turnover fees for portfolio weights and prices.
+Compute the turnover fees for portfolio weights.
+
+This is one term of the total fee, not the whole fee. [`Fees`](@ref) states the closed form as ``F_{\\text{Tn}}``, in the pair of equations that carries no price vector. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
+
+# Algorithm
+
+ 1. On a `nothing` `tn`, return `zero(eltype(w))`. The method reads `w` only for its element type.
+ 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
+ 3. On a `Number` `tn.val`, sum the traded amount and scale it by the one rate.
+ 4. On a `VecNum` `tn.val`, contract the rates with the traded amount.
+
+Steps 3 and 4 are not the same expression. They differed by `3.47e-18` on the sample that [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) names.
 
 # Arguments
 
@@ -778,6 +860,16 @@ end
     calc_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
 
 Compute the fixed portfolio fees for assets that have been allocated.
+
+A fixed fee is charged per position held, whatever its size, so no price vector reaches this name: the fee is a currency amount already. [`Fees`](@ref) states the closed form as ``F_{\\text{f}}``, which is the one term that carries no ``\\boldsymbol{X}`` in either pair of equations.
+
+# Algorithm
+
+ 1. On a `nothing` `fees`, return `zero(eltype(w))`. The method reads neither `kwargs` nor `op`.
+ 2. Otherwise build `idx1`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 3. Build `idx2`, marking the selected positions that `isapprox` does not call zero. `kwargs` is forwarded to `isapprox`, so its `atol` sets the boundary. Under the default `atol = 1e-8` a weight of `1e-9` attracts no fee and a weight of `1e-7` attracts one.
+ 4. On a `Number` `fees`, scale the count of the positions that `idx2` marks by the one rate.
+ 5. On a `VecNum` `fees`, sum the rates of the positions that `idx2` marks.
 
 # Arguments
 
@@ -831,7 +923,16 @@ end
 
 Compute total fees for portfolio weights.
 
-Sums proportional, fixed, and turnover fees for all assets.
+Sums proportional, fixed, and turnover fees for all assets. [`calc_asset_fees(w::VecNum, fees::Fees)`](@ref) splits the same total over the assets, and its sum is this number up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long proportional term `fees_long`, the call of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge.
+ 3. Charge the long fixed term `fees_fixed_long`, the call of [`calc_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 4. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`.
+ 5. Charge the turnover term `fees_turnover`, the call of [`calc_fees(w::VecNum, tn::Turnover)`](@ref) on `fees.tn`.
+ 6. Return the sum of the five terms.
 
 # Arguments
 
@@ -873,6 +974,16 @@ end
     calc_asset_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
 
 Compute the actual proportional per asset fees for portfolio weights and prices.
+
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``.
+
+# Algorithm
+
+ 1. Allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the mask of step 2 leaves out keeps its zero.
+ 2. On a `nothing` `fees`, return `fees_w`. The method reads neither `w` nor `op` beyond their element types.
+ 3. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 4. On a `Number` `fees`, write the selected weights, multiplied elementwise by the selected prices and scaled by the one rate, into the selected entries of `fees_w`.
+ 5. On a `VecNum` `fees`, write the same product, weighted by the selected per-asset rates, into the selected entries of `fees_w`.
 
 # Arguments
 
@@ -931,6 +1042,15 @@ end
 
 Compute the actual per asset turnover fees for portfolio weights and prices.
 
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
+
+# Algorithm
+
+ 1. On a `nothing` `tn`, return a vector of zeros one entry long per asset, in the promoted element type.
+ 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
+ 3. On a `Number` `tn.val`, multiply the traded amount elementwise by the prices, and scale it by the one rate.
+ 4. On a `VecNum` `tn.val`, multiply the traded amount elementwise by the prices and by the per-asset rates.
+
 # Arguments
 
   - `w`: Portfolio weights.
@@ -979,7 +1099,16 @@ end
 
 Compute total actual per asset fees for portfolio weights and prices.
 
-Sums actual proportional, fixed, and turnover fees for all assets.
+Sums actual proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, p::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long proportional term `fees_long`, the call of [`calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge.
+ 3. Charge the long fixed term `fees_fixed_long`, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`. It carries no price, because a fixed fee is a currency amount already.
+ 4. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`.
+ 5. Charge the turnover term `fees_turnover`, the call of [`calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) on `fees.tn`.
+ 6. Return the elementwise sum of the five vectors.
 
 # Arguments
 
@@ -1023,7 +1152,17 @@ end
     calc_asset_fees(w::VecNum, fees::Number, op::Function)
     calc_asset_fees(w::VecNum, fees::VecNum, op::Function)
 
-Compute the proportional per asset fees for portfolio weights and prices.
+Compute the proportional per asset fees for portfolio weights.
+
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, fees::Number, op::Function)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{p}}``, in the pair of equations that carries no price vector.
+
+# Algorithm
+
+ 1. Allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the mask of step 3 leaves out keeps its zero.
+ 2. On a `nothing` `fees`, return `fees_w`. The method reads neither `w` nor `op` beyond the element type of `w`.
+ 3. Otherwise build `idx`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 4. On a `Number` `fees`, write the selected weights, scaled by the one rate, into the selected entries of `fees_w`.
+ 5. On a `VecNum` `fees`, write the selected weights, multiplied elementwise by the selected rates, into the selected entries of `fees_w`.
 
 # Arguments
 
@@ -1078,7 +1217,16 @@ end
     calc_asset_fees(w::VecNum, ::Nothing)
     calc_asset_fees(w::VecNum, tn::Turnover)
 
-Compute the per asset turnover fees for portfolio weights and prices.
+Compute the per asset turnover fees for portfolio weights.
+
+This is one term of the total fee, not the whole fee. It is the elementwise form of [`calc_fees(w::VecNum, tn::Turnover)`](@ref), and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{Tn}}``, in the pair of equations that carries no price vector. The `fixed` flag of [`Turnover`](@ref) reaches no method here, for the reason [`calc_fees(w::VecNum, p::VecNum, tn::Turnover)`](@ref) gives.
+
+# Algorithm
+
+ 1. On a `nothing` `tn`, return a vector of zeros one entry long per asset, in the element type of `w`.
+ 2. Otherwise form the traded amount per asset, the absolute difference between `w` and the reference weights `tn.w`.
+ 3. On a `Number` `tn.val`, scale the traded amount by the one rate.
+ 4. On a `VecNum` `tn.val`, multiply the traded amount elementwise by the per-asset rates.
 
 # Arguments
 
@@ -1127,6 +1275,17 @@ end
     calc_asset_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
 
 Compute the per asset fixed portfolio fees for assets that have been allocated.
+
+This is the elementwise form of [`calc_fixed_fees`](@ref), and its entries sum to the number that name returns. No price vector reaches it, and [`Fees`](@ref) states the closed form as ``\\boldsymbol{F}_{\\text{f}}``.
+
+# Algorithm
+
+ 1. Allocate `fees_w`, a vector of zeros one entry long per asset, in the promoted element type. An asset the masks of steps 3 and 4 leave out keeps its zero.
+ 2. On a `nothing` `fees`, return `fees_w`. The method reads neither `kwargs` nor `op`.
+ 3. Otherwise build `idx1`, the mask of the assets that `op` selects against a zero of the promoted element type.
+ 4. Build `idx2`, marking the selected positions that `isapprox` does not call zero. `kwargs` is forwarded to `isapprox`, so its `atol` sets the boundary.
+ 5. On a `Number` `fees`, write the one rate, gated by `idx2`, into the selected entries of `fees_w`.
+ 6. On a `VecNum` `fees`, write the selected per-asset rates, gated by `idx2`, into the selected entries of `fees_w`.
 
 # Arguments
 
@@ -1178,7 +1337,7 @@ function calc_asset_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
-    fees_w[idx1] = fees[idx1][idx2]
+    fees_w[idx1] = fees[idx1] ⊙ idx2
     return fees_w
 end
 """
@@ -1186,7 +1345,16 @@ end
 
 Compute total per asset fees for portfolio weights.
 
-Sums proportional, fixed, and turnover fees for all assets.
+Sums proportional, fixed, and turnover fees for all assets. The entries sum to the number [`calc_fees(w::VecNum, fees::Fees)`](@ref) returns, up to the order of summation.
+
+# Algorithm
+
+ 1. Charge the long proportional term `fees_long`, the call of [`calc_asset_fees(w::VecNum, fees::Number, op::Function)`](@ref) on `fees.l` under `.>=`.
+ 2. Charge the short proportional term `fees_short`, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation is what makes the term a positive charge.
+ 3. Charge the long fixed term `fees_fixed_long`, the call of [`calc_asset_fixed_fees`](@ref) on `fees.fl` under `.>=`.
+ 4. Charge the short fixed term `fees_fixed_short`, the call of the same name on `fees.fs` under `.<`.
+ 5. Charge the turnover term `fees_turnover`, the call of [`calc_asset_fees(w::VecNum, tn::Turnover)`](@ref) on `fees.tn`.
+ 6. Return the elementwise sum of the five vectors.
 
 # Arguments
 
