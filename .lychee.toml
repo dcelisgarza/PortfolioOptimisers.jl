@@ -1,14 +1,18 @@
 # Cited academic hosts are intermittently slow from CI runners — ijcai.org tripped the default
-# timeout twice in one run while answering in under a second from a developer machine. Retry
-# before failing the build, so a slow host cannot turn the branch red on its own.
+# timeout twice in one run while answering in under a second from a developer machine, and it
+# tripped the 45 second timeout again under three retries. Retry five times before failing the
+# build, so a slow host cannot turn the branch red on its own.
 timeout = 45
-max_retries = 3
+max_retries = 5
 retry_wait_time = 2
 
 # A host that throttles an automated client answers 429 or 503. juliastats.org answered 503
-# to one run and 200 to the sibling run of the same commit. Accept the two throttle codes, so
-# a momentary refusal cannot turn the branch red. A dead link answers 404, which stays fatal.
-accept = ["200..=299", "429", "503"]
+# to one run and 200 to the sibling run of the same commit. A live site behind a content
+# delivery network answers 502 or 504 while its origin is unreachable.
+# www.contributor-covenant.org answered 502 to four links of one run and 200 to a developer
+# machine minutes later. Accept the four transient codes, so a momentary refusal cannot turn
+# the branch red. A dead link answers 404, which stays fatal.
+accept = ["200..=299", "429", "502", "503", "504"]
 
 exclude = [
   "@ref",
