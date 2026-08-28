@@ -190,6 +190,61 @@
         end
     end
 
+    @testset "The delta box conventions" begin
+        # #576. The two axes of the delta method are not in the same convention, and the
+        # numbers below are the ones the docstrings of `mu_delta_box_set` and
+        # `sigma_delta_box_set` state.
+        rng = StableRNG(987654321)
+        X = randn(rng, 60, 4)
+        X[:, 2] .-= 0.5                      # force a negative mean on asset 2
+        pr = prior(EmpiricalPrior(), X)
+        dmu, dsigma = 0.1, 0.2
+        ue = DeltaUncertaintySet(; dmu = dmu, dsigma = dsigma)
+        # The mean axis writes a width. `lb` is zero everywhere, and the half-width the
+        # model reads is `dmu * abs(mu)`, so `abs` fixes the width and never the centre.
+        mu_set = mu_ucs(ue, X)
+        @test all(iszero, mu_set.lb)
+        @test (mu_set.ub .- mu_set.lb) ./ 2 ≈ dmu .* abs.(pr.mu)
+        @test mu_set.val == pr.mu
+        @test pr.mu[2] < 0
+        half = (mu_set.ub .- mu_set.lb) ./ 2
+        @test mu_set.val[2] - half[2] < mu_set.val[2] < mu_set.val[2] + half[2]
+        # The covariance axis writes absolute bounds. They order entry by entry, on a
+        # negative entry as much as on a positive one.
+        sigma_set = sigma_ucs(ue, X)
+        @test sigma_set.lb ≈ pr.sigma .- dsigma .* abs.(pr.sigma)
+        @test sigma_set.ub ≈ pr.sigma .+ dsigma .* abs.(pr.sigma)
+        @test sigma_set.val == pr.sigma
+        @test all(sigma_set.lb .<= pr.sigma .<= sigma_set.ub)
+        @test any(pr.sigma .< 0)
+        @test diag(sigma_set.ub) ≈ (1 + dsigma) .* diag(pr.sigma)
+        @test diag(sigma_set.lb) ≈ (1 - dsigma) .* diag(pr.sigma)
+        # A zero fraction is admitted on either axis and gives a degenerate box.
+        ue0 = DeltaUncertaintySet(; dmu = 0.0, dsigma = 0.0)
+        mu_set0, sigma_set0 = ucs(ue0, X)
+        @test all(iszero, mu_set0.lb)
+        @test all(iszero, mu_set0.ub)
+        @test sigma_set0.lb == pr.sigma
+        @test sigma_set0.ub == pr.sigma
+        # The builder applies no `posdef!`, so a large `dsigma` leaves the lower bound
+        # indefinite. The consumer reads both bounds entry by entry, so it needs neither
+        # to be definite: the worst case stays finite, and for a long-only `w` it is
+        # `w' * ub * w`, which is what `tr(Au * ub) - tr(Al * lb)` reduces to.
+        big = sigma_ucs(DeltaUncertaintySet(; dsigma = 1.0), X)
+        @test minimum(eigvals(Symmetric(Matrix(big.lb)))) < 0
+        w = fill(1 / size(X, 2), size(X, 2))
+        wc = UncertaintySetVariance(; ucs = big, sigma = pr.sigma)(w)
+        @test isfinite(wc)
+        @test wc ≈ dot(w, big.ub, w)
+        @test wc > dot(w, pr.sigma, w)
+        # The three verbs fit the prior separately, and agree on their common axes.
+        mu_pair, sigma_pair = ucs(ue, X)
+        @test mu_pair.lb == mu_set.lb
+        @test mu_pair.ub == mu_set.ub
+        @test sigma_pair.lb == sigma_set.lb
+        @test sigma_pair.ub == sigma_set.ub
+    end
+
     @testset "Ellipsoidal Uncertainty sets" begin
         rng = StableRNG(123456789)
         ues = [NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
