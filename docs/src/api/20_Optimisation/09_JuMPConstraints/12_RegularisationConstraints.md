@@ -10,10 +10,10 @@ AbstractRegularisationEstimator
 squared_norm_radius_msg
 assert_ambiguity_radius_formulation
 LpRegularisation
-factory(x::LpRegularisation, pr::AbstractPriorResult, slv)
+factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
 VecL2Reg
 L2Regularisation
-factory(x::L2Regularisation, pr::AbstractPriorResult, slv)
+factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)
 L2Reg_VecL2Reg
 VecLpReg
 LpReg_VecLpReg
