@@ -20,6 +20,10 @@ PerfRM
 PrRM
 expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
+expected_risk(r::PrRM,
+                       pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecNum}};
+                       kwargs...)
 expected_return
 term_fees
 expected_ratio
