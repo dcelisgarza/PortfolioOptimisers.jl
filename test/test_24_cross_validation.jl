@@ -795,14 +795,20 @@
     end
     @testset "Grid search and Randomised search cv" begin
         opt = JuMPOptimiser(; slv = slv)
-        mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
+        # The grids below tune an L2 regularisation coefficient. `l2` holds an
+        # `L2Regularisation` and not the number, so the coefficient lives in that
+        # estimator's `val` field and the first inner optimiser must carry one for the
+        # lens to reach it. A number written into `l2` itself is outside the field's type
+        # bound, and `factory` has no method for it (issue #584).
+        optl2 = JuMPOptimiser(; slv = slv, l2 = L2Regularisation())
+        mr = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
                       opto = MeanRisk(; opt = opt))
         r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
         p = concrete_typed_array([["opti[2].opt.l1" =>
                                        range(; start = 0.0005, stop = 0.0008, length = 3),
-                                   "opti[1].opt.l2" =>
+                                   "opti[1].opt.l2.val" =>
                                        range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  ["opti[1].opt.l2" =>
+                                  ["opti[1].opt.l2.val" =>
                                        range(; start = 0.0004, stop = 0.0007, length = 3)],
                                   [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
                                    PropertyLens(:opti) =>
@@ -820,10 +826,10 @@
         p = concrete_typed_array([Dict("opti[2].opt.l1" =>
                                            range(; start = 0.0005, stop = 0.0008,
                                                  length = 3),
-                                       "opti[1].opt.l2" =>
+                                       "opti[1].opt.l2.val" =>
                                            range(; start = 0.0004, stop = 0.0007,
                                                  length = 3)),
-                                  Dict("opti[1].opt.l2" =>
+                                  Dict("opti[1].opt.l2.val" =>
                                            range(; start = 0.0004, stop = 0.0007,
                                                  length = 3)),
                                   Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘
@@ -872,7 +878,7 @@
         end
 
         p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
-              "opti[1].opt.l2" => Uniform(0, 0.0015)],
+              "opti[1].opt.l2.val" => Uniform(0, 0.0015)],
              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                             MeanRisk(; opt = opt, obj = MaximumRatio())]]]
         rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
@@ -880,7 +886,7 @@
 
         p = [OrderedDict("opti[2].opt.l1" =>
                              range(; start = 0.0005, stop = 0.0008, length = 3),
-                         "opti[1].opt.l2" => Uniform(0, 0.0015)),
+                         "opti[1].opt.l2.val" => Uniform(0, 0.0015)),
              OrderedDict("opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                        MeanRisk(; opt = opt, obj = MaximumRatio())])]
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
