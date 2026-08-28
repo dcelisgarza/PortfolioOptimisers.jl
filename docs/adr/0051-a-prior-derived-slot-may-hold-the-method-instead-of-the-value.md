@@ -419,3 +419,26 @@ So the fallback stays in the builders for the `w` slot too, and the clause this 
 with is now confirmed for both halves rather than only for the moment slots. The drift the review
 saw is real — 23 copies of one rule — but every mechanism that would remove the copies costs more
 than the copies do.
+
+## Amendment (2026-08-28) — from [#586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/586)
+
+Two clauses of this ADR moved when the calibration slot shipped. Both are recorded in full by
+ADR 0095 and ADR 0096; this amendment says what changed here.
+
+**The per-type entry point no longer resolves the deferred state and nothing else.** It resolves a
+Calibration Rule as well, in the same method and the same rebuild, because a measure that carries
+both kinds of slot must not be rebuilt twice and because the two resolutions have an order between
+them. The declaration and the one-slot resolver stay parallel — `calibration_slots` beside
+`deferred_slots`, `resolve_calibration_slot` beside `resolve_slot` — so only the entry point is
+shared. Its name is now narrower than the method it names.
+
+**Its signature is `resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)`.** The
+third argument is the effective solver, which a rule may need in order to call `ERM` or `RRM`. On
+the `factory` route the selection has already settled it; on the `JuMP` route
+`set_risk_constraints!` threads `opt.opt.slv` in, because no selection runs there.
+
+**The `factory` resolution point resolves last.** The generated prior `factory` used to resolve
+before it selected. It now selects first and hands the selected struct to the resolution, so a
+deferred slot sees the solver, the observation weights and the children already settled. The three
+resolution points of this ADR are unchanged; only the order inside the first one moved. ADR 0096
+carries the decision.

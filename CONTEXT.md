@@ -275,8 +275,11 @@ A value in a slot that computes its own number from the Prior instead of stating
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
 **Calibration Role**
-The type that places a Calibration Rule in the slot of one quantity, and names the quantity: the end of the distribution a tail probability or a deformation parameter addresses, the Ambiguity Radius, or the Esfahani-Kuhn tail weight. The rule itself lives in the role's `alg` field. A role is an Estimator and the rule it carries is an Algorithm, so a role placed inside another role's `alg` field is refused at construction by that field's bound.
+The type that places a Calibration Rule in the slot of one quantity, and names the quantity: the end of the distribution a Significance Level or a Deformation Parameter (§5) addresses, the Ambiguity Radius, or the Esfahani-Kuhn tail weight. The rule itself lives in the role's `alg` field. A role is an Estimator and the rule it carries is an Algorithm, so a role placed inside another role's `alg` field is refused at construction by that field's bound.
 *Avoid*: Calibration Rule (above), which is the rule a role carries rather than the placement of it.
+
+**Travelling Pair**
+Two slots whose Calibration Rules must resolve in a stated order, because one rule reads the number the other resolved to. One pair ships: a Deformation Parameter (§5) under an entropy budget beside the Significance Level of its own end of the distribution. The rule reads the sibling `alpha`, so the owning type resolves `alpha` first and hands the number to the `kappa` slot. No derivation can find that order, which is why a type that declares calibration slots writes the resolution beside them.
 
 ## 4. Optimisation
 
@@ -447,6 +450,14 @@ The two point measures a Range variant is the sum of: the **loss** tail on the n
 
 **Negated Upper Tail**
 The sign convention that lets a Range be a sum. The gain tail is the base measure applied to the *negated* returns, so it is reported on the same sign convention as the loss tail and the two add rather than subtract.
+
+**Significance Level**
+The probability mass in one end of the return distribution that a tail measure prices: `alpha` in the loss end, `beta` in the gain end, both in `(0, 1)`. At sample length `T` a tail at `alpha` holds `ceil(alpha * T)` of the sample's scenarios. The two ends are the **tail**, which is the lower one, and the **head**, which is the upper one, and that is where a Calibration Role (§3.9) takes its name.
+*Avoid*: Deformation Parameter (below), which shares the range `(0, 1)` and nothing else.
+
+**Deformation Parameter**
+The Kaniadakis `kappa` of a relativistic measure, in `(0, 1)`, which sets the shape of the deformed logarithm the measure prices its dual variable through. It is not a probability, and it names no end of the distribution on its own: a `kappa` slot addresses the end its sibling Significance Level addresses, which is why the Range form carries `kappa_a` beside `alpha` and `kappa_b` beside `beta`.
+*Avoid*: Significance Level (above).
 
 **Risk Series**
 The per-observation series a conic tail measure reduces. Two exist: the net portfolio returns, and the negated drawdown path. Both are signed as returns, so a loss is a negative entry.

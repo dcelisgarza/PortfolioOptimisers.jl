@@ -145,7 +145,7 @@ end
     # The POSITIONAL route is not checked here, and it is not a hole this mechanism opened:
     # `@concrete` emits an unconstrained `T(f1::__T_f1, ...) where {...}` for every struct
     # in the library, so a type-invalid positional call falls through every hand-written
-    # bound. Issue #588 carries that, and it reaches every `@concrete` type equally.
+    # bound. Issue #264 carries that, and it reaches every `@concrete` type equally.
     @test isa(RULE, PO.Func_SigCal) && !isa(RULE, PO.Func_DefCal)
     @test isa(KRULE, PO.Func_DefCal) && !isa(KRULE, PO.Func_SigCal)
     @test_throws TypeError SignificanceTailCalibration(; alg = KRULE)

@@ -200,3 +200,26 @@ rule that needs the whole Prior does not fit it without a change.
 - **A `TD_` wrapper holding a calibration rule is unresolved.** `JuMPOptimiser.l1` and `.linf` are
     bounded `TD_Option`, so such a slot has two deferral channels and ADR 0030 considered only one.
     Nothing has checked what the code does today.
+
+## Amendment (2026-08-28) — from [#586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/586)
+
+Map [#580](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/580) built the rest of this
+mechanism, and three statements above are now out of date. ADR 0095 records the shape that shipped.
+
+**The re-parenting has not shipped.** `AbstractUncertaintyKAlgorithm` and
+`AbstractUncertaintyEpsAlgorithm` still subtype `AbstractAlgorithm` directly.
+`AbstractCalibrationAlgorithm` lives in
+[`src/19_RiskMeasures/01_Base_RiskMeasures.jl`](../../src/19_RiskMeasures/01_Base_RiskMeasures.jl),
+beside `resolve_slot` and the mechanism that reads it, and re-parenting the two families needs the
+root in [`src/01_Base.jl`](../../src/01_Base.jl) first. So "the abstract hierarchy breaks" describes
+a break that has not happened, and `Num_UcSK` and `Num_UcSEps` are unrelated to the calibration
+bounds today.
+
+**A quantity takes a role, and the alias is named for it.** `AmbiguityRadiusValue` and
+`AmbiguityTailWeightValue` are not the spellings that shipped. The rule lives in the `alg` field of
+a **Calibration Role**, and a slot is bounded by `Num_AmbRadCal` or `Num_AmbTwtCal`, each pairing
+`Number` with one concrete role. The two quantities keep the two separate bounds this ADR insisted
+on, for the reason it gives: `r` is the radius and `l` is a tail weight.
+
+**`kappa` has a rule.** `EntropyBudget` computes the Kaniadakis deformation parameter that spends a
+stated entropy budget. The tail weight still has none, so that half of the observation stands.
