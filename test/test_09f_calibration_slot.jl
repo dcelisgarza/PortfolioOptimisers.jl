@@ -308,6 +308,22 @@ end
     @test isa(kmirrored, PO.Num_DefHeadCal)
 end
 
+@testset "Calibration slot: `sel` keeps a rule rather than filling from the prior" begin
+    # A slot the caller filled with the rule that computes the value is a STATED slot, so
+    # the prior must not fill it. The resolution that follows replaces it with the number
+    # the rule produced. This arm is reachable because the `@propagatable` prior `factory`
+    # selects BEFORE it resolves, so a widened slot that also carries `@pprop` arrives here
+    # still holding a rule.
+    role = SignificanceTailCalibration(; alg = RULE)
+    @test PO.sel(role, 0.05) === role
+    @test PO.sel(DeformationHeadCalibration(; alg = KRULE), 0.3) isa
+          DeformationHeadCalibration
+
+    # A stated number still wins, and an unstated slot still falls back, both unchanged.
+    @test PO.sel(0.01, 0.05) == 0.01
+    @test PO.sel(nothing, 0.05) == 0.05
+end
+
 #=
 The generated `factory` of a `@propagatable` type resolves Deferred Quantities LAST, after
 every selection. #581 moved it there so that a Calibration Rule, which resolves on the same
