@@ -553,7 +553,7 @@ A view that carries an upper-bound half is centred on the dual variable [`ep_eva
 
  1. Take the prior's dual variable as the centre.
  2. Where the view carries an upper-bound half, replace it with the dual variable of [`ep_evar_anchor`](@ref). Keep the prior's where the anchor does not converge.
- 3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid.
+ 3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid, and a grid of one point is the centre alone.
 
 # Related
 
@@ -585,7 +585,14 @@ function ep_evar_grid(x::VecNum, w::VecNum, alpha::Number, op::Symbol, rhs::Numb
     if !isnothing(anc)
         zc = anc.z
     end
-    return collect(range(zc * (one(pct) - pct), zc * (one(pct) + pct); length = K))
+    # `K` is odd, so the centre is a grid point, and a grid of one point is the centre
+    # alone. `range` refuses a single point between two ends that differ, so that case is
+    # written out rather than left to raise from `Base`.
+    return if isone(K)
+        [zc]
+    else
+        collect(range(zc * (one(pct) - pct), zc * (one(pct) + pct); length = K))
+    end
 end
 """
     ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs::Number,
@@ -698,7 +705,7 @@ A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor
 
  1. Take the prior's pair as the centre, and the distance from the prior value to the target as the translation each shift carries.
  2. Where the view carries an upper-bound half, replace both with the pair and the posterior of [`ep_rlvar_anchor`](@ref), and drop the translation. Keep the prior's pair when the anchor does not converge.
- 3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid.
+ 3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid, and a grid of one point is the centre alone.
  4. Minimise the objective over the shift at each point with [`ep_rlvar_shift`](@ref), and subtract the translation.
 
 # Related
@@ -738,7 +745,14 @@ function ep_rlvar_grid(x::VecNum, w::VecNum, alpha::Number, kappa::Number, op::S
     if !isnothing(anc)
         zc, wc, delta = anc.z, anc.w, zero(delta)
     end
-    z = collect(range(zc * (one(pct) - pct), zc * (one(pct) + pct); length = K))
+    # `K` is odd, so the centre is a grid point, and a grid of one point is the centre
+    # alone. `range` refuses a single point between two ends that differ, so that case is
+    # written out rather than left to raise from `Base`.
+    z = if isone(K)
+        [zc]
+    else
+        collect(range(zc * (one(pct) - pct), zc * (one(pct) + pct); length = K))
+    end
     t = [ep_rlvar_shift(x, wc, kappa, lnk, zk; args = args, kwargs = kwargs,
                         bracket = bracket).t - delta for zk in z]
     return t, z
@@ -1290,7 +1304,7 @@ Extract the Entropic Value-at-Risk (EVaR) for asset `i` from a prior result.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result containing asset return information. Only its returns matrix is read: the observations carry uniform weights, not `pr.w`, which is what every `get_pr_value` method of a tail risk measure does.
   - `i`: Index of the asset.
   - `::Val{:evar}`: Dispatch tag for EVaR extraction.
   - `alpha`: Confidence level (e.g. `0.05` for 5% EVaR).
@@ -1328,7 +1342,7 @@ Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result containing asset return information. Only its returns matrix is read: the observations carry uniform weights, not `pr.w`, which is what every `get_pr_value` method of a tail risk measure does.
   - `i`: Index of the asset.
   - `::Val{:rlvar}`: Dispatch tag for RLVaR extraction.
   - `alpha`: Confidence level (e.g. `0.05` for 5% RLVaR).
@@ -1812,8 +1826,9 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
  1. [`ConicEntropicValueatRiskView`](@ref) checks the two preconditions below, then appends one [`ConicEntropicValueatRiskViewConstraint`](@ref) carrying `x`, `alpha` and `rhs`.
  2. [`GridEntropicValueatRiskView`](@ref) normalises `w` to sum to one, giving `wi`.
  3. It builds the grid `z` of dual variables with [`ep_evar_grid`](@ref).
- 4. For the lower-bound half of the view, it builds the row of each grid point with [`ep_evar_grid_row`](@ref), and adds it to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
- 5. For the upper-bound half of the view, it appends one [`GridEntropicValueatRiskViewConstraint`](@ref) carrying `x`, the grid, `alpha`, `rhs` and the big-M constant `M`.
+ 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty.
+ 5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_evar_grid_row`](@ref), and adds it to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
+ 6. For the upper-bound half of the view, it appends one [`GridEntropicValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `rhs` and the big-M constant `M`.
 
 # Arguments
 
@@ -1835,6 +1850,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
 # Validation
 
   - [`ConicEntropicValueatRiskView`](@ref) needs an operator other than `<=`, and, for an equality, a target at or above the prior EVaR.
+  - [`GridEntropicValueatRiskView`](@ref) needs at least one grid point whose row is finite. [`ep_evar_grid_row`](@ref) overflows at a dual variable near zero. The grid sits there when `pct` approaches one, and wholly there when `alpha * T` falls below one, because [`ep_evar`](@ref)'s minimiser is then at the end of its bracket. The points it overflows at are dropped, and a grid that keeps none of them raises.
 
 # Returns
 
@@ -1845,6 +1861,7 @@ Lower one entropic value-at-risk view into the constraints its formulation needs
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`GridEntropicValueatRiskView`](@ref)
   - [`ep_evar_grid`](@ref)
+  - [`ep_evar_grid_row`](@ref)
   - [`ep_evar_views!`](@ref)
 """
 function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
@@ -1868,6 +1885,17 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
     wi = w ./ sum(w)
     z = ep_evar_grid(x, wi, alpha, op, rhs, zstar, pct, K; iters = iters, tol = tol,
                      tilt_iters = tilt_iters, args = args, kwargs = kwargs, zlo = zlo)
+    # A point whose row is not finite is not a grid point. `exp((x - rhs) / z)` overflows at
+    # a dual variable near zero, and a non-finite coefficient reaches the solver as
+    # `NaN * x[j]`. The grid sits there when `pct` approaches one, and wholly there when
+    # `alpha * T` falls below one, because the minimiser is then at the end of its bracket.
+    keep = filter(eachindex(z)) do k
+        c, isc = ep_evar_grid_row(x, rhs, z[k])
+        return all(isfinite, c) && isfinite(isc)
+    end
+    @argcheck(!isempty(keep),
+              ArgumentError("View `$(eqn)` builds no finite grid point. The row of every dual variable the grid spans overflows, which happens when `alpha` ($(alpha)) leaves fewer than one observation in the tail, and when `pct` ($(pct)) approaches one. Raise `alpha`, or narrow `pct`."))
+    z = z[keep]
     if op == :geq || op == :eq
         for zk in z
             c, isc = ep_evar_grid_row(x, rhs, zk)

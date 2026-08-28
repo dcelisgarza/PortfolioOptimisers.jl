@@ -1345,3 +1345,365 @@ end
     # the anchor the default tolerance reaches.
     @test grid_of(GridEntropicValueatRiskView(; tol = 1.0)) != zanc
 end
+
+@testset "a CVaR or EVaR view naming an asset the universe does not hold" begin
+    using Logging
+    # The counterpart of the RLVaR case above, for the two families whose walkers carry the
+    # same guard. Under `strict = false` the name is reported and dropped, the view produces
+    # no constraint, and the loop moves on.
+    v = LinearConstraintEstimator(; val = "NOTANASSET >= 0.1")
+    for f in (PO.ep_cvar_views!, PO.ep_evar_views!)
+        epc = Dict{Symbol, Any}()
+        tvs = PO.AbstractEntropyPoolingTailView[]
+        Logging.with_logger(Logging.NullLogger()) do
+            return f(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_w0, nothing; strict = false)
+        end
+        @test isempty(epc)
+        @test isempty(tvs)
+        # The same name under `strict = true` raises instead.
+        @test_throws ArgumentError f(v, epc, tvs, ep_pr0, ep_gsets, ep_a, ep_w0, nothing;
+                                     strict = true)
+    end
+end
+
+@testset "an EVaR grid point whose row overflows is dropped" begin
+    # The entropic counterpart of the relativistic case above. `ep_evar_grid_row` evaluates
+    # `exp((x - rhs) / z)`, which overflows at a dual variable near zero. The grid spans
+    # `zc * (1 - pct)` to `zc * (1 + pct)`, so its lower end sits there when `pct`
+    # approaches one, and `pct` is only bound to the open unit interval. Before the guard
+    # the scaled coefficients were `Inf / Inf`, and they reached JuMP as `NaN * x[j]`, whose
+    # message names neither the view nor the setting that caused it.
+    x = -ep_sX[:, 1]
+    e = PO.ep_evar(x, ep_sw0, ep_a)
+    tgt = 0.7 * e.evar
+    add(pct, op; a = ep_a, ea = e) = begin
+        epc = Dict{Symbol, Any}()
+        tvs = Any[]
+        PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; pct = pct), x, a, op,
+                             0.7 * ea.evar, ep_sw0, ea.z, ea.evar,
+                             "AAPL <= $(0.7 * ea.evar)")
+        return epc, tvs
+    end
+    # Nothing overflows at the default half-width, so the grid keeps every point it built.
+    _, tvs = add(GridEntropicValueatRiskView().pct, :leq)
+    @test length(only(tvs).z) == GridEntropicValueatRiskView().K
+    # The lowest point overflows here, and the ones that remain carry finite rows.
+    _, tvs = add(0.999, :leq)
+    tv = only(tvs)
+    @test length(tv.z) < GridEntropicValueatRiskView().K
+    for zk in tv.z
+        c, isc = PO.ep_evar_grid_row(x, tv.rhs, zk)
+        @test all(isfinite, c)
+        @test isfinite(isc)
+    end
+    # The lower-bound block writes its rows straight into the constraint set, and it drops
+    # the same points.
+    epc, _ = add(0.999, :geq)
+    lhs, rhs = epc[:ineq]
+    @test size(lhs, 1) == length(rhs) == length(tv.z)
+    @test all(isfinite, lhs)
+    @test all(isfinite, rhs)
+    # A level that leaves fewer than one observation in the tail puts the whole grid there:
+    # `ep_evar`'s minimiser is then at the end of its own bracket, a factor `sqrt(eps)`
+    # below the top. Every point overflows, and the raise names the two settings that reach
+    # it rather than leaving JuMP to refuse a `NaN` coefficient.
+    small = PO.ep_evar(x, ep_sw0, 1e-3)
+    @test ep_a * length(x) > 1 > 1e-3 * length(x)
+    @test small.z / e.z < 1e-6
+    @test_throws ArgumentError add(0.5, :leq; a = 1e-3, ea = small)
+    @test_throws ArgumentError add(0.5, :geq; a = 1e-3, ea = small)
+end
+
+@testset "a grid of one point is the centre alone" begin
+    # `K` is odd and at least one, so `K = 1` is a legal setting: one binary variable and
+    # one row, at the point the anchor found. `range(lo, hi; length = 1)` refuses two ends
+    # that differ, so both grids write that case out rather than raising from `Base`.
+    x = -rd.X[:, 1]
+    e = PO.ep_evar(x, ep_w0, ep_a)
+    tgt = 0.7 * e.evar
+    # A lower-bound view is centred on the prior's dual variable.
+    @test PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.5, 1) == [e.z]
+    # An upper-bound view is centred on the anchor's.
+    anc = PO.ep_evar_anchor(x, ep_w0, ep_a, tgt, e.z)
+    @test PO.ep_evar_grid(x, ep_w0, ep_a, :leq, tgt, e.z, 0.5, 1) == [anc.z]
+    # The half-width does not reach a grid of one point.
+    @test PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.9, 1) ==
+          PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.1, 1)
+    # The relativistic grid answers the same way, and its shift follows its one point.
+    r = PO.ep_rlvar(x, ep_w0, ep_a, ep_k)
+    t1, z1 = PO.ep_rlvar_grid(x, ep_w0, ep_a, ep_k, :geq, 0.7 * r.rlvar, r.z, r.rlvar, 0.5,
+                              1)
+    @test z1 == [r.z]
+    @test length(t1) == 1
+    # The centre of a grid of `K` points is the one point a grid of one holds.
+    z11 = PO.ep_evar_grid(x, ep_w0, ep_a, :leq, tgt, e.z, 0.5, 11)
+    @test z11[6] == only(PO.ep_evar_grid(x, ep_w0, ep_a, :leq, tgt, e.z, 0.5, 1))
+    # It reaches the view machinery, which builds one row from it. That path normalises the
+    # weights first, and the renormalised last bits move where Brent samples, so the anchor
+    # it finds agrees with the one above to about `sqrt(tol)`: the objective is flat of
+    # second order at its minimum, so a `tol` of `1e-10` on the value buys far less on `z`.
+    epc = Dict{Symbol, Any}()
+    tvs = Any[]
+    PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; K = 1), x, ep_a, :leq, tgt,
+                         ep_w0, e.z, e.evar, "AAPL <= $tgt")
+    @test isapprox(only(only(tvs).z), anc.z, rtol = 1e-6)
+end
+
+@testset "the closed forms answer to numbers computed by hand" begin
+    # Issue #541, condition 2. Each block below fixes one closed form against a number that
+    # does not come from the library.
+
+    # `ep_evar` against a `BigFloat` minimisation of the same objective. The value is flat
+    # of second order at its minimum, so the minimiser is the looser of the two.
+    function evar_bf(xf, wf, a)
+        xb, wb, ab = BigFloat.(xf), BigFloat.(wf), BigFloat(a)
+        wb ./= sum(wb)
+        f = z -> z * (log(sum(wb .* exp.(xb ./ z))) - log(ab))
+        hi = (maximum(xb) - sum(wb .* xb)) / (-log(ab))
+        r = PO.Optim.optimize(f, hi * BigFloat(1e-8), hi, PO.Optim.Brent();
+                              abs_tol = BigFloat(1e-40))
+        return Float64(PO.Optim.minimum(r))
+    end
+    for a in (0.01, 0.05, 0.25), j in (1, 5, 20)
+        @test isapprox(PO.ep_evar(-rd.X[:, j], ep_w0, a).evar,
+                       evar_bf(-rd.X[:, j], collect(ep_w0), a), rtol = 1e-14)
+    end
+
+    # `ep_evar_grid_row` term by term. The row `dot(c, p) <= alpha * isc` is the condition
+    # `sum_j p_j exp((x_j - rhs) / z) <= alpha`, which is the entropic value at risk at that
+    # dual variable, and the scaling divides both sides by the same number.
+    wv = StatsBase.pweights(LinearAlgebra.normalize(range(0.5, 1.5; length = T), 1))
+    for a in (0.01, 0.05, 0.1), j in (1, 5, 20)
+        x = -rd.X[:, j]
+        e = PO.ep_evar(x, ep_w0, a)
+        for m in (0.8, 1.0, 1.25), zm in (0.7, 1.0, 1.4)
+            rhs, z = e.evar * m, e.z * zm
+            c, isc = PO.ep_evar_grid_row(x, rhs, z)
+            row = LinearAlgebra.dot(c, wv) - a * isc
+            direct = (sum(wv .* exp.((x .- rhs) ./ z)) - a) * isc
+            @test abs(row - direct) <= 1e-13 * a * isc
+            # The row's sign is the sign of the entropic value at risk condition it states.
+            @test sign(row) == sign(z * (log(sum(wv .* exp.((x .- rhs) ./ z))) - log(a)))
+        end
+    end
+
+    # The big-M headroom. A row's coefficients sit in `(0, 1]` and the probabilities sum to
+    # one, so the largest value the left hand side of a released row takes is one.
+    Mneed = 0.0
+    for a in (0.01, 0.05, 0.25), j in (1, 5, 20)
+        x = -rd.X[:, j]
+        e = PO.ep_evar(x, ep_w0, a)
+        for m in (0.7, 0.85, 1.0)
+            rhs = e.evar * m
+            for zk in PO.ep_evar_grid(x, ep_w0, a, :leq, rhs, e.z, 0.5, 11)
+                c, isc = PO.ep_evar_grid_row(x, rhs, zk)
+                Mneed = max(Mneed, maximum(c) - a * isc)
+            end
+        end
+    end
+    @test Mneed <= 1
+    @test isapprox(Mneed, 1; rtol = 1e-7)
+    @test GridEntropicValueatRiskView().M >= 10 * Mneed
+
+    # The Brent bracket of `ep_evar` holds the minimiser strictly inside, over every asset
+    # and four levels. The upper end is a proof, so only the margin below it is a choice.
+    for a in (0.01, 0.05, 0.1, 0.25), j in axes(rd.X, 2)
+        x = -rd.X[:, j]
+        hi = (maximum(x) - LinearAlgebra.dot(collect(ep_w0), x)) / (-log(a))
+        lo = hi * sqrt(eps(Float64))
+        z = PO.ep_evar(x, ep_w0, a).z
+        @test lo < z < hi
+        @test z / hi <= 0.6
+        @test z / lo >= 1e6
+    end
+
+    # `ep_row_tilt` against the root of the tilt written out by hand. With uniform prior
+    # weights and `c = [1, 2, 3]`, `u = exp(-theta)` solves `u^2 - u - 3 = 0` at `b = 2.5`.
+    u = (1 + sqrt(13)) / 2
+    qhand = [u, u^2, u^3] ./ (u + u^2 + u^3)
+    q = PO.ep_row_tilt(fill(1 / 3, 3), [1.0, 2.0, 3.0], 2.5)
+    @test isapprox(q, qhand, rtol = 1e-15)
+    @test LinearAlgebra.dot(q, [1.0, 2.0, 3.0]) == 2.5
+    # A target at or outside an end of the range of `c` is attained by no probability
+    # vector, including the ends themselves.
+    @test isnothing(PO.ep_row_tilt(fill(1 / 3, 3), [1.0, 2.0, 3.0], 1.0))
+    @test isnothing(PO.ep_row_tilt(fill(1 / 3, 3), [1.0, 2.0, 3.0], 3.0))
+
+    # The three `ep_sbar` methods against the counts stated by hand. Uniform weights reach
+    # `alpha` at `ceil(alpha * T)`, the rule doubles that, and `ceil(2 * alpha * T)` floors
+    # it.
+    ord = sortperm(-rd.X[:, 1])
+    @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) ==
+          max(2 * ceil(Int, ep_a * T), ceil(Int, 2 * ep_a * T))
+    @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) == 102
+    @test PO.ep_sbar(5, T) == 5
+    @test PO.ep_sbar(2 * T, T) == T
+    @test PO.ep_sbar(0.1, T) == ceil(Int, 0.1 * T)
+    @test PO.ep_sbar(1e-6, T) == 1
+
+    # `ep_assert_reachable_view` is the open band between the best and the worst
+    # realisation. Both ends are refused, and everything strictly inside passes.
+    x = -rd.X[:, 1]
+    lo, hi = extrema(x)
+    @test isnothing(PO.ep_assert_reachable_view(:eq, (lo + hi) / 2, x, "e", "EVaR"))
+    @test isnothing(PO.ep_assert_reachable_view(:geq, prevfloat(hi), x, "e", "EVaR"))
+    @test isnothing(PO.ep_assert_reachable_view(:leq, nextfloat(lo), x, "e", "EVaR"))
+    for (op, v) in ((:geq, hi), (:leq, lo), (:eq, hi), (:eq, lo))
+        @test_throws DomainError PO.ep_assert_reachable_view(op, v, x, "e", "EVaR")
+    end
+
+    # `ep_normalise_view_term` flips the operator on a negative coefficient, and leaves an
+    # equality alone. All four cells.
+    @test PO.ep_normalise_view_term(2.0, :geq, 0.06) == (:geq, 0.03)
+    @test PO.ep_normalise_view_term(-2.0, :geq, -0.06) == (:leq, 0.03)
+    @test PO.ep_normalise_view_term(-2.0, :leq, -0.06) == (:geq, 0.03)
+    @test PO.ep_normalise_view_term(-2.0, :eq, -0.06) == (:eq, 0.03)
+    # A view written with an unnormalised coefficient resolves to the normalised one.
+    for (raw, norm) in
+        (("2*AAPL >= 0.06", "AAPL >= 0.03"), ("-3*AAPL <= -0.09", "AAPL >= 0.03"),
+         ("-2*AAPL >= -0.06", "AAPL <= 0.03"), ("4*AAPL == 0.12", "AAPL == 0.03"))
+        t1, t2 = ep_terms(raw, :cvar), ep_terms(norm, :cvar)
+        @test t1.idx == t2.idx
+        @test PO.ep_normalise_view_term(t1.coef[1], t1.op, t1.rhs) ==
+              PO.ep_normalise_view_term(t2.coef[1], t2.op, t2.rhs)
+    end
+
+    # `ep_evar_anchor` is a fixed point: the tilted posterior attains the target, and the
+    # dual variable it returns makes the row of that grid point tight at that posterior.
+    for a in (0.01, 0.05, 0.1), j in (1, 5, 20), m in (0.75, 0.85, 0.95)
+        x = -rd.X[:, j]
+        e = PO.ep_evar(x, ep_w0, a)
+        rhs = e.evar * m
+        anc = PO.ep_evar_anchor(x, ep_w0, a, rhs, e.z)
+        @test !isnothing(anc)
+        post = PO.ep_evar(x, anc.w, a)
+        @test abs(post.evar - rhs) <= 1e-10 * abs(rhs)
+        @test post.z == anc.z
+        c, isc = PO.ep_evar_grid_row(x, rhs, anc.z)
+        @test abs(LinearAlgebra.dot(c, anc.w) - a * isc) <= 1e-9 * a * isc
+    end
+    # The iteration gives up on three paths, and each returns `nothing`. A dual variable
+    # small enough to overflow the row is the first: it ends the iteration rather than
+    # tilting along a vector of `NaN`s.
+    @test isnothing(PO.ep_evar_anchor(-rd.X[:, 1], ep_w0, ep_a, 0.5 * ep_pevar, 1e-8))
+    # The second is a row no probability vector makes tight. The row's coefficients are
+    # `exp((x_j - max(x)) / z)`, which spans `exp((min(x) - max(x)) / z)` to one, and its
+    # target is `alpha * exp((rhs - max(x)) / z)`. So a target at or below
+    # `min(x) + z * ln(1 / alpha)` puts the target under the smallest coefficient, and that
+    # bound sits **inside** the band `ep_assert_reachable_view` admits: a legitimate view
+    # reaches it, and the grid then falls back to the prior's dual variable.
+    e1 = PO.ep_evar(-rd.X[:, 1], ep_w0, ep_a)
+    lo1 = minimum(-rd.X[:, 1])
+    @test lo1 + e1.z * log(inv(ep_a)) > lo1
+    @test isnothing(PO.ep_evar_anchor(-rd.X[:, 1], ep_w0, ep_a, 0.98 * lo1, e1.z))
+    # The third is `iters` steps that never reach the target, which the testset above pins.
+
+    # `get_pr_value` agrees with the closed form in this file, and reads uniform weights
+    # rather than `pr.w`, which is what its `# Arguments` states.
+    for a in (0.01, 0.05, 0.1), i in (1, 5, 20)
+        @test isapprox(PO.get_pr_value(ep_pr0, i, Val(:evar), a),
+                       PO.ep_evar(-rd.X[:, i], ep_w0, a).evar, rtol = 1e-14)
+        @test isapprox(PO.get_pr_value(ep_pr0, i, Val(:rlvar), a, ep_k),
+                       PO.ep_rlvar(-rd.X[:, i], ep_w0, a, ep_k).rlvar, rtol = 1e-14)
+    end
+
+    # `factor_residual_config` forwards the estimator its moments come from.
+    @test PO.factor_residual_config(EntropyPoolingPrior(; pe = FactorPrior())) ==
+          PO.factor_residual_config(FactorPrior())
+    @test isnothing(PO.factor_residual_config(EntropyPoolingPrior()))
+end
+
+@testset "each method of add_ep_tail_view! registers the rows its formulation names" begin
+    # The `# JuMP formulation` of `add_ep_tail_view!` names every entry each of the six
+    # methods registers. The counts below are those lists read off a model.
+    counts(tv, Tn) = begin
+        m = JuMP.Model()
+        pw = JuMP.@variable(m, [1:Tn], lower_bound = 0)
+        n0 = JuMP.num_variables(m)
+        PO.add_ep_tail_view!(m, pw, tv, 1.0)
+        d = Dict(k => JuMP.num_constraints(m, k...)
+                 for k in JuMP.list_of_constraint_types(m))
+        return JuMP.num_variables(m) - n0, d
+    end
+    LE = (JuMP.AffExpr, JuMP.MOI.LessThan{Float64})
+    EQ = (JuMP.AffExpr, JuMP.MOI.EqualTo{Float64})
+    BIN = (JuMP.VariableRef, JuMP.MOI.ZeroOne)
+    UB = (JuMP.VariableRef, JuMP.MOI.LessThan{Float64})
+    x = -ep_sX[:, 1]
+    Ts = length(x)
+
+    # Three rows: `T` bounds on `nu`, the budget, and the target.
+    nv, d = counts(PO.LinearConditionalValueatRiskViewConstraint(x, ep_a, 0.05), Ts)
+    @test nv == Ts
+    @test d[LE] == Ts + 1
+    @test d[EQ] == 1
+
+    # Three rows and the relative entropy cone, with `nu` bounded to `[0, 1]`.
+    nv, d = counts(PO.ConicEntropicValueatRiskViewConstraint(x, ep_a, 0.05), Ts)
+    @test nv == Ts
+    @test d[UB] == Ts
+    @test d[LE] == 1
+    @test d[EQ] == 1
+    @test d[(Vector{JuMP.AffExpr}, JuMP.MOI.RelativeEntropyCone)] == 1
+
+    # Five rows per asset over its window, and one row carrying the operator.
+    o = sortperm(x)
+    sb = PO.ep_sbar(nothing, Ts, ep_a, ep_sw0, o)
+    ordw = o[(Ts - sb + 1):Ts]
+    nv, d = counts(PO.IntegerConditionalValueatRiskViewConstraint([ordw], [x[ordw]], [1.0],
+                                                                  ep_a, :geq, 0.05), Ts)
+    @test nv == 2 * sb
+    @test d[BIN] == sb
+    @test d[LE] == 3 * sb + (sb - 1) + 1
+    @test d[EQ] == 1
+
+    # Two rows: the selector, and one row per grid point.
+    e = PO.ep_evar(x, ep_sw0, ep_a)
+    zg = PO.ep_evar_grid(x, ep_sw0, ep_a, :leq, 0.9 * e.evar, e.z, 0.5, 11)
+    nv, d = counts(PO.GridEntropicValueatRiskViewConstraint(x, zg, ep_a, 0.9 * e.evar,
+                                                            10.0), Ts)
+    @test nv == 11
+    @test d[BIN] == 11
+    @test d[LE] == 11
+    @test d[EQ] == 1
+
+    # Five rows, two of them a power cone per observation, and three auxiliary vectors.
+    nv, d = counts(PO.ConicRelativisticValueatRiskViewConstraint(x, ep_a, ep_k, 0.05), Ts)
+    @test nv == 3 * Ts
+    @test d[UB] == Ts
+    @test d[LE] == 2
+    @test d[EQ] == 1
+    @test d[(Vector{JuMP.AffExpr}, JuMP.MOI.PowerCone{Float64})] == 2 * Ts
+end
+
+@testset "two tail views of different families are met on one posterior" begin
+    # Each tail view is a constraint of the single entropy pooling problem, so a mandate
+    # carrying two of them is one solve, and both targets hold on its answer.
+    tc = ep_spcvar * 1.12
+    te = ep_sevar(5, ep_sw0) * 1.12
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                   cvar_views = ConditionalValueatRiskView(;
+                                                                           views = LinearConstraintEstimator(;
+                                                                                                             val = "AAPL >= $tc")),
+                                   evar_views = EntropicValueatRiskView(;
+                                                                        views = LinearConstraintEstimator(;
+                                                                                                          val = "$(rd.nx[5]) >= $te"))),
+               ep_srd)
+    @test isapprox(ep_scvar(1, pr.w), tc, rtol = 1e-6)
+    @test isapprox(ep_sevar(5, pr.w), te, rtol = 1e-6)
+    @test isapprox(sum(pr.w), 1)
+    @test pr.kld > 0
+    # The two views together cost more divergence than either alone.
+    one_c = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                      cvar_views = ConditionalValueatRiskView(;
+                                                                              views = LinearConstraintEstimator(;
+                                                                                                                val = "AAPL >= $tc"))),
+                  ep_srd)
+    one_e = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                      evar_views = EntropicValueatRiskView(;
+                                                                           views = LinearConstraintEstimator(;
+                                                                                                             val = "$(rd.nx[5]) >= $te"))),
+                  ep_srd)
+    @test pr.kld > one_c.kld
+    @test pr.kld > one_e.kld
+end
