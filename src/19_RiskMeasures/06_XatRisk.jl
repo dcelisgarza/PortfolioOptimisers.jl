@@ -373,8 +373,8 @@ The measure carries three prior-derived fields, and `mu` and `sigma` are indepen
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(alg::DistributionValueatRisk,
-                                     pr::AbstractPriorResult)::DistributionValueatRisk
+function resolve_deferred_quantities(alg::DistributionValueatRisk, pr::AbstractPriorResult,
+                                     ::Any = nothing)::DistributionValueatRisk
     sigma, chol = if isa(alg.sigma, DeferredQuantity)
         fitted = fit_deferred_quantity(alg.sigma, pr)
         deferred_quantity(fitted, :sigma), deferred_derived_quantity(fitted, :chol)

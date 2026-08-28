@@ -278,7 +278,7 @@ Resolve the ambiguity radius `r` and the tail weight `l` of a [`Distributionally
 
 Both slots take a **Calibration Rule** in place of the number, so both resolve here. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
 
-The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none.
+The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none. That holds on both routes: the third argument carries the effective solver for a measure that has a slot for one, and this measure has none.
 
 A measure whose two slots both hold numbers is returned unchanged, so the common case allocates nothing.
 
@@ -290,7 +290,7 @@ A measure whose two slots both hold numbers is returned unchanged, so the common
   - [`AmbiguityRadiusCalibration`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRisk,
-                                     pr::AbstractPriorResult)
+                                     pr::AbstractPriorResult, ::Any = nothing)
     ws = sel(x.w, pr.w)
     l = resolve_calibration_slot(x.l, :l, pr, ws)
     r = resolve_calibration_slot(x.r, :r, pr, ws)
@@ -647,7 +647,7 @@ The two tails take one role and not two. A radius names no end of the distributi
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRiskRange,
-                                     pr::AbstractPriorResult)
+                                     pr::AbstractPriorResult, ::Any = nothing)
     ws = sel(x.w, pr.w)
     slots = (x.l_a, x.r_a, x.l_b, x.r_b)
     l_a, r_a, l_b, r_b = map((slot, key) -> resolve_calibration_slot(slot, key, pr, ws),
@@ -1029,7 +1029,7 @@ It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdownatRisk,
-                                     pr::AbstractPriorResult)
+                                     pr::AbstractPriorResult, ::Any = nothing)
     ws = sel(x.w, pr.w)
     l = resolve_calibration_slot(x.l, :l, pr, ws)
     r = resolve_calibration_slot(x.r, :r, pr, ws)

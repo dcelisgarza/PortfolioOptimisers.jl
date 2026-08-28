@@ -1505,8 +1505,13 @@ end
         end
         return out
     end
+    # A type declares its slots through one of the two parallel verbs. `deferred_slots`
+    # names the slots that may hold a Deferred Quantity, and `calibration_slots` names the
+    # slots that may hold a Calibration Rule. Both are resolved by the same verb, and the
+    # pairing the rule asserts is resolver-with-declaration, not resolver-with-one-verb: the
+    # six distributionally robust slots #584 widened resolve a rule and declare it there.
     resolvers = firstargs(PO.resolve_deferred_quantities)
-    declarations = firstargs(PO.deferred_slots)
+    declarations = union(firstargs(PO.deferred_slots), firstargs(PO.calibration_slots))
     @test isempty(setdiff(resolvers, declarations))
 
     # `ArithmeticReturn` was the one violation, and it is reachable now: `ExpectedReturn.rt`
@@ -1519,6 +1524,20 @@ end
               NonOptimisationRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio)
         @test T in declarations
         @test !(T in resolvers)
+    end
+
+    # Every resolver takes the effective solver as a third positional argument (#591). The
+    # `JuMP` risk-constraint route passes three, so a method written with two would not be
+    # called at all: dispatch would fall through to the universal fallback, and the type's
+    # own resolution would be skipped in silence. `nargs` counts the function itself, so a
+    # method with three positional arguments has `nargs == 4`.
+    arities = Dict{Any, Set{Int}}()
+    for m in methods(PO.resolve_deferred_quantities)
+        T = Base.unwrap_unionall(m.sig).parameters[2]
+        push!(get!(arities, T, Set{Int}()), m.nargs)
+    end
+    for (T, ns) in arities
+        @test 4 in ns
     end
 end
 

@@ -197,8 +197,8 @@ The measure carries one deferrable slot, so there is no fan-out to make and it t
   - [`fit_deferred_quantity`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-function resolve_deferred_quantities(r::NegativeSkewness,
-                                     pr::AbstractPriorResult)::NegativeSkewness
+function resolve_deferred_quantities(r::NegativeSkewness, pr::AbstractPriorResult,
+                                     ::Any = nothing)::NegativeSkewness
     if !isa(r.sk, DeferredQuantity)
         return r
     end

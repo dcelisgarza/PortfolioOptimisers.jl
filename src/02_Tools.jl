@@ -1219,6 +1219,8 @@ Writing that half per type — rather than per field — is what lets slots that
 be resolved together: a deferred `sigma` supplies `chol` from the same fit, so the pair is
 never mixed across two sources.
 
+`slv` is the effective solver, and it is what a **Calibration Rule** in the same struct reads. It carries the value the optimisation settled on, so a rule resolves against one solver on both routes. On the [`factory`](@ref) route the [`@cprop`](@ref) selection has already put that solver on the struct, so the argument stays at its default. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) reads the solver off the estimator and threads it here. A type that carries a solver of its own settles it locally as `sel(x.slv, slv)`, beside the observation weights it already settles that way, and a type that carries none gives its rules none on either route.
+
 # Algorithm
 
  1. Return `x` unchanged. This method is the arm for a second argument that is **not** a prior result: with no prior in hand nothing can be fitted, so the deferred state travels on.
@@ -1233,7 +1235,7 @@ A more specific method dominates this one on a prior result: the one that [`defe
   - [`factory`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-resolve_deferred_quantities(x, ::Any) = x
+resolve_deferred_quantities(x, ::Any, ::Any = nothing) = x
 # ---------------------------------------------------------------------------
 # @propagatable — struct-definition macro for factory propagation
 # ---------------------------------------------------------------------------

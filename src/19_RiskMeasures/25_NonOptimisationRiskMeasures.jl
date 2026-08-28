@@ -379,7 +379,8 @@ Resolve a **Deferred Quantity** in [`ThirdCentralMoment`](@ref)'s `mu` slot agai
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.mu, DeferredQuantity)
         return r
     end

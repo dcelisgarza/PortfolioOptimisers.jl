@@ -16,6 +16,8 @@ thing to the resolver, and both bounds admit both.
 Issue #581 builds the mechanism. The rules themselves are #582, and the slots that hold them
 are #583 and #584, so every rule below is a probe defined here.
 =#
+using Clarabel, JuMP
+
 const PO = PortfolioOptimisers
 
 # A significance rule that reports what it was handed, so the resolver's argument order is
@@ -343,7 +345,8 @@ function OrderProbe(; slv = nothing, w = nothing, alpha = nothing)
 end
 PortfolioOptimisers.deferred_slots(x::OrderProbe) = (; alpha = x.alpha)
 function PortfolioOptimisers.resolve_deferred_quantities(x::OrderProbe,
-                                                         pr::PO.AbstractPriorResult)
+                                                         pr::PO.AbstractPriorResult,
+                                                         ::Any = nothing)
     ORDER_SEEN[] = (; slv = x.slv, w = x.w)
     return OrderProbe(; slv = x.slv, w = x.w, alpha = PO.resolve_slot(x.alpha, :mu, pr))
 end
@@ -372,4 +375,186 @@ end
     out = PO.factory(OrderProbe(; slv = own, alpha = SimpleExpectedReturns()), pr, slv)
     @test ORDER_SEEN[].slv === own
     @test out.slv === own
+end
+
+#=
+Issue #591. A measure resolves on two routes. The clustering route calls
+`factory(hrp.r, pr, hrp.opt.slv)`, whose `@cprop` selection puts the effective solver on the
+struct before the resolution runs. The `JuMP` risk-constraint route calls
+`resolve_deferred_quantities` directly and calls no `factory`, so no selection runs and the
+measure still holds the solver the caller stated — `nothing` in the common case, because a
+measure's solver normally comes from `opt.slv`. A rule that reads the solver therefore
+resolved against two different solvers, and inside `MeanRisk` the measure the result records
+and the constraint the model was built from would disagree.
+
+`set_risk_constraints!` now reads the estimator's own `opt.opt.slv` and threads it into the
+resolution, and the resolution carries it as a third positional argument. The owner settles
+it locally as `sel(x.slv, slv)`, beside the observation weights it already settles that way.
+
+No shipped measure carries both a `@cprop slv` field and a calibration slot yet: #583 writes
+the per-type methods for the twelve that carry the solver. So the wiring is gated on the
+probe below, which carries both halves and builds a zero risk expression.
+=#
+const SLV_SEEN = Ref{Any}(nothing)
+const BUILT_ALPHA = Ref{Any}(nothing)
+
+# A rule whose value depends on the solver it is handed, so the number a route produced
+# names the solver that route resolved against.
+function probe_solver_rule(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
+    SLV_SEEN[] = (; key = key, weighted = !isnothing(w), slv = slv)
+    return isnothing(slv) ? 0.1 : 0.05
+end
+
+PortfolioOptimisers.@propagatable struct SolverProbe{T1, T2, T3, T4} <: PO.RiskMeasure
+    settings::T1
+    @cprop slv::T2
+    @pprop w::T3
+    alpha::T4
+end
+function SolverProbe(; settings::RiskMeasureSettings = RiskMeasureSettings(), slv = nothing,
+                     w = nothing, alpha = 0.05)
+    return SolverProbe(settings, slv, w, alpha)
+end
+(::SolverProbe)(x::PO.VecNum) = sqrt(sum(abs2, x) / length(x))
+PortfolioOptimisers.risk_input_kind(::SolverProbe) = PO.NetReturnsInput()
+PortfolioOptimisers.calibration_slots(x::SolverProbe) = (; alpha = x.alpha)
+function PortfolioOptimisers.resolve_deferred_quantities(x::SolverProbe,
+                                                         pr::PO.AbstractPriorResult,
+                                                         slv = nothing)
+    # The two locals are the pair the ticket puts side by side: the effective observation
+    # weights, which every owner already settled locally, and the effective solver.
+    ws = PO.sel(x.w, pr.w)
+    sv = PO.sel(x.slv, slv)
+    return SolverProbe(; settings = x.settings, slv = x.slv, w = x.w,
+                       alpha = PO.resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv))
+end
+function PortfolioOptimisers.set_risk_constraints!(model::JuMP.Model, ::Any, r::SolverProbe,
+                                                   opt::PO.RiskJuMPOptimisationEstimator,
+                                                   pr::PO.AbstractPriorResult, args...;
+                                                   prefix::Symbol = Symbol(""), kwargs...)
+    # The builder records what it was handed, so the constraint's own number is in hand and
+    # can be compared with the number the result records.
+    BUILT_ALPHA[] = r.alpha
+    return PO.state_build!(model, prefix, :probe_risk) do
+        probe_risk = JuMP.@expression(model, zero(JuMP.AffExpr))
+        PO.set_risk_bounds_and_expression!(model, opt, probe_risk, r.settings, :probe_risk;
+                                           prefix = prefix)
+        return probe_risk
+    end
+end
+
+@testset "Calibration slot: the JuMP route resolves against the optimiser's solver" begin
+    rng = StableRNG(192837465)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+    rd = ReturnsResult(; nx = string.(1:4), X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    role = SignificanceTailCalibration(; alg = probe_solver_rule)
+
+    # The caller states no solver on the measure, which is the common case: a measure's
+    # solver comes from the optimiser.
+    r = SolverProbe(; alpha = role)
+    @test isnothing(r.slv)
+
+    opt = JuMPOptimiser(; slv = slv, pe = pr)
+    mr = MeanRisk(; r = r, opt = opt)
+    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    model = JuMP.Model()
+    PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    PO.set_maximum_ratio_factor_variables!(model, mr.obj)
+    PO.set_w!(model, attrs.pr.X, mr.wi)
+    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+    SLV_SEEN[] = nothing
+    BUILT_ALPHA[] = nothing
+    PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+
+    # The rule saw the optimiser's own solver, and not the measure's `nothing`. This is the
+    # assertion the ticket exists for: before the fix `slv` was `nothing` here.
+    @test SLV_SEEN[].slv === slv
+    @test SLV_SEEN[].key == :alpha
+    @test SLV_SEEN[].weighted == false
+    @test BUILT_ALPHA[] == 0.05
+
+    # A vector of measures takes the same route, and the second overload threads the same
+    # solver.
+    mrv = MeanRisk(; r = [SolverProbe(; alpha = role)], opt = opt)
+    attrsv = PO.processed_jump_optimiser_attributes(mrv.opt, rd)
+    modelv = JuMP.Model()
+    PO.set_model_scales!(modelv, mrv.opt.sc, mrv.opt.so)
+    PO.set_maximum_ratio_factor_variables!(modelv, mrv.obj)
+    PO.set_w!(modelv, attrsv.pr.X, mrv.wi)
+    PO.set_weight_constraints!(modelv, attrsv.wb, mrv.opt)
+    SLV_SEEN[] = nothing
+    PO.assemble_jump_model!(modelv, mrv, mrv.opt, attrsv, rd, mrv.r, mrv.obj)
+    @test SLV_SEEN[].slv === slv
+
+    # A measure that states its own solver keeps it, which is what `sel` has always done for
+    # the weights beside it.
+    own = Solver(; name = :own, solver = Clarabel.Optimizer)
+    mro = MeanRisk(; r = SolverProbe(; slv = own, alpha = role), opt = opt)
+    attrso = PO.processed_jump_optimiser_attributes(mro.opt, rd)
+    modelo = JuMP.Model()
+    PO.set_model_scales!(modelo, mro.opt.sc, mro.opt.so)
+    PO.set_maximum_ratio_factor_variables!(modelo, mro.obj)
+    PO.set_w!(modelo, attrso.pr.X, mro.wi)
+    PO.set_weight_constraints!(modelo, attrso.wb, mro.opt)
+    SLV_SEEN[] = nothing
+    PO.assemble_jump_model!(modelo, mro, mro.opt, attrso, rd, mro.r, mro.obj)
+    @test SLV_SEEN[].slv === own
+end
+
+@testset "Calibration slot: the two routes resolve against one solver" begin
+    rng = StableRNG(192837465)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+    rd = ReturnsResult(; nx = string.(1:4), X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    role = SignificanceTailCalibration(; alg = probe_solver_rule)
+    r = SolverProbe(; alpha = role)
+
+    # The clustering route's call, verbatim: `factory(hrp.r, pr, hrp.opt.slv)`. The
+    # selection puts the solver on the struct, and the resolution reads it there.
+    SLV_SEEN[] = nothing
+    fout = PO.factory(r, pr, slv)
+    @test SLV_SEEN[].slv === slv
+    @test fout.alpha == 0.05
+
+    # The whole clustering route agrees with the constraint route, measure for measure.
+    SLV_SEEN[] = nothing
+    hrp = HierarchicalRiskParity(; r = r, opt = HierarchicalOptimiser(; slv = slv, pe = pr))
+    res = optimise(hrp, rd)
+    @test SLV_SEEN[].slv === slv
+    @test isapprox(sum(res.w), 1)
+
+    # A rule resolved with no solver at all still produces its own number, so the two
+    # numbers above are the solver's doing and not the rule's.
+    SLV_SEEN[] = nothing
+    @test PO.resolve_deferred_quantities(r, pr).alpha == 0.1
+    @test isnothing(SLV_SEEN[].slv)
+end
+
+@testset "Calibration slot: the MeanRisk result records the measure the model was built from" begin
+    rng = StableRNG(192837465)
+    X = randn(rng, 60, 4)
+    pr = prior(EmpiricalPrior(), X)
+    rd = ReturnsResult(; nx = string.(1:4), X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    role = SignificanceTailCalibration(; alg = probe_solver_rule)
+
+    # `_optimise` builds the model from `mr.r` and records `factory(mr.r, pr, mr.opt.slv)`.
+    # The two calls are two routes over one measure, so the number the result carries must
+    # be the number the constraint was built from.
+    BUILT_ALPHA[] = nothing
+    mr = MeanRisk(; r = SolverProbe(; alpha = role),
+                  opt = JuMPOptimiser(; slv = slv, pe = pr))
+    res = optimise(mr, rd)
+    @test isa(res.jr.retcode, PO.OptimisationSuccess)
+    @test res.r.alpha == BUILT_ALPHA[]
+    @test res.r.alpha == 0.05
 end

@@ -247,7 +247,8 @@ A deferred slot therefore **wins over `pe`**, which is the map's precedence rule
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult)::Kurtosis
+function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult,
+                                     ::Any = nothing)::Kurtosis
     if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.kt, DeferredQuantity)
         return r
     end

@@ -268,7 +268,7 @@ A neighbourhood of a whole distribution, rather than of one of its moments: Wass
 The size of an Ambiguity Set, in the units of the return data. For a Wasserstein or a Gelbrich ball it enters the model as the coefficient of a dual-norm penalty on the weights, so the same number is spelled `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure.
 
 **Calibration Rule**
-A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory so the containing type's constructor validates the result. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
+A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
 ## 4. Optimisation

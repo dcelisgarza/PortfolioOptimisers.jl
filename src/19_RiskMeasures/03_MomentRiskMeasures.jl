@@ -1460,7 +1460,8 @@ Resolve a **Deferred Quantity** in [`LowOrderMoment`](@ref)'s `mu` slot against 
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.mu, DeferredQuantity)
         return r
     end
@@ -1517,7 +1518,8 @@ Resolve a **Deferred Quantity** in [`HighOrderMoment`](@ref)'s `mu` slot against
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.mu, DeferredQuantity)
         return r
     end

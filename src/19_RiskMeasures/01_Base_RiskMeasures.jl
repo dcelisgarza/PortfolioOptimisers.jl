@@ -1739,7 +1739,7 @@ A type that resolves a quantity of its own — a matrix out of a covariance esti
 """
 deferred_slots(::Any) = (;)
 """
-    resolve_deferred_child(slot, pr::AbstractPriorResult)
+    resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
 
 Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
 
@@ -1747,19 +1747,21 @@ A slot holds one of three things, and one rule covers all three. A child measure
 
 The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
 
+`slv` is the effective solver, and it travels down to the child untouched. A child that carries a solver of its own settles it against this one; a child that carries none gives its rules none. So a container hands each child the same solver the enclosing measure was resolved against.
+
 # Related
 
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
   - [`factory_child`](@ref)
 """
-function resolve_deferred_child(slot, pr::AbstractPriorResult)
-    return resolve_deferred_quantities(slot, pr)
+function resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
+    return resolve_deferred_quantities(slot, pr, slv)
 end
 function resolve_deferred_child(slot::AbstractArray{<:Union{<:AbstractEstimator,
                                                             <:AbstractAlgorithm}},
-                                pr::AbstractPriorResult)
-    return [resolve_deferred_child(s, pr) for s in slot]
+                                pr::AbstractPriorResult, slv = nothing)
+    return [resolve_deferred_child(s, pr, slv) for s in slot]
 end
 """
     rebuild_with_slots(x, slots::NamedTuple)
@@ -1794,18 +1796,20 @@ Refuse a type that declares a deferrable slot and no way to resolve it.
 function assert_declared_slot_resolver(x, slots::NamedTuple)
     for (key, slot) in pairs(slots)
         @argcheck(!isa(slot, DeferredQuantity),
-                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and `$(nameof(typeof(x)))` declares no `resolve_deferred_quantities` method to fit it. The derived recursion carries a child measure's own resolution, not a quantity of the enclosing type. Declare `resolve_deferred_quantities(x::$(nameof(typeof(x))), pr::AbstractPriorResult)` beside `deferred_slots`."))
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Deferred Quantity, a `$(nameof(typeof(slot)))`, and `$(nameof(typeof(x)))` declares no `resolve_deferred_quantities` method to fit it. The derived recursion carries a child measure's own resolution, not a quantity of the enclosing type. Declare `resolve_deferred_quantities(x::$(nameof(typeof(x))), pr::AbstractPriorResult, slv = nothing)` beside `deferred_slots`."))
     end
     return nothing
 end
 """
-    resolve_deferred_quantities(x, pr::AbstractPriorResult)
+    resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
 
 Resolve the children that [`deferred_slots`](@ref) declared, and return `x` itself when none of them changed.
 
 This is the derived half of the resolution rule. A container declares its children once and both entry points follow: [`factory`](@ref) reaches them through [`@fprop`](@ref), and the `JuMP` builders reach them through this method. Neither needs a forwarding method per container.
 
 A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
+
+`slv` is the effective solver, and the recursion threads it to every child. A container states no solver of its own, so it changes none: each child settles the one it was handed against the one it carries.
 
 # Related
 
@@ -1814,12 +1818,12 @@ A type that resolves a quantity of its own overrides this with its own method, w
   - [`assert_declared_slot_resolver`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-function resolve_deferred_quantities(x, pr::AbstractPriorResult)
+function resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
     slots = deferred_slots(x)
     if isempty(slots)
         return x
     end
-    resolved = map(slot -> resolve_deferred_child(slot, pr), slots)
+    resolved = map(slot -> resolve_deferred_child(slot, pr, slv), slots)
     assert_declared_slot_resolver(x, resolved)
     # A container whose children resolved to themselves is returned unchanged, so the common
     # case allocates nothing and the rebuild runs only where a slot really moved.
@@ -2192,7 +2196,7 @@ Resolve one calibration slot against prior result `pr`, the effective observatio
 
 A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
 
-A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. It does get the solver: [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so a rule may call [`ERM`](@ref) or [`RRM`](@ref).
+A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
 
 This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the four role types stay **out** of the [`DeferredQuantity`](@ref) union.
 

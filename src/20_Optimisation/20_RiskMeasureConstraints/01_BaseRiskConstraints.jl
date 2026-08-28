@@ -177,6 +177,13 @@ Both overloads stamp the owning measure onto the `:risk_frontier` entries that m
 registered ([`set_risk_frontier_owner!`](@ref)). This is the only depth at which the measure
 and its entries are both in hand.
 
+Both overloads resolve the measure through [`resolve_deferred_quantities`](@ref), and both
+thread the estimator's own solver into that call. This route calls no [`factory`](@ref), so
+no selection has run and a measure that states no solver of its own still holds `nothing`. A
+**Calibration Rule** that reads the solver would see that `nothing`, while the same rule on
+the `factory` route sees the optimiser's. Threading `opt.opt.slv` is what makes the two
+routes resolve one measure against one solver.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -205,6 +212,12 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # so this is where a Deferred Quantity becomes a value. It resolves the deferred state
     # alone; each builder's own prior fallback is untouched.
     #
+    # The estimator's own solver is threaded with the prior. No selection runs on this
+    # route, so a measure that states no solver of its own holds `nothing` here, and a
+    # Calibration Rule that reads the solver would see that `nothing` rather than the one
+    # the optimisation settled on. The `factory` route settles it by selection before it
+    # resolves, and this is how the two routes are made to agree (issue #591).
+    #
     # `scale` is a combination weight, so it is dropped here: a lone measure is not an
     # aggregate and the weight has nothing to weigh. The vector method below keeps it,
     # because there the measures really do combine.
@@ -214,8 +227,9 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     # unconstrained `NearOptimalCentering` did (ADR 0008, amendment 2 §4).
     first = risk_frontier_length(model)
     set_risk_constraints!(model, 1,
-                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr)), opt,
-                          pr, pl, fees, b1; kwargs...)
+                          unit_scale_risk_measure(resolve_deferred_quantities(r, pr,
+                                                                              opt.opt.slv)),
+                          opt, pr, pl, fees, b1; kwargs...)
     set_risk_frontier_owner!(model, first, 1)
     return nothing
 end
@@ -225,8 +239,8 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
                                kwargs...)
     for (i, r) in enumerate(rs)
         first = risk_frontier_length(model)
-        set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr), opt, pr, pl,
-                              fees, b1; kwargs...)
+        set_risk_constraints!(model, i, resolve_deferred_quantities(r, pr, opt.opt.slv),
+                              opt, pr, pl, fees, b1; kwargs...)
         set_risk_frontier_owner!(model, first, i)
     end
     return nothing

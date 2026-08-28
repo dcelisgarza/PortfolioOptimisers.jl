@@ -199,7 +199,8 @@ This is the only thing `factory` does to `mu`. The field is tagged [`@vprop`](@r
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.mu, DeferredQuantity)
         return r
     end

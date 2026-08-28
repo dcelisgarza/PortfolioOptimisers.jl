@@ -246,7 +246,8 @@ A deferred slot therefore **wins over `pe`**, which is the map's precedence rule
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult)::Skewness
+function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult,
+                                     ::Any = nothing)::Skewness
     if isnothing(r.pe) && !isa(r.mu, DeferredQuantity) && !isa(r.sk, DeferredQuantity)
         return r
     end
@@ -659,10 +660,11 @@ The composed measure adds a variance, a skewness and a kurtosis term, so a calle
   - [`fan_out_slot`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult)
-    vr = resolve_deferred_quantities(r.vr, pr)
-    sk = resolve_deferred_quantities(r.sk, pr)
-    kt = resolve_deferred_quantities(r.kt, pr)
+function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorResult,
+                                     slv = nothing)
+    vr = resolve_deferred_quantities(r.vr, pr, slv)
+    sk = resolve_deferred_quantities(r.sk, pr, slv)
+    kt = resolve_deferred_quantities(r.kt, pr, slv)
     if isnothing(r.pe)
         return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt,
                                     pe = nothing)

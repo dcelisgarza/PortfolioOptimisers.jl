@@ -263,7 +263,8 @@ Every `JuMP` path reaches this through [`factory`](@ref), which [`processed_jump
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
+function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(rt.mu, DeferredQuantity)
         return rt
     end

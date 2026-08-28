@@ -406,7 +406,7 @@ Resolve a **Deferred Quantity** in [`Variance`](@ref)'s `sigma` slot against pri
   - [`resolve_deferred_quantities`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult, ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
@@ -608,7 +608,8 @@ Resolve a **Deferred Quantity** in [`StandardDeviation`](@ref)'s `sigma` slot ag
   - [`resolve_deferred_quantities`](@ref)
   - [`fit_deferred_quantity`](@ref)
 """
-function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
@@ -889,7 +890,8 @@ Resolve a **Deferred Quantity** in [`UncertaintySetVariance`](@ref)'s `sigma` sl
   - [`resolve_deferred_quantities`](@ref)
   - [`resolve_slot`](@ref)
 """
-function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult)
+function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult,
+                                     ::Any = nothing)
     if !isa(r.sigma, DeferredQuantity)
         return r
     end
