@@ -154,6 +154,132 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         @test_throws ArgumentError fit_preprocessing(UnimplementedSelector(), RDZ)
     end
 
+    @testset "tail_mask boundaries" begin
+        # the tied block straddles the cut, so ONE asset is admitted, not two and not three
+        s = [3.0, 2.0, 2.0, 1.0]
+        @test findall(PO.tail_mask(s, 2, true, :best)) == [1]
+        @test count(PO.tail_mask(s, 2, true, :best)) == 1
+
+        # the tied block fits inside k, so both members are admitted
+        @test findall(PO.tail_mask([3.0, 3.0, 1.0], 2, true, :best)) == [1, 2]
+
+        # the count saturates at both ends
+        @test !any(PO.tail_mask(s, 0, true, :best))
+        @test !any(PO.tail_mask(s, -1, true, :best))
+        @test all(PO.tail_mask(s, 4, true, :best))
+        @test all(PO.tail_mask(s, 9, true, :best))
+
+        # bib decides which raw end is `:best`, so the two ends swap under it
+        r = [1.0, 2.0, 3.0, 4.0]
+        @test PO.tail_mask(r, 2, true, :best) == PO.tail_mask(r, 2, false, :worst)
+        @test PO.tail_mask(r, 2, false, :best) == PO.tail_mask(r, 2, true, :worst)
+        @test findall(PO.tail_mask(r, 2, true, :best)) == [3, 4]
+        @test findall(PO.tail_mask(r, 2, false, :best)) == [1, 2]
+        # and the two `:best` masks are complements, because k = 2 halves a 4-asset universe
+        @test PO.tail_mask(r, 2, true, :best) == .!PO.tail_mask(r, 2, false, :best)
+    end
+
+    @testset "rule boundaries" begin
+        s = [1.0, 2.0, 3.0, 4.0, 5.0]
+
+        # ThresholdRule compares strictly, so a score exactly on a bound is DROPPED
+        @test findall(PO.rule_keep(ThresholdRule(; lo = 2.0), s, false)) == [3, 4, 5]
+        @test findall(PO.rule_keep(ThresholdRule(; hi = 4.0), s, false)) == [1, 2, 3]
+
+        # an omitted bound disables that side alone
+        @test findall(PO.rule_keep(ThresholdRule(; hi = 3.0), s, false)) == [1, 2]
+
+        # QuantileRule rounds an exact half UP: 0.05 of ten assets is one, not none
+        s10 = collect(1.0:10.0)
+        @test count(PO.rule_keep(QuantileRule(; best = 0.05), s10, false)) == 1
+        @test count(PO.rule_keep(QuantileRule(; best = 0.04), s10, false)) == 0
+
+        # `:drop` is the exact complement of `:keep` on the same rule and scores
+        @test PO.rule_keep(RankRule(; best = 2, action = :drop), s, false) ==
+              .!PO.rule_keep(RankRule(; best = 2), s, false)
+        @test PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2, action = :drop), s,
+                           false) ==
+              .!PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2), s, false)
+    end
+
+    @testset "selection rule validators" begin
+        @test_throws PO.IsNothingError PO.assert_tail_counts(nothing, nothing, :RankRule)
+        @test_throws DomainError PO.assert_tail_counts(-1, nothing, :RankRule)
+        @test_throws DomainError PO.assert_tail_counts(nothing, -1, :RankRule)
+        @test_throws DomainError PO.assert_tail_counts(0, 0, :RankRule)
+        # a zero on one side is legal: the rule still takes an asset from the other
+        @test isnothing(PO.assert_tail_counts(0, 2, :RankRule))
+        @test findall(PO.rule_keep(RankRule(; best = 0, worst = 2), [1.0, 2.0, 3.0, 4.0],
+                                   false)) == [3, 4]
+
+        @test_throws ArgumentError PO.assert_selection_action(:nonsense)
+        @test isnothing(PO.assert_selection_action(:keep))
+        @test isnothing(PO.assert_selection_action(:drop))
+    end
+
+    @testset "asset_scores and assert_scoreable" begin
+        # the score of column i is `score(X[:, i])`, computed one column at a time
+        @test PO.asset_scores(SCM(), XZ) == [SCM()(view(XZ, :, i)) for i in axes(XZ, 2)]
+
+        # a NaN score is rejected: Skewness divides by a zero standard deviation
+        Xc = [0.1 0.0; -0.1 0.0; 0.2 0.0]
+        @test isnan(Skewness()(view(Xc, :, 2)))
+        @test_throws DomainError PO.asset_scores(Skewness(), Xc)
+        # a drawdown measure on a constant column is finite, so it is not that case
+        @test isfinite(MaximumDrawdown()(view(Xc, :, 2)))
+
+        # the message names the wrapper type, and only the two variance measures get the hint
+        for m in (Variance(), StandardDeviation())
+            e = try
+                PO.assert_scoreable(m)
+            catch err
+                err
+            end
+            @test occursin(string(Base.typename(typeof(m)).wrapper), e.msg)
+            @test occursin("SCM()", e.msg)
+        end
+        e = try
+            PO.assert_scoreable(EqualRisk())
+        catch err
+            err
+        end
+        @test occursin("EqualRisk", e.msg)
+        @test !occursin("SCM()", e.msg)
+    end
+
+    @testset "CompleteAssetSelector drops columns, never observations" begin
+        X = [0.1 0.2 NaN 0.4
+             0.3 0.2 0.1 0.5
+             0.2 0.1 0.2 0.6]
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+        res = fit_preprocessing(CompleteAssetSelector(), rd)
+        @test res.nx == ["A", "B", "D"]
+        @test size(apply_preprocessing(res, rd).X, 1) == size(X, 1)
+
+        # a `missing` never reaches the selector: a returns carrier binds X to numbers
+        @test_throws TypeError ReturnsResult(; nx = ["A", "B"],
+                                             X = Union{Missing, Float64}[0.1 0.2
+                                                                         0.3 missing])
+        # the helper itself does read both sentinels
+        @test PO.find_complete_indices(Union{Missing, Float64}[1.0 missing; 2.0 3.0];
+                                       dims = 1) == [1]
+    end
+
+    @testset "the fitted universe replays" begin
+        Xtr = [0.10 0.01 0.001; -0.10 -0.01 -0.001; 0.05 0.02 0.002]
+        Xte = [0.001 0.02 0.10; -0.001 -0.02 -0.10; 0.002 0.01 0.05]
+        rdtr = ReturnsResult(; nx = ["A", "B", "C"], X = Xtr)
+        rdte = ReturnsResult(; nx = ["A", "B", "C"], X = Xte)
+        sel = ScoreSelector(; score = SCM(), rule = RankRule(; best = 2))
+
+        res = fit_preprocessing(sel, rdtr)
+        @test res.nx == ["B", "C"]
+        # the test window's own scores would choose a different universe
+        @test fit_preprocessing(sel, rdte).nx == ["A", "B"]
+        # the replay keeps the fitted one, which is what makes the selector safe in CV
+        @test collect(apply_preprocessing(res, rdte).nx) == ["B", "C"]
+    end
+
     @testset "pipeline integration" begin
         rng = StableRNG(1234)
         T, N = 120, 6

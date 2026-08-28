@@ -194,7 +194,7 @@ commit = "a6d87c6"
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { lines = 68, misses = 0 }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { lines = 23, misses = 8 }
 "src/21_ExpectedReturns.jl" = { lines = 144, misses = 0 }
-"src/22_Preselection.jl" = { lines = 168, misses = 11 }
+"src/22_Preselection.jl" = { lines = 168, misses = 0 }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { lines = 61, misses = 14 }
 "src/23_Pipeline/02_StepExecution.jl" = { lines = 127, misses = 8 }
 "src/23_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 24 }

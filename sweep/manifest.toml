@@ -229,7 +229,7 @@
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
 "src/21_ExpectedReturns.jl" = { map = 8, units = 20, algorithm = 5, swept = true }
-"src/22_Preselection.jl" = { map = 8, units = 30, swept = false }
+"src/22_Preselection.jl" = { map = 8, units = 30, algorithm = 11, swept = true }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { map = 12, units = 19, swept = false }
 "src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 13, swept = false }
 "src/23_Pipeline/03_Pipeline.jl" = { map = 12, units = 27, swept = false }

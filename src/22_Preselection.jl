@@ -551,7 +551,7 @@ Columns are passed as views: a risk-measure functor reads its argument and never
 
 # Validation
 
-  - Every score is finite, else a `DomainError` is thrown naming the offending columns. A `NaN` score (a drawdown measure on a constant series, say) would make the ordering meaningless, so it throws rather than sorting arbitrarily.
+  - Every score is finite, else a `DomainError` is thrown naming the offending columns. A `NaN` score ([`Skewness`](@ref) on a constant series, say, which divides by a zero standard deviation) would make the ordering meaningless, so it throws rather than sorting arbitrarily.
 
 # Returns
 
@@ -668,9 +668,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset selector that drops every asset column holding a `missing` or `NaN` observation.
+Asset selector that drops every asset column holding a `NaN` observation.
 
 The returns-level counterpart of [`MissingDataFilter`](@ref)'s column threshold, for pipelines fed returns data directly (where the price stages never run). It has no observation-dropping mode: a fitted selector cannot decide which rows of an unseen window to drop without breaking the weights/returns alignment.
+
+A returns carrier binds `X` to a matrix of numbers, so a `missing` never reaches this selector: [`ReturnsResult`](@ref) rejects a `Matrix{Union{Missing, Float64}}` at construction. [`find_complete_indices`](@ref) reads both sentinels, and [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
 
 # Constructors
 
@@ -695,7 +697,7 @@ struct CompleteAssetSelector <: AbstractAssetSelector end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the assets a [`CompleteAssetSelector`](@ref) keeps: the asset columns that hold no `missing` and no `NaN`.
+Select the assets a [`CompleteAssetSelector`](@ref) keeps: the asset columns that hold no `NaN`.
 
 # Algorithm
 
