@@ -871,7 +871,7 @@ const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
 
 Union of prior-based return risk measures that are incompatible with [`PredictionResult`](@ref) inputs and require the use of [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead.
 
-The group exists because both members read the **prior result** itself rather than a returns matrix, so neither declares a [`risk_input_kind`](@ref). That one property drives both methods that dispatch on the alias: the vector-of-weights route resolves the measure once and keeps the prior in hand, and the prediction-result routes refuse the call.
+The group exists because both members read the **prior result** itself rather than a returns matrix, so neither declares a [`risk_input_kind`](@ref). That one property drives every method that dispatches on the alias: the vector-of-weights route resolves the measure once and keeps the prior in hand, the prediction-result routes refuse the call, and [`supports_precomputed_returns`](@ref) answers `false`.
 
 # Related
 
@@ -882,6 +882,24 @@ The group exists because both members read the **prior result** itself rather th
   - [`risk_input_kind`](@ref): the declaration neither member makes.
 """
 const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: a [`PrRM`](@ref) never supports precomputed returns.
+
+Both members read the **prior result** and contract the expected returns it states with the portfolio weights. A bare net-return series carries neither the expected returns nor the weights, so `r(x::VecNum)` is undefined for the two types and neither defines one. The predicate answers here rather than reaching the erroring default of [`risk_input_kind`](@ref), which reads to a caller as an internal fault rather than as a statement about the measure they chose.
+
+To score a bare return series, name [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead, which is the substitution [`prrm_prediction_message`](@ref) names for the prediction-result routes.
+
+# Related
+
+  - [`PrRM`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`risk_input_kind`](@ref): the declaration neither member makes.
+  - [`MeanReturn`](@ref): the [`NetReturnsInput`](@ref) measure that does score a bare series.
+  - [`expected_risk_from_returns`](@ref): the contract entry this predicate gates.
+"""
+supports_precomputed_returns(::PrRM) = false
 """
     expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)

@@ -162,19 +162,47 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
 end
 
 @testset "precomputed-returns contract — completeness" begin
-    # Every kind-classified concrete measure resolves `supports_precomputed_returns` to a
-    # `Bool` — a future measure that fails to inherit an eligibility (e.g. via a missing
-    # `risk_input_kind`) trips here rather than at runtime. The `_EXPLICIT` composites are
-    # covered behaviourally above.
+    # EVERY concrete measure resolves `supports_precomputed_returns` to a `Bool` — a future
+    # measure that fails to inherit an eligibility (e.g. via a missing `risk_input_kind`)
+    # trips here rather than at runtime.
+    #
+    # The `_EXPLICIT` composites are NOT skipped here, and that is the whole point of the
+    # loop being separate from the classification loop above. They are exempt from declaring
+    # a *kind*, because an explicit `expected_risk` method routes each of them. They are not
+    # exempt from resolving the *predicate*: `assert_scoreable` and
+    # `expected_risk_from_returns` call it on whatever measure the user names, so a
+    # composite that answers nothing raises the trait's internal "is not defined for" error
+    # in a seam where the user needs a statement about their measure instead. #587 is that
+    # defect: `ExpectedReturn` and `ExpectedReturnRiskRatio` reached `ScoreSelector` that
+    # way, and the skip that used to stand here is why nothing caught it.
     for T in all_concrete(PO.AbstractBaseRiskMeasure)
-        if T in _EXPLICIT
-            continue
-        end
         rt = reduce(typejoin, Base.return_types(PO.supports_precomputed_returns, (T,));
                     init = Union{})
         # `Bool <: rt` holds when the predicate resolves — `Bool`, or `Any` for a moment
         # UnionAll whose `mu` field is abstractly typed. It fails only on `Union{}`: an
         # undeclared measure whose `risk_input_kind` throws.
         @test Bool <: rt
+    end
+end
+
+@testset "precomputed-returns contract — the composites that refuse a bare series" begin
+    # #587. Three composites answered the predicate with the trait's internal "is not
+    # defined for" error, because the skip above meant nothing asked them.
+    #
+    #   - A `PrRM` reads the prior result and contracts the expected returns it states with
+    #     the weights. A bare series carries neither.
+    #   - A `RiskTrackingRiskMeasure` tracks a benchmark held as a WEIGHT vector, so both of
+    #     its functors need `w` as well.
+    #
+    # Each now answers `false`, and both seams that consult it then speak about the measure
+    # the user named rather than about the trait.
+    g = PO.expected_risk_from_returns
+    for r in (ExpectedReturn(), ExpectedReturnRiskRatio(),
+              RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5])))
+        @test !PO.supports_precomputed_returns(r)
+        @test_throws ArgumentError g(r, _x_series)
+        # The preselection seam is where the internal error used to reach the user.
+        @test_throws ArgumentError ScoreSelector(; score = r,
+                                                 rule = ThresholdRule(; lo = 0.0))
     end
 end

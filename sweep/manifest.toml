@@ -150,7 +150,7 @@
 "src/19_RiskMeasures/16_NoRisk.jl" = { map = 9, units = 6, swept = false }
 "src/19_RiskMeasures/16_Range.jl" = { map = 9, units = 1, swept = false }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { map = 9, units = 4, swept = false }
-"src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { map = 9, units = 16, swept = false }
+"src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { map = 9, units = 17, swept = false }
 "src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { map = 9, units = 5, swept = false }
 "src/19_RiskMeasures/20_VarianceSkewKurtosis.jl" = { map = 9, units = 16, swept = false }
 "src/19_RiskMeasures/21_GenericValueatRiskRange.jl" = { map = 9, units = 2, swept = false }
@@ -228,7 +228,7 @@
 "src/20_Optimisation/22_DiscreteFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
 "src/20_Optimisation/23_GreedyFiniteAllocation.jl" = { map = 10, units = 5, swept = false }
 "src/20_Optimisation/24_RiskMeasureCompatibility.jl" = { map = 10, units = 3, swept = false }
-"src/21_ExpectedReturns.jl" = { map = 8, units = 20, algorithm = 5, swept = true }
+"src/21_ExpectedReturns.jl" = { map = 8, units = 21, algorithm = 5, swept = true }
 "src/22_Preselection.jl" = { map = 8, units = 30, algorithm = 11, swept = true }
 "src/23_Pipeline/01_Base_Pipeline.jl" = { map = 12, units = 19, swept = false }
 "src/23_Pipeline/02_StepExecution.jl" = { map = 12, units = 13, swept = false }

@@ -624,5 +624,20 @@ series and its risk is a function of the net-return series alone.
   - [`ReturnsTracking`](@ref)
 """
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking}) = true
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: a [`RiskTrackingRiskMeasure`](@ref) tracks a benchmark held as a weight vector and always needs explicit portfolio weights.
+
+Its `tr` slot is a [`WeightsTracking`](@ref), and both functors read the benchmark weights from it: the independent mode measures the inner risk of `w - r.tr.w`, and the dependent mode takes the difference of the inner risk at `w` and at `r.tr.w`. A bare net-return series carries no weights, so neither difference exists for it.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`expected_risk_from_returns`](@ref): the contract entry this predicate gates.
+"""
+supports_precomputed_returns(::RiskTrackingRiskMeasure) = false
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

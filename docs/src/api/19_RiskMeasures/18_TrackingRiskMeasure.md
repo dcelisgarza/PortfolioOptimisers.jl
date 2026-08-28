@@ -19,6 +19,7 @@ factory(r::RiskTrackingRiskMeasure, w::VecNum)
 factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:WeightsTracking})
 supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})
+supports_precomputed_returns(::RiskTrackingRiskMeasure)
 ```
 
 ## References
