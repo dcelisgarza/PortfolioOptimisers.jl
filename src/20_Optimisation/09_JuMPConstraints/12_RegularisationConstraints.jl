@@ -215,6 +215,71 @@ of a constraint on that norm.
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
+    squared_norm_radius_msg(alg) -> String
+
+Build the refusal message of [`assert_ambiguity_radius_formulation`](@ref), naming the formulation that was paired with a rule.
+
+The message is written once and every refusing method reads it, so the two formulations that refuse a radius today, and any that a later type adds, all say the same thing. The formulation is named with `nameof`, not printed, for the reason [`assert_calibrated_slots`](@ref) states: a printed type carries a module prefix wherever the name is not visible from `Main`.
+
+# Arguments
+
+  - `alg`: The formulation that penalises the squared norm.
+
+# Returns
+
+  - `msg::String`: The refusal message.
+
+# Related
+
+  - [`assert_ambiguity_radius_formulation`](@ref)
+  - [`L2Regularisation`](@ref)
+"""
+function squared_norm_radius_msg(alg)
+    return "`L2Regularisation.val` holds an ambiguity radius, an `$(nameof(AmbiguityRadiusCalibration))`, beside a `$(nameof(typeof(alg)))` formulation. That formulation penalises `norm(w, 2)^2`, and an ambiguity radius is the coefficient of `norm(w, 2)`: the Blanchet-Chen-Zhou identity that makes a radius and an L2 coefficient the same number holds for the un-squared penalty alone. A radius beside a squared penalty therefore has no reading. Use `SOCRiskExpr()`, which is the default, or state a plain number."
+end
+"""
+    assert_ambiguity_radius_formulation(val, alg) -> Nothing
+
+Refuse an ambiguity radius that was placed beside a formulation which penalises the squared norm.
+
+[`L2Regularisation`](@ref) emits `val * norm(w, 2)` under [`SOCRiskExpr`](@ref), and `val * norm(w, 2)^2` under the three others. Only the first is the Wasserstein form, so only the first reads `val` as a radius. A plain number stays legal with every formulation, because a number is whatever coefficient the caller meant it to be; a rule states that the number *is* a radius, and that statement is false beside a squared penalty.
+
+The check is a set of methods rather than a list of types in one body, so a formulation that a later change adds refuses a radius by adding one method here. The permissive fallback is the first method, and each refusing method names one formulation of the family.
+
+# Algorithm
+
+ 1. The pair is anything but a radius rule beside a squared formulation: return `nothing`.
+ 2. A radius rule stands beside a [`VarianceFormulation`](@ref), which covers [`QuadRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref): refuse.
+ 3. A radius rule stands beside an [`RSOCRiskExpr`](@ref): refuse.
+
+# Arguments
+
+  - `val`: The coefficient slot's occupant: a number, or an [`AmbiguityRadiusCalibration`](@ref).
+  - `alg`: The formulation the coefficient multiplies.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`L2Regularisation`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`squared_norm_radius_msg`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+"""
+function assert_ambiguity_radius_formulation(::Any, ::Any)
+    return nothing
+end
+function assert_ambiguity_radius_formulation(::AmbiguityRadiusCalibration,
+                                             alg::VarianceFormulation)
+    return throw(ArgumentError(squared_norm_radius_msg(alg)))
+end
+function assert_ambiguity_radius_formulation(::AmbiguityRadiusCalibration,
+                                             alg::RSOCRiskExpr)
+    return throw(ArgumentError(squared_norm_radius_msg(alg)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 L2-norm regularisation term added to the optimisation objective.
@@ -244,7 +309,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     L2Regularisation(;
-        val::Number = 1e-4,
+        val::Num_AmbRadCal = 1e-4,
         alg::SecondMomentFormulation = SOCRiskExpr()
     ) -> L2Regularisation
 
@@ -252,11 +317,14 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `val > 0` and finite.
+  - If `val` is a number: `val > 0` and finite.
+  - If `val` holds an [`AmbiguityRadiusCalibration`](@ref): `alg` must be [`SOCRiskExpr`](@ref).
 
 # Related
 
   - [`AbstractRegularisationEstimator`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`assert_ambiguity_radius_formulation`](@ref)
   - [`L2Reg_VecL2Reg`](@ref)
   - [`VecL2Reg`](@ref)
   - [`SecondMomentFormulation`](@ref)
@@ -277,15 +345,51 @@ Keywords correspond to the struct's fields.
     $(field_dict[:l2reg_alg])
     """
     alg
-    function L2Regularisation(val::Number, alg::SecondMomentFormulation)
+    function L2Regularisation(val::Num_AmbRadCal, alg::SecondMomentFormulation)
         assert_nonempty_gt0_finite_val(val, :val)
+        assert_ambiguity_radius_formulation(val, alg)
         return new{typeof(val), typeof(alg)}(val, alg)
     end
 end
-function L2Regularisation(; val::Number = 1e-4,
+function L2Regularisation(; val::Num_AmbRadCal = 1e-4,
                           alg::SecondMomentFormulation = SOCRiskExpr())
     return L2Regularisation(val, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`L2Regularisation`](@ref) holding the number.
+
+This is the channel [`JuMPOptimiser`](@ref) uses: the estimator is not `@propagatable`, so the resolution takes the ordinary `factory` verb rather than the generated one, and [`assemble_jump_model!`](@ref) calls it with the optimisation's own prior result and solver. The rebuild goes through the keyword constructor, so the positivity check and [`assert_ambiguity_radius_formulation`](@ref) both re-run on the calibrated number.
+
+The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) carry the estimator through untouched, which is right: neither holds a prior result, so neither can resolve a rule, and a rule that survives a cluster slice is resolved against that cluster's own prior when the model is assembled.
+
+# Arguments
+
+  - `x`: The regularisation term.
+  - `pr`: Prior result the rule reads.
+  - `slv`: Effective solver, or `nothing`.
+
+# Returns
+
+  - `L2Regularisation`: The term, with `val` holding a number.
+
+# Related
+
+  - [`L2Regularisation`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`assert_ambiguity_radius_formulation`](@ref)
+  - [`assemble_jump_model!`](@ref)
+"""
+function factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)
+    val = resolve_calibration_slot(x.val, :val, pr, pr.w, slv)
+    if val === x.val
+        return x
+    end
+    return L2Regularisation(; val = val, alg = x.alg)
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::L2Regularisation) = (; val = x.val)
 """
     const VecL2Reg = AbstractVector{<:L2Regularisation}
 
@@ -447,7 +551,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LpRegularisation(; p::Number = 3, val::Number = 1e-3) -> LpRegularisation
+    LpRegularisation(; p::Number = 3, val::Num_AmbRadCal = 1e-3) -> LpRegularisation
 
 Keywords correspond to the struct's fields.
 
@@ -455,7 +559,7 @@ Keywords correspond to the struct's fields.
 
   - `isfinite(p)`.
   - `p > 1`.
-  - `val > 0` and finite.
+  - If `val` is a number: `val > 0` and finite.
 
 # Related
 
@@ -479,16 +583,51 @@ Keywords correspond to the struct's fields.
     $(field_dict[:lpreg_val])
     """
     val
-    function LpRegularisation(p::Number, val::Number)
+    function LpRegularisation(p::Number, val::Num_AmbRadCal)
         @argcheck(isfinite(p), IsNonFiniteError)
         @argcheck(p > one(p), DomainError)
         assert_nonempty_gt0_finite_val(val, :val)
         return new{typeof(p), typeof(val)}(p, val)
     end
 end
-function LpRegularisation(; p::Number = 3, val::Number = 1e-3)
+function LpRegularisation(; p::Number = 3, val::Num_AmbRadCal = 1e-3)
     return LpRegularisation(p, val)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
+
+It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing can be wrong and no guard runs: `val` multiplies `norm(w, p)` and never its square.
+
+The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. That field keeps its own bound, so nothing there widens and this method never reaches it.
+
+# Arguments
+
+  - `x`: The regularisation term.
+  - `pr`: Prior result the rule reads.
+  - `slv`: Effective solver, or `nothing`.
+
+# Returns
+
+  - `LpRegularisation`: The term, with `val` holding a number.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`L2Regularisation`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`assemble_jump_model!`](@ref)
+"""
+function factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
+    val = resolve_calibration_slot(x.val, :val, pr, pr.w, slv)
+    if val === x.val
+        return x
+    end
+    return LpRegularisation(; p = x.p, val = val)
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::LpRegularisation) = (; val = x.val)
 """
     const VecLpReg = AbstractVector{<:LpRegularisation}
 

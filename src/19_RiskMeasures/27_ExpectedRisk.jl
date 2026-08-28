@@ -60,6 +60,8 @@ Given a prior result the measure is put through [`factory`](@ref) first, so the 
 
 Given a bare returns matrix neither can happen. That call has no `pr.w` to thread and no factor returns to reach, so an unresolved slot is refused by name rather than several frames down ([`assert_resolved_slots`](@ref)), and an unstated slot keeps whatever the measure holds.
 
+A **Calibration Rule** is refused on the same terms, by [`assert_calibrated_slots`](@ref). A rule reads the sample size, the moments and the effective observation weights that a prior result carries, so a bare matrix cannot run one either. The two refusals are separate verbs because the two mechanisms are, and both are taken here.
+
 # Related
 
   - [`risk_input_kind`](@ref)
@@ -69,9 +71,11 @@ Given a bare returns matrix neither can happen. That call has no `pr.w` to threa
   - [`calc_net_returns`](@ref)
   - [`resolve_risk_inputs`](@ref)
   - [`assert_resolved_slots`](@ref)
+  - [`assert_calibrated_slots`](@ref)
 """
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     assert_resolved_slots(r)
+    assert_calibrated_slots(r)
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
 """
@@ -80,7 +84,7 @@ end
 
 Scalarise several risk measures into **one** number.
 
-Each element is evaluated through the singular public entry above and weighted by its own `settings.scale`, then the vector is combined by `sca`. So the vector crosses **no** seam as a unit: [`risk_input_kind`](@ref) and [`assert_resolved_slots`](@ref) are taken by each element itself, and an unresolved slot in element three is refused by name rather than several frames down.
+Each element is evaluated through the singular public entry above and weighted by its own `settings.scale`, then the vector is combined by `sca`. So the vector crosses **no** seam as a unit: [`risk_input_kind`](@ref), [`assert_resolved_slots`](@ref) and [`assert_calibrated_slots`](@ref) are taken by each element itself, and an unresolved slot in element three is refused by name rather than several frames down.
 
 ## Three rules the vector inherits
 

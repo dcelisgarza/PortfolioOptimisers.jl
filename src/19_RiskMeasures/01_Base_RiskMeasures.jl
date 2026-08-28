@@ -2646,6 +2646,419 @@ function bind_alpha(alg::EntropyBudget, alpha::Number)
     return EntropyBudget(; target = alg.target, alpha = alpha)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Computes an ambiguity radius from the data a prior result carries, so that the radius refits whenever the sample moves.
+
+An **Ambiguity Radius** is the radius of the ball of probability measures the model prices, and it is the coefficient of an un-squared norm penalty on the weight vector. It is neither a tail probability nor a deformation parameter, so it takes its own family beside the two of [`AbstractSignificanceCalibrationAlgorithm`](@ref) and [`AbstractDeformationCalibrationAlgorithm`](@ref), under the same root.
+
+All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. The family's role type, [`AmbiguityRadiusCalibration`](@ref), subtypes it as well.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractAmbiguityRadiusCalibrationAlgorithm` and implement the following method:
+
+## The functor
+
+  - `(alg::AbstractAmbiguityRadiusCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the ambiguity radius.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads its sample size and moments off.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
+  - `slv`: Effective solver, or `nothing` when the owner carries none.
+
+### Returns
+
+  - `r::Number`: The ambiguity radius.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Func_AmbRadCal`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+"""
+abstract type AbstractAmbiguityRadiusCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes an Esfahani-Kuhn tail weight, the weight that the `l` slot of a distributionally robust measure holds.
+
+The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a different family and a different role: a radius rule placed in a tail-weight slot is refused at construction.
+
+**No rule of this family ships.** The library computes no Esfahani-Kuhn tail weight, and inventing one would be a guess. The family exists so that a caller's own rule has a home, and [`Func_AmbTwtCal`](@ref) admits a plain function for exactly that case.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractAmbiguityTailWeightCalibrationAlgorithm` and implement the following method:
+
+## The functor
+
+  - `(alg::AbstractAmbiguityTailWeightCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the tail weight.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads its sample size and moments off.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
+  - `slv`: Effective solver, or `nothing` when the owner carries none.
+
+### Returns
+
+  - `l::Number`: The tail weight.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`Func_AmbTwtCal`](@ref)
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+"""
+abstract type AbstractAmbiguityTailWeightCalibrationAlgorithm <:
+              AbstractCalibrationAlgorithm end
+"""
+    const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
+
+Field bound for the `alg` field of an ambiguity-radius role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`Func_AmbTwtCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
+"""
+    const Func_AmbTwtCal = Union{<:Function,
+                                 <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
+
+Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same four arguments. No rule of the family ships, so the plain function is the whole of the field's population today.
+
+# Related
+
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`Func_AmbRadCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Func_AmbTwtCal = Union{<:Function, <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places an ambiguity-radius rule in a slot that holds the radius of the ball the model prices.
+
+The role is the whole of the type: the rule itself lives in `alg`. A radius has no lower and upper end to name, so the family carries one role rather than the two that a tail probability carries, and [`mirror_role`](@ref) needs no method for it.
+
+A slot bounded by [`Num_AmbRadCal`](@ref) admits this role and refuses [`AmbiguityTailWeightCalibration`](@ref), so a tail-weight rule placed in a radius slot is refused at construction rather than at fold time.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AmbiguityRadiusCalibration(;
+        alg::Func_AmbRadCal
+    ) -> AmbiguityRadiusCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
+  - [`Func_AmbRadCal`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+"""
+@concrete struct AmbiguityRadiusCalibration <: AbstractAmbiguityRadiusCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_amb_rad])
+    """
+    alg
+    function AmbiguityRadiusCalibration(alg::Func_AmbRadCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function AmbiguityRadiusCalibration(; alg::Func_AmbRadCal)
+    return AmbiguityRadiusCalibration(alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss.
+
+It is the counterpart of [`AmbiguityRadiusCalibration`](@ref), and carries the same shape. No rule of its family ships, so its `alg` holds a caller's own function today.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AmbiguityTailWeightCalibration(;
+        alg::Func_AmbTwtCal
+    ) -> AmbiguityTailWeightCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbTwtCal`](@ref)
+  - [`Func_AmbTwtCal`](@ref)
+"""
+@concrete struct AmbiguityTailWeightCalibration <:
+                 AbstractAmbiguityTailWeightCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_amb_twt])
+    """
+    alg
+    function AmbiguityTailWeightCalibration(alg::Func_AmbTwtCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function AmbiguityTailWeightCalibration(; alg::Func_AmbTwtCal)
+    return AmbiguityTailWeightCalibration(alg)
+end
+"""
+    const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration, <:Number}
+
+Field bound for an ambiguity-radius slot: the radius itself, or the role that computes it.
+
+The union names one role and no other, so a tail-weight role placed in a radius slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+
+# Related
+
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_AmbTwtCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration, <:Number}
+"""
+    const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration, <:Number}
+
+Field bound for an ambiguity-tail-weight slot: the tail weight itself, or the role that computes it.
+
+# Related
+
+  - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration, <:Number}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows.
+
+The radius is the Blanchet-Kang-Murthy form, a scale in the units of the returns times the square root of a chi-squared quantile over the sample size. The chi-squared factor is dimensionless and grows with the number of assets, so a wider universe buys a wider ball at a fixed confidence level, and a longer sample shrinks it.
+
+`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the returns, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average asset volatility off the prior result instead, which is the first pass the form's source recommends, and it moves with the sample the way the rest of the rule does.
+
+`T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ScenarioCount`](@ref). The radius prices estimation error, and the error of a weighted estimate falls with Kish's effective sample size rather than with the number of rows. [`RateRadius`](@ref) reads the raw row count instead, because a rate speaks of the length of the record.
+
+The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a radius outside the slot's range is refused there, at fold time.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ConcentrationRadius(;
+        confidence::Number = 0.95,
+        scale::Option{<:Number} = nothing
+    ) -> ConcentrationRadius
+
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average asset volatility off the prior result.
+
+## Validation
+
+  - `0 < confidence < 1`.
+  - If `scale` is not `nothing`: `scale > 0` and finite.
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`RateRadius`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct ConcentrationRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
+    """
+    $(field_dict[:cal_confidence])
+    """
+    confidence
+    """
+    $(field_dict[:cal_scale])
+    """
+    scale
+    function ConcentrationRadius(confidence::Number, scale::Option{<:Number})
+        assert_unit_interval(confidence, :confidence)
+        assert_nonempty_gt0_finite_val(scale, :scale)
+        return new{typeof(confidence), typeof(scale)}(confidence, scale)
+    end
+end
+function ConcentrationRadius(; confidence::Number = 0.95, scale::Option{<:Number} = nothing)
+    return ConcentrationRadius(confidence, scale)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the ambiguity radius that the concentration of measure gives on the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r &= s \\sqrt{\\dfrac{\\chi^{2}_{N,\\, q}}{T_{e}}}\\,,\\\\
+s &= \\begin{cases}
+\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
+\\texttt{scale} & \\textrm{otherwise}
+\\end{cases}\\,,\\\\
+T_{e} &= \\begin{cases}
+T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r``: Ambiguity radius.
+  - ``s``: Scale of the radius, in the units of the returns.
+  - ``\\chi^{2}_{N,\\, q}``: Quantile of the chi-squared distribution with ``N`` degrees of freedom at confidence level ``q``.
+  - $(math_dict[:N])
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:T])
+  - ``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.
+  - ``w_{i}``: Observation weight of period ``i``.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
+  - `pr`: Prior result the sample size, the asset count and the covariance matrix are read off.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver. This rule needs none.
+
+# Returns
+
+  - `r::Number`: The ambiguity radius.
+
+# Related
+
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+    N = size(pr.X, 2)
+    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    scale = if isnothing(alg.scale)
+        Statistics.mean(sqrt, LinearAlgebra.diag(pr.sigma))
+    else
+        alg.scale
+    end
+    q = Distributions.cquantile(Distributions.Chisq(N),
+                                one(alg.confidence) - alg.confidence)
+    return scale * sqrt(q / T)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes an ambiguity radius that shrinks with the square root of the sample length.
+
+The radius is `c / sqrt(T)`. The rate is the part of the form to trust, and the coefficient is the part to calibrate: a cross-validation over `c` is the honest route to a radius, and this is the shape a grid moves over.
+
+The rule reads the raw row count, and not the effective sample size that [`ConcentrationRadius`](@ref) reads. The rate is a statement about the length of the record, on the same terms as [`RateSignificance`](@ref).
+
+`c` carries the units of the returns, because the rate itself is dimensionless.
+
+The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RateRadius(;
+        c::Number = 1
+    ) -> RateRadius
+
+Keywords correspond to the struct's fields. `c` defaults to `1`, which is the plain ``1/\\sqrt{T}`` rate.
+
+## Validation
+
+  - `c > 0` and finite.
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct RateRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
+    """
+    $(field_dict[:cal_rate_c])
+    """
+    c
+    function RateRadius(c::Number)
+        assert_nonempty_gt0_finite_val(c, :c)
+        return new{typeof(c)}(c)
+    end
+end
+function RateRadius(; c::Number = 1)
+    return RateRadius(c)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the ambiguity radius at the square-root rate of the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r &= \\frac{c}{\\sqrt{T}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r``: Ambiguity radius.
+  - ``c``: Rate coefficient, in the units of the returns.
+  - $(math_dict[:T])
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. The rate is the same for every key.
+  - `pr`: Prior result the sample length is read off.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `slv`: Effective solver. This rule needs none.
+
+# Returns
+
+  - `r::Number`: The ambiguity radius.
+
+# Related
+
+  - [`RateRadius`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    return alg.c / sqrt(size(pr.X, 1))
+end
+"""
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
 
 Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
@@ -2841,4 +3254,5 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
-       RateSignificance, EntropyBudget
+       RateSignificance, EntropyBudget, AmbiguityRadiusCalibration,
+       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius

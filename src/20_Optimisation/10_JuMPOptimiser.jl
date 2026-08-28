@@ -394,10 +394,10 @@ $(DocStringExtensions.FIELDS)
         l2c::TD_Option{<:Number} = nothing,
         lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
         linfc::TD_Option{<:Number} = nothing,
-        l1::TD_Option{<:Number} = nothing,
+        l1::TD_Option{<:Num_AmbRadCal} = nothing,
         l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-        linf::TD_Option{<:Number} = nothing,
+        linf::TD_Option{<:Num_AmbRadCal} = nothing,
         brt::Bool = false,
         x_src::Symbol = :prior,
         z_src::Symbol = :data,
@@ -419,7 +419,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided: each must be `> 0` and finite.
+  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), which carries no such check until it resolves.
   - If `lp` is a vector: `!isempty(lp)`.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
@@ -633,9 +633,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
                            scard::TD_Option{<:Int_VecInt}, l2c::TD_Option{<:Number},
                            lpc::TD_Option{<:LpReg_VecLpReg}, linfc::TD_Option{<:Number},
-                           l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
-                           lp::TD_Option{<:LpReg_VecLpReg}, linf::TD_Option{<:Number},
-                           brt::Bool, x_src::Symbol, z_src::Symbol, strict::Bool)
+                           l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
+                           lp::TD_Option{<:LpReg_VecLpReg},
+                           linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
+                           z_src::Symbol, strict::Bool)
         assert_source_selector(x_src, :x_src)
         assert_source_selector(z_src, :z_src)
         if isa(slv, VecSlv)
@@ -914,11 +915,11 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        l2c::TD_Option{<:Number} = nothing,
                        lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
                        linfc::TD_Option{<:Number} = nothing,
-                       l1::TD_Option{<:Number} = nothing,
+                       l1::TD_Option{<:Num_AmbRadCal} = nothing,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
 
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linf::TD_Option{<:Number} = nothing, brt::Bool = false,
+                       linf::TD_Option{<:Num_AmbRadCal} = nothing, brt::Bool = false,
                        x_src::Symbol = :prior, z_src::Symbol = :data,
                        strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
@@ -1465,7 +1466,11 @@ and can be capped.
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
     constraint builders.
   - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `linfc`, `l1`, `l2`, `lp`, `linf`,
-    `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`).
+    `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`). The four regularisation coefficients are
+    the one place a **Calibration Rule** reaches the model builders, so they are resolved
+    against `attrs.pr` here rather than by [`processed_jump_optimiser_attributes`](@ref):
+    the bundle carries no slot for them and this is where both the prior result and the
+    optimiser are in hand.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
   - $(arg_dict[:rd])
@@ -1511,10 +1516,15 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_weight_norm_2_constraints!(model, opt.l2c)
     set_weight_norm_p_constraints!(model, opt.lpc)
     set_weight_norm_inf_constraints!(model, opt.linfc)
-    set_l1_regularisation!(model, opt.l1)
-    set_l2_regularisation!(model, opt.l2)
-    set_lp_regularisation!(model, opt.lp)
-    set_linf_regularisation!(model, opt.linf)
+    # The four regularisation coefficients are the ambiguity radii of the four ground
+    # metrics, so each takes a Calibration Rule and each resolves here, against the
+    # optimisation's own prior result and effective solver. `l2` and `lp` hold estimators,
+    # so their own `factory` methods resolve them; `l1` and `linf` hold the number itself.
+    set_l1_regularisation!(model, resolve_calibration_slot(opt.l1, :l1, pr, pr.w, opt.slv))
+    set_l2_regularisation!(model, factory(opt.l2, pr, opt.slv))
+    set_lp_regularisation!(model, factory(opt.lp, pr, opt.slv))
+    set_linf_regularisation!(model,
+                             resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)

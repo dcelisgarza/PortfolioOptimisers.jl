@@ -180,6 +180,16 @@ ScenarioCount
 RateSignificance
 EntropyBudget
 bind_alpha
+AbstractAmbiguityRadiusCalibrationAlgorithm
+AbstractAmbiguityTailWeightCalibrationAlgorithm
+Func_AmbRadCal
+Func_AmbTwtCal
+AmbiguityRadiusCalibration
+AmbiguityTailWeightCalibration
+Num_AmbRadCal
+Num_AmbTwtCal
+ConcentrationRadius
+RateRadius
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
