@@ -1,6 +1,6 @@
 @testset "Uncertainty set" begin
     using PortfolioOptimisers, Test, DataFrames, CSV, TimeSeries, StableRNGs, Random,
-          Statistics, LinearAlgebra, Distributions
+          Clarabel, Statistics, LinearAlgebra, Distributions
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     @testset "L1 Uncertainty sets" begin
@@ -142,6 +142,110 @@
                                                                               method = ActiveAssetsUncertaintyAlgorithm(;
                                                                                                                         active = 1)))
             @test_throws DomainError mu_ucs(ue, rdt)
+        end
+        @testset "The ladder starts at zero and never falls (#579)" begin
+            # Lemma 2 reads the ladder as a bracket, so it must be non-decreasing, and its
+            # first rung must be zero or no positive radius activates the first asset.
+            for sds in (nothing, sd_hat)
+                ladder = PortfolioOptimisers.l1_activation_ladder(mu_t, sds)
+                @test iszero(ladder[1])
+                @test issorted(ladder)
+            end
+        end
+        @testset "A calibrated radius activates exactly the assets it targets (#579)" begin
+            # The claim the whole family rests on: a radius from the open interval of
+            # Lemma 2 activates exactly `q` assets, equally weighted (Corollary 4) or
+            # inverse-volatility weighted (Corollary 11).
+            slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                         check_sol = (; allow_local = true, allow_almost = true),
+                         settings = Dict("verbose" => false))
+            function solve_long_only(q, scaled)
+                ue = CharacteristicUncertaintySet(;
+                                                  alg = L1UncertaintySetAlgorithm(;
+                                                                                  method = ActiveAssetsUncertaintyAlgorithm(;
+                                                                                                                            active = q),
+                                                                                  scaled = scaled))
+                opt = JuMPOptimiser(; slv = slv, bgt = 1.0,
+                                    wb = WeightBounds(; lb = 0.0, ub = 1.0),
+                                    ret = ArithmeticReturn(; ucs = ue))
+                return optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(), opt = opt),
+                                rdl1).w
+            end
+            for q in 1:N
+                @test count(x -> abs(x) > 1e-6, solve_long_only(q, false)) == q
+            end
+            # The active weights are equal unscaled, and inverse-volatility scaled.
+            w = solve_long_only(4, false)
+            @test isapprox(w[w .> 1e-6], fill(0.25, 4); rtol = 1e-5)
+            ws = solve_long_only(4, true)
+            act = findall(x -> abs(x) > 1e-6, ws)
+            @test isapprox(ws[act], inv.(sd_hat[act]) ./ sum(inv.(sd_hat[act]));
+                           rtol = 1e-5)
+            # The paired ladder activates the same count, split into two equal legs.
+            function solve_paired(active)
+                ue = CharacteristicUncertaintySet(;
+                                                  alg = L1UncertaintySetAlgorithm(;
+                                                                                  method = ActiveAssetsUncertaintyAlgorithm(;
+                                                                                                                            active = active),
+                                                                                  paired = true))
+                opt = JuMPOptimiser(; slv = slv, bgt = 0.0, sbgt = 0.5,
+                                    wb = WeightBounds(; lb = -1.0, ub = 1.0),
+                                    ret = ArithmeticReturn(; ucs = ue))
+                w = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(), opt = opt),
+                             rdl1).w
+                return (count(x -> x > 1e-6, w), count(x -> x < -1e-6, w))
+            end
+            for a in 2:2:(N - 2)
+                @test solve_paired(a) == (a ÷ 2, a ÷ 2)
+            end
+        end
+        @testset "The three edges of the ladder resolution (#579)" begin
+            alg = ActiveAssetsUncertaintyAlgorithm(; active = 1)
+            # A one-rung ladder has no increment to continue, so the radius is the inert
+            # `one`: a one-asset universe has its single weight pinned by the budget.
+            @test isone(PortfolioOptimisers.l1_eps_from_ladder(alg, [0.0], 1))
+            @test isone(mu_ucs(CharacteristicUncertaintySet(),
+                               ReturnsResult(; X = X[:, 1:1], nx = ["A1"])).eps)
+            # An empty ladder cannot be bracketed at all.
+            @test_throws Exception PortfolioOptimisers.l1_eps_from_ladder(alg, Float64[], 1)
+            # A paired calibration needs a pair.
+            @test_throws ArgumentError mu_ucs(CharacteristicUncertaintySet(;
+                                                                           alg = L1UncertaintySetAlgorithm(;
+                                                                                                           paired = true)),
+                                              ReturnsResult(; X = X[:, 1:1], nx = ["A1"]))
+            # A number is a passthrough on both resolution routes.
+            @test PortfolioOptimisers.l1_eps_from_ladder(0.5) == 0.5
+            @test PortfolioOptimisers.l1_resolve_eps(0.25) == 0.25
+        end
+        @testset "An odd universe leaves its middle asset unpaired (#579)" begin
+            # Lemma 5 forces w[i] == -w[N+1-i], so with an odd N the middle asset pairs
+            # with itself and its weight solves w == -w. The ladder stops at N ÷ 2, and
+            # every target at or above that rung resolves to the same radius.
+            No = N + 1
+            rdo = ReturnsResult(; X = hcat(X, X[:, 1] .+ 0.001), nx = string.("B", 1:No))
+            eps_of(a) = mu_ucs(CharacteristicUncertaintySet(;
+                                                            alg = L1UncertaintySetAlgorithm(;
+                                                                                            method = ActiveAssetsUncertaintyAlgorithm(;
+                                                                                                                                      active = a),
+                                                                                            paired = true)),
+                               rdo).eps
+            @test eps_of(2 * (No ÷ 2)) == eps_of(No) == eps_of(2 * No)
+        end
+        @testset "The paired count halves an integer and rounds a fraction (#579)" begin
+            # Both targets name pairs, so an even count and the matching fraction agree.
+            # An odd count truncates while the fraction rounds to nearest, so the two can
+            # name a different number of pairs.
+            paired_eps(a) = mu_ucs(CharacteristicUncertaintySet(;
+                                                                alg = L1UncertaintySetAlgorithm(;
+                                                                                                method = ActiveAssetsUncertaintyAlgorithm(;
+                                                                                                                                          active = a),
+                                                                                                paired = true)),
+                                   rdl1).eps
+            @test paired_eps(4) == paired_eps(4 / N)
+            @test paired_eps(8) == paired_eps(8 / N)
+            @test paired_eps(7) != paired_eps(7 / N)
+            @test paired_eps(7) == paired_eps(6)
+            @test paired_eps(7 / N) == paired_eps(8)
         end
     end
     @testset "Box Uncertainty sets" begin

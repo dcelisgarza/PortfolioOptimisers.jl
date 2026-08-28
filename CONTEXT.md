@@ -260,6 +260,9 @@ The per-asset quantity an ℓ1 uncertainty set is built around, usually the expe
 **Radius Calibration**
 The conversion from "how many assets should I hold?" to the radius that produces it. It is a calibration, not a constraint, so a further constraint may move the realised count.
 
+**Activation Ladder**
+The non-decreasing sequence of radii at which each successive asset of a ranking joins the ℓ1 solution, one rung per asset. A Radius Calibration reads it as a bracket: a radius strictly between the `q`-th rung and the next activates exactly `q` assets. The long-only ladder ranks the characteristic on its own; the paired ladder adds the ladder of the reversed, negated ranking, so one rung activates a long/short pair.
+
 **Ambiguity Set**
 A neighbourhood of a whole distribution, rather than of one of its moments: Wasserstein (the data moves), Gelbrich (the moments are wrong), or divergence (the probabilities are wrong). It is a **reading of machinery that already exists**, not an object — no estimator constructs one.
 *Avoid*: Uncertainty Set (above), which is an object a caller builds and passes.

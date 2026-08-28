@@ -92,7 +92,7 @@ commit = "a6d87c6"
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { lines = 19, misses = 0 }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { lines = 132, misses = 0 }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { lines = 135, misses = 0 }
-"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { lines = 109, misses = 3 }
+"src/14_UncertaintySets/05_L1UncertaintySets.jl" = { lines = 112, misses = 0 }
 "src/15_Turnover.jl" = { lines = 33, misses = 0 }
 "src/16_Fees.jl" = { lines = 132, misses = 0 }
 "src/17_NetReturnsDrawdowns.jl" = { lines = 28, misses = 0 }
