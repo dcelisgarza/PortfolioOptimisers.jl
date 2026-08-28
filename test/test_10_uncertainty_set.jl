@@ -696,4 +696,208 @@
             end
         end
     end
+    @testset "The normal law's arithmetic (#577)" begin
+        @testset "The chi-squared route lands on the generic method" begin
+            # The three chi-squared specialisations were deleted: their bodies were
+            # identical, line for line, to the `<:Any` fallback below them, and the
+            # fallback already catches `ChiSqKUncertaintyAlgorithm`. Dispatch must
+            # still land on one unambiguous method, and give the same radii.
+            rng = StableRNG(1357)
+            Xd = randn(rng, 300, 4) * 0.01
+            alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                     method = ChiSqKUncertaintyAlgorithm())
+            ue = NormalUncertaintySet(; alg = alg, seed = 11, n_sim = 500)
+            for f in (ucs, mu_ucs, sigma_ucs)
+                ms = methods(f, (typeof(ue), Matrix{Float64}))
+                @test length(ms) == 1
+                # The one method that answers is the generic ellipsoidal fallback, not
+                # a specialisation on the radius algorithm.
+                # With the specialisation gone the algorithm parameter is
+                # unconstrained, so the signature names no radius algorithm at all.
+                sig = string(only(ms).sig)
+                @test occursin("EllipsoidalUncertaintySetAlgorithm", sig)
+                @test !occursin("ChiSqKUncertaintyAlgorithm", sig)
+                @test !occursin("NormalKUncertaintyAlgorithm", sig)
+            end
+            m, s = ucs(ue, Xd)
+            @test mu_ucs(ue, Xd).k == m.k
+            @test sigma_ucs(ue, Xd).k == s.k
+            # The radii the deleted specialisations produced, recorded before the cut.
+            @test m.k ≈ 3.0802157451680485
+            @test s.k ≈ 5.127984750841625
+            # A plain number and the general algorithm take the same route.
+            for method in (GeneralKUncertaintyAlgorithm(), 2.5)
+                uf = NormalUncertaintySet(; seed = 11,
+                                          alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                   method = method))
+                mf, sf = ucs(uf, Xd)
+                @test mf.k == mu_ucs(uf, Xd).k
+                @test sf.k == sigma_ucs(uf, Xd).k
+            end
+        end
+        @testset "The commutation matrix transposes the vectorisation" begin
+            # A SYMMETRIC matrix cannot separate K from the identity, so the check is
+            # run on non-symmetric ones.
+            A = reshape(collect(1.0:6.0), 2, 3)
+            K23 = PortfolioOptimisers.commutation_matrix(A)
+            @test size(K23) == (6, 6)
+            @test K23 * vec(A) == vec(transpose(A))
+            B = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0]
+            K3 = PortfolioOptimisers.commutation_matrix(B)
+            @test !issymmetric(B)
+            @test K3 * vec(B) == vec(transpose(B))
+            # It is a permutation, so it is its own inverse and holds one entry per row.
+            @test K3 * K3 == I(9)
+            @test count(!iszero, K3) == 9
+            # The symmetric case is the one that proves nothing.
+            S = B + transpose(B)
+            @test K3 * vec(S) == vec(S)
+        end
+        @testset "The two asymptotic covariances are the normal sampling law" begin
+            rng = StableRNG(20250828)
+            N, T = 4, 500
+            L = tril(randn(rng, N, N)) + 3 * I
+            sigma = L * transpose(L) / 50
+            sigma_mu = PortfolioOptimisers.mu_asymptotic_cov(Posdef(), sigma, T)
+            @test sigma_mu ≈ sigma / T
+            ss = PortfolioOptimisers.sigma_asymptotic_cov(Posdef(), sigma_mu, sigma, T)
+            # Cajas (2025) Equations 11.17 and 11.24, Magnus and Neudecker's form of the
+            # asymptotic covariance of vec(S): T (I + K) kron(S/T, S/T) == (I + K) kron(S, S) / T.
+            K = Matrix(PortfolioOptimisers.commutation_matrix(sigma))
+            @test Matrix(ss) ≈ (I + K) * kron(sigma, sigma) / T
+            # Its (i,j) diagonal entry is the variance of the (i,j) entry of a
+            # Wishart(T, sigma / T) draw, so the sample `ucs` builds from those draws and
+            # the shape it measures them against are on one scale.
+            hand = [(sigma[i, i] * sigma[j, j] + sigma[i, j]^2) / T for j in 1:N
+                    for i in 1:N]
+            @test diag(Matrix(ss)) ≈ hand
+            ws = rand(StableRNG(5), Distributions.Wishart(T, sigma_mu), 20_000)
+            @test isapprox(sum(ws) / length(ws), sigma; rtol = 5e-3)
+            emp = [var(getindex.(ws, i, j)) for j in 1:N for i in 1:N]
+            @test isapprox(emp, hand; rtol = 5e-2)
+        end
+        @testset "The empirical route measures an error, not a level" begin
+            # Drawing from N(mu, sigma) in place of N(mu, sigma / T) multiplies every
+            # deviation, and therefore the radius, by sqrt(T).
+            rng = StableRNG(777)
+            N, T, q = 4, 250, 0.05
+            L = tril(randn(rng, N, N)) + 3 * I
+            sigma = L * transpose(L) / 50
+            sigma_mu = sigma / T
+            Z = randn(StableRNG(11), N, 5_000)
+            Xa = transpose(cholesky(Symmetric(sigma_mu)).L * Z)
+            Xb = transpose(cholesky(Symmetric(sigma)).L * Z)
+            ka = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xa, sigma_mu)
+            kb = PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), q, Xb, sigma_mu)
+            @test kb / ka ≈ sqrt(T)
+        end
+        @testset "The box halves the tail and the ellipsoid does not" begin
+            rng = StableRNG(4242)
+            N = 3
+            Xd = randn(rng, 400, N) * 0.01
+            ue = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
+                                      n_sim = 4_000, seed = 1)
+            pr_b, Tb, sigma_mu, q = PortfolioOptimisers.normal_box_preamble(ue, Xd)
+            @test q == ue.q * 0.5
+            @test Tb == size(Xd, 1)
+            mset, sset = ucs(ue, Xd)
+            # The mean box writes a WIDTH: the lower bound is zero, and the half-width
+            # the consumer reads is z_{1 - q/2} times the standard error.
+            z = Distributions.cquantile(Distributions.Normal(), ue.q * 0.5)
+            @test all(iszero, mset.lb)
+            @test mset.ub ≈ 2 * z * sqrt.(diag(sigma_mu))
+            @test (mset.ub - mset.lb) * 0.5 ≈ z * sqrt.(diag(sigma_mu))
+            @test mset.val == pr_b.mu
+            # The covariance bounds bracket the point estimate, and the two `posdef!`
+            # calls move a bound that is already positive definite by nothing.
+            @test all(sset.lb .<= pr_b.sigma .<= sset.ub)
+            @test isposdef(sset.lb)
+            @test isposdef(sset.ub)
+            lb1 = copy(sset.lb)
+            PortfolioOptimisers.posdef!(ue.pdm, lb1)
+            @test lb1 == sset.lb
+            # The ellipsoidal route passes `ue.q` UNDIVIDED, because a radius cuts only
+            # the upper tail of a distance that cannot be negative. Both routes therefore
+            # cover 1 - q: the box one entry at a time, the ellipsoid jointly.
+            sigma_mu_e = sigma_mu
+            k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), ue.q, nothing,
+                                          sigma_mu_e)
+            E = cholesky(Symmetric(sigma_mu_e)).L * randn(StableRNG(9), N, 100_000)
+            d2 = vec(sum(E .* (sigma_mu_e \ E); dims = 1))
+            @test isapprox(mean(d2 .<= k^2), 1 - ue.q; atol = 5e-3)
+            sd = sqrt.(diag(sigma_mu_e))
+            for i in 1:N
+                @test isapprox(mean(abs.(E[i, :]) .<= z * sd[i]), 1 - ue.q; atol = 5e-3)
+            end
+            # The per-entry box is not a joint region: over N entries it covers less.
+            @test mean(vec(all(abs.(E) .<= z .* sd; dims = 1))) < 1 - ue.q
+        end
+        @testset "The scaling parameter reads three sources in order" begin
+            rng = StableRNG(2468)
+            N, T = 3, 400
+            Xd = randn(rng, T, N) * 0.01
+            base = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
+                                        n_sim = 2_000, seed = 3)
+            pr_s = prior(base.pe, Xd)
+            @test isnothing(pr_s.ens)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_s) == size(Xd, 1)
+            # The estimator's own `ens` wins over the row count, and a prior that reports
+            # fewer effective scenarios widens the set: the width scales as T^(-1/2).
+            quarter = NormalUncertaintySet(; alg = BoxUncertaintySetAlgorithm(), q = 0.05,
+                                           n_sim = 2_000, seed = 3, ens = T / 4)
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_s) == T / 4
+            m1, _ = ucs(base, Xd)
+            m2, _ = ucs(quarter, Xd)
+            @test m2.ub ≈ 2 * m1.ub
+            # The prior's own `ens` wins over the row count when the estimator states none.
+            pr_ens = PortfolioOptimisers.LowOrderPrior(; X = pr_s.X, mu = pr_s.mu,
+                                                       sigma = pr_s.sigma, ens = T / 9)
+            @test PortfolioOptimisers.choose_scaling_parameter(base, pr_ens) == T / 9
+            @test PortfolioOptimisers.choose_scaling_parameter(quarter, pr_ens) == T / 4
+        end
+        @testset "Both verbs read the asset count from the prior" begin
+            # `ucs` and `sigma_ucs` both take N from `size(pr.X, 2)`, so a factor prior
+            # that changes the asset count moves the two together.
+            rng = StableRNG(31337)
+            Xd = randn(rng, 260, 5) * 0.01
+            Fd = randn(rng, 260, 2) * 0.01
+            alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                     method = NormalKUncertaintyAlgorithm(),
+                                                     diagonal = false)
+            ue = NormalUncertaintySet(; pe = FactorPrior(), alg = alg, n_sim = 200,
+                                      seed = 4242)
+            m_pair, s_pair = ucs(ue, Xd, Fd)
+            m_alone = mu_ucs(ue, Xd, Fd)
+            s_alone = sigma_ucs(ue, Xd, Fd)
+            @test size(s_pair.sigma, 1) == size(Xd, 2)^2
+            @test Matrix(s_alone.sigma) == Matrix(s_pair.sigma)
+            @test Matrix(m_alone.sigma) == Matrix(m_pair.sigma)
+        end
+        @testset "One generator serves two draws, so the pair splits the stream (#590)" begin
+            # `ucs` on the empirical route resolves ONE generator and draws the mean
+            # sample off it first, so its Wishart draws come from a stream that has
+            # already advanced. `sigma_ucs` draws the Wishart first. The mean radius
+            # therefore agrees between the two and the covariance radius does not.
+            rng = StableRNG(31337)
+            Xd = randn(rng, 260, 5) * 0.01
+            Fd = randn(rng, 260, 2) * 0.01
+            alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                     method = NormalKUncertaintyAlgorithm(),
+                                                     diagonal = false)
+            ue = NormalUncertaintySet(; pe = FactorPrior(), alg = alg, n_sim = 200,
+                                      seed = 4242)
+            m_pair, s_pair = ucs(ue, Xd, Fd)
+            @test m_pair.k == mu_ucs(ue, Xd, Fd).k
+            @test s_pair.k != sigma_ucs(ue, Xd, Fd).k
+            # The box route resolves its own generator inside `sigma_normal_box_set`,
+            # so there the two entry points agree entry for entry.
+            ub = NormalUncertaintySet(; pe = FactorPrior(),
+                                      alg = BoxUncertaintySetAlgorithm(), n_sim = 200,
+                                      seed = 4242)
+            _, b_pair = ucs(ub, Xd, Fd)
+            b_alone = sigma_ucs(ub, Xd, Fd)
+            @test b_alone.lb == b_pair.lb
+            @test b_alone.ub == b_pair.ub
+        end
+    end
 end
