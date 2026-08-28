@@ -655,7 +655,7 @@ Compute the expected risk for a portfolio using a return-based risk measure.
 """
 function expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
-    return expected_return(r.rt, w, pr, fees)
+    return expected_return(r.rt, w, pr, fees; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1034,7 +1034,7 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
 `X` holds **prices**, not returns. The period return of an asset is the ratio of its last value in the range to its first value, less one, which is a return only when the entries are prices.
 
-Both class returns divide by the class weight, and neither division is guarded. A class holding zero portfolio weight makes its ``r_{i}`` a `NaN`, and a class holding zero benchmark weight makes its ``r_{i}^{b}`` a `NaN`. The `NaN` then reaches every row of that class and the `Total` column. Drop the empty class from `asset_classes` to remove it.
+Both class returns divide by the class weight, and neither division is guarded. A class holding zero portfolio weight makes its ``r_{i}`` a `NaN`, and a class holding zero benchmark weight makes its ``r_{i}^{b}`` a `NaN`. The two spread differently, because ``\\mathrm{AA}_{i}`` reads only ``r_{i}^{b}``. A zero portfolio weight leaves ``\\mathrm{AA}_{i}`` finite and makes the other three rows of that class a `NaN`; a zero benchmark weight makes all four a `NaN`. The `Total` column is a row sum, so a row is a `NaN` exactly when one of its class entries is. Drop the empty class from `asset_classes` to remove it.
 
 # Mathematical definition
 
