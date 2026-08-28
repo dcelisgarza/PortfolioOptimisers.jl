@@ -320,3 +320,17 @@ end
     v = PortfolioOptimisers.port_opt_view(rdz, 1:(nobs - 10), [1, 2, 3])
     @test size(v.Z) == (nobs - 10, 3, 2)
 end
+
+@testset "Both standalone priors forward the residual config of the estimator they wrap" begin
+    # `FeaturePrior` adds only `Z`, so the residual block is the wrapped `pe`'s.
+    frc = PortfolioOptimisers.factor_residual_config
+    @test frc(FeaturePrior(; pe = FactorPrior(), ze = RegressionFeatures())) ==
+          frc(FactorPrior())
+    @test isnothing(frc(FeaturePrior(; pe = EmpiricalPrior(), ze = RegressionFeatures())))
+
+    # `OpinionPoolingPrior`'s opinions contribute observation weights alone, so every moment
+    # of the result -- and hence the residual block -- comes from the refit `pe2`.
+    ep = EntropyPoolingPrior()
+    @test frc(OpinionPoolingPrior(; pes = [ep], pe2 = FactorPrior())) == frc(FactorPrior())
+    @test isnothing(frc(OpinionPoolingPrior(; pes = [ep])))
+end

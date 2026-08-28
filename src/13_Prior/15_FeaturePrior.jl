@@ -27,6 +27,30 @@ A producer declares a matrix to be features and nothing else. It does *not* decl
 
 `pr` is the **already-computed** wrapped prior result, not an estimator. That ordering is required: [`RegressionFeatures`](@ref) reads `pr.rr`, which does not exist until the wrapped prior has run.
 
+# Algorithm
+
+Five methods dispatch on `ze`. Three forward a matrix, and two compute one.
+
+A literal `assets × features` matrix returns unchanged, in one step.
+
+A literal `observations × assets × features` array takes one step first:
+
+ 1. Check `size(ze, 1)` against the observation count of `X`, and raise when they differ.
+
+[`RegressionFeatures`](@ref) takes two steps:
+
+ 1. Assert that `pr` carries a regression, through [`assert_prior_regression`](@ref).
+ 2. Return `pr.rr.L`, the loadings.
+
+[`PhylogenyFeatures`](@ref) takes one step:
+
+ 1. Return [`phylogeny_features`](@ref) of `ze.alg` and `ze.pl` over `X`.
+
+[`AssetSetsFeatures`](@ref) takes two steps:
+
+ 1. Assert that `sets` is not `nothing`, and raise naming the keyword when it is.
+ 2. Return [`asset_sets_features`](@ref) of `ze.vals` against `sets`.
+
 # Arguments
 
   - `ze`: Feature matrix producer, or a literal feature matrix.
@@ -211,6 +235,20 @@ The inert surface is `alg` alone. `sep` lives on [`NetworkEstimator`](@ref), whi
 
 `Z[i, i]` is the top of the scale, never zero: `1` for any clustering source, and `separation_decay(decay, 0, dmax)` for [`Proximity`](@ref) over a graph — `n + 1` under the default [`LinearDecay`](@ref) and [`HopCount`](@ref), the observed diameter plus one under [`PathLength`](@ref)'s default budget, `1` for the members that pin `f(0) = 1`. That the diagonal is maximal is a contract on [`AbstractSeparationDecayAlgorithm`](@ref), checked before the loop by [`assert_separation_decay`](@ref).
 
+# Algorithm
+
+Over a graph source, under [`Proximity`](@ref):
+
+ 1. Build the structure from `X` through [`separation_graph`](@ref), giving `g`.
+ 2. Resolve the separation algorithm against the structure through [`resolve_separation`](@ref), giving `sep`.
+ 3. Measure the separations through [`separation_matrix`](@ref), giving `d`.
+ 4. Read the budget through [`separation_budget`](@ref), and score `d` through [`_proximity_features`](@ref).
+
+Over a partition source, under any algorithm:
+
+ 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to `eltype(X)`.
+ 2. Add the identity, restoring the diagonal that [`phylogeny_matrix`](@ref) subtracts.
+
 # Arguments
 
   - `alg`: Phylogeny feature algorithm.
@@ -251,6 +289,16 @@ function of the **separations** alone: the structure, the estimator and the data
 time it runs. Handing it a matrix is how the unreachable branch is tested — every structure a shipped
 estimator builds is connected, so a disconnected one arrives as an argument rather than through a
 test double that answers [`calc_adjacency`](@ref).
+
+# Algorithm
+
+ 1. Probe the decay over `0:dmax` through [`assert_separation_decay`](@ref), before the pair loop.
+ 2. Allocate `Z`, of the element type `et` and the size of `d`, filled with zeros.
+ 3. For each pair, read its separation `duv` and ask [`is_related`](@ref) whether it is inside the
+    budget, giving `rel`. This is the sentinel test as well as the budget rule, so it is the guard
+    on the next step.
+ 4. Where `rel` holds, write `separation_decay(dk, duv, dmax)` into `Z[u, v]`. Where it does not,
+    leave the zero of step 2.
 
 # Arguments
 
@@ -569,6 +617,16 @@ A literal feature matrix is *data* and must be sliced on its asset axis, exactly
 
 The literal path slices with `sq = false`, matching the prior carrier's own view: a derived `Z`'s feature axis is never sliced, because a producer refits rather than being cut down.
 
+# Algorithm
+
+A producer takes one step:
+
+ 1. Forward `ze` to [`port_opt_view`](@ref), whose universal fallback returns an estimator with nothing to slice unchanged.
+
+A literal feature matrix takes one step:
+
+ 1. Forward `ze` to [`feature_matrix_view`](@ref) with `sq = false`, `:` for the leading axis and `i` for the asset axis.
+
 # Related
 
   - [`FeaturePrior`](@ref)
@@ -587,7 +645,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Prior estimator that attaches a feature matrix to the prior it wraps.
 
-`FeaturePrior` delegates every moment to the wrapped estimator `pe` and adds nothing but `Z`, so it is a **provably pure addition**: the moments it returns are the wrapped estimator's, unchanged. That is what makes every existing prior feature-capable without any of them knowing about features.
+`FeaturePrior` delegates every moment to the wrapped estimator `pe` and adds nothing but `Z`, so it is a **provably pure addition**: the moments it returns are the wrapped estimator's, unchanged. That is what makes every existing prior feature-capable without any of them knowing about features. Moments come first and features second, because a producer may need the result — [`RegressionFeatures`](@ref) reads `pr.rr`.
 
 # Fields
 
@@ -617,17 +675,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `pe` and `sets` recurse through [`port_opt_view`](@ref).
   - `ze` goes through [`feature_estimator_view`](@ref) instead. A feature matrix carries assets on one axis and features on the other, so the asset selection reaches only the axis that holds assets.
 
-# Details
+# Nesting, and the two estimators that drop `Z`
 
-  - **Moments first, features second.** The wrapped prior is computed before `ze` runs, because a producer may need the result — [`RegressionFeatures`](@ref) reads `pr.rr`.
-  - **Nesting order does not matter.** Every wrapping prior estimator forwards `Z`, so `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive at [`distance`](@ref) with the same feature matrix. The exception is the estimators whose wrapped prior is fit on *factors* — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) — which drop it deliberately; wrap those from the outside.
-  - **The outermost declaration wins.** Nesting one `FeaturePrior` inside another overwrites the inner feature matrix rather than merging.
-  - **A literal `ze` must be static to survive a fold.** An `assets × features` matrix is observation-independent and is correct under any cross-validation fold. A time-varying literal is not: folds slice observations *before* the prior is fit and never touch the estimator, so its observation axis would no longer match — which [`LowOrderPrior`](@ref) rejects at construction. Use a producer to derive a time-varying `Z` per fold.
+Every wrapping prior estimator forwards `Z`, so `BlackLittermanPrior(; pe = FeaturePrior(…))` and `FeaturePrior(; pe = BlackLittermanPrior(…))` both arrive at [`distance`](@ref) with the same feature matrix. The exception is the estimators whose wrapped prior is fit on *factors* — [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) — which drop it deliberately; wrap those from the outside.
+
+The outermost declaration wins. Nesting one `FeaturePrior` inside another overwrites the inner feature matrix rather than merging.
 
 # Validation
 
   - If `ze` is a literal matrix, it is non-empty.
   - If `sets` is not `nothing`, `length(sets.dict[sets.xkey]) == size(X, 2)`.
+  - A literal `ze` must be static to survive a fold. An `assets × features` matrix is observation-independent and is correct under any cross-validation fold. A time-varying literal is not: folds slice observations *before* the prior is fit and never touch the estimator, so its observation axis would no longer match, and [`feature_matrix`](@ref) raises a `DimensionMismatch` naming three remedies. Use a producer to derive a time-varying `Z` per fold.
 
 # Examples
 
@@ -715,6 +773,13 @@ Return a view of a [`FeaturePrior`](@ref) restricted to assets at index `i`.
 
 Hand-written rather than generated by [`@vprop`](@ref): the `ze` slot holds either a producer or a literal feature matrix, and the two need different treatment — see [`feature_estimator_view`](@ref).
 
+# Algorithm
+
+ 1. View the wrapped estimator `pe.pe` through [`port_opt_view`](@ref).
+ 2. View the `ze` slot through [`feature_estimator_view`](@ref), which routes a producer and a literal differently.
+ 3. View the taxonomy `pe.sets` through [`port_opt_view`](@ref).
+ 4. Rebuild a `FeaturePrior` from the three, so its own constructor re-checks them.
+
 # Related
 
   - [`FeaturePrior`](@ref)
@@ -733,6 +798,14 @@ end
 Compute the wrapped prior's moments and attach a feature matrix to them.
 
 Every moment is the wrapped estimator's, untouched. The only addition is `Z`, produced by `pe.ze` from the *already-computed* prior result — the ordering [`RegressionFeatures`](@ref) needs, since it reads `pr.rr`.
+
+# Algorithm
+
+ 1. Orient `X` and `F` by `dims`.
+ 2. When `pe.sets` is not `nothing`, check its asset axis against the asset count of `X`.
+ 3. Fit the wrapped estimator `pe.pe`, giving the prior result `pr`.
+ 4. Compute the feature matrix `Z` from `pe.ze` against `pr`, `X`, `F` and `pe.sets`, through [`feature_matrix`](@ref).
+ 5. Forward `pr` with `Z` set, through [`forward_prior`](@ref). Every other slot passes through untouched.
 
 # Arguments
 

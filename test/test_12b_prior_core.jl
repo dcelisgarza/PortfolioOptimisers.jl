@@ -1121,7 +1121,10 @@ end
     @test length(opp.w) == 2
     @test isapprox(pr_a.mu, pr_b.mu)
 
-    # Uniform-weight branch (`w === nothing`) also hits the remainder path and must not error.
+    # Uniform-weight branch (`w === nothing`). `range(inv(M), inv(M); length = M)` carries
+    # `TwicePrecision` endpoints, so its entries sum to exactly `1.0` for every `M` measured
+    # (2, 3, 5, 7, 11) and `rw` is `0.0`. The branch therefore does *not* take the remainder
+    # path -- it takes the `else` arm, and `pw` gets `M` columns rather than `M + 1`.
     pr_unif = prior(OpinionPoolingPrior(;
                                         pes = [EntropyPoolingPrior(; sets = sets,
                                                                    mu_views = LinearConstraintEstimator(;
@@ -1158,6 +1161,84 @@ end
     pr_unif_p = prior(OpinionPoolingPrior(; pes = [op_a, op_b], p = 5), rd)
     @test all(isfinite, pr_unif_p.mu)
     @test isapprox(sum(pr_unif_p.ow), 1)
+    @test length(pr_unif_p.ow) == 2
+end
+
+@testset "Opinion pooling: the pooling rules against hand computations" begin
+    P = [0.30 0.10 0.25
+         0.10 0.40 0.15
+         0.20 0.20 0.20
+         0.25 0.20 0.10
+         0.15 0.10 0.30]
+    a = [0.5, 0.3, 0.2]
+
+    lin = PortfolioOptimisers.compute_pooling(LinearOpinionPooling(), a, P)
+    hand_lin = [sum(P[t, k] * a[k] for k in 1:3) for t in 1:5]
+    @test isapprox(collect(lin), hand_lin)
+    @test isapprox(sum(lin), 1)
+    @test all(>=(0), lin)
+
+    u = [sum(a[k] * log(P[t, k]) for k in 1:3) for t in 1:5]
+    hand_log = exp.(u) / sum(exp.(u))
+    lg = PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(), a, P)
+    @test isapprox(collect(lg), hand_log)
+    @test isapprox(sum(lg), 1)
+    @test all(>=(0), lg)
+    # The two rules are genuinely different answers on the same input.
+    @test !isapprox(collect(lin), collect(lg))
+
+    # A single zero scenario weight zeroes that scenario under the logarithmic rule and
+    # leaves it positive under the linear one.
+    Pz = copy(P)
+    Pz[3, 1] = 0.0
+    Pz[5, 1] = 0.35
+    lgz = PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(), a, Pz)
+    linz = PortfolioOptimisers.compute_pooling(LinearOpinionPooling(), a, Pz)
+    @test iszero(lgz[3])
+    @test !iszero(linz[3])
+    @test isapprox(sum(lgz), 1)
+
+    # A zero *opinion* weight against that zero scenario weight makes `0 * log(0)`, which is
+    # `NaN`, and `StatsBase.pweights` refuses it. This is the case the closed form does not
+    # cover; the docstring of `compute_pooling` states it under `# Validation`.
+    @test_throws ArgumentError PortfolioOptimisers.compute_pooling(LogarithmicOpinionPooling(),
+                                                                   [0.0, 0.5, 0.5], Pz)
+
+    # The robustness penalty against a hand-computed `alpha_k * exp(-p * D_k)`.
+    p = 2.0
+    c = P * a
+    D = [sum(P[t, k] * log(P[t, k] / c[t]) for t in 1:5) for k in 1:3]
+    num = a .* exp.(-p * D)
+    @test isapprox(PortfolioOptimisers.robust_probabilities(a, P, p), num / sum(num))
+    @test isapprox(sum(PortfolioOptimisers.robust_probabilities(a, P, p)), 1)
+    # The argument is never modified, and the no-penalty method returns it untouched.
+    @test a == [0.5, 0.3, 0.2]
+    @test PortfolioOptimisers.robust_probabilities(a, P, nothing) === a
+
+    # A larger `p` concentrates the mass on the opinion of smallest divergence, and the
+    # limit is that opinion alone.
+    @test argmin(D) == 1
+    masses = [PortfolioOptimisers.robust_probabilities(a, P, pp)[1]
+              for pp in (1.0, 10.0, 100.0, 1000.0)]
+    @test issorted(masses)
+    @test isapprox(masses[end], 1)
+end
+
+@testset "OpinionPoolingPrior constructor guards" begin
+    ep = EntropyPoolingPrior()
+    @test_throws PortfolioOptimisers.IsEmptyError OpinionPoolingPrior(;
+                                                                      pes = EntropyPoolingPrior[])
+    # `p` is bounded below by zero strictly: there is no `p = 0`.
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = 0.0)
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep], p = -1.0)
+    @test_throws PortfolioOptimisers.IsEmptyError OpinionPoolingPrior(; pes = [ep],
+                                                                      w = Float64[])
+    @test_throws DimensionMismatch OpinionPoolingPrior(; pes = [ep, ep], w = [1.0])
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep, ep], w = [-0.1, 0.5])
+    @test_throws DomainError OpinionPoolingPrior(; pes = [ep, ep], w = [0.7, 0.7])
+    # The sum guard is an inequality: weights summing to less than one are legal, and the
+    # remainder becomes a uniform-prior opinion in `prior`.
+    @test isa(OpinionPoolingPrior(; pes = [ep, ep], w = [0.3, 0.3]), OpinionPoolingPrior)
 end
 
 @testset "Factor block guard on wrapped priors" begin
