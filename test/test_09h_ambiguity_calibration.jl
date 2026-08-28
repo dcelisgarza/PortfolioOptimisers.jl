@@ -224,7 +224,9 @@ end
 
     # --- the scalar value-at-risk measure ----------------------------------------------
     m = DistributionallyRobustConditionalValueatRisk(; l = trole, r = rrole)
-    @test PO.calibration_slots(m) == (; l = trole, r = rrole)
+    # `alpha` joined the declaration when #583 widened the significance slots, and it
+    # stands first because the declaration follows field order.
+    @test PO.calibration_slots(m) == (; alpha = m.alpha, l = trole, r = rrole)
     out = PO.resolve_deferred_quantities(m, PR60)
     @test out.r ≈ r_num
     @test out.l ≈ l_num
@@ -250,7 +252,9 @@ end
     # --- the range measure --------------------------------------------------------------
     rg = DistributionallyRobustConditionalValueatRiskRange(; l_a = trole, r_a = rrole,
                                                            l_b = trole, r_b = rrole)
-    @test PO.calibration_slots(rg) == (; l_a = trole, r_a = rrole, l_b = trole, r_b = rrole)
+    @test PO.calibration_slots(rg) ==
+          (; alpha = rg.alpha, l_a = trole, r_a = rrole, beta = rg.beta, l_b = trole,
+           r_b = rrole)
     rgo = PO.resolve_deferred_quantities(rg, PR60)
     @test rgo.r_a ≈ r_num
     @test rgo.r_b ≈ r_num
@@ -272,7 +276,7 @@ end
 
     # --- the drawdown measure -----------------------------------------------------------
     dd = DistributionallyRobustConditionalDrawdownatRisk(; l = trole, r = rrole)
-    @test PO.calibration_slots(dd) == (; l = trole, r = rrole)
+    @test PO.calibration_slots(dd) == (; alpha = dd.alpha, l = trole, r = rrole)
     ddo = PO.resolve_deferred_quantities(dd, PR60)
     @test ddo.r ≈ r_num
     @test ddo.l ≈ l_num

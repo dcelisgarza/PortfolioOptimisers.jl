@@ -103,7 +103,7 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRisk
 
@@ -111,7 +111,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -169,7 +169,7 @@ EntropicValueatRisk
     """
     @pprop w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                 alpha::Number, w::Option{<:ObsWeights})
+                                 alpha::Num_SigTailCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -180,10 +180,40 @@ EntropicValueatRisk
     end
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                             slv::Option{<:Slv_VecSlv} = nothing,
+                             alpha::Num_SigTailCal = 0.05,
                              w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of an [`EntropicValueatRisk`](@ref) against prior result `pr`.
+
+The measure carries a solver, so the resolution settles one as `sel(x.slv, slv)` and hands it to the rule. A rule may therefore call [`ERM`](@ref) itself. On the [`factory`](@ref) route the `@cprop` selection has already put the effective solver on the struct, so the local `sel` reads the struct; on the `JuMP` route it reads the one [`set_risk_constraints!`](@ref) threaded. Both routes resolve one measure against one solver.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`ERM`](@ref)
+"""
+function resolve_deferred_quantities(x::EntropicValueatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        EntropicValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::EntropicValueatRisk) = (; alpha = x.alpha)
 function (r::EntropicValueatRisk)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w)
 end
@@ -220,8 +250,8 @@ $(DocStringExtensions.FIELDS)
     EntropicValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
+        beta::Num_SigHeadCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicValueatRiskRange
 
@@ -229,7 +259,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -265,8 +295,8 @@ Keywords correspond to the struct's fields.
     """
     @pprop w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
-                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                      beta::Number, w::Option{<:ObsWeights})
+                                      slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                      beta::Num_SigHeadCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -281,11 +311,42 @@ Keywords correspond to the struct's fields.
     end
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                  beta::Number = 0.05,
+                                  slv::Option{<:Slv_VecSlv} = nothing,
+                                  alpha::Num_SigTailCal = 0.05, beta::Num_SigHeadCal = 0.05,
                                   w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels of an [`EntropicValueatRiskRange`](@ref) against prior result `pr`.
+
+Each end carries its own slot and its own bound, so a tail rule and a head rule resolve independently. The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules: the two ends of one measure are priced by one solver.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+
+# Related
+
+  - [`EntropicValueatRiskRange`](@ref)
+  - [`EntropicValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::EntropicValueatRiskRange, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
+    return if alpha === x.alpha && beta === x.beta
+        x
+    else
+        EntropicValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                 beta = beta, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::EntropicValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Tail decomposition — see `range_tails`. The functor below is the value-level twin: it is
 # the same two tails, evaluated instead of built.
 function range_tails(r::EntropicValueatRiskRange)
@@ -346,7 +407,7 @@ $(DocStringExtensions.FIELDS)
     EntropicDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> EntropicDrawdownatRisk
 
@@ -354,7 +415,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -413,7 +474,7 @@ EntropicDrawdownatRisk
     """
     @pprop w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
-                                    slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                    slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
                                     w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -425,10 +486,38 @@ EntropicDrawdownatRisk
     end
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                                slv::Option{<:Slv_VecSlv} = nothing,
+                                alpha::Num_SigTailCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of an [`EntropicDrawdownatRisk`](@ref) against prior result `pr`.
+
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged. The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there, and the settled solver reaches it on the same terms.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`EntropicValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::EntropicDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        EntropicDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::EntropicDrawdownatRisk) = (; alpha = x.alpha)
 function (r::EntropicDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)
@@ -480,7 +569,7 @@ $(DocStringExtensions.FIELDS)
     RelativeEntropicDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeEntropicDrawdownatRisk
 
@@ -488,7 +577,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -544,8 +633,8 @@ RelativeEntropicDrawdownatRisk
     """
     @pprop w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                            slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                            w::Option{<:ObsWeights})
+                                            slv::Option{<:Slv_VecSlv},
+                                            alpha::Num_SigTailCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -558,10 +647,38 @@ end
 function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
-                                        alpha::Number = 0.05,
+                                        alpha::Num_SigTailCal = 0.05,
                                         w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`RelativeEntropicDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The solver is settled as `sel(x.slv, slv)` and handed to the rule, on the terms the absolute twin states.
+
+# Related
+
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativeEntropicDrawdownatRisk,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        RelativeEntropicDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                       w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativeEntropicDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)

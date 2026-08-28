@@ -247,7 +247,10 @@ end
     # local to the 33 types that take it.
     @test PO.calibration_slots(0.05) == (;)
     @test PO.calibration_slots(nothing) == (;)
-    @test PO.calibration_slots(ConditionalValueatRisk()) == (;)
+    # `Variance` is one of them: its `sigma` slot takes a Deferred Quantity, which is the
+    # other mechanism, and it states no quantity a rule could compute.
+    @test PO.calibration_slots(Variance()) == (;)
+    @test PO.calibration_slots(MaximumDrawdown()) == (;)
 
     # A type that names its slots gets the values back under the field names.
     probe = CalibratedProbe(; alpha = SignificanceTailCalibration(; alg = RULE))

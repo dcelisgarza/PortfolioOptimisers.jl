@@ -157,8 +157,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigTailCal = 0.05,
+        kappa::Num_DefTailCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRisk
 
@@ -166,8 +166,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -231,8 +231,8 @@ RelativisticValueatRisk
     """
     @pprop w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                     kappa::Number, w::Option{<:ObsWeights})
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                     kappa::Num_DefTailCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -247,11 +247,43 @@ RelativisticValueatRisk
     end
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 kappa::Number = 0.3,
+                                 slv::Option{<:Slv_VecSlv} = nothing,
+                                 alpha::Num_SigTailCal = 0.05, kappa::Num_DefTailCal = 0.3,
                                  w::Option{<:ObsWeights} = nothing)::RelativisticValueatRisk
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticValueatRisk`](@ref) against prior result `pr`.
+
+`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is handed to the `kappa` slot through [`bind_alpha`](@ref) before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling.
+
+The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`EntropyBudget`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticValueatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    return if alpha === x.alpha && kappa === x.kappa
+        x
+    else
+        RelativisticValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                kappa = kappa, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. The two travel together, and the resolution
+# above is what orders them.
+calibration_slots(x::RelativisticValueatRisk) = (; alpha = x.alpha, kappa = x.kappa)
 function (r::RelativisticValueatRisk)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
@@ -288,10 +320,10 @@ $(DocStringExtensions.FIELDS)
     RelativisticValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa_a::Number = 0.3,
-        beta::Number = 0.05,
-        kappa_b::Number = 0.3,
+        alpha::Num_SigTailCal = 0.05,
+        kappa_a::Num_DefTailCal = 0.3,
+        beta::Num_SigHeadCal = 0.05,
+        kappa_b::Num_DefHeadCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticValueatRiskRange
 
@@ -299,8 +331,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < kappa_a < 1`.
-  - `0 < beta < 1`, `0 < kappa_b < 1`.
+  - Each of `alpha` and `kappa_a` that is a number: `0 < val < 1`.
+  - Each of `beta` and `kappa_b` that is a number: `0 < val < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -372,9 +404,9 @@ RelativisticValueatRiskRange
     """
     @pprop w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
-                                          slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                          kappa_a::Number, beta::Number, kappa_b::Number,
-                                          w::Option{<:ObsWeights})
+                                          slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                          kappa_a::Num_DefTailCal, beta::Num_SigHeadCal,
+                                          kappa_b::Num_DefHeadCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -391,10 +423,51 @@ end
 function RelativisticValueatRiskRange(;
                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                       slv::Option{<:Slv_VecSlv} = nothing,
-                                      alpha::Number = 0.05, kappa_a::Number = 0.3,
-                                      beta::Number = 0.05, kappa_b::Number = 0.3,
+                                      alpha::Num_SigTailCal = 0.05,
+                                      kappa_a::Num_DefTailCal = 0.3,
+                                      beta::Num_SigHeadCal = 0.05,
+                                      kappa_b::Num_DefHeadCal = 0.3,
                                       w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels and the two deformation parameters of a [`RelativisticValueatRiskRange`](@ref) against prior result `pr`.
+
+Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. So the resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
+
+The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
+
+# Related
+
+  - [`RelativisticValueatRiskRange`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`EntropyBudget`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticValueatRiskRange,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa_a = resolve_calibration_slot(bind_alpha(x.kappa_a, alpha), :kappa_a, pr, ws, sv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
+    kappa_b = resolve_calibration_slot(bind_alpha(x.kappa_b, beta), :kappa_b, pr, ws, sv)
+    return if alpha === x.alpha &&
+              kappa_a === x.kappa_a &&
+              beta === x.beta &&
+              kappa_b === x.kappa_b
+        x
+    else
+        RelativisticValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                     kappa_a = kappa_a, beta = beta, kappa_b = kappa_b,
+                                     w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. One travelling pair per tail.
+function calibration_slots(x::RelativisticValueatRiskRange)
+    return (; alpha = x.alpha, kappa_a = x.kappa_a, beta = x.beta, kappa_b = x.kappa_b)
 end
 # Tail decomposition — see `range_tails`. Each tail carries its own deformation parameter:
 # `kappa_a` shapes the loss side, `kappa_b` the gain side. The functor below is the
@@ -458,8 +531,8 @@ $(DocStringExtensions.FIELDS)
     RelativisticDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigTailCal = 0.05,
+        kappa::Num_DefTailCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativisticDrawdownatRisk
 
@@ -467,8 +540,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -532,8 +605,8 @@ RelativisticDrawdownatRisk
     """
     @pprop w
     function RelativisticDrawdownatRisk(settings::RiskMeasureSettings,
-                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                        kappa::Number, w::Option{<:ObsWeights})
+                                        slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                        kappa::Num_DefTailCal, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -549,10 +622,40 @@ RelativisticDrawdownatRisk
 end
 function RelativisticDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
-                                    alpha::Number = 0.05, kappa::Number = 0.3,
+                                    alpha::Num_SigTailCal = 0.05,
+                                    kappa::Num_DefTailCal = 0.3,
                                     w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticDrawdownatRisk`](@ref) against prior result `pr`.
+
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and travels to the `kappa` slot through [`bind_alpha`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
+
+# Related
+
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    return if alpha === x.alpha && kappa === x.kappa
+        x
+    else
+        RelativisticDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                   kappa = kappa, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativisticDrawdownatRisk) = (; alpha = x.alpha, kappa = x.kappa)
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
@@ -605,8 +708,8 @@ $(DocStringExtensions.FIELDS)
     RelativeRelativisticDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        kappa::Number = 0.3,
+        alpha::Num_SigTailCal = 0.05,
+        kappa::Num_DefTailCal = 0.3,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeRelativisticDrawdownatRisk
 
@@ -614,8 +717,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -676,8 +779,10 @@ RelativeRelativisticDrawdownatRisk
     """
     @pprop w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                                slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                                kappa::Number, w::Option{<:ObsWeights})
+                                                slv::Option{<:Slv_VecSlv},
+                                                alpha::Num_SigTailCal,
+                                                kappa::Num_DefTailCal,
+                                                w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -694,9 +799,41 @@ end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            alpha::Num_SigTailCal = 0.05,
+                                            kappa::Num_DefTailCal = 0.3,
                                             w::Option{<:ObsWeights} = nothing)::RelativeRelativisticDrawdownatRisk
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativeRelativisticDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The travelling pair is resolved in the order the absolute twin states.
+
+# Related
+
+  - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    return if alpha === x.alpha && kappa === x.kappa
+        x
+    else
+        RelativeRelativisticDrawdownatRisk(; settings = x.settings, slv = x.slv,
+                                           alpha = alpha, kappa = kappa, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+function calibration_slots(x::RelativeRelativisticDrawdownatRisk)
+    return (; alpha = x.alpha, kappa = x.kappa)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)

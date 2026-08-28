@@ -1583,7 +1583,9 @@ end
     # legitimately in `Skewness.ve`. So the declaration is per type, and this is the gate that
     # catches the container that forgot one: it reads the field's own type bound off the
     # positional constructor and asks whether that bound admits any type that declares slots.
-    # Six containers were missing before the recursion was derived.
+    # Six containers were missing before the recursion was derived, and the two ordered-
+    # weights containers joined when #583 widened the significance slots of the four weight
+    # builders they hold.
     tr = WeightsTracking(; w = fill(0.2, 5))
     function instantiate(T)
         for f in (() -> T(), () -> T(; tr = tr), () -> T(; w = fill(0.2, 5)))
@@ -1602,7 +1604,7 @@ end
         x = instantiate(base(T))
         isnothing(x) || push!(declaring, x)
     end
-    @test length(declaring) == 22
+    @test length(declaring) == 24
 
     # The inner constructor states one bound per field, in field order.
     function field_bounds(T)

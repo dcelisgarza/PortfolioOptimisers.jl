@@ -10,7 +10,7 @@ commit = "2107fc7a40"
 [file]
 "ext/PortfolioOptimisersImputeExt.jl" = { cyc = 1, cog = 0, arg = 2, cyc_sum = 1, cog_sum = 0, arg_sum = 2, macros = [] }
 "ext/PortfolioOptimisersPlotsExt.jl" = { cyc = 10, cog = 15, arg = 16, cyc_sum = 365, cog_sum = 331, arg_sum = 820, macros = [] }
-"src/01_Base.jl" = { cyc = 27, cog = 50, arg = 7, cyc_sum = 201, cog_sum = 154, arg_sum = 181, macros = ["@define_pretty_show"] }
+"src/01_Base.jl" = { cyc = 27, cog = 50, arg = 7, cyc_sum = 202, cog_sum = 154, arg_sum = 181, macros = ["@define_pretty_show"] }
 "src/02_Tools.jl" = { cyc = 45, cog = 96, arg = 6, cyc_sum = 238, cog_sum = 233, arg_sum = 261, macros = ["@propagatable"] }
 "src/03_Preprocessing.jl" = { cyc = 19, cog = 28, arg = 15, cyc_sum = 160, cog_sum = 159, arg_sum = 137, macros = [] }
 "src/04_PosdefMatrix.jl" = { cyc = 5, cog = 4, arg = 2, cyc_sum = 10, cog_sum = 5, arg_sum = 4, macros = [] }
@@ -103,11 +103,11 @@ commit = "2107fc7a40"
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { cyc = 4, cog = 3, arg = 4, cyc_sum = 62, cog_sum = 36, arg_sum = 88, macros = ["@propagatable"] }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { cyc = 9, cog = 8, arg = 8, cyc_sum = 42, cog_sum = 28, arg_sum = 40, macros = [] }
 "src/19_RiskMeasures/05_NegativeSkewness.jl" = { cyc = 4, cog = 6, arg = 6, cyc_sum = 16, cog_sum = 10, arg_sum = 10, macros = [] }
-"src/19_RiskMeasures/06_XatRisk.jl" = { cyc = 5, cog = 5, arg = 5, cyc_sum = 64, cog_sum = 26, arg_sum = 68, macros = ["@propagatable"] }
-"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { cyc = 3, cog = 4, arg = 8, cyc_sum = 51, cog_sum = 28, arg_sum = 61, macros = ["@propagatable"] }
-"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 25, cog_sum = 13, arg_sum = 30, macros = ["@propagatable"] }
-"src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { cyc = 6, cog = 11, arg = 7, cyc_sum = 27, cog_sum = 19, arg_sum = 36, macros = ["@propagatable"] }
-"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 79, cog_sum = 41, arg_sum = 124, macros = [] }
+"src/19_RiskMeasures/06_XatRisk.jl" = { cyc = 5, cog = 5, arg = 5, cyc_sum = 79, cog_sum = 36, arg_sum = 84, macros = ["@propagatable"] }
+"src/19_RiskMeasures/07_ConditionalXatRisk.jl" = { cyc = 4, cog = 4, arg = 8, cyc_sum = 66, cog_sum = 37, arg_sum = 80, macros = ["@propagatable"] }
+"src/19_RiskMeasures/08_EntropicXatRisk.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 38, cog_sum = 22, arg_sum = 46, macros = ["@propagatable"] }
+"src/19_RiskMeasures/09_RelativisticXatRisk.jl" = { cyc = 6, cog = 11, arg = 7, cyc_sum = 45, cog_sum = 31, arg_sum = 52, macros = ["@propagatable"] }
+"src/19_RiskMeasures/10_OWARiskMeasures.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 105, cog_sum = 60, arg_sum = 156, macros = [] }
 "src/19_RiskMeasures/11_AverageDrawdown.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 10, cog_sum = 2, arg_sum = 12, macros = ["@propagatable"] }
 "src/19_RiskMeasures/12_UlcerIndex.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 8, cog_sum = 2, arg_sum = 6, macros = [] }
 "src/19_RiskMeasures/13_MaximumDrawdown.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 8, cog_sum = 2, arg_sum = 6, macros = [] }
@@ -117,7 +117,7 @@ commit = "2107fc7a40"
 "src/19_RiskMeasures/16_Range.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/19_RiskMeasures/17_TurnoverRiskMeasure.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = ["@propagatable"] }
 "src/19_RiskMeasures/18_TrackingRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 31, cog_sum = 18, arg_sum = 57, macros = ["@propagatable"] }
-"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 25, cog_sum = 13, arg_sum = 36, macros = ["@propagatable"] }
+"src/19_RiskMeasures/19_PowerNormXatRisk.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 38, cog_sum = 22, arg_sum = 52, macros = ["@propagatable"] }
 "src/19_RiskMeasures/20_VarianceSkewKurtosis.jl" = { cyc = 7, cog = 7, arg = 6, cyc_sum = 36, cog_sum = 21, arg_sum = 48, macros = ["@propagatable"] }
 "src/19_RiskMeasures/21_GenericValueatRiskRange.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 6, cog_sum = 1, arg_sum = 7, macros = ["@propagatable"] }
 "src/19_RiskMeasures/22_RatioRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = ["@propagatable"] }

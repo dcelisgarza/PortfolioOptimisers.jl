@@ -102,7 +102,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormValueatRisk
@@ -111,7 +111,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -176,7 +176,7 @@ PowerNormValueatRisk
     """
     @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                  alpha::Number, p::Number,
+                                  alpha::Num_SigTailCal, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -191,11 +191,42 @@ PowerNormValueatRisk
     end
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                              p::Number = 2.0,
+                              slv::Option{<:Slv_VecSlv} = nothing,
+                              alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
                               w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`PowerNormValueatRisk`](@ref) against prior result `pr`.
+
+`p` is the order of the norm and not a quantity of the sample, so it stays a number: nothing in a prior result says which order a caller meant. The solver is settled as `sel(x.slv, slv)` and handed to the rule, so a rule may call [`PRM`](@ref) itself.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` and `p >= 1` on the calibrated measure.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`PRM`](@ref)
+"""
+function resolve_deferred_quantities(x::PowerNormValueatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        PowerNormValueatRisk(; settings = x.settings, slv = x.slv, alpha = alpha, p = x.p,
+                             w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. `p` is the order of the norm, not a quantity
+# of the sample, so it is not one of them.
+calibration_slots(x::PowerNormValueatRisk) = (; alpha = x.alpha)
 function (r::PowerNormValueatRisk)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.p, r.w)
 end
@@ -232,8 +263,8 @@ $(DocStringExtensions.FIELDS)
     PowerNormValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
+        beta::Num_SigHeadCal = 0.05,
         pa::Number = 2.0,
         pb::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
@@ -243,7 +274,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`, `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - `pa > 1`, `pb > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -316,8 +347,8 @@ PowerNormValueatRiskRange
     """
     @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
-                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                       beta::Number, pa::Number, pb::Number,
+                                       slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                       beta::Num_SigHeadCal, pa::Number, pb::Number,
                                        w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -333,11 +364,43 @@ PowerNormValueatRiskRange
 end
 function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    slv::Option{<:Slv_VecSlv} = nothing,
-                                   alpha::Number = 0.05, beta::Number = 0.05,
-                                   pa::Number = 2.0, pb::Number = 2.0,
+                                   alpha::Num_SigTailCal = 0.05,
+                                   beta::Num_SigHeadCal = 0.05, pa::Number = 2.0,
+                                   pb::Number = 2.0,
                                    w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels of a [`PowerNormValueatRiskRange`](@ref) against prior result `pr`.
+
+Each end carries its own slot and its own bound, so a tail rule and a head rule resolve independently. `pa` and `pb` are the two norm orders and stay numbers, on the terms the scalar measure states.
+
+The solver is settled once and handed to both rules, so the two ends of one measure are priced by one solver.
+
+# Related
+
+  - [`PowerNormValueatRiskRange`](@ref)
+  - [`PowerNormValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::PowerNormValueatRiskRange, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
+    return if alpha === x.alpha && beta === x.beta
+        x
+    else
+        PowerNormValueatRiskRange(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                  beta = beta, pa = x.pa, pb = x.pb, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::PowerNormValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Tail decomposition — see `range_tails`. Each tail carries its own norm order: `pa` shapes
 # the loss side, `pb` the gain side. The functor below is the value-level twin, and it is
 # what pins that pairing.
@@ -401,7 +464,7 @@ $(DocStringExtensions.FIELDS)
     PowerNormDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> PowerNormDrawdownatRisk
@@ -410,7 +473,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -476,8 +539,8 @@ PowerNormDrawdownatRisk
     """
     @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
-                                     slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
-                                     w::Option{<:ObsWeights})
+                                     slv::Option{<:Slv_VecSlv}, alpha::Num_SigTailCal,
+                                     p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -491,11 +554,39 @@ PowerNormDrawdownatRisk
     end
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 p::Number = 2.0,
+                                 slv::Option{<:Slv_VecSlv} = nothing,
+                                 alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
                                  w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`PowerNormDrawdownatRisk`](@ref) against prior result `pr`.
+
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged. The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`PowerNormValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::PowerNormDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        PowerNormDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                p = x.p, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::PowerNormDrawdownatRisk) = (; alpha = x.alpha)
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
@@ -549,7 +640,7 @@ $(DocStringExtensions.FIELDS)
     RelativePowerNormDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativePowerNormDrawdownatRisk
@@ -558,7 +649,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -621,8 +712,9 @@ RelativePowerNormDrawdownatRisk
     """
     @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                             p::Number, w::Option{<:ObsWeights})
+                                             slv::Option{<:Slv_VecSlv},
+                                             alpha::Num_SigTailCal, p::Number,
+                                             w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -638,10 +730,38 @@ end
 function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
-                                         alpha::Number = 0.05, p::Number = 2.0,
+                                         alpha::Num_SigTailCal = 0.05, p::Number = 2.0,
                                          w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`RelativePowerNormDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The solver is settled as `sel(x.slv, slv)` and handed to the rule, on the terms the absolute twin states.
+
+# Related
+
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativePowerNormDrawdownatRisk,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    sv = sel(x.slv, slv)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
+    return if alpha === x.alpha
+        x
+    else
+        RelativePowerNormDrawdownatRisk(; settings = x.settings, slv = x.slv, alpha = alpha,
+                                        p = x.p, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativePowerNormDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)

@@ -229,8 +229,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :dims => "`dims`: Dimension along which to perform the computation.",#
                                  :omean => "`mean`: Optional mean value to use for centering.",
                                  :ex => "`ex`: Parallel execution strategy.",#
-                                 :alpha => "`alpha`: Quantile level for the lower tail.",#
-                                 :beta => "`beta`: Quantile level for the upper tail.",#
+                                 :alpha => "`alpha`: Quantile level for the lower tail. The bound is [`Num_SigTailCal`](@ref), so the slot takes the level itself or a [`SignificanceTailCalibration`](@ref) that computes it from the prior result.",#
+                                 :alpha_ltd => "`alpha`: Quantile level for the lower tail.",#
+                                 :beta => "`beta`: Quantile level for the upper tail. The bound is [`Num_SigHeadCal`](@ref), so the slot takes the level itself or a [`SignificanceHeadCalibration`](@ref) that computes it from the prior result.",#
                                  :l => "`l`: Risk aversion parameter.",#
                                  :ohf => "`ohf`: Objective homogenisation factor for the ratio problem, or `nothing` to size it from the resolved characteristic.",#
                                  :i_ret_term => "`i`: Index of the return term to maximise.",#
@@ -434,9 +435,9 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :alg1 => "`alg1`: First algorithm variant.",#
                                  :alg2 => "`alg2`: Second algorithm variant.",#
                                  :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#
-                                 :kappa => "`kappa`: Relativistic deformation parameter.",#
-                                 :kappa_a => "`kappa_a`: Relativistic deformation parameter for the lower tail.",#
-                                 :kappa_b => "`kappa_b`: Relativistic deformation parameter for the upper tail.",#
+                                 :kappa => "`kappa`: Relativistic deformation parameter. The bound is [`Num_DefTailCal`](@ref), so the slot takes the parameter itself or a [`DeformationTailCalibration`](@ref) that computes it from the prior result.",#
+                                 :kappa_a => "`kappa_a`: Relativistic deformation parameter for the lower tail. The bound is [`Num_DefTailCal`](@ref), so the slot takes the parameter itself or a [`DeformationTailCalibration`](@ref) that computes it from the prior result.",#
+                                 :kappa_b => "`kappa_b`: Relativistic deformation parameter for the upper tail. The bound is [`Num_DefHeadCal`](@ref), so the slot takes the parameter itself or a [`DeformationHeadCalibration`](@ref) that computes it from the prior result.",#
                                  :l_a => "`l_a`: Weight of the tail term in the Esfahani-Kuhn loss of the lower tail. The mean term is not scaled by it. The bound is [`Num_AmbTwtCal`](@ref), so the slot takes the weight itself or an [`AmbiguityTailWeightCalibration`](@ref) that computes it from the prior result.",#
                                  :r_a => "`r_a`: Radius of the type-1 Wasserstein ambiguity ball of the lower tail. It multiplies a decision variable, so it is not a constant offset. The bound is [`Num_AmbRadCal`](@ref), so the slot takes the radius itself or an [`AmbiguityRadiusCalibration`](@ref) that computes it from the prior result.",#
                                  :l_b => "`l_b`: Weight of the tail term in the Esfahani-Kuhn loss of the upper tail. The mean term is not scaled by it. The bound is [`Num_AmbTwtCal`](@ref), so the slot takes the weight itself or an [`AmbiguityTailWeightCalibration`](@ref) that computes it from the prior result.",#
@@ -845,9 +846,9 @@ const val_dict = unique_key_dict(:val_dict,
                                  :D => "`!isempty(D)`.",#
                                  :ck => "`k >= 1`.",#
                                  :lm_k => "`k >= 2`.",#
-                                 :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
+                                 :alpha_i_alpha => "`0 < alpha_i < alpha < 1`, checked when `alpha` is a number. When `alpha` holds a [`SignificanceTailCalibration`](@ref) only `0 < alpha_i < 1` is checked here, and the joint bound is checked when the rebuild runs at fold time. A rule that returns a value at or below the stated `alpha_i` is refused there, and this joint bound is the whole of the ordering validation.",#
                                  :a_sim_pos => "`a_sim > 0`.",#
-                                 :beta_i_beta => "`0 < beta_i < beta < 1`.",#
+                                 :beta_i_beta => "`0 < beta_i < beta < 1`, checked when `beta` is a number. When `beta` holds a [`SignificanceHeadCalibration`](@ref) only `0 < beta_i < 1` is checked here, and the joint bound is checked when the rebuild runs at fold time, on the terms the lower tail states.",#
                                  :b_sim_pos => "`b_sim > 0`.",#
                                  :S_D => "`size(S) == size(D)`.",#
                                  :S_P => "If `P` is not `nothing`, `!isempty(P)` and `size(S) == size(P)`.",#
@@ -4424,9 +4425,12 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    assert_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_unit_interval(args...)
 
 Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
+
+A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate a slot whose bound admits more than a number without a branch of its own, on the terms [`assert_nonempty_gt0_finite_val`](@ref) already sets. A **Calibration Rule** ([`AbstractCalibrationAlgorithm`](@ref)) states no number at construction, so the range is checked when the rebuild runs, against the number the rule returned.
 
 # Arguments
 
@@ -4435,7 +4439,8 @@ Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 
 # Validation
 
-  - `0 < val < 1`, which raises a `DomainError` naming `sym` and `val`.
+  - `::Number`: `0 < val < 1`, which raises a `DomainError` naming `sym` and `val`.
+  - Any other type: no rule, so the call always passes.
 
 # Returns
 
@@ -4445,10 +4450,14 @@ Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 
   - [`assert_nonneg`](@ref)
   - [`assert_gt0`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
 """
 function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(zero(val) < val < one(val),
               DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+function assert_unit_interval(args...)::Nothing
     return nothing
 end
 """

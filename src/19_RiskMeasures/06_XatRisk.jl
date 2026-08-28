@@ -460,7 +460,7 @@ $(DocStringExtensions.FIELDS)
 
     ValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing,
         alg::ValueatRiskFormulation = MIPValueatRisk()
     ) -> ValueatRisk
@@ -469,7 +469,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 ## Propagated parameters
@@ -544,7 +544,7 @@ ValueatRisk
     $(field_dict[:alg])
     """
     @fprop @vprop alg
-    function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
+    function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -553,10 +553,41 @@ ValueatRisk
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
+                     alpha::Num_SigTailCal = 0.05, w::Option{<:ObsWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`ValueatRisk`](@ref) against prior result `pr`, and resolve the formulation `alg` beside it.
+
+`alpha` takes a **Calibration Rule** in place of the number, so it resolves here. The rebuild goes through the ordinary keyword constructor, and that call re-runs `0 < alpha < 1` on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the constructor a caller's own number meets.
+
+This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through [`resolve_deferred_child`](@ref), which is the verb the derivation would have used.
+
+The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule. The measure carries no solver of its own, so it hands the rule the one it was given.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    alg = resolve_deferred_child(x.alg, pr, slv)
+    return if alpha === x.alpha && alg === x.alg
+        x
+    else
+        ValueatRisk(; settings = x.settings, alpha = alpha, w = x.w, alg = alg)
+    end
+end
+# Calibration slots — see `calibration_slots`. The significance level is the one quantity of
+# this measure that a rule may compute.
+calibration_slots(x::ValueatRisk) = (; alpha = x.alpha)
 # The empirical order statistic is the `MIPValueatRisk` estimand, so the two functors
 # below name that formulation. Leaving `alg` free makes them overlap the parametric
 # method further down, which no rule of specificity can order.
@@ -620,8 +651,8 @@ $(DocStringExtensions.FIELDS)
 
     ValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
+        beta::Num_SigHeadCal = 0.05,
         w::Option{<:ObsWeights} = nothing,
         alg::ValueatRiskFormulation = MIPValueatRisk()
     ) -> ValueatRiskRange
@@ -630,8 +661,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `beta` is a number: `0 < beta < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 ## Propagated parameters
@@ -709,8 +740,9 @@ ValueatRiskRange
     $(field_dict[:alg])
     """
     @fprop @vprop alg
-    function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
-                              w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
+    function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
+                              beta::Num_SigHeadCal, w::Option{<:ObsWeights},
+                              alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -722,11 +754,42 @@ ValueatRiskRange
     end
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          alpha::Number = 0.05, beta::Number = 0.05,
+                          alpha::Num_SigTailCal = 0.05, beta::Num_SigHeadCal = 0.05,
                           w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prior result `pr`, and resolve the formulation `alg` beside them.
+
+Each tail carries its own slot and its own bound, so a tail rule and a head rule resolve independently and neither is mirrored onto the other. The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+
+This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
+
+# Related
+
+  - [`ValueatRiskRange`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
+    alg = resolve_deferred_child(x.alg, pr, slv)
+    return if alpha === x.alpha && beta === x.beta && alg === x.alg
+        x
+    else
+        ValueatRiskRange(; settings = x.settings, alpha = alpha, beta = beta, w = x.w,
+                         alg = alg)
+    end
+end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::ValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Deferrable slots — see `deferred_slots`. The formulation carries them, so both the check and
 # the derived recursion in `resolve_deferred_quantities` reach them through `alg`.
 # `MIPValueatRisk` defers nothing, so the recursion is the identity for it.
@@ -836,7 +899,7 @@ $(DocStringExtensions.FIELDS)
 
     DrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing,
         b::Option{<:Number} = nothing,
         s::Option{<:Number} = nothing
@@ -846,7 +909,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
   - If `b` is not `nothing`: `b > 0`.
   - If `s` is not `nothing`: `s > 0`.
@@ -911,7 +974,7 @@ DrawdownatRisk
     $(field_dict[:s_mip])
     """
     s
-    function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
+    function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
         assert_unit_interval(alpha, :alpha)
@@ -934,11 +997,39 @@ DrawdownatRisk
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
+                        alpha::Num_SigTailCal = 0.05, w::Option{<:ObsWeights} = nothing,
                         b::Option{<:Number} = nothing,
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`DrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure reads the drawdown series of the sample, so a rule that counts scenarios counts the same rows the drawdown is taken over. The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` and the `b > s` pairing on the calibrated measure.
+
+The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
+
+# Related
+
+  - [`DrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::DrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    return if alpha === x.alpha
+        x
+    else
+        DrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w, b = x.b, s = x.s)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::DrawdownatRisk) = (; alpha = x.alpha)
 """
     absolute_drawdown_vec(x::VecNum) -> Vector
 
@@ -1072,7 +1163,7 @@ $(DocStringExtensions.FIELDS)
 
     RelativeDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeDrawdownatRisk
 
@@ -1080,7 +1171,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 # Functor
@@ -1130,7 +1221,7 @@ RelativeDrawdownatRisk
     """
     @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                    alpha::Number, w::Option{<:ObsWeights})
+                                    alpha::Num_SigTailCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -1138,10 +1229,38 @@ RelativeDrawdownatRisk
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                alpha::Number = 0.05,
+                                alpha::Num_SigTailCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`RelativeDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+
+The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
+
+# Related
+
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativeDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    return if alpha === x.alpha
+        x
+    else
+        RelativeDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativeDrawdownatRisk) = (; alpha = x.alpha)
 """
     relative_drawdown_vec(x)
 

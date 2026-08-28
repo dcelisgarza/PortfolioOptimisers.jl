@@ -71,7 +71,7 @@ LowerTailDependenceCovariance
     """
     @fprop @vprop ve
     """
-    $(field_dict[:alpha])
+    $(field_dict[:alpha_ltd])
     """
     alpha
     """

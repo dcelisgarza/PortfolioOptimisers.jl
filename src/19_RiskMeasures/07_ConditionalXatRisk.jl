@@ -46,7 +46,7 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalValueatRisk
 
@@ -54,7 +54,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 # Functor
@@ -107,7 +107,7 @@ ConditionalValueatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
+    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                                     w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -115,10 +115,38 @@ ConditionalValueatRisk
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Number = 0.05,
+                                alpha::Num_SigTailCal = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::ConditionalValueatRisk
     return ConditionalValueatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`ConditionalValueatRisk`](@ref) against prior result `pr`.
+
+The measure averages the losses beyond the `alpha`-quantile, so the tail it prices holds `ceil(alpha * T)` of the sample's scenarios. A [`ScenarioCount`](@ref) rule fixes that count instead of the probability, which is what makes the tail hold the same number of scenarios at every fold length.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number. The effective observation weights are computed locally as `sel(x.w, pr.w)` and threaded to the rule.
+
+# Related
+
+  - [`ConditionalValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`ScenarioCount`](@ref)
+"""
+function resolve_deferred_quantities(x::ConditionalValueatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    return if alpha === x.alpha
+        x
+    else
+        ConditionalValueatRisk(; settings = x.settings, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::ConditionalValueatRisk) = (; alpha = x.alpha)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -171,7 +199,7 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalValueatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         l::Num_AmbTwtCal = 1.0,
         r::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -181,7 +209,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -248,7 +276,8 @@ DistributionallyRobustConditionalValueatRisk
     """
     @pprop w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
-                                                          alpha::Number, l::Num_AmbTwtCal,
+                                                          alpha::Num_SigTailCal,
+                                                          l::Num_AmbTwtCal,
                                                           r::Num_AmbRadCal,
                                                           w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
@@ -265,7 +294,7 @@ DistributionallyRobustConditionalValueatRisk
 end
 function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                      alpha::Number = 0.05,
+                                                      alpha::Num_SigTailCal = 0.05,
                                                       l::Num_AmbTwtCal = 1.0,
                                                       r::Num_AmbRadCal = 0.02,
                                                       w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRisk
@@ -274,9 +303,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
+Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
 
-Both slots take a **Calibration Rule** in place of the number, so both resolve here. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
+All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The three are independent: no rule of one slot reads another, so the order among them is free. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
 
 The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none. That holds on both routes: the third argument carries the effective solver for a measure that has a slot for one, and this measure has none.
 
@@ -290,21 +319,22 @@ A measure whose two slots both hold numbers is returned unchanged, so the common
   - [`AmbiguityRadiusCalibration`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRisk,
-                                     pr::AbstractPriorResult, ::Any = nothing)
+                                     pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
-    l = resolve_calibration_slot(x.l, :l, pr, ws)
-    r = resolve_calibration_slot(x.r, :r, pr, ws)
-    return if l === x.l && r === x.r
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    l = resolve_calibration_slot(x.l, :l, pr, ws, slv)
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv)
+    return if alpha === x.alpha && l === x.l && r === x.r
         x
     else
-        DistributionallyRobustConditionalValueatRisk(; settings = x.settings,
-                                                     alpha = x.alpha, l = l, r = r, w = x.w)
+        DistributionallyRobustConditionalValueatRisk(; settings = x.settings, alpha = alpha,
+                                                     l = l, r = r, w = x.w)
     end
 end
-# Calibration slots — see `calibration_slots`. The radius and the tail weight are the two
-# quantities of the Esfahani-Kuhn loss that a rule may compute.
+# Calibration slots — see `calibration_slots`. The significance level, the radius and the
+# tail weight are the three quantities of the Esfahani-Kuhn loss that a rule may compute.
 function calibration_slots(x::DistributionallyRobustConditionalValueatRisk)
-    return (; l = x.l, r = x.r)
+    return (; alpha = x.alpha, l = x.l, r = x.r)
 end
 """
     const RMCVaR{T} = Union{...}
@@ -381,8 +411,8 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
-        beta::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
+        beta::Num_SigHeadCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalValueatRiskRange
 
@@ -390,8 +420,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `beta` is a number: `0 < beta < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 # Functor
@@ -448,8 +478,9 @@ ConditionalValueatRiskRange
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
-                                         beta::Number, w::Option{<:ObsWeights})
+    function ConditionalValueatRiskRange(settings::RiskMeasureSettings,
+                                         alpha::Num_SigTailCal, beta::Num_SigHeadCal,
+                                         w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -459,10 +490,41 @@ ConditionalValueatRiskRange
 end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                     alpha::Number = 0.05, beta::Number = 0.05,
+                                     alpha::Num_SigTailCal = 0.05,
+                                     beta::Num_SigHeadCal = 0.05,
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the two significance levels of a [`ConditionalValueatRiskRange`](@ref) against prior result `pr`.
+
+The measure is the sum of a loss-side CVaR at `alpha` and a gain-side CVaR at `beta`, and each end carries its own slot and its own bound. So a rule stated on one end is not carried to the other: [`mirror_role`](@ref) is the default of the two ordered-weights Range types and not of this one, whose two levels default to numbers.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
+
+# Related
+
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::ConditionalValueatRiskRange,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
+    return if alpha === x.alpha && beta === x.beta
+        x
+    else
+        ConditionalValueatRiskRange(; settings = x.settings, alpha = alpha, beta = beta,
+                                    w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
+calibration_slots(x::ConditionalValueatRiskRange) = (; alpha = x.alpha, beta = x.beta)
 # Tail decomposition — see `range_tails`.
 function range_tails(r::ConditionalValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
@@ -502,10 +564,10 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         l_a::Num_AmbTwtCal = 1.0,
         r_a::Num_AmbRadCal = 0.02,
-        beta::Number = 0.05,
+        beta::Num_SigHeadCal = 0.05,
         l_b::Num_AmbTwtCal = 1.0,
         r_b::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -515,8 +577,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
-  - `0 < beta < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
+  - If `beta` is a number: `0 < beta < 1`.
   - Each of `l_a`, `r_a`, `l_b` and `r_b` that is a number: `> 0` and finite.
   - If `w` is not `nothing`: `!isempty(w)`.
 
@@ -599,10 +661,10 @@ DistributionallyRobustConditionalValueatRiskRange
     """
     @pprop w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
-                                                               alpha::Number,
+                                                               alpha::Num_SigTailCal,
                                                                l_a::Num_AmbTwtCal,
                                                                r_a::Num_AmbRadCal,
-                                                               beta::Number,
+                                                               beta::Num_SigHeadCal,
                                                                l_b::Num_AmbTwtCal,
                                                                r_b::Num_AmbRadCal,
                                                                w::Option{<:ObsWeights})
@@ -620,10 +682,10 @@ DistributionallyRobustConditionalValueatRiskRange
 end
 function DistributionallyRobustConditionalValueatRiskRange(;
                                                            settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                           alpha::Number = 0.05,
+                                                           alpha::Num_SigTailCal = 0.05,
                                                            l_a::Num_AmbTwtCal = 1.0,
                                                            r_a::Num_AmbRadCal = 0.02,
-                                                           beta::Number = 0.05,
+                                                           beta::Num_SigHeadCal = 0.05,
                                                            l_b::Num_AmbTwtCal = 1.0,
                                                            r_b::Num_AmbRadCal = 0.02,
                                                            w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRiskRange
@@ -647,25 +709,29 @@ The two tails take one role and not two. A radius names no end of the distributi
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRiskRange,
-                                     pr::AbstractPriorResult, ::Any = nothing)
+                                     pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
-    slots = (x.l_a, x.r_a, x.l_b, x.r_b)
-    l_a, r_a, l_b, r_b = map((slot, key) -> resolve_calibration_slot(slot, key, pr, ws),
-                             slots, (:l_a, :r_a, :l_b, :r_b))
+    slots = (x.alpha, x.l_a, x.r_a, x.beta, x.l_b, x.r_b)
+    alpha, l_a, r_a, beta, l_b, r_b = map((slot, key) -> resolve_calibration_slot(slot, key,
+                                                                                  pr, ws,
+                                                                                  slv),
+                                          slots, (:alpha, :l_a, :r_a, :beta, :l_b, :r_b))
     # The comparison is the one `resolve_deferred_quantities` makes over its derived slots:
-    # a measure whose four slots all resolved to themselves is returned unchanged.
-    return if all(map(===, (l_a, r_a, l_b, r_b), slots))
+    # a measure whose six slots all resolved to themselves is returned unchanged.
+    return if all(map(===, (alpha, l_a, r_a, beta, l_b, r_b), slots))
         x
     else
         DistributionallyRobustConditionalValueatRiskRange(; settings = x.settings,
-                                                          alpha = x.alpha, l_a = l_a,
-                                                          r_a = r_a, beta = x.beta,
-                                                          l_b = l_b, r_b = r_b, w = x.w)
+                                                          alpha = alpha, l_a = l_a,
+                                                          r_a = r_a, beta = beta, l_b = l_b,
+                                                          r_b = r_b, w = x.w)
     end
 end
-# Calibration slots — see `calibration_slots`. Each tail carries its own ambiguity pair.
+# Calibration slots — see `calibration_slots`. Each tail carries its own significance level
+# and its own ambiguity pair.
 function calibration_slots(x::DistributionallyRobustConditionalValueatRiskRange)
-    return (; l_a = x.l_a, r_a = x.r_a, l_b = x.l_b, r_b = x.r_b)
+    return (; alpha = x.alpha, l_a = x.l_a, r_a = x.r_a, beta = x.beta, l_b = x.l_b,
+            r_b = x.r_b)
 end
 # Tail decomposition — see `range_tails`. Each tail keeps its own ambiguity parameters:
 # `l_a`/`r_a` describe the loss-side Wasserstein ball, `l_b`/`r_b` the gain-side one.
@@ -804,7 +870,7 @@ $(DocStringExtensions.FIELDS)
 
     ConditionalDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> ConditionalDrawdownatRisk
 
@@ -812,7 +878,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 # Functor
@@ -865,7 +931,7 @@ ConditionalDrawdownatRisk
     $(field_dict[:oow])
     """
     @pprop w
-    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
+    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigTailCal,
                                        w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -873,10 +939,38 @@ ConditionalDrawdownatRisk
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Number = 0.05,
+                                   alpha::Num_SigTailCal = 0.05,
                                    w::Option{<:ObsWeights} = nothing)::ConditionalDrawdownatRisk
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`ConditionalDrawdownatRisk`](@ref) against prior result `pr`.
+
+The drawdown series has one entry per row of the sample, so a rule that counts scenarios counts the same rows here as it does on the return series.
+
+The rebuild goes through the ordinary keyword constructor, which re-runs `0 < alpha < 1` on the calibrated number.
+
+# Related
+
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+"""
+function resolve_deferred_quantities(x::ConditionalDrawdownatRisk, pr::AbstractPriorResult,
+                                     slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    return if alpha === x.alpha
+        x
+    else
+        ConditionalDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::ConditionalDrawdownatRisk) = (; alpha = x.alpha)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -915,7 +1009,7 @@ $(DocStringExtensions.FIELDS)
 
     DistributionallyRobustConditionalDrawdownatRisk(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         l::Num_AmbTwtCal = 1.0,
         r::Num_AmbRadCal = 0.02,
         w::Option{<:ObsWeights} = nothing
@@ -925,7 +1019,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
   - If `w` is not `nothing`: `!isempty(w)`.
@@ -992,7 +1086,7 @@ DistributionallyRobustConditionalDrawdownatRisk
     """
     @pprop w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
-                                                             alpha::Number,
+                                                             alpha::Num_SigTailCal,
                                                              l::Num_AmbTwtCal,
                                                              r::Num_AmbRadCal,
                                                              w::Option{<:ObsWeights})
@@ -1008,7 +1102,7 @@ DistributionallyRobustConditionalDrawdownatRisk
 end
 function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                         alpha::Number = 0.05,
+                                                         alpha::Num_SigTailCal = 0.05,
                                                          l::Num_AmbTwtCal = 1.0,
                                                          r::Num_AmbRadCal = 0.02,
                                                          w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalDrawdownatRisk
@@ -1017,7 +1111,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
+Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
 
 It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged. The ball is a ball over the returns of the sample, and the drawdown series is built from those returns, so a rule reads the same sample size here as it does there.
 
@@ -1029,21 +1123,22 @@ It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdownatRisk,
-                                     pr::AbstractPriorResult, ::Any = nothing)
+                                     pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
-    l = resolve_calibration_slot(x.l, :l, pr, ws)
-    r = resolve_calibration_slot(x.r, :r, pr, ws)
-    return if l === x.l && r === x.r
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    l = resolve_calibration_slot(x.l, :l, pr, ws, slv)
+    r = resolve_calibration_slot(x.r, :r, pr, ws, slv)
+    return if alpha === x.alpha && l === x.l && r === x.r
         x
     else
         DistributionallyRobustConditionalDrawdownatRisk(; settings = x.settings,
-                                                        alpha = x.alpha, l = l, r = r,
+                                                        alpha = alpha, l = l, r = r,
                                                         w = x.w)
     end
 end
 # Calibration slots — see `calibration_slots`.
 function calibration_slots(x::DistributionallyRobustConditionalDrawdownatRisk)
-    return (; l = x.l, r = x.r)
+    return (; alpha = x.alpha, l = x.l, r = x.r)
 end
 """
     const RMCDaR{T} = Union{...}
@@ -1173,7 +1268,7 @@ $(DocStringExtensions.FIELDS)
 
     RelativeConditionalDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-        alpha::Number = 0.05,
+        alpha::Num_SigTailCal = 0.05,
         w::Option{<:ObsWeights} = nothing
     ) -> RelativeConditionalDrawdownatRisk
 
@@ -1181,7 +1276,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - If `alpha` is a number: `0 < alpha < 1`.
   - If `w` is not `nothing`: `!isempty(w)`.
 
 # Functor
@@ -1232,7 +1327,8 @@ RelativeConditionalDrawdownatRisk
     """
     @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Number, w::Option{<:ObsWeights})
+                                               alpha::Num_SigTailCal,
+                                               w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -1240,10 +1336,36 @@ RelativeConditionalDrawdownatRisk
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                           alpha::Number = 0.05,
+                                           alpha::Num_SigTailCal = 0.05,
                                            w::Option{<:ObsWeights} = nothing)::RelativeConditionalDrawdownatRisk
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the significance level `alpha` of a [`RelativeConditionalDrawdownatRisk`](@ref) against prior result `pr`.
+
+The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The relative drawdown series has one entry per row of the sample, so a rule reads the same sample size here as on the absolute twin.
+
+# Related
+
+  - [`RelativeConditionalDrawdownatRisk`](@ref)
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`calibration_slots`](@ref)
+"""
+function resolve_deferred_quantities(x::RelativeConditionalDrawdownatRisk,
+                                     pr::AbstractPriorResult, slv = nothing)
+    ws = sel(x.w, pr.w)
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    return if alpha === x.alpha
+        x
+    else
+        RelativeConditionalDrawdownatRisk(; settings = x.settings, alpha = alpha, w = x.w)
+    end
+end
+# Calibration slots — see `calibration_slots`.
+calibration_slots(x::RelativeConditionalDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     return conditional_drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
                                         get_observation_weights(r.w, x))
