@@ -1,6 +1,6 @@
 @testset "Uncertainty set" begin
     using PortfolioOptimisers, Test, DataFrames, CSV, TimeSeries, StableRNGs, Random,
-          Statistics, LinearAlgebra
+          Statistics, LinearAlgebra, Distributions
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     @testset "L1 Uncertainty sets" begin
@@ -490,6 +490,155 @@
             @test sl1v.ep == 0.1
             @test sl1v.en == 0.2
             @test sl1v.mu == pr_ref.mu[i]
+        end
+    end
+    @testset "The map's vocabulary (#575)" begin
+        @testset "The three passthrough routes return their own argument" begin
+            # `ucs` on an already-built pair hands the pair back, so a consumer never has
+            # to ask whether its slot holds an estimator or a result.
+            b1 = BoxUncertaintySet(; lb = [0.1, 0.2], ub = [0.3, 0.4])
+            b2 = BoxUncertaintySet(; lb = [0.0 0.0; 0.0 0.0], ub = [1.0 0.5; 0.5 1.0])
+            @test isnothing(ucs(nothing))
+            @test ucs((b1, b2)) === (b1, b2)
+            @test ucs((nothing, b2)) === (nothing, b2)
+            # The trailing arguments are absorbed, so the same call shape serves the
+            # estimator method.
+            @test ucs((b1, b2), rd.X, nothing; dims = 1) === (b1, b2)
+            @test mu_ucs(b1) === b1
+            @test isnothing(mu_ucs(nothing))
+            @test sigma_ucs(b2) === b2
+            @test isnothing(sigma_ucs(nothing))
+            # An estimator carries no asset axis, so a view hands it back unchanged.
+            ue = NormalUncertaintySet()
+            @test PortfolioOptimisers.port_opt_view(ue, [1, 2]) === ue
+            @test isnothing(PortfolioOptimisers.port_opt_view(nothing, [1, 2]))
+        end
+        @testset "The ReturnsResult forwards check both preconditions" begin
+            # `rd.X` is nothing: every one of the three raises.
+            rd_no_X = ReturnsResult()
+            ue = NormalUncertaintySet()
+            @test_throws PortfolioOptimisers.IsNothingError ucs(ue, rd_no_X)
+            @test_throws PortfolioOptimisers.IsNothingError mu_ucs(ue, rd_no_X)
+            @test_throws PortfolioOptimisers.IsNothingError sigma_ucs(ue, rd_no_X)
+            # A factor prior with no factor returns: the second raise, on all three.
+            uf = NormalUncertaintySet(; pe = FactorPrior(), n_sim = 20, seed = 7)
+            rd_no_F = ReturnsResult(; X = rd.X, nx = rd.nx)
+            @test isa(uf.pe, PortfolioOptimisers.AbstractHiLoOrderPriorEstimator_F)
+            @test_throws PortfolioOptimisers.IsNothingError ucs(uf, rd_no_F)
+            @test_throws PortfolioOptimisers.IsNothingError mu_ucs(uf, rd_no_F)
+            @test_throws PortfolioOptimisers.IsNothingError sigma_ucs(uf, rd_no_F)
+        end
+        @testset "ucs_selector takes the branches its table names" begin
+            b = BoxUncertaintySet(; lb = [0.1], ub = [0.3])
+            ue = NormalUncertaintySet()
+            @test isnothing(PortfolioOptimisers.ucs_selector(nothing, nothing))
+            @test PortfolioOptimisers.ucs_selector(b, nothing) === b
+            @test PortfolioOptimisers.ucs_selector(b, ue) === b
+            @test PortfolioOptimisers.ucs_selector(nothing, ue) === ue
+        end
+        @testset "The general radius is Cantelli's bound at k" begin
+            # k = sqrt((1 - q) / q) inverts to 1 / (1 + k^2) == q exactly, which is the
+            # one-sided Chebyshev tail at k standard deviations.
+            for q in (0.01, 0.05, 0.1, 0.25)
+                k = PortfolioOptimisers.k_ucs(GeneralKUncertaintyAlgorithm(), q)
+                @test k ≈ sqrt((1 - q) / q)
+                @test 1 / (1 + k^2) ≈ q
+            end
+            # It reads neither the sample nor the shape matrix.
+            @test PortfolioOptimisers.k_ucs(GeneralKUncertaintyAlgorithm(), 0.05) ==
+                  PortfolioOptimisers.k_ucs(GeneralKUncertaintyAlgorithm(), 0.05,
+                                            randn(StableRNG(3), 10, 4),
+                                            LinearAlgebra.Diagonal(ones(4)))
+        end
+        @testset "The chi-squared radius reads size(sigma_X, 1)" begin
+            # The degrees of freedom is the first dimension of the shape matrix, so the
+            # same algorithm gives N on the mean axis and N^2 on the covariance axis.
+            for p in (4, 16)
+                k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
+                                              LinearAlgebra.Diagonal(ones(p)))
+                @test k ≈ sqrt(quantile(Distributions.Chisq(p), 0.95))
+            end
+            # A symmetric N x N matrix carries N(N+1)/2 free entries, so the N^2 the
+            # covariance axis passes overstates the dimension of the ellipsoid, and the
+            # radius is the conservative one.
+            N = 4
+            k_sq = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
+                                             LinearAlgebra.Diagonal(ones(N^2)))
+            k_free = sqrt(quantile(Distributions.Chisq(N * (N + 1) ÷ 2), 0.95))
+            @test k_sq > k_free
+        end
+        @testset "The empirical radius measures against the shape it is given" begin
+            # `ellipsoidal_set` takes the diagonal BEFORE it fits k, so on the default the
+            # quantile is one of distances against the diagonal shape, not the full one.
+            rng = StableRNG(20250828)
+            Xd = randn(rng, 252, 5) * 0.01
+            cv = Statistics.cov(Xd)
+            km = NormalKUncertaintyAlgorithm()
+            e_full = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xd, cv,
+                                                         MuEllipsoidalUncertaintySet())
+            e_diag = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xd, cv,
+                                                         MuEllipsoidalUncertaintySet())
+            d2_diag = [LinearAlgebra.dot(Xd[t, :], LinearAlgebra.Diagonal(cv) \ Xd[t, :])
+                       for t in axes(Xd, 1)]
+            @test e_diag.k ≈ sqrt(quantile(d2_diag, 0.95))
+            @test e_diag.sigma == LinearAlgebra.Diagonal(cv)
+            @test !isapprox(e_full.k, e_diag.k)
+            # The full-shape radius is the hand computation against the full shape.
+            d2_full = [LinearAlgebra.dot(Xd[t, :], cv \ Xd[t, :]) for t in axes(Xd, 1)]
+            @test e_full.k ≈ sqrt(quantile(d2_full, 0.95))
+        end
+        @testset "vec_quantile_bounds reads rows, so its input is N x n_sim" begin
+            # A rectangular sample settles the axis: three components, four hundred draws.
+            mus = randn(StableRNG(99), 3, 400) .+ [10.0, 20.0, 30.0]
+            lb, ub = PortfolioOptimisers.vec_quantile_bounds(mus, 0.025, (;))
+            @test length(lb) == 3
+            @test length(ub) == 3
+            @test all(lb .<= ub)
+            @test all(lb .<= vec(Statistics.mean(mus; dims = 2)) .<= ub)
+        end
+        @testset "box_quantile_bounds is symmetric and brackets the centre" begin
+            rng = StableRNG(5150)
+            N = 4
+            base = Statistics.cov(randn(rng, 200, N))
+            sims = map(1:300) do _
+                s = base .+ 1e-4 * randn(rng, N, N)
+                return (s + s') / 2
+            end
+            get_ij = (i, j) -> [s[i, j] for s in sims]
+            lb, ub = PortfolioOptimisers.box_quantile_bounds(Float64, get_ij, N, 0.025, (;))
+            @test LinearAlgebra.issymmetric(lb)
+            @test LinearAlgebra.issymmetric(ub)
+            @test all(lb .<= ub)
+            @test all(lb .<= sum(sims) / length(sims) .<= ub)
+        end
+        @testset "A view carries k through, so it is not the subset's own fit" begin
+            # The restricted shape matrix equals the one fitted on the subset alone, but
+            # the radius does not: only the general route, which reads neither the data nor
+            # the shape, is invariant under the restriction.
+            rng = StableRNG(778899)
+            Nf = 4
+            i = [1, 3]
+            Xf = randn(rng, 400, Nf) * 0.01
+            Xs = Xf[:, i]
+            for (method, invariant) in ((GeneralKUncertaintyAlgorithm(), true),
+                                        (ChiSqKUncertaintyAlgorithm(), false),
+                                        (NormalKUncertaintyAlgorithm(), false))
+                alg = EllipsoidalUncertaintySetAlgorithm(; method = method, diagonal = true)
+                ue = NormalUncertaintySet(; alg = alg, n_sim = 200, seed = 42)
+                mu_full, sigma_full = ucs(ue, Xf)
+                mu_sub, sigma_sub = ucs(ue, Xs)
+                mv = PortfolioOptimisers.port_opt_view(mu_full, i)
+                sv = PortfolioOptimisers.port_opt_view(sigma_full, i)
+                # The shapes agree on both axes, whatever the radius route.
+                @test Matrix(mv.sigma) ≈ Matrix(mu_sub.sigma)
+                @test Matrix(sv.sigma) ≈ Matrix(sigma_sub.sigma)
+                @test size(sv.sigma, 1) == length(i)^2
+                @test isapprox(mv.k, mu_sub.k) == invariant
+                @test isapprox(sv.k, sigma_sub.k) == invariant
+                # The view never shrinks the radius, so it is the conservative choice.
+                @test mv.k >= mu_sub.k
+                @test sv.k >= sigma_sub.k
+            end
         end
     end
 end

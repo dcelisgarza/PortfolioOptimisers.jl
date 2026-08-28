@@ -123,7 +123,7 @@
 "src/13_Prior/13_OpinionPoolingPrior.jl" = { map = 6, units = 7, algorithm = 3, swept = true }
 "src/13_Prior/14_HighOrderFactorPriorEstimator.jl" = { map = 6, units = 4, algorithm = 3, swept = true }
 "src/13_Prior/15_FeaturePrior.jl" = { map = 6, units = 13, algorithm = 6, swept = true }
-"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 34, swept = false }
+"src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 34, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, swept = false }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 20, swept = false }
 "src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, swept = false }
