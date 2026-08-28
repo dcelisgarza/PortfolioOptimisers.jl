@@ -1155,14 +1155,16 @@ end
 # residual. The docstrings state the failure and the signs that name it. Change this testset
 # in the commit that changes that decision.
 #
-# #574 moved what this pair gives. The single-view CVaR bracket ends at `B * (1 - sqrt(eps))`
-# rather than at `B`, so the search visits a different sequence of candidates, and the runaway
-# dual now overflows before it settles. The pair raises where it used to answer a posterior on
-# one observation. Neither raise detects the infeasibility: both are the same runaway dual met
-# further along, and the `MeucciEntropyPoolingPrior` warning names them. The answer of an
-# infeasible set is not robust, because the search over one is chaotic: any perturbation of the
-# candidate sequence moves it. The feasible control below still solves, so the raise is the
-# direction of the views and not the shrink.
+# #574 and #592: which of the three faces a route gives is not stable, so this testset asserts
+# the set of the three faces and not which one appears. The faces are a raise from the moment
+# estimators, which meet the non-finite weights of the runaway dual, a raise from the CVaR
+# search, which names the ways out, and a posterior that carries the weight of a handful of
+# observations. The search over an infeasible set is chaotic, so any perturbation of the
+# candidate sequence moves the face. #574 moved it by ending the single-view CVaR bracket at
+# `B * (1 - sqrt(eps))` rather than at `B`. #592 saw the CI host give a face that a developer
+# machine does not give, with no source change between the two runs, which is the class of
+# #414. None of the three faces reports the infeasibility, and the feasible control below
+# still solves, so the answer comes from the direction of the views and not from the shrink.
 @testset "MeucciEntropyPoolingPrior does not detect an infeasible view pair" begin
     cvv = ConditionalValueatRiskView(;
                                      views = LinearConstraintEstimator(;
@@ -1175,12 +1177,25 @@ end
                                           sigma_views = LinearConstraintEstimator(;
                                                                                   val = "AAPL == 0.2*prior(AAPL)"),
                                           cvar_views = cvv)
-    # The staged route overflows inside the search, and the non-finite weights reach the
-    # moment estimators, which raise on them. The `EntropyPoolingPrior` warning names this.
-    @test_throws ArgumentError prior(mk(H1_EntropyPooling()), rd)
-    # The single-shot route overflows too, and there the CVaR search raises its own message,
-    # which names the ways out. The two routes give alike, so it is not an artefact of staging.
-    @test_throws ErrorException prior(mk(H0_EntropyPooling()), rd)
+    for alg in (H1_EntropyPooling(), H0_EntropyPooling())
+        face = try
+            prior(mk(alg), rd)
+        catch e
+            e
+        end
+        if isa(face, Exception)
+            # The moment estimators raise an `ArgumentError` on the non-finite weights, and
+            # the CVaR search raises an `ErrorException` of its own. The warnings of
+            # `EntropyPoolingPrior` and `MeucciEntropyPoolingPrior` name both raises.
+            @test isa(face, Union{ArgumentError, ErrorException})
+        else
+            # A posterior that comes back is degenerate. The runaway dual puts the weight of
+            # the sample on a few observations, so the posterior fails the two tests that the
+            # feasible control below passes.
+            @test face.ens < 0.5 * T0
+            @test maximum(face.w) > 0.05
+        end
+    end
     # The same pair on two different assets is feasible and solves normally, so it is the
     # direction of the views and not the pairing.
     prok = prior(MeucciEntropyPoolingPrior(; sets = sets,
