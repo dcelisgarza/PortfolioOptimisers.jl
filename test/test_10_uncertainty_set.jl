@@ -900,4 +900,194 @@
             @test b_alone.ub == b_pair.ub
         end
     end
+    @testset "The three block bootstraps (#578)" begin
+        # Every claim the docstrings of `04_BootstrapUncertaintySets.jl` make about the
+        # three schemes is measured here, not read off the bodies.
+        Xb = rd.X[:, 1:5]
+        Tb = size(Xb, 1)
+        @testset "Only the moving scheme needs a block_size guard" begin
+            # A block that wraps is taken through `mod1`, which cannot leave `1:T`. A block
+            # that does not wrap is drawn from `1:(T - block_size + 1)`, which is empty as
+            # soon as `block_size` passes `T`, so only that scheme raises.
+            T = 10
+            for alg in (StationaryBootstrap(), CircularBootstrap(), MovingBootstrap())
+                idx = PortfolioOptimisers.bootstrap_indices(alg, StableRNG(11), T, 3)
+                @test length(idx) == T
+                @test all(i -> 1 <= i <= T, idx)
+            end
+            @test_throws DomainError PortfolioOptimisers.bootstrap_indices(MovingBootstrap(),
+                                                                           StableRNG(11), T,
+                                                                           T + 1)
+            # The two that wrap take the same input without a raise, and stay in range.
+            for alg in (StationaryBootstrap(), CircularBootstrap())
+                idx = PortfolioOptimisers.bootstrap_indices(alg, StableRNG(11), T, T + 1)
+                @test all(i -> 1 <= i <= T, idx)
+            end
+            # Without the guard the moving scheme would fail on an empty range, and the
+            # message would name neither `block_size` nor `T`.
+            @test_throws ArgumentError rand(StableRNG(11), 1:(T - (T + 1) + 1))
+        end
+        @testset "A circular block_size at or above T collapses the set" begin
+            # The first block already fills the vector, so every resample is a cyclic shift
+            # of the series. A cyclic shift is a permutation, and neither the mean nor the
+            # covariance changes under a permutation of the rows.
+            T = 10
+            for bs in (T, T + 1, 2 * T)
+                idx = PortfolioOptimisers.bootstrap_indices(CircularBootstrap(),
+                                                            StableRNG(11), T, bs)
+                @test sort(idx) == collect(1:T)
+            end
+            ue = ARCHUncertaintySet(; bootstrap = CircularBootstrap(), block_size = Tb + 1,
+                                    n_sim = 20, seed = 987654321)
+            mus, sigmas = PortfolioOptimisers.bootstrap_generator(ue, Xb)
+            @test maximum(abs, mus .- mus[:, 1]) < 1e-15
+            @test maximum(abs, sigmas .- sigmas[:, :, 1]) < 1e-15
+            mset, sset = ucs(ue, Xb)
+            @test maximum(mset.ub .- mset.lb) < 1e-15
+            @test maximum(sset.ub .- sset.lb) < 1e-15
+            # Nothing raises on the ellipsoidal route either: the shape matrix goes to
+            # zero and the radius stays finite, so the set is empty rather than an error.
+            uee = ARCHUncertaintySet(; bootstrap = CircularBootstrap(), block_size = Tb + 1,
+                                     n_sim = 20, seed = 987654321,
+                                     alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                              diagonal = false))
+            emu, _ = ucs(uee, Xb)
+            @test maximum(abs, emu.sigma) < 1e-30
+            @test isfinite(emu.k)
+            # The stationary scheme does not collapse there: a restart still fires with
+            # probability `1 / block_size`, so the spread only narrows.
+            big = ARCHUncertaintySet(; bootstrap = StationaryBootstrap(),
+                                     block_size = Tb + 1, n_sim = 100, seed = 987654321)
+            small = ARCHUncertaintySet(; bootstrap = StationaryBootstrap(), block_size = 3,
+                                       n_sim = 100, seed = 987654321)
+            sd_big = maximum(std(PortfolioOptimisers.mu_bootstrap_generator(big, Xb);
+                                 dims = 2))
+            sd_small = maximum(std(PortfolioOptimisers.mu_bootstrap_generator(small, Xb);
+                                   dims = 2))
+            @test 0 < sd_big < sd_small
+        end
+        @testset "The stationary block length is geometric with mean block_size" begin
+            # The helper's accumulator must not share a name with the one below it. A
+            # nested function inside a `@testset` rebinds the enclosing local of the same
+            # name rather than making its own, which silently resets the tally.
+            function block_lengths(idx, T)
+                out = Int[]
+                run = 1
+                for t in 2:length(idx)
+                    if idx[t] == mod1(idx[t - 1] + 1, T)
+                        run += 1
+                    else
+                        push!(out, run)
+                        run = 1
+                    end
+                end
+                push!(out, run)
+                return out
+            end
+            T, bs = 500, 10
+            rng = StableRNG(20260828)
+            lens = Int[]
+            for _ in 1:500
+                append!(lens,
+                        block_lengths(PortfolioOptimisers.bootstrap_indices(StationaryBootstrap(),
+                                                                            rng, T, bs), T))
+            end
+            # The truncation of the last block of each vector biases the mean slightly low.
+            @test length(lens) > 20_000
+            @test isapprox(mean(lens), bs; rtol = 0.05)
+            for k in 1:5
+                @test isapprox(count(==(k), lens) / length(lens), (1 - 1 / bs)^(k - 1) / bs;
+                               rtol = 0.1)
+            end
+        end
+        @testset "Only the moving scheme draws the ends less often" begin
+            # Observation `j` of the first `block_size` lies inside only `j` of the start
+            # positions, so it is drawn about `j / block_size` as often as a middle one.
+            function coverage(alg, T, bs, n)
+                c = zeros(Int, T)
+                rng = StableRNG(20260828)
+                for _ in 1:n
+                    for i in PortfolioOptimisers.bootstrap_indices(alg, rng, T, bs)
+                        c[i] += 1
+                    end
+                end
+                return c ./ (n * one(eltype(c)))
+            end
+            T, bs, n = 100, 5, 5000
+            cm = coverage(MovingBootstrap(), T, bs, n)
+            mid = mean(cm[10:90])
+            for j in 1:bs
+                @test isapprox(cm[j] / mid, j / bs; atol = 0.05)
+                @test isapprox(cm[end - j + 1] / mid, j / bs; atol = 0.05)
+            end
+            # The two schemes that wrap are flat to Monte-Carlo noise.
+            for alg in (CircularBootstrap(), StationaryBootstrap())
+                c = coverage(alg, T, bs, n)
+                @test isapprox(minimum(c) / mean(c), 1; atol = 0.05)
+                @test isapprox(maximum(c) / mean(c), 1; atol = 0.05)
+            end
+        end
+        @testset "The three verbs agree with a seed and not without one" begin
+            # `resolve_rng` hands back a private reseeded copy, so each of the three calls
+            # restarts one index stream at the same place. With no seed the three walk
+            # different parts of the shared generator.
+            ue = ARCHUncertaintySet(; bootstrap = StationaryBootstrap(), n_sim = 100,
+                                    rng = StableRNG(123456789), seed = 987654321)
+            m1, s1 = ucs(ue, Xb)
+            @test m1.lb == mu_ucs(ue, Xb).lb
+            @test m1.ub == mu_ucs(ue, Xb).ub
+            @test s1.lb == sigma_ucs(ue, Xb).lb
+            @test s1.ub == sigma_ucs(ue, Xb).ub
+            un = ARCHUncertaintySet(; bootstrap = StationaryBootstrap(), n_sim = 100,
+                                    rng = StableRNG(123456789))
+            n1, t1 = ucs(un, Xb)
+            @test n1.lb != mu_ucs(un, Xb).lb
+            @test t1.lb != sigma_ucs(un, Xb).lb
+        end
+        @testset "The centre comes from pe and the width from me, so they can disagree" begin
+            # `val` is the prior's point estimate and the bounds are quantiles of the
+            # refits, so a box need not contain its own centre.
+            ue = ARCHUncertaintySet(; pe = EmpiricalPrior(), me = MedianExpectedReturns(),
+                                    n_sim = 250, seed = 987654321, block_size = 3)
+            mset = mu_ucs(ue, Xb)
+            @test any(.!(mset.lb .<= mset.val .<= mset.ub))
+            # The prior's own mean estimator agrees with the refits, and then it does not.
+            agree = ARCHUncertaintySet(; pe = EmpiricalPrior(),
+                                       me = SimpleExpectedReturns(), n_sim = 250,
+                                       seed = 987654321, block_size = 3)
+            aset = mu_ucs(agree, Xb)
+            @test all(aset.lb .<= aset.val .<= aset.ub)
+        end
+        @testset "ce fits the resamples and the deviations, so it enters twice" begin
+            # Dropping the bias correction divides by `n` instead of `n - 1`, so the move
+            # is exact and names which fit each factor came from.
+            n_sim = 50
+            corrected = PortfolioOptimisersCovariance()
+            uncorrected = PortfolioOptimisersCovariance(;
+                                                        ce = Covariance(;
+                                                                        ce = GeneralCovariance(;
+                                                                                               ce = StatsBase.SimpleCovariance(;
+                                                                                                                               corrected = false))))
+            alg = EllipsoidalUncertaintySetAlgorithm(; diagonal = false)
+            uA = ARCHUncertaintySet(; ce = corrected, n_sim = n_sim, seed = 987654321,
+                                    alg = alg)
+            uB = ARCHUncertaintySet(; ce = uncorrected, n_sim = n_sim, seed = 987654321,
+                                    alg = alg)
+            # Inside every resample: the resampled covariances move by `(T - 1) / T`.
+            sigA = PortfolioOptimisers.sigma_bootstrap_generator(uA, Xb)
+            sigB = PortfolioOptimisers.sigma_bootstrap_generator(uB, Xb)
+            @test isapprox(sigB, sigA .* ((Tb - 1) / Tb))
+            # Over the deviations: the mean-axis shape moves by `(n_sim - 1) / n_sim`, and
+            # `mu_bootstrap_generator` fits no covariance, so that is the only `ce` there.
+            mA = mu_ucs(uA, Xb)
+            mB = mu_ucs(uB, Xb)
+            @test isapprox(Matrix(mB.sigma), Matrix(mA.sigma) .* ((n_sim - 1) / n_sim))
+            # The covariance axis compounds the two, so it moves by more than either.
+            sA = sigma_ucs(uA, Xb)
+            sB = sigma_ucs(uB, Xb)
+            rel(x, y) = maximum(abs, x .- y) / maximum(abs, x)
+            @test rel(Matrix(sA.sigma), Matrix(sB.sigma)) >
+                  rel(Matrix(mA.sigma), Matrix(mB.sigma))
+        end
+    end
 end

@@ -126,7 +126,7 @@
 "src/14_UncertaintySets/01_Base_UncertaintySets.jl" = { map = 7, units = 34, algorithm = 11, swept = true }
 "src/14_UncertaintySets/02_DeltaUncertaintySets.jl" = { map = 7, units = 6, algorithm = 5, swept = true }
 "src/14_UncertaintySets/03_NormalUncertaintySets.jl" = { map = 7, units = 17, algorithm = 16, swept = true }
-"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, swept = false }
+"src/14_UncertaintySets/04_BootstrapUncertaintySets.jl" = { map = 7, units = 16, algorithm = 10, swept = true }
 "src/14_UncertaintySets/05_L1UncertaintySets.jl" = { map = 7, units = 14, swept = false }
 "src/15_Turnover.jl" = { map = 8, units = 15, algorithm = 8, swept = true }
 "src/16_Fees.jl" = { map = 8, units = 20, algorithm = 17, swept = true }

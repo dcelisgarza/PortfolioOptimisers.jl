@@ -21,7 +21,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects how a block bootstrap draws its blocks, which is what keeps the serial dependence of a return series in the resample.
 
-All concrete subtypes should subtype `ARCHBootstrapSet`. The three that ship differ in whether the block length is fixed or random, and in whether a block wraps around the end of the sample.
+All concrete subtypes should subtype `ARCHBootstrapSet`. The three that ship differ on three axes at once, and a caller chooses between them on those three axes alone.
+
+| Scheme                        | Block length                                    | Wraps past the end | Start range              |
+|:----------------------------- |:----------------------------------------------- |:------------------ |:------------------------ |
+| [`StationaryBootstrap`](@ref) | geometric, restart probability `1 / block_size` | yes, by `mod1`     | `1:T`                    |
+| [`CircularBootstrap`](@ref)   | fixed `block_size`                              | yes, by `mod1`     | `1:T`                    |
+| [`MovingBootstrap`](@ref)     | fixed `block_size`                              | no                 | `1:(T - block_size + 1)` |
+
+The wrapping column is the one that decides whether every observation is drawn equally often. The two schemes that wrap draw each of the `T` observations equally often; the one that does not draw the first and the last observations of the series less often than the middle, in the ramp [`MovingBootstrap`](@ref) states.
 
 # Interfaces
 
@@ -53,7 +61,11 @@ abstract type ARCHBootstrapSet <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a stationary bootstrap [politis1994stationary](@cite) in time series data. Blocks have geometrically distributed random lengths with mean `block_size`, and wrap around the end of the sample.
+Draws blocks of geometrically distributed random length, so the resample is itself a stationary series.
+
+A block starts anywhere in `1:T`, continues to the next index by `mod1` so that it wraps past the end of the series, and restarts with probability `1 / block_size` at each index. The block length is therefore geometric with mean `block_size`: over 101170 blocks at `block_size = 10` the measured mean length is 9.884, and the measured length frequencies `[0.101, 0.0921, 0.082, 0.0733, 0.0671, 0.0584]` for lengths `1:6` match the geometric masses `[0.1, 0.09, 0.081, 0.0729, 0.0656, 0.059]`. The mean falls a little below `block_size` because the last block of an index vector is cut short at `T`.
+
+Because a block wraps, every observation is drawn equally often. `block_size` is a mean and not a bound, so it may exceed `T` without a raise: the restart probability is then below `1 / T` and the scheme approaches a single wrapped block. The spread does not collapse, but it narrows — over 250 resamples of a 252-by-5 sample the standard deviation of the bootstrap means at `block_size = T + 1` is 0.377 of the value at `block_size = 3`.
 
 # Related
 
@@ -69,7 +81,11 @@ struct StationaryBootstrap <: ARCHBootstrapSet end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a circular block bootstrap [politis1992circular](@cite) in time series data. Blocks have fixed length `block_size` and wrap around the end of the sample.
+Draws blocks of fixed length `block_size` that wrap past the end of the series, so every observation is drawn equally often.
+
+A block starts anywhere in `1:T` and runs `block_size` indices forward, each taken by `mod1`, so the series is read as a circle. The wrap is what buys the equal coverage: over 20000 index vectors at `T = 100` and `block_size = 5` every observation is drawn between 0.985 and 1.015 of the average, against a ramp down to 0.192 under [`MovingBootstrap`](@ref).
+
+**A `block_size` of `T` or more collapses the set to a point.** The first block already fills the whole index vector, so every resample is a cyclic shift of the series, and a cyclic shift is a permutation. The mean and the covariance do not change under a permutation of the rows, so every resample returns the same statistics. Measured over 50 resamples of a 252-by-5 sample at `block_size = T + 1`, the spread of the bootstrap means is 1.3e-18 and the box width is 1.7e-18. Nothing raises: the ellipsoidal route builds a shape matrix of order 1e-37 and a finite radius, which is an empty set rather than an error.
 
 # Related
 
@@ -85,7 +101,11 @@ struct CircularBootstrap <: ARCHBootstrapSet end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a moving block bootstrap [kunsch1989](@cite) in time series data. Blocks have fixed length `block_size` and do not wrap around the end of the sample.
+Draws blocks of fixed length `block_size` that never wrap, so a resample holds no join between the end of the series and its start.
+
+A block starts in `1:(T - block_size + 1)` and runs `block_size` indices forward, so the last index of a block never passes `T`. This is the one scheme of the three that guards `block_size`, and it is the one that needs a guard: the start range is empty as soon as `block_size` exceeds `T`, and the raise turns an `ArgumentError` about an empty range into a `DomainError` that names `block_size` and `T`. The two schemes that wrap take every index through `mod1`, which cannot leave `1:T`, so neither can build an out-of-range index and neither needs a guard.
+
+**The price of the missing wrap is uneven coverage.** Observation `j` of the first `block_size` observations lies inside only `j` of the start positions, so it is drawn about `j / block_size` as often as an observation of the middle, and the last `block_size` observations mirror the ramp. Measured over 20000 index vectors at `T = 100` and `block_size = 5`, the first five observations are drawn at 0.192, 0.392, 0.594, 0.791 and 0.987 of the middle rate, and the last five at 1.007, 0.806, 0.605, 0.403 and 0.202. So the first and the last observations carry about one fifth of the weight of a middle one at this block size, and about `1 / block_size` of it in general. Prefer [`CircularBootstrap`](@ref) when that asymmetry is not wanted.
 
 # Related
 
@@ -104,6 +124,36 @@ struct MovingBootstrap <: ARCHBootstrapSet end
 
 Generate a vector of `T` observation indices for one block bootstrap resample.
 
+The three methods lay blocks of consecutive indices end to end until `T` indices are filled, and they differ only in how long a block is, in whether it wraps past the end of the series, and in where it may start. [`ARCHBootstrapSet`](@ref) tabulates the three axes.
+
+# Algorithm
+
+The method Julia selects on the type of `alg` is the algorithm, so the three procedures below are the three methods.
+
+## `StationaryBootstrap`
+
+ 1. Set the restart probability `p` to `inv(block_size)`.
+ 2. Draw `idx[1]` uniformly from `1:T`, which starts the first block.
+ 3. For each later `t`, draw one uniform variate. Below `p`, draw `idx[t]` uniformly from `1:T`, which starts a new block. Otherwise set `idx[t]` to `mod1(idx[t - 1] + 1, T)`, which continues the block and wraps it past the end of the series.
+ 4. Return `idx`. Step 3 makes the block length geometric with mean `block_size`, and `mod1` keeps every index inside `1:T` whatever `block_size` is.
+
+## `CircularBootstrap`
+
+ 1. Set the fill position `t` to zero.
+ 2. While `t` is below `T`, draw a start `s` uniformly from `1:T`.
+ 3. Fill the next `min(block_size, T - t)` entries with `mod1(s + k, T)` for `k` from zero, which lays one block and wraps it past the end of the series. The last block of the vector is cut short when fewer than `block_size` entries are left.
+ 4. Advance `t` by `block_size`, and go back to step 2 while `t` is below `T`.
+ 5. Return `idx`. `mod1` keeps every index inside `1:T`, so this method needs no guard on `block_size`.
+
+## `MovingBootstrap`
+
+ 1. Check that `block_size` does not exceed `T`, and raise a `DomainError` otherwise. Step 3 would draw from an empty range.
+ 2. Set the fill position `t` to zero.
+ 3. While `t` is below `T`, draw a start `s` uniformly from `1:(T - block_size + 1)`, which is the last start whose block still ends at or before `T`.
+ 4. Fill the next `min(block_size, T - t)` entries with `s + k` for `k` from zero, which lays one block without a wrap. The last block of the vector is cut short when fewer than `block_size` entries are left.
+ 5. Advance `t` by `block_size`, and go back to step 3 while `t` is below `T`.
+ 6. Return `idx`. Step 3 bounds `s + k` by `T`, so no index leaves the range.
+
 # Arguments
 
   - `alg`: Bootstrap algorithm type.
@@ -111,19 +161,13 @@ Generate a vector of `T` observation indices for one block bootstrap resample.
   - `T`: Number of observations in the sample being resampled.
   - `block_size`: Size of blocks for resampling. Mean block length for [`StationaryBootstrap`](@ref), fixed block length otherwise.
 
+# Validation
+
+  - [`MovingBootstrap`](@ref) requires `block_size <= T`, raising a `DomainError`. The other two methods take a `block_size` above `T` without a raise, and each states on its own type what it degenerates to.
+
 # Returns
 
   - `idx::Vector{Int}`: Indices in `1:T` selecting the rows of one bootstrap resample.
-
-# Details
-
-  - [`StationaryBootstrap`](@ref): each index either continues the previous block (wrapping around `T`) or, with probability `1 / block_size`, starts a new block at a uniformly random position, yielding geometrically distributed block lengths [politis1994stationary](@cite).
-  - [`CircularBootstrap`](@ref): fixed-length blocks with uniformly random starts, wrapping around `T` [politis1992circular](@cite).
-  - [`MovingBootstrap`](@ref): fixed-length blocks with uniformly random starts in `1:(T - block_size + 1)`, no wrap-around [kunsch1989](@cite).
-
-## Validation
-
-  - [`MovingBootstrap`](@ref) requires `block_size <= T`.
 
 # Related
 
@@ -131,6 +175,12 @@ Generate a vector of `T` observation indices for one block bootstrap resample.
   - [`CircularBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
   - [`ARCHBootstrapSet`](@ref)
+
+# References
+
+  - $(ref_dict[:politis1994stationary])
+  - $(ref_dict[:politis1992circular])
+  - $(ref_dict[:kunsch1989])
 """
 function bootstrap_indices(::StationaryBootstrap, rng::Random.AbstractRNG, T::Integer,
                            block_size::Integer)
@@ -177,6 +227,12 @@ $(DocStringExtensions.TYPEDEF)
 Fits a box or an ellipsoidal uncertainty set from the spread of the statistics over a block bootstrap of the return series.
 
 It is the bootstrapping method of Equation 11.18 of the source, and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref) and cites its own paper for.
+
+**The name carries no volatility model.** The method was ported from Riskfolio-Lib, which draws its resamples through the `bootstrap` sub-package of the Python `arch` package. That package is named for the volatility models it also ships, and its bootstrap sub-package fits none of them. This type fits none either: it refits `me` and `ce` on each resample and reads the spread of the refits, so no docstring in this file states a conditional variance recursion.
+
+**The centre and the spread come from different estimators, and nothing reconciles them.** The centre `val` is the point estimate `pe` fits, while the bounds come from refitting `me` and `ce` on the resamples. So a box need not contain its own centre when the two disagree. With `pe = EmpiricalPrior()` and `me = MedianExpectedReturns()` over 250 resamples of a 252-by-5 sample at `block_size = 3` and `seed = 987654321`, one asset's `val` of -0.000934 sits above its `ub` of -0.001007. A consumer of the mean axis reads only `val` and the half-width `(ub - lb) / 2`, so the asymmetry is discarded and the set is centred on the prior's estimate with the bootstrap's width; a consumer of the covariance axis reads both bounds and never `val`.
+
+**`ce` enters the ellipsoidal covariance axis twice.** It fits the covariance of every resample, and it then fits the shape matrix over the deviations of those covariances. Turning off its bias correction moves the resampled covariances by 0.397% over 252 observations and the covariance-axis shape matrix by 1.784% over 100 resamples. The mean axis reads `ce` once, over the deviations alone, and moves by exactly 1.0%.
 
 # Fields
 
@@ -354,7 +410,18 @@ end
 """
     bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
-Generates bootstrapped samples of expected returns and covariance statistics for time series data using the specified bootstrap algorithm.
+Refits the mean and the covariance on every block bootstrap resample of `X`, in one pass over one index stream.
+
+Both statistics are read from the same resample, so a caller that needs both axes gets them from `ue.n_sim` index vectors rather than from two independent runs of `ue.n_sim` each.
+
+# Algorithm
+
+ 1. Read the observation count `T` from `X`, and allocate `mus` and `sigmas`.
+ 2. Resolve the generator with [`resolve_rng`](@ref), giving `rng`. A set `ue.seed` gives a private reseeded copy, so the stream restarts at the same place on every call and `ue.rng` is never advanced. An unset `ue.seed` gives `ue.rng` itself, so the stream continues where the previous call left it.
+ 3. For each of the `ue.n_sim` simulations, draw one index vector with [`bootstrap_indices`](@ref) and take those rows of `X`, giving the resample `Xi`.
+ 4. Fit `ue.me` on `Xi`, giving one column of `mus`.
+ 5. Fit `ue.ce` on `Xi`, giving one slice of `sigmas`. Steps 4 and 5 read the same `Xi`, which is what pairs the two statistics.
+ 6. Return `mus` and `sigmas`. `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
 
 # Arguments
 
@@ -366,13 +433,6 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 
   - `mus::Matrix{<:Number}`: Matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`).
   - `sigmas::Array{<:Number, 3})`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
-
-# Details
-
-  - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the expected return with `ue.me` and the covariance with `ue.ce`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
-  - Stores the bootstrapped expected returns and covariances for uncertainty set estimation.
 
 # Related
 
@@ -396,7 +456,17 @@ end
 """
     mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
-Generates bootstrap samples of expected return vectors for returns data using the specified bootstrap algorithm.
+Refits the mean on every block bootstrap resample of `X`, and fits no covariance.
+
+The index stream is the one [`bootstrap_generator`](@ref) walks, drawn one vector per simulation. A set `ue.seed` restarts it at the same place, so this function sees the same resamples as its two siblings; an unset `ue.seed` does not, and the three then walk different parts of one shared stream.
+
+# Algorithm
+
+ 1. Read the observation count `T` from `X`, and allocate `mus`.
+ 2. Resolve the generator with [`resolve_rng`](@ref), giving `rng`. A set `ue.seed` gives a private reseeded copy, so the stream restarts at the same place on every call and `ue.rng` is never advanced. An unset `ue.seed` gives `ue.rng` itself, so the stream continues where the previous call left it.
+ 3. For each of the `ue.n_sim` simulations, draw one index vector with [`bootstrap_indices`](@ref) and take those rows of `X`, giving the resample `Xi`.
+ 4. Fit `ue.me` on `Xi`, giving one column of `mus`.
+ 5. Return `mus`. `ue.ce` is not read, and `ue.pe` fits the point estimate the deviations are taken from and takes no part here.
 
 # Arguments
 
@@ -407,13 +477,6 @@ Generates bootstrap samples of expected return vectors for returns data using th
 # Returns
 
   - `mus::Matrix{<:Number}`: Matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`).
-
-# Details
-
-  - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the expected return with `ue.me`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
-  - Stores the bootstrapped expected returns for uncertainty set estimation.
 
 # Related
 
@@ -435,7 +498,17 @@ end
 """
     sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
-Generates bootstrap samples of covariance matrices for time series data using the specified bootstrap algorithm.
+Refits the covariance on every block bootstrap resample of `X`, and fits no mean.
+
+The index stream is the one [`bootstrap_generator`](@ref) walks, drawn one vector per simulation. A set `ue.seed` restarts it at the same place, so this function sees the same resamples as its two siblings; an unset `ue.seed` does not, and the three then walk different parts of one shared stream.
+
+# Algorithm
+
+ 1. Read the observation count `T` from `X`, and allocate `sigmas`.
+ 2. Resolve the generator with [`resolve_rng`](@ref), giving `rng`. A set `ue.seed` gives a private reseeded copy, so the stream restarts at the same place on every call and `ue.rng` is never advanced. An unset `ue.seed` gives `ue.rng` itself, so the stream continues where the previous call left it.
+ 3. For each of the `ue.n_sim` simulations, draw one index vector with [`bootstrap_indices`](@ref) and take those rows of `X`, giving the resample `Xi`.
+ 4. Fit `ue.ce` on `Xi`, giving one slice of `sigmas`. This is the first of the two places the ellipsoidal route reads `ue.ce`.
+ 5. Return `sigmas`. `ue.me` is not read, and `ue.pe` fits the point estimate the deviations are taken from and takes no part here.
 
 # Arguments
 
@@ -446,13 +519,6 @@ Generates bootstrap samples of covariance matrices for time series data using th
 # Returns
 
   - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
-
-# Details
-
-  - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
-  - For each bootstrap sample, computes the covariance with `ue.ce`. The prior estimator `ue.pe` fits the point estimate the deviations are taken from, and takes no part here.
-  - Stores the bootstrapped covariances for uncertainty set estimation.
 
 # Related
 
@@ -478,7 +544,7 @@ end
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-# Mathematical definition
+Both sets come from one pass over one index stream, so the mean and the covariance of a given simulation are read from the same resample. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) return the same bounds bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place and all three walk one index stream. With `ue.seed` unset they do not: over 200 resamples of a 252-by-5 sample the mean lower bound moved by 5.31e-4 against a set width of 9.53e-3. So a caller who splits one [`ucs`](@ref) call into two calls to save work keeps the answer only while a seed is set.
 
 Generate ``M`` bootstrap samples, compute ``\\hat{\\boldsymbol{\\mu}}^{(m)}`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)}``, then take element-wise quantile bounds:
 
@@ -505,9 +571,18 @@ Where:
   - ``\\hat{\\Sigma}^{(m)}_{ij}``: Bootstrap covariance element ``(i,j)`` in sample ``m``.
   - ``q``: Significance level.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` and `pr.sigma` become the centre `val` of the two sets, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled statistics with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
+ 3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
+ 4. Read the element-wise quantiles of `mus` with `vec_quantile_bounds`, giving `mu_l` and `mu_u`.
+ 5. Read the element-wise quantiles of `sigmas` with `box_quantile_bounds`, giving `sigma_l` and `sigma_u`.
+ 6. Return the two [`BoxUncertaintySet`](@ref) values. The bounds come from step 2 and the centres from step 1, so neither set is guaranteed to contain its own centre.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator.
+  - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val` of both sets, and `ue.me` and `ue.ce` fit the bounds on the resamples, so the two need not agree.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -517,13 +592,6 @@ Where:
 
   - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
   - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty set.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of expected returns and covariance using the specified bootstrap algorithm.
-  - Computes lower and upper bounds for expected returns and covariance using quantiles of bootstrapped samples.
-  - Returns both sets as a tuple.
 
 # Related
 
@@ -554,6 +622,8 @@ end
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
+The method walks its own index stream. With `ue.seed` set it returns the same bounds as the mean half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 5.31e-4 against a set width of 9.53e-3.
+
 # Mathematical definition
 
 ```math
@@ -570,9 +640,17 @@ Where:
   - ``\\hat{\\mu}^{(m)}_i``: Bootstrap mean for asset ``i`` in sample ``m``.
   - ``q``: Significance level.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` becomes the centre `val`, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled means with [`mu_bootstrap_generator`](@ref), giving `mus`. No covariance is fitted here, so `ue.ce` is not read.
+ 3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
+ 4. Read the element-wise quantiles of `mus` with `vec_quantile_bounds`, giving `mu_l` and `mu_u`.
+ 5. Return the [`BoxUncertaintySet`](@ref). The bounds come from step 2 and the centre from step 1, so the set is not guaranteed to contain its own centre.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator.
+  - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val`, and `ue.me` fits the bounds on the resamples, so the two need not agree.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -581,13 +659,6 @@ Where:
 # Returns
 
   - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of expected returns using the specified bootstrap algorithm.
-  - Computes lower and upper bounds for expected returns using quantiles of bootstrapped samples.
-  - Returns the expected returns box uncertainty set.
 
 # Related
 
@@ -614,6 +685,8 @@ end
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
 
+The method walks its own index stream. With `ue.seed` set it returns the same bounds as the covariance half of [`ucs`](@ref), bit for bit, because [`resolve_rng`](@ref) restarts each call at the same place. With `ue.seed` unset it does not: over 200 resamples of a 252-by-5 sample the lower bound moved by 2.12e-5.
+
 # Mathematical definition
 
 ```math
@@ -630,9 +703,17 @@ Where:
   - ``\\hat{\\Sigma}^{(m)}_{ij}``: Bootstrap covariance element ``(i,j)`` in sample ``m``.
   - ``q``: Significance level.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.sigma` becomes the centre `val`, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref), giving `sigmas`. No mean is fitted here, so `ue.me` is not read.
+ 3. Halve `ue.q`, giving the tail mass `q` that each side of a bound takes.
+ 4. Read the element-wise quantiles of `sigmas` with `box_quantile_bounds`, giving `sigma_l` and `sigma_u`.
+ 5. Return the [`BoxUncertaintySet`](@ref). The bounds come from step 2 and the centre from step 1, so the set is not guaranteed to contain its own centre.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, box algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. `ue.pe` fits the centre `val`, and `ue.ce` fits the bounds on the resamples, so the two need not agree.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -641,13 +722,6 @@ Where:
 # Returns
 
   - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty set.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of covariance using the specified bootstrap algorithm.
-  - Computes lower and upper bounds for covariance using quantiles of bootstrapped samples.
-  - Returns the covariance box uncertainty set.
 
 # Related
 
@@ -675,6 +749,8 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+Both sets come from one pass over one index stream. The shape matrices are the empirical covariances of the bootstrap deviations, fitted with `ue.ce`, so `ue.ce` fits the covariance axis twice: once inside every resample and once over the deviations of those resampled covariances. The mean axis reads it once, over the mean deviations alone. With `ue.seed` set, this method and the pair [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) agree; with `ue.seed` unset they do not.
 
 # Mathematical definition
 
@@ -711,9 +787,18 @@ Where:
   - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
   - ``k_{\\mu}``, ``k_{\\Sigma}``: Empirically fitted scaling parameters.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` and `pr.sigma` become the centres of the two sets, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled statistics with [`bootstrap_generator`](@ref), giving `mus` and `sigmas` from one index stream.
+ 3. Subtract `pr.mu` from each column of `mus`, and the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrices `X_mu` and `X_sigma`. Transpose both, so a row is one simulation.
+ 4. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. This is the second reading of `ue.ce` on the covariance axis and the only one on the mean axis, so the shape matrices are empirical and no asymptotic formula enters.
+ 5. Fit `ue.ce` on `X_sigma`, giving the shape matrix `sigma_sigma`.
+ 6. Build both sets with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits each radius `k` at the level `ue.q`.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. `ue.ce` fits both the covariance of every resample and the shape matrix over the deviations, so it enters the covariance axis twice and the mean axis once. `ue.pe` fits the centres, and `ue.me` and `ue.ce` fit the spread, so the two need not agree.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -723,14 +808,6 @@ Where:
 
   - `mu_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for expected returns.
   - `sigma_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for covariance.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of expected returns and covariance using the specified bootstrap algorithm.
-  - Computes deviations from prior statistics for each bootstrap sample.
-  - Computes covariance matrices of deviations and constructs ellipsoidal uncertainty sets using the specified method and quantile.
-  - Returns both sets as a tuple.
 
 # Related
 
@@ -770,6 +847,8 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
+The shape matrix is the empirical covariance of the bootstrap mean deviations, fitted with `ue.ce`, so `ue.ce` enters this axis once even though no covariance is fitted inside a resample. With `ue.seed` set the method returns the same set as the mean half of [`ucs`](@ref); with `ue.seed` unset it does not.
+
 # Mathematical definition
 
 ```math
@@ -786,9 +865,17 @@ Where:
   - ``\\mathcal{E}_{\\mu}``: Ellipsoidal uncertainty set for expected returns.
   - ``k_{\\mu}``: Empirically fitted scaling parameter.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.mu` becomes the centre, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled means with [`mu_bootstrap_generator`](@ref), giving `mus`.
+ 3. Subtract `pr.mu` from each column of `mus`, giving the deviation matrix `X_mu`. Transpose it, so a row is one simulation.
+ 4. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. The shape is empirical and no asymptotic formula enters.
+ 5. Build the set with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits the radius `k` at the level `ue.q`.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. `ue.me` fits the mean of every resample, and `ue.ce` fits the shape matrix over the deviations.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -797,14 +884,6 @@ Where:
 # Returns
 
   - `mu_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for expected returns.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of expected returns using the specified bootstrap algorithm.
-  - Computes deviations from prior expected returns for each bootstrap sample.
-  - Computes the covariance matrix of deviations and constructs an ellipsoidal uncertainty set using the specified method and quantile.
-  - Returns the expected returns ellipsoidal uncertainty set.
 
 # Related
 
@@ -838,6 +917,8 @@ end
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
 
+The shape matrix is the empirical covariance of the bootstrap covariance deviations, fitted with `ue.ce`, so `ue.ce` enters this axis twice: once inside every resample and once over the deviations. Turning off its bias correction moves the resampled covariances by 0.397% over 252 observations and the shape matrix by 1.784% over 100 resamples. With `ue.seed` set the method returns the same set as the covariance half of [`ucs`](@ref); with `ue.seed` unset it does not.
+
 # Mathematical definition
 
 ```math
@@ -854,9 +935,17 @@ Where:
   - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
   - ``k_{\\Sigma}``: Empirically fitted scaling parameter.
 
+# Algorithm
+
+ 1. Fit `ue.pe` on `X` and `F`, giving the prior `pr`. Its `pr.sigma` becomes the centre, and `pr.X` replaces `X` for the resampling.
+ 2. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref), giving `sigmas`. This is the first reading of `ue.ce`.
+ 3. Subtract the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrix `X_sigma`. Transpose it, so a row is one simulation.
+ 4. Fit `ue.ce` on `X_sigma`, giving the shape matrix `sigma_sigma`. This is the second reading of `ue.ce`, and the shape is empirical rather than asymptotic.
+ 5. Build the set with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits the radius `k` at the level `ue.q`.
+
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. `ue.ce` fits both the covariance of every resample and the shape matrix over the deviations, so it enters this axis twice.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -865,14 +954,6 @@ Where:
 # Returns
 
   - `sigma_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for covariance.
-
-# Details
-
-  - Computes prior statistics using the provided prior estimator.
-  - Generates bootstrap samples of covariance using the specified bootstrap algorithm.
-  - Computes deviations from prior covariance for each bootstrap sample.
-  - Computes the covariance matrix of deviations and constructs an ellipsoidal uncertainty set using the specified method and quantile.
-  - Returns the covariance ellipsoidal uncertainty set.
 
 # Related
 
