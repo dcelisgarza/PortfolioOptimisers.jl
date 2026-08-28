@@ -110,7 +110,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Relativistic Value-at-Risk (RLVaR) risk measure.
 
-`RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Tsallis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme.
+`RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Kaniadakis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme. It is the Kaniadakis counterpart of the Kullback-Leibler ambiguity ball that [`EntropicValueatRisk`](@ref) reads as a risk measure.
 
 # Mathematical definition
 
@@ -128,7 +128,7 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - $(math_dict[:kappa_rm])
   - $(math_dict[:ln_kappa])
   - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
 
@@ -147,6 +147,25 @@ Where:
   - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
 For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The Kaniadakis logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
+
+The dual of that programme is the worst expected loss over a Kaniadakis ball about the sample distribution:
+
+```math
+\\begin{align}
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{Q \\in \\mathcal{Q}_{\\kappa}(\\alpha)}{\\sup} \\mathbb{E}_{Q}[L]\\,, \\\\
+\\mathcal{Q}_{\\kappa}(\\alpha) &= \\left\\{ Q : \\sum_{t=1}^{T} q_t \\ln_{\\kappa}\\!\\left(\\frac{q_t}{p_t T}\\right) \\leq \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{Q}_{\\kappa}(\\alpha)``: Kaniadakis ambiguity ball of radius ``\\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right)``.
+  - $(math_dict[:amb_Q])
+  - $(math_dict[:amb_P])
+  - $(math_dict[:amb_EQ_L])
+  - $(math_dict[:amb_L_t])
+
+The left side takes the place the Kullback-Leibler divergence holds for [`EntropicValueatRisk`](@ref). With equal observation weights ``p_t = 1/T`` it is the negated Kaniadakis entropy of ``Q``. Because ``\\ln_{\\kappa}`` has no multiplication-to-addition property, the sample size ``T`` stays inside both sides, and neither side separates into a term in ``T`` and a term in ``\\alpha``. The Kullback-Leibler ball at radius ``-\\ln(\\alpha)`` is recovered in the limit ``\\kappa \\to 0``.
 
 # Fields
 
@@ -310,6 +329,8 @@ Where:
   - ``\\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RLVaR with parameters ``(\\beta, \\kappa_b)``.
 
 $(math_dict[:negated_upper_tail])
+
+Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution, one deformed by ``\\kappa_a`` at level ``\\alpha`` and one deformed by ``\\kappa_b`` at level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -519,8 +540,10 @@ Where:
 
   - ``\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - $(math_dict[:kappa_rm])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
+
+So the RLDaR is the worst expected drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -696,8 +719,10 @@ Where:
 
   - ``\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relative Relativistic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
-  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - $(math_dict[:kappa_rm])
   - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
+
+So the Relative RLDaR is the worst expected relative drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 

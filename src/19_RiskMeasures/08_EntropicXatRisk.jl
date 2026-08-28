@@ -57,7 +57,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Entropic Value-at-Risk (EVaR) risk measure.
 
-`EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver.
+`EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver. It is also the divergence Ambiguity Set of the library, read as a risk measure: the worst expected loss over a Kullback-Leibler ball about the sample distribution, at radius ``-\\ln(\\alpha)``.
 
 # Mathematical definition
 
@@ -74,7 +74,7 @@ Where:
   - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Value-at-Risk (tightest exponential upper bound on VaR and CVaR).
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
-  - ``L_t = -x_t``: Loss at period ``t``.
+  - $(math_dict[:amb_L_t])
   - ``M_L(u) = \\mathbb{E}[e^{uL}]``: Moment-generating function of the loss.
   - ``z``: Exponential tilt parameter.
 
@@ -93,6 +93,25 @@ Where:
   - ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
 
 For observation-weighted samples with weight vector ``\\boldsymbol{w}``, the normalisation ``\\alpha T`` becomes ``\\alpha \\sum_{t=1}^{T} w_t`` and the budget constraint becomes ``\\boldsymbol{w}^\\intercal \\boldsymbol{u} \\leq z``.
+
+The dual of that programme is the worst expected loss over a Kullback-Leibler ball about the sample distribution:
+
+```math
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{Q \\in \\mathcal{Q}_{\\mathrm{KL}}(\\alpha)}{\\sup} \\mathbb{E}_{Q}[L]\\,, \\\\
+\\mathcal{Q}_{\\mathrm{KL}}(\\alpha) &= \\left\\{ Q : D_{\\mathrm{KL}}(Q \\,\\|\\, P) \\leq -\\ln(\\alpha) \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{Q}_{\\mathrm{KL}}(\\alpha)``: Kullback-Leibler ambiguity ball of radius ``-\\ln(\\alpha)``.
+  - ``D_{\\mathrm{KL}}(Q \\,\\|\\, P) = \\sum_{t=1}^{T} q_t \\ln\\!\\left(\\frac{q_t}{p_t}\\right)``: Kullback-Leibler divergence.
+  - $(math_dict[:amb_Q])
+  - $(math_dict[:amb_P])
+  - $(math_dict[:amb_EQ_L])
+
+So the significance level is the Ambiguity Radius, through ``-\\ln(\\alpha)``, and a smaller ``\\alpha`` widens the ball. The ball is a reading of this measure and not an object, so no estimator constructs one.
 
 # Fields
 
@@ -240,6 +259,8 @@ Where:
   - ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail entropic risk at level ``\\beta``.
 
 $(math_dict[:negated_upper_tail])
+
+Each term is the worst expected loss over its own Kullback-Leibler ball about the sample distribution, at radius ``-\\ln(\\alpha)`` on the lower tail and ``-\\ln(\\beta)`` on the upper tail. [`EntropicValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -397,6 +418,8 @@ Where:
   - ``\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
+
+So the EDaR is the worst expected drawdown over a Kullback-Leibler ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``, at radius ``-\\ln(\\alpha)``. [`EntropicValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -559,6 +582,8 @@ Where:
   - ``\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Entropic Drawdown-at-Risk.
   - $(math_dict[:alpha_rm])
   - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
+
+So the Relative EDaR is the worst expected relative drawdown over a Kullback-Leibler ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``, at radius ``-\\ln(\\alpha)``. [`EntropicValueatRisk`](@ref) states the ball.
 
 # Fields
 

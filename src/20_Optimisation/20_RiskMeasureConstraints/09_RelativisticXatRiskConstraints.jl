@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
 `model`.
 
-Each overload uses power cone constraints (`PowerCone`) to encode the Tsallis entropy-based
+Each overload uses power cone constraints (`PowerCone`) to encode the Kaniadakis entropy-based
 risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `psi`,
 `theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
 upper-tail relativistic expression.

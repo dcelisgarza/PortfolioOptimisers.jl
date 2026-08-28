@@ -971,6 +971,14 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # Risk measure parameters.
                        :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                        :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                       # The divergence Ambiguity Set reading, in the sense CONTEXT.md
+                       # gives the noun. `EntropicValueatRisk` is the Kullback-Leibler
+                       # ball and `RelativisticValueatRisk` is its Kaniadakis
+                       # counterpart, so the two state one set of symbols.
+                       :amb_L_t => "``L_t = -x_t``: Loss at period ``t``.",#
+                       :amb_P => "``P``: Sample distribution of the losses, whose ``t``-th probability is ``p_t``. It is uniform over the ``T`` observations, or the normalised observation weights when they are stated.",#
+                       :amb_Q => "``Q``: Distribution in the ambiguity ball, whose ``t``-th probability is ``q_t``.",#
+                       :amb_EQ_L => "``\\mathbb{E}_{Q}[L] = \\sum_{t=1}^{T} q_t L_t``: Expected loss under ``Q``.",#
                        # The Kaniadakis logarithm. `kappa_log` states it, and the
                        # relativistic risk measures, their JuMP constraint layer and the
                        # entropy pooling views all read the one symbol.
@@ -979,7 +987,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        # per-observation power cones `ep_rlvar_tail` minimises out. The two
                        # entropy pooling view formulations and the three helpers around
                        # them state one programme, so they share these symbols.
-                       :kappa_rm => "``\\kappa``: Deformation parameter, ``\\kappa \\in (0, 1)``.",#
+                       :kappa_rm => "``\\kappa``: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.",#
                        :rlvar_loss => "``\\boldsymbol{x}``: ``T \\times 1`` loss series of one asset, the negated returns, whose ``j``-th entry is ``x_{j}``.",#
                        :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, summing to one. In a view they are the posterior probabilities the model solves for.",#
                        :rlvar_stat => "``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X)``: Relativistic value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha`` and deformation ``\\kappa``.",#
