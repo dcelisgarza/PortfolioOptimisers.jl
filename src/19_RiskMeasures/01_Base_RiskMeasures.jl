@@ -2309,6 +2309,343 @@ function mirror_role(r::DeformationTailCalibration)
     return DeformationHeadCalibration(; alg = r.alg)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes.
+
+A stated `alpha` fixes the tail's probability. A fold half as long then leaves half as many observations in the tail, and the measure it feeds grows noisier as the sample shrinks. This rule fixes the count instead and returns `n / T`, so `ceil(alpha * T) == n` at every sample length the resolution meets.
+
+`T` is the effective sample size when observation weights are stated, and the raw row count when they are not. Kish's effective sample size is the number of equally weighted observations that carries the same information as the weighted sample, so a weighted tail holds `n` observations in that sense rather than `n` rows. This is the only one of the three rules that reads the weights.
+
+The rule carries no range check of its own. It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a count that produces a value outside the slot's range is refused there, at fold time.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ScenarioCount(;
+        n::Number
+    ) -> ScenarioCount
+
+Keywords correspond to the struct's fields. `n` has no default, because a scenario count that suits every sample does not exist.
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`RateSignificance`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct ScenarioCount <: AbstractSignificanceCalibrationAlgorithm
+    """
+    $(field_dict[:cal_n])
+    """
+    n
+    function ScenarioCount(n::Number)
+        return new{typeof(n)}(n)
+    end
+end
+function ScenarioCount(; n::Number)
+    return ScenarioCount(n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the significance level that leaves `alg.n` observations in the tail of the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\alpha &= \\frac{n}{T_{e}}\\,,\\\\
+T_{e} &= \\begin{cases}
+T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:alpha_rm])
+  - ``n``: Number of observations the tail is to hold.
+  - $(math_dict[:T])
+  - ``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.
+  - ``w_{i}``: Observation weight of period ``i``.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. The count is the same for every key, so a tail slot and a head slot that carry one rule resolve to one number.
+  - `pr`: Prior result the sample length is read off.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver. This rule needs none.
+
+# Returns
+
+  - `alpha::Number`: The significance level.
+
+# Related
+
+  - [`ScenarioCount`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::ScenarioCount)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    return alg.n / T
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes a significance level that shrinks with the square root of the sample length.
+
+The tail probability is `c / sqrt(T)`, so the tail's expected count is `c * sqrt(T)`. It grows with the sample, but more slowly than the sample does, which is the rate at which a sample mean's own error falls. A longer sample therefore buys a further tail rather than only a fuller one, and [`ScenarioCount`](@ref) is the rule that buys neither.
+
+The rule reads the raw row count, and not the effective sample size that [`ScenarioCount`](@ref) reads. The rate is a statement about the length of the record, whereas a scenario count is a statement about the observations the tail holds.
+
+The rule carries no range check of its own, on the same terms as [`ScenarioCount`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RateSignificance(;
+        c::Number = 1
+    ) -> RateSignificance
+
+Keywords correspond to the struct's fields. `c` defaults to `1`, which is the plain ``1/\\sqrt{T}`` rate.
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`ScenarioCount`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct RateSignificance <: AbstractSignificanceCalibrationAlgorithm
+    """
+    $(field_dict[:cal_c])
+    """
+    c
+    function RateSignificance(c::Number)
+        return new{typeof(c)}(c)
+    end
+end
+function RateSignificance(; c::Number = 1)
+    return RateSignificance(c)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the significance level at the square-root rate of the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\alpha &= \\frac{c}{\\sqrt{T}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:alpha_rm])
+  - ``c``: Rate coefficient.
+  - $(math_dict[:T])
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. The rate is the same for every key.
+  - `pr`: Prior result the sample length is read off.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `slv`: Effective solver. This rule needs none.
+
+# Returns
+
+  - `alpha::Number`: The significance level.
+
+# Related
+
+  - [`RateSignificance`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::RateSignificance)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    return alg.c / sqrt(size(pr.X, 1))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes the Kaniadakis deformation parameter that makes a relativistic measure spend a stated entropy budget.
+
+[`RRM`](@ref) multiplies its dual variable by `kappa_log(inv(alpha * T), kappa)`, so that coefficient is the price the model pays for the deformation, and `target` states it directly. The rule returns the ``\\kappa`` that meets it. A stated `kappa` fixes the shape of the deformation and lets the price move with the sample; this rule fixes the price and lets the shape move.
+
+The two quantities travel together. The rule reads its sibling `alpha`, which is why the `alpha` field exists: [`bind_alpha`](@ref) fills it with the number the slot owner resolved, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` instead.
+
+The inversion is monotone, and it is solved by bisection over ``(0, 1)``. Writing ``l = \\ln(u)``, the coefficient is ``l \\sinh(\\kappa l) / (\\kappa l)``, and ``\\sinh(x)/x`` rises with ``|x|``, so the coefficient walks once from ``l`` at ``\\kappa \\to 0`` to ``\\sinh(l)`` at ``\\kappa = 1``. There is no elementary inverse of ``\\sinh(x)/x``, so the solve is a fixed sweep of 64 halvings rather than a formula.
+
+The band the coefficient reaches moves with the sample, and a target outside it is refused at fold time. This is the one check any of the three rules carries, and it is not a range check on the quantity the rule returns — the slot owner's constructor keeps that job, as it does for the two significance rules. It states that the equation has a root at all: a target the band does not reach leaves the sweep at an end of the interval, where ``\\kappa`` is far too small or too large to be the answer to the question the caller asked and yet still inside the range the slot owner admits.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EntropyBudget(;
+        target::Number,
+        alpha::Option{<:Number} = nothing
+    ) -> EntropyBudget
+
+Keywords correspond to the struct's fields. `target` has no default, because the budget is the whole content of the rule. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`kappa_log`](@ref)
+  - [`RRM`](@ref)
+"""
+@concrete struct EntropyBudget <: AbstractDeformationCalibrationAlgorithm
+    """
+    $(field_dict[:cal_target])
+    """
+    target
+    """
+    $(field_dict[:cal_alpha_sib])
+    """
+    alpha
+    function EntropyBudget(target::Number, alpha::Option{<:Number})
+        return new{typeof(target), typeof(alpha)}(target, alpha)
+    end
+end
+function EntropyBudget(; target::Number, alpha::Option{<:Number} = nothing)
+    return EntropyBudget(target, alpha)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the deformation parameter whose Kaniadakis logarithm meets `alg.target` on the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+u &= \\frac{1}{\\alpha T}\\,,\\\\
+\\ln_{\\kappa}(u) &= \\frac{u^{\\kappa} - u^{-\\kappa}}{2 \\kappa}\\,,\\\\
+\\kappa &: \\ln_{\\kappa}(u) = \\tau\\,, \\quad \\kappa \\in (0,\\, 1)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:kappa_rm])
+  - ``\\tau``: Target value of the Kaniadakis logarithm.
+  - ``u``: Argument of the Kaniadakis logarithm, the reciprocal of the tail's expected count.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+
+# Arguments
+
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `key`: Name of the slot that is being resolved. The budget is the same for every key.
+  - `pr`: Prior result the sample length is read off.
+  - `w`: Effective observation weights. This rule reads the raw row count, so it ignores them.
+  - `slv`: Effective solver. This rule needs none, because the inversion is a scalar one.
+
+# Validation
+
+  - `alg.alpha` must not be `nothing`.
+  - `alg.target` must lie strictly between ``\\ln(u)`` and ``\\sinh(\\ln(u))``, which is the band the coefficient reaches over ``\\kappa \\in (0,\\, 1)``.
+
+# Returns
+
+  - `kappa::Number`: The deformation parameter.
+
+# Related
+
+  - [`EntropyBudget`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`kappa_log`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    @argcheck(!isnothing(alg.alpha),
+              IsNothingError("`EntropyBudget.alpha` is `nothing`, so the rule cannot form `inv(alpha * T)`. The sibling `alpha` travels to the rule through `bind_alpha`, which the slot owner calls after it resolves `alpha`. State `alpha` on the rule itself to run it outside a measure."))
+    T = size(pr.X, 1)
+    u = inv(alg.alpha * T)
+    l = log(u)
+    lo_b, hi_b = minmax(l, (u - inv(u)) / 2)
+    @argcheck(lo_b < alg.target < hi_b,
+              DomainError(alg.target,
+                          "`EntropyBudget.target` must lie in ($lo_b, $hi_b), the band that `kappa_log(inv(alpha * T), kappa)` reaches over `kappa` in (0, 1) at `alpha = $(alg.alpha)` and `T = $T`. No deformation parameter meets a target outside it, so the rule has nothing to return. The band moves with the sample, so a target that suits one fold need not suit another."))
+    target = alg.target / l
+    lo = zero(target)
+    hi = one(target)
+    # The normalised coefficient rises once from `1` to `sinh(l) / l` over `(0, 1)`, so one
+    # comparison carries both signs of `l` and the sweep needs no sign branch. Sixty-four
+    # halvings take the bracket below the resolution of a `Float64`.
+    for _ in 1:64
+        kappa = (lo + hi) / 2
+        if kappa_log(u, kappa) / l < target
+            lo = kappa
+        else
+            hi = kappa
+        end
+    end
+    return (lo + hi) / 2
+end
+"""
+    bind_alpha(slot, alpha::Number)
+
+Hand a resolved `alpha` to the rule that reads it, and return the slot's occupant with the number in place.
+
+`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of a sibling slot, and [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number. So the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the `kappa` slot, and resolves the result:
+
+```julia
+alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
+kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, w, slv)
+```
+
+The default is the identity, so a stated number, a plain function and a rule that reads no sibling all pass through untouched. A deformation role is rebuilt around the bound rule, which is what lets the verb take the slot rather than the rule the caller has to unwrap first. The significance family needs no method, because no significance rule reads a sibling and the identity is already the right answer for it.
+
+# Arguments
+
+  - `slot`: The slot's occupant: a number, a deformation role, or a rule.
+  - `alpha`: The sibling slot's resolved significance level.
+
+# Returns
+
+  - `bound`: The occupant, with `alpha` in place wherever a rule reads it.
+
+# Related
+
+  - [`EntropyBudget`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function bind_alpha(slot, ::Number)
+    return slot
+end
+function bind_alpha(r::DeformationTailCalibration, alpha::Number)
+    return DeformationTailCalibration(; alg = bind_alpha(r.alg, alpha))
+end
+function bind_alpha(r::DeformationHeadCalibration, alpha::Number)
+    return DeformationHeadCalibration(; alg = bind_alpha(r.alg, alpha))
+end
+function bind_alpha(alg::EntropyBudget, alpha::Number)
+    return EntropyBudget(; target = alg.target, alpha = alpha)
+end
+"""
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
 
 Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
@@ -2503,4 +2840,5 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
-       DeformationTailCalibration, DeformationHeadCalibration
+       DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
+       RateSignificance, EntropyBudget

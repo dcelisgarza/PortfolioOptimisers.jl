@@ -176,6 +176,10 @@ resolve_calibration_slot
 calibration_slots
 assert_calibrated_slots
 mirror_role
+ScenarioCount
+RateSignificance
+EntropyBudget
+bind_alpha
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
