@@ -271,6 +271,10 @@ The size of an Ambiguity Set, in the units of the return data. For a Wasserstein
 A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
+**Calibration Role**
+The type that places a Calibration Rule in the slot of one quantity, and names the quantity: the end of the distribution a tail probability or a deformation parameter addresses, the Ambiguity Radius, or the Esfahani-Kuhn tail weight. The rule itself lives in the role's `alg` field. A role is an Estimator and the rule it carries is an Algorithm, so a role placed inside another role's `alg` field is refused at construction by that field's bound.
+*Avoid*: Calibration Rule (above), which is the rule a role carries rather than the placement of it.
+
 ## 4. Optimisation
 
 **Optimisation Estimator**

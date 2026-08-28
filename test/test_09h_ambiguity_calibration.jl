@@ -56,6 +56,13 @@ end
     @test !(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm <:
             PO.AbstractDeformationCalibrationAlgorithm)
 
+    # Both roles are Estimators, not Algorithms. #593 split the taxonomy so that a role
+    # inside another role's `alg` field is refused by the field's bound.
+    @test AmbiguityRadiusCalibration <: PO.AbstractCalibrationEstimator
+    @test AmbiguityTailWeightCalibration <: PO.AbstractCalibrationEstimator
+    @test !(AmbiguityRadiusCalibration <: PO.AbstractCalibrationAlgorithm)
+    @test !(AmbiguityTailWeightCalibration <: PO.AbstractCalibrationAlgorithm)
+
     # Neither abstract type is exported: an export is public API, and the convention is
     # that an abstract type is not one.
     @test :AbstractAmbiguityRadiusCalibrationAlgorithm ∉ names(PortfolioOptimisers)
@@ -102,6 +109,12 @@ end
     @test_throws TypeError AmbiguityRadiusCalibration(; alg = ScenarioCount(; n = 25))
     @test_throws TypeError AmbiguityTailWeightCalibration(; alg = rrule)
     @test_throws TypeError AmbiguityRadiusCalibration(; alg = 0.02)
+
+    # A role is not a rule, so a role inside an `alg` field is refused on the same terms.
+    @test !isa(rrole, PO.Func_AmbRadCal)
+    @test !isa(trole, PO.Func_AmbTwtCal)
+    @test_throws TypeError AmbiguityRadiusCalibration(; alg = rrole)
+    @test_throws TypeError AmbiguityTailWeightCalibration(; alg = trole)
 
     # The slot bound names one role and no other, so a tail-weight role in a radius slot
     # fails the constructor's signature.

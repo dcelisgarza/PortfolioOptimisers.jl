@@ -77,15 +77,21 @@ const RULE = ProbeScenarioCount(25)
 const KRULE = ProbeEntropyBudget(0.3)
 
 @testset "Calibration slot: the taxonomy" begin
-    # One root under `AbstractAlgorithm`, two families under the root, and both role types
-    # of a family under that family.
+    # TWO roots, which is what #593 settled. A rule is an Algorithm, and the role that
+    # places a rule in a slot is configuration that holds an algorithm, so it is an
+    # Estimator. The two families sit under the algorithm root; the roles sit under
+    # NEITHER of them, and that is the whole of the refusal below.
     @test PO.AbstractCalibrationAlgorithm <: PO.AbstractAlgorithm
+    @test PO.AbstractCalibrationEstimator <: PO.AbstractEstimator
+    @test !(PO.AbstractCalibrationEstimator <: PO.AbstractAlgorithm)
+    @test !(PO.AbstractCalibrationAlgorithm <: PO.AbstractEstimator)
     @test PO.AbstractSignificanceCalibrationAlgorithm <: PO.AbstractCalibrationAlgorithm
     @test PO.AbstractDeformationCalibrationAlgorithm <: PO.AbstractCalibrationAlgorithm
-    @test SignificanceTailCalibration <: PO.AbstractSignificanceCalibrationAlgorithm
-    @test SignificanceHeadCalibration <: PO.AbstractSignificanceCalibrationAlgorithm
-    @test DeformationTailCalibration <: PO.AbstractDeformationCalibrationAlgorithm
-    @test DeformationHeadCalibration <: PO.AbstractDeformationCalibrationAlgorithm
+    for T in (SignificanceTailCalibration, SignificanceHeadCalibration,
+              DeformationTailCalibration, DeformationHeadCalibration)
+        @test T <: PO.AbstractCalibrationEstimator
+        @test !(T <: PO.AbstractCalibrationAlgorithm)
+    end
 
     # The two families are disjoint, which is what makes a family bound a real check.
     @test !(PO.AbstractSignificanceCalibrationAlgorithm <:
@@ -100,9 +106,10 @@ const KRULE = ProbeEntropyBudget(0.3)
     @test !isa(DeformationTailCalibration(; alg = KRULE), PO.DeferredQuantity)
     @test !isa(DeformationHeadCalibration(; alg = KRULE), PO.DeferredQuantity)
 
-    # The three abstract types stay unexported; the four role types are caller-facing.
+    # The four abstract types stay unexported; the four role types are caller-facing.
     exported = names(PortfolioOptimisers)
     @test !(:AbstractCalibrationAlgorithm in exported)
+    @test !(:AbstractCalibrationEstimator in exported)
     @test !(:AbstractSignificanceCalibrationAlgorithm in exported)
     @test !(:AbstractDeformationCalibrationAlgorithm in exported)
     @test :SignificanceTailCalibration in exported
@@ -149,6 +156,21 @@ end
     # A number is not a rule, so it never reaches an `alg` field.
     @test_throws TypeError SignificanceTailCalibration(; alg = 0.05)
     @test_throws TypeError DeformationTailCalibration(; alg = 0.05)
+
+    # A ROLE is not a rule either, so a role inside another role's `alg` field is refused
+    # at construction. Before #593 split the taxonomy a role subtyped its own rule family,
+    # so `Func_SigCal` admitted it and the nesting type-checked. The refusal is the bound's,
+    # and no guard method is written for it.
+    tail = SignificanceTailCalibration(; alg = RULE)
+    head = SignificanceHeadCalibration(; alg = RULE)
+    ktail = DeformationTailCalibration(; alg = KRULE)
+    @test !isa(tail, PO.Func_SigCal) && !isa(head, PO.Func_SigCal)
+    @test !isa(ktail, PO.Func_DefCal)
+    @test_throws TypeError SignificanceTailCalibration(; alg = head)
+    @test_throws TypeError SignificanceTailCalibration(; alg = tail)
+    @test_throws TypeError SignificanceHeadCalibration(; alg = tail)
+    @test_throws TypeError DeformationTailCalibration(; alg = ktail)
+    @test_throws TypeError DeformationHeadCalibration(; alg = ktail)
 end
 
 @testset "Calibration slot: the four field bounds" begin

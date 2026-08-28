@@ -160,6 +160,7 @@ rebuild_with_slots
 assert_declared_slot_resolver
 assert_resolved_slots
 AbstractCalibrationAlgorithm
+AbstractCalibrationEstimator
 AbstractSignificanceCalibrationAlgorithm
 AbstractDeformationCalibrationAlgorithm
 Func_SigCal

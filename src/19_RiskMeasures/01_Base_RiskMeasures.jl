@@ -1871,16 +1871,21 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a tail probability or a deformation parameter from the data a prior result carries, so that the quantity refits whenever the sample moves.
+Computes a calibrated quantity — a tail probability, a deformation parameter, an ambiguity radius or an Esfahani-Kuhn tail weight — from the data a prior result carries, so that the quantity refits whenever the sample moves.
 
-All concrete subtypes should subtype one of the two families under this root rather than the root itself. A plain number in place of a rule is the quantity itself, exactly as it is today.
+All concrete subtypes should subtype one of the four families under this root rather than the root itself. A plain number in place of a rule is the quantity itself, exactly as it is today.
+
+This root carries the **rules** alone. A **role**, the type that places a rule in the slot of one quantity, is an Estimator under [`AbstractCalibrationEstimator`](@ref) and subtypes nothing here, so a role placed inside another role's `alg` field is refused by the field's bound.
 
 A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`DeferredQuantity`](@ref)
 """
@@ -1888,9 +1893,30 @@ abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Places a **Calibration Rule** in the slot of one quantity, and names the quantity the slot holds.
+
+A role is configuration that carries an algorithm, so a role is an Estimator and the rule it carries is the Algorithm. [`AbstractOrderedWeightsArrayEstimator`](@ref) and [`AbstractOrderedWeightsArrayAlgorithm`](@ref) are the same pair, and the two calibration roots are separate for the same reason.
+
+The separation is the whole of the role validation. Every `alg` field is bounded by a `Func_` union that names one rule family under [`AbstractCalibrationAlgorithm`](@ref), and no role subtypes that root. So a role placed inside another role's `alg` field is refused **at construction, by the bound**, and no guard method is written for it.
+
+The root is flat, and no role carries a per-family supertype, because nothing dispatches on a family of roles. Each slot's `Num_` bound names one concrete role, and the three sites that read a role — [`resolve_calibration_slot`](@ref), [`assert_calibrated_slots`](@ref) and [`sel`](@ref) — read this root itself.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`assert_calibrated_slots`](@ref)
+"""
+abstract type AbstractCalibrationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
-All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same four arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype the family as well: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends.
+All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same four arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends. Neither role subtypes this family, so neither is admitted by [`Func_SigCal`](@ref).
 
 # Interfaces
 
@@ -1925,7 +1951,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a deformation parameter, the Kaniadakis ``\\kappa`` that a `kappa` slot holds.
 
-All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. The family's two role types, [`DeformationTailCalibration`](@ref) and [`DeformationHeadCalibration`](@ref), subtype it as well.
+All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. The family's two role types, [`DeformationTailCalibration`](@ref) and [`DeformationHeadCalibration`](@ref), subtype [`AbstractCalibrationEstimator`](@ref) instead, and neither is admitted by [`Func_DefCal`](@ref).
 
 # Interfaces
 
@@ -2004,13 +2030,14 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`SignificanceHeadCalibration`](@ref)
   - [`Num_SigTailCal`](@ref)
   - [`Func_SigCal`](@ref)
   - [`mirror_role`](@ref)
 """
-@concrete struct SignificanceTailCalibration <: AbstractSignificanceCalibrationAlgorithm
+@concrete struct SignificanceTailCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_sig])
     """
@@ -2043,13 +2070,14 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
   - [`SignificanceTailCalibration`](@ref)
   - [`Num_SigHeadCal`](@ref)
   - [`Func_SigCal`](@ref)
   - [`mirror_role`](@ref)
 """
-@concrete struct SignificanceHeadCalibration <: AbstractSignificanceCalibrationAlgorithm
+@concrete struct SignificanceHeadCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_sig])
     """
@@ -2082,13 +2110,14 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`Num_DefTailCal`](@ref)
   - [`Func_DefCal`](@ref)
   - [`mirror_role`](@ref)
 """
-@concrete struct DeformationTailCalibration <: AbstractDeformationCalibrationAlgorithm
+@concrete struct DeformationTailCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_def])
     """
@@ -2121,13 +2150,14 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`Num_DefHeadCal`](@ref)
   - [`Func_DefCal`](@ref)
   - [`mirror_role`](@ref)
 """
-@concrete struct DeformationHeadCalibration <: AbstractDeformationCalibrationAlgorithm
+@concrete struct DeformationHeadCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_def])
     """
@@ -2198,13 +2228,13 @@ A slot that holds a role type is unwrapped, and the rule in its `alg` field is *
 
 A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
 
-This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the four role types stay **out** of the [`DeferredQuantity`](@ref) union.
+This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the six role types stay **out** of the [`DeferredQuantity`](@ref) union.
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, or one of the four role types.
+  - `slot`: The slot's occupant: a number, or one of the six role types.
   - `key`: Name of the slot that is being resolved.
   - `pr`: Prior result the rule reads.
   - `w`: Effective observation weights, or `nothing`.
@@ -2216,6 +2246,7 @@ The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the mea
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`calibration_slots`](@ref)
   - [`Func_SigCal`](@ref)
@@ -2225,7 +2256,7 @@ function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
                                   ::Any = nothing)
     return slot
 end
-function resolve_calibration_slot(r::AbstractCalibrationAlgorithm, key::Symbol,
+function resolve_calibration_slot(r::AbstractCalibrationEstimator, key::Symbol,
                                   pr::AbstractPriorResult, w, slv = nothing)
     return r.alg(key, pr, w, slv)
 end
@@ -2249,7 +2280,7 @@ calibration_slots(::Any) = (;)
 """
     assert_calibrated_slots(x)
 
-Refuse a **Calibration Rule** that reached a value-level entry point, which has no prior result to resolve it against.
+Refuse a **Calibration Role** that reached a value-level entry point, which has no prior result to resolve its rule against.
 
 [`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: a rule reads the sample size and the moments the prior carries, and it reads the effective observation weights, none of which a bare returns matrix supplies. So it refuses instead, and names the slot, the role standing in it and the way out.
 
@@ -2260,14 +2291,14 @@ The slots come from [`calibration_slots`](@ref) and the check recurses into what
 # Related
 
   - [`calibration_slots`](@ref)
-  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`assert_resolved_slots`](@ref)
   - [`expected_risk`](@ref)
 """
 function assert_calibrated_slots(x)
     for (key, slot) in pairs(calibration_slots(x))
-        @argcheck(!isa(slot, AbstractCalibrationAlgorithm),
-                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Rule, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. A rule reads the sample size, the moments and the effective observation weights, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+        @argcheck(!isa(slot, AbstractCalibrationEstimator),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Role, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve its rule against. A rule reads the sample size, the moments and the effective observation weights, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
         assert_calibrated_slots(slot)
     end
     return nothing
@@ -2656,7 +2687,7 @@ Computes an ambiguity radius from the data a prior result carries, so that the r
 
 An **Ambiguity Radius** is the radius of the ball of probability measures the model prices, and it is the coefficient of an un-squared norm penalty on the weight vector. It is neither a tail probability nor a deformation parameter, so it takes its own family beside the two of [`AbstractSignificanceCalibrationAlgorithm`](@ref) and [`AbstractDeformationCalibrationAlgorithm`](@ref), under the same root.
 
-All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. The family's role type, [`AmbiguityRadiusCalibration`](@ref), subtypes it as well.
+All concrete subtypes should subtype `AbstractAmbiguityRadiusCalibrationAlgorithm`, and should be **callable**, on the same terms as the two other families. The family's role type, [`AmbiguityRadiusCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) instead, and is not admitted by [`Func_AmbRadCal`](@ref).
 
 # Interfaces
 
@@ -2691,7 +2722,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an Esfahani-Kuhn tail weight, the weight that the `l` slot of a distributionally robust measure holds.
 
-The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a different family and a different role: a radius rule placed in a tail-weight slot is refused at construction.
+The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a different family and a different role: a radius rule placed in a tail-weight slot is refused at construction. The family's role type, [`AmbiguityTailWeightCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) rather than this family, and is not admitted by [`Func_AmbTwtCal`](@ref).
 
 **No rule of this family ships.** The library computes no Esfahani-Kuhn tail weight, and inventing one would be a guess. The family exists so that a caller's own rule has a home, and [`Func_AmbTwtCal`](@ref) admits a plain function for exactly that case.
 
@@ -2771,6 +2802,7 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`AmbiguityTailWeightCalibration`](@ref)
   - [`Num_AmbRadCal`](@ref)
@@ -2778,7 +2810,7 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
 """
-@concrete struct AmbiguityRadiusCalibration <: AbstractAmbiguityRadiusCalibrationAlgorithm
+@concrete struct AmbiguityRadiusCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_amb_rad])
     """
@@ -2811,13 +2843,13 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
 
 # Related
 
+  - [`AbstractCalibrationEstimator`](@ref)
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`Num_AmbTwtCal`](@ref)
   - [`Func_AmbTwtCal`](@ref)
 """
-@concrete struct AmbiguityTailWeightCalibration <:
-                 AbstractAmbiguityTailWeightCalibrationAlgorithm
+@concrete struct AmbiguityTailWeightCalibration <: AbstractCalibrationEstimator
     """
     $(field_dict[:cal_alg_amb_twt])
     """
@@ -3154,7 +3186,7 @@ sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_va
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
-sel(risk_variable::AbstractCalibrationAlgorithm, ::Any) = risk_variable
+sel(risk_variable::AbstractCalibrationEstimator, ::Any) = risk_variable
 """
     _ctx(args...)
 
