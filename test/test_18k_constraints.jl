@@ -507,6 +507,56 @@ end
                    PortfolioOptimisers.norm_error(L2Norm(; ddof = sq.ddof), rd.X * res.w,
                                                   wr, size(rd.X, 1))^2)
 
+    #=
+    Issue #547 asked for the `SquaredL2Norm` conversion to be confirmed against a solved
+    model, because the `TrackingError` docstring states it as a trap: `err` is read in the
+    units of `alg`, so the same number is two different bounds. The conversion is the
+    square root and it carries no dependence on `T`, so a `SquaredL2Norm` bound of `9e-6`
+    and an `L2Norm` bound of `3e-3` are the SAME bound. `tracking_error_soc_factor` writes
+    one cone bound for both, and the two models must therefore return the same weights.
+    Read the deviation from the weights, not from a model key: `TrackingError` registers
+    `:t_te_`, `:te_`, `:cte_soc_` and `:cte_`, and never `:sq_tracking_risk_`, which
+    belongs to `TrackingRiskMeasure`.
+    =#
+    optsq = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 9e-6,
+                                             alg = SquaredL2Norm()))
+    optl2 = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 3e-3,
+                                             alg = L2Norm()))
+    ressq = optimise(MeanRisk(; obj = MinimumRisk(), opt = optsq))
+    resl2 = optimise(MeanRisk(; obj = MinimumRisk(), opt = optl2))
+    @test PortfolioOptimisers.tracking_error_soc_factor(SquaredL2Norm(), 9e-6,
+                                                        size(rd.X, 1)) ==
+          PortfolioOptimisers.tracking_error_soc_factor(L2Norm(), 3e-3, size(rd.X, 1))
+    @test isapprox(ressq.w, resl2.w, atol = 1e-8)
+    dsq = PortfolioOptimisers.norm_error(SquaredL2Norm(), rd.X * ressq.w, wr, size(rd.X, 1))
+    dl2 = PortfolioOptimisers.norm_error(L2Norm(), rd.X * resl2.w, wr, size(rd.X, 1))
+    @test isapprox(dsq, dl2^2)
+    # both bounds bind, so the equality is not the trivial one of a slack constraint
+    @test dsq <= 9e-6 * (1 + 1e-6)
+    @test dl2 <= 3e-3 * (1 + 1e-6)
+    @test dsq / 9e-6 > 0.999
+    @test dl2 / 3e-3 > 0.999
+    # the model registers the tracking rows under `te`, not under `tracking_risk`
+    ks = keys(JuMP.object_dictionary(ressq.model))
+    @test :t_te_1 in ks
+    @test :te_1 in ks
+    @test :cte_soc_1 in ks
+    @test :cte_1 in ks
+    @test !(:sq_tracking_risk_1 in ks)
+    @test !(:tracking_risk_1 in ks)
+    # `ddof` moves the cone bound, so it moves the realised deviation
+    optd0 = JuMPOptimiser(; pe = pr, slv = slv,
+                          tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 3e-3,
+                                             alg = L2Norm(; ddof = 0)))
+    resd0 = optimise(MeanRisk(; obj = MinimumRisk(), opt = optd0))
+    @test LinearAlgebra.norm(rd.X * resd0.w - wr) > LinearAlgebra.norm(rd.X * resl2.w - wr)
+    @test isapprox(LinearAlgebra.norm(rd.X * resd0.w - wr),
+                   PortfolioOptimisers.tracking_error_soc_factor(L2Norm(; ddof = 0), 3e-3,
+                                                                 size(rd.X, 1)),
+                   rtol = 1e-6)
+
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 4.5e-3,
                                            alg = LpNorm()))

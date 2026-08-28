@@ -454,7 +454,7 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  # Turnover.
                                  :w_tn => "`w`: Reference portfolio weight vector. Deviations are measured against it, and it is never the candidate weight vector an optimiser solves for.",#
                                  :w_ref => "`w`: Reference portfolio weights vector.",#
-                                 :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
+                                 :w_bm_ret => "`w`: Benchmark portfolio returns vector. It holds `T` returns, one per observation, and **not** `N` weights, so its length must match the number of rows of the return matrix the model is built on.",#
                                  :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
                                  # Tracking specification.
                                  :tr_spec => "`tr`: Benchmark tracking specification.",#

@@ -312,3 +312,57 @@
         @test !PortfolioOptimisers.needs_previous_weights(Fees(; l = 0.01, fl = 1.0))
     end
 end
+
+# The net-returns pair of `src/17_NetReturnsDrawdowns.jl`, swept under issue #547.
+@testset "Net returns" begin
+    using PortfolioOptimisers, Test
+
+    PO = PortfolioOptimisers
+    wn = [0.6, -0.4, 0.0, 0.25]
+    Xn = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+    fn = Fees(; l = 0.002, s = 0.003, fl = 0.01, fs = 0.02)
+
+    @testset "the per asset returns sum to the portfolio series" begin
+        # `calc_net_returns` subtracts the scalar `calc_fees`; `calc_net_asset_returns`
+        # subtracts the per-asset `calc_asset_fees`. The two sides add in a different
+        # order, so the identity holds to rounding and not to `==`.
+        a = calc_net_returns(wn, Xn, fn)
+        b = vec(sum(calc_net_asset_returns(wn, Xn, fn); dims = 2))
+        @test a ≈ b
+        @test maximum(abs, a - b) < 1e-16
+
+        # and with no fee at all
+        @test calc_net_returns(wn, Xn) ≈ vec(sum(calc_net_asset_returns(wn, Xn); dims = 2))
+    end
+
+    @testset "the fee is charged in every period" begin
+        # `calc_fees` returns one number for the whole weight vector, and it is
+        # subtracted from every row of `X * w`, so a `T`-row matrix charges it `T` times.
+        f = PO.calc_fees(wn, fn)
+        @test f == 0.0429
+        @test calc_net_returns(wn, Xn, fn) ≈ Xn * wn .- f
+        @test all(calc_net_returns(wn, Xn) - calc_net_returns(wn, Xn, fn) .≈ f)
+
+        # the per asset form charges its own vector in every period too
+        fa = PO.calc_asset_fees(wn, fn)
+        @test calc_net_asset_returns(wn, Xn, fn) ≈
+              calc_net_asset_returns(wn, Xn) .- transpose(fa)
+    end
+
+    @testset "a nothing fee reaches the args... method" begin
+        # It must not charge a zero fee through the `Fees` method.
+        m = which(calc_net_returns, (typeof(wn), typeof(Xn), Nothing))
+        @test m.file ==
+              Symbol(joinpath(dirname(@__DIR__), "src", "17_NetReturnsDrawdowns.jl"))
+        @test calc_net_returns(wn, Xn, nothing) == Xn * wn
+        @test calc_net_asset_returns(wn, Xn, nothing) == Xn .* transpose(wn)
+    end
+
+    @testset "a vector of weight vectors gives one series each" begin
+        ws = [wn, [0.25, 0.25, 0.25, 0.25]]
+        r = calc_net_returns(ws, Xn)
+        @test length(r) == 2
+        @test r[1] ≈ Xn * ws[1]
+        @test r[2] ≈ Xn * ws[2]
+    end
+end

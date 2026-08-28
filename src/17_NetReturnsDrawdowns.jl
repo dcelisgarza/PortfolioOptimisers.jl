@@ -1,10 +1,13 @@
 """
     calc_net_returns(w::VecNum, X::MatNum, args...)
     calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
+    calc_net_returns(w::VecVecNum, X::MatNum, args...)
 
 Compute the net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
-Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+The fee is one scalar and it is charged in **every** period. [`calc_fees`](@ref) contracts the whole weight vector into a single number, and that number is subtracted from every row of ``\\mathbf{X}\\boldsymbol{w}``, so a `T`-row matrix charges it `T` times. On a three-period matrix with ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` and `l = 0.002`, `s = 0.003`, `fl = 0.01`, `fs = 0.02`, the fee measured `0.0429`, and each of the three net returns sat `0.0429` below its gross value. That is why the [`Fees`](@ref) rates must be stated per period of `X`.
+
+The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on the weights above the largest difference measured `6.9e-18`.
 
 # Mathematical definition
 
@@ -22,16 +25,24 @@ Where:
   - ``F_{\\text{t}}(\\boldsymbol{w})``: Total fees computed using [`calc_fees`](@ref).
   - ``\\ominus``: Elementwise (Hadamard) subtraction.
 
+# Algorithm
+
+ 1. Contract `X` with `w`, giving `X * w`, the `T × 1` gross portfolio return series.
+ 2. On the `args...` method, return that series unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
+ 3. On the `fees::Fees` method, compute the one scalar `calc_fees(w, fees)` and subtract it from every entry of the series.
+ 4. On the `w::VecVecNum` method, apply steps 1 to 3 to each weight vector `wi` of `w`, and collect one return series per weight vector.
+
 # Arguments
 
-  - `w`: Portfolio weights.
+  - `w`: Portfolio weights, or a vector of portfolio weight vectors.
   - `X`: Asset return matrix (observations × assets).
   - `fees`: [`Fees`](@ref) structure.
   - `args...`: Additional arguments (ignored).
 
 # Returns
 
-  - `val::VecNum`: Portfolio net returns.
+  - `val::VecNum`: Portfolio net returns, for a `w::VecNum`.
+  - `val::Vector{<:VecNum}`: One net return series per weight vector, for a `w::VecVecNum`.
 
 # Examples
 
@@ -45,9 +56,11 @@ julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
 # Related
 
   - [`VecNum`](@ref)
+  - [`VecVecNum`](@ref)
   - [`MatNum`](@ref)
-  - [`calc_net_asset_returns`](@ref)
-  - [`calc_fees`](@ref)
+  - [`calc_net_asset_returns`](@ref): The per asset split of this series. Its rows sum to this one.
+  - [`calc_fees`](@ref): Computes the one scalar that step 3 subtracts.
+  - [`Fees`](@ref)
 """
 function calc_net_returns(w::VecNum, X::MatNum, args...)
     return X * w
@@ -64,7 +77,9 @@ end
 
 Compute the per asset net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
-Returns the per asset portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+The rows sum to the portfolio series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces [`calc_net_returns(w, X, fees)`](@ref), because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`: on ``\\boldsymbol{w} = [0.6,\\, -0.4,\\, 0,\\, 0.25]`` with all four rate fields set, the largest difference measured `6.9e-18`.
+
+Each per asset fee is charged in **every** period, as it is for [`calc_net_returns`](@ref). The `N × 1` fee vector is subtracted from every row of ``\\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal}``, so a `T`-row matrix charges it `T` times.
 
 # Mathematical definition
 
@@ -82,6 +97,12 @@ Where:
   - ``\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w})``: `N × 1` per asset vector of total portfolio fees computed using [`calc_fees`](@ref).
   - ``\\odot``: Elementwise (Hadamard) multiplication.
   - ``\\ominus``: Elementwise (Hadamard) subtraction.
+
+# Algorithm
+
+ 1. Scale each column of `X` by its weight, giving `X ⊙ transpose(w)`, the `T × N` matrix of gross per asset contributions.
+ 2. On the `args...` method, return that matrix unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
+ 3. On the `fees::Fees` method, compute the `N × 1` vector `calc_asset_fees(w, fees)` and subtract its transpose from every row of the matrix.
 
 # Arguments
 
@@ -107,8 +128,10 @@ julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
 
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
-  - [`calc_net_returns`](@ref)
+  - [`calc_net_returns`](@ref): The portfolio series this matrix sums to along `dims = 2`.
+  - [`calc_asset_fees`](@ref): Computes the per asset vector that step 3 subtracts.
   - [`calc_fees`](@ref)
+  - [`Fees`](@ref)
 """
 function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     return X ⊙ transpose(w)
@@ -123,18 +146,27 @@ Compute the relative cumulative returns from a return matrix.
 
 Internal helper that computes cumulative returns as `cumprod(1 .+ X; dims=dims)`, returning the cumulative portfolio value relative to the starting value.
 
+The series is quoted against an initial capital of one, so an entry below one is a loss and an entry above one is a gain. [`relative_drawdown_arr`](@ref) reads that convention through its `init = one(eltype(X))`.
+
+# Algorithm
+
+ 1. Add one to every entry of `X`, giving the per period growth factors.
+ 2. Take the running product of those factors along `dims`, giving the cumulative portfolio value relative to the starting value.
+
 # Arguments
 
   - `X`: Return matrix.
-  - `dims`: Observation dimension (default `1`).
+  - $(arg_dict[:dims])
 
 # Returns
 
-  - Relative cumulative return matrix.
+  - `ret::ArrNum`: Relative cumulative return matrix, same shape as `X`.
 
 # Related
 
-  - [`absolute_cumulative_returns`](@ref)
+  - [`ArrNum`](@ref)
+  - [`absolute_cumulative_returns`](@ref): The additive sibling, whose series starts at zero.
+  - [`cumulative_returns`](@ref): The public entry point that reaches this helper when `compound` is `true`.
   - [`relative_drawdown_arr`](@ref)
 """
 function relative_cumulative_returns(X::ArrNum; dims::Int = 1)
@@ -147,18 +179,26 @@ Compute the absolute cumulative returns from a return matrix.
 
 Internal helper that computes `cumsum(X; dims=dims)`, returning the cumulative sum of portfolio returns.
 
+The series is quoted against an initial capital of zero, so an entry below zero is a loss and an entry above zero is a gain. [`absolute_drawdown_arr`](@ref) reads that convention through its `init = zero(eltype(X))`.
+
+# Algorithm
+
+ 1. Take the running sum of `X` along `dims`, giving the cumulative portfolio return.
+
 # Arguments
 
   - `X`: Return matrix.
-  - `dims`: Observation dimension (default `1`).
+  - $(arg_dict[:dims])
 
 # Returns
 
-  - Cumulative return matrix.
+  - `ret::ArrNum`: Cumulative return matrix, same shape as `X`.
 
 # Related
 
-  - [`relative_cumulative_returns`](@ref)
+  - [`ArrNum`](@ref)
+  - [`relative_cumulative_returns`](@ref): The multiplicative sibling, whose series starts at one.
+  - [`cumulative_returns`](@ref): The public entry point that reaches this helper when `compound` is `false`.
   - [`absolute_drawdown_arr`](@ref)
 """
 function absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
@@ -196,6 +236,12 @@ Where:
 
 The same definitions apply as above, but for each individual asset in the returns matrix ``\\mathbf{X}`` instead of the portfolio return ``\\mathbf{X} \\boldsymbol{w}``.
 
+# Algorithm
+
+ 1. Read `compound`, which selects one of two helpers.
+ 2. When `compound` is `false`, reach [`absolute_cumulative_returns`](@ref), giving the running sum of `X` along `dims`.
+ 3. When `compound` is `true`, reach [`relative_cumulative_returns`](@ref), giving the running product of `one(eltype(X)) .+ X` along `dims`.
+
 # Arguments
 
   - `X`: Array of asset or portfolio returns (vector or matrix).
@@ -225,6 +271,8 @@ julia> cumulative_returns([0.01, 0.02, -0.01], true)
 # Related
 
   - [`ArrNum`](@ref)
+  - [`absolute_cumulative_returns`](@ref): The helper that step 2 reaches.
+  - [`relative_cumulative_returns`](@ref): The helper that step 3 reaches.
   - [`drawdowns`](@ref)
 """
 function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
@@ -241,20 +289,32 @@ Compute the absolute drawdown array for a matrix of cumulative (or raw) returns.
 
 Each element represents the drawdown from the running peak along the specified dimension.
 
+**The running peak starts at the initial capital, not at the first observation.** `accumulate(max, ...)` is seeded with `init = zero(eltype(X))`, which is the value an additive cumulative series starts from, so a series that is under water from the first period reports a negative drawdown there. `absolute_drawdown_arr([-0.1, 0.05])` returns `[-0.1, -0.05]` and not `[0.0, 0.0]`. That `init` is the whole convention, and this function holds one of its two definitions.
+
+# Algorithm
+
+ 1. Read `cX`, which says whether `X` is already cumulative.
+ 2. When `cX` is `false`, reach [`absolute_cumulative_returns`](@ref) along `dims`, giving the cumulative series `cX`. When `cX` is `true`, take `X` as that series unchanged.
+ 3. Take the running maximum of `cX` along `dims` with `init = zero(eltype(X))`, giving the running peak. The `init` starts the peak at the initial capital of zero.
+ 4. Subtract the running peak from `cX`, giving the drawdown array.
+
 # Arguments
 
   - `X::ArrNum`: Returns array (or cumulative-returns array if `cX = true`).
   - `cX::Bool = false`: If `true`, treat `X` as already cumulative returns.
-  - `dims::Int = 1`: Dimension along which to compute drawdowns.
+  - $(arg_dict[:dims])
 
 # Returns
 
-  - `ArrNum`: Drawdown array of the same shape as `X`.
+  - `dd::ArrNum`: Drawdown array of the same shape as `X`. Every entry is zero or negative.
 
 # Related
 
+  - [`ArrNum`](@ref)
   - [`absolute_drawdown_vec`](@ref)
-  - [`drawdowns`](@ref)
+  - [`relative_drawdown_arr`](@ref): The compound sibling, seeded with `init = one(eltype(X))`.
+  - [`drawdowns`](@ref): The public entry point that reaches this function when `compound` is `false`.
+  - [`absolute_cumulative_returns`](@ref): The helper that step 2 reaches.
   - [`cumulative_returns`](@ref)
 """
 function absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
@@ -268,20 +328,34 @@ Compute the relative drawdown array for a matrix of cumulative (or raw) compound
 
 Each element represents the relative drawdown from the running peak along the specified dimension.
 
+**The running peak starts at the initial capital, not at the first observation.** `accumulate(max, ...)` is seeded with `init = one(eltype(X))`, which is the value a compound cumulative series starts from, so a series that is under water from the first period reports a negative drawdown there. `relative_drawdown_arr([-0.1, 0.05])` returns `[-0.09999999999999998, -0.05499999999999994]` and not `[0.0, 0.0]`. That `init` is the whole convention, and this function holds one of its two definitions.
+
+The two conventions agree to first order on a small return. On `[-1e-6, 5e-7]` the additive and the compound answers differ by `5.0e-13`.
+
+# Algorithm
+
+ 1. Read `cX`, which says whether `X` is already cumulative.
+ 2. When `cX` is `false`, reach [`relative_cumulative_returns`](@ref) along `dims`, giving the cumulative series `cX`. When `cX` is `true`, take `X` as that series unchanged.
+ 3. Take the running maximum of `cX` along `dims` with `init = one(eltype(X))`, giving the running peak. The `init` starts the peak at the initial capital of one.
+ 4. Divide `cX` by the running peak and subtract one, giving the relative drawdown array.
+
 # Arguments
 
   - `X::ArrNum`: Returns array (or cumulative-returns array if `cX = true`).
   - `cX::Bool = false`: If `true`, treat `X` as already cumulative compounded returns.
-  - `dims::Int = 1`: Dimension along which to compute drawdowns.
+  - $(arg_dict[:dims])
 
 # Returns
 
-  - `ArrNum`: Relative drawdown array of the same shape as `X`.
+  - `dd::ArrNum`: Relative drawdown array of the same shape as `X`. Every entry is zero or negative.
 
 # Related
 
-  - [`absolute_drawdown_arr`](@ref)
-  - [`drawdowns`](@ref)
+  - [`ArrNum`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`absolute_drawdown_arr`](@ref): The additive sibling, seeded with `init = zero(eltype(X))`.
+  - [`drawdowns`](@ref): The public entry point that reaches this function when `compound` is `true`.
+  - [`relative_cumulative_returns`](@ref): The helper that step 2 reaches.
   - [`cumulative_returns`](@ref)
 """
 function relative_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
@@ -292,6 +366,10 @@ end
     drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
 
 Compute simple or compounded drawdowns along a specified dimension.
+
+**The running peak starts at the initial capital, not at the first observation**, so a series that is under water from the first period reports a negative drawdown there. `drawdowns([-0.1, 0.05])` returns `[-0.1, -0.05]` and not `[0.0, 0.0]`. `drawdowns` dispatches to [`absolute_drawdown_arr`](@ref) or to [`relative_drawdown_arr`](@ref), which hold the single definition of the peak: the `init` of their `accumulate(max, ...)` is the initial capital, `zero(eltype(X))` for the additive path and `one(eltype(X))` for the compound one.
+
+The two paths agree to first order on a small return. On `[-1e-6, 5e-7]` the additive and the compound answers differ by `5.0e-13`.
 
 # Mathematical definition
 
@@ -318,6 +396,14 @@ Where:
 
 The same definitions apply as above, but for each individual asset in the returns matrix ``\\mathbf{X}`` instead of the portfolio return ``\\mathbf{X} \\boldsymbol{w}``.
 
+# Algorithm
+
+ 1. Read `compound`, which selects one of two builders.
+ 2. When `compound` is `false`, reach [`absolute_drawdown_arr`](@ref), forwarding `cX` and `dims`.
+ 3. When `compound` is `true`, reach [`relative_drawdown_arr`](@ref), forwarding `cX` and `dims`.
+ 4. The builder that step 2 or step 3 reaches cumulates `X` along `dims` first, unless `cX` is `true`, in which case it takes `X` as the cumulative series it already is.
+ 5. That builder then subtracts the running peak, seeded at the initial capital.
+
 # Arguments
 
   - `X`: Array of asset or portfolio returns (vector or matrix).
@@ -327,13 +413,7 @@ The same definitions apply as above, but for each individual asset in the return
 
 # Returns
 
-  - `dd::ArrNum`: Array of drawdowns, same shape as `X`.
-
-# Details
-
-`drawdowns` computes the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
-
-The running peak starts at the initial capital, not at the first observation, so a series that is under water from the first period reports a negative drawdown there. `drawdowns` dispatches to [`absolute_drawdown_arr`](@ref) or [`relative_drawdown_arr`](@ref), which hold the single definition of the peak.
+  - `dd::ArrNum`: Array of drawdowns, same shape as `X`. Every entry is zero or negative.
 
 # Examples
 
@@ -360,8 +440,8 @@ julia> drawdowns([-0.1, 0.05])
 
   - [`ArrNum`](@ref)
   - [`cumulative_returns`](@ref)
-  - [`absolute_drawdown_arr`](@ref)
-  - [`relative_drawdown_arr`](@ref)
+  - [`absolute_drawdown_arr`](@ref): The builder that step 2 reaches, and one of the two homes of the running-peak convention.
+  - [`relative_drawdown_arr`](@ref): The builder that step 3 reaches, and the other home of the running-peak convention.
 """
 function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
     return if !compound

@@ -96,7 +96,7 @@ commit = "a6d87c6"
 "src/15_Turnover.jl" = { lines = 33, misses = 0 }
 "src/16_Fees.jl" = { lines = 132, misses = 0 }
 "src/17_NetReturnsDrawdowns.jl" = { lines = 28, misses = 0 }
-"src/18_Tracking.jl" = { lines = 25, misses = 6 }
+"src/18_Tracking.jl" = { lines = 25, misses = 0 }
 "src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 217, misses = 27 }
 "src/19_RiskMeasures/02_Variance.jl" = { lines = 117, misses = 11 }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 2 }

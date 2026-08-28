@@ -2401,3 +2401,115 @@
         @test_throws DomainError Threshold(; val = -1.0)
     end
 end
+
+# `src/18_Tracking.jl`, swept under issue #547. `factory(tr::WeightsTracking, w)` and
+# `needs_previous_weights(tr::VecTr)` were the file's six coverage misses; the rest of the
+# testset is the condition-2 measurement the ticket asked for.
+@testset "Tracking" begin
+    using PortfolioOptimisers, Test
+
+    PO = PortfolioOptimisers
+    wb = [0.3, 0.2, 0.4, 0.1]
+    Xt = [0.01 0.02 -0.01 0.03; 0.03 0.04 0.02 -0.02; -0.01 0.005 0.01 0.04]
+
+    @testset "the constructors validate w and err" begin
+        # `assert_nonempty_finite_val` demands one finite entry, not every entry.
+        @test_throws PortfolioOptimisers.IsEmptyError WeightsTracking(; w = Float64[])
+        @test_throws PortfolioOptimisers.IsEmptyError ReturnsTracking(; w = Float64[])
+        @test_throws DomainError WeightsTracking(; w = [NaN, NaN])
+        @test_throws DomainError ReturnsTracking(; w = [Inf, NaN])
+        @test WeightsTracking(; w = [0.5, NaN]).w[1] == 0.5
+
+        tr = WeightsTracking(; w = wb)
+        @test_throws DomainError TrackingError(; tr = tr, err = -0.01)
+        @test_throws DomainError TrackingError(; tr = tr, err = Inf)
+        @test_throws DomainError TrackingError(; tr = tr, err = NaN)
+        @test TrackingError(; tr = tr, err = 0.0).err == 0.0
+    end
+
+    @testset "the benchmark is the net return series" begin
+        # `tracking_benchmark(tr::WeightsTracking, X)` is `calc_net_returns`, hand-checked.
+        trn = WeightsTracking(; w = wb)
+        @test PO.tracking_benchmark(trn, Xt) == Xt * wb
+        @test PO.tracking_benchmark(trn, Xt) ≈ [0.006, 0.023, 0.006]
+
+        # a fee is the one scalar, subtracted from every period
+        trf = WeightsTracking(; fees = Fees(; l = 0.001), w = wb)
+        @test PO.tracking_benchmark(trf, Xt) ≈ Xt * wb .- 0.001
+        @test PO.tracking_benchmark(trf, Xt) ≈ [0.005, 0.022, 0.005]
+
+        # `fees = nothing` reaches the `args...` method, not the `Fees` one
+        @test PO.tracking_benchmark(trn, Xt) == calc_net_returns(wb, Xt, nothing)
+    end
+
+    @testset "a ReturnsTracking benchmark reads no return matrix" begin
+        rt = ReturnsTracking(; w = [0.01, 0.02, 0.03])
+        @test PO.tracking_benchmark(rt) === rt.w
+        # a matrix of the wrong number of rows still succeeds: the length mismatch is the
+        # model's to raise, not this function's
+        @test PO.tracking_benchmark(rt, zeros(7, 2)) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(7, 2), :nonsense, 42) === rt.w
+    end
+
+    @testset "factory obeys fixed the way Turnover's does" begin
+        tn = Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01)
+        neww = [0.25, 0.25, 0.25, 0.25]
+
+        # `fixed = true` returns the object itself and never reads `w`
+        trF = WeightsTracking(; fees = Fees(; tn = tn), w = wb, fixed = true)
+        @test PO.factory(trF, neww) === trF
+        @test PO.factory(trF, neww).w == wb
+
+        # `fixed = false` takes the new weights, and hands the OLD ones to the turnover
+        trV = WeightsTracking(; fees = Fees(; tn = tn), w = wb, fixed = false)
+        fV = PO.factory(trV, neww)
+        @test fV.w == neww
+        @test fV.fees.tn.w == wb
+        @test fV.fixed == false
+
+        # which is the rule `Turnover`'s own factory follows
+        @test PO.factory(Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01), wb).w == wb
+        @test PO.factory(Turnover(; w = [0.1, 0.2, 0.3, 0.4], val = 0.01, fixed = true),
+                         wb).w == [0.1, 0.2, 0.3, 0.4]
+    end
+
+    @testset "needs_previous_weights on a vector is any, not all" begin
+        teFixed = TrackingError(; tr = WeightsTracking(; w = wb, fixed = true), err = 0.01)
+        teFree = TrackingError(; tr = WeightsTracking(; w = wb, fixed = false), err = 0.01)
+        teRet = TrackingError(; tr = ReturnsTracking(; w = [0.01, 0.02]), err = 0.01)
+
+        @test !PO.needs_previous_weights(teFixed)
+        @test PO.needs_previous_weights(teFree)
+        @test !PO.needs_previous_weights(teRet)
+
+        # `all` would answer `false` here, so the mixed vector is the discriminating case
+        @test PO.needs_previous_weights([teFixed, teFree])
+        @test PO.needs_previous_weights([teFree, teFixed])
+        @test !PO.needs_previous_weights([teFixed, teRet])
+        @test PO.needs_previous_weights([teFree, teFree])
+    end
+
+    @testset "the SquaredL2Norm bound is the square of the L2Norm bound" begin
+        # Both norms share one cone, and `tracking_error_soc_factor` is where they meet.
+        # `err = 9e-6` under `SquaredL2Norm` is `err = 3e-3` under `L2Norm`: the two write
+        # the identical bound, with no dependence on `T`.
+        @test PO.tracking_error_soc_factor(SquaredL2Norm(), 9e-6, 252) ==
+              PO.tracking_error_soc_factor(L2Norm(), 3e-3, 252)
+        @test PO.tracking_error_soc_factor(SquaredL2Norm(), 5e-6, 252) ≈
+              PO.tracking_error_soc_factor(L2Norm(), sqrt(5e-6), 252)
+
+        # `ddof` moves the bound, through `norm_factor`
+        @test PO.norm_factor(L2Norm(; ddof = 0), 252) == sqrt(252)
+        @test PO.norm_factor(L2Norm(; ddof = 1), 252) == sqrt(251)
+        @test PO.norm_factor(SquaredL2Norm(; ddof = 1), 252) == 251
+        @test PO.tracking_error_soc_factor(L2Norm(; ddof = 0), 3e-3, 252) !=
+              PO.tracking_error_soc_factor(L2Norm(; ddof = 1), 3e-3, 252)
+
+        # and `norm_error` divides by exactly that factor
+        a = [0.01, -0.02, 0.03]
+        b = [0.005, -0.015, 0.02]
+        @test PO.norm_error(L2Norm(), a, b, nothing) == LinearAlgebra.norm(a - b)
+        @test PO.norm_error(SquaredL2Norm(), a, b, 3) ≈
+              PO.norm_error(L2Norm(; ddof = 1), a, b, 3)^2
+    end
+end
