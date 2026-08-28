@@ -2333,12 +2333,13 @@ orthogonal, stackable field tags:
     threaded optimiser value (a solver) found by type via `sel(getfield(x, :f), _ctx(args...))`.
 
 When at least one field is tagged `@pprop` or `@cprop`, a second method
-`factory(x, pr::AbstractPriorResult, args...)` is generated. It first calls
-[`resolve_deferred_quantities`](@ref) on `x` — the identity unless the type declares a
-method — so every slot holding a **Deferred Quantity** becomes a plain value before
-selection runs. It then selects `@pprop`/`@cprop` fields as above and threads
-`@fprop`-only fields with `pr` (`factory_child(getfield(x, :f), pr, args...)`);
-a field tagged both `@pprop` and `@fprop` is prior-selected in this method (`@pprop` wins).
+`factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
+fields as above and threads `@fprop`-only fields with `pr`
+(`factory_child(getfield(x, :f), pr, args...)`); a field tagged both `@pprop` and `@fprop`
+is prior-selected in this method (`@pprop` wins). It then calls
+[`resolve_deferred_quantities`](@ref) on the **selected** struct — the identity unless the
+type declares a method — so the Deferred-Quantity resolution runs **last** and a slot that
+holds one sees the solver, the observation weights and the children already settled.
 Because this method is more specific than the general `factory(x, args...)`, it is chosen
 whenever a prior is passed.
 
@@ -2405,7 +2406,7 @@ Docstrings on the enclosing definition are forwarded correctly via
  6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor whose pairs come from [`prop_channel_pairs`](@ref); otherwise the body is `x` itself. **This method is always emitted**, so an untagged [`@propagatable`](@ref) struct still answers [`factory`](@ref) with the identity.
  7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`, whose channel threads `i` before `args...`.
  8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`, whose channel threads `i` and takes no tail.
- 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body first binds `xr` to [`resolve_deferred_quantities`](@ref) of `x` against `pr`, and **every field is then read off `xr` rather than off `x`**, so a Deferred Quantity is a plain value before selection runs. This method is more specific than the one of step 6, so a call that threads a prior chooses it.
+ 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field off `x` and then hands the selected struct to [`resolve_deferred_quantities`](@ref), so **the Deferred-Quantity resolution runs last**. A Deferred Quantity and a **Calibration Rule** therefore see the solver, the observation weights and the children in the state the optimisation settled them in, and a rule may call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the one of step 6, so a call that threads a prior chooses it.
 10. Build `pprop_tuple`, the `@pprop`-tagged field names as a tuple of quoted symbols.
 11. Return one escaped block holding, in order: `Base.@__doc__ chain`, so a docstring on the declaration reaches the struct; the emitted methods; and the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
 
@@ -2510,15 +2511,17 @@ macro propagatable(expr)
 
     # --- prior/context selection (@pprop / @cprop) — emit only when a field opts in ---
     if prop_channel_active(:prior, tagged)
-        # Every field is read off the Deferred-Quantity-resolved struct, not the argument.
+        # Every field is read off the argument, the selections run on it, and the
+        # Deferred-Quantity resolution runs on the selected struct, LAST. A Deferred
+        # Quantity and a Calibration Rule therefore see the solver, the observation
+        # weights and the children in the state the optimisation settled them in.
         prior_body = Expr(:call, struct_name,
                           Expr(:parameters,
-                               prop_channel_pairs(:prior, tagged, all_fields, :xr, POMOD,
+                               prop_channel_pairs(:prior, tagged, all_fields, :x, POMOD,
                                                   (:pr,))...))
         prior_def = quote
             function $_factory(x::$struct_name, pr::$_prior_result, args...; kwargs...)
-                xr = $_resolve_fn(x, pr)
-                return $prior_body
+                return $_resolve_fn($prior_body, pr)
             end
         end
         push!(defs, prior_def)

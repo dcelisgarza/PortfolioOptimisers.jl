@@ -417,6 +417,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  # Risk measure fields.
                                  :rc => "`rc`: Risk contribution constraint.",#
                                  :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
+                                 :cal_alg_sig => "`alg`: Calibration rule that computes the significance level from the data the prior result carries. It is run by calling it, so it is either a callable [`AbstractSignificanceCalibrationAlgorithm`](@ref) or a plain function of the same four arguments. The bound is [`Func_SigCal`](@ref), so a deformation rule in this field is refused at construction.",#
+                                 :cal_alg_def => "`alg`: Calibration rule that computes the deformation parameter from the data the prior result carries. It is run by calling it, so it is either a callable [`AbstractDeformationCalibrationAlgorithm`](@ref) or a plain function of the same four arguments. The bound is [`Func_DefCal`](@ref), so a significance rule in this field is refused at construction.",#
                                  :vr_rm => "`vr`: Variance risk measure component.",#
                                  :sk_rm => "`sk`: Skewness risk measure component.",#
                                  :kt_rm => "`kt`: Kurtosis risk measure component.",#

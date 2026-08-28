@@ -1865,6 +1865,450 @@ function assert_resolved_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Computes a tail probability or a deformation parameter from the data a prior result carries, so that the quantity refits whenever the sample moves.
+
+All concrete subtypes should subtype one of the two families under this root rather than the root itself. A plain number in place of a rule is the quantity itself, exactly as it is today.
+
+A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
+
+All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same four arguments is therefore a rule as well, and needs no type at all. The family's two role types, [`SignificanceTailCalibration`](@ref) and [`SignificanceHeadCalibration`](@ref), subtype the family as well: a role names the end of the distribution the slot addresses and holds the rule in its `alg` field, and the same rule serves both ends.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractSignificanceCalibrationAlgorithm` and implement the following method:
+
+## The functor
+
+  - `(alg::AbstractSignificanceCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the significance level.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads its sample size and moments off.
+  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
+  - `slv`: Effective solver, or `nothing` when the measure carries none.
+
+### Returns
+
+  - `alpha::Number`: The significance level.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+abstract type AbstractSignificanceCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes a deformation parameter, the Kaniadakis ``\\kappa`` that a `kappa` slot holds.
+
+All concrete subtypes should subtype `AbstractDeformationCalibrationAlgorithm`, and should be **callable**, on the same terms as the significance family. The family's two role types, [`DeformationTailCalibration`](@ref) and [`DeformationHeadCalibration`](@ref), subtype it as well.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractDeformationCalibrationAlgorithm` and implement the following method:
+
+## The functor
+
+  - `(alg::AbstractDeformationCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the deformation parameter.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads its sample size and moments off.
+  - `w`: Effective observation weights, or `nothing` when neither the measure nor the prior names any.
+  - `slv`: Effective solver, or `nothing` when the measure carries none.
+
+### Returns
+
+  - `kappa::Number`: The deformation parameter.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`Func_DefCal`](@ref)
+  - [`kappa_log`](@ref)
+"""
+abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
+"""
+    const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm}
+
+Field bound for the `alg` field of a significance role: a rule of the family, or a plain function of the same four arguments.
+
+A rule is run by calling it, so a function and a callable struct are the same thing to [`resolve_calibration_slot`](@ref). The struct earns its keep by carrying parameters and a name that a docstring can describe; the function is the shortest way to state a one-off rule, and a closure over a caller's own data is the case that has no type.
+
+A function carries no family, so it is admitted by both role families and the family split cannot refuse it. Only a rule that names its family is checked.
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`Func_DefCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Func_SigCal = Union{<:Function, <:AbstractSignificanceCalibrationAlgorithm}
+"""
+    const Func_DefCal = Union{<:Function, <:AbstractDeformationCalibrationAlgorithm}
+
+Field bound for the `alg` field of a deformation role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Func_DefCal = Union{<:Function, <:AbstractDeformationCalibrationAlgorithm}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places a significance rule in a slot that addresses the lower tail of the return distribution.
+
+The role is the whole of the type: the rule itself lives in `alg`, and both ends of the distribution take the same rule. A slot bounded by [`Num_SigTailCal`](@ref) admits this role and refuses [`SignificanceHeadCalibration`](@ref), so a head rule placed in a tail slot is refused at construction rather than at fold time.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SignificanceTailCalibration(;
+        alg::Func_SigCal
+    ) -> SignificanceTailCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`Num_SigTailCal`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`mirror_role`](@ref)
+"""
+@concrete struct SignificanceTailCalibration <: AbstractSignificanceCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_sig])
+    """
+    alg
+    function SignificanceTailCalibration(alg::Func_SigCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function SignificanceTailCalibration(; alg::Func_SigCal)
+    return SignificanceTailCalibration(alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places a significance rule in a slot that addresses the upper tail of the return distribution.
+
+It is the counterpart of [`SignificanceTailCalibration`](@ref), and takes the same `alg` members. Every head slot in the library sits on a Range measure, so the head role never appears on a scalar measure.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SignificanceHeadCalibration(;
+        alg::Func_SigCal
+    ) -> SignificanceHeadCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`SignificanceTailCalibration`](@ref)
+  - [`Num_SigHeadCal`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`mirror_role`](@ref)
+"""
+@concrete struct SignificanceHeadCalibration <: AbstractSignificanceCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_sig])
+    """
+    alg
+    function SignificanceHeadCalibration(alg::Func_SigCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function SignificanceHeadCalibration(; alg::Func_SigCal)
+    return SignificanceHeadCalibration(alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places a deformation rule in a slot that addresses the lower tail of the return distribution.
+
+It is the deformation family's counterpart of [`SignificanceTailCalibration`](@ref), and carries the same shape.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DeformationTailCalibration(;
+        alg::Func_DefCal
+    ) -> DeformationTailCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`Num_DefTailCal`](@ref)
+  - [`Func_DefCal`](@ref)
+  - [`mirror_role`](@ref)
+"""
+@concrete struct DeformationTailCalibration <: AbstractDeformationCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_def])
+    """
+    alg
+    function DeformationTailCalibration(alg::Func_DefCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function DeformationTailCalibration(; alg::Func_DefCal)
+    return DeformationTailCalibration(alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Places a deformation rule in a slot that addresses the upper tail of the return distribution.
+
+It is the counterpart of [`DeformationTailCalibration`](@ref), and takes the same `alg` members.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DeformationHeadCalibration(;
+        alg::Func_DefCal
+    ) -> DeformationHeadCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`Num_DefHeadCal`](@ref)
+  - [`Func_DefCal`](@ref)
+  - [`mirror_role`](@ref)
+"""
+@concrete struct DeformationHeadCalibration <: AbstractDeformationCalibrationAlgorithm
+    """
+    $(field_dict[:cal_alg_def])
+    """
+    alg
+    function DeformationHeadCalibration(alg::Func_DefCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function DeformationHeadCalibration(; alg::Func_DefCal)
+    return DeformationHeadCalibration(alg)
+end
+"""
+    const Num_SigTailCal = Union{<:SignificanceTailCalibration, <:Number}
+
+Field bound for a lower-tail significance slot: the tail probability itself, or the role that computes it.
+
+The union names one role and no other, so a head role placed in a tail slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+
+# Related
+
+  - [`SignificanceTailCalibration`](@ref)
+  - [`Num_SigHeadCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_SigTailCal = Union{<:SignificanceTailCalibration, <:Number}
+"""
+    const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:Number}
+
+Field bound for an upper-tail significance slot: the tail probability itself, or the role that computes it.
+
+# Related
+
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`Num_SigTailCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_SigHeadCal = Union{<:SignificanceHeadCalibration, <:Number}
+"""
+    const Num_DefTailCal = Union{<:DeformationTailCalibration, <:Number}
+
+Field bound for a lower-tail deformation slot: the deformation parameter itself, or the role that computes it.
+
+# Related
+
+  - [`DeformationTailCalibration`](@ref)
+  - [`Num_DefHeadCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_DefTailCal = Union{<:DeformationTailCalibration, <:Number}
+"""
+    const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:Number}
+
+Field bound for an upper-tail deformation slot: the deformation parameter itself, or the role that computes it.
+
+# Related
+
+  - [`DeformationHeadCalibration`](@ref)
+  - [`Num_DefTailCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_DefHeadCal = Union{<:DeformationHeadCalibration, <:Number}
+"""
+    resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing)
+
+Resolve one calibration slot against prior result `pr`, the effective observation weights `w` and the effective solver `slv`, and return a plain number.
+
+A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
+
+A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. It does get the solver: [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so a rule may call [`ERM`](@ref) or [`RRM`](@ref).
+
+This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the four role types stay **out** of the [`DeferredQuantity`](@ref) union.
+
+The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
+
+# Arguments
+
+  - `slot`: The slot's occupant: a number, or one of the four role types.
+  - `key`: Name of the slot that is being resolved.
+  - `pr`: Prior result the rule reads.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver, or `nothing` when the measure carries none.
+
+# Returns
+
+  - `val::Number`: The calibrated quantity, or the stated value unchanged.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`Func_SigCal`](@ref)
+  - [`resolve_slot`](@ref)
+"""
+function resolve_calibration_slot(slot, ::Symbol, ::AbstractPriorResult, ::Any,
+                                  ::Any = nothing)
+    return slot
+end
+function resolve_calibration_slot(r::AbstractCalibrationAlgorithm, key::Symbol,
+                                  pr::AbstractPriorResult, w, slv = nothing)
+    return r.alg(key, pr, w, slv)
+end
+"""
+    calibration_slots(x)
+
+Declare the slots of `x` that may hold a **Calibration Rule**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no calibration slot needs no method.
+
+This is the parallel of [`deferred_slots`](@ref), and [`assert_calibrated_slots`](@ref) reads it. A type that names its slots here writes the resolution beside them, because a rule that reads a sibling slot must be resolved after that sibling and no derivation can know the order.
+
+A slot that holds a child measure is declared here too, so a container names its children and each child names its own slots.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`assert_calibrated_slots`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`deferred_slots`](@ref)
+"""
+calibration_slots(::Any) = (;)
+"""
+    assert_calibrated_slots(x)
+
+Refuse a **Calibration Rule** that reached a value-level entry point, which has no prior result to resolve it against.
+
+[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: a rule reads the sample size and the moments the prior carries, and it reads the effective observation weights, none of which a bare returns matrix supplies. So it refuses instead, and names the slot, the role standing in it and the way out.
+
+This is the shape [`assert_resolved_slots`](@ref) already uses on the Deferred-Quantity side, and the message names both types with `nameof` for the same reason: a printed type carries a module prefix wherever the name is not visible from `Main`, and the message must read the same in every process.
+
+The slots come from [`calibration_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations.
+
+# Related
+
+  - [`calibration_slots`](@ref)
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`assert_resolved_slots`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function assert_calibrated_slots(x)
+    for (key, slot) in pairs(calibration_slots(x))
+        @argcheck(!isa(slot, AbstractCalibrationAlgorithm),
+                  ArgumentError("`$(nameof(typeof(x))).$key` holds a Calibration Rule, a `$(nameof(typeof(slot)))`, and this entry point has no prior result to resolve it against. A rule reads the sample size, the moments and the effective observation weights, which a bare returns matrix does not carry. Pass the prior result itself — `expected_risk(r, w, pr, fees)` — or resolve the measure first with `factory(r, pr)`."))
+        assert_calibrated_slots(slot)
+    end
+    return nothing
+end
+function assert_calibrated_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
+                                                           <:AbstractAlgorithm}})
+    for x in xs
+        assert_calibrated_slots(x)
+    end
+    return nothing
+end
+"""
+    mirror_role(x)
+
+Carry the occupant of a lower-tail slot across to its upper-tail counterpart, and keep the rule.
+
+A Range measure defaults its head slot to whatever its tail slot holds. A number crosses unchanged, and a tail role crosses as the head role of the same family holding the same `alg`, so the default survives the widening and no stated number moves.
+
+The two role families are the whole domain of the second and third methods, because a head slot's bound admits nothing else.
+
+# Arguments
+
+  - `x`: The lower-tail slot's occupant.
+
+# Returns
+
+  - `y`: The upper-tail slot's occupant.
+
+# Related
+
+  - [`SignificanceTailCalibration`](@ref)
+  - [`SignificanceHeadCalibration`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+"""
+function mirror_role(x::Number)
+    return x
+end
+function mirror_role(r::SignificanceTailCalibration)
+    return SignificanceHeadCalibration(; alg = r.alg)
+end
+function mirror_role(r::DeformationTailCalibration)
+    return DeformationHeadCalibration(; alg = r.alg)
+end
+"""
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
 
 Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
@@ -1928,7 +2372,10 @@ operand types to the appropriate leaf selector and inlines to zero cost:
 
   - solvers (`Slv_VecSlv`) → [`solver_selector`](@ref)
   - uncertainty sets (`UcSE_UcS`) → [`ucs_selector`](@ref)
+  - a **Deferred Quantity** or a **Calibration Rule** → kept, because a slot the caller filled with the method that computes the value is a stated slot
   - everything else (moments) → [`nothing_scalar_array_selector`](@ref)
+
+The Deferred-Quantity arm exists because [`@propagatable`](@ref) runs the selection **before** [`resolve_deferred_quantities`](@ref), so a `@pprop` slot that admits a Deferred Quantity reaches here still holding one. The prior must not fill such a slot: the caller stated the method, and the resolution that follows replaces it with the value that method produced. The same reading covers a Calibration Rule.
 
 Note: the `solver_selector` both-`nothing` "cannot solve" error is not reachable through
 `sel` (both-`nothing` routes to the moment selector and returns `nothing`); the
@@ -1952,6 +2399,8 @@ end
 sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_variable)
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
+sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
+sel(risk_variable::AbstractCalibrationAlgorithm, ::Any) = risk_variable
 """
     _ctx(args...)
 
@@ -2053,4 +2502,5 @@ function bounds_risk_measure end
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
-       LinearBound, SquaredBound
+       LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
+       DeformationTailCalibration, DeformationHeadCalibration
