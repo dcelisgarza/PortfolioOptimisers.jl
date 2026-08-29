@@ -2546,6 +2546,7 @@ Keywords correspond to the struct's fields. `target` has no default, because the
   - [`bind_alpha`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
+  - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
   - [`RRM`](@ref)
 """
@@ -2639,11 +2640,210 @@ function (alg::EntropyBudget)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
     return (lo + hi) / 2
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Estimate the tail index of the pool of standardised values of `X`, over the worst `k` order statistics of the pool.
+
+Every column is centred and divided by its own sample dispersion, and `s` names the end. Hill's estimator reads the `k` of the `T N` standardised values that lie furthest into that end. [`HillTailDecay`](@ref) states the reading and the assumptions the pool carries. This verb is the estimate alone.
+
+The element type is bound by the signature, so the pool and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
+
+# Arguments
+
+  - `X`: Returns matrix, `T × N`.
+  - `s`: Sign of the end the estimate reads: `1` reads the gain tail and `-1` reads the loss tail.
+  - `k`: Number of order statistics the estimate reads. The caller states it, and the caller keeps the floor under it.
+
+# Validation
+
+  - The `k + 1`-th largest pooled value must be positive.
+
+# Returns
+
+  - `a::Number`: The Hill estimate of the tail index of the pool.
+
+# Related
+
+  - [`HillTailDecay`](@ref)
+"""
+function hill_tail_index(X::AbstractMatrix{E}, s::Integer, k::Integer) where {E <: Number}
+    T, N = size(X)
+    pool = Vector{float(E)}(undef, T * N)
+    for j in axes(X, 2)
+        col = view(X, :, j)
+        mu = Statistics.mean(col)
+        sd = Statistics.std(col; mean = mu)
+        o = (j - 1) * T
+        for t in 1:T
+            pool[o + t] = -s * (col[t] - mu) / sd
+        end
+    end
+    # The pool is signed so that the end being priced is the LOWER tail, and the estimate
+    # reads the `k + 1` smallest. The ratio of two negatives is the ratio of their
+    # magnitudes, so the sum below is Hill's with no further sign, and the message reads the
+    # magnitude the caller thinks in.
+    vkp1 = partialsort!(pool, k + 1)
+    ukp1 = -vkp1
+    @argcheck(ukp1 > 0,
+              DomainError(ukp1,
+                          "The $(k + 1)-th largest of the pooled standardised values is $ukp1, which is not positive, so there is no Hill estimate: the estimator reads `log(u_i / u_(k+1))`, which needs a positive ratio. The pool holds fewer than $(k + 1) values on the side of the mean this end prices. Lower the count `k`."))
+    return k / sum(i -> log(pool[i] / vkp1), 1:k)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at.
+
+The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kappa}(x) = \\left(\\kappa x + \\sqrt{1 + \\kappa^{2} x^{2}}\\right)^{1/\\kappa}``, which goes to ``(2 \\kappa x)^{1/\\kappa}`` for large ``x``. A ``\\kappa``-deformed exponential tail is therefore a power law of index ``1/\\kappa``, and ``\\kappa`` is a reciprocal tail index. So the rule estimates the sample's tail index ``\\hat{a}`` and returns ``1/\\hat{a}``, which makes the deformation decay at the rate the sample decays at. The band the slot admits, ``(0,\\, 1)``, reads as ``\\hat{a} > 1``, and that is the condition for a finite mean. The refusal is built into the reading, on the same terms as the band of [`EntropyBudget`](@ref).
+
+The estimator is Hill's, over the worst `k` order statistics of a **pool**. Every column of `pr.X` is centred and divided by its own sample dispersion, the standardised values are signed to the end the slot prices, and the `T * N` of them are pooled. **The rule reads `pr.X` alone, and never `pr.sigma`.** A column's dispersion comes from that column, which is the line that separates this rule from a rule that whitens with the covariance matrix.
+
+The pool carries two assumptions, and both are stated rather than hidden. The columns share one tail index after standardisation, which is what lets one estimate stand for the whole sample. The columns are also cross-correlated, so the pool holds far fewer than `T * N` independent points and the estimator's spread is wider than the nominal one of `k` points. The median of `N` per-asset estimates drops both assumptions, and pays for it in noise: at `alpha = 0.05` and `T = 250` a column leaves 12 tail points, and a Hill estimate on 12 points moves from fold to fold for no reason in the data.
+
+`alpha` fixes the depth of the reading as well as the count. A Hill estimate reads the tail at the depth `alpha` names, and a sample whose tail approaches its power law slowly is read with a bias that falls as the depth rises: a Student-t sample read at a five per cent depth returns a ``\\kappa`` above the reciprocal of its degrees of freedom, and the same sample read at one per cent returns most of that distance. The spread of the estimate rises as the count falls, and `kmin` is the floor under that trade.
+
+`key` says which end the slot prices, and **the answer is not the same for every key**. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. This is the opposite of [`EntropyBudget`](@ref), whose budget is a price the model pays and is therefore one number for both ends. A tail index is a statement about a tail, and a skewed sample has two different ones, which is the whole point of the rule on a Range measure.
+
+The rule reads the returns of `pr.X`, so it is exact for [`RelativisticValueatRisk`](@ref) and [`RelativisticValueatRiskRange`](@ref), and approximate for [`RelativisticDrawdownatRisk`](@ref) and [`RelativeRelativisticDrawdownatRisk`](@ref). Those two carry the key `:kappa` as well, so `key` does not say whether the owner prices returns or drawdowns, and a rule is given no portfolio and cannot form the drawdown series. A drawdown tail is heavier than the returns tail it is built from, so the parameter this rule returns to a drawdown measure is a reading of the returns.
+
+The rule carries no range check on the parameter it returns. The slot owner's constructor keeps that job, as it does for every calibration rule. Its checks are statements that the estimate exists at all.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    HillTailDecay(;
+        kmin::Integer = 30,
+        alpha::Option{<:Number} = nothing
+    ) -> HillTailDecay
+
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+
+## Validation
+
+  - `kmin > 0`.
+
+# Related
+
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`EntropyBudget`](@ref)
+  - [`hill_tail_index`](@ref)
+  - [`kappa_log`](@ref)
+"""
+@concrete struct HillTailDecay <: AbstractDeformationCalibrationAlgorithm
+    """
+    $(field_dict[:cal_kmin])
+    """
+    kmin
+    """
+    $(field_dict[:cal_alpha_sib])
+    """
+    alpha
+    function HillTailDecay(kmin::Integer, alpha::Option{<:Number})
+        assert_gt0(kmin, :kmin)
+        return new{typeof(kmin), typeof(alpha)}(kmin, alpha)
+    end
+end
+function HillTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing)
+    return HillTailDecay(kmin, alpha)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the deformation parameter whose reciprocal is the Hill tail index of the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s &= \\begin{cases}
++1 & \\textrm{if the slot prices the gain end}\\\\
+-1 & \\textrm{if the slot prices the loss end}
+\\end{cases}\\,,\\\\
+u_{tj} &= s \\dfrac{r_{tj} - \\hat{\\mu}_{j}}{\\hat{\\sigma}_{j}}\\,,\\\\
+k &= \\left\\lceil \\alpha T N \\right\\rceil\\,,\\\\
+\\hat{a} &= \\dfrac{k}{\\sum\\limits_{i=1}^{k} \\ln\\left(\\dfrac{u_{(i)}}{u_{(k+1)}}\\right)}\\,,\\\\
+\\kappa &= \\dfrac{1}{\\hat{a}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:alpha_rm]) It is the probability of the end this slot prices, so a head slot reads its own ``\\beta``.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+  - $(math_dict[:r_tj])
+  - $(math_dict[:mu_hat_j])
+  - ``\\hat{\\sigma}_{j}``: Sample dispersion of column ``j``, read off that column alone and never off ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``s``: Sign of the end the slot prices.
+  - ``u_{tj}``: Standardised value of asset ``j`` at time ``t``, signed so that the end the slot prices is the upper tail of the pool.
+  - ``u_{(i)}``: ``i``-th largest of the ``T N`` pooled values, so that ``u_{(1)} \\geq \\ldots \\geq u_{(k+1)}``.
+  - ``k``: Number of order statistics the estimate reads.
+  - ``\\hat{a}``: Hill estimate of the tail index of the pool.
+
+# Arguments
+
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `key`: Name of the slot that is being resolved. It names the end, so `:kappa` and `:kappa_a` read the loss tail and `:kappa_b` reads the gain tail. A skewed sample therefore resolves the two ends of a Range measure to two different numbers.
+  - `pr`: Prior result the returns matrix is read off.
+  - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
+  - `slv`: Effective solver. This rule needs none, because the estimate is a closed form.
+
+# Validation
+
+  - `alg.alpha` must not be `nothing`.
+  - `k` must be at least `alg.kmin`.
+  - The pool must hold at least `k + 1` values.
+  - ``u_{(k+1)}`` must be positive, which [`hill_tail_index`](@ref) checks.
+  - ``\\hat{a}`` must be greater than one, which is the band ``\\kappa \\in (0,\\, 1)`` read as a tail index.
+
+# Returns
+
+  - `kappa::Number`: The deformation parameter.
+
+# Related
+
+  - [`HillTailDecay`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`EntropyBudget`](@ref)
+  - [`hill_tail_index`](@ref)
+  - [`kappa_log`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    @argcheck(!isnothing(alg.alpha),
+              IsNothingError("`HillTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T * N)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
+    X = pr.X
+    # `:kappa_b` is the only head key, so every other key prices the loss end. The sign puts
+    # the end the slot prices in the UPPER tail of the pool, and one estimator then serves
+    # both ends.
+    s = key === :kappa_b ? 1 : -1
+    np = prod(size(X))
+    k = ceil(Int, alg.alpha * np)
+    @argcheck(k >= alg.kmin,
+              DomainError(k,
+                          "`HillTailDecay` reads the worst `k = ceil(alpha * T * N) = $k` of the $np pooled standardised values, and `HillTailDecay.kmin` puts the floor at $(alg.kmin). A Hill estimate over fewer order statistics moves from fold to fold for no reason in the data, and the deformation parameter moves with it. Lengthen the sample, widen `alpha`, or lower `kmin` and take the noise."))
+    @argcheck(k + 1 <= np,
+              DomainError(k,
+                          "`HillTailDecay` needs $(k + 1) pooled values to form the estimate, and the pool of `T * N` holds $np. The count is `k = ceil(alpha * T * N)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
+    a = hill_tail_index(X, s, k)
+    @argcheck(a > 1,
+              DomainError(a,
+                          "`HillTailDecay` estimated a tail index of $a on the pool, so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The sample is heavier-tailed than the measure can price."))
+    return inv(a)
+end
+"""
     bind_alpha(slot, alpha::Number)
 
 Hand a resolved `alpha` to the rule that reads it, and return the slot's occupant with the number in place.
 
-`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of a sibling slot, and [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number. So the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the `kappa` slot, and resolves the result:
+`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) and [`HillTailDecay`](@ref) each read the significance level of a sibling slot, and [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number. So the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the `kappa` slot, and resolves the result:
 
 ```julia
 alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
@@ -2664,6 +2864,7 @@ The default is the identity, so a stated number, a plain function and a rule tha
 # Related
 
   - [`EntropyBudget`](@ref)
+  - [`HillTailDecay`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -2679,6 +2880,9 @@ function bind_alpha(r::DeformationHeadCalibration, alpha::Number)
 end
 function bind_alpha(alg::EntropyBudget, alpha::Number)
     return EntropyBudget(; target = alg.target, alpha = alpha)
+end
+function bind_alpha(alg::HillTailDecay, alpha::Number)
+    return HillTailDecay(; kmin = alg.kmin, alpha = alpha)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -3571,6 +3775,6 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
-       RateSignificance, EntropyBudget, AmbiguityRadiusCalibration,
+       RateSignificance, EntropyBudget, HillTailDecay, AmbiguityRadiusCalibration,
        AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
        NormCeilingCalibration, EffectiveAssetFloor

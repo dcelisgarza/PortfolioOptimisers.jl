@@ -284,7 +284,7 @@ The type that places a Calibration Rule in the slot of one quantity, and names t
 *Avoid*: Calibration Rule (above), which is the rule a role carries rather than the placement of it.
 
 **Travelling Pair**
-Two slots whose Calibration Rules must resolve in a stated order, because one rule reads the number the other resolved to. One pair ships: a Deformation Parameter (§5) under an entropy budget beside the Significance Level of its own end of the distribution. The rule reads the sibling `alpha`, so the owning type resolves `alpha` first and hands the number to the `kappa` slot. No derivation can find that order, which is why a type that declares calibration slots writes the resolution beside them.
+Two slots whose Calibration Rules must resolve in a stated order, because one rule reads the number the other resolved to. One pair shape ships: a Deformation Parameter (§5) beside the Significance Level of its own end of the distribution. Two rules read that sibling, an entropy budget and a tail-index reading. The rule reads the sibling `alpha`, so the owning type resolves `alpha` first and hands the number to the `kappa` slot. No derivation can find that order, which is why a type that declares calibration slots writes the resolution beside them.
 
 ## 4. Optimisation
 

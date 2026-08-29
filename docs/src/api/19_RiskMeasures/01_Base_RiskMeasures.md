@@ -180,6 +180,8 @@ mirror_role
 ScenarioCount
 RateSignificance
 EntropyBudget
+hill_tail_index
+HillTailDecay
 bind_alpha
 AbstractAmbiguityRadiusCalibrationAlgorithm
 AbstractAmbiguityTailWeightCalibrationAlgorithm
