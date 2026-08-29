@@ -1076,9 +1076,19 @@ end
     # A per-asset stretch is not a uniform scaling: it moves the relative dispersion of the
     # columns, so the whitening reorders the distances and the returns reading moves. This
     # is the line that separates the returns reading from the drawdown reading.
-    D6 = Diagonal(1.0:6.0)
+    #
+    # Build the congruence with a BROADCAST rather than with `Diagonal(d) * sigma * Diagonal(d)`.
+    # The matrix product rounds the `(i, j)` entry as `(d[i] * sigma[i, j]) * d[j]` and the
+    # `(j, i)` entry as `(d[j] * sigma[j, i]) * d[i]`, which is the same three factors in a
+    # different order, so the product is not exactly symmetric on every host. `cholesky`
+    # then reports `info = -1`, which is a matrix that is not Hermitian rather than a failed
+    # pivot, and `whitening_factor` refuses it. The broadcast multiplies each entry by
+    # `d[i] * d[j]` once, and a scalar product commutes exactly, so the stretch is symmetric
+    # on every host.
+    d6 = collect(1.0:6.0)
     stretched = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu,
-                              sigma = Matrix(D6 * PRDD.sigma * D6))
+                              sigma = PRDD.sigma .* (d6 * transpose(d6)))
+    @test issymmetric(stretched.sigma)
     @test ret(:kappa, stretched, nothing, nothing) != ret(:kappa, PRDD, nothing, nothing)
     @test rule(:kappa, stretched, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
 
