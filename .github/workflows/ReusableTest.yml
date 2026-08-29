@@ -114,7 +114,7 @@ jobs:
         run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
       # The artifact belongs to this run, so the action finds it with no `run-id` and no token, and
       # this workflow needs no scope above `contents: read`.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@latest
         with:
           name: lcov
           path: coverage_download
