@@ -114,7 +114,12 @@ jobs:
         run: julia --project=code_health -e 'using Pkg; Pkg.instantiate()'
       # The artifact belongs to this run, so the action finds it with no `run-id` and no token, and
       # this workflow needs no scope above `contents: read`.
-      - uses: actions/download-artifact@latest
+      #
+      # Pin the MAJOR. `actions/download-artifact` publishes no `latest` tag, so `@latest` does
+      # not resolve and the job fails at `Set up job`, before the first step runs. The major must
+      # also match the `actions/upload-artifact` above that writes the artifact: v4 writes an
+      # artifact that v4 reads.
+      - uses: actions/download-artifact@v4
         with:
           name: lcov
           path: coverage_download
