@@ -364,6 +364,8 @@ This is the channel [`JuMPOptimiser`](@ref) uses: the estimator is not `@propaga
 
 The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) carry the estimator through untouched, which is right: neither holds a prior result, so neither can resolve a rule, and a rule that survives a cluster slice is resolved against that cluster's own prior when the model is assembled.
 
+The slot is named `val` and its key is `:l2reg_val`, because [`LpRegularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. A key that read `:val` could not tell the type-2 metric of this penalty from the type-``q`` metric of that one, so [`DualNormRadius`](@ref) would have no reading of either. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
+
 # Arguments
 
   - `x`: The regularisation term.
@@ -382,7 +384,7 @@ The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) carry the estimato
   - [`assemble_jump_model!`](@ref)
 """
 function factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)
-    val = resolve_calibration_slot(x.val, :val, pr, pr.w, slv)
+    val = resolve_calibration_slot(x.val, :l2reg_val, pr, pr.w, slv)
     if val === x.val
         return x
     end
@@ -696,6 +698,10 @@ It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchan
 
 The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling role through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius role on the other side.
 
+The slot is named `val` and its key is `:lpreg_val`, because [`L2Regularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
+
+The key still names no norm order, because `p` lives on this estimator and one rule may stand in several terms. So this route hands the term's own order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, on the same terms as [`norm_ceiling_factory`](@ref). [`DualNormRadius`](@ref) is the rule that reads it.
+
 # Arguments
 
   - `x`: The regularisation term.
@@ -717,7 +723,7 @@ The same estimator also serves as a norm *constraint* through the `lpc` field of
 """
 function factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
     assert_penalty_coefficient_role(x.val)
-    val = resolve_calibration_slot(x.val, :val, pr, pr.w, slv)
+    val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpreg_val, pr, pr.w, slv)
     if val === x.val
         return x
     end

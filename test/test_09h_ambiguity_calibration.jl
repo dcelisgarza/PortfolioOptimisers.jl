@@ -172,7 +172,7 @@ end
 
     # The key never selects the value, so one rule in two slots resolves to one number.
     @test alg(:r, PR60, nothing, nothing) == alg(:r_a, PR60, nothing, nothing)
-    @test alg(:r, PR60, nothing, nothing) == alg(:val, PR60, nothing, nothing)
+    @test alg(:r, PR60, nothing, nothing) == alg(:l2reg_val, PR60, nothing, nothing)
 
     # Stated weights move `T` to Kish's effective sample size, which is smaller than the
     # row count for any weights that are not equal, so the ball widens.
@@ -565,4 +565,251 @@ So the order falls out of the pipeline and nothing had to invent it.
     # Outside every fold loop the schedule falls back to its own default, which is a
     # number here and reaches the model as one.
     @test PO.reset_time_dependent_fields(opt).l1 == 0.5
+end
+
+#=
+`DualNormRadius` is the first rule of the family for which `key` carries meaning. The eight
+radius slots do not measure distance in one norm, so a rule that returns one number for
+every key gives one coefficient to two penalties whose natural scales differ. This rule
+reads the key, picks the ground metric of that slot, and returns the sampling error of the
+empirical measure in it.
+
+Issue #614 ships it, and it settles the `:val` collision by widening the two regularisation
+keys to `:l2reg_val` and `:lpreg_val`. The two symbols are the two names `field_dict`
+already uses for the two slots, so a caller's own function placed in an
+`AmbiguityRadiusCalibration` now receives one of those in place of `:val`.
+
+The `:lpreg_val` key still names no norm order, because `p` lives on the owner. The order
+travels to the rule through `bind_norm_order`, which #615's sibling ticket already built
+for the norm-ceiling family, so the caller states the order once and on the penalty.
+
+The prior below carries a DIAGONAL covariance matrix, so every norm of the per-asset error
+vector has a closed form and no test reads a number off the implementation.
+=#
+const DNR_SD = [0.2, 0.3, 0.4, 0.5]
+const PRDIAG = LowOrderPrior(; X = X60, mu = zeros(4),
+                             sigma = Matrix(Diagonal(DNR_SD .^ 2)))
+const DNR_Z = Distributions.quantile(Distributions.Normal(), 0.95)
+const DNR_KISH = sum(WTS)^2 / sum(abs2, WTS)
+
+@testset "DualNormRadius: the ground metric of the slot selects the norm" begin
+    # The rule joins the radius family, and it is exported beside the two that ship.
+    @test DualNormRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
+    @test !(DualNormRadius <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)
+    @test :DualNormRadius ∈ names(PortfolioOptimisers)
+    @test isa(DualNormRadius(), PO.Func_AmbRadCal)
+    @test !isa(DualNormRadius(), PO.Func_AmbTwtCal)
+    @test isa(AmbiguityRadiusCalibration(; alg = DualNormRadius()), PO.Num_AmbRadCal)
+
+    # The defaults: a per-coordinate 95% level, and no norm order, which serves every slot
+    # but `:lpreg_val`.
+    @test DualNormRadius().confidence == 0.95
+    @test isnothing(DualNormRadius().p)
+    @test DualNormRadius(; p = 3).p == 3
+
+    alg = DualNormRadius()
+    e = DNR_SD / sqrt(60)
+
+    # --- the four closed forms, on a diagonal covariance matrix -------------------------
+    # The `l1` coefficient multiplies the 1-norm of the weights, so its ground metric is
+    # the ∞-norm and the radius is the largest per-asset error.
+    @test alg(:l1, PRDIAG, nothing, nothing) ≈ DNR_Z * maximum(e)
+
+    # The `linf` coefficient and the three DR radii all multiply the ∞-norm, so their
+    # ground metric is the 1-norm and the radius is the sum of the per-asset errors.
+    @test alg(:linf, PRDIAG, nothing, nothing) ≈ DNR_Z * sum(e)
+    @test alg(:r, PRDIAG, nothing, nothing) ≈ DNR_Z * sum(e)
+
+    # The L2 penalty is its own dual, so the radius is the 2-norm.
+    @test alg(:l2reg_val, PRDIAG, nothing, nothing) ≈ DNR_Z * norm(e, 2)
+
+    # The Lp penalty's ground metric is the type-`q` metric with `1/p + 1/q = 1`. The
+    # penalty site fills `p` through `bind_norm_order`, and a stated `p` runs the rule on
+    # its own, outside that site.
+    @test DualNormRadius(; p = 3)(:lpreg_val, PRDIAG, nothing, nothing) ≈
+          DNR_Z * norm(e, 1.5)
+    @test DualNormRadius(; p = 1.25)(:lpreg_val, PRDIAG, nothing, nothing) ≈
+          DNR_Z * norm(e, 5)
+
+    # --- the defect the rule fixes ------------------------------------------------------
+    # One rule, two slots, two numbers. That is the whole point: `ConcentrationRadius` and
+    # `RateRadius` cannot tell the two apart, and this rule can.
+    @test alg(:l1, PRDIAG, nothing, nothing) != alg(:linf, PRDIAG, nothing, nothing)
+    @test alg(:linf, PRDIAG, nothing, nothing) > alg(:l1, PRDIAG, nothing, nothing)
+    @test alg(:l2reg_val, PRDIAG, nothing, nothing) !=
+          alg(:l1, PRDIAG, nothing, nothing) !=
+          alg(:linf, PRDIAG, nothing, nothing)
+
+    # A radius names no end of the distribution, so the two ends of a Range twin resolve to
+    # one number and both agree with the scalar measure's own slot.
+    @test alg(:r_a, PRDIAG, nothing, nothing) == alg(:r_b, PRDIAG, nothing, nothing)
+    @test alg(:r_a, PRDIAG, nothing, nothing) == alg(:r, PRDIAG, nothing, nothing)
+
+    # --- the confidence level -----------------------------------------------------------
+    # A higher level buys a larger ball, and the level scales the whole vector, so the
+    # ratio of two levels is the ratio of the two quantiles in every ground metric.
+    hi = DualNormRadius(; confidence = 0.99)
+    z99 = Distributions.quantile(Distributions.Normal(), 0.99)
+    @test hi(:l1, PRDIAG, nothing, nothing) > alg(:l1, PRDIAG, nothing, nothing)
+    @test hi(:linf, PRDIAG, nothing, nothing) / alg(:linf, PRDIAG, nothing, nothing) ≈
+          z99 / DNR_Z
+
+    # --- the sample size ----------------------------------------------------------------
+    # With no weights the rule reads the raw row count, and stated weights move it to
+    # Kish's effective sample size, which is smaller for any weights that are not equal.
+    @test DNR_KISH < 60
+    @test alg(:l1, PRDIAG, WTS, nothing) ≈ DNR_Z * maximum(DNR_SD) / sqrt(DNR_KISH)
+    @test alg(:l1, PRDIAG, WTS, nothing) > alg(:l1, PRDIAG, nothing, nothing)
+    @test alg(:linf, PRDIAG, WTS, nothing) ≈ DNR_Z * sum(DNR_SD) / sqrt(DNR_KISH)
+    @test alg(:linf, PRDIAG, WTS, nothing) / alg(:linf, PRDIAG, nothing, nothing) ≈
+          sqrt(60 / DNR_KISH)
+
+    # The rule needs no solver, so it ignores the one the resolution threads.
+    @test alg(:l1, PRDIAG, nothing, Solver(; solver = nothing)) ==
+          alg(:l1, PRDIAG, nothing, nothing)
+
+    # --- the two refusals ---------------------------------------------------------------
+    # An unrecognised key is the one refusal the rule owes: a caller who writes their own
+    # measure hits it first, so the message names the key it got and the keys it serves.
+    err = try
+        alg(:alpha, PRDIAG, nothing, nothing)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    @test occursin(":alpha", err.msg)
+    for k in (":l1", ":linf", ":r", ":r_a", ":r_b", ":l2reg_val", ":lpreg_val")
+        @test occursin(k, err.msg)
+    end
+
+    # `:lpreg_val` with no norm order cannot name its ground metric. The penalty site fills
+    # the field, so a `nothing` here means the rule ran outside that site, and the message
+    # names both the field and the verb that fills it.
+    perr = try
+        alg(:lpreg_val, PRDIAG, nothing, nothing)
+        nothing
+    catch e
+        e
+    end
+    @test isa(perr, ArgumentError)
+    @test occursin("lpreg_val", perr.msg)
+    @test occursin("DualNormRadius.p", perr.msg)
+    @test occursin("bind_norm_order", perr.msg)
+
+    # The scale function is the whole of the key's meaning, and it is reachable on its own.
+    @test PO.dual_norm_radius_scale(alg, :l1, DNR_SD) == maximum(DNR_SD)
+    @test PO.dual_norm_radius_scale(alg, :linf, DNR_SD) == sum(DNR_SD)
+    @test_throws ArgumentError PO.dual_norm_radius_scale(alg, :beta, DNR_SD)
+
+    # --- construction validation --------------------------------------------------------
+    # The confidence level is a probability, and the norm order meets the check its owner
+    # makes: finite and greater than one.
+    @test_throws DomainError DualNormRadius(; confidence = 1.0)
+    @test_throws DomainError DualNormRadius(; confidence = 0.0)
+    @test_throws DomainError DualNormRadius(; p = 1.0)
+    @test_throws DomainError DualNormRadius(; p = 0.5)
+    @test_throws PO.IsNonFiniteError DualNormRadius(; p = Inf)
+end
+
+@testset "DualNormRadius: the three distributionally robust radius slots" begin
+    role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    # The measures resolve against the empirical prior, so the number is read from the same
+    # rule rather than written out twice.
+    r_num = DualNormRadius()(:r, PR60, nothing, nothing)
+    @test r_num > 0
+
+    m = DistributionallyRobustConditionalValueatRisk(; r = role)
+    @test PO.resolve_deferred_quantities(m, PR60).r ≈ r_num
+    @test PO.factory(m, PR60).r ≈ r_num
+
+    dd = DistributionallyRobustConditionalDrawdownatRisk(; r = role)
+    @test PO.resolve_deferred_quantities(dd, PR60).r ≈ r_num
+
+    # Both ends of the Range twin carry the same ground metric, so one rule on both ends
+    # gives one number. The two ends of a radius are not two tails.
+    rg = DistributionallyRobustConditionalValueatRiskRange(; r_a = role, r_b = role)
+    rgo = PO.resolve_deferred_quantities(rg, PR60)
+    @test rgo.r_a ≈ r_num
+    @test rgo.r_b ≈ r_num
+    @test rgo.r_a == rgo.r_b
+end
+
+@testset "DualNormRadius: the two regularisation keys are two names, not one" begin
+    # `:val` named both slots, and the two carry two different ground metrics, so route 1
+    # of #614 widened them to the two names `field_dict` already used.
+    l2role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    l2 = L2Regularisation(; val = l2role)
+    @test PO.factory(l2, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 2)
+
+    # The Lp term reads the type-`q` metric of its own norm order. The order belongs to the
+    # penalty, so the site hands it over with `bind_norm_order` and the caller states
+    # nothing: the rule below carries no `p` of its own.
+    lprole = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+    lp = LpRegularisation(; p = 3, val = lprole)
+    @test PO.factory(lp, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 1.5)
+    @test PO.factory(lp, PRDIAG).p == 3
+
+    # A second term of a different norm order gets a different number from the same rule,
+    # which is the whole reason the order travels rather than sitting on the rule.
+    lp2 = LpRegularisation(; p = 1.25, val = lprole)
+    @test PO.factory(lp2, PRDIAG).val ≈ DNR_Z * norm(DNR_SD / sqrt(60), 5)
+    @test PO.factory(lp, PRDIAG).val != PO.factory(lp2, PRDIAG).val
+
+    # The order the site holds wins, so a rule that already carries one has it replaced.
+    stated = LpRegularisation(; p = 3,
+                              val = AmbiguityRadiusCalibration(;
+                                                               alg = DualNormRadius(;
+                                                                                    p = 1.25)))
+    @test PO.factory(stated, PRDIAG).val ≈ PO.factory(lp, PRDIAG).val
+
+    # The two keys reach two different numbers from one rule, which is what the widening
+    # bought. A rule that read `:val` for both could not tell them apart.
+    @test PO.factory(l2, PRDIAG).val != PO.factory(lp, PRDIAG).val
+
+    # `bind_norm_order` fills the order through the role, and leaves everything else where
+    # it was: a number, a plain function, and a rule that reads no order all cross whole.
+    @test PO.bind_norm_order(l2role, 3).alg.p == 3
+    @test PO.bind_norm_order(l2role, 3).alg.confidence == l2role.alg.confidence
+    @test PO.bind_norm_order(0.3, 3) == 0.3
+    cr_role = AmbiguityRadiusCalibration(; alg = ConcentrationRadius())
+    @test PO.bind_norm_order(cr_role, 3).alg === cr_role.alg
+
+    # The three older rules read no key, so the widening moved nothing for them.
+    cr = ConcentrationRadius(; scale = 0.5)
+    @test cr(:l2reg_val, PRDIAG, nothing, nothing) ==
+          cr(:lpreg_val, PRDIAG, nothing, nothing)
+end
+
+@testset "DualNormRadius: l1 and linf reach the model with two coefficients" begin
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    rd = ReturnsResult(; nx = string.(1:4), X = X60)
+    role = AmbiguityRadiusCalibration(; alg = DualNormRadius())
+
+    # One rule, stated on both coefficients of one optimiser.
+    opt = JuMPOptimiser(; slv = slv, pe = PR60, l1 = role, linf = role)
+    mr = MeanRisk(; r = Variance(), opt = opt)
+    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    model = JuMP.Model()
+    PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    PO.set_maximum_ratio_factor_variables!(model, mr.obj)
+    PO.set_w!(model, attrs.pr.X, mr.wi)
+    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+    PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
+
+    c_l1 = JuMP.coefficient(model[:l1], model[:t_l1])
+    c_linf = JuMP.coefficient(model[:linf], model[:t_linf])
+
+    # The defect #614 fixes: the two penalties bound distance in two different norms, so
+    # one rule must give them two coefficients. Under either older rule these are equal.
+    @test c_l1 != c_linf
+    @test c_l1 ≈ DualNormRadius()(:l1, PR60, PR60.w, slv)
+    @test c_linf ≈ DualNormRadius()(:linf, PR60, PR60.w, slv)
+    @test c_linf > c_l1
+
+    # The gap grows with the universe, because the 1-norm of the error vector sums over the
+    # assets and the ∞-norm does not.
+    @test c_linf / c_l1 > 1
 end

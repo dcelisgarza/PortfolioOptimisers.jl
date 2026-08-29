@@ -3473,6 +3473,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
+  - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3591,6 +3592,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
+  - [`DualNormRadius`](@ref): answers what the sampling error is in the ground metric the slot names, so its number changes with the key while this one's does not.
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3786,6 +3788,188 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Computes an ambiguity radius in the ground metric that the slot it stands in names, so that two slots of two different norms get two different numbers.
+
+The eight radius slots of the library do not measure distance in one norm. A radius multiplies a norm of the weight vector, and the ground metric of the ball is the dual of that norm, so the `l1` coefficient of [`JuMPOptimiser`](@ref) is a distance in the ∞-norm while its `linf` coefficient is a distance in the 1-norm. This rule reads `key`, picks the ground metric of that slot, and returns the sampling error of the empirical measure in it. [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) return one number for every key, which is right inside one measure and wrong across the eight slots.
+
+The sampling error of the mean vector is the part a linear loss sees, and its per-asset scale is the asset's volatility over the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level `confidence` states.
+
+`confidence` is a **per-coordinate** level, and it is not corrected for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a per-coordinate level understates it, and a caller who wants a level over the whole vector states the corrected number themselves, as `1 - (1 - c) / N`.
+
+The 1-norm case sums the per-asset errors, which prices them as if they moved together. That is the worst case over the correlations, and it is therefore the conservative reading for a radius. A correlation-aware form would give a smaller ball, and this rule does not compute one.
+
+`p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site fills this field through [`bind_norm_order`](@ref) before it resolves the slot, and the call **overwrites** whatever the field holds. A stated `p` therefore serves a caller who runs the rule outside that site, and nothing else. Every other key ignores the field.
+
+The drawdown owner is served on the asset-return scale and no other. [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios, and no rule can form the drawdown series, so the number this rule returns on `:r` understates the drawdown error scale. It is a floor for that slot, not the radius the measure would price.
+
+`T_e` is Kish's effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref).
+
+The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DualNormRadius(;
+        confidence::Number = 0.95,
+        p::Option{<:Number} = nothing
+    ) -> DualNormRadius
+
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `p` defaults to `nothing`, which serves every slot but `:lpreg_val`.
+
+## Validation
+
+  - `0 < confidence < 1`.
+  - If `p` is not `nothing`: `isfinite(p)` and `p > 1`, on the same terms as [`LpRegularisation`](@ref).
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`ConcentrationRadius`](@ref): answers how wide the ball is at a confidence level, in one dimensionless factor that no norm enters.
+  - [`RateRadius`](@ref): answers how fast the ball shrinks with the record, and leaves the coefficient to a cross-validation.
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct DualNormRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
+    """
+    `confidence`: Per-coordinate confidence level of the normal quantile the error scale is multiplied by. It is not corrected for the number of assets, so the ∞-norm case reads a level over one coordinate and not over the vector.
+    """
+    confidence
+    """
+    `p`: Norm order of the [`LpRegularisation`](@ref) penalty the radius stands in, or `nothing`. It is read for the `:lpreg_val` key alone, where the ground metric is the type-``q`` metric with ``1/p + 1/q = 1`` and no key can name ``q``. The penalty site overwrites it through [`bind_norm_order`](@ref), so state it only to run the rule outside that site.
+    """
+    p
+    function DualNormRadius(confidence::Number, p::Option{<:Number})
+        assert_unit_interval(confidence, :confidence)
+        if !isnothing(p)
+            @argcheck(isfinite(p), IsNonFiniteError)
+            @argcheck(p > one(p), DomainError)
+        end
+        return new{typeof(confidence), typeof(p)}(confidence, p)
+    end
+end
+function DualNormRadius(; confidence::Number = 0.95, p::Option{<:Number} = nothing)
+    return DualNormRadius(confidence, p)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the ambiguity radius of the slot `key` names, in the ground metric of that slot, on the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r &= z_{c} \\lVert \\boldsymbol{e} \\rVert_{g}\\,,\\\\
+e_{i} &= \\dfrac{\\hat{\\sigma}_{i}}{\\sqrt{T_{e}}}\\,,\\\\
+T_{e} &= \\begin{cases}
+T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,,\\\\
+q &= \\dfrac{p}{p - 1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_r_radius])
+  - ``z_{c}``: Quantile of the standard normal distribution at the per-coordinate confidence level ``c``.
+  - ``\\boldsymbol{e}``: Per-asset scale of the sampling error of the mean vector, in the units of the returns.
+  - ``g``: Order of the ground metric, which `key` names.
+  - $(math_dict[:sigma_hat_i])
+  - $(math_dict[:T])
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_w_i])
+  - ``p``: Norm order of the penalty, the `p` field.
+  - ``q``: Order of the type-``q`` ground metric of that penalty.
+
+# The ground metric of each key
+
+| `key`          | Slot                                                                                                              | Penalised norm | Ground metric ``g`` |
+|:-------------- |:----------------------------------------------------------------------------------------------------------------- |:-------------- |:------------------- |
+| `:l1`          | `l1` of [`JuMPOptimiser`](@ref)                                                                                   | 1              | ``\\infty``         |
+| `:linf`        | `linf` of [`JuMPOptimiser`](@ref)                                                                                 | ``\\infty``    | 1                   |
+| `:r`           | [`DistributionallyRobustConditionalValueatRisk`](@ref), [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) | ``\\infty``    | 1                   |
+| `:r_a`, `:r_b` | [`DistributionallyRobustConditionalValueatRiskRange`](@ref)                                                       | ``\\infty``    | 1                   |
+| `:l2reg_val`   | `val` of [`L2Regularisation`](@ref)                                                                               | 2              | 2                   |
+| `:lpreg_val`   | `val` of [`LpRegularisation`](@ref)                                                                               | ``p``          | ``q``               |
+
+The two ends of a Range measure carry one ground metric, so a rule stated on both resolves to one number. A radius names no end of the distribution.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. It selects the ground metric, so this is the one rule of its family for which the key carries meaning.
+  - `pr`: Prior result the sample size and the covariance matrix are read off.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver. This rule needs none.
+
+# Validation
+
+  - `key` is one of the seven the table names, else an `ArgumentError` naming the key it received and the keys it serves.
+  - The `:lpreg_val` key needs a stated `p`, else an `ArgumentError` naming the field.
+
+# Returns
+
+  - `r::Number`: The ambiguity radius.
+
+# Related
+
+  - [`DualNormRadius`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::DualNormRadius)(key::Symbol, pr::AbstractPriorResult, w, ::Any)
+    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    e = sqrt.(LinearAlgebra.diag(pr.sigma) / T)
+    z = Distributions.quantile(Distributions.Normal(), alg.confidence)
+    return z * dual_norm_radius_scale(alg, key, e)
+end
+"""
+    dual_norm_radius_scale(alg::DualNormRadius, key::Symbol, e::AbstractVector)
+
+Reduce the per-asset error vector `e` to one number, in the ground metric that `key` names.
+
+This is the whole of the key's meaning, held apart from the functor. Six of the seven keys name a fixed norm order, so they are a literal table and not a chain of branches. The seventh, `:lpreg_val`, derives its order from the `p` the rule carries, because no key can name it. An eighth key is a refusal, because a caller who writes their own measure reaches it first and the message must name the keys the rule serves.
+
+# Arguments
+
+  - `alg`: The rule, read for `p` on the `:lpreg_val` arm alone.
+  - `key`: Name of the slot that is being resolved.
+  - `e`: Per-asset scale of the sampling error of the mean vector.
+
+# Validation
+
+  - `key` is one of the seven [`DualNormRadius`](@ref) serves, else an `ArgumentError`.
+  - `alg.p` is stated when `key` is `:lpreg_val`, else an `ArgumentError`.
+
+# Returns
+
+  - `s::Number`: The norm of `e` in the ground metric of the slot.
+
+# Related
+
+  - [`DualNormRadius`](@ref)
+  - [`LpRegularisation`](@ref)
+"""
+function dual_norm_radius_scale(alg::DualNormRadius, key::Symbol, e::AbstractVector)
+    metrics = (; l1 = Inf, linf = 1, r = 1, r_a = 1, r_b = 1, l2reg_val = 2)
+    g = if key === :lpreg_val
+        @argcheck(!isnothing(alg.p),
+                  ArgumentError("`DualNormRadius.p` is `nothing` while the `:lpreg_val` slot is being resolved. That slot's ground metric is the type-`q` metric of an `LpRegularisation` penalty, with `1/p + 1/q = 1`, and the order belongs to the penalty. The penalty site fills the field through `bind_norm_order`, so a `nothing` here means the rule was resolved somewhere that binds no order. Place the rule in the `val` field of an `LpRegularisation`, or state `p` on the rule."))
+        alg.p / (alg.p - one(alg.p))
+    else
+        get(() -> throw(ArgumentError("`DualNormRadius` reads `key` to pick the ground metric of the slot it stands in, and it received `:$key`, which names no slot it serves. The keys it serves are `:l1`, `:linf`, `:r`, `:r_a`, `:r_b`, `:l2reg_val` and `:lpreg_val`. A measure of your own that holds a radius resolves its slot under one of those keys, or carries a rule of its own.")),
+            metrics, key)
+    end
+    return LinearAlgebra.norm(e, g)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes.
 
 A norm ceiling and the effective number of assets are reciprocally related, so a bound on the norm is a floor on that count. This rule states the floor as a **fraction of the universe** rather than as a count. The asset count comes off the prior result, so a subset view, a cluster and a cross-validation fold each get the floor their own universe earns, and no number is pinned to the universe it was written for.
@@ -3906,14 +4090,16 @@ Hand the norm order of a weight-norm constraint to the rule that computes its ce
 
 A **Norm Ceiling** is read against one norm order, and that order is a property of the constraint rather than of the rule: one rule placed in `lpc` serves every term, and each term carries its own `p`. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the order travels through the rule itself. This is the shape [`bind_alpha`](@ref) already uses to carry a significance level to a deformation rule.
 
+An **Ambiguity Radius** on the `val` field of [`LpRegularisation`](@ref) reads the same order, and reads it for the same reason. The ground metric of that penalty is the type-``q`` metric with ``1/p + 1/q = 1``, so [`DualNormRadius`](@ref) needs the owner's `p`, and `key` names the slot rather than the norm order. So that site binds too, and the radius family carries the same pair of methods the ceiling family carries.
+
 The default is the identity, so a stated number crosses unchanged, and so does a caller's own plain function. A plain function reads the slot's name from `key` instead.
 
-The order the constraint site holds **wins**. A rule that already carries one has it replaced, because the constraint is the thing the ceiling is read against and the rule cannot know which site it reached.
+The order the constraint site holds **wins**. A rule that already carries one has it replaced, because the constraint is the thing the quantity is read against and the rule cannot know which site it reached.
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, or a [`NormCeilingCalibration`](@ref).
-  - `p`: Norm order of the constraint the ceiling stands in.
+  - `slot`: The slot's occupant: a number, a [`NormCeilingCalibration`](@ref), or an [`AmbiguityRadiusCalibration`](@ref).
+  - `p`: Norm order of the constraint or penalty the quantity stands in.
 
 # Returns
 
@@ -3923,6 +4109,8 @@ The order the constraint site holds **wins**. A rule that already carries one ha
 
   - [`NormCeilingCalibration`](@ref)
   - [`EffectiveAssetFloor`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`DualNormRadius`](@ref)
   - [`bind_alpha`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3934,6 +4122,12 @@ function bind_norm_order(r::NormCeilingCalibration, p::Number)
 end
 function bind_norm_order(alg::EffectiveAssetFloor, p::Number)
     return EffectiveAssetFloor(; fraction = alg.fraction, p = p)
+end
+function bind_norm_order(r::AmbiguityRadiusCalibration, p::Number)
+    return AmbiguityRadiusCalibration(; alg = bind_norm_order(r.alg, p))
+end
+function bind_norm_order(alg::DualNormRadius, p::Number)
+    return DualNormRadius(; confidence = alg.confidence, p = p)
 end
 """
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
@@ -4149,4 +4343,4 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
        RateSignificance, EntropyBudget, HillTailDecay, AmbiguityRadiusCalibration,
        AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
-       DimensionalRateRadius, NormCeilingCalibration, EffectiveAssetFloor
+       DimensionalRateRadius, DualNormRadius, NormCeilingCalibration, EffectiveAssetFloor
