@@ -223,3 +223,20 @@ on, for the reason it gives: `r` is the radius and `l` is a tail weight.
 
 **`kappa` has a rule.** `EntropyBudget` computes the Kaniadakis deformation parameter that spends a
 stated entropy budget. The tail weight still has none, so that half of the observation stands.
+
+## Amendment (2026-08-29) — from ADR 0097
+
+**The `lpc` field was widened by accident, and nothing resolved it.** This decision widened
+`LpRegularisation.val` for the penalty reading of the `lp` field. The same type also serves
+as a norm *constraint* through `JuMPOptimiser.lpc`, so that field inherited a bound naming a
+role that has no reading in it, and `set_weight_norm_p_constraints!` read `val` raw. An
+`AmbiguityRadiusCalibration` placed in `lpc` therefore reached a JuMP expression unresolved.
+ADR 0097 closes it: the field refuses a radius role at construction, and a ceiling role in it
+resolves.
+
+**The three norm ceilings are not radius slots.** `l2c`, `lpc` and `linfc` are spelled beside
+`l1` and `linf` and are read against the same norms, so the twelve-slot table above reads as
+though it had passed over them. It did not. A radius is the coefficient of a norm penalty and
+a ceiling is a bound on that norm, and neither shipped rule of this decision computes a
+ceiling. ADR 0097 gives the ceiling its own family, role and bound, on the shape ADR 0095
+records.

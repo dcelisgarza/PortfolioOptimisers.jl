@@ -2755,6 +2755,47 @@ In order to implement a new concrete type that works seamlessly with the library
 abstract type AbstractAmbiguityTailWeightCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Computes a norm ceiling from the data a prior result carries, so that the ceiling refits whenever the universe moves.
+
+A **Norm Ceiling** is an upper bound on a norm of the weight vector, the quantity the `l2c`, `lpc` and `linfc` slots of [`JuMPOptimiser`](@ref) hold. It is not an **Ambiguity Radius**. A radius is the coefficient of a norm penalty in the objective, and a ceiling bounds that norm in a constraint. The reciprocal of a ceiling is a floor on the effective number of assets, which is a diversification statement rather than a statement about the set of measures the model prices. So the quantity takes its own family beside the others, under the same root.
+
+All concrete subtypes should subtype `AbstractNormCeilingCalibrationAlgorithm`, and should be **callable**, on the same terms as the other families. The family's role type, [`NormCeilingCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) instead, and is not admitted by [`Func_NormCeilCal`](@ref).
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractNormCeilingCalibrationAlgorithm` and implement the following method:
+
+## The functor
+
+  - `(alg::AbstractNormCeilingCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv) -> Number`: Returns the norm ceiling.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved: `:l2c`, `:lpc` or `:linfc`.
+  - `pr`: Prior result the rule reads its asset count and sample size off.
+  - `w`: Effective observation weights, or `nothing` when neither the owner nor the prior names any.
+  - `slv`: Effective solver, or `nothing` when the owner carries none.
+
+### Returns
+
+  - `val::Number`: The norm ceiling.
+
+## The norm order
+
+A ceiling is read against one norm order, and that order belongs to the constraint rather than to the rule. A rule that needs the order should implement a [`bind_norm_order`](@ref) method, which each constraint site calls before it resolves the slot. A rule that needs no order needs no method.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`NormCeilingCalibration`](@ref)
+  - [`Func_NormCeilCal`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`EffectiveAssetFloor`](@ref)
+"""
+abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
+"""
     const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlgorithm}
 
 Field bound for the `alg` field of an ambiguity-radius role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_SigCal`](@ref), and carries its reading unchanged.
@@ -2779,6 +2820,19 @@ Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the 
   - [`resolve_calibration_slot`](@ref)
 """
 const Func_AmbTwtCal = Union{<:Function, <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
+"""
+    const Func_NormCeilCal = Union{<:Function,
+                                   <:AbstractNormCeilingCalibrationAlgorithm}
+
+Field bound for the `alg` field of a norm-ceiling role: a rule of the family, or a plain function of the same four arguments. It is the counterpart of [`Func_AmbRadCal`](@ref), and carries its reading unchanged.
+
+# Related
+
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
+  - [`Func_AmbRadCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Func_NormCeilCal = Union{<:Function, <:AbstractNormCeilingCalibrationAlgorithm}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2862,6 +2916,48 @@ function AmbiguityTailWeightCalibration(; alg::Func_AmbTwtCal)
     return AmbiguityTailWeightCalibration(alg)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Places a norm-ceiling rule in a slot that bounds a norm of the weight vector from above.
+
+A ceiling is a different quantity from a radius, so it takes a different role: a radius rule placed in a ceiling slot is refused at construction, and a ceiling rule placed in a radius slot is refused the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
+
+The role is the whole of the type: the rule itself lives in `alg`. A ceiling has no lower and upper end to name, so the family carries one role rather than two, and [`mirror_role`](@ref) needs no method for it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NormCeilingCalibration(;
+        alg::Func_NormCeilCal
+    ) -> NormCeilingCalibration
+
+Keywords correspond to the struct's fields. `alg` has no default, because the rule is the whole content of the type.
+
+# Related
+
+  - [`AbstractCalibrationEstimator`](@ref)
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`Num_NormCeilCal`](@ref)
+  - [`Func_NormCeilCal`](@ref)
+  - [`EffectiveAssetFloor`](@ref)
+"""
+@concrete struct NormCeilingCalibration <: AbstractCalibrationEstimator
+    """
+    $(field_dict[:cal_alg_norm_ceil])
+    """
+    alg
+    function NormCeilingCalibration(alg::Func_NormCeilCal)
+        return new{typeof(alg)}(alg)
+    end
+end
+function NormCeilingCalibration(; alg::Func_NormCeilCal)
+    return NormCeilingCalibration(alg)
+end
+"""
     const Num_AmbRadCal = Union{<:AmbiguityRadiusCalibration, <:Number}
 
 Field bound for an ambiguity-radius slot: the radius itself, or the role that computes it.
@@ -2887,6 +2983,39 @@ Field bound for an ambiguity-tail-weight slot: the tail weight itself, or the ro
   - [`resolve_calibration_slot`](@ref)
 """
 const Num_AmbTwtCal = Union{<:AmbiguityTailWeightCalibration, <:Number}
+"""
+    const Num_NormCeilCal = Union{<:NormCeilingCalibration, <:Number}
+
+Field bound for a norm-ceiling slot: the ceiling itself, or the role that computes it.
+
+The union names one role and no other, so a radius role placed in a ceiling slot fails the constructor's signature and is refused at construction. That is the whole of the role validation, and no guard method is written for it.
+
+# Related
+
+  - [`NormCeilingCalibration`](@ref)
+  - [`Num_AmbRadCal`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+const Num_NormCeilCal = Union{<:NormCeilingCalibration, <:Number}
+"""
+    const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration,
+                                        <:NormCeilingCalibration, <:Number}
+
+Field bound for the one slot the library reads as two quantities, the `val` field of [`LpRegularisation`](@ref).
+
+That estimator is a penalty in the `lp` field of [`JuMPOptimiser`](@ref) and a norm constraint in its `lpc` field, so `val` is an ambiguity radius on one route and a norm ceiling on the other. One field cannot carry two bounds, so this bound admits both roles and each route refuses the role that has no reading on it. It is the only slot in the library whose role is settled after construction rather than by its bound.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`Num_AmbRadCal`](@ref)
+  - [`Num_NormCeilCal`](@ref)
+  - [`assert_penalty_coefficient_role`](@ref)
+  - [`assert_norm_ceiling_role`](@ref)
+"""
+const Num_AmbRadNormCeilCal = Union{<:AmbiguityRadiusCalibration, <:NormCeilingCalibration,
+                                    <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -3095,6 +3224,158 @@ function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
     return alg.c / sqrt(size(pr.X, 1))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes.
+
+A norm ceiling and the effective number of assets are reciprocally related, so a bound on the norm is a floor on that count. This rule states the floor as a **fraction of the universe** rather than as a count. The asset count comes off the prior result, so a subset view, a cluster and a cross-validation fold each get the floor their own universe earns, and no number is pinned to the universe it was written for.
+
+`p` is the norm order the ceiling is read against, and it belongs to the constraint. Each of the three constraint sites calls [`bind_norm_order`](@ref) before it resolves the slot, and that call **overwrites** whatever this field holds. So a stated `p` serves a caller who runs the rule outside those sites, and nothing else.
+
+The rule carries no range check on its answer, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the slot owner is the whole validation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+m &= f N\\,,\\\\
+\\mathrm{val} &= \\begin{cases}
+m^{-1} & \\textrm{if } p \\textrm{ is infinite}\\\\
+m^{-1/p} & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{val}``: Norm ceiling.
+  - ``m``: Effective number of assets the ceiling holds as a floor.
+  - ``f``: Fraction of the universe, the `fraction` field.
+  - $(math_dict[:N])
+  - ``p``: Norm order of the constraint the ceiling stands in.
+
+The two arms are the two readings the library already states. For a finite order the p-norm effective number of assets is ``1 / \\lVert \\boldsymbol{w} \\rVert_{p}^{p}``, so ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{-1/p}`` is the floor. For the infinite order the ceiling caps the largest weight, and a cap of ``1/m`` on a fully invested portfolio spreads it over at least ``m`` assets.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EffectiveAssetFloor(;
+        fraction::Number = 0.5,
+        p::Option{<:Number} = nothing
+    ) -> EffectiveAssetFloor
+
+Keywords correspond to the struct's fields. `fraction` defaults to `0.5`, which holds half of the universe effective, and `p` defaults to `nothing`, which every constraint site fills.
+
+## Validation
+
+  - `0 < fraction <= 1`.
+  - If `p` is not `nothing`: `p >= 1`.
+
+# Related
+
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
+  - [`NormCeilingCalibration`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`number_effective_assets`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct EffectiveAssetFloor <: AbstractNormCeilingCalibrationAlgorithm
+    """
+    $(field_dict[:cal_fraction])
+    """
+    fraction
+    """
+    $(field_dict[:cal_norm_order])
+    """
+    p
+    function EffectiveAssetFloor(fraction::Number, p::Option{<:Number})
+        assert_nonempty_gt0_finite_val(fraction, :fraction)
+        @argcheck(fraction <= one(fraction), DomainError)
+        if !isnothing(p)
+            @argcheck(p >= one(p), DomainError)
+        end
+        return new{typeof(fraction), typeof(p)}(fraction, p)
+    end
+end
+function EffectiveAssetFloor(; fraction::Number = 0.5, p::Option{<:Number} = nothing)
+    return EffectiveAssetFloor(fraction, p)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the norm ceiling that holds `fraction` of the universe that `pr` carries effective.
+
+The universe is the column count of the prior result's returns matrix, so the ceiling moves with the universe the model actually sees.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. It names the site in the refusal below, and the ceiling itself does not depend on it: the norm order carries that dependence instead.
+  - `pr`: Prior result the asset count is read off.
+  - `w`: Effective observation weights. A universe count is not a sample count, so this rule ignores them.
+  - `slv`: Effective solver. This rule needs none.
+
+# Validation
+
+  - `alg.p` is not `nothing`. Every constraint site fills it through [`bind_norm_order`](@ref), so a `nothing` here means the rule was resolved somewhere that binds no order.
+
+# Returns
+
+  - `val::Number`: The norm ceiling.
+
+# Related
+
+  - [`EffectiveAssetFloor`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::EffectiveAssetFloor)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
+    p = alg.p
+    @argcheck(!isnothing(p),
+              ArgumentError("`$(nameof(EffectiveAssetFloor)).p` is `nothing` while the rule in `$key` is being resolved. A ceiling is read against one norm order, the order belongs to the constraint, and each constraint site fills it through `bind_norm_order`. Place the rule in `l2c`, `lpc` or `linfc`, or state `p` on the rule."))
+    m = alg.fraction * size(pr.X, 2)
+    return isinf(p) ? inv(m) : m^(-inv(p))
+end
+"""
+    bind_norm_order(slot, p::Number)
+
+Hand the norm order of a weight-norm constraint to the rule that computes its ceiling.
+
+A **Norm Ceiling** is read against one norm order, and that order is a property of the constraint rather than of the rule: one rule placed in `lpc` serves every term, and each term carries its own `p`. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the order travels through the rule itself. This is the shape [`bind_alpha`](@ref) already uses to carry a significance level to a deformation rule.
+
+The default is the identity, so a stated number crosses unchanged, and so does a caller's own plain function. A plain function reads the slot's name from `key` instead.
+
+The order the constraint site holds **wins**. A rule that already carries one has it replaced, because the constraint is the thing the ceiling is read against and the rule cannot know which site it reached.
+
+# Arguments
+
+  - `slot`: The slot's occupant: a number, or a [`NormCeilingCalibration`](@ref).
+  - `p`: Norm order of the constraint the ceiling stands in.
+
+# Returns
+
+  - `y`: The occupant, with the order filled wherever it holds a rule that reads one.
+
+# Related
+
+  - [`NormCeilingCalibration`](@ref)
+  - [`EffectiveAssetFloor`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function bind_norm_order(slot, ::Number)
+    return slot
+end
+function bind_norm_order(r::NormCeilingCalibration, p::Number)
+    return NormCeilingCalibration(; alg = bind_norm_order(r.alg, p))
+end
+function bind_norm_order(alg::EffectiveAssetFloor, p::Number)
+    return EffectiveAssetFloor(; fraction = alg.fraction, p = p)
+end
+"""
     sigma_chol_selector(sigma, chol, pr::AbstractPriorResult)
 
 Apply the prior fallback to a covariance slot and its factorisation **as a pair**, so that the two never come from two different sources.
@@ -3291,4 +3572,5 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
        RateSignificance, EntropyBudget, AmbiguityRadiusCalibration,
-       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius
+       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
+       NormCeilingCalibration, EffectiveAssetFloor

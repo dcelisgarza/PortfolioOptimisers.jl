@@ -9,8 +9,11 @@ set_linf_regularisation!
 AbstractRegularisationEstimator
 squared_norm_radius_msg
 assert_ambiguity_radius_formulation
+assert_penalty_coefficient_role
+assert_norm_ceiling_role
 LpRegularisation
 factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
+norm_ceiling_factory
 VecL2Reg
 L2Regularisation
 factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)

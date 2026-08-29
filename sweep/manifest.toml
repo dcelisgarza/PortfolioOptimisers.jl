@@ -132,7 +132,7 @@
 "src/16_Fees.jl" = { map = 8, units = 20, algorithm = 17, swept = true }
 "src/17_NetReturnsDrawdowns.jl" = { map = 8, units = 8, algorithm = 8, swept = true }
 "src/18_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true }
-"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 125, swept = false }
+"src/19_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 133, swept = false }
 "src/19_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, swept = false }
 "src/19_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/19_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
@@ -190,7 +190,7 @@
 "src/20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl" = { map = 11, units = 2, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl" = { map = 11, units = 6, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { map = 11, units = 2, swept = false }
-"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 16, swept = false }
+"src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { map = 11, units = 19, swept = false }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { map = 11, units = 3, swept = false }
 "src/20_Optimisation/10_JuMPOptimiser.jl" = { map = 10, units = 18, swept = false }
 "src/20_Optimisation/11_MeanRisk.jl" = { map = 10, units = 14, swept = false }

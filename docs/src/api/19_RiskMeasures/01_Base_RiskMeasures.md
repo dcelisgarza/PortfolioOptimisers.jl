@@ -191,6 +191,13 @@ Num_AmbRadCal
 Num_AmbTwtCal
 ConcentrationRadius
 RateRadius
+AbstractNormCeilingCalibrationAlgorithm
+Func_NormCeilCal
+NormCeilingCalibration
+Num_NormCeilCal
+Num_AmbRadNormCeilCal
+EffectiveAssetFloor
+bind_norm_order
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view

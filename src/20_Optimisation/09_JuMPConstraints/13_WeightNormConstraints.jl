@@ -6,6 +6,8 @@ Constrain the 2-norm of the weights.
 
 `val` is a direct upper bound on ``\\lVert \\boldsymbol{w} \\rVert_2``, expressed relative to the budget `k`: the constraint is ``\\lVert \\boldsymbol{w} \\rVert_2 \\leq \\mathrm{val} \\cdot k``. Smaller `val` forces the weights to spread more evenly across the assets.
 
+The builder takes a number. The caller-facing slot also takes a [`NormCeilingCalibration`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here.
+
 # Mathematical definition
 
 ```math
@@ -50,6 +52,8 @@ The 2-norm and the effective number of assets are reciprocally related: for a fu
 
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`set_weight_norm_inf_constraints!`](@ref)
+  - [`NormCeilingCalibration`](@ref)
+  - [`EffectiveAssetFloor`](@ref)
   - [`number_effective_assets`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
@@ -76,6 +80,8 @@ Constrain the p-norm of the weights.
 Generalises [`set_weight_norm_2_constraints!`](@ref) to an arbitrary norm order ``p > 1``. Each term supplies its own norm order and bound, so several may be imposed at once.
 
 Each term is an [`LpRegularisation`](@ref), reused here as a constraint rather than a penalty: its `p` field is the norm order, and its `val` field is a direct upper bound on ``\\lVert \\boldsymbol{w} \\rVert_p``, expressed relative to the budget `k`. Smaller `val` forces a more evenly spread portfolio.
+
+That reuse is why `val` carries two readings and one bound. Here it is a ceiling, so [`norm_ceiling_factory`](@ref) refuses an [`AmbiguityRadiusCalibration`](@ref) in it, resolves a [`NormCeilingCalibration`](@ref) against the prior result, and hands each term its own norm order first. Every `val` this builder sees is therefore a number.
 
 # Mathematical definition
 
@@ -124,6 +130,9 @@ For a fully invested portfolio (``k = 1``), the p-norm effective number of asset
   - [`LpReg_VecLpReg`](@ref)
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`set_weight_norm_inf_constraints!`](@ref)
+  - [`norm_ceiling_factory`](@ref)
+  - [`assert_norm_ceiling_role`](@ref)
+  - [`NormCeilingCalibration`](@ref)
   - [`set_lp_regularisation!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
@@ -166,6 +175,8 @@ Constrain the ∞-norm of the weights, capping the largest absolute weight.
 
 The limiting case of [`set_weight_norm_p_constraints!`](@ref). `val` is a direct upper bound on the largest absolute weight, expressed relative to the budget `k`: the constraint is ``\\lVert \\boldsymbol{w} \\rVert_\\infty \\leq \\mathrm{val} \\cdot k``. So a fully invested portfolio (``k = 1``) constrained with `val = 0.2` holds no position larger than 20%. Smaller `val` forces a more evenly spread portfolio.
 
+The builder takes a number. The caller-facing slot also takes a [`NormCeilingCalibration`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here.
+
 # Mathematical definition
 
 ```math
@@ -204,6 +215,8 @@ Capping the largest weight spreads the portfolio across a minimum number of asse
 
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
+  - [`NormCeilingCalibration`](@ref)
+  - [`EffectiveAssetFloor`](@ref)
   - [`set_linf_regularisation!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """

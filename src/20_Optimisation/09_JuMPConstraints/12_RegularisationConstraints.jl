@@ -551,7 +551,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LpRegularisation(; p::Number = 3, val::Num_AmbRadCal = 1e-3) -> LpRegularisation
+    LpRegularisation(;
+        p::Number = 3,
+        val::Num_AmbRadNormCeilCal = 1e-3
+    ) -> LpRegularisation
 
 Keywords correspond to the struct's fields.
 
@@ -560,12 +563,16 @@ Keywords correspond to the struct's fields.
   - `isfinite(p)`.
   - `p > 1`.
   - If `val` is a number: `val > 0` and finite.
+  - The role in `val` is checked by the field that holds the term, not here. `val` is the one dual-use slot in the library, so this constructor cannot know which reading applies: [`JuMPOptimiser`](@ref)'s constructor refuses a norm-ceiling role in `lp` and a radius role in `lpc`, and the two `factory` routes refuse the same pairings again.
 
 # Related
 
   - [`AbstractRegularisationEstimator`](@ref)
   - [`LpReg_VecLpReg`](@ref)
   - [`VecLpReg`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`assert_penalty_coefficient_role`](@ref)
+  - [`assert_norm_ceiling_role`](@ref)
   - [`set_lp_regularisation!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`L2Regularisation`](@ref)
@@ -583,15 +590,102 @@ Keywords correspond to the struct's fields.
     $(field_dict[:lpreg_val])
     """
     val
-    function LpRegularisation(p::Number, val::Num_AmbRadCal)
+    function LpRegularisation(p::Number, val::Num_AmbRadNormCeilCal)
         @argcheck(isfinite(p), IsNonFiniteError)
         @argcheck(p > one(p), DomainError)
         assert_nonempty_gt0_finite_val(val, :val)
         return new{typeof(p), typeof(val)}(p, val)
     end
 end
-function LpRegularisation(; p::Number = 3, val::Num_AmbRadCal = 1e-3)
+function LpRegularisation(; p::Number = 3, val::Num_AmbRadNormCeilCal = 1e-3)
     return LpRegularisation(p, val)
+end
+"""
+    assert_penalty_coefficient_role(x) -> Nothing
+
+Refuse a norm-ceiling rule that was placed in a slot which reads its number as a penalty coefficient.
+
+The `val` field of [`LpRegularisation`](@ref) is the one dual-use slot in the library. [`JuMPOptimiser`](@ref)'s `lp` field adds `val * norm(w, p)` to the objective, where `val` is an ambiguity radius, and its `lpc` field bounds `norm(w, p) <= val * k`, where `val` is a norm ceiling. One field cannot carry two bounds, so [`Num_AmbRadNormCeilCal`](@ref) admits both roles and the slot's *owner* settles which reading is legal.
+
+This is the penalty half. A [`NormCeilingCalibration`](@ref) states that the number **is** a ceiling, and a ceiling has no reading as a penalty coefficient: its reciprocal is a floor on the effective number of assets, which says nothing about how strongly the objective should shrink the weights. A plain number stays legal on both routes, because a number is whatever quantity the caller meant it to be.
+
+The check is a set of methods rather than a list of types in one body, on the same terms as [`assert_ambiguity_radius_formulation`](@ref). It runs in [`JuMPOptimiser`](@ref)'s constructor, where the caller wrote the field, and again in [`factory`](@ref) for a term that reached the objective by another route.
+
+# Algorithm
+
+ 1. The occupant is anything but a norm-ceiling role: return `nothing`.
+ 2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
+ 3. The occupant is a vector of them: check each.
+ 4. The occupant is a [`NormCeilingCalibration`](@ref): refuse.
+
+# Arguments
+
+  - `x`: A regularisation term, a vector of them, or the occupant of a `val` slot.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`assert_norm_ceiling_role`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
+function assert_penalty_coefficient_role(::Any)
+    return nothing
+end
+function assert_penalty_coefficient_role(x::LpRegularisation)
+    return assert_penalty_coefficient_role(x.val)
+end
+function assert_penalty_coefficient_role(xs::AbstractVector{<:LpRegularisation})
+    return foreach(assert_penalty_coefficient_role, xs)
+end
+function assert_penalty_coefficient_role(::NormCeilingCalibration)
+    return throw(ArgumentError("`LpRegularisation.val` holds a norm ceiling, a `$(nameof(NormCeilingCalibration))`, in a slot that reads it as a penalty coefficient. `JuMPOptimiser.lp` adds `val * norm(w, p)` to the objective, and a ceiling is an upper bound on that norm instead: the two are different quantities. Move the term to `JuMPOptimiser.lpc`, which reads `val` as a ceiling, or state an `$(nameof(AmbiguityRadiusCalibration))` or a plain number."))
+end
+"""
+    assert_norm_ceiling_role(x) -> Nothing
+
+Refuse an ambiguity-radius rule that was placed in a slot which reads its number as a norm ceiling.
+
+This is the norm-constraint half of the pair [`assert_penalty_coefficient_role`](@ref) opens, and it carries that method's reading unchanged. An [`AmbiguityRadiusCalibration`](@ref) states that the number **is** a radius, the coefficient of a norm penalty in the objective. `JuMPOptimiser.lpc` bounds the norm instead, so the statement is false there.
+
+# Algorithm
+
+ 1. The occupant is anything but a radius role: return `nothing`.
+ 2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
+ 3. The occupant is a vector of them: check each.
+ 4. The occupant is an [`AmbiguityRadiusCalibration`](@ref): refuse.
+
+# Arguments
+
+  - `x`: A norm-constraint term, a vector of them, or the occupant of a `val` slot.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`assert_penalty_coefficient_role`](@ref)
+  - [`Num_AmbRadNormCeilCal`](@ref)
+  - [`norm_ceiling_factory`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref)
+"""
+function assert_norm_ceiling_role(::Any)
+    return nothing
+end
+function assert_norm_ceiling_role(x::LpRegularisation)
+    return assert_norm_ceiling_role(x.val)
+end
+function assert_norm_ceiling_role(xs::AbstractVector{<:LpRegularisation})
+    return foreach(assert_norm_ceiling_role, xs)
+end
+function assert_norm_ceiling_role(::AmbiguityRadiusCalibration)
+    return throw(ArgumentError("`LpRegularisation.val` holds an ambiguity radius, an `$(nameof(AmbiguityRadiusCalibration))`, in a slot that reads it as a norm ceiling. `JuMPOptimiser.lpc` bounds `norm(w, p) <= val * k`, and a radius is the coefficient of that norm in the objective instead: the two are different quantities. Move the term to `JuMPOptimiser.lp`, which reads `val` as a radius, or state a `$(nameof(NormCeilingCalibration))` or a plain number."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -600,7 +694,7 @@ Resolve the ambiguity radius in `val` against prior result `pr`, and return an [
 
 It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing can be wrong and no guard runs: `val` multiplies `norm(w, p)` and never its square.
 
-The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. That field keeps its own bound, so nothing there widens and this method never reaches it.
+The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling role through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius role on the other side.
 
 # Arguments
 
@@ -616,15 +710,63 @@ The same estimator also serves as a norm *constraint* through the `lpc` field of
 
   - [`LpRegularisation`](@ref)
   - [`L2Regularisation`](@ref)
+  - [`assert_penalty_coefficient_role`](@ref)
+  - [`norm_ceiling_factory`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
 function factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
+    assert_penalty_coefficient_role(x.val)
     val = resolve_calibration_slot(x.val, :val, pr, pr.w, slv)
     if val === x.val
         return x
     end
     return LpRegularisation(; p = x.p, val = val)
+end
+"""
+    norm_ceiling_factory(x, pr::AbstractPriorResult, slv = nothing)
+
+Resolve the norm ceiling in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
+
+It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and it is a second verb because the two routes read one field as two quantities. A `factory` call on the `lpc` field would resolve a radius rule that has no reading there, and would bind no norm order.
+
+This route does two things the penalty route does not. It refuses a radius role through [`assert_norm_ceiling_role`](@ref). It also hands the term's own norm order to the rule with [`bind_norm_order`](@ref) before it resolves the slot, because one rule placed in `lpc` serves every term and each term carries its own `p`.
+
+The fallback returns its argument unchanged, so `nothing` and a stated number both cross untouched.
+
+# Arguments
+
+  - `x`: The norm-constraint term, or a vector of them.
+  - `pr`: Prior result the rule reads.
+  - `slv`: Effective solver, or `nothing`.
+
+# Returns
+
+  - The term, or the vector of terms, with each `val` holding a number.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`factory`](@ref)
+  - [`assert_norm_ceiling_role`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref)
+  - [`assemble_jump_model!`](@ref)
+"""
+function norm_ceiling_factory(x, ::AbstractPriorResult, ::Any = nothing)
+    return x
+end
+function norm_ceiling_factory(x::LpRegularisation, pr::AbstractPriorResult, slv = nothing)
+    assert_norm_ceiling_role(x.val)
+    val = resolve_calibration_slot(bind_norm_order(x.val, x.p), :lpc, pr, pr.w, slv)
+    if val === x.val
+        return x
+    end
+    return LpRegularisation(; p = x.p, val = val)
+end
+function norm_ceiling_factory(xs::AbstractVector{<:LpRegularisation},
+                              pr::AbstractPriorResult, slv = nothing)
+    return [norm_ceiling_factory(x, pr, slv) for x in xs]
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::LpRegularisation) = (; val = x.val)

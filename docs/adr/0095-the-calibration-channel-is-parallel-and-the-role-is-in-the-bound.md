@@ -209,3 +209,23 @@ the whole validation and it already runs on the rebuilt struct, and a reorder in
 - **A `TD_` wrapper holding a rule is still unspecified.** `JuMPOptimiser.l1` and `.linf` are
   `TD_Option{<:Num_AmbRadCal}`, so one field carries two deferral channels and ADR 0030 never
   considered a second. The case arises nowhere in `src/19_RiskMeasures/`.
+
+## Amendment (2026-08-29) — from ADR 0097
+
+**One bound names two roles.** The decision above states that a slot bound pairs `Number`
+with **one** concrete role, and that the bound is the whole of the role validation. ADR 0097
+adds the one exception: `LpRegularisation.val` is a penalty coefficient in
+`JuMPOptimiser.lp` and a norm ceiling in `JuMPOptimiser.lpc`, so `Num_AmbRadNormCeilCal`
+admits both roles and two `assert_` methods settle the reading. Those checks run in
+`JuMPOptimiser`'s own constructor, so the refusal still fires where the caller wrote the
+field. Every other bound is unchanged.
+
+**A seventh role ships.** `NormCeilingCalibration` stands in `l2c`, `linfc` and the `val`
+that `lpc` reads, over the rule family `AbstractNormCeilingCalibrationAlgorithm`, whose one
+member is `EffectiveAssetFloor`. It carries one role rather than two, for the reason
+`AmbiguityRadiusCalibration` does: a ceiling names no end of a distribution.
+
+**A second travelling pair ships.** `bind_norm_order(slot, p)` carries a constraint's norm
+order into the rule that computes its ceiling, on the shape `bind_alpha` gives. The two
+differ in one respect: an order is a property of the constraint rather than of a sibling
+slot, so the constraint site's order overwrites one the rule already carries.

@@ -269,13 +269,18 @@ A neighbourhood of a whole distribution, rather than of one of its moments: Wass
 
 **Ambiguity Radius**
 The size of an Ambiguity Set, in the units of the return data. For a Wasserstein or a Gelbrich ball it enters the model as the coefficient of a dual-norm penalty on the weights, so the same number is spelled `val` on a Regularisation Estimator and `r` on a distributionally robust risk measure.
+*Avoid*: Norm Ceiling (below), which bounds the same norm instead of multiplying it.
+
+**Norm Ceiling**
+The upper bound on a norm of the weight vector, in a constraint rather than in the objective: `l2c`, `lpc` and `linfc` on `JuMPOptimiser`. Its reciprocal is a floor on the Effective Number of Assets, so it is a diversification statement and carries no units. A ceiling and an Ambiguity Radius are read against the same norm and are different quantities, so each takes its own Calibration Role and neither role is admitted in the other's slot. `LpRegularisation` serves both readings, so its `val` is the one slot whose role is settled by the field that holds the term rather than by the field's own bound.
+*Avoid*: Ambiguity Radius (above), which is the coefficient of the norm rather than a bound on it.
 
 **Calibration Rule**
 A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
 **Calibration Role**
-The type that places a Calibration Rule in the slot of one quantity, and names the quantity: the end of the distribution a Significance Level or a Deformation Parameter (§5) addresses, the Ambiguity Radius, or the Esfahani-Kuhn tail weight. The rule itself lives in the role's `alg` field. A role is an Estimator and the rule it carries is an Algorithm, so a role placed inside another role's `alg` field is refused at construction by that field's bound.
+The type that places a Calibration Rule in the slot of one quantity, and names the quantity: the end of the distribution a Significance Level or a Deformation Parameter (§5) addresses, the Ambiguity Radius, the Esfahani-Kuhn tail weight, or the Norm Ceiling. The rule itself lives in the role's `alg` field. A role is an Estimator and the rule it carries is an Algorithm, so a role placed inside another role's `alg` field is refused at construction by that field's bound.
 *Avoid*: Calibration Rule (above), which is the rule a role carries rather than the placement of it.
 
 **Travelling Pair**

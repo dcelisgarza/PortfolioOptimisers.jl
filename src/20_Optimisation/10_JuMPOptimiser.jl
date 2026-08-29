@@ -391,9 +391,9 @@ $(DocStringExtensions.FIELDS)
         ss::TD_Option{<:Number} = nothing,
         card::TD_Option{<:Integer} = nothing,
         scard::TD_Option{<:Int_VecInt} = nothing,
-        l2c::TD_Option{<:Number} = nothing,
+        l2c::TD_Option{<:Num_NormCeilCal} = nothing,
         lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-        linfc::TD_Option{<:Number} = nothing,
+        linfc::TD_Option{<:Num_NormCeilCal} = nothing,
         l1::TD_Option{<:Num_AmbRadCal} = nothing,
         l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
@@ -419,7 +419,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), which carries no such check until it resolves.
+  - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), and `l2c` and `linfc` a [`NormCeilingCalibration`](@ref). A role carries no such check until it resolves.
+  - The role in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a [`NormCeilingCalibration`](@ref), and `lpc` is a constraint, so it refuses an [`AmbiguityRadiusCalibration`](@ref). The term itself carries one bound for both readings, so this is the point at which the reading is known.
   - If `lp` is a vector: `!isempty(lp)`.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
@@ -631,8 +632,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
                            cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
-                           scard::TD_Option{<:Int_VecInt}, l2c::TD_Option{<:Number},
-                           lpc::TD_Option{<:LpReg_VecLpReg}, linfc::TD_Option{<:Number},
+                           scard::TD_Option{<:Int_VecInt},
+                           l2c::TD_Option{<:Num_NormCeilCal},
+                           lpc::TD_Option{<:LpReg_VecLpReg},
+                           linfc::TD_Option{<:Num_NormCeilCal},
                            l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            lp::TD_Option{<:LpReg_VecLpReg},
                            linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
@@ -679,6 +682,13 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         if isa(lp, AbstractVector)
             @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
         end
+        # `LpRegularisation.val` is read as a coefficient in `lp` and as a ceiling in
+        # `lpc`, and one field cannot carry two bounds. This is the first point at which
+        # the reading is known, so it is where the wrong role is refused. A `TimeDependent`
+        # needs no guard: it is not a term, so it meets the permissive fallback, and the
+        # constructor test-substitutes each of its entries through this same check.
+        assert_penalty_coefficient_role(lp)
+        assert_norm_ceiling_role(lpc)
         if !isnothing(linf) && !isa(linf, TimeDependent)
             assert_nonempty_gt0_finite_val(linf, :linf)
         end
@@ -912,9 +922,9 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        so::Number = 1, ss::TD_Option{<:Number} = nothing,
                        card::TD_Option{<:Integer} = nothing,
                        scard::TD_Option{<:Int_VecInt} = nothing,
-                       l2c::TD_Option{<:Number} = nothing,
+                       l2c::TD_Option{<:Num_NormCeilCal} = nothing,
                        lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linfc::TD_Option{<:Number} = nothing,
+                       linfc::TD_Option{<:Num_NormCeilCal} = nothing,
                        l1::TD_Option{<:Num_AmbRadCal} = nothing,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
 
@@ -1465,12 +1475,14 @@ and can be capped.
   - $(arg_dict[:model])
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
     constraint builders.
-  - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `linfc`, `l1`, `l2`, `lp`, `linf`,
-    `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`). The four regularisation coefficients are
-    the one place a **Calibration Rule** reaches the model builders, so they are resolved
-    against `attrs.pr` here rather than by [`processed_jump_optimiser_attributes`](@ref):
-    the bundle carries no slot for them and this is where both the prior result and the
-    optimiser are in hand.
+  - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `lpc`, `linfc`, `l1`, `l2`,
+    `lp`, `linf`, `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`). The four regularisation
+    coefficients and the three norm ceilings are the one place a **Calibration Rule**
+    reaches the model builders, so they are resolved against `attrs.pr` here rather than
+    by [`processed_jump_optimiser_attributes`](@ref): the bundle carries no slot for them
+    and this is where both the prior result and the optimiser are in hand. A ceiling is
+    read against one norm order, so each of the three sites binds its own order into the
+    rule with [`bind_norm_order`](@ref) before it resolves the slot.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
   - $(arg_dict[:rd])
@@ -1513,9 +1525,18 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                           opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
-    set_weight_norm_2_constraints!(model, opt.l2c)
-    set_weight_norm_p_constraints!(model, opt.lpc)
-    set_weight_norm_inf_constraints!(model, opt.linfc)
+    # The three norm ceilings each take a Calibration Rule, and each resolves here. A
+    # ceiling is read against one norm order, which belongs to the constraint and not to
+    # the rule, so each site binds its own order first. `lpc` holds estimators and carries
+    # one order per term, so it goes through `norm_ceiling_factory`.
+    set_weight_norm_2_constraints!(model,
+                                   resolve_calibration_slot(bind_norm_order(opt.l2c, 2),
+                                                            :l2c, pr, pr.w, opt.slv))
+    set_weight_norm_p_constraints!(model, norm_ceiling_factory(opt.lpc, pr, opt.slv))
+    set_weight_norm_inf_constraints!(model,
+                                     resolve_calibration_slot(bind_norm_order(opt.linfc,
+                                                                              Inf), :linfc,
+                                                              pr, pr.w, opt.slv))
     # The four regularisation coefficients are the ambiguity radii of the four ground
     # metrics, so each takes a Calibration Rule and each resolves here, against the
     # optimisation's own prior result and effective solver. `l2` and `lp` hold estimators,
