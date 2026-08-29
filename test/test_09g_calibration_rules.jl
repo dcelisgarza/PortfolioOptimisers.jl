@@ -1060,12 +1060,27 @@ end
     @test Fr == PO.whitening_factor(PRDD)
 
     # `pr.sigma` IS THE COVARIANCE MATRIX OF THE RETURNS, so it reaches nothing under a
-    # drawdown marker: a hundredfold scaling of it moves the returns reading and leaves the
-    # drawdown reading where it stands.
+    # drawdown marker: a change of it leaves the drawdown reading exactly where it stands.
     scaled = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu, sigma = 100 .* PRDD.sigma)
     @test rule(:kappa, scaled, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+
+    # The returns reading DOES read `pr.sigma`, but only through the SHAPE of the whitening.
+    # A hundredfold scaling of the covariance matrix scales every radial distance alike, and
+    # a Hill estimate reads the ratios `u[i] / u[k + 1]` alone, so the scale cancels and the
+    # returns reading holds to rounding. Do not tighten this to an equality: the two sides
+    # take different roundings through the Cholesky factorisation, and CI has returned both
+    # the same last bit and a different one.
     ret = RadialTailDecay(; kmin = 20, alpha = alpha)
-    @test ret(:kappa, scaled, nothing, nothing) != ret(:kappa, PRDD, nothing, nothing)
+    @test ret(:kappa, scaled, nothing, nothing) ≈ ret(:kappa, PRDD, nothing, nothing)
+
+    # A per-asset stretch is not a uniform scaling: it moves the relative dispersion of the
+    # columns, so the whitening reorders the distances and the returns reading moves. This
+    # is the line that separates the returns reading from the drawdown reading.
+    D6 = Diagonal(1.0:6.0)
+    stretched = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu,
+                              sigma = Matrix(D6 * PRDD.sigma * D6))
+    @test ret(:kappa, stretched, nothing, nothing) != ret(:kappa, PRDD, nothing, nothing)
+    @test rule(:kappa, stretched, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
 
     # The distance still has no sign, so the rule answers one number for every key. The
     # marker moves the sample the distance is taken over, and not what a distance is.
