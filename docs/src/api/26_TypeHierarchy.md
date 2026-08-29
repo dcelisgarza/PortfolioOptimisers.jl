@@ -27,7 +27,9 @@ its docstring.
 │   └── [WeightBounds](@ref)\
 ├── [AbstractEntropyPoolingTailView](@ref)\
 │   ├── [ConicEntropicValueatRiskViewConstraint](@ref)\
+│   ├── [ConicRelativisticValueatRiskViewConstraint](@ref)\
 │   ├── [GridEntropicValueatRiskViewConstraint](@ref)\
+│   ├── [GridRelativisticValueatRiskViewConstraint](@ref)\
 │   ├── [IntegerConditionalValueatRiskViewConstraint](@ref)\
 │   └── [LinearConditionalValueatRiskViewConstraint](@ref)\
 ├── [AbstractJuMPResult](@ref)\
@@ -203,6 +205,14 @@ its docstring.
 │           ├── [Variance](@ref)\
 │           ├── [VarianceSkewKurtosis](@ref)\
 │           └── [WorstRealisation](@ref)\
+├── [AbstractCalibrationEstimator](@ref)\
+│   ├── [AmbiguityRadiusCalibration](@ref)\
+│   ├── [AmbiguityTailWeightCalibration](@ref)\
+│   ├── [DeformationHeadCalibration](@ref)\
+│   ├── [DeformationTailCalibration](@ref)\
+│   ├── [NormCeilingCalibration](@ref)\
+│   ├── [SignificanceHeadCalibration](@ref)\
+│   └── [SignificanceTailCalibration](@ref)\
 ├── [AbstractCentralityEstimator](@ref)\
 │   └── [CentralityEstimator](@ref)\
 ├── [AbstractConstraintEstimator](@ref)\
@@ -244,7 +254,8 @@ its docstring.
 ├── [AbstractEntropyPoolingViewEstimator](@ref)\
 │   ├── [AbstractEntropyPoolingTailViewEstimator](@ref)\
 │   │   ├── [ConditionalValueatRiskView](@ref)\
-│   │   └── [EntropicValueatRiskView](@ref)\
+│   │   ├── [EntropicValueatRiskView](@ref)\
+│   │   └── [RelativisticValueatRiskView](@ref)\
 │   └── [ValueatRiskView](@ref)\
 ├── [AbstractExpectedReturnsEstimator](@ref)\
 │   ├── [AbstractShrunkExpectedReturnsEstimator](@ref)\
@@ -463,6 +474,23 @@ its docstring.
 │   │   ├── [Knuth](@ref)\
 │   │   └── [Scott](@ref)\
 │   └── [HacineGharbiRavier](@ref)\
+├── [AbstractCalibrationAlgorithm](@ref)\
+│   ├── [AbstractAmbiguityRadiusCalibrationAlgorithm](@ref)\
+│   │   ├── [ConcentrationRadius](@ref)\
+│   │   ├── [DimensionalRateRadius](@ref)\
+│   │   ├── [DualNormRadius](@ref)\
+│   │   └── [RateRadius](@ref)\
+│   ├── [AbstractAmbiguityTailWeightCalibrationAlgorithm](@ref)\
+│   │   └── [TailTermParity](@ref)\
+│   ├── [AbstractDeformationCalibrationAlgorithm](@ref)\
+│   │   ├── [EntropyBudget](@ref)\
+│   │   ├── [HillTailDecay](@ref)\
+│   │   └── [RadialTailDecay](@ref)\
+│   ├── [AbstractNormCeilingCalibrationAlgorithm](@ref)\
+│   │   └── [EffectiveAssetFloor](@ref)\
+│   └── [AbstractSignificanceCalibrationAlgorithm](@ref)\
+│       ├── [RateSignificance](@ref)\
+│       └── [ScenarioCount](@ref)\
 ├── [AbstractCentralityPolarity](@ref)\
 │   ├── [DistancePolarity](@ref)\
 │   └── [SimilarityPolarity](@ref)\
@@ -495,9 +523,12 @@ its docstring.
 │   ├── [AbstractConditionalValueatRiskViewFormulation](@ref)\
 │   │   ├── [IntegerConditionalValueatRiskView](@ref)\
 │   │   └── [LinearConditionalValueatRiskView](@ref)\
-│   └── [AbstractEntropicValueatRiskViewFormulation](@ref)\
-│       ├── [ConicEntropicValueatRiskView](@ref)\
-│       └── [GridEntropicValueatRiskView](@ref)\
+│   ├── [AbstractEntropicValueatRiskViewFormulation](@ref)\
+│   │   ├── [ConicEntropicValueatRiskView](@ref)\
+│   │   └── [GridEntropicValueatRiskView](@ref)\
+│   └── [AbstractRelativisticValueatRiskViewFormulation](@ref)\
+│       ├── [ConicRelativisticValueatRiskView](@ref)\
+│       └── [GridRelativisticValueatRiskView](@ref)\
 ├── [AbstractEstimatorValueAlgorithm](@ref)\
 │   └── [UniformValues](@ref)\
 ├── [AbstractExpectedReturnsAlgorithm](@ref)\
@@ -689,6 +720,7 @@ its docstring.
 │   ├── [DiagonalTarget](@ref)\
 │   ├── [MahalanobisTarget](@ref)\
 │   └── [PortfolioTarget](@ref)\
+├── [RelativisticValueatRiskViewBracket](@ref)\
 ├── [SchurComplementAlgorithm](@ref)\
 │   ├── [MonotonicSchurComplement](@ref)\
 │   └── [NonMonotonicSchurComplement](@ref)\

@@ -100,8 +100,8 @@ Configures and applies denoising algorithms to covariance or correlation matrice
 </summary>
 ```
 
-- Denoises by setting the smallest `num_factors` eigenvalues to zero. [`SpectralDenoise`](@ref)
-- Denoises by replacing the smallest `num_factors` eigenvalues with their average. [`FixedDenoise`](@ref)
+- Denoises by setting the noise eigenvalues to zero. [`SpectralDenoise`](@ref)
+- Denoises by replacing the noise eigenvalues with their own mean. [`FixedDenoise`](@ref)
 - Denoises by shrinking the off-diagonal part of the noise block towards zero, keeping its diagonal whole. [`ShrunkDenoise`](@ref)
 
 ```@raw html
@@ -325,15 +325,15 @@ Configures and applies Smyth-Broby covariance estimators. [`SmythBrobyCovariance
 </summary>
 ```
 
-- Divides the difference of the concordant and discordant Smyth-Broby kernel sums by their sum. [`SmythBroby0`](@ref)
-- Divides the difference of the concordant and discordant Smyth-Broby kernel sums by their sum plus the neutral sum. [`SmythBroby1`](@ref)
-- Normalises the raw difference of the Smyth-Broby kernel sums by the geometric mean of its own diagonal. [`SmythBroby2`](@ref)
-- Weights each Smyth-Broby kernel sum by its own observation count, then divides the difference by the sum. [`SmythBrobyGerber0`](@ref)
-- Weights each Smyth-Broby kernel sum by its own count, then divides the difference by the sum plus the neutral term. [`SmythBrobyGerber1`](@ref)
-- Weights each Smyth-Broby kernel sum by its own count, and standardises the raw difference by its own diagonal. [`SmythBrobyGerber2`](@ref)
-- Counts concordant and discordant observations, discards the kernel, and divides their difference by their sum. [`SmythBrobyCount0`](@ref)
-- Counts concordant, discordant and neutral observations, discards the kernel, and divides the net count by the total. [`SmythBrobyCount1`](@ref)
-- Counts concordant and discordant observations, discards the kernel, and standardises the net count by its own diagonal. [`SmythBrobyCount2`](@ref)
+- Divides the difference of the concordant and discordant Smyth-Broby contribution sums by their sum. [`SmythBroby0`](@ref)
+- Divides the difference of the concordant and discordant Smyth-Broby contribution sums by their sum plus the neutral sum. [`SmythBroby1`](@ref)
+- Normalises the net Smyth-Broby contribution of a pair by the geometric mean of its own diagonal. [`SmythBroby2`](@ref)
+- Weights each Smyth-Broby contribution sum by its own observation count, then divides the difference by the sum. [`SmythBrobyGerber0`](@ref)
+- Weights each Smyth-Broby contribution sum by its own count, then divides the difference by the sum plus the neutral term. [`SmythBrobyGerber1`](@ref)
+- Weights each Smyth-Broby contribution sum by its own count, then normalises the net score by the geometric mean of its own diagonal. [`SmythBrobyGerber2`](@ref)
+- Counts concordant and discordant observations, discards the contribution sums, and divides their difference by their sum. [`SmythBrobyCount0`](@ref)
+- Counts concordant, discordant and neutral observations, discards the contribution sums, and divides the net count by the total. [`SmythBrobyCount1`](@ref)
+- Counts concordant and discordant observations, discards the contribution sums, and normalises the net count by the geometric mean of its own diagonal. [`SmythBrobyCount2`](@ref)
 
 ```@raw html
 </details>
@@ -545,7 +545,7 @@ Implements [`coskewness`](@ref).
 <summary>
 ```
 
-Container type for coskewness estimators. [`Coskewness`](@ref)
+Estimates the coskewness tensor of a returns matrix, together with its negative spectral skewness matrix. [`Coskewness`](@ref)
 
 ```@raw html
 </summary>
@@ -569,7 +569,7 @@ Implements [`cokurtosis`](@ref).
 <summary>
 ```
 
-Container type for cokurtosis estimators. [`Cokurtosis`](@ref)
+Estimates the square cokurtosis matrix of a returns matrix. [`Cokurtosis`](@ref)
 
 ```@raw html
 </summary>
@@ -1064,7 +1064,7 @@ Reweights the observations of a prior so that its moments and its tails meet a s
 </summary>
 ```
 
-Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior. Alongside the moment views it takes views on the conditional and entropic value at risk, each written as constraints of the one entropy pooling problem.
+Entropy pooling reweights the observations so that the posterior satisfies the stated views while staying as close as possible to the prior. Alongside the moment views it takes views on the conditional, entropic and relativistic value at risk, each written as constraints of the one entropy pooling problem.
 
 - Container for Black-Litterman investor views in canonical matrix form. [`BlackLittermanViews`](@ref)
 
@@ -1102,6 +1102,8 @@ Tail view formulations
 - Integer formulation of a conditional value-at-risk view [EPTail](@cite). [`IntegerConditionalValueatRiskView`](@ref)
 - Exponential cone formulation of an entropic value-at-risk view [EPTail](@cite). [`ConicEntropicValueatRiskView`](@ref)
 - Grid formulation of an entropic value-at-risk view [EPTail](@cite). [`GridEntropicValueatRiskView`](@ref)
+- Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite). [`ConicRelativisticValueatRiskView`](@ref)
+- Grid formulation of a relativistic value-at-risk view. [`GridRelativisticValueatRiskView`](@ref)
 
 ```@raw html
 </details>
@@ -1118,11 +1120,13 @@ View groups
 </summary>
 ```
 
-A significance level belongs to a view, not to the estimator holding it. These pair a group of view equations with the level, and for a tail view the formulation, they are read under, so one estimator can state views at several levels.
+A significance level belongs to a view, not to the estimator holding it. These pair a group of view equations with the level, and for a tail view the formulation, they are read under, so one estimator can state views at several levels. A relativistic view group carries its deformation parameter on the same reasoning.
 
-- A group of value-at-risk views, with the significance level they are read under. [`ValueatRiskView`](@ref)
-- A group of conditional value-at-risk views, with the significance level and formulation they are read under. [`ConditionalValueatRiskView`](@ref)
-- A group of entropic value-at-risk views, with the significance level and formulation they are read under. [`EntropicValueatRiskView`](@ref)
+- A group of **value at risk** views, with the significance level they are read under. [`ValueatRiskView`](@ref)
+- A group of **conditional value at risk** views, with the significance level and formulation they are read under. [`ConditionalValueatRiskView`](@ref)
+- A group of **entropic value at risk** views, with the significance level and formulation they are read under. [`EntropicValueatRiskView`](@ref)
+- A group of **relativistic value at risk** views, with the significance level, the deformation parameter and the formulation they are read under. [`RelativisticValueatRiskView`](@ref)
+- Spans of the two searches that read a relativistic value at risk. [`RelativisticValueatRiskViewBracket`](@ref)
 
 ```@raw html
 </details>
@@ -1459,7 +1463,7 @@ Quintile portfolios are expressed as an uncertainty set on the characteristic ve
 <summary>
 ```
 
-Estimator for $\ell_1$ uncertainty sets on the characteristic vector. [`CharacteristicUncertaintySet`](@ref)
+Fits an $\ell_1$ uncertainty set on the characteristic vector, mean-only and with a calibrated radius. [`CharacteristicUncertaintySet`](@ref)
 
 ```@raw html
 </summary>
@@ -1467,7 +1471,7 @@ Estimator for $\ell_1$ uncertainty sets on the characteristic vector. [`Characte
 
 - $\ell_1$ (cross-polytope) uncertainty set on the characteristic vector. [`L1UncertaintySet`](@ref) and [`L1UncertaintySetAlgorithm`](@ref)
 - Signed $\ell_1$ uncertainty set on the characteristic vector, with a separate error budget per sign. [`SignedL1UncertaintySet`](@ref) and [`SignedL1UncertaintySetAlgorithm`](@ref)
-- Radius algorithm that calibrates the $\ell_1$ uncertainty radius to a target number of active assets. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+- Calibrates the $\ell_1$ uncertainty radius to a target number of active assets. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
 
 ```@raw html
 </details>
@@ -1499,7 +1503,7 @@ The turnover is defined as the element-wise absolute difference between the vect
 
 Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
 
-- Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set. [`fees_constraints`](@ref)
+- Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors. [`fees_constraints`](@ref)
 - Compute the fixed portfolio fees for assets that have been allocated. [`calc_fixed_fees`](@ref) and [`calc_asset_fixed_fees`](@ref)
 
 ```@raw html
@@ -1582,6 +1586,46 @@ It is also possible to track the error in with risk measures [`RiskTrackingError
 `PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them.
 
 Every prior-derived slot on a risk measure -- `mu`, `sigma`, `kt`, `sk` -- takes the value itself or the estimator that computes it, a [`DeferredQuantity`](@ref). The estimator is resolved against the optimisation's own prior, so it refits per cross-validation fold and per meta-optimiser subset where a pasted matrix cannot. A measure with two or more deferrable slots names one prior estimator in `pe` instead, and one fit fills every slot the measure leaves unstated. See ADR 0051.
+
+### Calibration
+
+A tail probability and a deformation parameter also take a **rule** in place of the number. The rule goes inside the role that names the end of the distribution the slot addresses, and the role is resolved against the optimisation's own prior, so the quantity refits per cross-validation fold and per meta-optimiser subset where a stated number holds still. The role carries the rule in its `alg` field, and that field takes a callable estimator or a plain function of `(key, pr, w, slv)`. Five rules ship: two compute a significance level, and three compute a deformation parameter. Forty slots across twenty-seven risk measures and weight builders take one: every `alpha` and `beta`, and every `kappa`, `kappa_a` and `kappa_b`. The two inner integration bounds of the tail-Gini family, `alpha_i` and `beta_i`, are starting points rather than quantities to estimate, so they keep their numbers and the joint `0 < alpha_i < alpha < 1` bound is checked against the calibrated `alpha` at fold time.
+
+- Places a significance rule in a slot that addresses the lower tail of the return distribution. [`SignificanceTailCalibration`](@ref)
+- Places a significance rule in a slot that addresses the upper tail of the return distribution. [`SignificanceHeadCalibration`](@ref)
+- Places a deformation rule in a slot that addresses the lower tail of the return distribution. [`DeformationTailCalibration`](@ref)
+- Places a deformation rule in a slot that addresses the upper tail of the return distribution. [`DeformationHeadCalibration`](@ref)
+
+A significance rule reads the sample length, and reads the effective observation weights where the count it states is a count of observations. A deformation rule reads the probability of its own end, which travels to it through `bind_alpha`. One spends a stated entropy budget on the sample length. The other two read the shape of the sample's own tail and return the reciprocal of its index: one standardises each column and answers per end, so a skewed sample gives two numbers, and one whitens each observation with the covariance matrix and answers one number for both ends.
+
+A rule that reads the shape of a series is told which series to read. A drawdown measure prices the drawdown series of the portfolio rather than its returns, and the slot key names neither, so the measure hands the rule its own series through `bind_series` in the same place it hands over the significance level. The two rules then run the same reading over the drawdown series of each column, in place of the columns themselves: the pooled rule pools those series, and the radial rule whitens their rows with the covariance matrix of that same sample, because a prior result states no drawdown moment. The series belongs to the measure, so a marker stated on a rule serves a caller who runs it by hand and is overwritten wherever a measure resolves it.
+
+- Computes a significance level from a count of observations, so that the tail keeps the same number of scenarios whatever the sample length becomes. [`ScenarioCount`](@ref)
+- Computes a significance level that shrinks with the square root of the sample length. [`RateSignificance`](@ref)
+- Computes the Kaniadakis deformation parameter that makes a relativistic measure spend a stated entropy budget. [`EntropyBudget`](@ref)
+- Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at. [`HillTailDecay`](@ref)
+- Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's radial series decays at. [`RadialTailDecay`](@ref)
+
+An ambiguity radius takes a rule on the same terms. It names no end of the distribution, so it carries one role rather than two, and it reaches the four regularisation coefficients of [`JuMPOptimiser`](@ref) as well as the two distributionally robust risk measures. Four rules ship, and all four compute a radius. Two shrink the ball at the square-root rate of the sample length, and the third shrinks it at the rate the number of assets sets, which is far slower over a wide universe.
+
+- Places an ambiguity-radius rule in a slot that holds the radius of the ball the model prices. [`AmbiguityRadiusCalibration`](@ref)
+- Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss. [`AmbiguityTailWeightCalibration`](@ref)
+- Computes an ambiguity radius from the concentration of measure, so that the ball shrinks as the sample grows. [`ConcentrationRadius`](@ref)
+- Computes an ambiguity radius that shrinks with the square root of the sample length. [`RateRadius`](@ref)
+- Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate. [`DimensionalRateRadius`](@ref)
+
+Those three return one number for every slot, and the eight radius slots do not measure distance in one norm. The fourth rule reads the slot's key, picks the ground metric that slot names, and returns the sampling error of the empirical measure in it, so the `l1` and `linf` coefficients of one optimiser get two coefficients rather than one.
+
+- Computes an ambiguity radius in the ground metric that the slot it stands in names, so that two slots of two different norms get two different numbers. [`DualNormRadius`](@ref)
+
+The tail weight of an Esfahani-Kuhn loss carries a role and a family of its own. One rule ships there, and it prices the tail term of the loss at a stated multiple of its mean term: a stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency. That rule reads the probability of its own slot, which travels to it through `bind_alpha`.
+
+- Computes the Esfahani-Kuhn tail weight that prices the tail term of the loss at a stated multiple of its mean term. [`TailTermParity`](@ref)
+
+A norm ceiling is a different quantity from a radius, so it carries a role and a family of its own and neither role is admitted in the other's slot. A radius is the coefficient of a norm penalty in the objective; a ceiling bounds that norm in a constraint, and its reciprocal is a floor on the effective number of assets. It reaches the three norm-constraint slots of [`JuMPOptimiser`](@ref), `l2c`, `lpc` and `linfc`. One rule ships, and it holds a stated fraction of the universe effective, so the floor moves with the universe the prior carries. The order the ceiling is read against belongs to the constraint rather than to the rule, so each constraint site hands its own order over before the slot resolves.
+
+- Places a norm-ceiling rule in a slot that bounds a norm of the weight vector from above. [`NormCeilingCalibration`](@ref)
+- Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes. [`EffectiveAssetFloor`](@ref)
 
 ### Risk measures for traditional optimisation
 

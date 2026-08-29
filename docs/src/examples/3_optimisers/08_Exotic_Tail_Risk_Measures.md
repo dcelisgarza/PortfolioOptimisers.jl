@@ -15,7 +15,7 @@ aggressively than CVaR:
     built from the exponential moment-generating function. It is more conservative than CVaR
     and is solved over the **exponential cone**.
   - [`RelativisticValueatRisk`](@ref) (RLVaR) — a coherent generalisation of EVaR via the
-    Tsallis (``\kappa``-deformed) entropy, parametrised by ``\kappa \in (0, 1)``. It
+    Kaniadakis (``\kappa``-deformed) entropy, parametrised by ``\kappa \in (0, 1)``. It
     *interpolates* between EVaR (as ``\kappa \to 0``) and the worst realisation (as
     ``\kappa \to 1``), giving a continuous dial on how hard the extreme tail is penalised.
     Solved over the **power cone**.
