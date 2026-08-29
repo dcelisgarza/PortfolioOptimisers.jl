@@ -2141,9 +2141,15 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `kappa::Number`: The deformation parameter.
 
+## The series
+
+A deformation slot sits on a measure of the return distribution and on a drawdown measure alike, and both resolve the key `:kappa`, so `key` does not say which quantity the owner prices. A rule whose answer moves with that quantity should carry a `series` field and implement a [`bind_series`](@ref) method, which each slot owner calls before it resolves the slot. A rule whose answer does not move with it needs no method, and [`EntropyBudget`](@ref) is that case.
+
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`bind_series`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`Func_DefCal`](@ref)
@@ -2395,7 +2401,7 @@ Resolve one calibration slot against prior result `pr`, the effective observatio
 
 A slot that holds a role type is unwrapped, and the rule in its `alg` field is **called** as `alg(key, pr, w, slv)`. So a callable rule and a plain function are the same thing here, and a rule never sees the role it was placed in. Anything else, a stated number above all, is returned unchanged.
 
-A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
+A rule gets no portfolio. A prior result carries no portfolio weight vector, so no rule can measure a portfolio's own loss series. What it can measure is the series of each **column** of the sample, and [`bind_series`](@ref) tells it which series the slot owner prices. It does get the solver, on both of the routes that resolve a measure, so a rule may call [`ERM`](@ref) or [`RRM`](@ref). On the [`factory`](@ref) route [`@propagatable`](@ref) runs the `@cprop` selection before the resolution, so the solver is on the struct. On the `JuMP` route no selection runs, so [`set_risk_constraints!`](@ref) threads it into [`resolve_deferred_quantities`](@ref) and the owner settles it as `sel(x.slv, slv)`.
 
 This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather than a widening of the first for two reasons. `resolve_slot`'s body is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit followed by an extraction, and a rule fits nothing. `resolve_slot` also carries neither `w` nor `slv`, which a rule needs. So the six role types stay **out** of the [`DeferredQuantity`](@ref) union.
 
@@ -2532,6 +2538,181 @@ function mirror_role(r::SignificanceTailCalibration)
 end
 function mirror_role(r::DeformationTailCalibration)
     return DeformationHeadCalibration(; alg = r.alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the series a calibration rule reads, so that a rule reads the quantity its slot owner prices.
+
+A rule gets no portfolio, which [`resolve_calibration_slot`](@ref) states, so it cannot form the loss series of a portfolio that does not exist until the solver returns. What it can form is the series of each **column** of `pr.X`. This family names which one: the column itself, or the drawdown series that column carries. [`calibration_series`](@ref) is the trait a slot owner answers, and [`bind_series`](@ref) carries the answer into the rule.
+
+The marker states the **quantity** and not the estimator, so each rule reads it on its own terms. [`HillTailDecay`](@ref) forms the series and estimates its tail index. [`RadialTailDecay`](@ref) cannot form it, because a Mahalanobis distance carries no path, so it shifts the index of the returns instead.
+
+# Related
+
+  - [`ReturnsSeries`](@ref)
+  - [`AbstractDrawdownSeries`](@ref)
+  - [`calibration_series`](@ref)
+  - [`calibration_series_vec`](@ref)
+  - [`bind_series`](@ref)
+"""
+abstract type AbstractCalibrationSeries end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names a drawdown series, the quantity a drawdown measure prices.
+
+A drawdown is a path functional of one series, so it is formed per column and never per row. The two members differ in how the path compounds, and they are the two series [`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) build.
+
+A drawdown series is non-positive, so it carries **one end**. A rule that answers per end therefore refuses a head key under this family, and the refusal is a statement about the quantity rather than about the sample.
+
+**What a drawdown reading says depends on the record.** A drawdown is a running functional, so its law over a finite record is not the law of one step, and a rule that reads the shape of a series reads a different shape here. A sample whose drift is strong enough for the drawdown process to settle reads **heavier** than its own returns, which is the reading a stationary drawdown carries. A sample whose drift is weak reads the range of the path over the record instead, and that range is **thinner** in the tail than the step law that made it. Both are readings of the series the measure prices over the record the measure prices it on, so a rule states the sample rather than a claim about drawdowns in general.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`AbsoluteDrawdownSeries`](@ref)
+  - [`RelativeDrawdownSeries`](@ref)
+  - [`series_end_sign`](@ref)
+"""
+abstract type AbstractDrawdownSeries <: AbstractCalibrationSeries end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the returns themselves, the columns of `pr.X` unchanged.
+
+It is the series every measure of the return distribution prices, and it is the default of every rule that carries a `series` field. A rule that never left this marker reads what it read before the family existed.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series`](@ref)
+  - [`calibration_series_vec`](@ref)
+"""
+struct ReturnsSeries <: AbstractCalibrationSeries end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the absolute drawdown series of a column, which [`absolute_drawdown_vec`](@ref) builds.
+
+The path is the cumulative sum of the column, and the series is the distance of that path below its own running peak. [`RelativisticDrawdownatRisk`](@ref) prices it, and [`DrawdownatRisk`](@ref) is the measure it takes its name from.
+
+# Related
+
+  - [`AbstractDrawdownSeries`](@ref)
+  - [`RelativeDrawdownSeries`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`calibration_series_vec`](@ref)
+"""
+struct AbsoluteDrawdownSeries <: AbstractDrawdownSeries end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the relative drawdown series of a column, which [`relative_drawdown_vec`](@ref) builds.
+
+The path is the compounded value of the column, and the series is the fractional distance of that path below its own running peak. [`RelativeRelativisticDrawdownatRisk`](@ref) prices it, and [`RelativeDrawdownatRisk`](@ref) is the measure it takes its name from.
+
+# Related
+
+  - [`AbstractDrawdownSeries`](@ref)
+  - [`AbsoluteDrawdownSeries`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`calibration_series_vec`](@ref)
+"""
+struct RelativeDrawdownSeries <: AbstractDrawdownSeries end
+"""
+    calibration_series(x)
+
+Declare the series that `x` prices, so that a rule in one of its calibration slots reads that quantity.
+
+The default is [`ReturnsSeries`](@ref), so a type that prices the return distribution needs no method. The two relativistic drawdown measures write one, because the series they price is not the sample they carry.
+
+This is a trait on the **slot owner** and not a field on the rule, for the reason [`bind_norm_order`](@ref) carries a norm order rather than reading one off the rule: the quantity belongs to the measure, and a rule cannot know which measure it reached. So a marker a caller states on a rule is overwritten wherever a measure resolves it, and it serves a caller who runs the rule by hand.
+
+# Arguments
+
+  - `x`: The slot owner, a risk measure above all.
+
+# Returns
+
+  - `series::AbstractCalibrationSeries`: The series the owner prices.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_slots`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+calibration_series(::Any) = ReturnsSeries()
+"""
+    calibration_series_vec(series::AbstractCalibrationSeries, x::VecNum)
+
+Return the univariate series that `series` names, built from one column of the sample.
+
+A drawdown marker builds a fresh vector, and [`ReturnsSeries`](@ref) returns the column itself. So the returns reading allocates nothing and reads the sample it was always given.
+
+The verb takes one column rather than the whole matrix because a drawdown is a path functional: it accumulates down a column and says nothing across a row. A caller that needs the pool walks the columns and calls this once per column.
+
+# Arguments
+
+  - `series`: The series marker.
+  - `x`: One column of the sample.
+
+# Returns
+
+  - `s::VecNum`: The series the marker names.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`hill_tail_index`](@ref)
+"""
+function calibration_series_vec(::ReturnsSeries, x::VecNum)
+    return x
+end
+function calibration_series_vec(::AbsoluteDrawdownSeries, x::VecNum)
+    return absolute_drawdown_vec(x)
+end
+function calibration_series_vec(::RelativeDrawdownSeries, x::VecNum)
+    return relative_drawdown_vec(x)
+end
+"""
+    calibration_series_matrix(series::AbstractCalibrationSeries, X::AbstractMatrix)
+
+Return the sample that `series` names, one series per column of `X`.
+
+It is [`calibration_series_vec`](@ref) over the columns, and it holds the same shape as `X`: a drawdown series carries one entry per observation, so no observation is lost and the count of a tail is the count the caller formed on `X`.
+
+[`ReturnsSeries`](@ref) returns `X` itself, so the returns reading allocates nothing. A rule that walks the columns one at a time should call [`calibration_series_vec`](@ref) instead, and allocate one column rather than a matrix.
+
+# Arguments
+
+  - `series`: The series marker.
+  - `X`: Returns matrix, `T × N`.
+
+# Returns
+
+  - `Y::AbstractMatrix`: The sample the marker names, `T × N`.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series_vec`](@ref)
+  - [`radial_series_inputs`](@ref)
+"""
+function calibration_series_matrix(::ReturnsSeries, X::AbstractMatrix)
+    return X
+end
+function calibration_series_matrix(series::AbstractDrawdownSeries,
+                                   X::AbstractMatrix{E}) where {E <: Number}
+    Y = Matrix{float(E)}(undef, size(X))
+    for j in axes(X, 2)
+        Y[:, j] = calibration_series_vec(series, view(X, :, j))
+    end
+    return Y
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -2845,19 +3026,22 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Estimate the tail index of the pool of standardised values of `X`, over the worst `k` order statistics of the pool.
 
-Every column is centred and divided by its own sample dispersion, and `s` names the end. Hill's estimator reads the `k` of the `T N` standardised values that lie furthest into that end. [`HillTailDecay`](@ref) states the reading and the assumptions the pool carries. This verb is the estimate alone.
+`series` names the series each column carries, and [`calibration_series_vec`](@ref) builds it. Every such series is centred and divided by its own sample dispersion, and `s` names the end. Hill's estimator reads the `k` of the `T N` standardised values that lie furthest into that end. [`HillTailDecay`](@ref) states the reading and the assumptions the pool carries. This verb is the estimate alone.
+
+The pool holds `T` values per column under every marker, because a drawdown series holds one entry per observation. So the count `k` the caller formed is the count this verb reads, whatever the series is.
 
 The element type is bound by the signature, so the pool and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
 
 # Algorithm
 
  1. Read the shape of `X` into `T` and `N`, and allocate the pool `pool` of `T * N` values.
- 2. Walk the columns of `X`. Take each column's sample mean `mu` and its sample dispersion `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
+ 2. Walk the columns of `X`. Build each column's series with [`calibration_series_vec`](@ref), take its sample mean `mu` and its sample dispersion `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
  3. Partially sort `pool` about its `k + 1`-th smallest value, giving `vkp1`. The sign of step 2 puts the end the caller prices in the **lower** tail of the pool, so the `k` entries before `vkp1` are the ones the estimate reads.
  4. Return `k` over the sum of `log(pool[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
 
 # Arguments
 
+  - `series`: The series each column carries.
   - `X`: Returns matrix, `T × N`.
   - `s`: Sign of the end the estimate reads: `1` reads the gain tail and `-1` reads the loss tail.
   - `k`: Number of order statistics the estimate reads. The caller states it, and the caller keeps the floor under it.
@@ -2873,12 +3057,15 @@ The element type is bound by the signature, so the pool and the sum it feeds are
 # Related
 
   - [`HillTailDecay`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series_vec`](@ref)
 """
-function hill_tail_index(X::AbstractMatrix{E}, s::Integer, k::Integer) where {E <: Number}
+function hill_tail_index(series::AbstractCalibrationSeries, X::AbstractMatrix{E},
+                         s::Integer, k::Integer) where {E <: Number}
     T, N = size(X)
     pool = Vector{float(E)}(undef, T * N)
     for j in axes(X, 2)
-        col = view(X, :, j)
+        col = calibration_series_vec(series, view(X, :, j))
         mu = Statistics.mean(col)
         sd = Statistics.std(col; mean = mu)
         o = (j - 1) * T
@@ -2898,6 +3085,43 @@ function hill_tail_index(X::AbstractMatrix{E}, s::Integer, k::Integer) where {E 
     return k / sum(i -> log(pool[i] / vkp1), 1:k)
 end
 """
+    series_end_sign(series::AbstractCalibrationSeries, key::Symbol)
+
+Return the sign of the end that `key` prices on `series`, and refuse an end the series does not have.
+
+`:kappa_b` is the only head key, so on a returns series every other key prices the loss end. A drawdown series is non-positive and carries one end alone, so the head key names nothing on it and is refused. No drawdown Range measure ships, so the refusal is reached by a caller who runs a rule by hand.
+
+# Arguments
+
+  - `series`: The series the estimate is taken over.
+  - `key`: Name of the slot that is being resolved.
+
+# Validation
+
+  - `key` must not be `:kappa_b` when `series` is an [`AbstractDrawdownSeries`](@ref).
+
+# Returns
+
+  - `s::Int`: `1` for the gain end and `-1` for the loss end.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`AbstractDrawdownSeries`](@ref)
+  - [`HillTailDecay`](@ref)
+  - [`hill_tail_index`](@ref)
+"""
+function series_end_sign(::ReturnsSeries, key::Symbol)
+    # `:kappa_b` is the only head key, so every other key prices the loss end. One estimator
+    # then serves both ends.
+    return key === :kappa_b ? 1 : -1
+end
+function series_end_sign(series::AbstractDrawdownSeries, key::Symbol)
+    @argcheck(key !== :kappa_b,
+              ArgumentError("The `:kappa_b` slot prices the gain end, and a $(nameof(typeof(series))) has no gain end: a drawdown series is non-positive, so its one end is the loss end that `:kappa` and `:kappa_a` price. No drawdown Range measure ships, so a rule reached this key outside a measure. Resolve the rule under `:kappa`, or state a `ReturnsSeries`."))
+    return -1
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Computes the Kaniadakis deformation parameter whose tail decays at the rate the sample's own tail decays at.
@@ -2912,7 +3136,15 @@ The pool carries two assumptions, and both are stated rather than hidden. The co
 
 `key` says which end the slot prices, and **the answer is not the same for every key**. `:kappa` and `:kappa_a` read the loss tail, and `:kappa_b` reads the gain tail. This is the opposite of [`EntropyBudget`](@ref), whose budget is a price the model pays and is therefore one number for both ends. A tail index is a statement about a tail, and a skewed sample has two different ones, which is the whole point of the rule on a Range measure.
 
-The rule reads the returns of `pr.X`, so it is exact for [`RelativisticValueatRisk`](@ref) and [`RelativisticValueatRiskRange`](@ref), and approximate for [`RelativisticDrawdownatRisk`](@ref) and [`RelativeRelativisticDrawdownatRisk`](@ref). Those two carry the key `:kappa` as well, so `key` does not say whether the owner prices returns or drawdowns, and a rule is given no portfolio and cannot form the drawdown series. A drawdown tail is heavier than the returns tail it is built from, so the parameter this rule returns to a drawdown measure is a reading of the returns.
+**`series` says which quantity the pool holds, and the slot owner states it.** A measure of the return distribution pools the columns of `pr.X`. A drawdown measure pools the per-column drawdown series of `pr.X` instead, because that is the quantity it prices, and [`bind_series`](@ref) puts the marker there at the resolution site. Nothing else in the reading moves: the same standardisation, the same count and the same estimator run over the drawdown sample. The estimate the pool then carries is the index of the drawdown series rather than of the returns, and the two are different numbers. [`AbstractDrawdownSeries`](@ref) states which way they part, and it is the record that decides.
+
+**The per-column reading stands for the portfolio's own drawdown**, under the assumption the pool already states. The rule forms no portfolio, so it reads the drawdown series of each column and pools them, exactly as it pools the columns themselves on a returns series. The columns share one tail index after standardisation, and one map carries a column to its drawdown series, so the reading the pool gives is the reading the portfolio's own drawdown series would give. A portfolio drawdown is shallower than the average asset drawdown, and that is a statement about the **scale**, which a tail index does not read.
+
+The count is the same count. A drawdown series holds one entry per observation, so the pool holds `T N` entries under every marker and `k = ceil(alpha * T * N)` is unchanged. No observation is dropped by the change of series.
+
+`alpha` reaches the right series as well. A drawdown measure resolves the significance level of its own drawdown series, and the depth the rule reads is that same level under a drawdown marker.
+
+The pool of a drawdown series carries **more dependence** than the pool of a returns series. A drawdown series is a running functional, so consecutive entries move together and one deep episode fills many of the `k` order statistics the estimate reads. The `T N` entries therefore hold far fewer independent tail points than the same count of returns, and the spread of the estimate is wider than the count states. `kmin` is stated in entries and not in independent points, so the same floor buys less here. Raise it for a drawdown owner.
 
 The rule carries no range check on the parameter it returns. The slot owner's constructor keeps that job, as it does for every calibration rule. Its checks are statements that the estimate exists at all.
 
@@ -2924,10 +3156,11 @@ $(DocStringExtensions.FIELDS)
 
     HillTailDecay(;
         kmin::Integer = 30,
-        alpha::Option{<:Number} = nothing
+        alpha::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> HillTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -2936,13 +3169,16 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
 # Related
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
   - [`RadialTailDecay`](@ref)
+  - [`series_end_sign`](@ref)
 """
 @concrete struct HillTailDecay <: AbstractDeformationCalibrationAlgorithm
     """
@@ -2953,18 +3189,24 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
     $(field_dict[:cal_alpha_sib])
     """
     alpha
-    function HillTailDecay(kmin::Integer, alpha::Option{<:Number})
+    """
+    $(field_dict[:cal_series])
+    """
+    series
+    function HillTailDecay(kmin::Integer, alpha::Option{<:Number},
+                           series::AbstractCalibrationSeries)
         assert_gt0(kmin, :kmin)
-        return new{typeof(kmin), typeof(alpha)}(kmin, alpha)
+        return new{typeof(kmin), typeof(alpha), typeof(series)}(kmin, alpha, series)
     end
 end
-function HillTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing)
-    return HillTailDecay(kmin, alpha)
+function HillTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing,
+                       series::AbstractCalibrationSeries = ReturnsSeries())
+    return HillTailDecay(kmin, alpha, series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the sample that `pr` carries.
+Compute the deformation parameter whose reciprocal is the Hill tail index of the series that `alg.series` names, over the sample that `pr` carries.
 
 # Mathematical definition
 
@@ -2974,7 +3216,8 @@ s &= \\begin{cases}
 +1 & \\textrm{if the slot prices the gain end}\\\\
 -1 & \\textrm{if the slot prices the loss end}
 \\end{cases}\\,,\\\\
-u_{tj} &= s \\dfrac{r_{tj} - \\hat{\\mu}_{j}}{\\hat{\\sigma}_{j}}\\,,\\\\
+y_{tj} &= \\left(\\mathcal{S}\\left(\\boldsymbol{r}_{j}\\right)\\right)_{t}\\,,\\\\
+u_{tj} &= s \\dfrac{y_{tj} - \\hat{\\mu}_{j}}{\\hat{\\sigma}_{j}}\\,,\\\\
 k &= \\left\\lceil \\alpha T N \\right\\rceil\\,,\\\\
 \\hat{a} &= \\dfrac{k}{\\sum\\limits_{i=1}^{k} \\ln\\left(\\dfrac{u_{(i)}}{u_{(k+1)}}\\right)}\\,,\\\\
 \\kappa &= \\dfrac{1}{\\hat{a}}\\,.
@@ -2988,8 +3231,11 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:r_tj])
-  - $(math_dict[:mu_hat_j])
-  - ``\\hat{\\sigma}_{j}``: Sample dispersion of column ``j``, read off that column alone and never off ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``\\boldsymbol{r}_{j}``: Column ``j`` of the sample.
+  - ``\\mathcal{S}``: The series `alg.series` names, built from one column. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``y_{tj}``: Entry ``t`` of the series of column ``j``.
+  - ``\\hat{\\mu}_{j}``: Sample mean of the series of column ``j``, and not of the column under a drawdown marker.
+  - ``\\hat{\\sigma}_{j}``: Sample dispersion of the series of column ``j``, read off that series alone and never off ``\\hat{\\mathbf{\\Sigma}}``.
   - ``s``: Sign of the end the slot prices.
   - ``u_{tj}``: Standardised value of asset ``j`` at time ``t``, signed so that the end the slot prices is the upper tail of the pool.
   - ``u_{(i)}``: ``i``-th largest of the ``T N`` pooled values, so that ``u_{(1)} \\geq \\ldots \\geq u_{(k+1)}``.
@@ -2999,14 +3245,14 @@ Where:
 # Algorithm
 
  1. Read the returns matrix off `pr` into `X`, and its element count into `np`.
- 2. Take the sign `s` from `key`. `:kappa_b` is the only head key, so it gives `+1`, and every other key prices the loss end and gives `-1`. One estimator then serves both ends.
+ 2. Take the sign `s` from `key` and `alg.series` with [`series_end_sign`](@ref). A drawdown series carries one end, so it refuses the head key rather than signing it.
  3. Form the count `k = ceil(Int, alg.alpha * np)`, the number of order statistics the estimate reads.
- 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`.
+ 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`. The pool holds the series `alg.series` names, one entry per observation per column under every marker.
  5. Return `inv(a)`, which is the deformation parameter.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. It names the end, so `:kappa` and `:kappa_a` read the loss tail and `:kappa_b` reads the gain tail. A skewed sample therefore resolves the two ends of a Range measure to two different numbers.
   - `pr`: Prior result the returns matrix is read off.
   - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
@@ -3015,6 +3261,7 @@ Where:
 # Validation
 
   - `alg.alpha` must not be `nothing`.
+  - `key` must name an end the series has, which [`series_end_sign`](@ref) checks.
   - `k` must be at least `alg.kmin`.
   - The pool must hold at least `k + 1` values.
   - ``u_{(k+1)}`` must be positive, which [`hill_tail_index`](@ref) checks.
@@ -3028,20 +3275,21 @@ Where:
 
   - [`HillTailDecay`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
   - [`EntropyBudget`](@ref)
   - [`hill_tail_index`](@ref)
   - [`kappa_log`](@ref)
   - [`RadialTailDecay`](@ref)
   - [`resolve_calibration_slot`](@ref)
+  - [`series_end_sign`](@ref)
 """
 function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
     @argcheck(!isnothing(alg.alpha),
               IsNothingError("`HillTailDecay.alpha` is `nothing`, so the rule cannot form the count `k = ceil(alpha * T * N)`. The probability of the end travels to the rule through `bind_alpha`, which the slot owner calls after it resolves that end's own probability. State `alpha` on the rule itself to run it outside a measure."))
     X = pr.X
-    # `:kappa_b` is the only head key, so every other key prices the loss end. The sign puts
-    # the end the slot prices in the UPPER tail of the pool, and one estimator then serves
-    # both ends.
-    s = key === :kappa_b ? 1 : -1
+    # The sign puts the end the slot prices in the UPPER tail of the pool, and one estimator
+    # then serves both ends. The series decides which ends there are to price.
+    s = series_end_sign(alg.series, key)
     np = prod(size(X))
     k = ceil(Int, alg.alpha * np)
     @argcheck(k >= alg.kmin,
@@ -3050,10 +3298,10 @@ function (alg::HillTailDecay)(key::Symbol, pr::AbstractPriorResult, ::Any, ::Any
     @argcheck(k + 1 <= np,
               DomainError(k,
                           "`HillTailDecay` needs $(k + 1) pooled values to form the estimate, and the pool of `T * N` holds $np. The count is `k = ceil(alpha * T * N)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
-    a = hill_tail_index(X, s, k)
+    a = hill_tail_index(alg.series, X, s, k)
     @argcheck(a > 1,
               DomainError(a,
-                          "`HillTailDecay` estimated a tail index of $a on the pool, so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The sample is heavier-tailed than the measure can price."))
+                          "`HillTailDecay` estimated a tail index of $a on the pool of the $(nameof(typeof(alg.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
     return inv(a)
 end
 """
@@ -3177,7 +3425,9 @@ The inverse of [`kappa_log`](@ref) is the ``\\kappa``-exponential ``\\exp_{\\kap
 
 The series holds `T` entries where the pool of [`HillTailDecay`](@ref) holds `T N`, so this rule reads **fewer** tail points from the same sample: `alpha = 0.05` at `T = 250` leaves 12 of them. `kmin` is the floor under that count, and it is stated in the same units as its sibling's, so the floor binds harder here. A count below it is refused rather than estimated. The points the series does hold are one per observation rather than `N` per observation, so they carry none of the cross-correlation the pool carries.
 
-The rule reads the returns of `pr.X`, so it is exact for [`RelativisticValueatRisk`](@ref) and [`RelativisticValueatRiskRange`](@ref), and approximate for [`RelativisticDrawdownatRisk`](@ref) and [`RelativeRelativisticDrawdownatRisk`](@ref). Those two carry the key `:kappa` as well, so `key` does not say whether the owner prices returns or drawdowns, and a rule is given no portfolio and cannot form the drawdown series. A drawdown tail is heavier than the returns tail it is built from, so the parameter this rule returns to a drawdown measure is a reading of the returns.
+**`series` says which sample the rows are read off, and the slot owner states it.** A measure of the return distribution whitens the rows of `pr.X`. A drawdown measure whitens the rows of the **drawdown sample**: [`calibration_series_matrix`](@ref) turns each column into the drawdown series it carries, and the rows of that sample are whitened and normed on the same terms. So the radial reading itself is unchanged, and only the sample it reads moves. The distance is then the depth of the whole cross-section in drawdown at one date, where on a returns series it is the distance the whole cross-section moved.
+
+**A drawdown sample carries its own moments, and the prior states none of them.** `pr.mu` and `pr.sigma` are the moments of the returns, and no scaling of them states the moments of a drawdown. So under a drawdown marker the centre is the column means of the drawdown sample and the factor is the Cholesky factor of its covariance matrix, both taken off that sample. [`radial_series_inputs`](@ref) is where the two readings part, and the precedence of `pr.chol` over `pr.sigma` therefore governs the returns reading alone.
 
 A third reading of ``\\kappa`` exists and this rule does not take it. The excess kurtosis ``g`` of a Student-t gives ``\\nu = 4 + 6/g``, and ``\\kappa = 1/\\nu`` follows. It reads the whole sample rather than the tail, so it is steady where a Hill estimate is noisy, and it pays for that with an assumption about the shape of the whole distribution rather than of its tail.
 
@@ -3191,10 +3441,11 @@ $(DocStringExtensions.FIELDS)
 
     RadialTailDecay(;
         kmin::Integer = 30,
-        alpha::Option{<:Number} = nothing
+        alpha::Option{<:Number} = nothing,
+        series::AbstractCalibrationSeries = ReturnsSeries()
     ) -> RadialTailDecay
 
-Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is the floor under the count of order statistics the estimate reads. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in. `series` defaults to [`ReturnsSeries`](@ref), and every slot owner overwrites it through [`bind_series`](@ref).
 
 ## Validation
 
@@ -3203,12 +3454,15 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
 # Related
 
   - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
+  - [`radial_series_inputs`](@ref)
   - [`radial_tail_index`](@ref)
   - [`whitening_factor`](@ref)
 """
@@ -3221,25 +3475,79 @@ Keywords correspond to the struct's fields. `kmin` defaults to `30`, which is th
     $(field_dict[:cal_alpha_sib])
     """
     alpha
-    function RadialTailDecay(kmin::Integer, alpha::Option{<:Number})
+    """
+    $(field_dict[:cal_series_rad])
+    """
+    series
+    function RadialTailDecay(kmin::Integer, alpha::Option{<:Number},
+                             series::AbstractCalibrationSeries)
         assert_gt0(kmin, :kmin)
-        return new{typeof(kmin), typeof(alpha)}(kmin, alpha)
+        return new{typeof(kmin), typeof(alpha), typeof(series)}(kmin, alpha, series)
     end
 end
-function RadialTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing)
-    return RadialTailDecay(kmin, alpha)
+function RadialTailDecay(; kmin::Integer = 30, alpha::Option{<:Number} = nothing,
+                         series::AbstractCalibrationSeries = ReturnsSeries())
+    return RadialTailDecay(kmin, alpha, series)
+end
+"""
+    radial_series_inputs(series::AbstractCalibrationSeries, pr::AbstractPriorResult)
+
+Return the sample, the centre and the whitening factor that the radial series of `series` is built from.
+
+A [`ReturnsSeries`](@ref) reads the three off the prior result: `pr.X`, `pr.mu` and the factor [`whitening_factor`](@ref) takes off `pr.chol` or `pr.sigma`. That is the reading [`RadialTailDecay`](@ref) has always carried, and this verb leaves it untouched.
+
+A drawdown series reads the three off the **drawdown sample** instead, because a prior result states no drawdown moment. [`calibration_series_matrix`](@ref) builds the sample, the centre is the column means of that sample, and the factor is the Cholesky factor of its covariance matrix. So the whole reading moves to the quantity the measure prices, and `pr.mu` and `pr.sigma` reach nothing: they are the moments of the returns, and no scaling of them states the moments of a drawdown.
+
+# Arguments
+
+  - `series`: The series the slot owner prices.
+  - `pr`: Prior result the sample and, on a returns series, the moments are read off.
+
+# Validation
+
+  - The covariance matrix of the drawdown sample must be positive definite. A column with no movement, and two columns with one path between them, are what reach this.
+
+# Returns
+
+  - `Y::AbstractMatrix`: The sample the marker names, `T × N`.
+  - `mu::AbstractVector`: The centre of that sample, `N × 1`.
+  - `U::AbstractMatrix`: Square factor of its covariance matrix.
+
+# Related
+
+  - [`RadialTailDecay`](@ref)
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series_matrix`](@ref)
+  - [`radial_tail_index`](@ref)
+  - [`whitening_factor`](@ref)
+"""
+function radial_series_inputs(::ReturnsSeries, pr::AbstractPriorResult)
+    return pr.X, pr.mu, whitening_factor(pr)
+end
+function radial_series_inputs(series::AbstractDrawdownSeries, pr::AbstractPriorResult)
+    Y = calibration_series_matrix(series, pr.X)
+    mu = vec(Statistics.mean(Y; dims = 1))
+    # A prior result states the moments of the RETURNS, so the moments of the drawdown
+    # sample come off that sample. `whitening_factor` is not the verb here: its precedence
+    # rule and its refusals are statements about `pr.chol` and `pr.sigma`.
+    f = LinearAlgebra.cholesky(Statistics.cov(Y); check = false)
+    @argcheck(LinearAlgebra.issuccess(f),
+              DomainError(f.info,
+                          "The Cholesky factorisation of the covariance matrix of the $(nameof(typeof(series))) sample failed at pivot $(f.info), so that matrix is not positive definite and no whitening of the drawdown sample exists. A column that never moves has a drawdown series of zeros, and two columns with one path between them state one drawdown series twice. Drop the column, or state `kappa` on the slot."))
+    return Y, mu, f.U
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `pr` carries.
+Compute the deformation parameter whose reciprocal is the Hill tail index of the radial series of the sample that `alg.series` names.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\hat{\\mathbf{\\Sigma}} &= \\mathbf{U}^{\\top} \\mathbf{U}\\,,\\\\
-\\boldsymbol{z}_{t} &= \\mathbf{U}^{-\\top} \\left(\\boldsymbol{x}_{t} - \\hat{\\boldsymbol{\\mu}}\\right)\\,,\\\\
+\\boldsymbol{y}_{t} &= \\mathcal{S}\\left(\\boldsymbol{x}_{t}\\right)\\,,\\\\
+\\hat{\\mathbf{\\Sigma}}_{y} &= \\mathbf{U}^{\\top} \\mathbf{U}\\,,\\\\
+\\boldsymbol{z}_{t} &= \\mathbf{U}^{-\\top} \\left(\\boldsymbol{y}_{t} - \\hat{\\boldsymbol{\\mu}}_{y}\\right)\\,,\\\\
 d_{t} &= \\left\\lVert \\boldsymbol{z}_{t} \\right\\rVert_{2}\\,,\\\\
 k &= \\left\\lceil \\alpha T \\right\\rceil\\,,\\\\
 \\hat{a} &= \\dfrac{k}{\\sum\\limits_{i=1}^{k} \\ln\\left(\\dfrac{d_{(i)}}{d_{(k+1)}}\\right)}\\,,\\\\
@@ -3253,9 +3561,11 @@ Where:
   - $(math_dict[:alpha_rm]) It is the probability of the end the slot prices, and the count it fixes is the same for both ends because the series has no sign.
   - $(math_dict[:T])
   - $(math_dict[:x_t_obs])
-  - $(math_dict[:mu_hat_shrink])
-  - $(math_dict[:Sigma_hat])
-  - ``\\mathbf{U}``: Square factor of ``\\hat{\\mathbf{\\Sigma}}``, which is `pr.chol` when the prior carries one.
+  - ``\\mathcal{S}``: The sample `alg.series` names, built one column at a time. It is the identity on a [`ReturnsSeries`](@ref), and a drawdown series on the two markers of [`AbstractDrawdownSeries`](@ref).
+  - ``\\boldsymbol{y}_{t}``: Row ``t`` of that sample.
+  - ``\\hat{\\boldsymbol{\\mu}}_{y}``: Centre of that sample. It is `pr.mu` on a returns series, and the column means of the drawdown sample on a drawdown series.
+  - ``\\hat{\\mathbf{\\Sigma}}_{y}``: Covariance matrix of that sample. It is `pr.sigma` on a returns series, and the covariance matrix of the drawdown sample on a drawdown series.
+  - ``\\mathbf{U}``: Square factor of ``\\hat{\\mathbf{\\Sigma}}_{y}``, which is `pr.chol` when the prior carries one and the slot prices the returns.
   - ``\\boldsymbol{z}_{t}``: Whitened observation ``t``.
   - ``d_{t}``: Mahalanobis distance of observation ``t``, the ``t``-th entry of the radial series.
   - ``d_{(i)}``: ``i``-th largest entry of the radial series, so that ``d_{(1)} \\geq \\ldots \\geq d_{(k+1)}``.
@@ -3265,14 +3575,14 @@ Where:
 # Algorithm
 
  1. Read the returns matrix off `pr` into `X`, and its row count into `T`.
- 2. Form the count `k = ceil(Int, alg.alpha * T)`, the number of order statistics the estimate reads.
- 3. Take the square factor of the covariance matrix with [`whitening_factor`](@ref).
+ 2. Form the count `k = ceil(Int, alg.alpha * T)`, the number of order statistics the estimate reads. A drawdown series holds one entry per observation, so the count is the same count under every marker.
+ 3. Take the sample, its centre and its whitening factor with [`radial_series_inputs`](@ref).
  4. Estimate the tail index of the radial series with [`radial_tail_index`](@ref), giving `a`.
  5. Return `inv(a)`, which is the deformation parameter.
 
 # Arguments
 
-  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there, and its `series` field names the quantity, which [`bind_series`](@ref) puts there.
   - `key`: Name of the slot that is being resolved. The radial series has no sign, so this rule reads no end from it and returns one number for every key.
   - `pr`: Prior result the returns matrix, the expected returns vector and the covariance matrix are read off.
   - `w`: Effective observation weights. A tail index is a statement about the shape of a series rather than about the count of observations behind it, so this rule ignores them.
@@ -3283,7 +3593,7 @@ Where:
   - `alg.alpha` must not be `nothing`.
   - `k` must be at least `alg.kmin`.
   - The series must hold at least `k + 1` entries.
-  - The covariance matrix must state a whitening, which [`whitening_factor`](@ref) checks.
+  - The sample must state a whitening, which [`radial_series_inputs`](@ref) checks on both readings.
   - ``d_{(k+1)}`` must be positive, which [`radial_tail_index`](@ref) checks.
   - ``\\hat{a}`` must be greater than one, which is the band ``\\kappa \\in (0,\\, 1)`` read as a tail index.
 
@@ -3295,9 +3605,11 @@ Where:
 
   - [`RadialTailDecay`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
   - [`kappa_log`](@ref)
+  - [`radial_series_inputs`](@ref)
   - [`radial_tail_index`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`whitening_factor`](@ref)
@@ -3314,10 +3626,11 @@ function (alg::RadialTailDecay)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
     @argcheck(k + 1 <= T,
               DomainError(k,
                           "`RadialTailDecay` needs $(k + 1) radial distances to form the estimate, and the series holds one per observation, which is $T. The count is `k = ceil(alpha * T)` at `alpha = $(alg.alpha)`, so only a probability that takes the whole sample reaches this. Lower `alpha`."))
-    a = radial_tail_index(X, pr.mu, whitening_factor(pr), k)
+    Y, mu, U = radial_series_inputs(alg.series, pr)
+    a = radial_tail_index(Y, mu, U, k)
     @argcheck(a > 1,
               DomainError(a,
-                          "`RadialTailDecay` estimated a tail index of $a on the radial series, so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The sample is heavier-tailed than the measure can price."))
+                          "`RadialTailDecay` estimated a tail index of $a on the radial series of the $(nameof(typeof(alg.series))), so `kappa = 1 / a` is $(inv(a)) and lies outside the (0, 1) the slot admits. An index of one or less is a tail with no finite mean, so no admissible deformation parameter reads it. The series is heavier-tailed than the measure can price."))
     return inv(a)
 end
 """
@@ -3367,10 +3680,65 @@ function bind_alpha(alg::EntropyBudget, alpha::Number)
     return EntropyBudget(; target = alg.target, alpha = alpha)
 end
 function bind_alpha(alg::HillTailDecay, alpha::Number)
-    return HillTailDecay(; kmin = alg.kmin, alpha = alpha)
+    return HillTailDecay(; kmin = alg.kmin, alpha = alpha, series = alg.series)
 end
 function bind_alpha(alg::RadialTailDecay, alpha::Number)
-    return RadialTailDecay(; kmin = alg.kmin, alpha = alpha)
+    return RadialTailDecay(; kmin = alg.kmin, alpha = alpha, series = alg.series)
+end
+"""
+    bind_series(slot, series::AbstractCalibrationSeries)
+
+Hand the series a slot owner prices to the rule that reads it, and return the slot's occupant with the marker in place.
+
+A rule gets a prior result and no portfolio, so the quantity it can read is the sample the prior carries. Which series of that sample is the right one is a property of the **owner**: [`RelativisticValueatRisk`](@ref) prices the returns and [`RelativisticDrawdownatRisk`](@ref) prices a drawdown series of them. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no marker, and the key `:kappa` serves both owners, so the marker travels through the rule itself. This is the shape [`bind_alpha`](@ref) uses to carry a significance level, and the shape [`bind_norm_order`](@ref) uses to carry a norm order.
+
+The owner's series **wins**, on the terms [`bind_norm_order`](@ref) states. A rule that already carries a marker has it replaced, because the quantity belongs to the measure and a rule cannot know which measure it reached. So a stated `series` serves a caller who runs the rule by hand, and nothing else.
+
+The default is the identity, so a stated number, a travelling role, a plain function and a rule that reads no series all pass through untouched. [`EntropyBudget`](@ref) needs no method: it reads the sample length and the sibling `alpha`, and neither moves with the series. The significance, radius, tail-weight and norm-ceiling families need none either, which the open question of ADR 0095 records.
+
+The slot owner's own resolution method calls this beside [`bind_alpha`](@ref):
+
+```julia
+alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
+kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha),
+                                             calibration_series(x)), :kappa, pr, w, slv)
+```
+
+# Arguments
+
+  - `slot`: The slot's occupant: a number, a travelling role, or a rule.
+  - `series`: The series the slot owner prices, which [`calibration_series`](@ref) states.
+
+# Returns
+
+  - `bound`: The occupant, with `series` in place wherever a rule reads one.
+
+# Related
+
+  - [`AbstractCalibrationSeries`](@ref)
+  - [`calibration_series`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`bind_norm_order`](@ref)
+  - [`HillTailDecay`](@ref)
+  - [`RadialTailDecay`](@ref)
+  - [`DeformationTailCalibration`](@ref)
+  - [`DeformationHeadCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function bind_series(slot, ::AbstractCalibrationSeries)
+    return slot
+end
+function bind_series(r::DeformationTailCalibration, series::AbstractCalibrationSeries)
+    return DeformationTailCalibration(; alg = bind_series(r.alg, series))
+end
+function bind_series(r::DeformationHeadCalibration, series::AbstractCalibrationSeries)
+    return DeformationHeadCalibration(; alg = bind_series(r.alg, series))
+end
+function bind_series(alg::HillTailDecay, series::AbstractCalibrationSeries)
+    return HillTailDecay(; kmin = alg.kmin, alpha = alg.alpha, series = series)
+end
+function bind_series(alg::RadialTailDecay, series::AbstractCalibrationSeries)
+    return RadialTailDecay(; kmin = alg.kmin, alpha = alg.alpha, series = series)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -4787,8 +5155,9 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound, SignificanceTailCalibration, SignificanceHeadCalibration,
-       DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
-       RateSignificance, EntropyBudget, HillTailDecay, RadialTailDecay,
-       AmbiguityRadiusCalibration, AmbiguityTailWeightCalibration, ConcentrationRadius,
-       RateRadius, DimensionalRateRadius, DualNormRadius, TailTermParity,
-       NormCeilingCalibration, EffectiveAssetFloor
+       DeformationTailCalibration, DeformationHeadCalibration, ReturnsSeries,
+       AbsoluteDrawdownSeries, RelativeDrawdownSeries, ScenarioCount, RateSignificance,
+       EntropyBudget, HillTailDecay, RadialTailDecay, AmbiguityRadiusCalibration,
+       AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
+       DimensionalRateRadius, DualNormRadius, TailTermParity, NormCeilingCalibration,
+       EffectiveAssetFloor

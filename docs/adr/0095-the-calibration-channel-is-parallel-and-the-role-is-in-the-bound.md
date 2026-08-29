@@ -241,3 +241,43 @@ its mean term, on the sample the prior result carries. The slot still admits a c
 **The tail-weight role travels, and the radius role does not.** `bind_alpha` gains a method
 for `AmbiguityTailWeightCalibration` and one for the rule inside it, because the tail-term
 scale is a CVaR at the slot owner's own significance level. The radius family needs none.
+
+## Amendment (2026-08-29) — the series a rule reads
+
+**A slot key names no quantity, so the owner hands its series over.** `RelativisticValueatRisk`
+and `RelativisticDrawdownatRisk` both resolve the key `:kappa`, and the two price two different
+series. A rule that reads the *shape* of a series therefore cannot tell from the key which
+quantity it stands in front of, and before this amendment both owners got a reading of the
+returns. `calibration_series(x)` is the trait each owner answers, and `bind_series(slot, series)`
+carries the answer into the rule, on the shape `bind_alpha` and `bind_norm_order` already give.
+The owner's series **overwrites** one the rule carries, for the reason a constraint's norm order
+does: the quantity belongs to the measure, and a rule cannot know which measure it reached.
+
+**The reading does not move, only the sample it reads.** `AbstractCalibrationSeries` names three
+markers: `ReturnsSeries`, and `AbsoluteDrawdownSeries` and `RelativeDrawdownSeries` under
+`AbstractDrawdownSeries`. `HillTailDecay` pools the drawdown series of each column in place of the
+columns, with the same standardisation, the same count and the same estimator. `RadialTailDecay`
+whitens the rows of the drawdown sample in place of the rows of `pr.X`. Neither rule forms a
+portfolio, and neither needs one: a drawdown series is formed per column, and it holds one entry
+per observation, so every count a rule forms on `pr.X` is the count it reads.
+
+**A drawdown sample carries its own moments.** `pr.mu` and `pr.sigma` are moments of the returns,
+and no scaling of them states the moments of a drawdown, so under a drawdown marker
+`RadialTailDecay` centres on the column means of the drawdown sample and whitens by the Cholesky
+factor of its covariance matrix. The precedence of `pr.chol` over `pr.sigma`, which ADR 0095 and
+issue #612 record, therefore governs the returns reading alone. This is the one place where the
+change of series changes what a rule reads off the prior result.
+
+**A drawdown series has one end.** It is non-positive, so `:kappa_b` names nothing on it and
+`series_end_sign` refuses that key under `AbstractDrawdownSeries`. No drawdown Range measure
+ships, so only a caller who runs a rule by hand reaches the refusal.
+
+**Three rules still read no series.** `EntropyBudget` reads the sample length and its sibling
+`alpha`, and neither moves with the series, so it needs no `bind_series` method and the identity
+default serves it. The significance and norm-ceiling families need none either.
+
+**Two rules of other families keep the gap this amendment closes.** `TailTermParity` prices a mean
+term and a CVaR of the *returns* on a drawdown owner, and `ConcentrationRadius` and
+`DualNormRadius` read a returns scale there. Their families carry no series field yet, and the
+open question of this ADR records the `DualNormRadius` case already. The mechanism above is what
+they would use.

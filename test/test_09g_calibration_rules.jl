@@ -17,6 +17,14 @@ far too small or too large to be the answer and yet still inside the range the s
 admits. A pool with no Hill estimate leaves `HillTailDecay` with nothing to invert, and a
 covariance matrix that states no whitening leaves `RadialTailDecay` with no series to read.
 
+Two of the five read the SHAPE of a series, and a slot owner tells them which series that is.
+A drawdown measure prices the drawdown series of the portfolio and resolves the key `:kappa`,
+which the value-at-risk twin resolves as well, so the key names no quantity and the marker
+travels through the rule itself. `calibration_series` is the trait the owner answers and
+`bind_series` is the verb that carries it, on the shape `bind_alpha` and `bind_norm_order`
+already carry. The reading itself does not move: the same standardisation, the same count and
+the same estimator run over the drawdown series of each column, in place of the columns.
+
 Issue #582 ships the first three rules, #611 ships `HillTailDecay` and #612 ships
 `RadialTailDecay`. Issue #583 widens the slots that hold them, so every call below states the
 resolution by hand.
@@ -85,10 +93,19 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test ScenarioCount(25).n == 25
     @test RateSignificance(2).c == 2
     @test EntropyBudget(-1.3, 0.05).alpha == 0.05
-    @test HillTailDecay(12, 0.05).kmin == 12
-    @test HillTailDecay(12, 0.05).alpha == 0.05
-    @test RadialTailDecay(12, 0.05).kmin == 12
-    @test RadialTailDecay(12, 0.05).alpha == 0.05
+    @test HillTailDecay(12, 0.05, ReturnsSeries()).kmin == 12
+    @test HillTailDecay(12, 0.05, ReturnsSeries()).alpha == 0.05
+    @test isa(HillTailDecay(12, 0.05, AbsoluteDrawdownSeries()).series,
+              AbsoluteDrawdownSeries)
+    @test RadialTailDecay(12, 0.05, ReturnsSeries()).kmin == 12
+    @test RadialTailDecay(12, 0.05, ReturnsSeries()).alpha == 0.05
+    @test isa(RadialTailDecay(12, 0.05, RelativeDrawdownSeries()).series,
+              RelativeDrawdownSeries)
+
+    # The series defaults to the returns, which is what every rule read before the marker
+    # existed. A rule that never leaves it reads what it read then.
+    @test isa(HillTailDecay().series, ReturnsSeries)
+    @test isa(RadialTailDecay().series, ReturnsSeries)
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
@@ -845,4 +862,291 @@ const PRZDIAG = LowOrderPrior(; X = XSING, mu = zeros(4), sigma = Matrix(1.0I, 4
     end
     @test occursin("Entry 3 of the diagonal", msg)
     @test occursin("`pr.chol`", msg)
+end
+
+#=
+The **series** a rule reads. A drawdown measure prices the drawdown series of the portfolio,
+and a rule forms no portfolio, so it reads the drawdown series of each COLUMN in place of the
+column. Nothing else in either reading moves. `bind_series` carries the marker from the owner
+to the rule, and the owner's marker wins, because the quantity belongs to the measure and a
+rule cannot know which measure it reached.
+
+The fixture is a drifted Student-t draw. The drift matters to what a drawdown series says: a
+drawdown is a running functional, so a sample whose drift is strong enough for the drawdown
+process to settle reads heavier than its own returns, and a weakly drifted one reads the
+range of its path over the record. Both are readings of the series the measure prices, and
+the tests below state the MECHANISM rather than the direction the two readings part in.
+=#
+const XDD = 0.0005 .+ 0.01 .* rand(StableRNG(515151), Distributions.TDist(4), 3000, 6)
+const PRDD = prior(EmpiricalPrior(), XDD)
+
+@testset "Calibration series: the family, the trait and the two series" begin
+    # Two markers name a drawdown and one names the returns, so a rule asks the family
+    # rather than the marker whether it holds a path functional.
+    @test ReturnsSeries <: PO.AbstractCalibrationSeries
+    @test AbsoluteDrawdownSeries <: PO.AbstractDrawdownSeries
+    @test RelativeDrawdownSeries <: PO.AbstractDrawdownSeries
+    @test PO.AbstractDrawdownSeries <: PO.AbstractCalibrationSeries
+    @test !(ReturnsSeries <: PO.AbstractDrawdownSeries)
+
+    # The markers are caller-facing, because a caller states one to run a rule by hand.
+    exported = names(PortfolioOptimisers)
+    @test :ReturnsSeries in exported
+    @test :AbsoluteDrawdownSeries in exported
+    @test :RelativeDrawdownSeries in exported
+
+    # The trait. The default is the returns, so a type that prices the return distribution
+    # writes no method, and the two drawdown measures do.
+    @test isa(PO.calibration_series(0.3), ReturnsSeries)
+    @test isa(PO.calibration_series(RelativisticValueatRisk()), ReturnsSeries)
+    @test isa(PO.calibration_series(RelativisticValueatRiskRange()), ReturnsSeries)
+    @test isa(PO.calibration_series(RelativisticDrawdownatRisk()), AbsoluteDrawdownSeries)
+    @test isa(PO.calibration_series(RelativeRelativisticDrawdownatRisk()),
+              RelativeDrawdownSeries)
+
+    # A DRAWDOWN SERIES HOLDS ONE ENTRY PER OBSERVATION, so the change of series takes no
+    # observation away and the count a rule forms on `X` is the count it reads.
+    col = view(XDD, :, 2)
+    @test PO.calibration_series_vec(ReturnsSeries(), col) === col
+    @test PO.calibration_series_vec(AbsoluteDrawdownSeries(), col) ==
+          PO.absolute_drawdown_vec(col)
+    @test PO.calibration_series_vec(RelativeDrawdownSeries(), col) ==
+          PO.relative_drawdown_vec(col)
+    for s in (AbsoluteDrawdownSeries(), RelativeDrawdownSeries())
+        @test length(PO.calibration_series_vec(s, col)) == length(col)
+        @test size(PO.calibration_series_matrix(s, XDD)) == size(XDD)
+    end
+
+    # The matrix is the vector over the columns, and the returns matrix is passed through.
+    @test PO.calibration_series_matrix(ReturnsSeries(), XDD) === XDD
+    D = PO.calibration_series_matrix(AbsoluteDrawdownSeries(), XDD)
+    @test all(j -> view(D, :, j) == PO.absolute_drawdown_vec(view(XDD, :, j)), axes(XDD, 2))
+
+    # A drawdown series is non-positive and the returns are not, which is the whole reason
+    # the two readings differ.
+    @test all(<=(0), D)
+    @test any(>(0), XDD)
+end
+
+@testset "Calibration series: `bind_series` carries the owner's series" begin
+    rule = HillTailDecay(; kmin = 12, alpha = 0.02)
+
+    # The verb reaches the rule, and through both roles of the family.
+    @test isa(PO.bind_series(rule, AbsoluteDrawdownSeries()).series, AbsoluteDrawdownSeries)
+    @test isa(PO.bind_series(DeformationTailCalibration(; alg = rule),
+                             RelativeDrawdownSeries()).alg.series, RelativeDrawdownSeries)
+    @test isa(PO.bind_series(DeformationHeadCalibration(; alg = rule),
+                             AbsoluteDrawdownSeries()).alg.series, AbsoluteDrawdownSeries)
+    @test isa(PO.bind_series(RadialTailDecay(; kmin = 7), AbsoluteDrawdownSeries()).series,
+              AbsoluteDrawdownSeries)
+
+    # It carries the rule's other fields over untouched, and it commutes with `bind_alpha`:
+    # the two verbs fill two different fields.
+    bound = PO.bind_series(rule, AbsoluteDrawdownSeries())
+    @test bound.kmin == 12
+    @test bound.alpha == 0.02
+    @test PO.bind_alpha(PO.bind_series(HillTailDecay(; kmin = 12),
+                                       AbsoluteDrawdownSeries()), 0.02) == bound
+    @test PO.bind_series(PO.bind_alpha(HillTailDecay(; kmin = 12), 0.02),
+                         AbsoluteDrawdownSeries()) == bound
+
+    # THE OWNER'S SERIES WINS. A rule that already carries a marker has it replaced, because
+    # the quantity belongs to the measure. This is the reading `bind_norm_order` states for
+    # a norm order, and it is the opposite of `bind_alpha`, whose number no rule holds.
+    stated = HillTailDecay(; kmin = 12, alpha = 0.02, series = RelativeDrawdownSeries())
+    @test isa(PO.bind_series(stated, ReturnsSeries()).series, ReturnsSeries)
+
+    # The default is the identity, so everything that reads no series crosses unchanged.
+    @test PO.bind_series(0.3, AbsoluteDrawdownSeries()) === 0.3
+    @test PO.bind_series(nothing, AbsoluteDrawdownSeries()) === nothing
+    budget = EntropyBudget(; target = -1.3, alpha = 0.05)
+    @test PO.bind_series(budget, AbsoluteDrawdownSeries()) === budget
+    probe = (key, pr, w, slv) -> 0.4
+    @test PO.bind_series(probe, AbsoluteDrawdownSeries()) === probe
+    @test PO.bind_series(DeformationTailCalibration(; alg = probe),
+                         AbsoluteDrawdownSeries()).alg === probe
+    @test PO.bind_series(SignificanceTailCalibration(; alg = RateSignificance()),
+                         AbsoluteDrawdownSeries()).alg == RateSignificance()
+end
+
+@testset "Calibration series: `HillTailDecay` pools the drawdowns" begin
+    alpha = 0.05
+    k = ceil(Int, alpha * length(XDD))
+
+    # The count does not move with the series: the pool holds `T * N` entries under every
+    # marker, because a drawdown series holds one entry per observation.
+    @test k == ceil(Int, alpha * size(XDD, 1) * size(XDD, 2))
+
+    # The reading is the sibling's, over the drawdown series of each column. The pool is
+    # built here by hand, so the whole chain is checked and not merely its two ends.
+    function hill_by_hand(f, X, k)
+        pool = Float64[]
+        for j in axes(X, 2)
+            s = f(view(X, :, j))
+            append!(pool, (s .- mean(s)) ./ std(s))
+        end
+        u = sort(pool)
+        return k / sum(log(u[i] / u[k + 1]) for i in 1:k)
+    end
+    for (s, f) in ((AbsoluteDrawdownSeries(), PO.absolute_drawdown_vec),
+                   (RelativeDrawdownSeries(), PO.relative_drawdown_vec), (ReturnsSeries(), identity))
+        rule = HillTailDecay(; kmin = 20, alpha = alpha, series = s)
+        @test rule(:kappa, PRDD, nothing, nothing) ≈ inv(hill_by_hand(f, XDD, k))
+    end
+
+    # The three markers name three series of one sample, so they answer three numbers.
+    ka = HillTailDecay(; kmin = 20, alpha = alpha, series = ReturnsSeries())(:kappa, PRDD,
+                                                                             nothing,
+                                                                             nothing)
+    kb = HillTailDecay(; kmin = 20, alpha = alpha, series = AbsoluteDrawdownSeries())(:kappa,
+                                                                                      PRDD,
+                                                                                      nothing,
+                                                                                      nothing)
+    kc = HillTailDecay(; kmin = 20, alpha = alpha, series = RelativeDrawdownSeries())(:kappa,
+                                                                                      PRDD,
+                                                                                      nothing,
+                                                                                      nothing)
+    @test ka != kb
+    @test kb != kc
+    @test all(k -> 0 < k < 1, (ka, kb, kc))
+
+    # A DRAWDOWN SERIES HAS ONE END, so the head key names nothing on it and is refused. No
+    # drawdown Range measure ships, so only a caller who runs the rule by hand reaches this.
+    @test PO.series_end_sign(ReturnsSeries(), :kappa_b) == 1
+    @test PO.series_end_sign(ReturnsSeries(), :kappa) == -1
+    @test PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa) == -1
+    @test PO.series_end_sign(RelativeDrawdownSeries(), :kappa_a) == -1
+    @test_throws ArgumentError PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa_b)
+    @test_throws ArgumentError HillTailDecay(; kmin = 20, alpha = alpha,
+                                             series = AbsoluteDrawdownSeries())(:kappa_b,
+                                                                                PRDD,
+                                                                                nothing,
+                                                                                nothing)
+    msg = try
+        PO.series_end_sign(AbsoluteDrawdownSeries(), :kappa_b)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("has no gain end", msg)
+    @test occursin("AbsoluteDrawdownSeries", msg)
+end
+
+@testset "Calibration series: `RadialTailDecay` whitens the drawdowns" begin
+    alpha = 0.05
+    rule = RadialTailDecay(; kmin = 20, alpha = alpha, series = AbsoluteDrawdownSeries())
+
+    # The reading is the returns reading over the drawdown sample: the rows of that sample
+    # are centred on ITS column means and whitened by the factor of ITS covariance matrix,
+    # because a prior result states no drawdown moment.
+    D = PO.calibration_series_matrix(AbsoluteDrawdownSeries(), XDD)
+    mu = vec(mean(D; dims = 1))
+    U = cholesky(cov(D)).U
+    d = [norm(transpose(U) \ (D[t, :] .- mu)) for t in axes(D, 1)]
+    k = ceil(Int, alpha * length(d))
+    u = sort(d; rev = true)
+    ahat = k / sum(log(u[i] / u[k + 1]) for i in 1:k)
+    @test rule(:kappa, PRDD, nothing, nothing) ≈ inv(ahat)
+    @test 0 < rule(:kappa, PRDD, nothing, nothing) < 1
+
+    # The verb that picks the three inputs is separate, and it states which reading is which.
+    Y, m, F = PO.radial_series_inputs(AbsoluteDrawdownSeries(), PRDD)
+    @test Y == D
+    @test m == mu
+    @test F == U
+    Yr, mr, Fr = PO.radial_series_inputs(ReturnsSeries(), PRDD)
+    @test Yr === PRDD.X
+    @test mr === PRDD.mu
+    @test Fr == PO.whitening_factor(PRDD)
+
+    # `pr.sigma` IS THE COVARIANCE MATRIX OF THE RETURNS, so it reaches nothing under a
+    # drawdown marker: a hundredfold scaling of it moves the returns reading and leaves the
+    # drawdown reading where it stands.
+    scaled = LowOrderPrior(; X = PRDD.X, mu = PRDD.mu, sigma = 100 .* PRDD.sigma)
+    @test rule(:kappa, scaled, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+    ret = RadialTailDecay(; kmin = 20, alpha = alpha)
+    @test ret(:kappa, scaled, nothing, nothing) != ret(:kappa, PRDD, nothing, nothing)
+
+    # The distance still has no sign, so the rule answers one number for every key. The
+    # marker moves the sample the distance is taken over, and not what a distance is.
+    @test rule(:kappa_a, PRDD, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+    @test rule(:kappa_b, PRDD, nothing, nothing) == rule(:kappa, PRDD, nothing, nothing)
+
+    # A drawdown sample states its own covariance matrix, so a sample that states a singular
+    # one is refused there rather than in `whitening_factor`. Two columns with one path
+    # between them are what produce it.
+    twice = [XDD[:, 1] XDD[:, 1]]
+    prtwice = LowOrderPrior(; X = twice, mu = vec(mean(twice; dims = 1)),
+                            sigma = Matrix(1.0I, 2, 2))
+    @test_throws DomainError rule(:kappa, prtwice, nothing, nothing)
+    msg = try
+        PO.radial_series_inputs(AbsoluteDrawdownSeries(), prtwice)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("AbsoluteDrawdownSeries", msg)
+    @test occursin("not positive definite", msg)
+    # The same carrier passes the returns reading, because `pr.sigma` states a whitening.
+    @test 0 < ret(:kappa, prtwice, nothing, nothing) < 1
+end
+
+@testset "Calibration series: a measure hands its own series over" begin
+    # The four owners resolve one key, `:kappa`, and three of them price three series. The
+    # marker is the only thing that separates the three readings.
+    hill = DeformationTailCalibration(; alg = HillTailDecay(; kmin = 20))
+    rlvar = PO.resolve_deferred_quantities(RelativisticValueatRisk(; alpha = 0.05,
+                                                                   kappa = hill), PRDD)
+    rldar = PO.resolve_deferred_quantities(RelativisticDrawdownatRisk(; alpha = 0.05,
+                                                                      kappa = hill), PRDD)
+    rrldar = PO.resolve_deferred_quantities(RelativeRelativisticDrawdownatRisk(;
+                                                                               alpha = 0.05,
+                                                                               kappa = hill),
+                                            PRDD)
+    @test rlvar.kappa ==
+          HillTailDecay(; kmin = 20, alpha = 0.05, series = ReturnsSeries())(:kappa, PRDD,
+                                                                             nothing,
+                                                                             nothing)
+    @test rldar.kappa ==
+          HillTailDecay(; kmin = 20, alpha = 0.05, series = AbsoluteDrawdownSeries())(:kappa,
+                                                                                      PRDD,
+                                                                                      nothing,
+                                                                                      nothing)
+    @test rrldar.kappa ==
+          HillTailDecay(; kmin = 20, alpha = 0.05, series = RelativeDrawdownSeries())(:kappa,
+                                                                                      PRDD,
+                                                                                      nothing,
+                                                                                      nothing)
+    @test rlvar.kappa != rldar.kappa
+    @test rldar.kappa != rrldar.kappa
+
+    # The radial rule travels the same way, and its drawdown reading is its own.
+    radial = DeformationTailCalibration(; alg = RadialTailDecay(; kmin = 20))
+    rdar = PO.resolve_deferred_quantities(RelativisticDrawdownatRisk(; alpha = 0.05,
+                                                                     kappa = radial), PRDD)
+    @test rdar.kappa ==
+          RadialTailDecay(; kmin = 20, alpha = 0.05, series = AbsoluteDrawdownSeries())(:kappa,
+                                                                                        PRDD,
+                                                                                        nothing,
+                                                                                        nothing)
+    @test rdar.kappa != rldar.kappa
+
+    # A MARKER STATED ON THE RULE IS OVERWRITTEN by the measure that resolves it. It serves
+    # a caller who runs the rule by hand, and nothing else.
+    wrong = DeformationTailCalibration(;
+                                       alg = HillTailDecay(; kmin = 20,
+                                                           series = AbsoluteDrawdownSeries()))
+    o = PO.resolve_deferred_quantities(RelativisticValueatRisk(; alpha = 0.05,
+                                                               kappa = wrong), PRDD)
+    @test o.kappa == rlvar.kappa
+
+    # Both ends of a Range measure price ONE series, where each end prices its own
+    # probability. So the marker reaching the two `kappa` slots is the same marker.
+    rg = PO.resolve_deferred_quantities(RelativisticValueatRiskRange(; alpha = 0.05,
+                                                                     kappa_a = hill,
+                                                                     beta = 0.05,
+                                                                     kappa_b = PO.mirror_role(hill)),
+                                        PRDD)
+    @test rg.kappa_a == rlvar.kappa
+    @test 0 < rg.kappa_b < 1
 end

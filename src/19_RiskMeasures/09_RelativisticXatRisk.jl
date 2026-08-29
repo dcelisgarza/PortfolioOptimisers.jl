@@ -278,6 +278,8 @@ Resolve the significance level `alpha` and the deformation parameter `kappa` of 
 
 `alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is handed to the `kappa` slot through [`bind_alpha`](@ref) before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling.
 
+The series this measure prices travels the same way, through [`bind_series`](@ref). It is the returns, which is the default [`calibration_series`](@ref) states, so the call binds what a rule already carries and is written for the reason every site writes it: the marker belongs to the measure, and a rule that carries a drawdown marker into this slot is corrected rather than obeyed.
+
 The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through the ordinary keyword constructor, which re-runs both range checks on the calibrated numbers.
 
 # Related
@@ -285,14 +287,18 @@ The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a
   - [`RelativisticValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series`](@ref)
   - [`EntropyBudget`](@ref)
 """
 function resolve_deferred_quantities(x::RelativisticValueatRisk, pr::AbstractPriorResult,
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
+    s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
+                                     ws, sv)
     return if alpha === x.alpha && kappa === x.kappa
         x
     else
@@ -460,21 +466,28 @@ Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `
 
 The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
 
+Both ends price one series, which is the returns, so [`bind_series`](@ref) carries the same marker to both `kappa` slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+
 # Related
 
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series`](@ref)
   - [`EntropyBudget`](@ref)
 """
 function resolve_deferred_quantities(x::RelativisticValueatRiskRange,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
+    s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa_a = resolve_calibration_slot(bind_alpha(x.kappa_a, alpha), :kappa_a, pr, ws, sv)
+    kappa_a = resolve_calibration_slot(bind_series(bind_alpha(x.kappa_a, alpha), s),
+                                       :kappa_a, pr, ws, sv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, sv)
-    kappa_b = resolve_calibration_slot(bind_alpha(x.kappa_b, beta), :kappa_b, pr, ws, sv)
+    kappa_b = resolve_calibration_slot(bind_series(bind_alpha(x.kappa_b, beta), s),
+                                       :kappa_b, pr, ws, sv)
     return if alpha === x.alpha &&
               kappa_a === x.kappa_a &&
               beta === x.beta &&
@@ -657,19 +670,26 @@ Resolve the significance level `alpha` and the deformation parameter `kappa` of 
 
 It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and travels to the `kappa` slot through [`bind_alpha`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
 
+**The series does not carry over, and [`bind_series`](@ref) is what says so.** This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, in place of the columns themselves, and the `alpha` it reads is the level of that same drawdown series. The key `:kappa` names this slot and the twin's slot alike, so nothing else could have told the rule which quantity it stands in front of.
+
 # Related
 
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativisticValueatRisk`](@ref)
+  - [`AbsoluteDrawdownSeries`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::AbstractPriorResult,
                                      slv = nothing)
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
+    s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
+                                     ws, sv)
     return if alpha === x.alpha && kappa === x.kappa
         x
     else
@@ -679,6 +699,9 @@ function resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::Abstract
 end
 # Calibration slots — see `calibration_slots`.
 calibration_slots(x::RelativisticDrawdownatRisk) = (; alpha = x.alpha, kappa = x.kappa)
+# Calibration series — see `calibration_series`. The measure prices the drawdown series of
+# the portfolio, so a rule reads the drawdown series of each column and not the columns.
+calibration_series(::RelativisticDrawdownatRisk) = AbsoluteDrawdownSeries()
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
@@ -836,19 +859,26 @@ Resolve the significance level `alpha` and the deformation parameter `kappa` of 
 
 The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The travelling pair is resolved in the order the absolute twin states.
 
+The series is the twin's reading in its own units: this measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref) and [`bind_series`](@ref) carries it. The two markers name two different series of the same column, and a rule that reads the shape of a series answers differently on each.
+
 # Related
 
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
+  - [`RelativeDrawdownSeries`](@ref)
   - [`bind_alpha`](@ref)
+  - [`bind_series`](@ref)
+  - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
 """
 function resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     sv = sel(x.slv, slv)
+    s = calibration_series(x)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, sv)
-    kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, ws, sv)
+    kappa = resolve_calibration_slot(bind_series(bind_alpha(x.kappa, alpha), s), :kappa, pr,
+                                     ws, sv)
     return if alpha === x.alpha && kappa === x.kappa
         x
     else
@@ -860,6 +890,9 @@ end
 function calibration_slots(x::RelativeRelativisticDrawdownatRisk)
     return (; alpha = x.alpha, kappa = x.kappa)
 end
+# Calibration series — see `calibration_series`. The path compounds here, where the absolute
+# twin sums it, so the two measures name two different series of one column.
+calibration_series(::RelativeRelativisticDrawdownatRisk) = RelativeDrawdownSeries()
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
