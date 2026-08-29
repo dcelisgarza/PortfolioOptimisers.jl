@@ -421,7 +421,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `tn` or `tr` is a vector: each must be non-empty.
   - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an [`AmbiguityRadiusCalibration`](@ref), and `l2c` and `linfc` a [`NormCeilingCalibration`](@ref). A role carries no such check until it resolves.
   - The role in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a [`NormCeilingCalibration`](@ref), and `lpc` is a constraint, so it refuses an [`AmbiguityRadiusCalibration`](@ref). The term itself carries one bound for both readings, so this is the point at which the reading is known.
-  - If `lp` is a vector: `!isempty(lp)`.
+  - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
   - `l2`, `lp` and `lpc` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
@@ -679,8 +679,14 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         if !isnothing(l1) && !isa(l1, TimeDependent)
             assert_nonempty_gt0_finite_val(l1, :l1)
         end
+        if isa(l2, AbstractVector)
+            @argcheck(!isempty(l2), IsEmptyError("l2 cannot be empty"))
+        end
         if isa(lp, AbstractVector)
             @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
+        end
+        if isa(lpc, AbstractVector)
+            @argcheck(!isempty(lpc), IsEmptyError("lpc cannot be empty"))
         end
         # `LpRegularisation.val` is read as a coefficient in `lp` and as a ceiling in
         # `lpc`, and one field cannot carry two bounds. This is the first point at which

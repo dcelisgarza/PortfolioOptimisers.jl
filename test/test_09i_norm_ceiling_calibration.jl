@@ -530,3 +530,46 @@ and ADR 0095 grants none.
     @test_throws ArgumentError PO.resolve_calibration_slot(PO.bind_norm_order(dnr, 3), :lpc,
                                                            PR60, PR60.w, SLV)
 end
+
+#=
+Issue #626. `JuMPOptimiser` refused an empty `lp` and accepted an empty `l2` and an empty
+`lpc`. The three fields hold the same shape of value, a term or a vector of terms, and each
+builder iterates the terms, so an empty vector builds the model that `nothing` builds. The
+three now agree: a vector must carry at least one term.
+=#
+@testset "Issue #626: the three regularisation fields refuse an empty vector" begin
+    # -- The static case. One message per field, and the field names itself.
+    @test_throws PortfolioOptimisers.IsEmptyError JuMPOptimiser(; slv = SLV,
+                                                                l2 = L2Regularisation[])
+    @test_throws PortfolioOptimisers.IsEmptyError JuMPOptimiser(; slv = SLV,
+                                                                lp = LpRegularisation[])
+    @test_throws PortfolioOptimisers.IsEmptyError JuMPOptimiser(; slv = SLV,
+                                                                lpc = LpRegularisation[])
+
+    # A vector that carries one term is admitted, so the guard refuses emptiness alone.
+    opt = JuMPOptimiser(; slv = SLV, l2 = [L2Regularisation(; val = 5e-6)],
+                        lp = [LpRegularisation(; val = 1e-3)],
+                        lpc = [LpRegularisation(; val = 0.6)])
+    @test length(opt.l2) == 1
+    @test length(opt.lp) == 1
+    @test length(opt.lpc) == 1
+
+    # `nothing` is the way to build no term, and it stays admitted. That is the state the
+    # empty vector reached by accident, and it now has one spelling rather than two.
+    plain = JuMPOptimiser(; slv = SLV)
+    @test isnothing(plain.l2)
+    @test isnothing(plain.lp)
+    @test isnothing(plain.lpc)
+
+    # -- The scheduled case. A `TimeDependent` is not a vector of terms, so it meets no
+    # guard itself. Its entries are test-substituted through this same constructor, so an
+    # empty entry is refused there.
+    @test_throws PortfolioOptimisers.IsEmptyError JuMPOptimiser(; slv = SLV,
+                                                                l2 = TimeDependent([L2Regularisation[]];
+                                                                                   default = [L2Regularisation(;
+                                                                                                               val = 5e-6)]))
+    @test_throws PortfolioOptimisers.IsEmptyError JuMPOptimiser(; slv = SLV,
+                                                                lpc = TimeDependent([LpRegularisation[]];
+                                                                                    default = [LpRegularisation(;
+                                                                                                                val = 0.6)]))
+end

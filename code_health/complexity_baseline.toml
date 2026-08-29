@@ -158,7 +158,7 @@ commit = "2107fc7a40"
 "src/20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 12, cog_sum = 4, arg_sum = 57, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 28, cog_sum = 6, arg_sum = 55, macros = [] }
 "src/20_Optimisation/09_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 7, cog_sum = 1, arg_sum = 9, macros = [] }
-"src/20_Optimisation/10_JuMPOptimiser.jl" = { cyc = 100, cog = 96, arg = 44, cyc_sum = 140, cog_sum = 126, arg_sum = 116, macros = ["@forward_properties"] }
+"src/20_Optimisation/10_JuMPOptimiser.jl" = { cyc = 102, cog = 98, arg = 44, cyc_sum = 142, cog_sum = 128, arg_sum = 116, macros = ["@forward_properties"] }
 "src/20_Optimisation/11_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 41, cog_sum = 23, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/12_FactorRiskContribution.jl" = { cyc = 4, cog = 3, arg = 9, cyc_sum = 18, cog_sum = 11, arg_sum = 33, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/20_Optimisation/13_NearOptimalCentering.jl" = { cyc = 12, cog = 14, arg = 14, cyc_sum = 80, cog_sum = 52, arg_sum = 202, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
