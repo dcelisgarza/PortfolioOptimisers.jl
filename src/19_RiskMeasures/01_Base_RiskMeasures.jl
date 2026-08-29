@@ -2407,6 +2407,8 @@ This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather t
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
+**A [`TimeDependent`](@ref) reaches the host that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of a host, so the host is what a schedule swaps. Where the host is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the host is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the host already carries.
+
 # Algorithm
 
  1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
@@ -4369,11 +4371,13 @@ The radius is the Esfahani-Kuhn [drcvar](@cite) form, a scale in the units of th
 
 The source result carries a second branch for a short record, whose exponent is `1 / a` for a tail-decay exponent `a` rather than `1 / max(N, 2)`. That branch binds only below a threshold that depends on constants the source leaves to the caller, so this rule drops it and ships the one branch. A reader who holds the paper beside this form finds the difference stated here, rather than by deriving it.
 
+**The branch stays dropped, and [`HillTailDecay`](@ref) does not supply it.** That rule estimates the tail index of a **power law**, which is the heavy-tailed regime. The `a` of the second branch is the exponent of the **light-tail** moment condition the concentration result assumes, and the same condition carries the two constants that place the threshold. So the two exponents share a letter and nothing else, and a rule that read one for the other would state a rate the result does not give. The threshold is also unreachable in practice: it puts the short branch below a record of a few dozen rows, which no fold of a portfolio problem uses.
+
 `N` is the asset count, `size(pr.X, 2)`, because the ball is over the assets. A factor prior carries a smaller effective dimension, and the ball is still over the assets, so a factor prior does not move `N`.
 
 `scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the loss the ball is drawn around, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average per-asset dispersion of the series the slot owner prices instead, on the same terms as [`ConcentrationRadius`](@ref), and a drawdown owner is read on a drawdown scale there for the reason that rule states.
 
-[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, but the reading off `pr.sigma` is a return volatility and a drawdown is not a return. State `scale` on a drawdown slot rather than leave it `nothing`.
+[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, and the scale moves with the series: [`bind_series`](@ref) puts the owner's marker on the rule, and [`calibration_series_dispersion`](@ref) then reads the per-asset dispersion off the drawdown sample rather than off `pr.sigma`. A drawdown column is a running functional of its returns, so its dispersion is the wider of the two, and a `scale` of `nothing` therefore gives a wider ball on that owner than on a returns owner of the same sample. A stated `scale` still wins, and it is the way to price a ball whose units are neither.
 
 `T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref) and [`ScenarioCount`](@ref). The rate is a concentration statement, so the record it prices is the one Kish's count measures. [`RateRadius`](@ref) reads the raw row count instead, because its rate speaks of the length of the record.
 
@@ -4512,9 +4516,15 @@ The eight radius slots of the library do not measure distance in one norm. A rad
 
 The sampling error of the mean vector is the part a linear loss sees, and its per-asset scale is the dispersion of the series the slot owner prices over the square root of the effective sample size. The radius is a norm of that error vector, at the confidence level `confidence` states.
 
+**No term of the covariance error belongs in that vector.** A radius multiplies a norm of the weight vector, so it prices the part of the loss that is **linear** in the weights, and the loss of a distributionally robust measure is linear in the sample point. The error of the second moment reaches the objective through the tail term rather than through the ball, and the tail term carries its own coefficient, which [`TailTermParity`](@ref) sets. A radius that carried both would price one error twice.
+
 `confidence` is a **per-coordinate** level, and it is not corrected for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a per-coordinate level understates it, and a caller who wants a level over the whole vector states the corrected number themselves, as `1 - (1 - c) / N`.
 
+**The correction stays with the caller, and it is not a rounding.** A Bonferroni step from `0.95` to `1 - 0.05 / N` moves the quantile by about a third at four assets and by more at twenty. It is also one choice of several: a level over the vector read off `N` correlated coordinates and one read off `N` independent ones disagree by an amount only the correlation states. The source result states a per-coordinate level and no correction, so the rule ships what the result states and names the corrected number in prose. A rule that corrected silently would give a caller a level they did not ask for and cannot see.
+
 The 1-norm case sums the per-asset errors, which prices them as if they moved together. That is the worst case over the correlations, and it is therefore the conservative reading for a radius. A correlation-aware form would give a smaller ball, and this rule does not compute one.
+
+**The worst case is the reading a radius wants, so the correlation-aware form stays out.** A radius that understates the ball gives a model that is robust to less than the caller asked for, and the failure is silent: the optimisation solves and the weights are not robust. A radius that overstates it is visible, because the portfolio moves towards cash. The two errors are not symmetric, so the rule takes the one a caller can see.
 
 `p` serves the `:lpreg_val` slot alone. The ground metric of [`LpRegularisation`](@ref) is the type-``q`` metric with ``1/p + 1/q = 1``, and `key` names the slot rather than the norm order. The order belongs to the penalty, so that site fills this field through [`bind_norm_order`](@ref) before it resolves the slot, and the call **overwrites** whatever the field holds. A stated `p` therefore serves a caller who runs the rule outside that site, and nothing else. Every other key ignores the field.
 
@@ -4525,6 +4535,8 @@ The 1-norm case sums the per-asset errors, which prices them as if they moved to
 `T_e` is Kish's effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref).
 
 The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref).
+
+**A sample of no dispersion gives a radius of zero, and the slot admits it.** Every diagonal of the dispersion is non-negative, so the radius is non-negative and finite for every admissible input. A sample whose columns never move gives an error vector of zeros, and a ball of no width is the right answer for it: the empirical measure is the only measure such a sample supports, and the robust measure reduces to the plain one it is drawn around. In floating point that sample gives a number many orders below the smallest one a caller would state rather than an exact zero, so the slot owner's `> 0` check passes and the model prices a ball of no width. Both outcomes read the same way, and neither is a defect.
 
 # Fields
 
@@ -4709,6 +4721,8 @@ At ``r \\to 0`` the loss of [`DistributionallyRobustConditionalValueatRisk`](@re
 The rule carries the sample's own units and nothing else, so the preference stays the caller's. `ratio` states how many mean terms one tail term is worth, and the rule returns the `l` that prices it so on the sample the prior result carries. `ratio = 1` is parity, and `ratio = 2` prices the tail term at twice the mean term on every sample.
 
 A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. The series it reads is the cross-section of the per-asset losses of the quantity the slot owner prices: the mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}``. **The mean of the per-column values is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is deliberate.** A pooled tail is drawn from the worst columns, so it is dominated by the most volatile assets and gives a smaller weight. The measure prices a portfolio rather than a single asset, so the per-column mean is the reading that answers it.
+
+**A caller who holds a reference portfolio still cannot state one, and that is the design.** The pooled cross-section is the equal-weight reading, and a stated reference portfolio would give a sharper one. It would also make the rule a second place where a portfolio enters the problem, and the calibration channel carries no portfolio by construction: [`resolve_calibration_slot`](@ref) hands a rule the Prior and nothing else, so a reference vector would have to travel a channel of its own, be checked against the universe of the fold, and be re-stated whenever a subset view or a cluster changed that universe. The exchange rate the rule prices is a property of the **sample**, and the equal-weight cross-section is the reading of it that needs no second input. A caller who wants the rate at their own portfolio computes `l` themselves and states the number.
 
 ``m`` is negative for a sample of positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign: a negative weight is not admissible in the slot, and a sample of negative expected return does not turn the trade-off around.
 
@@ -4926,7 +4940,7 @@ The rule carries no range check on its answer, on the same terms as [`Concentrat
 m &= f N\\,,\\\\
 \\mathrm{val} &= \\begin{cases}
 m^{-1} & \\textrm{if } p \\textrm{ is infinite}\\\\
-m^{-1/p} & \\textrm{otherwise}
+m^{1/p - 1} & \\textrm{otherwise}
 \\end{cases}\\,.
 \\end{align}
 ```
@@ -4939,7 +4953,9 @@ Where:
   - $(math_dict[:N])
   - ``p``: Norm order of the constraint the ceiling stands in.
 
-The two arms are the two readings the library already states. For a finite order the p-norm effective number of assets is ``1 / \\lVert \\boldsymbol{w} \\rVert_{p}^{p}``, so ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{-1/p}`` is the floor. For the infinite order the ceiling caps the largest weight, and a cap of ``1/m`` on a fully invested portfolio spreads it over at least ``m`` assets.
+The order-``p`` effective number of assets is ``N_{\\mathrm{eff},\\, p}(\\boldsymbol{w}) = \\left(\\sum_{i} \\lvert w_{i} \\rvert^{p}\\right)^{1/(1 - p)}``, so ``N_{\\mathrm{eff},\\, p} \\geq m`` is ``\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1}``. It is the reading [`number_effective_assets`](@ref) states, taken to an arbitrary order: at ``p = 2`` the two are the same number, and at every order an equal-weight portfolio over ``m`` assets reports exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, because ``1/p - 1 = -1/q``.
+
+The infinite arm is the limit of the finite one and not a second reading. ``m^{1/p - 1} \\to m^{-1}`` as ``p`` grows, and a cap of ``1/m`` on the largest weight of a fully invested portfolio spreads it over at least ``m`` assets. So the two arms meet, and a caller who raises ``p`` towards the infinite order sees the ceiling move towards ``1/m`` rather than away from it.
 
 # Fields
 
@@ -5022,7 +5038,7 @@ function (alg::EffectiveAssetFloor)(key::Symbol, pr::AbstractPriorResult, ::Any,
     @argcheck(!isnothing(p),
               ArgumentError("`$(nameof(EffectiveAssetFloor)).p` is `nothing` while the rule in `$key` is being resolved. A ceiling is read against one norm order, the order belongs to the constraint, and each constraint site fills it through `bind_norm_order`. Place the rule in `l2c`, `lpc` or `linfc`, or state `p` on the rule."))
     m = alg.fraction * size(pr.X, 2)
-    return isinf(p) ? inv(m) : m^(-inv(p))
+    return isinf(p) ? inv(m) : m^(inv(p) - one(p))
 end
 """
     bind_norm_order(slot, p::Number)

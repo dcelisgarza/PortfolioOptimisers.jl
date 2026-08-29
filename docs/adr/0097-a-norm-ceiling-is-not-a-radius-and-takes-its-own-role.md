@@ -68,8 +68,21 @@ for the same reason.
 ### One rule ships, and it refits
 
 `EffectiveAssetFloor(; fraction = 0.5, p = nothing)` returns the ceiling that holds
-`fraction * N` assets effective: `m^(-1/p)` for a finite order, and `1/m` for the infinite
-one. Both arms are the reciprocal reading the three constraint builders already document.
+`fraction * N` assets effective: `m^(1/p - 1)` for a finite order, and `1/m` for the
+infinite one.
+
+The count the ceiling is read against is the order-`p` effective number of assets,
+`(sum_i |w_i|^p)^(1/(1 - p))`. It is `number_effective_assets` taken to an arbitrary order:
+the two are one number at `p = 2`, and at every order an equal-weight portfolio over `m`
+assets reports exactly `m`. So the infinite arm is the limit of the finite one, because
+`m^(1/p - 1)` tends to `1/m` as `p` grows, and the two arms meet.
+
+The sweep of issue #617 corrected this. The first draft of the rule, and the
+`set_weight_norm_p_constraints!` builder it mirrored, read the count as
+`1 / ||w||_p^p`. That expression is the same number at `p = 2` and is not an effective
+count anywhere else: an equal-weight portfolio over ten assets reports one hundred at
+`p = 3`, which is a count above the size of the universe. Both statements now carry the
+order-`p` reading.
 
 The rule states a **fraction of the universe** rather than a count, and it reads `N` off the
 Prior. So a cluster, a subset view and a cross-validation fold each get the floor their own

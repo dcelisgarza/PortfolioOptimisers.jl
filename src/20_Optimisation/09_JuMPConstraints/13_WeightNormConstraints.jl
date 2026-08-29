@@ -102,13 +102,15 @@ Where:
 
 # Diversification interpretation
 
-For a fully invested portfolio (``k = 1``), the p-norm effective number of assets is ``\\mathrm{ENA}_p(\\boldsymbol{w}) = 1 / \\lVert \\boldsymbol{w} \\rVert_p^p``. To require **at least `m` p-norm effective assets**, set `val = m^(-1/p)`:
+For a fully invested portfolio (``k = 1``), the order-``p`` effective number of assets is ``\\mathrm{ENA}_p(\\boldsymbol{w}) = \\left(\\sum_i \\lvert w_i \\rvert^p\\right)^{1/(1 - p)}``. To require **at least `m` order-``p`` effective assets**, set `val = m^(1/p - 1)`:
 
 ```math
 \\begin{align}
-\\lVert \\boldsymbol{w} \\rVert_p \\leq m^{-1/p} \\iff \\mathrm{ENA}_p(\\boldsymbol{w}) = \\frac{1}{\\lVert \\boldsymbol{w} \\rVert_p^p} \\geq m\\,.
+\\lVert \\boldsymbol{w} \\rVert_p \\leq m^{1/p - 1} \\iff \\mathrm{ENA}_p(\\boldsymbol{w}) = \\left(\\sum_i \\lvert w_i \\rvert^p\\right)^{\\frac{1}{1 - p}} \\geq m\\,.
 \\end{align}
 ```
+
+This is [`number_effective_assets`](@ref) taken to an arbitrary order. At ``p = 2`` the two are the same number, and at every order an equal-weight portfolio over ``m`` assets reports exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, and it tends to ``-1`` as ``p`` grows, which is the ceiling [`set_weight_norm_inf_constraints!`](@ref) states.
 
 # Arguments
 

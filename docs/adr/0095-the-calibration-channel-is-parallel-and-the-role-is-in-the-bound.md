@@ -327,3 +327,29 @@ number of assets.
 carries the same asymmetry, from the amendment above. Closing it needs a rule that holds a **prior
 estimator** and fits it to the drawdown sample, which is a design the maintainer has raised and
 which this ADR does not decide.
+
+## Amendment (2026-08-29) — a schedule reaches the host, and no further
+
+Every calibration rule shipped so far carries the same open question in its charter: whether a
+`TimeDependent` wrapping the rule is meaningful. Issues #617, #619, #620 and #621 each restate it.
+It is settled here, and the answer is that no channel is missing.
+
+**A rule is never standalone.** It stands in a slot of a host, so the host is the thing a schedule
+swaps, and the host already carries the channel. Where the host is a `JuMPOptimiser`, the four norm
+fields are themselves schedulable, and a schedule over one of them selects a rule per fold. Where
+the host is a risk measure, the slot's own bound admits no schedule, and the caller varies the whole
+measure instead, through the schedulable risk-measure field of the optimiser.
+
+**The two run at two points of the pipeline, and neither knows about the other.** The selection runs
+in `update_time_dependent_fields`, before any prior is fitted. The resolution runs at assembly,
+against the prior of the period that was selected. So a schedule and a rule compose, and the order
+falls out of the pipeline rather than being invented for it.
+
+**A schedule inside a rule would be a duplicate, not a widening.** It would name a fold the rule
+cannot see, and it would give a second channel for what the host already varies. So the `Num_` and
+`Func_` bounds of the six roles stay free of `TimeDependent`, and the rules' charters no longer
+carry the question.
+
+A generic resolution is possible in principle: nothing in the mechanism stops a schedule from being
+resolved wherever it stands. It buys no reading that the host's own channel does not already give,
+so it is not built.

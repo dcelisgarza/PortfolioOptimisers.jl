@@ -753,14 +753,14 @@ end
 #=
 The two deferral channels can now meet in one field: `l1` and `linf` are bounded
 `TD_Option{<:Num_AmbRadCal}`, so a `TimeDependent` may wrap a Calibration Rule. ADR 0030
-never considered a second channel, and the map that owns this work keeps the ORDER in its
-*Not yet specified* section.
+never considered a second channel, and the amendment issues #617, #619, #620 and #621 added
+to ADR 0095 settles it: a schedule reaches the HOST that holds the slot and no further. A
+rule is never standalone, so the host is what a schedule swaps, and no channel is missing.
 
-This testset records what the code does today rather than ratifying a design. The two verbs
-run at two different points of the pipeline and neither knows about the other: the period
-selection runs in `update_time_dependent_fields`, before any prior is fitted, and the
-calibration resolution runs at assembly, against the prior of the period that was selected.
-So the order falls out of the pipeline and nothing had to invent it.
+The two verbs run at two different points of the pipeline and neither knows about the
+other: the period selection runs in `update_time_dependent_fields`, before any prior is
+fitted, and the calibration resolution runs at assembly, against the prior of the period
+that was selected. So the order falls out of the pipeline and nothing had to invent it.
 =#
 @testset "Ambiguity calibration: the time-dependent wrapper selects, then the rule runs" begin
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -1247,4 +1247,97 @@ end
     # allocates no rebuild in the common case.
     plain = DistributionallyRobustConditionalDrawdownatRisk()
     @test PO.resolve_deferred_quantities(plain, PRDDA) === plain
+end
+
+#=
+Issues #619, #620 and #621 sweep the three rules of this file that shipped after the first
+two. Each ticket asks the same kind of question: whether a reading the rule takes is the
+right one, and whether a correction or a guard belongs in the rule. The answers are in the
+three docstrings, and the numbers that back them are here.
+
+Every case below is a reading the sweep SETTLED rather than a mechanism it added, so the
+tests pin numbers and refusals rather than types.
+=#
+@testset "Sweep #619, #620, #621: the readings the three rules settle on" begin
+    lq = log(1 / 0.05)
+    alpha = 0.05
+
+    # -- #619. The exponent is floored at one half, so a ONE-asset universe returns the
+    # same square-root rate a two-asset one does. The bound states no rate above the floor.
+    X60_1 = X60[:, 1:1]
+    PR60_1 = prior(EmpiricalPrior(), X60_1)
+    dim = DimensionalRateRadius(; confidence = 0.95, scale = 0.5)
+    @test size(PR60_1.X, 2) == 1
+    @test dim(:r, PR60_1, nothing, nothing) ≈ 0.5 * sqrt(lq / 60)
+    @test dim(:r, PR60_1, nothing, nothing) ≈ dim(:r, PR60_2, nothing, nothing)
+
+    # -- #619. The radius is positive and finite at both ends of the admissible confidence
+    # interval, so nothing re-checks it after resolution.
+    for c in (1e-8, 0.5, 1 - 1e-8)
+        v = DimensionalRateRadius(; confidence = c, scale = 1)(:r, PR60, nothing, nothing)
+        @test v > 0
+        @test isfinite(v)
+    end
+
+    # -- #620. A sample of NO dispersion gives a ball of no width, which is the right
+    # answer for it: the empirical measure is the only measure such a sample supports. In
+    # floating point the number is many orders below the smallest one a caller would state
+    # rather than an exact zero, so the slot's `> 0` check passes and the model prices it.
+    Xflat = repeat([0.01 0.02 0.03], 60)
+    PRFLAT = prior(EmpiricalPrior(), Xflat)
+    vflat = DualNormRadius()(:r, PRFLAT, nothing, nothing)
+    @test vflat >= 0
+    @test vflat < 1e-12
+    @test isa(DistributionallyRobustConditionalValueatRisk(; r = vflat).r, Number)
+
+    # -- #620. `confidence` is a per-coordinate level and the rule does not correct it for
+    # the number of assets. The correction is a whole number of per cent rather than a
+    # rounding, which is why it stays with the caller and is named in prose.
+    N = size(X60, 2)
+    z_coord = Distributions.quantile(Distributions.Normal(), 0.95)
+    z_vec = Distributions.quantile(Distributions.Normal(), 1 - 0.05 / N)
+    @test z_vec / z_coord > 1.3
+    @test DualNormRadius(; confidence = 0.95)(:l1, PR60, nothing, nothing) * z_vec /
+          z_coord ≈ DualNormRadius(; confidence = 1 - 0.05 / N)(:l1, PR60, nothing, nothing)
+
+    # -- #620. The 1-norm arm sums the per-asset errors, so it prices them as if they moved
+    # together. That is the LARGEST of the seven readings, and the ∞-norm arm is the
+    # smallest, so the conservative reading is the one the rule takes.
+    e = sqrt.(diag(PR60.sigma)) ./ sqrt(60)
+    @test DualNormRadius()(:r, PR60, nothing, nothing) ≈ z_coord * sum(e)
+    @test DualNormRadius()(:r, PR60, nothing, nothing) >
+          DualNormRadius()(:l2reg_val, PR60, nothing, nothing)
+    @test DualNormRadius()(:l2reg_val, PR60, nothing, nothing) >
+          DualNormRadius()(:l1, PR60, nothing, nothing)
+    @test DualNormRadius()(:l1, PR60, nothing, nothing) ≈ z_coord * maximum(e)
+
+    # -- #621. `c` is the mean of the per-column CVaR and NOT the pooled one. A pooled tail
+    # is drawn from the worst columns, so on a universe of unequal volatilities it is the
+    # larger number and it would give the SMALLER weight.
+    Xuneq = hcat(0.0005 .+ 0.002 * randn(RNG, 2520), 0.0005 .+ 0.01 * randn(RNG, 2520),
+                 0.0005 .+ 0.05 * randn(RNG, 2520))
+    PRUNEQ = prior(EmpiricalPrior(), Xuneq)
+    c_col = mean(hand_cvar(view(Xuneq, :, j), alpha) for j in axes(Xuneq, 2))
+    c_pool = hand_cvar(vec(Xuneq), alpha)
+    @test c_pool > c_col
+    l_col = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRUNEQ, nothing, nothing)
+    @test l_col ≈ abs(-mean(Xuneq)) / c_col
+    @test l_col > abs(-mean(Xuneq)) / c_pool
+
+    # -- #621. The parity claim, against the loss the measure prices. At the weight the
+    # rule returns, one tail term is worth exactly `ratio` mean terms.
+    m = -mean(XDAY)
+    c = mean(hand_cvar(view(XDAY, :, j), alpha) for j in axes(XDAY, 2))
+    for ratio in (0.5, 1.0, 2.0)
+        l = TailTermParity(; ratio = ratio, alpha = alpha)(:l, PRDAY, nothing, nothing)
+        @test l * c / abs(m) ≈ ratio
+    end
+
+    # -- #621. A stated `l = 1.0` is two trade-offs across the frequency pair: about forty
+    # mean terms on the daily sample and under ten on the monthly one, the two numbers the
+    # docstring names.
+    l_day = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRDAY, nothing, nothing)
+    l_mon = TailTermParity(; ratio = 1, alpha = alpha)(:l, PRMON, nothing, nothing)
+    @test 35 < inv(l_day) < 50
+    @test inv(l_mon) < 10
 end

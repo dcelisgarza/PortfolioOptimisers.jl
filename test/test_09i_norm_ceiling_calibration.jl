@@ -108,12 +108,13 @@ end
     @test EffectiveAssetFloor(; fraction = 0.5, p = 3).p == 3
 
     # The prior carries four assets, so half of the universe is two effective assets. The
-    # ceiling is the reciprocal form the constraint's own docstring states.
+    # ceiling is the order-`p` effective-asset reading the constraint's own docstring
+    # states: `m^(1/p - 1)` for a finite order, and `1/m` for the infinite one.
     f2 = EffectiveAssetFloor(; fraction = 0.5, p = 2)
     f3 = EffectiveAssetFloor(; fraction = 0.5, p = 3)
     fi = EffectiveAssetFloor(; fraction = 0.5, p = Inf)
     @test f2(:l2c, PR60, PR60.w, nothing) ≈ 2^(-1 / 2)
-    @test f3(:lpc, PR60, PR60.w, nothing) ≈ 2^(-1 / 3)
+    @test f3(:lpc, PR60, PR60.w, nothing) ≈ 2^(1 / 3 - 1)
     @test fi(:linfc, PR60, PR60.w, nothing) ≈ 1 / 2
 
     # The whole universe is the whole universe, so an equally weighted portfolio is the
@@ -132,6 +133,68 @@ end
     # The order belongs to the constraint. A rule resolved where nothing bound one names
     # the verb that should have filled it.
     @test_throws ArgumentError EffectiveAssetFloor()(:l2c, PR60, nothing, nothing)
+end
+
+#=
+Issue #617 sweeps the family, and the exponent of the finite arm is what it corrected. The
+first draft read the count as `1 / ||w||_p^p`, which is the same number as
+`number_effective_assets` at `p = 2` and is not an effective count anywhere else: an
+equal-weight portfolio over ten assets reports ONE HUNDRED at `p = 3`, a count above the
+size of the universe. The order-`p` count is `(sum |w_i|^p)^(1/(1 - p))`, and its ceiling
+is `m^(1/p - 1)`.
+
+The three properties below are what separate the two readings, and no one of them alone
+does it: the first holds for both at `p = 2`, and the second is what the third then joins
+to the infinite arm.
+=#
+@testset "Norm ceiling calibration: the ceiling is the order-p effective count" begin
+    # The order-`p` effective number of assets, written out. It is the reading
+    # `number_effective_assets` states, taken to an arbitrary order.
+    ena(w, p) = isinf(p) ? inv(maximum(abs, w)) : sum(abs.(w) .^ p)^inv(1 - p)
+
+    # 1. An equal-weight portfolio over `m` assets reports EXACTLY `m`, at every order.
+    for p in (1.5, 2.0, 3.0, 5.0, Inf), m in (2, 4, 5)
+        @test ena(fill(1 / m, m), p) ≈ m
+    end
+
+    # 2. The rule's ceiling is the point where that count equals the floor, so an
+    #    equal-weight portfolio over exactly `m` assets sits ON the ceiling, and one over
+    #    fewer breaks it. The universe is four assets and the fraction is one half, so
+    #    `m = 2` here and `pr9` below carries nine.
+    pr9 = prior(EmpiricalPrior(), randn(RNG, 60, 9))
+    for p in (1.5, 2.0, 3.0, Inf)
+        alg = EffectiveAssetFloor(; fraction = 1 / 3, p = p)
+        val = alg(:lpc, pr9, nothing, nothing)
+        @test ena(fill(1 / 3, 3), p) ≈ 3
+        @test LinearAlgebra.norm(fill(1 / 3, 3), p) ≈ val
+        @test LinearAlgebra.norm(fill(1 / 2, 2), p) > val
+        @test LinearAlgebra.norm(fill(1 / 4, 4), p) < val
+    end
+
+    # 3. The infinite arm is the LIMIT of the finite one rather than a second reading, so
+    #    the ceiling moves towards `1/m` as the order grows instead of away from it.
+    m = 2
+    fi = EffectiveAssetFloor(; fraction = 0.5, p = Inf)(:linfc, PR60, nothing, nothing)
+    @test fi ≈ inv(m)
+    prev = Inf
+    for p in (2.0, 5.0, 20.0, 100.0, 1000.0)
+        val = EffectiveAssetFloor(; fraction = 0.5, p = p)(:lpc, PR60, nothing, nothing)
+        @test val > fi
+        @test val < prev
+        prev = val
+    end
+    far = EffectiveAssetFloor(; fraction = 0.5, p = 1e6)(:lpc, PR60, nothing, nothing)
+    @test isapprox(far, fi; rtol = 1e-5)
+
+    # At `p = 2` the two readings are one number, which is why the defect survived the
+    # first draft: every test of the family stood at that order.
+    @test EffectiveAssetFloor(; fraction = 0.5, p = 2)(:l2c, PR60, nothing, nothing) ≈
+          2^(-1 / 2)
+    @test 2^(1 / 2 - 1) ≈ 2^(-1 / 2)
+
+    # A 1-norm ceiling is one, which is the budget itself: the 1-norm of a fully invested
+    # long-only portfolio is one whatever it holds, so no floor on it binds.
+    @test EffectiveAssetFloor(; fraction = 0.5, p = 1)(:lpc, PR60, nothing, nothing) ≈ 1
 end
 
 @testset "Norm ceiling calibration: bind_norm_order carries the constraint's order" begin
@@ -196,7 +259,7 @@ end
     terms = [LpRegularisation(; p = 2, val = crole), LpRegularisation(; p = 3, val = crole)]
     out = PO.norm_ceiling_factory(terms, PR60, SLV)
     @test out[1].val ≈ 2^(-1 / 2)
-    @test out[2].val ≈ 2^(-1 / 3)
+    @test out[2].val ≈ 2^(1 / 3 - 1)
     @test out[1].p == 2
     @test out[2].p == 3
 
@@ -266,13 +329,13 @@ end
     mrule = build(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = crole, linfc = crole,
                                 lpc = LpRegularisation(; p = 3, val = crole)))
     mnum = build(JuMPOptimiser(; slv = SLV, pe = PR60, l2c = 2^(-1 / 2), linfc = 1 / 2,
-                               lpc = LpRegularisation(; p = 3, val = 2^(-1 / 3))))
+                               lpc = LpRegularisation(; p = 3, val = 2^(1 / 3 - 1))))
     @test JuMP.normalized_rhs(mrule[:cl2c]) ≈ JuMP.normalized_rhs(mnum[:cl2c])
     @test JuMP.normalized_rhs(mrule[:clinfc]) ≈ JuMP.normalized_rhs(mnum[:clinfc])
     @test JuMP.normalized_rhs(mrule[:clpc_bnd_1]) ≈ JuMP.normalized_rhs(mnum[:clpc_bnd_1])
     @test JuMP.normalized_rhs(mrule[:cl2c]) ≈ 2^(-1 / 2)
     @test JuMP.normalized_rhs(mrule[:clinfc]) ≈ 1 / 2
-    @test JuMP.normalized_rhs(mrule[:clpc_bnd_1]) ≈ 2^(-1 / 3)
+    @test JuMP.normalized_rhs(mrule[:clpc_bnd_1]) ≈ 2^(1 / 3 - 1)
 
     # A model that names no ceiling carries no ceiling constraint, so the widening added no
     # constraint to a caller who states nothing.
@@ -290,8 +353,9 @@ end
 
 #=
 `l2c` and `linfc` are bounded `TD_Option{<:Num_NormCeilCal}`, so one field now carries two
-deferral channels. This is the same open case ADR 0030 never considered for `l1` and
-`linf`, and this testset records what the code does rather than ratifying a design.
+deferral channels. ADR 0030 never considered the pair, and the amendment issue #617 added
+to ADR 0095 settles it: a schedule reaches the HOST that holds the slot and no further,
+because a rule is never standalone and the host already carries the channel.
 
 The two verbs run at different points and neither knows about the other: the period
 selection runs in `update_time_dependent_fields`, before any prior is fitted, and the
