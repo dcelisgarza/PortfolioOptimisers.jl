@@ -2408,8 +2408,8 @@ Where:
   - $(math_dict[:alpha_rm])
   - ``n``: Number of observations the tail is to hold.
   - $(math_dict[:T])
-  - ``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.
-  - ``w_{i}``: Observation weight of period ``i``.
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_w_i])
 
 # Arguments
 
@@ -2919,6 +2919,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`Func_AmbRadCal`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
 """
 abstract type AbstractAmbiguityRadiusCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -3067,6 +3068,7 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
   - [`Func_AmbRadCal`](@ref)
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
 """
 @concrete struct AmbiguityRadiusCalibration <: AbstractCalibrationEstimator
     """
@@ -3255,6 +3257,7 @@ Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and
 
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`RateRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3299,14 +3302,14 @@ T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
 
 Where:
 
-  - ``r``: Ambiguity radius.
-  - ``s``: Scale of the radius, in the units of the returns.
+  - $(math_dict[:cal_r_radius])
+  - $(math_dict[:cal_s_radius])
   - ``\\chi^{2}_{N,\\, q}``: Quantile of the chi-squared distribution with ``N`` degrees of freedom at confidence level ``q``.
   - $(math_dict[:N])
   - $(math_dict[:Sigma_hat_ii])
   - $(math_dict[:T])
-  - ``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.
-  - ``w_{i}``: Observation weight of period ``i``.
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_w_i])
 
 # Arguments
 
@@ -3324,6 +3327,7 @@ Where:
 
   - [`ConcentrationRadius`](@ref)
   - [`RateRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::ConcentrationRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
@@ -3371,6 +3375,7 @@ Keywords correspond to the struct's fields. `c` defaults to `1`, which is the pl
 
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
   - [`ConcentrationRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -3402,7 +3407,7 @@ r &= \\frac{c}{\\sqrt{T}}\\,.
 
 Where:
 
-  - ``r``: Ambiguity radius.
+  - $(math_dict[:cal_r_radius])
   - ``c``: Rate coefficient, in the units of the returns.
   - $(math_dict[:T])
 
@@ -3422,10 +3427,146 @@ Where:
 
   - [`RateRadius`](@ref)
   - [`ConcentrationRadius`](@ref)
+  - [`DimensionalRateRadius`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function (alg::RateRadius)(::Symbol, pr::AbstractPriorResult, ::Any, ::Any)
     return alg.c / sqrt(size(pr.X, 1))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate.
+
+The radius is the Esfahani-Kuhn [drcvar](@cite) form, a scale in the units of the returns times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
+
+**The ball hardly shrinks over a wide universe, and that is the model speaking rather than a defect.** At `N = 20` and `T = 250` the factor `T^(-1/20)` is `0.76`, so a record ten times longer buys almost nothing. This is the curse of dimensionality of the Wasserstein ball. A caller who reads a square-root rate and expects an estimation error reads a statement about a *mean*, and this rule makes one about a *measure*.
+
+**The radius is conservative in practice, and its source recommends a cross-validation over the radius in its place.** A portfolio priced against a ball this wide can hold nothing but cash. [`RateRadius`](@ref) is the shape such a grid moves over, so calibrate there and read this rule as the statement of what the rate is.
+
+The source result carries a second branch for a short record, whose exponent is `1 / a` for a tail-decay exponent `a` rather than `1 / max(N, 2)`. That branch binds only below a threshold that depends on constants the source leaves to the caller, so this rule drops it and ships the one branch. A reader who holds the paper beside this form finds the difference stated here, rather than by deriving it.
+
+`N` is the asset count, `size(pr.X, 2)`, because the ball is over the assets. A factor prior carries a smaller effective dimension, and the ball is still over the assets, so a factor prior does not move `N`.
+
+`scale` states the units. A radius multiplies a norm of the weight vector, so it is in the units of the returns, and no caller can intuit that number from the confidence level alone. `scale = nothing` reads the average asset volatility off the prior result instead, on the same terms as [`ConcentrationRadius`](@ref).
+
+[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) prices a ball around the drawdown scenarios. The scenario dimension there is still `N`, so the rate carries, but the reading off `pr.sigma` is a return volatility and a drawdown is not a return. State `scale` on a drawdown slot rather than leave it `nothing`.
+
+`T` is the effective sample size when observation weights are stated, and the raw row count when they are not, on the same terms as [`ConcentrationRadius`](@ref) and [`ScenarioCount`](@ref). The rate is a concentration statement, so the record it prices is the one Kish's count measures. [`RateRadius`](@ref) reads the raw row count instead, because its rate speaks of the length of the record.
+
+The rule carries no range check of its own, on the same terms as [`ConcentrationRadius`](@ref). It returns the quantity of the slot it stands in, so the slot owner's constructor is the whole validation, and a radius outside the slot's range is refused there, at fold time.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DimensionalRateRadius(;
+        confidence::Number = 0.95,
+        scale::Option{<:Number} = nothing
+    ) -> DimensionalRateRadius
+
+Keywords correspond to the struct's fields. `confidence` defaults to `0.95`, and `scale` defaults to `nothing`, which reads the average asset volatility off the prior result.
+
+## Validation
+
+  - `0 < confidence < 1`.
+  - If `scale` is not `nothing`: `scale > 0` and finite.
+
+# Related
+
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+  - [`AmbiguityRadiusCalibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar])
+"""
+@concrete struct DimensionalRateRadius <: AbstractAmbiguityRadiusCalibrationAlgorithm
+    """
+    $(field_dict[:cal_dim_confidence])
+    """
+    confidence
+    """
+    $(field_dict[:cal_dim_scale])
+    """
+    scale
+    function DimensionalRateRadius(confidence::Number, scale::Option{<:Number})
+        assert_unit_interval(confidence, :confidence)
+        assert_nonempty_gt0_finite_val(scale, :scale)
+        return new{typeof(confidence), typeof(scale)}(confidence, scale)
+    end
+end
+function DimensionalRateRadius(; confidence::Number = 0.95,
+                               scale::Option{<:Number} = nothing)
+    return DimensionalRateRadius(confidence, scale)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the ambiguity radius that the measure-concentration bound gives on the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r &= s \\left(\\dfrac{\\ln\\left(\\dfrac{1}{1 - q}\\right)}{T_{e}}\\right)^{\\frac{1}{\\max(N,\\, 2)}}\\,,\\\\
+s &= \\begin{cases}
+\\dfrac{1}{N} \\sum\\limits_{i=1}^{N} \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}} & \\textrm{if } \\texttt{scale} \\textrm{ is } \\texttt{nothing}\\\\
+\\texttt{scale} & \\textrm{otherwise}
+\\end{cases}\\,,\\\\
+T_{e} &= \\begin{cases}
+T & \\textrm{if } w \\textrm{ is } \\texttt{nothing}\\\\
+\\dfrac{\\left(\\sum\\limits_{i=1}^{T} w_{i}\\right)^{2}}{\\sum\\limits_{i=1}^{T} w_{i}^{2}} & \\textrm{otherwise}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:cal_r_radius])
+  - $(math_dict[:cal_s_radius])
+  - ``q``: Confidence level the bound is read at.
+  - $(math_dict[:N])
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:T])
+  - $(math_dict[:cal_T_e])
+  - $(math_dict[:cal_w_i])
+
+The exponent is floored at one half, so a universe of one or two assets returns the square-root rate rather than a faster one. The bound states no rate above that floor.
+
+# Arguments
+
+  - `alg`: The rule.
+  - `key`: Name of the slot that is being resolved. The radius is the same for every key, so the two tails of a Range measure that carry one rule resolve to one number.
+  - `pr`: Prior result the sample size, the asset count and the covariance matrix are read off.
+  - `w`: Effective observation weights, or `nothing`.
+  - `slv`: Effective solver. This rule needs none.
+
+# Returns
+
+  - `r::Number`: The ambiguity radius.
+
+# Related
+
+  - [`DimensionalRateRadius`](@ref)
+  - [`ConcentrationRadius`](@ref)
+  - [`RateRadius`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::DimensionalRateRadius)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+    N = size(pr.X, 2)
+    T = isnothing(w) ? size(pr.X, 1) : sum(w)^2 / sum(abs2, w)
+    scale = if isnothing(alg.scale)
+        Statistics.mean(sqrt, LinearAlgebra.diag(pr.sigma))
+    else
+        alg.scale
+    end
+    return scale * (log(inv(one(alg.confidence) - alg.confidence)) / T)^inv(max(N, 2))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -3777,4 +3918,4 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
        RateSignificance, EntropyBudget, HillTailDecay, AmbiguityRadiusCalibration,
        AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
-       NormCeilingCalibration, EffectiveAssetFloor
+       DimensionalRateRadius, NormCeilingCalibration, EffectiveAssetFloor

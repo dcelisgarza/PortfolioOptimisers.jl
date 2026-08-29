@@ -430,6 +430,8 @@ const arg_dict = unique_key_dict(:arg_dict,
                                  :cal_confidence => "`confidence`: Confidence level of the chi-squared quantile the radius is read off. A higher level buys a larger ball, so the model prices a wider set of measures.",#
                                  :cal_scale => "`scale`: Scale of the radius, in the units of the returns, or `nothing` to read the average asset volatility off the prior result. The chi-squared factor is dimensionless, so this field carries the whole of the radius' units.",#
                                  :cal_rate_c => "`c`: Rate coefficient. The radius is this coefficient divided by the square root of the number of observations.",#
+                                 :cal_dim_confidence => "`confidence`: Confidence level the measure-concentration bound is read at. It enters the radius as `log(1 / (1 - confidence))`, so a higher level buys a larger ball, and the exponent of the sample size flattens the buying.",#
+                                 :cal_dim_scale => "`scale`: Scale of the radius, in the units of the returns, or `nothing` to read the average asset volatility off the prior result. The rate factor is dimensionless, so this field carries the whole of the radius' units. A drawdown slot needs a stated scale, because the reading off the prior result is a return volatility.",#
                                  :cal_alg_norm_ceil => "`alg`: Calibration rule that computes the norm ceiling from the data the prior result carries. It is run by calling it, so it is either a callable [`AbstractNormCeilingCalibrationAlgorithm`](@ref) or a plain function of the same four arguments. The bound is [`Func_NormCeilCal`](@ref), so a radius rule, or a calibration role, in this field is refused at construction.",#
                                  :cal_fraction => "`fraction`: Fraction of the universe that must stay effective. The rule reads the asset count off the prior result and multiplies it by this fraction, so the floor moves with the universe rather than with a count the caller pins.",#
                                  :cal_norm_order => "`p`: Norm order the ceiling is read against, or `nothing`. The order belongs to the constraint rather than to the rule, so each of the three constraint sites overwrites this field through [`bind_norm_order`](@ref) before it resolves the slot. State it only to run the rule outside those sites.",#
@@ -1137,7 +1139,16 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
                        :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#
                        :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
                        :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
-                       :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.")
+                       :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
+                       # The ambiguity radius rules of `01_Base_RiskMeasures.jl`, and the
+                       # effective sample size the significance rules share with them. Each
+                       # rule returns one radius off one record, so the radius, its scale
+                       # and the weighted count of the record are each stated by two or
+                       # more Units of that file.
+                       :cal_r_radius => "``r``: Ambiguity radius.",#
+                       :cal_s_radius => "``s``: Scale of the radius, in the units of the returns.",#
+                       :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
+                       :cal_w_i => "``w_{i}``: Observation weight of period ``i``.")
 """
     ref_dict
 

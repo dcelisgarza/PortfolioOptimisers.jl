@@ -193,6 +193,7 @@ Num_AmbRadCal
 Num_AmbTwtCal
 ConcentrationRadius
 RateRadius
+DimensionalRateRadius
 AbstractNormCeilingCalibrationAlgorithm
 Func_NormCeilCal
 NormCeilingCalibration

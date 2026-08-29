@@ -29,6 +29,15 @@ const PR60 = prior(EmpiricalPrior(), X60)
 const X120 = randn(RNG, 120, 4)
 const PR120 = prior(EmpiricalPrior(), X120)
 const WTS = pweights(range(; start = 1, stop = 2, length = 60))
+# A two-asset universe is the corner where `DimensionalRateRadius` reduces to the
+# square-root rate, and a twenty-asset one at two record lengths is where it parts
+# company with `RateRadius`.
+const X60_2 = X60[:, 1:2]
+const PR60_2 = prior(EmpiricalPrior(), X60_2)
+const X125_20 = randn(RNG, 125, 20)
+const PR125_20 = prior(EmpiricalPrior(), X125_20)
+const X250_20 = randn(RNG, 250, 20)
+const PR250_20 = prior(EmpiricalPrior(), X250_20)
 
 # A radius rule with no type at all. A closure over a caller's own number is the case that
 # cannot be given one, and it is why the `alg` bound admits a bare `Function`.
@@ -72,7 +81,7 @@ end
     # two older families.
     for sym in
         (:AmbiguityRadiusCalibration, :AmbiguityTailWeightCalibration, :ConcentrationRadius,
-         :RateRadius)
+         :RateRadius, :DimensionalRateRadius)
         @test sym ∈ names(PortfolioOptimisers)
     end
 
@@ -80,6 +89,7 @@ end
     # family. Nothing computes an Esfahani-Kuhn tail weight, and that is deliberate.
     @test ConcentrationRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test RateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
+    @test DimensionalRateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test isempty(filter(t -> t !== AmbiguityTailWeightCalibration,
                          subtypes(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)))
 end
@@ -204,6 +214,78 @@ end
     @test_throws DomainError RateRadius(; c = 0.0)
     @test_throws DomainError RateRadius(; c = -1.0)
     @test_throws DomainError RateRadius(; c = Inf)
+end
+
+@testset "DimensionalRateRadius: the dimensional rate" begin
+    # The exponent is floored at one half, so a two-asset universe is the corner this rule
+    # shares with `RateRadius`, and the radius there is a hand-computed square-root rate.
+    alg = DimensionalRateRadius(; confidence = 0.95, scale = 0.5)
+    lq = log(1 / 0.05)
+    @test size(PR60_2.X, 2) == 2
+    @test alg(:r, PR60_2, nothing, nothing) ≈ 0.5 * sqrt(lq / 60)
+
+    # A wide universe flattens the rate, and that difference is the whole content of the
+    # rule. Over a doubling of the record `RateRadius` shrinks by `sqrt(2)` and this rule
+    # shrinks by `2^(1/20)`.
+    @test size(PR125_20.X, 2) == 20
+    @test size(PR250_20.X, 2) == 20
+    dim_ratio = alg(:r, PR125_20, nothing, nothing) / alg(:r, PR250_20, nothing, nothing)
+    rate = RateRadius(; c = 0.5)
+    rate_ratio = rate(:r, PR125_20, nothing, nothing) / rate(:r, PR250_20, nothing, nothing)
+    @test dim_ratio ≈ 2^(1 / 20)
+    @test rate_ratio ≈ sqrt(2)
+    @test dim_ratio < rate_ratio
+
+    # `T^(-1/20)` at `T = 250` is `0.76`, the number the docstring names.
+    @test isapprox(250^(-1 / 20), 0.76; atol = 5e-3)
+
+    # A higher confidence level buys a larger ball, through `log(1 / (1 - confidence))`.
+    @test DimensionalRateRadius(; confidence = 0.99, scale = 0.5)(:r, PR60_2, nothing,
+                                                                  nothing) >
+          alg(:r, PR60_2, nothing, nothing)
+
+    # `scale = nothing` reads the average asset volatility off the prior result, and a
+    # stated scale overrides it. That is the pair `ConcentrationRadius` is tested on.
+    auto = DimensionalRateRadius()
+    scale = mean(sqrt, diag(PR60_2.sigma))
+    @test auto(:r, PR60_2, nothing, nothing) ≈ scale * sqrt(lq / 60)
+    @test auto(:r, PR60_2, nothing, nothing) != alg(:r, PR60_2, nothing, nothing)
+    @test isnothing(auto.scale)
+    @test DimensionalRateRadius(; scale = 0.1).scale == 0.1
+    @test DimensionalRateRadius().confidence == 0.95
+
+    # The key never selects the value, so one rule in two slots resolves to one number.
+    @test alg(:r, PR60_2, nothing, nothing) == alg(:r_a, PR60_2, nothing, nothing)
+    @test alg(:r, PR60_2, nothing, nothing) == alg(:val, PR60_2, nothing, nothing)
+
+    # Stated weights move `T` to Kish's effective sample size, on the same terms as
+    # `ConcentrationRadius` and unlike `RateRadius`. This rule is a concentration
+    # statement, so it prices the record that Kish's count measures.
+    kish = sum(WTS)^2 / sum(abs2, WTS)
+    @test kish < 60
+    @test alg(:r, PR60_2, WTS, nothing) ≈ 0.5 * sqrt(lq / kish)
+    @test alg(:r, PR60_2, WTS, nothing) > alg(:r, PR60_2, nothing, nothing)
+
+    # The rule needs no solver, so it ignores the one the resolution threads.
+    @test alg(:r, PR60_2, nothing, Solver(; solver = nothing)) ==
+          alg(:r, PR60_2, nothing, nothing)
+
+    # A four-asset universe already leaves the square-root corner.
+    @test alg(:r, PR60, nothing, nothing) ≈ 0.5 * (lq / 60)^(1 / 4)
+    @test alg(:r, PR60, nothing, nothing) != alg(:r, PR60_2, nothing, nothing)
+
+    # Construction validation, on the terms `ConcentrationRadius` writes.
+    @test_throws DomainError DimensionalRateRadius(; confidence = 1.0)
+    @test_throws DomainError DimensionalRateRadius(; confidence = 0.0)
+    @test_throws DomainError DimensionalRateRadius(; confidence = 0.95, scale = -1.0)
+    @test_throws DomainError DimensionalRateRadius(; confidence = 0.95, scale = Inf)
+
+    # The rule joins the radius family and its bounds, and no other.
+    @test DimensionalRateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
+    @test isa(alg, PO.Func_AmbRadCal)
+    @test !isa(alg, PO.Func_AmbTwtCal)
+    @test isa(AmbiguityRadiusCalibration(; alg = alg), PO.Num_AmbRadCal)
+    @test_throws TypeError AmbiguityTailWeightCalibration(; alg = alg)
 end
 
 @testset "Ambiguity calibration: the resolver runs a rule by calling it" begin
