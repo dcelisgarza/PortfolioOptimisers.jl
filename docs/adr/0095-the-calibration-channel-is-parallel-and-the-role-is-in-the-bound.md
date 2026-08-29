@@ -229,3 +229,15 @@ member is `EffectiveAssetFloor`. It carries one role rather than two, for the re
 order into the rule that computes its ceiling, on the shape `bind_alpha` gives. The two
 differ in one respect: an order is a property of the constraint rather than of a sibling
 slot, so the constraint site's order overwrites one the rule already carries.
+
+## Amendment (2026-08-29) — from issue #613
+
+**A rule computes an Esfahani-Kuhn tail weight.** The open question above records that
+`AmbiguityTailWeightCalibration` and its family ship with no member. `TailTermParity` is that
+member: it returns the weight that prices the tail term of the loss at a stated multiple of
+its mean term, on the sample the prior result carries. The slot still admits a caller's
+`Function` beside it, and the bound is unchanged.
+
+**The tail-weight role travels, and the radius role does not.** `bind_alpha` gains a method
+for `AmbiguityTailWeightCalibration` and one for the rule inside it, because the tail-term
+scale is a CVaR at the slot owner's own significance level. The radius family needs none.

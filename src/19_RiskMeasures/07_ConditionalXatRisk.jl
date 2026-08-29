@@ -305,7 +305,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalValueatRisk`](@ref) against prior result `pr`.
 
-All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The three are independent: no rule of one slot reads another, so the order among them is free. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
+All three slots take a **Calibration Rule** in place of the number, so all three resolve here. The struct is rebuilt through its ordinary keyword constructor, and that call is what re-runs the positivity check on the calibrated number: a rule that returns a value the slot does not admit is refused at fold time, by the same constructor a caller's own number meets.
+
+`alpha` resolves first, because the tail weight reads it. [`TailTermParity`](@ref) prices a tail term at the measure's own significance level, so `alpha` and `l` are a **travelling pair** and the number reaches the `l` slot through [`bind_alpha`](@ref). A stated number, a plain function and a rule that reads no sibling all pass through `bind_alpha` untouched, so the order costs nothing where no rule reads a sibling. The radius reads neither of the two, so its own order is free.
 
 The effective observation weights are computed locally as `sel(r.w, pr.w)` and threaded to the rule, so a rule that reads a weighted sample size sees the weights the optimisation settled on. The measure carries no solver, so the rule receives none. That holds on both routes: the third argument carries the effective solver for a measure that has a slot for one, and this measure has none.
 
@@ -317,12 +319,14 @@ A measure whose two slots both hold numbers is returned unchanged, so the common
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
   - [`AmbiguityRadiusCalibration`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`TailTermParity`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRisk,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    l = resolve_calibration_slot(x.l, :l, pr, ws, slv)
+    l = resolve_calibration_slot(bind_alpha(x.l, alpha), :l, pr, ws, slv)
     r = resolve_calibration_slot(x.r, :r, pr, ws, slv)
     return if alpha === x.alpha && l === x.l && r === x.r
         x
@@ -699,6 +703,8 @@ Resolve the two ambiguity radii and the two tail weights of a [`Distributionally
 
 Each tail keeps its own pair, so four slots resolve here. It carries the reading of the scalar measure's method unchanged: the rebuild re-runs every positivity check, the effective observation weights are computed locally, and a measure whose four slots all hold numbers is returned unchanged.
 
+**Each end's tail weight reads that end's own probability.** `alpha` and `beta` resolve first, and each travels to the tail weight beside it through [`bind_alpha`](@ref): `l_a` reads `alpha` and `l_b` reads `beta`. A skewed sample therefore resolves the two tail weights to two different numbers, which is the whole point of [`TailTermParity`](@ref) on a Range measure. The two radii read neither probability, so the four remaining slots resolve in one pass.
+
 The two tails take one role and not two. A radius names no end of the distribution, so a rule placed in the loss-side pair and the same rule placed in the gain-side pair resolve independently, and [`mirror_role`](@ref) has nothing to carry across.
 
 # Related
@@ -707,15 +713,22 @@ The two tails take one role and not two. A radius names no end of the distributi
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`TailTermParity`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalValueatRiskRange,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     slots = (x.alpha, x.l_a, x.r_a, x.beta, x.l_b, x.r_b)
-    alpha, l_a, r_a, beta, l_b, r_b = map((slot, key) -> resolve_calibration_slot(slot, key,
-                                                                                  pr, ws,
-                                                                                  slv),
-                                          slots, (:alpha, :l_a, :r_a, :beta, :l_b, :r_b))
+    alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
+    beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
+    # Each tail weight is bound to the probability of its OWN end before it resolves, and
+    # the two radii read neither. The bound slot is never compared against: `bind_alpha`
+    # builds a new role, so the comparison below reads `slots`, which holds the measure's
+    # own occupants.
+    l_a, r_a, l_b, r_b = map((slot, key) -> resolve_calibration_slot(slot, key, pr, ws, slv),
+                             (bind_alpha(x.l_a, alpha), x.r_a, bind_alpha(x.l_b, beta),
+                              x.r_b), (:l_a, :r_a, :l_b, :r_b))
     # The comparison is the one `resolve_deferred_quantities` makes over its derived slots:
     # a measure whose six slots all resolved to themselves is returned unchanged.
     return if all(map(===, (alpha, l_a, r_a, beta, l_b, r_b), slots))
@@ -1113,7 +1126,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha`, the ambiguity radius `r` and the tail weight `l` of a [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) against prior result `pr`.
 
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged. The ball is a ball over the returns of the sample, and the drawdown series is built from those returns, so a rule reads the same sample size here as it does there.
+It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk measure unchanged, `alpha` first and the tail weight bound to it through [`bind_alpha`](@ref). The ball is a ball over the returns of the sample, and the drawdown series is built from those returns, so a rule reads the same sample size here as it does there.
+
+**The tail term this measure prices is a drawdown, and a rule reads the returns.** [`TailTermParity`](@ref) returns the ratio of the asset columns here. The tail-term scale it divides by is a return CVaR, and the drawdown the measure prices is the larger quantity, so the weight the rule gives **overstates** the parity it names. Its own docstring states the limit.
 
 # Related
 
@@ -1121,12 +1136,14 @@ It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
   - [`resolve_calibration_slot`](@ref)
   - [`calibration_slots`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`TailTermParity`](@ref)
 """
 function resolve_deferred_quantities(x::DistributionallyRobustConditionalDrawdownatRisk,
                                      pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    l = resolve_calibration_slot(x.l, :l, pr, ws, slv)
+    l = resolve_calibration_slot(bind_alpha(x.l, alpha), :l, pr, ws, slv)
     r = resolve_calibration_slot(x.r, :r, pr, ws, slv)
     return if alpha === x.alpha && l === x.l && r === x.r
         x

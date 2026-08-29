@@ -3058,18 +3058,18 @@ end
 
 Hand a resolved `alpha` to the rule that reads it, and return the slot's occupant with the number in place.
 
-`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) and [`HillTailDecay`](@ref) each read the significance level of a sibling slot, and [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number. So the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the `kappa` slot, and resolves the result:
+Two pairs **travel** through this verb. `alpha` and `kappa`: [`EntropyBudget`](@ref) and [`HillTailDecay`](@ref) each read the significance level of a sibling slot. `alpha` and `l`: [`TailTermParity`](@ref) prices a tail term at the measure's own significance level. [`resolve_calibration_slot`](@ref) carries a `Symbol` and no number, so the number travels through the rule itself. The slot owner's own resolution method resolves `alpha` first, calls this verb on the slot that reads it, and resolves the result:
 
 ```julia
 alpha = resolve_calibration_slot(x.alpha, :alpha, pr, w, slv)
 kappa = resolve_calibration_slot(bind_alpha(x.kappa, alpha), :kappa, pr, w, slv)
 ```
 
-The default is the identity, so a stated number, a plain function and a rule that reads no sibling all pass through untouched. A deformation role is rebuilt around the bound rule, which is what lets the verb take the slot rather than the rule the caller has to unwrap first. The significance family needs no method, because no significance rule reads a sibling and the identity is already the right answer for it.
+The default is the identity, so a stated number, a plain function and a rule that reads no sibling all pass through untouched. A travelling role is rebuilt around the bound rule, which is what lets the verb take the slot rather than the rule the caller has to unwrap first. The significance family and the radius family need no method, because no rule of either reads a sibling and the identity is already the right answer for both.
 
 # Arguments
 
-  - `slot`: The slot's occupant: a number, a deformation role, or a rule.
+  - `slot`: The slot's occupant: a number, a travelling role, or a rule.
   - `alpha`: The sibling slot's resolved significance level.
 
 # Returns
@@ -3080,8 +3080,10 @@ The default is the identity, so a stated number, a plain function and a rule tha
 
   - [`EntropyBudget`](@ref)
   - [`HillTailDecay`](@ref)
+  - [`TailTermParity`](@ref)
   - [`DeformationTailCalibration`](@ref)
   - [`DeformationHeadCalibration`](@ref)
+  - [`AmbiguityTailWeightCalibration`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 function bind_alpha(slot, ::Number)
@@ -3144,7 +3146,7 @@ Computes an Esfahani-Kuhn tail weight, the weight that the `l` slot of a distrib
 
 The tail weight scales the tail term of the Esfahani-Kuhn loss, and the mean term is not scaled by it. It is a different quantity from the radius, so it takes a different family and a different role: a radius rule placed in a tail-weight slot is refused at construction. The family's role type, [`AmbiguityTailWeightCalibration`](@ref), subtypes [`AbstractCalibrationEstimator`](@ref) rather than this family, and is not admitted by [`Func_AmbTwtCal`](@ref).
 
-**No rule of this family ships.** The library computes no Esfahani-Kuhn tail weight, and inventing one would be a guess. The family exists so that a caller's own rule has a home, and [`Func_AmbTwtCal`](@ref) admits a plain function for exactly that case.
+[`TailTermParity`](@ref) is the rule the family ships. A stated tail weight is dimensionless and is not scale-free in the sample, so one number is a different trade-off at every sampling frequency; the rule reads the sample's own units and leaves the preference in the caller's `ratio`. [`Func_AmbTwtCal`](@ref) admits a plain function beside it, so a caller's own rule needs no type.
 
 # Interfaces
 
@@ -3171,6 +3173,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - [`AmbiguityTailWeightCalibration`](@ref)
   - [`Func_AmbTwtCal`](@ref)
   - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`TailTermParity`](@ref)
 """
 abstract type AbstractAmbiguityTailWeightCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
@@ -3231,12 +3234,13 @@ const Func_AmbRadCal = Union{<:Function, <:AbstractAmbiguityRadiusCalibrationAlg
     const Func_AmbTwtCal = Union{<:Function,
                                  <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
 
-Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same four arguments. No rule of the family ships, so the plain function is the whole of the field's population today.
+Field bound for the `alg` field of an ambiguity-tail-weight role: a rule of the family, or a plain function of the same four arguments. [`TailTermParity`](@ref) is the rule the family ships, and the plain function carries a caller's own.
 
 # Related
 
   - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
   - [`Func_AmbRadCal`](@ref)
+  - [`TailTermParity`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
 const Func_AmbTwtCal = Union{<:Function, <:AbstractAmbiguityTailWeightCalibrationAlgorithm}
@@ -3302,7 +3306,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Places a tail-weight rule in a slot that holds the weight of the tail term of an Esfahani-Kuhn loss.
 
-It is the counterpart of [`AmbiguityRadiusCalibration`](@ref), and carries the same shape. No rule of its family ships, so its `alg` holds a caller's own function today.
+It is the counterpart of [`AmbiguityRadiusCalibration`](@ref), and carries the same shape. Its `alg` holds [`TailTermParity`](@ref) or a caller's own function.
+
+The role **travels**, and the radius role does not. A tail weight prices a tail at the measure's own significance level, so [`bind_alpha`](@ref) rebuilds the role around the bound rule before the slot is resolved, on the same terms as the two deformation roles.
 
 # Fields
 
@@ -3323,6 +3329,8 @@ Keywords correspond to the struct's fields. `alg` has no default, because the ru
   - [`AmbiguityRadiusCalibration`](@ref)
   - [`Num_AmbTwtCal`](@ref)
   - [`Func_AmbTwtCal`](@ref)
+  - [`TailTermParity`](@ref)
+  - [`bind_alpha`](@ref)
 """
 @concrete struct AmbiguityTailWeightCalibration <: AbstractCalibrationEstimator
     """
@@ -3970,6 +3978,174 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Computes the Esfahani-Kuhn tail weight that prices the tail term of the loss at a stated multiple of its mean term.
+
+At ``r \\to 0`` the loss of [`DistributionallyRobustConditionalValueatRisk`](@ref) reduces to ``-\\mathbb{E}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, so `l` is the exchange rate between one unit of expected return and one unit of tail loss. Both terms carry the units of the returns, so `l` is dimensionless. **A dimensionless number is not a scale-free one, and that is the trap this rule exists for.** The mean of a daily return column sits two orders of magnitude below its five per cent CVaR, and on a monthly column the gap is far smaller, so a stated `l = 1.0` prices the tail term about forty times the mean term on a daily sample and under ten times on a monthly one. One stated number is a different trade-off at every sampling frequency, and at every re-fit that changes the record.
+
+The rule carries the sample's own units and nothing else, so the preference stays the caller's. `ratio` states how many mean terms one tail term is worth, and the rule returns the `l` that prices it so on the sample the prior result carries. `ratio = 1` is parity, and `ratio = 2` prices the tail term at twice the mean term on every sample.
+
+A rule reads no portfolio, so it cannot form ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}``. The series it reads is the cross-section of the per-asset losses ``-\\mathbf{X}``: the mean-term scale ``m`` is the mean of that pool, and the tail-term scale ``c`` is the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}``. **The mean of the per-column values is not the pooled ``\\mathrm{CVaR}_{\\alpha}``, and the difference is deliberate.** A pooled tail is drawn from the worst columns, so it is dominated by the most volatile assets and gives a smaller weight. The measure prices a portfolio rather than a single asset, so the per-column mean is the reading that answers it.
+
+``m`` is negative for a sample of positive expected return, and the rule takes ``\\lvert m \\rvert``. No field states the sign: a negative weight is not admissible in the slot, and a sample of negative expected return does not turn the trade-off around.
+
+The rule reads its sibling `alpha`, because ``c`` is a ``\\mathrm{CVaR}`` at the measure's own significance level. `alpha` and `l` are a **travelling pair**, on the same terms as `alpha` and `kappa`: [`bind_alpha`](@ref) fills the `alpha` field with the number the slot owner resolved, and the owner's own resolution method resolves `alpha` first for that reason. A caller who runs the rule outside a measure states `alpha` instead.
+
+**Both scales read the observation weights.** They are sample statistics rather than counts, so a weighted sample is read weighted. [`RateRadius`](@ref) and [`RateSignificance`](@ref) ignore `w` because a rate speaks of the length of the record, and that reading does not carry to a moment.
+
+[`DistributionallyRobustConditionalDrawdownatRisk`](@ref) carries the key `:l` as well, and its tail term is a ``\\mathrm{CDaR}`` of the portfolio drawdown series. A rule is given no portfolio and cannot form that series, so the number the rule returns there is the ratio of the asset columns. A drawdown tail is the larger quantity, so the rule **overstates** `l` on that measure. Read it as the shape a grid moves over rather than as the answer.
+
+A second reading of `l` exists, and this rule does not take it. `l` can be read as a risk-aversion coefficient and mapped from a mean-variance one, but a variance penalty is quadratic in the weight vector and a ``\\mathrm{CVaR}`` term is positively homogeneous, so the two objectives are not comparable term by term. The map holds at one reference portfolio and nowhere else, and a rule gets no portfolio.
+
+The rule carries no range check on the weight it returns, on the same terms as [`RateRadius`](@ref). The slot owner's constructor keeps that job. Its two refusals state that the ratio exists at all, which is the shape of the one check [`EntropyBudget`](@ref) carries. A sample whose mean loss is near zero returns a very large weight, and that is the sample speaking rather than a defect: no threshold separates a small mean loss from a smaller one.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TailTermParity(;
+        ratio::Number = 1,
+        alpha::Option{<:Number} = nothing
+    ) -> TailTermParity
+
+Keywords correspond to the struct's fields. `ratio` defaults to `1`, which is parity between the two terms. `alpha` defaults to `nothing`, which is the state a rule stands in a slot in.
+
+## Validation
+
+  - `ratio > 0` and finite.
+
+# Related
+
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`AmbiguityTailWeightCalibration`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`ConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`RateRadius`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+
+# References
+
+  - $(ref_dict[:drcvar])
+"""
+@concrete struct TailTermParity <: AbstractAmbiguityTailWeightCalibrationAlgorithm
+    """
+    $(field_dict[:cal_ratio])
+    """
+    ratio
+    """
+    $(field_dict[:cal_alpha_sib])
+    """
+    alpha
+    function TailTermParity(ratio::Number, alpha::Option{<:Number})
+        assert_nonempty_gt0_finite_val(ratio, :ratio)
+        return new{typeof(ratio), typeof(alpha)}(ratio, alpha)
+    end
+end
+function TailTermParity(; ratio::Number = 1, alpha::Option{<:Number} = nothing)
+    return TailTermParity(ratio, alpha)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the tail weight that prices the tail term at `ratio` mean terms on the sample that `pr` carries.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+l &= \\rho \\dfrac{\\lvert m \\rvert}{c}\\,,\\\\
+m &= -\\dfrac{\\sum\\limits_{t=1}^{T} \\sum\\limits_{j=1}^{N} w_{t} r_{tj}}{N \\sum\\limits_{t=1}^{T} w_{t}}\\,,\\\\
+c &= \\dfrac{1}{N} \\sum\\limits_{j=1}^{N} \\mathrm{CVaR}_{\\alpha}\\left(\\boldsymbol{r}_{j}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``l``: Esfahani-Kuhn tail weight, the weight of the tail term of the loss.
+  - ``\\rho``: Number of mean terms that one tail term is worth.
+  - ``m``: Mean-term scale, the mean of the pooled cross-section of the per-asset losses.
+  - ``c``: Tail-term scale, the mean of the per-column ``\\mathrm{CVaR}_{\\alpha}`` of the loss.
+  - ``\\boldsymbol{r}_{j}``: Column ``j`` of the returns matrix.
+  - ``w_{t}``: Observation weight of period ``t``. Every weight is one when none is stated.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+  - $(math_dict[:r_tj])
+
+Every column holds ``T`` entries, so the pooled mean and the mean of the per-column means are one number, and the pooled form is the one written.
+
+# Algorithm
+
+ 1. Read the returns matrix off `pr` into `X`, and the effective observation weights off `w`.
+ 2. Form the mean-term scale `m`, the negated weighted mean of the pooled cross-section of `X`.
+ 3. Build a [`ConditionalValueatRisk`](@ref) at `alg.alpha` carrying the same weights, and form the tail-term scale `c`, the mean over the columns of `X` of the value that measure takes on each. The measure's own reading is the one used, so the rule and the measure it calibrates cannot drift apart.
+ 4. Return `alg.ratio * abs(m) / c`.
+
+# Arguments
+
+  - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
+  - `key`: Name of the slot that is being resolved. The scales are read off the asset columns, so the key never selects the value, and the two ends of a Range measure part company through their two probabilities alone.
+  - `pr`: Prior result the returns matrix is read off.
+  - `w`: Effective observation weights, or `nothing`. Both scales are sample statistics, so this rule reads them.
+  - `slv`: Effective solver. This rule needs none, because both scales are closed forms.
+
+# Validation
+
+  - `alg.alpha` must not be `nothing`.
+  - ``\\lvert m \\rvert`` must be positive.
+  - ``c`` must be positive.
+
+# Returns
+
+  - `l::Number`: The Esfahani-Kuhn tail weight.
+
+# Related
+
+  - [`TailTermParity`](@ref)
+  - [`bind_alpha`](@ref)
+  - [`ConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+function (alg::TailTermParity)(::Symbol, pr::AbstractPriorResult, w, ::Any)
+    @argcheck(!isnothing(alg.alpha),
+              IsNothingError("`TailTermParity.alpha` is `nothing`, so the rule cannot form the tail-term scale `c`, which is a CVaR at the measure's own significance level. The probability travels to the rule through `bind_alpha`, which the slot owner calls after it resolves `alpha`. State `alpha` on the rule itself to run it outside a measure."))
+    X = pr.X
+    N = size(X, 2)
+    ws = get_observation_weights(w, view(X, :, 1))
+    m = if isnothing(ws)
+        -Statistics.mean(X)
+    else
+        -sum(j -> LinearAlgebra.dot(view(X, :, j), ws), axes(X, 2)) / (N * sum(ws))
+    end
+    @argcheck(abs(m) > 0,
+              DomainError(m,
+                          "`TailTermParity` read a mean-term scale of $m on the sample, so the ratio `ratio * abs(m) / c` is zero and the slot admits no such weight. The rule prices one term of the loss against the other, and a sample whose pooled mean loss is zero states no exchange rate between them: every tail weight prices a mean term of zero alike. State `l` on the slot instead."))
+    # The tail term the weight scales is a CVaR, so the reading is the measure's own rather
+    # than a second encoding of it here. A rule that carried its own copy would drift from
+    # the measure it calibrates the moment either moved.
+    rm = ConditionalValueatRisk(; alpha = alg.alpha, w = w)
+    c = Statistics.mean(j -> rm(view(X, :, j)), axes(X, 2))
+    @argcheck(c > 0,
+              DomainError(c,
+                          "`TailTermParity` read a tail-term scale of $c at `alpha = $(alg.alpha)`, which is not positive, so the ratio `ratio * abs(m) / c` has no admissible value. The scale is the mean of the per-column CVaR of the loss, and a non-positive one is a sample whose worst `alpha` of every column holds no loss at all. Widen `alpha`, or state `l` on the slot."))
+    return alg.ratio * abs(m) / c
+end
+# The other methods of `bind_alpha` stand beside the deformation rules, which are the pair
+# the verb was built for. These two stand here because the types they name are declared
+# above them, and the role is rebuilt around the bound rule on the same terms.
+function bind_alpha(r::AmbiguityTailWeightCalibration, alpha::Number)
+    return AmbiguityTailWeightCalibration(; alg = bind_alpha(r.alg, alpha))
+end
+function bind_alpha(alg::TailTermParity, alpha::Number)
+    return TailTermParity(; ratio = alg.ratio, alpha = alpha)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Computes a norm ceiling that holds a stated fraction of the universe effective, so that the floor refits whenever the universe changes.
 
 A norm ceiling and the effective number of assets are reciprocally related, so a bound on the norm is a floor on that count. This rule states the floor as a **fraction of the universe** rather than as a count. The asset count comes off the prior result, so a subset view, a cluster and a cross-validation fold each get the floor their own universe earns, and no number is pinned to the universe it was written for.
@@ -4343,4 +4519,5 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        DeformationTailCalibration, DeformationHeadCalibration, ScenarioCount,
        RateSignificance, EntropyBudget, HillTailDecay, AmbiguityRadiusCalibration,
        AmbiguityTailWeightCalibration, ConcentrationRadius, RateRadius,
-       DimensionalRateRadius, DualNormRadius, NormCeilingCalibration, EffectiveAssetFloor
+       DimensionalRateRadius, DualNormRadius, TailTermParity, NormCeilingCalibration,
+       EffectiveAssetFloor

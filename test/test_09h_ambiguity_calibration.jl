@@ -5,8 +5,8 @@ the loss it minimises. Twelve slots across six types hold one or the other, and 
 takes a **Calibration Rule** in place of the number.
 
 `test_09f_calibration_slot.jl` covers the mechanism and `test_09g_calibration_rules.jl`
-covers the three rules of the two older families. This file covers the two families this
-ticket adds, the two radius rules it ships, and the twelve slots.
+covers the rules of the two older families. This file covers the ambiguity families, the
+four radius rules and the one tail-weight rule they ship, and the twelve slots.
 
 The two families take the same shape as the two older ones: an abstract family under
 `AbstractCalibrationAlgorithm`, a `Func_` bound for the `alg` field that admits a plain
@@ -39,12 +39,48 @@ const PR125_20 = prior(EmpiricalPrior(), X125_20)
 const X250_20 = randn(RNG, 250, 20)
 const PR250_20 = prior(EmpiricalPrior(), X250_20)
 
+# `TailTermParity` reads a mean against a tail, so it needs a sample that carries a real
+# expected return. `XDAY` is ten years of daily returns, and `XMON` sums its rows in blocks
+# of 21. A mean scales with the horizon and a dispersion scales with its square root, so
+# the two samples carry two DIFFERENT mean-to-CVaR ratios. That is the defect the rule
+# fixes: one stated `l` is two trade-offs across the pair.
+const XDAY = 0.0005 .+ 0.01 * randn(RNG, 2520, 4)
+const PRDAY = prior(EmpiricalPrior(), XDAY)
+const XMON = reduce(vcat,
+                    [sum(view(XDAY, ((k - 1) * 21 + 1):(k * 21), :); dims = 1)
+                     for k in 1:120])
+const PRMON = prior(EmpiricalPrior(), XMON)
+const WDAY = pweights(range(; start = 1, stop = 2, length = 2520))
+
+# A sample of strictly positive returns has no loss in the worst `alpha` of any column, so
+# its tail-term scale is not positive. It is one of the rule's two refusals.
+const XPOS = 0.01 .+ 0.001 * abs.(randn(RNG, 60, 3))
+const PRPOS = prior(EmpiricalPrior(), XPOS)
+
+# Every column of `XZERO` sums to EXACTLY zero, so its pooled mean loss is exactly zero and
+# the sample states no exchange rate between the two terms of the loss. The three columns
+# carry three different patterns, so the covariance matrix is not singular.
+const XZERO = hcat(repeat([0.02, -0.02], 30), repeat([0.03, 0.01, -0.03, -0.01], 15),
+                   repeat([-0.05, 0.05], 30))
+const PRZERO = prior(EmpiricalPrior(), XZERO)
+
+# The CVaR of a return column, written out: the mean of the worst `alpha * T` of the
+# sample, negated, with the boundary observation carrying its fractional part. The rule
+# reads the measure's own CVaR, so this second encoding is what checks it.
+function hand_cvar(x, alpha)
+    T = length(x)
+    s = sort(collect(x))
+    aT = alpha * T
+    k = ceil(Int, aT)
+    return (-sum(view(s, 1:(k - 1))) - s[k] * (aT - (k - 1))) / aT
+end
+
 # A radius rule with no type at all. A closure over a caller's own number is the case that
 # cannot be given one, and it is why the `alg` bound admits a bare `Function`.
 probe_radius(::Symbol, pr::PO.AbstractPriorResult, ::Any, ::Any) = 3 / size(pr.X, 1)
 
-# The tail-weight family ships no rule, so a caller's own function is the whole of its
-# population. This one reports the key, so the resolver's argument order is asserted.
+# The tail-weight family ships `TailTermParity`, and a caller's own function stands beside
+# it. This one reports the key, so the resolver's argument order is asserted.
 const TWT_SEEN = Ref{Any}(nothing)
 function probe_tail_weight(key::Symbol, pr::PO.AbstractPriorResult, w, slv)
     TWT_SEEN[] = (; key = key, weighted = !isnothing(w), solved = !isnothing(slv))
@@ -81,17 +117,20 @@ end
     # two older families.
     for sym in
         (:AmbiguityRadiusCalibration, :AmbiguityTailWeightCalibration, :ConcentrationRadius,
-         :RateRadius, :DimensionalRateRadius)
+         :RateRadius, :DimensionalRateRadius, :DualNormRadius, :TailTermParity)
         @test sym ∈ names(PortfolioOptimisers)
     end
 
-    # The two rules that ship both compute a radius, and neither joins the tail-weight
-    # family. Nothing computes an Esfahani-Kuhn tail weight, and that is deliberate.
+    # Four rules compute a radius, and one computes an Esfahani-Kuhn tail weight. Neither
+    # family holds a member of the other, and the abstract types stay unexported.
     @test ConcentrationRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test RateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
     @test DimensionalRateRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
-    @test isempty(filter(t -> t !== AmbiguityTailWeightCalibration,
-                         subtypes(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)))
+    @test DualNormRadius <: PO.AbstractAmbiguityRadiusCalibrationAlgorithm
+    @test TailTermParity <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm
+    @test filter(t -> t !== AmbiguityTailWeightCalibration,
+                 subtypes(PO.AbstractAmbiguityTailWeightCalibrationAlgorithm)) ==
+          [TailTermParity]
 end
 
 @testset "Ambiguity calibration: the roles, the bounds and the family split" begin
@@ -286,6 +325,192 @@ end
     @test !isa(alg, PO.Func_AmbTwtCal)
     @test isa(AmbiguityRadiusCalibration(; alg = alg), PO.Num_AmbRadCal)
     @test_throws TypeError AmbiguityTailWeightCalibration(; alg = alg)
+end
+
+@testset "TailTermParity: the tail term at a stated multiple of the mean term" begin
+    alg = TailTermParity(; ratio = 1, alpha = 0.05)
+    l = alg(:l, PRDAY, nothing, nothing)
+
+    # The two scales, each read off the sample without the rule. The tail-term scale is
+    # written out here rather than taken off the measure, so the two encodings are checked
+    # against one another.
+    m = -mean(XDAY)
+    c = mean(j -> hand_cvar(view(XDAY, :, j), 0.05), axes(XDAY, 2))
+    @test m < 0
+    @test c > 0
+    @test l ≈ abs(m) / c
+
+    # `ratio = 1` is PARITY: the tail term and the mean term are equal in magnitude on the
+    # sample the prior carries. That is the whole content of the rule.
+    @test l * c ≈ abs(m)
+
+    # `ratio` is the caller's preference, and it scales the weight exactly.
+    @test TailTermParity(; ratio = 2, alpha = 0.05)(:l, PRDAY, nothing, nothing) ≈ 2 * l
+    @test TailTermParity(; ratio = 0.5, alpha = 0.05)(:l, PRDAY, nothing, nothing) ≈ l / 2
+
+    # The tail-term scale is the MEAN of the per-column CVaR and not the POOLED one. A
+    # pooled tail is drawn from the worst columns, so a universe of unequal volatilities
+    # gives a pooled CVaR half again as large and a weight a third smaller.
+    het = XDAY .* [1.0 2.0 4.0 8.0]
+    c_het = mean(j -> hand_cvar(view(het, :, j), 0.05), axes(het, 2))
+    pooled_het = hand_cvar(vec(het), 0.05)
+    @test pooled_het > 1.4 * c_het
+    @test abs(-mean(het)) / pooled_het < abs(-mean(het)) / c_het
+
+    # The key never selects the value: the scales are read off the asset columns, so the
+    # two ends of a Range measure part company through their two probabilities alone.
+    @test alg(:l_a, PRDAY, nothing, nothing) == l
+    @test alg(:l_b, PRDAY, nothing, nothing) == l
+
+    # `alpha` fixes the depth of the tail, so a wider probability reads a smaller scale
+    # and returns a larger weight.
+    @test TailTermParity(; ratio = 1, alpha = 0.2)(:l, PRDAY, nothing, nothing) > l
+
+    # The rule needs no solver, so it ignores the one the resolution threads.
+    @test alg(:l, PRDAY, nothing, Solver(; solver = nothing)) == l
+
+    # Both scales are sample statistics rather than counts, so stated weights move them.
+    # That is where the rule parts company with `RateRadius`, which reads a raw row count.
+    mw = -sum(j -> dot(view(XDAY, :, j), WDAY), axes(XDAY, 2)) / (4 * sum(WDAY))
+    cw = mean(j -> ConditionalValueatRisk(; alpha = 0.05, w = WDAY)(view(XDAY, :, j)),
+              axes(XDAY, 2))
+    @test alg(:l, PRDAY, WDAY, nothing) ≈ abs(mw) / cw
+    @test alg(:l, PRDAY, WDAY, nothing) != l
+
+    # Construction validation, on the terms `RateRadius` writes.
+    @test TailTermParity().ratio == 1
+    @test isnothing(TailTermParity().alpha)
+    @test_throws DomainError TailTermParity(; ratio = 0.0)
+    @test_throws DomainError TailTermParity(; ratio = -1.0)
+    @test_throws DomainError TailTermParity(; ratio = Inf)
+
+    # The rule joins the tail-weight family and its bounds, and no other.
+    @test TailTermParity <: PO.AbstractAmbiguityTailWeightCalibrationAlgorithm
+    @test isa(alg, PO.Func_AmbTwtCal)
+    @test !isa(alg, PO.Func_AmbRadCal)
+    @test isa(AmbiguityTailWeightCalibration(; alg = alg), PO.Num_AmbTwtCal)
+    @test_throws TypeError AmbiguityRadiusCalibration(; alg = alg)
+end
+
+@testset "TailTermParity: one stated tail weight is two trade-offs" begin
+    alg = TailTermParity(; ratio = 1, alpha = 0.05)
+    l_day = alg(:l, PRDAY, nothing, nothing)
+    l_mon = alg(:l, PRMON, nothing, nothing)
+
+    # The monthly sample sums 21 daily rows. A mean scales with the horizon and a
+    # dispersion scales with its square root, so the parity weight rises by about
+    # `sqrt(21)`. The rule follows the sample, and that is the defect it fixes.
+    @test l_mon > l_day
+    @test isapprox(l_mon / l_day, sqrt(21); rtol = 0.15)
+
+    # At `l = 1` the daily sample prices the tail term about forty times the mean term,
+    # and the monthly one under ten times. Those are the numbers the docstring names.
+    @test 40 < inv(l_day) < 50
+    @test 8 < inv(l_mon) < 10
+
+    # A STATED number is one number on both samples. The same slot holding the rule gives
+    # two, and each is the trade-off its own sample earns.
+    @test PO.resolve_calibration_slot(1.0, :l, PRDAY, nothing) ==
+          PO.resolve_calibration_slot(1.0, :l, PRMON, nothing)
+    role = AmbiguityTailWeightCalibration(; alg = alg)
+    @test PO.resolve_calibration_slot(role, :l, PRDAY, nothing) !=
+          PO.resolve_calibration_slot(role, :l, PRMON, nothing)
+end
+
+@testset "TailTermParity: `alpha` and `l` travel together" begin
+    alg = TailTermParity(; ratio = 1)
+    role = AmbiguityTailWeightCalibration(; alg = alg)
+
+    # The rule cannot run until the probability reaches it, and the message names the verb
+    # that carries it.
+    err = try
+        alg(:l, PRDAY, nothing, nothing)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, PO.IsNothingError)
+    @test occursin("bind_alpha", err.msg)
+
+    # `bind_alpha` fills the field, and it takes the ROLE as well as the rule. A stated
+    # number and a plain function pass through untouched, so no existing behaviour moved.
+    @test PO.bind_alpha(alg, 0.05).alpha == 0.05
+    @test PO.bind_alpha(TailTermParity(; ratio = 3), 0.05).ratio == 3
+    @test PO.bind_alpha(role, 0.05).alg.alpha == 0.05
+    @test PO.bind_alpha(1.0, 0.05) === 1.0
+    @test PO.bind_alpha(probe_tail_weight, 0.05) === probe_tail_weight
+
+    # The scalar measure resolves `alpha` first, so the slot reads the measure's own
+    # probability and two measures give two weights.
+    m1 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.05, l = role)
+    m2 = DistributionallyRobustConditionalValueatRisk(; alpha = 0.2, l = role)
+    @test PO.resolve_deferred_quantities(m1, PRDAY).l ≈
+          TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
+    @test PO.resolve_deferred_quantities(m2, PRDAY).l ≈
+          TailTermParity(; ratio = 1, alpha = 0.2)(:l, PRDAY, nothing, nothing)
+    @test PO.resolve_deferred_quantities(m1, PRDAY).l !=
+          PO.resolve_deferred_quantities(m2, PRDAY).l
+
+    # Each end of a Range measure reads its OWN probability, which is the case the six-slot
+    # resolution has to get right.
+    rg = DistributionallyRobustConditionalValueatRiskRange(; alpha = 0.05, beta = 0.2,
+                                                           l_a = role, l_b = role)
+    out = PO.resolve_deferred_quantities(rg, PRDAY)
+    @test out.l_a ≈ TailTermParity(; ratio = 1, alpha = 0.05)(:l_a, PRDAY, nothing, nothing)
+    @test out.l_b ≈ TailTermParity(; ratio = 1, alpha = 0.2)(:l_b, PRDAY, nothing, nothing)
+    @test out.l_a != out.l_b
+    @test out.alpha == 0.05
+    @test out.beta == 0.2
+
+    # A rule in the `alpha` slot beside a rule in the `l` slot resolves in the right order:
+    # the tail weight reads the RESOLVED probability and not the slot's occupant.
+    srole = SignificanceTailCalibration(; alg = RateSignificance(; c = 0.5))
+    both = DistributionallyRobustConditionalValueatRisk(; alpha = srole, l = role)
+    bout = PO.resolve_deferred_quantities(both, PRDAY)
+    @test bout.alpha ≈ 0.5 / sqrt(2520)
+    @test bout.l ≈
+          TailTermParity(; ratio = 1, alpha = bout.alpha)(:l, PRDAY, nothing, nothing)
+
+    # The drawdown measure carries the same pair. Its tail term is a drawdown and the rule
+    # reads the returns, so the weight overstates the parity it names. The limit is stated
+    # in the docstring, and the number is the asset-column one.
+    dd = DistributionallyRobustConditionalDrawdownatRisk(; alpha = 0.05, l = role)
+    @test PO.resolve_deferred_quantities(dd, PRDAY).l ≈
+          TailTermParity(; ratio = 1, alpha = 0.05)(:l, PRDAY, nothing, nothing)
+
+    # A measure whose slots all hold numbers is still returned unchanged, so the binding
+    # costs nothing where no rule reads a sibling.
+    plain = DistributionallyRobustConditionalValueatRisk()
+    @test PO.resolve_deferred_quantities(plain, PRDAY) === plain
+    plain_rg = DistributionallyRobustConditionalValueatRiskRange()
+    @test PO.resolve_deferred_quantities(plain_rg, PRDAY) === plain_rg
+end
+
+@testset "TailTermParity: the two refusals" begin
+    alg = TailTermParity(; ratio = 1, alpha = 0.05)
+
+    # A sample of strictly positive returns holds no loss in the worst `alpha` of any
+    # column, so it has no tail-term scale and no weight prices one term against the other.
+    err = try
+        alg(:l, PRPOS, nothing, nothing)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test occursin("tail-term scale", err.msg)
+
+    # A sample whose pooled mean loss is zero states no exchange rate between the two
+    # terms: every weight prices a mean term of zero alike.
+    @test mean(XZERO) == 0
+    err = try
+        alg(:l, PRZERO, nothing, nothing)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test occursin("mean-term scale", err.msg)
 end
 
 @testset "Ambiguity calibration: the resolver runs a rule by calling it" begin

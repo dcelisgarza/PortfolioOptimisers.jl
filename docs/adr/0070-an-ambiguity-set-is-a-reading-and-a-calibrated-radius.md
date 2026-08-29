@@ -240,3 +240,17 @@ though it had passed over them. It did not. A radius is the coefficient of a nor
 a ceiling is a bound on that norm, and neither shipped rule of this decision computes a
 ceiling. ADR 0097 gives the ceiling its own family, role and bound, on the shape ADR 0095
 records.
+
+## Amendment (2026-08-29) — from issue #613
+
+**The tail weight has a rule.** `TailTermParity` computes the Esfahani-Kuhn tail weight that
+prices the tail term of the loss at a stated multiple of its mean term. The observation above
+that "no rule ships for the tail weight" and that "inventing one would be a guess" was right
+about a preference and wrong about a unit: `l` is dimensionless and is not scale-free in the
+sample, so one stated number is a different trade-off at every sampling frequency. The rule
+carries the sample's own units, and the preference stays in the caller's `ratio`.
+
+**A second pair travels through `bind_alpha`.** The rule reads the significance level of its
+own slot, because its tail-term scale is a CVaR at that level. `alpha` and `l` therefore
+travel together on the shape `alpha` and `kappa` already use, and the three sites that resolve
+an `l` slot bind the level first.

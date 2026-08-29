@@ -196,6 +196,7 @@ RateRadius
 DimensionalRateRadius
 DualNormRadius
 dual_norm_radius_scale
+TailTermParity
 AbstractNormCeilingCalibrationAlgorithm
 Func_NormCeilCal
 NormCeilingCalibration
