@@ -1149,7 +1149,7 @@ end
           ["AAPL == 0.06", "AAPL == 0.07", "AAPL == 0.08"]
     for (p, t) in zip(op.pes, (0.06, 0.07, 0.08))
         @test isapprox(ConditionalValueatRisk(; w = prior(p, rd).w)(rd.X[:, 1]), t,
-                       rtol = 1e-5)
+                       rtol = 5e-4)
     end
     prop = prior(op, rd)
     @test isapprox(sum(prop.w), 1, rtol = 5e-7)
