@@ -206,3 +206,15 @@ end
                                                  rule = ThresholdRule(; lo = 0.0))
     end
 end
+
+@testset "the base-file selectors refuse a both-`nothing` call" begin
+    # #595. `solver_selector` documented "Returns `nothing` if neither is available", and
+    # the both-`nothing` method throws instead. The docstring now states the refusal, and
+    # these two assertions hold it there. `sel` never reaches the solver refusal: a
+    # both-`nothing` call routes on the operand types to `nothing_scalar_array_selector`.
+    @test_throws ArgumentError PO.solver_selector(nothing, nothing)
+    @test_throws ArgumentError PO.risk_measure_nothing_scalar_array_view(nothing, nothing,
+                                                                         1)
+    @test isnothing(PO.sel(nothing, nothing))
+    @test isnothing(PO.nothing_scalar_array_selector(nothing, nothing))
+end

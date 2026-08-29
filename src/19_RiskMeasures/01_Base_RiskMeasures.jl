@@ -184,6 +184,10 @@ Return the [`RiskInputKind`](@ref) of risk measure `r`, declaring what its funct
 
 There is no default: every concrete [`AbstractBaseRiskMeasure`](@ref) (other than composite measures handled by explicit `expected_risk` methods) must declare its kind beside its type definition. Returning one of [`NetReturnsInput`](@ref), [`WeightsReturnsFeesInput`](@ref), or [`WeightsInput`](@ref). An undeclared measure throws, rather than silently routing to the wrong input shape.
 
+# Validation
+
+  - Throws an `ArgumentError` when `r` declares no method of its own. An undeclared measure would otherwise route to the wrong input shape in silence.
+
 # Returns
 
   - `RiskInputKind`: the declared input kind.
@@ -214,6 +218,10 @@ There is no default. A measure that is not a range, or one that fuses, throws ra
 
   - `r`: Range risk measure.
 
+# Validation
+
+  - Throws an `ArgumentError` when `r` declares no method of its own. A measure that is not a range, and one that fuses its two tails into a single formulation, both take that arm.
+
 # Returns
 
   - `(; loss, gain)`: The loss-tail and gain-tail point measures.
@@ -242,6 +250,20 @@ It is *not* the primary safety mechanism. A [`WeightsInput`](@ref) measure's own
 series *as weights*; dispatch alone cannot tell the two apart. Eligibility is therefore
 decided up front by [`supports_precomputed_returns`](@ref), which the contract entry
 [`expected_risk_from_returns`](@ref) consults before ever calling the functor.
+
+# Validation
+
+  - Throws an `ArgumentError` on every call. The method names no precondition a caller can meet: reaching it means the measure has no precomputed-returns form at all.
+
+# Returns
+
+  - Nothing is returned. The method always raises.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk_from_returns`](@ref)
 """
 function (r::AbstractBaseRiskMeasure)(::VecNum)
     return throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
@@ -316,6 +338,14 @@ composites) as `supports_precomputed_returns(::T) = false`. Reaching this leaf m
 measure forgot to declare it — throws an `ArgumentError` with instructions rather than
 silently mis-routing (and the completeness test in `test_09c_risk_input_kind.jl` turns that
 into a CI failure).
+
+# Validation
+
+  - Throws an `ArgumentError` on every call. Reaching this leaf means the measure declared no `supports_precomputed_returns` method of its own, and the message states the declaration to write.
+
+# Returns
+
+  - Nothing is returned. The method always raises.
 
 # Related
 
@@ -545,7 +575,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a square-root transformation to bound values before enforcing them.
 
-Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units: on a 250x5 sample a five-point sweep gave standard deviations `0.004539514, 0.005969048, 0.007398587, 0.008828127, 0.010257666`, evenly spaced to `4.1e-9`, whose squares are the variances `2.0607e-5, 3.5630e-5, 5.4739e-5, 7.7936e-5, 1.0522e-4`, which are **not** evenly spaced.
+The conversion is `sqrt(ub)`. The caller writes the bound against the **measure**, and the model enforces it against the square root of that quantity, so a bound on a variance becomes a bound on a standard deviation. Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units: on a 250x5 sample a five-point sweep gave standard deviations `0.004539514, 0.005969048, 0.007398587, 0.008828127, 0.010257666`, evenly spaced to `4.1e-9`, whose squares are the variances `2.0607e-5, 3.5630e-5, 5.4739e-5, 7.7936e-5, 1.0522e-4`, which are **not** evenly spaced.
 
 # Related
 
@@ -560,7 +590,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Passes bound values through unchanged (identity transformation).
 
-Used when the risk expression and the user-supplied bound are already in the same units (e.g. SDP variance formulation where both sides are in variance units).
+The conversion is `ub` itself. The caller writes the bound against the **measure**, and the model enforces it against that same quantity. Used when the risk expression and the user-supplied bound are already in the same units (e.g. SDP variance formulation where both sides are in variance units). This is the default of [`Frontier`](@ref), so a sweep that names no `bound` is evenly spaced in the units of the measure.
 
 # Related
 
@@ -575,7 +605,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a squaring transformation to bound values before enforcing them.
 
-Used when the risk expression is in squared units but the user-supplied bound is in linear units (e.g. kurtosis SDP formulation).
+The conversion is `ub^2`. The caller writes the bound against the **measure**, and the model enforces it against the square of that quantity, so a bound on a standard deviation becomes a bound on a variance. Used when the risk expression is in squared units but the user-supplied bound is in linear units (e.g. kurtosis SDP formulation).
 
 # Related
 
@@ -1049,6 +1079,16 @@ Where:
   - ``r_i``: `i`-th risk measure value.
   - ``w_i``: Weight of the `i`-th risk measure.
 
+# JuMP formulation
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The bounded quantity is `risk`, the free variable [`scalarise_risk_expression!`](@ref) creates for this strategy. The row `risk_ms` holds it at or **above** every entry of `risk_vec`, so `model[:risk]` stands above the maximum rather than on it.
+  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls: on a 250x5 sample the model reported `0.0782482` against a true `0.0380465`.
+  - An `ub` on the aggregate is unaffected. It constrains `risk`, and the aggregation stands below `risk`, so the aggregation meets the bound too. Read the exact figure back with [`expected_risk`](@ref).
+
 # Related
 
   - [`Scalariser`](@ref)
@@ -1141,6 +1181,16 @@ So a large ``\\gamma`` gives the maximum. On the scaled values `[0.1, 0.2, 0.05]
     The model form is an exponential cone, which cannot hold a quadratic risk expression. Both [`Variance`](@ref) formulations produce one, so a `Variance` under this scalariser aborts the solve with `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}}`. Use [`StandardDeviation`](@ref) instead, or [`SumScalariser`](@ref), which sums a quadratic expression directly. Nothing refuses the combination up front.
 
 In clustering optimisations each cluster's risk is computed separately, so there is no coherence between clusters, and the value level has no cone to build: it evaluates the measures first and reduces the numbers, where a large ``\\gamma`` is safe because `LogExpFunctions.logsumexp` shifts by the maximum before it exponentiates.
+
+# JuMP formulation
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The bounded quantity is `risk`, the free variable [`scalarise_risk_expression!`](@ref) creates for this strategy. The rows `u_risk_lse` and `risk_lse` state the exponential-cone form of the log-sum-exp, which holds `model[:risk]` at or **above** the smoothed maximum.
+  - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls: on a 250x5 sample at ``\\gamma = 100`` the model reported `0.0612520` against a true `0.0440182`.
+  - An `ub` on the aggregate is unaffected, on the terms [`MaxScalariser`](@ref) states. Read the exact figure back with [`expected_risk`](@ref).
 
 # Fields
 
@@ -1263,6 +1313,16 @@ The combining rules are:
 
   - [`LogSumExpScalariser`](@ref): slot-wise `logsumexp` of `gamma`-scaled values, divided by `gamma`.
 
+# Algorithm
+
+ 1. Start the accumulator `acc` at `nothing`, and the winning key `k` at `nothing` beside it. [`LogSumExpScalariser`](@ref) starts neither, and takes steps 5 and 6 instead.
+ 2. Apply `f` to each element of `itr` in turn, giving `v`.
+ 3. Fold `v` into `acc` through the branch that `sca` selects. [`SumScalariser`](@ref) takes `scalarise_combine(+, acc, v)`. [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) take `scalarise_combine(max, acc, v)` and `scalarise_combine(min, acc, v)` while `by` is `nothing`.
+ 4. Given a `by`, read the key `ki = by(v)` in place of step 3, and take `v` and `ki` as the new `acc` and `k` when `ki` beats the `k` already held. A tie keeps the earlier element.
+ 5. Under [`LogSumExpScalariser`](@ref), apply `f` to every element of `itr`, scale each result by `sca.gamma` with [`scalarise_map`](@ref), and collect them into `vs`.
+ 6. Reduce `vs` slot-wise with [`scalarise_logsumexp`](@ref), and divide the reduction by `sca.gamma` with [`scalarise_map`](@ref).
+ 7. Return `acc`, or the value step 6 built.
+
 # Arguments
 
   - `f`: Per-element evaluation closure, applied to each element of `itr`.
@@ -1365,6 +1425,10 @@ Internal helper for slicing scalar, array, or `nothing` risk/prior variables by 
   - `prior_variable`: Prior variable (array or `nothing`).
   - `i`: Index or range to slice.
 
+# Validation
+
+  - Throws an `ArgumentError` when `risk_variable` and `prior_variable` are both `nothing`. There is then nothing to slice, and the caller named no source.
+
 # Returns
 
   - Sliced or unchanged value.
@@ -1387,16 +1451,20 @@ end
 
 Select the appropriate solver for a risk measure computation.
 
-Returns the risk-measure-specific solver if provided, otherwise falls back to the optimiser-level solver. Returns `nothing` if neither is available.
+Returns the risk-measure-specific solver if provided, otherwise falls back to the optimiser-level solver. Neither is refused rather than answered with `nothing`: a `JuMP` model that carries no solver cannot be solved, and the refusal names that where the caller can act on it. [`sel`](@ref) never reaches the refusal, because a both-`nothing` call routes to [`nothing_scalar_array_selector`](@ref) on the operand types instead.
 
 # Arguments
 
   - `risk_solvers`: Risk-measure-specific solver(s) or `nothing`.
   - `slv`: Optimiser-level solver(s) or `nothing`.
 
+# Validation
+
+  - Throws an `ArgumentError` when `risk_solvers` and `slv` are both `nothing`.
+
 # Returns
 
-  - Selected solver(s) or `nothing`.
+  - `Slv_VecSlv`: The selected solver or solvers.
 
 # Related
 
@@ -1501,6 +1569,17 @@ The estimator sees `pr.original_X` — the returns the **caller** supplied, slic
 A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` together with the matrix-processing estimator that built `V`, as a named tuple — `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref).
 
 `mean` is the centre the higher moment is taken about. [`deferred_centre`](@ref) supplies it, so that the resolved `mu` and the resolved `kt` or `sk` describe one distribution. `nothing` leaves the estimator to centre on its own `me`.
+
+# Algorithm
+
+ 1. Rebuild `dq` against the prior's observation weights with `factory(dq, pr.w)`. The two co-moment arms bind the rebuilt estimator as `kte` and `ske`.
+ 2. Run the rebuilt estimator on `pr.original_X`, through the verb of its own family: `Statistics.mean` for an expected-returns estimator, `Statistics.cov` for a covariance estimator, [`cokurtosis`](@ref) for a cokurtosis estimator, [`coskewness`](@ref) for a coskewness estimator, and [`prior`](@ref) for a prior estimator, which also takes `deferred_factors(pr)`.
+ 3. Pass `mean` on to the two co-moment verbs, so the tensor is taken about the centre the caller named.
+ 4. Return the quantity the verb gave. The coskewness arm returns the named tuple `(; sk, V, skmp)` instead, because `V` comes out of the same call and [`coskewness_processor`](@ref) names the estimator that built it.
+
+# Returns
+
+  - The deferred quantity: a vector for an expected-returns estimator, a matrix for a covariance or a cokurtosis estimator, an [`AbstractPriorResult`](@ref) for a prior estimator, and the named tuple `(; sk, V, skmp)` for a coskewness estimator.
 
 # Related
 
@@ -1616,6 +1695,16 @@ A co-moment estimator takes the centre as `mean =` ([`centring_target`](@ref) pu
 
 Every other occupant centres itself and has no channel to take one, so `centre` is dropped. That is the case of an [`AbstractPriorEstimator`](@ref) in the slot: it computes its own `mu` and its own tensor about that `mu`, and the centre is read **back** off the result it produced rather than pushed into it. A `mu` the caller stated alongside such a slot still wins as the measure's centring target, and the docstring's consistency warning is what covers the gap.
 
+# Algorithm
+
+ 1. Return `fit_deferred_quantity(dq, pr)` when `dq` is neither a [`CokurtosisEstimator`](@ref) nor a [`CoskewnessEstimator`](@ref). Such an occupant has no channel to take a centre, so `centre` is dropped.
+ 2. Put `centre` into the row shape a co-moment estimator wants with [`centring_target`](@ref).
+ 3. Run [`fit_deferred_quantity`](@ref) with that row as `mean`, and return what it gives.
+
+# Returns
+
+  - The moment the fit produced, taken about `centre` on the two co-moment arms.
+
 # Related
 
   - [`fit_deferred_quantity`](@ref)
@@ -1635,6 +1724,14 @@ end
 Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
 
 A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a named tuple, because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+
+# Validation
+
+  - Throws an `ArgumentError` when `fitted` is a `NamedTuple` carrying no `key`, and when `fitted` is an [`AbstractPriorResult`](@ref) carrying no property `key`. The slot named an estimator that computes something else, and a silent `nothing` would reach the model builders as though the caller had stated none. This is the difference from [`deferred_derived_quantity`](@ref), which answers `nothing` for a key its fit does not carry.
+
+# Returns
+
+  - The quantity named by `key`, or the whole fit when a moment estimator produced it.
 
 # Related
 
@@ -1665,6 +1762,15 @@ A measure that carries **two or more independently deferrable slots** takes a `p
 The precedence is the map's: a stated slot wins, `pe` fills the rest, and a slot that neither names is left `nothing` so the consumer's own prior fallback still applies.
 
 A measure with exactly one deferrable slot takes no `pe`. It widens that slot instead, and a derived companion — `chol` with `sigma`, `V` with `sk` — travels with it out of the same fit rather than being fanned out separately.
+
+# Algorithm
+
+ 1. Return `slot` unchanged when it is not `nothing`. A slot the caller stated wins over the fan-out.
+ 2. Read the quantity named by `key` off `fitted` with [`deferred_quantity`](@ref), and return it.
+
+# Returns
+
+  - The stated slot, or the quantity named by `key`.
 
 # Related
 
@@ -1706,6 +1812,16 @@ Resolve one risk-measure slot against prior result `pr` and return a plain value
 A slot that holds a **Deferred Quantity** is run against `pr` and the quantity named by `key` is read back. Anything else — a stated value, `nothing`, a centring strategy — is returned unchanged, so the caller can apply the ordinary prior fallback ([`sel`](@ref)) on top.
 
 This is the whole of the third state. The other two are unchanged: `nothing` still falls back to the prior's own field, and a stated value still wins.
+
+# Algorithm
+
+ 1. Return `slot` unchanged when it is not a [`DeferredQuantity`](@ref). A stated value, `nothing` and a centring strategy all take that arm.
+ 2. Run the Deferred Quantity against `pr` with [`fit_deferred_quantity`](@ref), giving `fitted`.
+ 3. Read the quantity named by `key` off `fitted` with [`deferred_quantity`](@ref), and return it.
+
+# Returns
+
+  - A plain value: the slot's own occupant, or the quantity the fit produced.
 
 # Related
 
@@ -1770,6 +1886,17 @@ Return a copy of `x` whose fields named by `slots` hold the values in `slots`.
 
 The field list is derived from the type and the constructor is recovered from it, so nothing is written per type. The call is positional, so the inner constructor runs and every guard the type states is re-applied to the rebuilt value.
 
+# Algorithm
+
+ 1. Read the type of `x` into `T`.
+ 2. Read every field of `x` into the named tuple `props`, in declaration order.
+ 3. Merge `slots` over `props`, so a named slot carries its new value and every other field survives.
+ 4. Call `T.name.wrapper` positionally on the merged values, so the inner constructor runs and re-applies every guard the type states.
+
+# Returns
+
+  - A value of the same type as `x`, holding the values in `slots`.
+
 # Related
 
   - [`resolve_deferred_quantities`](@ref)
@@ -1786,6 +1913,20 @@ end
 Refuse a type that declares a deferrable slot and no way to resolve it.
 
 `slots` is what the derived recursion produced. A **Deferred Quantity** that survives it names a type that declared the slot in [`deferred_slots`](@ref) and then wrote no [`resolve_deferred_quantities`](@ref) method, so the estimator would reach the model builders and be multiplied as though it were a matrix. ADR 0051 pairs the two declarations; this is where the pair is enforced.
+
+# Algorithm
+
+ 1. Walk the pairs of `slots`, giving each slot's name `key` and its occupant `slot`.
+ 2. Refuse an occupant that is still a [`DeferredQuantity`](@ref).
+ 3. Return `nothing` once the walk is spent.
+
+# Validation
+
+  - Throws an `ArgumentError` when an entry of `slots` still holds a [`DeferredQuantity`](@ref). The message names the type, the slot and the method to declare.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -1810,6 +1951,19 @@ This is the derived half of the resolution rule. A container declares its childr
 A type that resolves a quantity of its own overrides this with its own method, which is more specific. So the derivation carries container recursion alone, and never guesses how a matrix, a tensor or the centre a moment was taken about comes out of a fit.
 
 `slv` is the effective solver, and the recursion threads it to every child. A container states no solver of its own, so it changes none: each child settles the one it was handed against the one it carries.
+
+# Algorithm
+
+ 1. Read the slots `x` declares with [`deferred_slots`](@ref), giving `slots`.
+ 2. Return `x` unchanged when `slots` is empty. A type with no deferrable slot needs no method of its own.
+ 3. Resolve every entry of `slots` with [`resolve_deferred_child`](@ref), threading `pr` and `slv` to each, giving `resolved`.
+ 4. Refuse a slot the recursion left unresolved with [`assert_declared_slot_resolver`](@ref).
+ 5. Return `x` itself when every entry of `resolved` is the entry `slots` held, so the common case allocates nothing.
+ 6. Otherwise rebuild `x` around `resolved` with [`rebuild_with_slots`](@ref), and return the rebuilt value.
+
+# Returns
+
+  - `x` itself when no slot moved, and a rebuilt copy of `x` when one did.
 
 # Related
 
@@ -1845,6 +1999,21 @@ This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the c
 The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. A slot that holds a vector of children is recursed element by element, which is the rule [`resolve_deferred_child`](@ref) applies on the resolution path. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
 
 The message names both types with `nameof`, not by printing the type. A printed type carries a module prefix whenever the name is not visible from `Main`, which is the case inside an isolated test worker and inside any module that imports the package qualified. `Variance.sigma` is the path the caller wrote, and the message must read the same in every process.
+
+# Algorithm
+
+ 1. Walk the pairs that [`deferred_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`.
+ 2. Refuse an occupant that holds a [`DeferredQuantity`](@ref).
+ 3. Recurse into the occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
+ 4. Return `nothing` once the walk is spent.
+
+# Validation
+
+  - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds a [`DeferredQuantity`](@ref). The message names the slot, the Estimator standing in it and the two ways out.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -2232,6 +2401,12 @@ This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather t
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
+# Algorithm
+
+ 1. Return `slot` unchanged when it is not an [`AbstractCalibrationEstimator`](@ref). A stated number takes that arm.
+ 2. Read the rule out of the role's `alg` field.
+ 3. Call the rule as `alg(key, pr, w, slv)`, and return the number it gives. A callable struct and a plain function are the same thing here, so a rule never sees the role it was placed in.
+
 # Arguments
 
   - `slot`: The slot's occupant: a number, or one of the six role types.
@@ -2287,6 +2462,21 @@ Refuse a **Calibration Role** that reached a value-level entry point, which has 
 This is the shape [`assert_resolved_slots`](@ref) already uses on the Deferred-Quantity side, and the message names both types with `nameof` for the same reason: a printed type carries a module prefix wherever the name is not visible from `Main`, and the message must read the same in every process.
 
 The slots come from [`calibration_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations.
+
+# Algorithm
+
+ 1. Walk the pairs that [`calibration_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`.
+ 2. Refuse an occupant that holds an [`AbstractCalibrationEstimator`](@ref).
+ 3. Recurse into the occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
+ 4. Return `nothing` once the walk is spent.
+
+# Validation
+
+  - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds an [`AbstractCalibrationEstimator`](@ref). The message names the slot, the role standing in it and the two ways out.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -2589,6 +2779,16 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
+# Algorithm
+
+ 1. Read the sample length `T` off `pr.X`.
+ 2. Form the argument `u = inv(alg.alpha * T)`, and its plain logarithm `l = log(u)`.
+ 3. Form the band `(lo_b, hi_b)` as the ordered pair of `l` and `(u - inv(u)) / 2`, which are the values the Kaniadakis logarithm reaches at the two ends of ``\\kappa \\in (0,\\, 1)``. `# Validation` states the refusal this band carries.
+ 4. Normalise the target as `target = alg.target / l`. The normalised coefficient rises once from `1`, so one comparison carries both signs of `l` and the sweep needs no sign branch.
+ 5. Bracket the answer with `lo = 0` and `hi = 1`.
+ 6. Halve the bracket 64 times. Take the midpoint `kappa` each time, and raise `lo` to it when `kappa_log(u, kappa) / l` is below `target`, or lower `hi` to it otherwise. Sixty-four halvings take the bracket below the resolution of a `Float64`.
+ 7. Return the midpoint of the last bracket.
+
 # Arguments
 
   - `alg`: The rule. Its `alpha` field must hold a number, which [`bind_alpha`](@ref) puts there.
@@ -2647,6 +2847,13 @@ Estimate the tail index of the pool of standardised values of `X`, over the wors
 Every column is centred and divided by its own sample dispersion, and `s` names the end. Hill's estimator reads the `k` of the `T N` standardised values that lie furthest into that end. [`HillTailDecay`](@ref) states the reading and the assumptions the pool carries. This verb is the estimate alone.
 
 The element type is bound by the signature, so the pool and the sum it feeds are concrete. A rule reads `pr.X` off an [`AbstractPriorResult`](@ref), whose field types no signature states, and this is the boundary that type crosses at.
+
+# Algorithm
+
+ 1. Read the shape of `X` into `T` and `N`, and allocate the pool `pool` of `T * N` values.
+ 2. Walk the columns of `X`. Take each column's sample mean `mu` and its sample dispersion `sd`, and write `-s * (col[t] - mu) / sd` into `pool`.
+ 3. Partially sort `pool` about its `k + 1`-th smallest value, giving `vkp1`. The sign of step 2 puts the end the caller prices in the **lower** tail of the pool, so the `k` entries before `vkp1` are the ones the estimate reads.
+ 4. Return `k` over the sum of `log(pool[i] / vkp1)` across those `k` entries. Both terms of each ratio are negative, so the ratio is one of magnitudes and the sum is Hill's with no further sign.
 
 # Arguments
 
@@ -2786,6 +2993,14 @@ Where:
   - ``u_{(i)}``: ``i``-th largest of the ``T N`` pooled values, so that ``u_{(1)} \\geq \\ldots \\geq u_{(k+1)}``.
   - ``k``: Number of order statistics the estimate reads.
   - ``\\hat{a}``: Hill estimate of the tail index of the pool.
+
+# Algorithm
+
+ 1. Read the returns matrix off `pr` into `X`, and its element count into `np`.
+ 2. Take the sign `s` from `key`. `:kappa_b` is the only head key, so it gives `+1`, and every other key prices the loss end and gives `-1`. One estimator then serves both ends.
+ 3. Form the count `k = ceil(Int, alg.alpha * np)`, the number of order statistics the estimate reads.
+ 4. Estimate the tail index of the pool with [`hill_tail_index`](@ref), giving `a`.
+ 5. Return `inv(a)`, which is the deformation parameter.
 
 # Arguments
 
@@ -3755,6 +3970,22 @@ A derived slot is a function of its source, so the two are one pair out of one f
   - **The source holds a Deferred Quantity.** That fit supplies the pair, so the caller's derived value would be discarded, or worse, kept beside a source it does not describe.
 
 `chol` is a factorisation of `sigma`, and `V` is the negative spectral part of `sk`. Both follow this rule, so a stated derived slot always means a stated source value.
+
+# Arguments
+
+  - `derived`: The derived slot's occupant.
+  - `source`: The source slot's occupant.
+  - `dname`: Name of the derived slot, as the message prints it.
+  - `sname`: Name of the source slot, as the message prints it.
+
+# Validation
+
+  - Throws an `ArgumentError` when `source` holds a [`DeferredQuantity`](@ref) and `derived` is not `nothing`. That fit supplies the pair.
+  - Throws an `ArgumentError` when `derived` is not `nothing` and `source` is `nothing`. The prior would supply the source, and the caller's derived value would pair with a source the caller never saw.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
